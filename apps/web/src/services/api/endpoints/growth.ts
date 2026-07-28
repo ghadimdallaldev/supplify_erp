@@ -104,16 +104,6 @@ export type SupplierGrowthMetrics = {
   }
 }
 
-export type RestaurantConnectionRequest = {
-  id: string
-  supplier_id: string
-  supplier_name: string
-  restaurant_id: string
-  status: string
-  expires_at: string
-  created_at: string
-}
-
 export const growthApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getSupplierGrowthMetrics: builder.query<SupplierGrowthMetrics, void>({

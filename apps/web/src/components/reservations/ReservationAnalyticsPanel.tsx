@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { ComponentType } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ResponsiveContainer,
@@ -16,6 +17,13 @@ import type { ReservationAnalyticsResponse } from '../../types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs'
 import { Badge } from '../ui/badge'
+
+const ChartXAxis = XAxis as unknown as ComponentType<any>
+const ChartYAxis = YAxis as unknown as ComponentType<any>
+const ChartTooltip = Tooltip as unknown as ComponentType<any>
+const ChartLegend = Legend as unknown as ComponentType<any>
+const ChartArea = Area as unknown as ComponentType<any>
+const ChartBar = Bar as unknown as ComponentType<any>
 
 interface ReservationAnalyticsPanelProps {
   analytics?: ReservationAnalyticsResponse
@@ -188,7 +196,7 @@ export function ReservationAnalyticsPanel({
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ede8f5" />
-                  <XAxis
+                  <ChartXAxis
                     dataKey="label"
                     type="category"
                     tick={{ fontSize: 11 }}
@@ -197,16 +205,16 @@ export function ReservationAnalyticsPanel({
                     textAnchor={activeRange === 'month' ? 'end' : 'middle'}
                     height={activeRange === 'month' ? 48 : 28}
                   />
-                  <YAxis width={36} allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <Tooltip
+                  <ChartYAxis width={36} allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <ChartTooltip
                     labelFormatter={(_, payload) => {
                       const row = payload?.[0]?.payload as ChartPoint | undefined
                       if (!row) return ''
                       return new Date(row.hour_slot).toLocaleString()
                     }}
                   />
-                  <Legend />
-                  <Area
+                  <ChartLegend />
+                  <ChartArea
                     type="monotone"
                     dataKey="total_covers"
                     name={t('analytics.chart.covers')}
@@ -214,7 +222,7 @@ export function ReservationAnalyticsPanel({
                     fill="url(#coversGradient)"
                     strokeWidth={2}
                   />
-                  <Area
+                  <ChartArea
                     type="monotone"
                     dataKey="cancelled"
                     name={t('analytics.chart.cancelled')}
@@ -242,10 +250,10 @@ export function ReservationAnalyticsPanel({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={waitlistData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ede8f5" />
-                  <XAxis dataKey="status" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} width={32} tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar
+                  <ChartXAxis dataKey="status" tick={{ fontSize: 11 }} />
+                  <ChartYAxis allowDecimals={false} width={32} tick={{ fontSize: 11 }} />
+                  <ChartTooltip />
+                  <ChartBar
                     dataKey="total"
                     name={t('analytics.chart.guests')}
                     fill="#f59e0b"

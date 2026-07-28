@@ -39,7 +39,8 @@ function userInitials(user: AdminUserRow): string {
 
 function roleTone(role: string): string {
   const normalized = role.toLowerCase()
-  if (normalized.includes('admin')) return 'bg-violet-50 text-violet-700 border-violet-200'
+  if (normalized.includes('admin'))
+    return 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
   if (normalized.includes('owner')) return 'bg-amber-50 text-amber-800 border-amber-200'
   if (normalized.includes('manager')) return 'bg-sky-50 text-sky-800 border-sky-200'
   return 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]'
@@ -188,11 +189,11 @@ export function AdminUsersTab() {
               {filteredUsers.map((user) => (
                 <article
                   key={user.id}
-                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                  className="rounded-md border border-[var(--app-border)] p-4 space-y-3"
                 >
                   <div className="flex items-start gap-3">
                     <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-semibold text-[var(--brand)]"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--app-border-mid)] bg-[var(--app-bg-subtle)] text-xs font-semibold text-[var(--text-mid)]"
                       aria-hidden
                     >
                       {userInitials(user)}
@@ -262,7 +263,7 @@ export function AdminUsersTab() {
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
                           <span
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--brand-pale)] text-xs font-semibold text-[var(--brand)]"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[var(--app-border-mid)] bg-[var(--app-bg-subtle)] text-xs font-semibold text-[var(--text-mid)]"
                             aria-hidden
                           >
                             {userInitials(user)}

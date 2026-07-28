@@ -61,6 +61,10 @@ import {
   scheduleOrderPlacedNotification,
   elapsedMsSince,
 } from './orders.helpers.js'
+import {
+  collectOrdersCalendarTenantIdsFromOrder,
+  scheduleOrdersCalendarCacheInvalidation,
+} from '../../lib/orders-calendar-cache.js'
 
 const router = express.Router()
 
@@ -461,6 +465,11 @@ router.post(
       orderCreateTimings.notificationScheduleMs = elapsedMsSince(phaseStart)
       orderCreateTimings.notificationsScheduled = notificationsScheduled
 
+      scheduleOrdersCalendarCacheInvalidation(
+        result.flatMap((order) => collectOrdersCalendarTenantIdsFromOrder(order)),
+        { reason: 'order.created', requestId: req.requestId }
+      )
+
       orderCreateTimings.totalHandlerMs = elapsedMsSince(handlerStartedAt)
       if (req._perf?.stages) {
         const s = req._perf.stages
@@ -724,6 +733,11 @@ router.post(
         totalAmount: result.total_amount,
         itemCount: result.items.length,
         actor: req.userData.id,
+      })
+
+      scheduleOrdersCalendarCacheInvalidation(collectOrdersCalendarTenantIdsFromOrder(result), {
+        reason: 'order.manual_created',
+        requestId: req.requestId,
       })
 
       res.status(201).json({

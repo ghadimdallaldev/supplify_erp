@@ -60,7 +60,7 @@ function sourceLabel(source: EffectiveFeature['source']) {
 function sourceTone(source: EffectiveFeature['source']): string {
   const map: Record<EffectiveFeature['source'], string> = {
     tenant_override: 'bg-amber-50 text-amber-800 border-amber-200',
-    global: 'bg-violet-50 text-violet-700 border-violet-200',
+    global: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
     plan: 'bg-sky-50 text-sky-800 border-sky-200',
     default: 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]',
   }
@@ -293,7 +293,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         </div>
       )}
 
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+      <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
           Global flags
@@ -389,7 +389,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               {filteredGlobalFlags.map((flag) => (
                 <article
                   key={flag.featureKey}
-                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                  className="rounded-md border border-[var(--app-border)] p-4 space-y-2"
                 >
                   <p className="font-medium">{flag.featureName}</p>
                   <p className="font-mono text-xs text-[var(--text-muted)]">{flag.featureKey}</p>
@@ -464,7 +464,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         )}
       </AppPanel>
 
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+      <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
           Tenant overrides
@@ -569,7 +569,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               {filteredEffectiveFeatures.map((feature) => (
                 <article
                   key={feature.featureKey}
-                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
+                  className="rounded-md border border-[var(--app-border)] p-4 space-y-2"
                 >
                   <p className="font-medium">{feature.featureName}</p>
                   <StatusBadge status={feature.enabled ? 'ACTIVE' : 'INACTIVE'} />

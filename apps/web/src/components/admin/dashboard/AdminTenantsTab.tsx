@@ -287,830 +287,845 @@ export function AdminTenantsTab({
       : 'Manage supplier and restaurant accounts across the platform.'
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <AdminSectionHeader
-        title={headerTitle}
-        description={headerDescription}
-        action={
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
-            {isFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
-        }
-      />
+    <div data-testid="admin-tenants-tab">
+      <TooltipProvider delayDuration={300}>
+        <AdminSectionHeader
+          title={headerTitle}
+          description={headerDescription}
+          action={
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          }
+        />
 
-      {!showSuppliersOnly && !showRestaurantsOnly && !suppliersLoading && !restaurantsLoading && (
-        <div className="mb-4">
-          <SummaryStrip
-            testId="admin-tenants-stats"
-            columns={4}
-            metrics={[
-              {
-                label: 'Suppliers',
-                value: suppliersTotal,
-                hint: `${suppliersForUi?.length ?? 0} loaded`,
-                tone: 'brand',
-              },
-              {
-                label: 'Restaurants',
-                value: restaurantsTotal,
-                hint: `${restaurantsForUi?.length ?? 0} loaded`,
-                tone: 'brand',
-              },
-              {
-                label: 'Active / trial',
-                value: activeSubsCount,
-                hint: 'Across loaded tenants',
-                tone: 'mint',
-              },
-              {
-                label: 'Loaded total',
-                value: (suppliersForUi?.length ?? 0) + (restaurantsForUi?.length ?? 0),
-                hint: `Of ${suppliersTotal + restaurantsTotal} platform tenants`,
-              },
-            ]}
-          />
-        </div>
-      )}
-
-      {showSuppliersOnly && !suppliersLoading && (
-        <div className="mb-4">
-          <SummaryStrip
-            testId="admin-suppliers-stats"
-            columns={4}
-            metrics={[
-              {
-                label: 'Suppliers',
-                value: `${suppliersForUi?.length ?? 0} / ${suppliersTotal}`,
-                hint: 'Loaded vs total',
-                tone: 'brand',
-              },
-              {
-                label: 'Active subs',
-                value:
-                  suppliersForUi?.filter(
-                    (s) =>
-                      s.subscription_status === 'ACTIVE' || s.subscription_status === 'TRIALING'
-                  ).length ?? 0,
-                tone: 'mint',
-              },
-              {
-                label: 'Products',
-                value:
-                  suppliersForUi?.reduce(
-                    (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
-                    0
-                  ) ?? 0,
-              },
-              {
-                label: 'Revenue',
-                value: formatCurrency(
-                  suppliersForUi?.reduce(
-                    (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
-                    0
-                  ) ?? 0
-                ),
-              },
-            ]}
-          />
-        </div>
-      )}
-
-      {showRestaurantsOnly && !restaurantsLoading && (
-        <div className="mb-4">
-          <SummaryStrip
-            testId="admin-restaurants-stats"
-            columns={3}
-            metrics={[
-              {
-                label: 'Restaurants',
-                value: `${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`,
-                hint: 'Loaded vs total',
-                tone: 'brand',
-              },
-              {
-                label: 'Active subs',
-                value:
-                  restaurantsForUi?.filter(
-                    (r) =>
-                      r.subscription_status === 'ACTIVE' || r.subscription_status === 'TRIALING'
-                  ).length ?? 0,
-                tone: 'mint',
-              },
-              {
-                label: 'Orders (30d)',
-                value:
-                  restaurantsForUi?.reduce(
-                    (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
-                    0
-                  ) ?? 0,
-              },
-            ]}
-          />
-        </div>
-      )}
-
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
-        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-          <Filter className="h-3.5 w-3.5" />
-          Filters
-        </div>
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_auto]">
-          <div className="relative min-w-0">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-              aria-hidden
-            />
-            <Input
-              className="h-10 pl-9"
-              placeholder={
-                showSuppliersOnly
-                  ? 'Search suppliers by name or email…'
-                  : showRestaurantsOnly
-                    ? 'Search restaurants by name or email…'
-                    : 'Search tenants by name or email…'
-              }
-              value={tenantSearch}
-              onChange={(e) => setTenantSearch(e.target.value)}
-              aria-label={t('tenants.searchAriaLabel')}
+        {!showSuppliersOnly && !showRestaurantsOnly && !suppliersLoading && !restaurantsLoading && (
+          <div className="mb-4">
+            <SummaryStrip
+              testId="admin-tenants-stats"
+              columns={4}
+              metrics={[
+                {
+                  label: 'Suppliers',
+                  value: suppliersTotal,
+                  hint: `${suppliersForUi?.length ?? 0} loaded`,
+                  tone: 'brand',
+                },
+                {
+                  label: 'Restaurants',
+                  value: restaurantsTotal,
+                  hint: `${restaurantsForUi?.length ?? 0} loaded`,
+                  tone: 'brand',
+                },
+                {
+                  label: 'Active / trial',
+                  value: activeSubsCount,
+                  hint: 'Across loaded tenants',
+                  tone: 'mint',
+                },
+                {
+                  label: 'Loaded total',
+                  value: (suppliersForUi?.length ?? 0) + (restaurantsForUi?.length ?? 0),
+                  hint: `Of ${suppliersTotal + restaurantsTotal} platform tenants`,
+                },
+              ]}
             />
           </div>
+        )}
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-10 w-full" aria-label={t('tenants.filterStatusAriaLabel')}>
-              {STATUS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </SelectTrigger>
-          </Select>
+        {showSuppliersOnly && !suppliersLoading && (
+          <div className="mb-4">
+            <SummaryStrip
+              testId="admin-suppliers-stats"
+              columns={4}
+              metrics={[
+                {
+                  label: 'Suppliers',
+                  value: `${suppliersForUi?.length ?? 0} / ${suppliersTotal}`,
+                  hint: 'Loaded vs total',
+                  tone: 'brand',
+                },
+                {
+                  label: 'Active subs',
+                  value:
+                    suppliersForUi?.filter(
+                      (s) =>
+                        s.subscription_status === 'ACTIVE' || s.subscription_status === 'TRIALING'
+                    ).length ?? 0,
+                  tone: 'mint',
+                },
+                {
+                  label: 'Products',
+                  value:
+                    suppliersForUi?.reduce(
+                      (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
+                      0
+                    ) ?? 0,
+                },
+                {
+                  label: 'Revenue',
+                  value: formatCurrency(
+                    suppliersForUi?.reduce(
+                      (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
+                      0
+                    ) ?? 0
+                  ),
+                },
+              ]}
+            />
+          </div>
+        )}
 
-          {hasActiveFilters && (
-            <Button type="button" variant="ghost" size="sm" className="h-10" onClick={clearFilters}>
-              <X className="mr-1.5 h-4 w-4" />
-              Clear
-            </Button>
-          )}
+        {showRestaurantsOnly && !restaurantsLoading && (
+          <div className="mb-4">
+            <SummaryStrip
+              testId="admin-restaurants-stats"
+              columns={3}
+              metrics={[
+                {
+                  label: 'Restaurants',
+                  value: `${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`,
+                  hint: 'Loaded vs total',
+                  tone: 'brand',
+                },
+                {
+                  label: 'Active subs',
+                  value:
+                    restaurantsForUi?.filter(
+                      (r) =>
+                        r.subscription_status === 'ACTIVE' || r.subscription_status === 'TRIALING'
+                    ).length ?? 0,
+                  tone: 'mint',
+                },
+                {
+                  label: 'Orders (30d)',
+                  value:
+                    restaurantsForUi?.reduce(
+                      (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
+                      0
+                    ) ?? 0,
+                },
+              ]}
+            />
+          </div>
+        )}
+
+        <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            <Filter className="h-3.5 w-3.5" />
+            Filters
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_auto]">
+            <div className="relative min-w-0">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+                aria-hidden
+              />
+              <Input
+                className="h-10 pl-9"
+                placeholder={
+                  showSuppliersOnly
+                    ? 'Search suppliers by name or email…'
+                    : showRestaurantsOnly
+                      ? 'Search restaurants by name or email…'
+                      : 'Search tenants by name or email…'
+                }
+                value={tenantSearch}
+                onChange={(e) => setTenantSearch(e.target.value)}
+                aria-label={t('tenants.searchAriaLabel')}
+              />
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger
+                className="h-10 w-full"
+                aria-label={t('tenants.filterStatusAriaLabel')}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </SelectTrigger>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-10"
+                onClick={clearFilters}
+              >
+                <X className="mr-1.5 h-4 w-4" />
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="space-y-4">
-        {!showRestaurantsOnly && (
-          <AppPanel
-            title={t('tenants.suppliersTitle')}
-            description={
-              suppliersLoading && supplierListOffset === 0
-                ? 'Loading suppliers…'
-                : `${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'} shown${filteredSuppliers.length !== (suppliersForUi?.length ?? 0) ? ` of ${suppliersForUi?.length ?? 0} loaded` : ''}${suppliersTotal > 0 ? ` · ${suppliersTotal} total` : ''}`
-            }
-            testId="admin-tenants-suppliers"
-            footer={
-              suppliersFetching && !suppliersLoading ? (
-                <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Updating suppliers…
-                </p>
-              ) : undefined
-            }
-          >
-            {suppliersError ? (
-              <AdminErrorState
-                title={t('tenants.suppliersFailedTitle')}
-                message="The supplier directory request failed."
-                onRetry={() => refetchSuppliers()}
-              />
-            ) : suppliersLoading && supplierListOffset === 0 ? (
-              <AdminLoadingSkeleton rows={6} />
-            ) : filteredSuppliers.length === 0 ? (
-              <AdminEmptyState
-                icon={<Building2 className="h-8 w-8 text-[var(--text-muted)]" />}
-                title={hasActiveFilters ? 'No suppliers match your filters' : 'No suppliers found'}
-                description={
-                  hasActiveFilters
-                    ? 'Adjust search or status filters and try again.'
-                    : 'Supplier tenants appear here after registration.'
-                }
-                action={
-                  hasActiveFilters ? (
-                    <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                      Clear filters
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <>
-                <div className="space-y-3 lg:hidden">
-                  {filteredSuppliers.map((supplier) => (
-                    <article
-                      key={supplier.id}
-                      className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-[var(--text)]">{supplier.name}</p>
-                          <p className="truncate text-xs text-[var(--text-muted)]">
-                            {supplier.contact_email}
-                          </p>
+        <div className="space-y-4">
+          {!showRestaurantsOnly && (
+            <AppPanel
+              title={t('tenants.suppliersTitle')}
+              description={
+                suppliersLoading && supplierListOffset === 0
+                  ? 'Loading suppliers…'
+                  : `${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'} shown${filteredSuppliers.length !== (suppliersForUi?.length ?? 0) ? ` of ${suppliersForUi?.length ?? 0} loaded` : ''}${suppliersTotal > 0 ? ` · ${suppliersTotal} total` : ''}`
+              }
+              testId="admin-tenants-suppliers"
+              footer={
+                suppliersFetching && !suppliersLoading ? (
+                  <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating suppliers…
+                  </p>
+                ) : undefined
+              }
+            >
+              {suppliersError ? (
+                <AdminErrorState
+                  title={t('tenants.suppliersFailedTitle')}
+                  message="The supplier directory request failed."
+                  onRetry={() => refetchSuppliers()}
+                />
+              ) : suppliersLoading && supplierListOffset === 0 ? (
+                <AdminLoadingSkeleton rows={6} />
+              ) : filteredSuppliers.length === 0 ? (
+                <AdminEmptyState
+                  icon={<Building2 className="h-8 w-8 text-[var(--text-muted)]" />}
+                  title={
+                    hasActiveFilters ? 'No suppliers match your filters' : 'No suppliers found'
+                  }
+                  description={
+                    hasActiveFilters
+                      ? 'Adjust search or status filters and try again.'
+                      : 'Supplier tenants appear here after registration.'
+                  }
+                  action={
+                    hasActiveFilters ? (
+                      <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <>
+                  <div className="space-y-3 lg:hidden">
+                    {filteredSuppliers.map((supplier) => (
+                      <article
+                        key={supplier.id}
+                        className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-[var(--text)]">
+                              {supplier.name}
+                            </p>
+                            <p className="truncate text-xs text-[var(--text-muted)]">
+                              {supplier.contact_email}
+                            </p>
+                          </div>
+                          <StatusBadge status={supplier.subscription_status || 'NONE'} />
                         </div>
-                        <StatusBadge status={supplier.subscription_status || 'NONE'} />
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <Badge variant="outline" className="font-normal">
-                          {formatPlanDisplayName(
-                            supplier.plan_code,
-                            supplier.plan_name || 'Free Trial'
-                          )}
-                        </Badge>
-                        <span className="text-[var(--text-muted)]">
-                          {supplier.product_count || 0} products · {supplier.warehouse_count || 0}{' '}
-                          warehouses
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <AdminTooltip label={t('common.tooltips.diagnostics')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              onTenantDiag({
-                                id: supplier.id,
-                                tenantType: 'SUPPLIER',
-                                name: supplier.name || supplier.id,
-                              })
-                            }
-                          >
-                            <Stethoscope className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                        <AdminTooltip label={t('common.tooltips.impersonate')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              handleStartImpersonation(
-                                supplier.id,
-                                'SUPPLIER',
-                                supplier.name || supplier.id
-                              )
-                            }
-                          >
-                            <UserCog className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                        {canResetPassword && supplier.contact_email && (
-                          <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge variant="outline" className="font-normal">
+                            {formatPlanDisplayName(
+                              supplier.plan_code,
+                              supplier.plan_name || 'Free Trial'
+                            )}
+                          </Badge>
+                          <span className="text-[var(--text-muted)]">
+                            {supplier.product_count || 0} products · {supplier.warehouse_count || 0}{' '}
+                            warehouses
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <AdminTooltip label={t('common.tooltips.diagnostics')}>
                             <Button
                               size="sm"
                               variant="outline"
                               className="h-8 px-2"
                               onClick={() =>
-                                onPasswordReset({
-                                  email: supplier.contact_email!,
-                                  displayName: supplier.name || supplier.contact_email!,
+                                onTenantDiag({
+                                  id: supplier.id,
+                                  tenantType: 'SUPPLIER',
+                                  name: supplier.name || supplier.id,
                                 })
                               }
                             >
-                              <KeyRound className="h-4 w-4" />
+                              <Stethoscope className="h-4 w-4" />
                             </Button>
                           </AdminTooltip>
-                        )}
-                        <AdminTooltip label={t('common.tooltips.changePlan')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              openChangePlanForTenant(
-                                supplier.subscription_id,
-                                'SUPPLIER',
-                                supplier.name || supplier.id,
-                                'supplier'
-                              )
-                            }
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <TableScroll
-                  aria-label={t('tenants.suppliersTableAriaLabel')}
-                  className="hidden lg:block"
-                >
-                  <table className="w-full min-w-[880px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        <th className="px-4 py-3">{t('common.supplier')}</th>
-                        <th className="px-4 py-3">{t('common.table.plan')}</th>
-                        <th className="px-4 py-3">{t('common.table.status')}</th>
-                        <th
-                          className={cn(
-                            'hidden px-4 py-3',
-                            responsiveDataListClasses.columnSecondary
+                          <AdminTooltip label={t('common.tooltips.impersonate')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                handleStartImpersonation(
+                                  supplier.id,
+                                  'SUPPLIER',
+                                  supplier.name || supplier.id
+                                )
+                              }
+                            >
+                              <UserCog className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                          {canResetPassword && supplier.contact_email && (
+                            <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2"
+                                onClick={() =>
+                                  onPasswordReset({
+                                    email: supplier.contact_email!,
+                                    displayName: supplier.name || supplier.contact_email!,
+                                  })
+                                }
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                            </AdminTooltip>
                           )}
-                        >
-                          Products
-                        </th>
-                        <th
-                          className={cn(
-                            'hidden px-4 py-3',
-                            responsiveDataListClasses.columnTertiary
-                          )}
-                        >
-                          Warehouses
-                        </th>
-                        <th
-                          className={cn(
-                            'hidden px-4 py-3',
-                            responsiveDataListClasses.columnSecondary
-                          )}
-                        >
-                          Revenue
-                        </th>
-                        <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--app-border)]">
-                      {filteredSuppliers.map((supplier) => (
-                        <tr
-                          key={supplier.id}
-                          className="transition-colors hover:bg-[var(--brand-ultra)]/35"
-                        >
-                          <td className="px-4 py-3.5">
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-[var(--text)]">
-                                {supplier.name}
-                              </p>
-                              <p className="truncate text-xs text-[var(--text-muted)]">
-                                {supplier.contact_email}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <Badge variant="outline" className="font-normal">
-                              {formatPlanDisplayName(
-                                supplier.plan_code,
-                                supplier.plan_name || 'Free Trial'
-                              )}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <StatusBadge status={supplier.subscription_status || 'NONE'} />
-                          </td>
-                          <td
+                          <AdminTooltip label={t('common.tooltips.changePlan')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                openChangePlanForTenant(
+                                  supplier.subscription_id,
+                                  'SUPPLIER',
+                                  supplier.name || supplier.id,
+                                  'supplier'
+                                )
+                              }
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <TableScroll
+                    aria-label={t('tenants.suppliersTableAriaLabel')}
+                    className="hidden lg:block"
+                  >
+                    <table className="w-full min-w-[880px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          <th className="px-4 py-3">{t('common.supplier')}</th>
+                          <th className="px-4 py-3">{t('common.table.plan')}</th>
+                          <th className="px-4 py-3">{t('common.table.status')}</th>
+                          <th
                             className={cn(
-                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                              'hidden px-4 py-3',
                               responsiveDataListClasses.columnSecondary
                             )}
                           >
-                            {supplier.product_count || 0}
-                          </td>
-                          <td
+                            Products
+                          </th>
+                          <th
                             className={cn(
-                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                              'hidden px-4 py-3',
                               responsiveDataListClasses.columnTertiary
                             )}
                           >
-                            {supplier.warehouse_count || 0}
-                          </td>
-                          <td
+                            Warehouses
+                          </th>
+                          <th
                             className={cn(
-                              'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
+                              'hidden px-4 py-3',
                               responsiveDataListClasses.columnSecondary
                             )}
                           >
-                            {formatCurrency(supplier.total_revenue)}
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex flex-wrap justify-end gap-1.5">
-                              <AdminTooltip label={t('common.tooltips.diagnostics')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    onTenantDiag({
-                                      id: supplier.id,
-                                      tenantType: 'SUPPLIER',
-                                      name: supplier.name || supplier.id,
-                                    })
-                                  }
-                                >
-                                  <Stethoscope className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                              <AdminTooltip label={t('common.tooltips.impersonate')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    handleStartImpersonation(
-                                      supplier.id,
-                                      'SUPPLIER',
-                                      supplier.name || supplier.id
-                                    )
-                                  }
-                                >
-                                  <UserCog className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                              {canResetPassword && supplier.contact_email && (
-                                <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                            Revenue
+                          </th>
+                          <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--app-border)]">
+                        {filteredSuppliers.map((supplier) => (
+                          <tr
+                            key={supplier.id}
+                            className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                          >
+                            <td className="px-4 py-3.5">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-[var(--text)]">
+                                  {supplier.name}
+                                </p>
+                                <p className="truncate text-xs text-[var(--text-muted)]">
+                                  {supplier.contact_email}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <Badge variant="outline" className="font-normal">
+                                {formatPlanDisplayName(
+                                  supplier.plan_code,
+                                  supplier.plan_name || 'Free Trial'
+                                )}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <StatusBadge status={supplier.subscription_status || 'NONE'} />
+                            </td>
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
+                              {supplier.product_count || 0}
+                            </td>
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnTertiary
+                              )}
+                            >
+                              {supplier.warehouse_count || 0}
+                            </td>
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
+                              {formatCurrency(supplier.total_revenue)}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-wrap justify-end gap-1.5">
+                                <AdminTooltip label={t('common.tooltips.diagnostics')}>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     className="h-8 px-2"
                                     onClick={() =>
-                                      onPasswordReset({
-                                        email: supplier.contact_email!,
-                                        displayName: supplier.name || supplier.contact_email!,
+                                      onTenantDiag({
+                                        id: supplier.id,
+                                        tenantType: 'SUPPLIER',
+                                        name: supplier.name || supplier.id,
                                       })
                                     }
                                   >
-                                    <KeyRound className="h-4 w-4" />
+                                    <Stethoscope className="h-4 w-4" />
                                   </Button>
                                 </AdminTooltip>
-                              )}
-                              <AdminTooltip label={t('common.tooltips.changePlan')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    openChangePlanForTenant(
-                                      supplier.subscription_id,
-                                      'SUPPLIER',
-                                      supplier.name || supplier.id,
-                                      'supplier'
-                                    )
-                                  }
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TableScroll>
+                                <AdminTooltip label={t('common.tooltips.impersonate')}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2"
+                                    onClick={() =>
+                                      handleStartImpersonation(
+                                        supplier.id,
+                                        'SUPPLIER',
+                                        supplier.name || supplier.id
+                                      )
+                                    }
+                                  >
+                                    <UserCog className="h-4 w-4" />
+                                  </Button>
+                                </AdminTooltip>
+                                {canResetPassword && supplier.contact_email && (
+                                  <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 px-2"
+                                      onClick={() =>
+                                        onPasswordReset({
+                                          email: supplier.contact_email!,
+                                          displayName: supplier.name || supplier.contact_email!,
+                                        })
+                                      }
+                                    >
+                                      <KeyRound className="h-4 w-4" />
+                                    </Button>
+                                  </AdminTooltip>
+                                )}
+                                <AdminTooltip label={t('common.tooltips.changePlan')}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2"
+                                    onClick={() =>
+                                      openChangePlanForTenant(
+                                        supplier.subscription_id,
+                                        'SUPPLIER',
+                                        supplier.name || supplier.id,
+                                        'supplier'
+                                      )
+                                    }
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </AdminTooltip>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableScroll>
 
-                {!suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal && (
-                  <div className="mt-4 flex justify-center border-t border-[var(--app-border)] pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={suppliersFetching}
-                      onClick={() => setSupplierListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
-                    >
-                      {suppliersFetching ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading…
-                        </>
-                      ) : (
-                        `Load more suppliers (${suppliersForUi?.length ?? 0} of ${suppliersTotal})`
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </AppPanel>
-        )}
+                  {!suppliersLoading && (suppliersForUi?.length ?? 0) < suppliersTotal && (
+                    <div className="mt-4 flex justify-center border-t border-[var(--app-border)] pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={suppliersFetching}
+                        onClick={() => setSupplierListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
+                      >
+                        {suppliersFetching ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading…
+                          </>
+                        ) : (
+                          `Load more suppliers (${suppliersForUi?.length ?? 0} of ${suppliersTotal})`
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </AppPanel>
+          )}
 
-        {!showSuppliersOnly && (
-          <AppPanel
-            title={t('tenants.restaurantsTitle')}
-            description={
-              restaurantsLoading && restaurantListOffset === 0
-                ? 'Loading restaurants…'
-                : `${filteredRestaurants.length} restaurant${filteredRestaurants.length === 1 ? '' : 's'} shown${filteredRestaurants.length !== (restaurantsForUi?.length ?? 0) ? ` of ${restaurantsForUi?.length ?? 0} loaded` : ''}${restaurantsTotal > 0 ? ` · ${restaurantsTotal} total` : ''}`
-            }
-            testId="admin-tenants-restaurants"
-            footer={
-              restaurantsFetching && !restaurantsLoading ? (
-                <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Updating restaurants…
-                </p>
-              ) : undefined
-            }
-          >
-            {restaurantsError ? (
-              <AdminErrorState
-                title={t('tenants.restaurantsFailedTitle')}
-                message="The restaurant directory request failed."
-                onRetry={() => refetchRestaurants()}
-              />
-            ) : restaurantsLoading && restaurantListOffset === 0 ? (
-              <AdminLoadingSkeleton rows={6} />
-            ) : filteredRestaurants.length === 0 ? (
-              <AdminEmptyState
-                icon={<Users className="h-8 w-8 text-[var(--text-muted)]" />}
-                title={
-                  hasActiveFilters ? 'No restaurants match your filters' : 'No restaurants found'
-                }
-                description={
-                  hasActiveFilters
-                    ? 'Adjust search or status filters and try again.'
-                    : 'Restaurant tenants appear here after registration.'
-                }
-                action={
-                  hasActiveFilters ? (
-                    <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                      Clear filters
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <>
-                <div className="space-y-3 lg:hidden">
-                  {filteredRestaurants.map((restaurant) => (
-                    <article
-                      key={restaurant.id}
-                      className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-[var(--text)]">
-                            {restaurant.name}
-                          </p>
-                          <p className="truncate text-xs text-[var(--text-muted)]">
-                            {restaurant.contact_email}
-                          </p>
+          {!showSuppliersOnly && (
+            <AppPanel
+              title={t('tenants.restaurantsTitle')}
+              description={
+                restaurantsLoading && restaurantListOffset === 0
+                  ? 'Loading restaurants…'
+                  : `${filteredRestaurants.length} restaurant${filteredRestaurants.length === 1 ? '' : 's'} shown${filteredRestaurants.length !== (restaurantsForUi?.length ?? 0) ? ` of ${restaurantsForUi?.length ?? 0} loaded` : ''}${restaurantsTotal > 0 ? ` · ${restaurantsTotal} total` : ''}`
+              }
+              testId="admin-tenants-restaurants"
+              footer={
+                restaurantsFetching && !restaurantsLoading ? (
+                  <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating restaurants…
+                  </p>
+                ) : undefined
+              }
+            >
+              {restaurantsError ? (
+                <AdminErrorState
+                  title={t('tenants.restaurantsFailedTitle')}
+                  message="The restaurant directory request failed."
+                  onRetry={() => refetchRestaurants()}
+                />
+              ) : restaurantsLoading && restaurantListOffset === 0 ? (
+                <AdminLoadingSkeleton rows={6} />
+              ) : filteredRestaurants.length === 0 ? (
+                <AdminEmptyState
+                  icon={<Users className="h-8 w-8 text-[var(--text-muted)]" />}
+                  title={
+                    hasActiveFilters ? 'No restaurants match your filters' : 'No restaurants found'
+                  }
+                  description={
+                    hasActiveFilters
+                      ? 'Adjust search or status filters and try again.'
+                      : 'Restaurant tenants appear here after registration.'
+                  }
+                  action={
+                    hasActiveFilters ? (
+                      <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
+                        Clear filters
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <>
+                  <div className="space-y-3 lg:hidden">
+                    {filteredRestaurants.map((restaurant) => (
+                      <article
+                        key={restaurant.id}
+                        className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-[var(--text)]">
+                              {restaurant.name}
+                            </p>
+                            <p className="truncate text-xs text-[var(--text-muted)]">
+                              {restaurant.contact_email}
+                            </p>
+                          </div>
+                          <StatusBadge status={restaurant.subscription_status || 'NONE'} />
                         </div>
-                        <StatusBadge status={restaurant.subscription_status || 'NONE'} />
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <Badge variant="outline" className="font-normal">
-                          {formatPlanDisplayName(
-                            restaurant.plan_code,
-                            restaurant.plan_name || 'Free Trial'
-                          )}
-                        </Badge>
-                        <span className="text-[var(--text-muted)]">
-                          {restaurant.orders_last_30d || 0} orders (30d) ·{' '}
-                          {formatCurrency(restaurant.total_spent)} spent
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <AdminTooltip label={t('common.tooltips.diagnostics')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              onTenantDiag({
-                                id: restaurant.id,
-                                tenantType: 'RESTAURANT',
-                                name: restaurant.name || restaurant.id,
-                              })
-                            }
-                          >
-                            <Stethoscope className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                        <AdminTooltip label={t('common.tooltips.impersonate')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              handleStartImpersonation(
-                                restaurant.id,
-                                'RESTAURANT',
-                                restaurant.name || restaurant.id
-                              )
-                            }
-                          >
-                            <UserCog className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                        {canResetPassword && restaurant.contact_email && (
-                          <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge variant="outline" className="font-normal">
+                            {formatPlanDisplayName(
+                              restaurant.plan_code,
+                              restaurant.plan_name || 'Free Trial'
+                            )}
+                          </Badge>
+                          <span className="text-[var(--text-muted)]">
+                            {restaurant.orders_last_30d || 0} orders (30d) ·{' '}
+                            {formatCurrency(restaurant.total_spent)} spent
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <AdminTooltip label={t('common.tooltips.diagnostics')}>
                             <Button
                               size="sm"
                               variant="outline"
                               className="h-8 px-2"
                               onClick={() =>
-                                onPasswordReset({
-                                  email: restaurant.contact_email!,
-                                  displayName: restaurant.name || restaurant.contact_email!,
+                                onTenantDiag({
+                                  id: restaurant.id,
+                                  tenantType: 'RESTAURANT',
+                                  name: restaurant.name || restaurant.id,
                                 })
                               }
                             >
-                              <KeyRound className="h-4 w-4" />
+                              <Stethoscope className="h-4 w-4" />
                             </Button>
                           </AdminTooltip>
-                        )}
-                        <AdminTooltip label={t('common.tooltips.changePlan')}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-2"
-                            onClick={() =>
-                              openChangePlanForTenant(
-                                restaurant.subscription_id,
-                                'RESTAURANT',
-                                restaurant.name || restaurant.id,
-                                'restaurant'
-                              )
-                            }
+                          <AdminTooltip label={t('common.tooltips.impersonate')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                handleStartImpersonation(
+                                  restaurant.id,
+                                  'RESTAURANT',
+                                  restaurant.name || restaurant.id
+                                )
+                              }
+                            >
+                              <UserCog className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                          {canResetPassword && restaurant.contact_email && (
+                            <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2"
+                                onClick={() =>
+                                  onPasswordReset({
+                                    email: restaurant.contact_email!,
+                                    displayName: restaurant.name || restaurant.contact_email!,
+                                  })
+                                }
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                            </AdminTooltip>
+                          )}
+                          <AdminTooltip label={t('common.tooltips.changePlan')}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-2"
+                              onClick={() =>
+                                openChangePlanForTenant(
+                                  restaurant.subscription_id,
+                                  'RESTAURANT',
+                                  restaurant.name || restaurant.id,
+                                  'restaurant'
+                                )
+                              }
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </AdminTooltip>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <TableScroll
+                    aria-label={t('tenants.restaurantsTableAriaLabel')}
+                    className="hidden lg:block"
+                  >
+                    <table className="w-full min-w-[760px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                          <th className="px-4 py-3">{t('common.restaurant')}</th>
+                          <th className="px-4 py-3">{t('common.table.plan')}</th>
+                          <th className="px-4 py-3">{t('common.table.status')}</th>
+                          <th
+                            className={cn(
+                              'hidden px-4 py-3',
+                              responsiveDataListClasses.columnSecondary
+                            )}
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </AdminTooltip>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                <TableScroll
-                  aria-label={t('tenants.restaurantsTableAriaLabel')}
-                  className="hidden lg:block"
-                >
-                  <table className="w-full min-w-[760px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                        <th className="px-4 py-3">{t('common.restaurant')}</th>
-                        <th className="px-4 py-3">{t('common.table.plan')}</th>
-                        <th className="px-4 py-3">{t('common.table.status')}</th>
-                        <th
-                          className={cn(
-                            'hidden px-4 py-3',
-                            responsiveDataListClasses.columnSecondary
-                          )}
-                        >
-                          Orders (30d)
-                        </th>
-                        <th
-                          className={cn(
-                            'hidden px-4 py-3',
-                            responsiveDataListClasses.columnSecondary
-                          )}
-                        >
-                          Total spent
-                        </th>
-                        <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--app-border)]">
-                      {filteredRestaurants.map((restaurant) => (
-                        <tr
-                          key={restaurant.id}
-                          className="transition-colors hover:bg-[var(--brand-ultra)]/35"
-                        >
-                          <td className="px-4 py-3.5">
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-[var(--text)]">
-                                {restaurant.name}
-                              </p>
-                              <p className="truncate text-xs text-[var(--text-muted)]">
-                                {restaurant.contact_email}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <Badge variant="outline" className="font-normal">
-                              {formatPlanDisplayName(
-                                restaurant.plan_code,
-                                restaurant.plan_name || 'Free Trial'
+                            Orders (30d)
+                          </th>
+                          <th
+                            className={cn(
+                              'hidden px-4 py-3',
+                              responsiveDataListClasses.columnSecondary
+                            )}
+                          >
+                            Total spent
+                          </th>
+                          <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--app-border)]">
+                        {filteredRestaurants.map((restaurant) => (
+                          <tr
+                            key={restaurant.id}
+                            className="transition-colors hover:bg-[var(--brand-ultra)]/35"
+                          >
+                            <td className="px-4 py-3.5">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-[var(--text)]">
+                                  {restaurant.name}
+                                </p>
+                                <p className="truncate text-xs text-[var(--text-muted)]">
+                                  {restaurant.contact_email}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <Badge variant="outline" className="font-normal">
+                                {formatPlanDisplayName(
+                                  restaurant.plan_code,
+                                  restaurant.plan_name || 'Free Trial'
+                                )}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <StatusBadge status={restaurant.subscription_status || 'NONE'} />
+                            </td>
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
                               )}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <StatusBadge status={restaurant.subscription_status || 'NONE'} />
-                          </td>
-                          <td
-                            className={cn(
-                              'hidden px-4 py-3.5 text-[var(--text-muted)]',
-                              responsiveDataListClasses.columnSecondary
-                            )}
-                          >
-                            {restaurant.orders_last_30d || 0}
-                          </td>
-                          <td
-                            className={cn(
-                              'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
-                              responsiveDataListClasses.columnSecondary
-                            )}
-                          >
-                            {formatCurrency(restaurant.total_spent)}
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <div className="flex flex-wrap justify-end gap-1.5">
-                              <AdminTooltip label={t('common.tooltips.diagnostics')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    onTenantDiag({
-                                      id: restaurant.id,
-                                      tenantType: 'RESTAURANT',
-                                      name: restaurant.name || restaurant.id,
-                                    })
-                                  }
-                                >
-                                  <Stethoscope className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                              <AdminTooltip label={t('common.tooltips.impersonate')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    handleStartImpersonation(
-                                      restaurant.id,
-                                      'RESTAURANT',
-                                      restaurant.name || restaurant.id
-                                    )
-                                  }
-                                >
-                                  <UserCog className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                              {canResetPassword && restaurant.contact_email && (
-                                <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                            >
+                              {restaurant.orders_last_30d || 0}
+                            </td>
+                            <td
+                              className={cn(
+                                'hidden px-4 py-3.5 tabular-nums text-[var(--text-muted)]',
+                                responsiveDataListClasses.columnSecondary
+                              )}
+                            >
+                              {formatCurrency(restaurant.total_spent)}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex flex-wrap justify-end gap-1.5">
+                                <AdminTooltip label={t('common.tooltips.diagnostics')}>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     className="h-8 px-2"
                                     onClick={() =>
-                                      onPasswordReset({
-                                        email: restaurant.contact_email!,
-                                        displayName: restaurant.name || restaurant.contact_email!,
+                                      onTenantDiag({
+                                        id: restaurant.id,
+                                        tenantType: 'RESTAURANT',
+                                        name: restaurant.name || restaurant.id,
                                       })
                                     }
                                   >
-                                    <KeyRound className="h-4 w-4" />
+                                    <Stethoscope className="h-4 w-4" />
                                   </Button>
                                 </AdminTooltip>
-                              )}
-                              <AdminTooltip label={t('common.tooltips.changePlan')}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 px-2"
-                                  onClick={() =>
-                                    openChangePlanForTenant(
-                                      restaurant.subscription_id,
-                                      'RESTAURANT',
-                                      restaurant.name || restaurant.id,
-                                      'restaurant'
-                                    )
-                                  }
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </AdminTooltip>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TableScroll>
+                                <AdminTooltip label={t('common.tooltips.impersonate')}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2"
+                                    onClick={() =>
+                                      handleStartImpersonation(
+                                        restaurant.id,
+                                        'RESTAURANT',
+                                        restaurant.name || restaurant.id
+                                      )
+                                    }
+                                  >
+                                    <UserCog className="h-4 w-4" />
+                                  </Button>
+                                </AdminTooltip>
+                                {canResetPassword && restaurant.contact_email && (
+                                  <AdminTooltip label={t('common.tooltips.resetPassword')}>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 px-2"
+                                      onClick={() =>
+                                        onPasswordReset({
+                                          email: restaurant.contact_email!,
+                                          displayName: restaurant.name || restaurant.contact_email!,
+                                        })
+                                      }
+                                    >
+                                      <KeyRound className="h-4 w-4" />
+                                    </Button>
+                                  </AdminTooltip>
+                                )}
+                                <AdminTooltip label={t('common.tooltips.changePlan')}>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2"
+                                    onClick={() =>
+                                      openChangePlanForTenant(
+                                        restaurant.subscription_id,
+                                        'RESTAURANT',
+                                        restaurant.name || restaurant.id,
+                                        'restaurant'
+                                      )
+                                    }
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </AdminTooltip>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableScroll>
 
-                {!restaurantsLoading && (restaurantsForUi?.length ?? 0) < restaurantsTotal && (
-                  <div className="mt-4 flex justify-center border-t border-[var(--app-border)] pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={restaurantsFetching}
-                      onClick={() => setRestaurantListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
-                    >
-                      {restaurantsFetching ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading…
-                        </>
-                      ) : (
-                        `Load more restaurants (${restaurantsForUi?.length ?? 0} of ${restaurantsTotal})`
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
-          </AppPanel>
-        )}
-      </div>
-    </TooltipProvider>
+                  {!restaurantsLoading && (restaurantsForUi?.length ?? 0) < restaurantsTotal && (
+                    <div className="mt-4 flex justify-center border-t border-[var(--app-border)] pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={restaurantsFetching}
+                        onClick={() => setRestaurantListOffset((o) => o + ADMIN_TENANT_PAGE_SIZE)}
+                      >
+                        {restaurantsFetching ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading…
+                          </>
+                        ) : (
+                          `Load more restaurants (${restaurantsForUi?.length ?? 0} of ${restaurantsTotal})`
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </AppPanel>
+          )}
+        </div>
+      </TooltipProvider>
+    </div>
   )
 }

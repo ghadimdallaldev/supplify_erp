@@ -22,6 +22,7 @@ import {
   getInvoiceDetail,
   updateInvoiceStatus,
 } from '../services/invoice.service.js'
+import { scheduleOrdersCalendarCacheInvalidation } from '../lib/orders-calendar-cache.js'
 
 const router = express.Router()
 
@@ -284,6 +285,11 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       logger.error('Failed to send invoice notification', { error: notifError.message })
     })
 
+    scheduleOrdersCalendarCacheInvalidation([invoice.restaurant_id, invoice.supplier_id], {
+      reason: 'invoice.created',
+      requestId: req.requestId,
+    })
+
     res.status(201).json({
       ok: true,
       data: { invoice },
@@ -340,6 +346,11 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
         userId: req.userData.id,
       })
     )
+
+    scheduleOrdersCalendarCacheInvalidation([invoice.restaurant_id, invoice.supplier_id], {
+      reason: 'invoice.updated',
+      requestId: req.requestId,
+    })
 
     res.json({
       ok: true,

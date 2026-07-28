@@ -160,7 +160,9 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
     })
   }
 
-  const { notifications, unreadCount } = useNotificationBadge()
+  const { notifications, unreadCount } = useNotificationBadge({
+    includeList: notificationsMounted,
+  })
 
   const handleLogout = async () => {
     try {
@@ -207,13 +209,13 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
   return (
     <header
       data-testid="header"
-      className="flex h-14 min-h-14 shrink-0 items-center gap-2 border-b border-[var(--app-border)]/40 bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-4 xl:px-6"
+      className="flex h-12 min-h-12 shrink-0 items-center gap-2 border-b border-[var(--app-border)] bg-[var(--surface)] px-3 pt-[env(safe-area-inset-top)] sm:gap-3 sm:px-4 xl:px-6"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {onOpenMobileNav && !isAdminPortalRoute && (
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] lg:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--app-bg-subtle)] hover:text-[var(--text)] lg:hidden"
           aria-label={t('openMenu')}
           onClick={onOpenMobileNav}
         >
@@ -275,7 +277,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             </Button>
             <button
               type="button"
-              className="relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] sm:hidden"
+              className="relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--app-bg-subtle)] hover:text-[var(--text)] sm:hidden"
               aria-label={hasUrgency ? t('header.upgradePlan') : t('header.viewPlans')}
               onClick={handleNavUpgrade}
             >
@@ -290,7 +292,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         {/* Command palette */}
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)] md:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--app-bg-subtle)] hover:text-[var(--text)] md:hidden"
           aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >
@@ -298,7 +300,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         </button>
         <button
           type="button"
-          className="hidden h-8 min-w-[130px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)]/50 bg-[var(--brand-ultra)]/30 px-2.5 text-start transition-colors hover:border-[var(--app-border)]/70 hover:bg-[var(--brand-ultra)]/50 md:flex lg:min-w-[160px] xl:min-w-[200px]"
+          className="hidden h-8 min-w-[130px] cursor-pointer items-center gap-1.5 rounded-md border border-[var(--app-border)] bg-[var(--surface)] px-2.5 text-start transition-colors hover:border-[var(--app-border-mid)] hover:bg-[var(--app-bg-subtle)] md:flex lg:min-w-[160px] xl:min-w-[200px]"
           aria-label={t('header.openCommandPalette')}
           onClick={openCommandPalette}
         >
@@ -325,7 +327,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
         <div className="relative">
           <button
             type="button"
-            className="erp-pressable relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--brand-ultra)]/50 hover:text-[var(--text)]"
+            className="erp-pressable relative flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition-colors hover:bg-[var(--app-bg-subtle)] hover:text-[var(--text)]"
             aria-label={
               unreadCount > 0
                 ? t('header.notificationsUnread', { count: unreadCount })
@@ -344,11 +346,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             <div
               data-testid="notifications-dropdown"
               className={cn(
-                'fixed inset-x-3 top-[calc(3.5rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-lg border border-[var(--app-border)]/50 bg-[var(--surface)] shadow-sm transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-10 sm:w-[min(100vw-1.5rem,20rem)]',
+                'fixed inset-x-3 top-[calc(3rem+env(safe-area-inset-top))] z-50 max-h-[min(70vh,24rem)] overflow-y-auto rounded-md border border-[var(--app-border)] bg-[var(--surface)] shadow-[0_8px_24px_rgba(15,23,42,0.10)] transition-opacity duration-150 ease-out motion-reduce:transition-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-10 sm:w-[min(100vw-1.5rem,20rem)]',
                 notificationsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
               )}
             >
-              <div className="flex items-center justify-between border-b border-[var(--app-border)]/40 px-4 py-3">
+              <div className="flex items-center justify-between border-b border-[var(--app-border)] px-4 py-3">
                 <span className="text-[13px] font-semibold text-[var(--text)]">
                   {t('notifications')}
                 </span>
@@ -474,7 +476,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             <button
               type="button"
               data-testid="user-menu-trigger"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--mint-mid)] text-[11px] font-semibold text-white ring-1 ring-[var(--app-border)]/30 transition-opacity hover:opacity-90"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--app-border-mid)] bg-[var(--app-bg-subtle)] text-[11px] font-semibold text-[var(--text-mid)] transition-colors hover:bg-[var(--surface-mid)]"
               aria-label={t('header.openUserMenu', {
                 name: user?.displayName || user?.email || '',
               })}
@@ -483,7 +485,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-56 p-0">
-            <div className="border-b border-[var(--app-border)]/40 px-3 py-2.5">
+            <div className="border-b border-[var(--app-border)] px-3 py-2.5">
               <p className="truncate text-sm font-semibold text-[var(--text)]">
                 {user?.displayName || user?.email}
               </p>
@@ -494,7 +496,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
             <div className="p-1">
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--text)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--text)] transition-colors hover:bg-[var(--app-bg-subtle)]"
                 onClick={() => {
                   setUserMenuOpen(false)
                   navigate('/app/settings')
@@ -504,17 +506,17 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                 {t('settings')}
               </button>
             </div>
-            <div className="border-t border-[var(--app-border)]/40 px-3 py-2.5">
+            <div className="border-t border-[var(--app-border)] px-3 py-2.5">
               <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
                 {t('language.switch', { ns: 'common' })}
               </p>
               <LanguageSwitcher compact />
             </div>
-            <div className="border-t border-[var(--app-border)]/40 p-1">
+            <div className="border-t border-[var(--app-border)] p-1">
               <button
                 type="button"
                 data-testid="logout-button"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--red)] transition-colors hover:bg-[var(--brand-ultra)]/50"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-[var(--red)] transition-colors hover:bg-[var(--app-bg-subtle)]"
                 onClick={() => {
                   setUserMenuOpen(false)
                   void handleLogout()

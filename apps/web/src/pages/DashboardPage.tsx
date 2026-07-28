@@ -84,6 +84,29 @@ export function DashboardPage() {
   const isSupplier = isEffectiveSupplier
   const tenantType = isRestaurant ? 'RESTAURANT' : isSupplier ? 'SUPPLIER' : null
   const showDashboardCalendar = shouldShowDashboardCalendar(persona, tenantType, can)
+  const [calendarReady, setCalendarReady] = useState(false)
+  useEffect(() => {
+    if (!showDashboardCalendar) {
+      setCalendarReady(false)
+      return
+    }
+    let cancelled = false
+    const enable = () => {
+      if (!cancelled) setCalendarReady(true)
+    }
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(enable, { timeout: 900 })
+      return () => {
+        cancelled = true
+        window.cancelIdleCallback(idleId)
+      }
+    }
+    const timer = window.setTimeout(enable, 150)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [showDashboardCalendar])
   const restaurantLayout =
     isRestaurant && persona.restaurantDashboardMode
       ? getRestaurantDashboardLayout(persona.restaurantDashboardMode, can, persona.readOnly)
@@ -340,9 +363,9 @@ export function DashboardPage() {
         <Suspense
           fallback={
             <div className="dashboard-content-grid">
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-64 rounded-xl" />
-              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-md" />
+              <Skeleton className="h-64 rounded-md" />
+              <Skeleton className="h-64 rounded-md" />
             </div>
           }
         >
@@ -374,17 +397,8 @@ export function DashboardPage() {
           />
         </Suspense>
 
-        {showDashboardCalendar && (
-          <div
-            className="min-w-0"
-            style={{
-              marginTop: DASHBOARD_CALENDAR_EXTRA_GAP,
-              background: 'var(--surface)',
-              border: '1px solid var(--app-border)',
-              borderRadius: 12,
-              overflow: 'hidden',
-            }}
-          >
+        {showDashboardCalendar && calendarReady && (
+          <div className="min-w-0" style={{ marginTop: DASHBOARD_CALENDAR_EXTRA_GAP }}>
             <Suspense
               fallback={
                 <div className="p-6">

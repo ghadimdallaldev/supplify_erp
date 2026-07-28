@@ -51,7 +51,7 @@ export interface AdminSubscriptionsTabProps {
 
 function tenantTypeTone(type: string): string {
   return type === 'SUPPLIER'
-    ? 'bg-violet-50 text-violet-700 border-violet-200'
+    ? 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
     : 'bg-sky-50 text-sky-800 border-sky-200'
 }
 
@@ -204,7 +204,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
         </div>
       )}
 
-      <div className="mb-4 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
+      <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
           Filters
@@ -309,7 +309,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
               {filteredSubscriptions.map((sub) => (
                 <article
                   key={sub.id}
-                  className="rounded-xl border border-[var(--app-border)] p-4 space-y-3"
+                  className="rounded-md border border-[var(--app-border)] p-4 space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

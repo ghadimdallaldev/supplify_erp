@@ -130,11 +130,16 @@ export async function deleteCacheByPrefix(prefix) {
           'MATCH',
           `${prefix}*`,
           'COUNT',
-          100
+          500
         )
         cursor = nextCursor
         if (keys.length > 0) {
-          await redisClient.del(...keys)
+          // UNLINK is non-blocking vs DEL for large key sets
+          if (typeof redisClient.unlink === 'function') {
+            await redisClient.unlink(...keys)
+          } else {
+            await redisClient.del(...keys)
+          }
         }
       } while (cursor !== '0')
       return

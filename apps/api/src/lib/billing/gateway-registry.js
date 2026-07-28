@@ -17,8 +17,18 @@ export function getBillingGateway(providerId) {
   if (config.APP_ENV === 'prod' && config.PAYMENTS_MODE === 'mock') {
     throw new Error('PAYMENTS_MODE=mock is not allowed in production')
   }
+  if (config.PAYMENTS_MODE === 'live' && id === 'stub') {
+    throw new Error(
+      'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live (use BILLING_GATEWAY=manual for pilot, or a registered PSP)'
+    )
+  }
   const gateway = registry.get(id)
   if (!gateway) {
+    if (config.PAYMENTS_MODE === 'live') {
+      throw new Error(
+        `Unknown billing gateway "${id}" while PAYMENTS_MODE=live — refusing stub fallback`
+      )
+    }
     logger.warn('Unknown billing gateway; falling back to stub', { providerId: id })
     return stubGateway
   }

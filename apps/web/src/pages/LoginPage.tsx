@@ -184,7 +184,7 @@ export function LoginPage() {
             className="animate-rise-in"
             style={{
               border: '1px solid var(--app-border)',
-              boxShadow: '0 8px 32px rgba(91,33,182,0.10)',
+              boxShadow: '0 10px 30px rgba(15,23,42,0.08)',
             }}
           >
             <CardHeader className="space-y-1 pb-4">

@@ -31,7 +31,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between',
+        'flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between',
         isCompact && 'mb-4',
         className
       )}
@@ -41,8 +41,8 @@ export function PageHeader({
         {breadcrumb && <div className="mb-1.5 text-xs text-[var(--text-muted)]">{breadcrumb}</div>}
         <h1
           className={cn(
-            'text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl',
-            isCompact && 'text-xl sm:text-2xl'
+            'text-lg font-semibold text-[var(--text)] sm:text-xl',
+            isCompact && 'text-lg sm:text-xl'
           )}
         >
           {title}
@@ -51,7 +51,7 @@ export function PageHeader({
           <p
             className={cn(
               'max-w-3xl leading-relaxed text-[var(--lead-text-color)]',
-              isCompact ? 'mt-1 text-sm sm:text-base' : 'mt-2 text-base'
+              isCompact ? 'mt-1 text-sm' : 'mt-1.5 text-sm sm:text-[15px]'
             )}
           >
             {body}
