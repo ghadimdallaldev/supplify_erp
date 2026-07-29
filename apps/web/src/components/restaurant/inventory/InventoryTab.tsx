@@ -34,7 +34,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   useGetRestaurantInventoryQuery,
   useGetRestaurantInventoryHistoryQuery,
@@ -87,7 +87,6 @@ export function InventoryTab({
 }: InventoryTabProps) {
   const { t, i18n } = useTranslation('inventory')
   const { t: tCommon } = useTranslation('common')
-  const navigate = useNavigate()
 
   useEffect(() => {
     void ensureNamespace('inventory')

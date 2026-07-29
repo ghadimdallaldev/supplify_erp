@@ -18,6 +18,7 @@ import {
 } from './staff-portal-mail.service.js'
 import { config } from '../config/env.js'
 import { isEmailConfigured } from './email/email.service.js'
+import { normalizeIdentityEmail } from '../lib/identity-normalize.js'
 
 function generateTemporaryPassword() {
   return `${randomBytes(9).toString('base64url')}Aa1!`
@@ -127,7 +128,12 @@ export function mapPortalAccessInfo(row) {
 }
 
 async function assertStaffEmail(staff) {
-  const email = (staff.email || '').trim()
+  let email
+  try {
+    email = normalizeIdentityEmail(staff.email)
+  } catch {
+    email = ''
+  }
   if (!email) {
     const err = new Error('Staff member must have an email before creating a portal account')
     err.name = 'STAFF_EMAIL_REQUIRED'

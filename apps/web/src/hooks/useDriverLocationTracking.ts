@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSendDriverLocationMutation } from '../services/api'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
+import { createDriverLocationProvider } from '../lib/driverLocationPlatform'
+import { enqueueDriverLocation } from '../lib/driverLocationQueue'
+import type { DriverLocationPoint, TrackingStatus } from '../lib/driverLocationProvider'
 
 export function getGpsUpdateIntervalMs() {
   const sec = Number(import.meta.env.VITE_GPS_UPDATE_INTERVAL_SECONDS ?? 15)
@@ -13,90 +16,179 @@ export function isGpsTrackingEnabledClient() {
   return true
 }
 
+function isSessionTrackingEnabledClient() {
+  const raw = import.meta.env.VITE_GPS_TRACKING_SESSIONS_ENABLED
+  return raw === 'true' || raw === '1'
+}
+
 type ActiveDelivery = {
   orderId: string
   deliveryStatus: string
+  routeId?: string | null
 }
+
+type SessionResponse = { ok: boolean; data?: { session?: { id: string } } }
 
 export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
   const [sendLocation] = useSendDriverLocationMutation()
-  const watchIdRef = useRef<number | null>(null)
+  const providerRef = useRef(createDriverLocationProvider())
+  const sessionIdRef = useRef<string | null>(null)
   const [trackingActive, setTrackingActive] = useState(false)
   const [gpsError, setGpsError] = useState<string | null>(null)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | null>(null)
+  const [trackingRestartToken, setTrackingRestartToken] = useState(0)
 
   const trackable = activeDeliveries.filter((d) => isTrackableDeliveryStatus(d.deliveryStatus))
   const trackableKey = trackable.map((t) => `${t.orderId}:${t.deliveryStatus}`).join('|')
+  const trackableRef = useRef(trackable)
+  trackableRef.current = trackable
 
   useEffect(() => {
-    if (!isGpsTrackingEnabledClient() || trackable.length === 0) {
-      setTrackingActive(false)
-      if (watchIdRef.current != null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
+    let cancelled = false
+    const provider = providerRef.current
+
+    async function sendPoint(point: DriverLocationPoint) {
+      const sessionId = sessionIdRef.current
+      if (sessionId) {
+        const response = await fetch(`/api/driver/tracking-sessions/${sessionId}/locations`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(point),
+        })
+        if (!response.ok) {
+          enqueueDriverLocation({ ...point, sessionId })
+          setTrackingStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  pendingLocationCount: prev.pendingLocationCount + 1,
+                  networkState: 'offline',
+                  error: 'Locations are stored locally until synchronization resumes',
+                }
+              : prev
+          )
+          throw new Error('Location upload failed; point queued for synchronization')
+        }
+        setTrackingStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                lastSyncedAt: new Date().toISOString(),
+                error: null,
+                networkState: 'online',
+              }
+            : prev
+        )
+        return
       }
-      return
+      await Promise.all(
+        trackableRef.current.map((delivery) =>
+          sendLocation({
+            orderId: delivery.orderId,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            accuracyMeters: point.accuracyMeters,
+            speedMps: point.speedMps,
+            headingDegrees: point.headingDegrees,
+            recordedAt: point.recordedAt,
+            route_id: null,
+            route_stop_id: null,
+          }).unwrap()
+        )
+      )
+      setTrackingStatus((prev) =>
+        prev ? { ...prev, lastSyncedAt: new Date().toISOString(), error: null } : prev
+      )
     }
 
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported on this device')
-      setTrackingActive(false)
-      return
-    }
-
-    const primary = trackable[0]
-    const intervalMs = getGpsUpdateIntervalMs()
-    let lastSent = 0
-
-    const onPosition = (pos: GeolocationPosition) => {
-      const now = Date.now()
-      if (now - lastSent < intervalMs - 500) return
-      lastSent = now
-      setGpsError(null)
-      setTrackingActive(true)
-      sendLocation({
-        orderId: primary.orderId,
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracyMeters: pos.coords.accuracy,
-        speedMps: pos.coords.speed ?? undefined,
-        headingDegrees: pos.coords.heading ?? undefined,
-        recordedAt: new Date(pos.timestamp).toISOString(),
-      }).catch((err: unknown) => {
-        const msg =
-          (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-          'Could not send GPS update to the server'
-        setGpsError(msg)
+    async function start() {
+      if (!isGpsTrackingEnabledClient() || trackableRef.current.length === 0) {
+        await provider.stopTracking()
         setTrackingActive(false)
+        return
+      }
+      try {
+        if (isSessionTrackingEnabledClient()) {
+          const response = await fetch('/api/driver/tracking-sessions', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ routeId: trackableRef.current[0]?.routeId ?? null }),
+          })
+          const payload = (await response.json()) as SessionResponse
+          if (!response.ok || !payload.data?.session?.id)
+            throw new Error('Unable to start the tracking session')
+          sessionIdRef.current = payload.data.session.id
+        }
+        await provider.startTracking({
+          routeId: trackableRef.current[0]?.routeId ?? null,
+          sessionId: sessionIdRef.current,
+          deliveries: trackableRef.current,
+          onPoint: sendPoint,
+          onStatus: (status) => {
+            if (cancelled) return
+            setTrackingStatus(status)
+            setGpsError(status.error)
+            setPermissionDenied(status.gpsState === 'LOCATION_PERMISSION_DENIED')
+          },
+        })
+        if (!cancelled) setTrackingActive(true)
+      } catch (error) {
+        if (cancelled) return
+        setTrackingActive(false)
+        setGpsError(error instanceof Error ? error.message : 'Location is not updating')
+      }
+    }
+
+    void start()
+    return () => {
+      cancelled = true
+      void provider.stopTracking()
+      const sessionId = sessionIdRef.current
+      sessionIdRef.current = null
+      if (sessionId) {
+        void fetch(`/api/driver/tracking-sessions/${sessionId}/stop`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'active_assignment_changed' }),
+        })
+      }
+    }
+  }, [sendLocation, trackableKey, trackingRestartToken])
+
+  const startTracking = () => {
+    setGpsError(null)
+    setTrackingRestartToken((value) => value + 1)
+  }
+
+  const stopTracking = async () => {
+    await providerRef.current.stopTracking()
+    const sessionId = sessionIdRef.current
+    sessionIdRef.current = null
+    setTrackingActive(false)
+    if (sessionId) {
+      await fetch(`/api/driver/tracking-sessions/${sessionId}/stop`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'driver_action' }),
       })
     }
+  }
 
-    const onError = (err: GeolocationPositionError) => {
-      if (err.code === err.PERMISSION_DENIED) {
-        setPermissionDenied(true)
-        setGpsError('Location permission denied. Enable GPS to share live tracking.')
-      } else {
-        setGpsError(err.message || 'Unable to read GPS position')
-      }
-      setTrackingActive(false)
-    }
-
-    watchIdRef.current = navigator.geolocation.watchPosition(onPosition, onError, {
-      enableHighAccuracy: true,
-      maximumAge: intervalMs,
-      timeout: 20_000,
-    })
-
-    return () => {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
-      }
-      setTrackingActive(false)
-    }
-    // trackableKey serializes trackable; raw trackable array is a new reference each render
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- trackableKey captures trackable contents for stable deps
-  }, [trackableKey, sendLocation])
-
-  return { trackingActive, gpsError, permissionDenied, trackableCount: trackable.length }
+  return {
+    trackingActive,
+    gpsError,
+    permissionDenied,
+    trackableCount: trackable.length,
+    trackingStatus,
+    provider: trackingStatus?.provider ?? 'web',
+    startTracking,
+    stopTracking,
+    pendingLocationCount: trackingStatus?.pendingLocationCount ?? 0,
+    lastSyncedAt: trackingStatus?.lastSyncedAt ?? null,
+  }
 }

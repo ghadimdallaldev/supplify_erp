@@ -55,6 +55,7 @@ import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
+import { driverTrackingRoutes } from './routes/driver-tracking.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
 import { supplierGrowthRoutes, growthPublicRoutes } from './routes/supplier-growth.routes.js'
@@ -227,6 +228,29 @@ const authLimiter = config.RATE_LIMIT_ENABLED
       { storePrefix: 'rl:auth' }
     )
   : noopLimiter
+const refreshLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 20 : 500, 'Too many refresh attempts, please try again later.', {
+      storePrefix: 'rl:auth-refresh',
+    })
+  : noopLimiter
+const invitationAcceptLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 12 : 200,
+      'Too many invitation attempts, please try again later.',
+      {
+        storePrefix: 'rl:invite-accept',
+      }
+    )
+  : noopLimiter
+const availabilityLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(
+      isProduction ? 60 : 300,
+      'Too many availability checks, please try again later.',
+      {
+        storePrefix: 'rl:availability',
+      }
+    )
+  : noopLimiter
 const staffLinkLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(
       isProduction ? 10 : 100,
@@ -263,6 +287,10 @@ app.use(
 )
 
 app.use('/auth', authLimiter)
+app.use('/auth/refresh', refreshLimiter)
+app.use('/auth/mobile/refresh', refreshLimiter)
+app.use('/api/public/invitations', invitationAcceptLimiter)
+app.use('/api/public/reservations/availability', availabilityLimiter)
 app.use('/api/public', publicLimiter)
 app.use(limiter)
 
@@ -429,6 +457,7 @@ app.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
 app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
+app.use('/api/driver', driverTrackingRoutes)
 app.use('/api/drivers', driversRoutes)
 app.use('/api/supplier', supplierOpsRoutes)
 app.use('/api/supplier/growth', supplierGrowthRoutes)

@@ -166,6 +166,8 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
 
   const handleLogout = async () => {
     try {
+      const { stopAuthSessionRefresh } = await import('../lib/authSessionRefresh')
+      stopAuthSessionRefresh()
       const data = await logout().unwrap()
       dispatch(api.util.resetApiState())
       toast.success(t('header.loggedOutSuccess'))

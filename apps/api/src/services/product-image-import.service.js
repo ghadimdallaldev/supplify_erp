@@ -10,6 +10,7 @@ import { ValidationError, NotFoundError, ConflictError } from '../middlewares/er
 import { ensureStorageForUpload } from '../lib/subscription.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
+import { assertPublicHttpUrl } from '../lib/ssrf-guard.js'
 import {
   putObject,
   deleteObject,
@@ -524,39 +525,8 @@ export function buildImageImportFailureCsv(failures) {
   return `${lines.join('\n')}\n`
 }
 
-function isPrivateHostname(hostname) {
-  const host = String(hostname || '').toLowerCase()
-  if (!host || host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) {
-    return true
-  }
-
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
-    const parts = host.split('.').map(Number)
-    if (parts[0] === 10) return true
-    if (parts[0] === 127) return true
-    if (parts[0] === 169 && parts[1] === 254) return true
-    if (parts[0] === 192 && parts[1] === 168) return true
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true
-    if (parts[0] === 0) return true
-  }
-
-  return false
-}
-
 export function assertSafeImageUrl(urlString) {
-  let parsed
-  try {
-    parsed = new URL(urlString)
-  } catch {
-    throw new ValidationError('Invalid image URL')
-  }
-  if (!['http:', 'https:'].includes(parsed.protocol)) {
-    throw new ValidationError('Only HTTP and HTTPS URLs are allowed')
-  }
-  if (isPrivateHostname(parsed.hostname)) {
-    throw new ValidationError('Private or local URLs are not allowed')
-  }
-  return parsed
+  return assertPublicHttpUrl(urlString, { label: 'Image URL' })
 }
 
 export function validateFetchResponseUrl(urlString) {

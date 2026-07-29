@@ -64,11 +64,16 @@ export function ReservationTableBuilder({
   readOnly = false,
 }: ReservationTableBuilderProps) {
   const { t } = useTranslation('reservations')
+  // These getters resolve labels via i18n.t() internally, so `t` is a real
+  // dependency that the lint rule cannot see. Dropping it would freeze the
+  // labels in whichever language was active on first render.
+  /* eslint-disable react-hooks/exhaustive-deps */
   const shapePresets = useMemo(() => getShapePresets(), [t])
   const colorPresets = useMemo(() => getColorPresets(), [t])
   const zones = useMemo(() => getZones(), [t])
   const featureOptions = useMemo(() => getFeatureOptions(), [t])
   const serviceStatusStyles = useMemo(() => getServiceStatusStyles(), [t])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Core state
   const [editableTables, setEditableTables] = useState<EditableTable[]>(() => hydrateTables(tables))
@@ -355,24 +360,27 @@ export function ReservationTableBuilder({
     })
   }
 
-  const handleDuplicateTable = useCallback((table: EditableTable) => {
-    const offsetX = clamp(table.x + table.width * 0.1, 0, 1 - table.width)
-    const offsetY = clamp(table.y + table.height * 0.1, 0, 1 - table.height)
-    setEditableTables((prev) => {
-      const localId = createLocalId()
-      const duplicate: EditableTable = {
-        ...table,
-        id: undefined,
-        localId,
-        name: `${table.name} ${t('common.copySuffix')}`,
-        x: offsetX,
-        y: offsetY,
-        features: [...table.features],
-      }
-      setSelectedTableId(localId)
-      return [...prev, duplicate]
-    })
-  }, [])
+  const handleDuplicateTable = useCallback(
+    (table: EditableTable) => {
+      const offsetX = clamp(table.x + table.width * 0.1, 0, 1 - table.width)
+      const offsetY = clamp(table.y + table.height * 0.1, 0, 1 - table.height)
+      setEditableTables((prev) => {
+        const localId = createLocalId()
+        const duplicate: EditableTable = {
+          ...table,
+          id: undefined,
+          localId,
+          name: `${table.name} ${t('common.copySuffix')}`,
+          x: offsetX,
+          y: offsetY,
+          features: [...table.features],
+        }
+        setSelectedTableId(localId)
+        return [...prev, duplicate]
+      })
+    },
+    [t]
+  )
 
   const handleDeleteTable = useCallback((localId: string) => {
     setEditableTables((prev) => prev.filter((t) => t.localId !== localId))

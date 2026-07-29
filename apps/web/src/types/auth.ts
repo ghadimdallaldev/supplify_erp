@@ -46,6 +46,10 @@ export interface User {
   adminPreferences?: AdminUserPreferences
   /** Persisted UI locale preference */
   preferredLocale?: 'en' | 'ar'
+  /** Access JWT exp (ms epoch) from server — drives proactive refresh */
+  accessTokenExpiresAt?: number | null
+  /** Server flag for proactive refresh scheduler */
+  proactiveRefreshEnabled?: boolean
 }
 
 export type AdminLandingTab =

@@ -103,6 +103,15 @@ export const config = {
   COOKIE_SECURE: envBool(process.env.COOKIE_SECURE, isProductionNode),
   COOKIE_SAME_SITE: process.env.COOKIE_SAME_SITE || (isProductionNode ? 'lax' : 'lax'),
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || '',
+  /** Align with Keycloak access token lifespan (20 minutes). */
+  AUTH_ACCESS_COOKIE_MAX_AGE_MS: envInt(process.env.AUTH_ACCESS_COOKIE_MAX_AGE_MS, 20 * 60 * 1000),
+  /** Align with Keycloak SSO Session Max (30 days). */
+  AUTH_REFRESH_COOKIE_MAX_AGE_MS: envInt(
+    process.env.AUTH_REFRESH_COOKIE_MAX_AGE_MS,
+    30 * 24 * 60 * 60 * 1000
+  ),
+  /** Web proactive refresh scheduler (frontend reads via /auth/me). */
+  AUTH_PROACTIVE_REFRESH: envBool(process.env.AUTH_PROACTIVE_REFRESH, true),
   SESSION_SECRET:
     process.env.SESSION_SECRET || (isProductionNode ? '' : 'dev-session-secret-change-me'),
   /** JWT signing for B2C diner sessions (consumer_auth_token cookie). Separate from Keycloak. */
@@ -114,6 +123,14 @@ export const config = {
     process.env.IMPERSONATION_SECRET ||
     process.env.SESSION_SECRET ||
     (isProductionNode ? '' : 'dev-session-secret-change-me'),
+  ACTIVE_TENANT_SECRET:
+    process.env.ACTIVE_TENANT_SECRET ||
+    (isProductionNode
+      ? ''
+      : process.env.IMPERSONATION_SECRET ||
+        process.env.SESSION_SECRET ||
+        'dev-active-tenant-secret'),
+  ACTIVE_TENANT_SECRET_IS_FALLBACK: !process.env.ACTIVE_TENANT_SECRET,
   IMPERSONATION_MAX_DURATION_MINUTES: envInt(process.env.IMPERSONATION_MAX_DURATION_MINUTES, 60),
   STORAGE_DRIVER:
     process.env.STORAGE_DRIVER ||
@@ -265,9 +282,23 @@ export const config = {
     24 * 60 * 60 * 1000
   ),
   GPS_TRACKING_ENABLED: envBool(process.env.GPS_TRACKING_ENABLED, true),
+  GPS_NATIVE_TRACKING_ENABLED: envBool(process.env.GPS_NATIVE_TRACKING_ENABLED, false),
+  GPS_TRACKING_SESSIONS_ENABLED: envBool(process.env.GPS_TRACKING_SESSIONS_ENABLED, false),
+  GPS_OFFLINE_QUEUE_ENABLED: envBool(process.env.GPS_OFFLINE_QUEUE_ENABLED, false),
+  GPS_LIVE_EVENTS_ENABLED: envBool(process.env.GPS_LIVE_EVENTS_ENABLED, false),
+  GPS_GEOFENCE_ENABLED: envBool(process.env.GPS_GEOFENCE_ENABLED, false),
   GPS_STALE_AFTER_SECONDS: envInt(process.env.GPS_STALE_AFTER_SECONDS, 300),
   GPS_UPDATE_INTERVAL_SECONDS: envInt(process.env.GPS_UPDATE_INTERVAL_SECONDS, 15),
   GPS_MIN_ACCURACY_METERS: envInt(process.env.GPS_MIN_ACCURACY_METERS, 100),
+  GPS_MAX_ACCURACY_METERS: envInt(process.env.GPS_MAX_ACCURACY_METERS, 250),
+  GPS_MAX_SPEED_KPH: envInt(process.env.GPS_MAX_SPEED_KPH, 160),
+  GPS_BATCH_MAX_SIZE: envInt(process.env.GPS_BATCH_MAX_SIZE, 100),
+  GPS_MIN_SEND_INTERVAL_SECONDS: envInt(process.env.GPS_MIN_SEND_INTERVAL_SECONDS, 15),
+  GPS_MIN_MOVEMENT_METERS: envInt(process.env.GPS_MIN_MOVEMENT_METERS, 5),
+  GPS_GEOFENCE_APPROACHING_METERS: envInt(process.env.GPS_GEOFENCE_APPROACHING_METERS, 500),
+  GPS_GEOFENCE_NEARBY_METERS: envInt(process.env.GPS_GEOFENCE_NEARBY_METERS, 200),
+  GPS_GEOFENCE_ARRIVAL_METERS: envInt(process.env.GPS_GEOFENCE_ARRIVAL_METERS, 80),
+  GPS_GEOFENCE_DWELL_SECONDS: envInt(process.env.GPS_GEOFENCE_DWELL_SECONDS, 45),
   GPS_LOCATION_RETENTION_DAYS: envInt(process.env.GPS_LOCATION_RETENTION_DAYS, 90),
   GPS_ALLOW_RESTAURANT_LIVE_TRACKING: envBool(process.env.GPS_ALLOW_RESTAURANT_LIVE_TRACKING, true),
   GPS_RESTAURANT_SHOW_DRIVER_NAME: envBool(process.env.GPS_RESTAURANT_SHOW_DRIVER_NAME, true),

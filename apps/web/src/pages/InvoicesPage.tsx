@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState, useCallback } from 'react'
+import { Suspense, useEffect, useMemo, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ensureNamespace } from '../i18n'
@@ -146,15 +146,12 @@ export function InvoicesPage() {
     entitlementsData?.entitlements,
     'disputes_returns'
   )
-  const { data: tenantCreditNotesData, refetch: refetchCreditNotes } = useGetCreditNotesQuery(
-    undefined,
-    {
-      skip: !disputesEnabled,
-    }
-  )
+  const { data: tenantCreditNotesData } = useGetCreditNotesQuery(undefined, {
+    skip: !disputesEnabled,
+  })
   const tenantCreditNotes = tenantCreditNotesData?.creditNotes || []
 
-  const invoices = invoicesData?.invoices || []
+  const invoices = useMemo(() => invoicesData?.invoices || [], [invoicesData])
   const analytics = analyticsData?.analytics || {}
   const creditNotes = creditsData?.creditNotes || []
 

@@ -20,6 +20,11 @@ export function singleflight(key, fn) {
   return promise
 }
 
+/** @param {string} key */
+export function hasInflight(key) {
+  return inflight.has(key)
+}
+
 /** @internal Test helper */
 export function resetSingleflightForTests() {
   inflight.clear()

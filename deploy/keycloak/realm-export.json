@@ -8,6 +8,17 @@
   "resetPasswordAllowed": true,
   "editUsernameAllowed": false,
   "bruteForceProtected": true,
+  "rememberMe": false,
+  "accessTokenLifespan": 1200,
+  "accessTokenLifespanForImplicitFlow": 1200,
+  "ssoSessionIdleTimeout": 604800,
+  "ssoSessionMaxLifespan": 2592000,
+  "ssoSessionIdleTimeoutRememberMe": 0,
+  "ssoSessionMaxLifespanRememberMe": 0,
+  "clientSessionIdleTimeout": 604800,
+  "clientSessionMaxLifespan": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "clients": [
     {
       "clientId": "supplify-api",
@@ -33,8 +44,8 @@
       "webOrigins": ["+"],
       "protocol": "openid-connect",
       "attributes": {
-        "access.token.lifespan": "3600",
-        "access.token.lifespan.for.implicit.flow": "3600",
+        "access.token.lifespan": "1200",
+        "access.token.lifespan.for.implicit.flow": "1200",
         "client.secret.creation.time": "1700000000",
         "post.logout.redirect.uris": "http://localhost:5173/login##http://localhost:5173/*##http://localhost:4000/login##http://localhost:4000/*##http://localhost/login##http://localhost/*##http://localhost:8180/login##https://app-dev.supplifyerp.com/login##https://app-dev.supplifyerp.com/*##https://api-dev.supplifyerp.com/auth/register?continue=1##https://api-dev.supplifyerp.com/auth/register##https://api-dev.supplifyerp.com/*##https://supplify-web-dev-development.up.railway.app/login##https://supplify-web-dev-development.up.railway.app/*##https://supplify-api-dev-development.up.railway.app/auth/register?continue=1##https://supplify-api-dev-development.up.railway.app/auth/register##https://supplify-api-dev-development.up.railway.app/*"
       },
@@ -87,6 +98,8 @@
       "protocol": "openid-connect",
       "attributes": {
         "pkce.code.challenge.method": "S256",
+        "access.token.lifespan": "1200",
+        "access.token.lifespan.for.implicit.flow": "1200",
         "post.logout.redirect.uris": "supplify://auth/logout"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],

@@ -1,10 +1,11 @@
-import { verifyToken, refreshAccessToken } from './auth.js'
+import { verifyToken, refreshAccessTokenSingleFlight, getAccessTokenExpiresAtMs } from './auth.js'
 import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { singleflight } from './singleflight.js'
+import { emitAuthSessionEvent } from './auth-session-events.js'
 import { startStage, mark, noteCacheHit } from '../middlewares/request-timing.js'
 import {
   resolveRequestBillingSubscription,
@@ -47,6 +48,7 @@ import {
   isBearerAuthRequest,
 } from './mobile-auth.js'
 import { isBillingRecoveryPath } from './billing/billing-recovery-paths.js'
+import { normalizeIdentityEmail, isUniqueViolation } from './identity-normalize.js'
 
 export { extractBearerToken, extractAccessToken, isBearerAuthRequest } from './mobile-auth.js'
 
@@ -94,8 +96,18 @@ function authCookieOptions(maxAge) {
 
 // Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts)
 export function setAuthCookies(res, accessToken, refreshToken) {
-  res.cookie('access_token', accessToken, authCookieOptions(60 * 60 * 1000))
-  res.cookie('refresh_token', refreshToken, authCookieOptions(7 * 24 * 60 * 60 * 1000))
+  const accessMaxAge = config.AUTH_ACCESS_COOKIE_MAX_AGE_MS
+  const refreshMaxAge = config.AUTH_REFRESH_COOKIE_MAX_AGE_MS
+  res.cookie('access_token', accessToken, authCookieOptions(accessMaxAge))
+  res.cookie('refresh_token', refreshToken, authCookieOptions(refreshMaxAge))
+}
+
+export function getSessionMetaFromAccessToken(accessToken) {
+  const expiresAt = getAccessTokenExpiresAtMs(accessToken)
+  return {
+    accessTokenExpiresAt: expiresAt,
+    proactiveRefreshEnabled: config.AUTH_PROACTIVE_REFRESH !== false,
+  }
 }
 
 // Clear auth cookies (same path/sameSite as setAuthCookies so browser actually removes them)
@@ -128,7 +140,11 @@ export async function getUserBySub(sub, req = null) {
       }
 
       const lookupStart = req?._perf ? process.hrtime.bigint() : null
-      const result = await query('SELECT * FROM app_user WHERE keycloak_sub = $1', [sub], req)
+      const result = await query(
+        'SELECT * FROM app_user WHERE keycloak_sub = $1 AND COALESCE(is_active, TRUE) = TRUE',
+        [sub],
+        req
+      )
       if (lookupStart != null && req?._perf) {
         req._perf.stages.userLookup = Math.round(
           Number(process.hrtime.bigint() - lookupStart) / 1_000_000
@@ -172,7 +188,8 @@ export async function ensureUserForAccessPayload(payload, req = null) {
 export async function upsertUser(userInfo, roles = []) {
   try {
     const { sub, email, given_name, family_name } = userInfo
-    const displayName = `${given_name || ''} ${family_name || ''}`.trim() || email
+    const normalizedEmail = normalizeIdentityEmail(email)
+    const displayName = `${given_name || ''} ${family_name || ''}`.trim() || normalizedEmail
 
     logger.debug('Upserting user', { sub })
 
@@ -191,7 +208,7 @@ export async function upsertUser(userInfo, roles = []) {
     } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
-      const emailLower = (email || '').toLowerCase()
+      const emailLower = normalizedEmail
       if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
         explicitRole = 'ADMIN'
       } else if (emailLower === 'supplier@supplify.com') {
@@ -204,10 +221,17 @@ export async function upsertUser(userInfo, roles = []) {
 
     const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT'])
     const existingLookup = await query(
-      `SELECT role FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
-      [sub, email]
+      `SELECT role, is_active FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+      [sub, normalizedEmail]
     )
-    const existingRole = existingLookup.rows[0]?.role
+    const existingUser = existingLookup.rows[0]
+    if (existingUser && existingUser.is_active === false) {
+      throw Object.assign(new Error('Account is deactivated'), {
+        name: 'ACCOUNT_DEACTIVATED',
+        code: 'ACCOUNT_DEACTIVATED',
+      })
+    }
+    const existingRole = existingUser?.role
     if (
       existingRole &&
       PLATFORM_ROLES.has(existingRole) &&
@@ -240,7 +264,7 @@ export async function upsertUser(userInfo, roles = []) {
       UNION ALL
       SELECT * FROM inserted
     `,
-      [sub, email, displayName, explicitRole, insertRole]
+      [sub, normalizedEmail, displayName, explicitRole, insertRole]
     )
 
     logger.debug('User upserted', { userId: result.rows[0]?.id, role: result.rows[0]?.role })
@@ -248,7 +272,8 @@ export async function upsertUser(userInfo, roles = []) {
     if (sub) await invalidateUserBySubCache(sub)
     return row
   } catch (error) {
-    logger.error('Error upserting user', { error: error.message })
+    logger.error('Error upserting user', { error: error.message, code: error.code })
+    if (isUniqueViolation(error)) error.identityField = 'email'
     throw error
   }
 }
@@ -278,6 +303,7 @@ export async function requireAuth(req, res, next) {
       const payload = await verifyToken(accessToken)
       req.user = payload
       req.userSub = payload.sub
+      req.accessTokenExpiresAt = getAccessTokenExpiresAtMs(accessToken)
 
       // Get user from database (mobile bearer upserts on first login)
       const user = bearerToken
@@ -329,6 +355,7 @@ export async function requireAuth(req, res, next) {
       if (!refreshToken) {
         logger.debug('No refresh token available')
         clearAuthCookies(res)
+        emitAuthSessionEvent('AUTH_SESSION_EXPIRED', { reason: 'missing_refresh' })
         return res.status(401).json({
           ok: false,
           data: null,
@@ -340,13 +367,37 @@ export async function requireAuth(req, res, next) {
         })
       }
 
-      // Attempt to refresh the token
+      // Attempt to refresh the token (single-flight; rotation-safe)
       logger.debug('Attempting to refresh token')
-      const newTokens = await refreshAccessToken(refreshToken)
+      const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
 
-      if (!newTokens) {
-        logger.warn('Token refresh returned null')
+      if (!refreshResult.ok) {
+        if (refreshResult.reason === 'transient') {
+          emitAuthSessionEvent('AUTH_OFFLINE_REFRESH_DEFERRED', {
+            status: refreshResult.status || null,
+          })
+          emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', {
+            reason: 'transient',
+            status: refreshResult.status || null,
+          })
+          // Do not clear cookies — client should retry when connectivity returns
+          return res.status(503).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+              message: 'Authentication service temporarily unavailable. Retry shortly.',
+            },
+            requestId: req.requestId,
+          })
+        }
+        if (refreshResult.reason === 'reuse') {
+          emitAuthSessionEvent('AUTH_REFRESH_TOKEN_REUSED')
+        }
+        logger.warn('Token refresh failed', { reason: refreshResult.reason })
         clearAuthCookies(res)
+        emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', { reason: refreshResult.reason })
+        emitAuthSessionEvent('AUTH_SESSION_EXPIRED', { reason: refreshResult.reason })
         return res.status(401).json({
           ok: false,
           data: null,
@@ -358,7 +409,9 @@ export async function requireAuth(req, res, next) {
         })
       }
 
+      const newTokens = refreshResult.tokens
       logger.debug('Token refresh successful')
+      emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'requireAuth' })
 
       // Set new cookies
       setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
@@ -367,6 +420,7 @@ export async function requireAuth(req, res, next) {
       const payload = await verifyToken(newTokens.access_token)
       req.user = payload
       req.userSub = payload.sub
+      req.accessTokenExpiresAt = getAccessTokenExpiresAtMs(newTokens.access_token)
 
       // Get user from database
       const user = await getUserBySub(payload.sub, req)
@@ -444,23 +498,25 @@ export async function optionalAuth(req, res, next) {
 
       if (refreshToken) {
         try {
-          const newTokens = await refreshAccessToken(refreshToken)
+          const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
 
-          if (newTokens) {
-            // Set new cookies
+          if (refreshResult.ok) {
+            const newTokens = refreshResult.tokens
             setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+            emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'optionalAuth' })
 
-            // Verify the new token
             const payload = await verifyToken(newTokens.access_token)
             req.user = payload
             req.userSub = payload.sub
+            req.accessTokenExpiresAt = getAccessTokenExpiresAtMs(newTokens.access_token)
 
-            // Get user from database
             const user = await getUserBySub(payload.sub)
             if (user) {
               req.userData = user
               syncRequestLogContext(req)
             }
+          } else if (refreshResult.reason === 'transient') {
+            emitAuthSessionEvent('AUTH_OFFLINE_REFRESH_DEFERRED', { source: 'optionalAuth' })
           }
         } catch (refreshError) {
           // Refresh failed, continue without authentication

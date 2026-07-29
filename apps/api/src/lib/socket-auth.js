@@ -1,4 +1,4 @@
-import { verifyToken, refreshAccessToken } from './auth.js'
+import { verifyToken, refreshAccessTokenSingleFlight } from './auth.js'
 import { getUserBySub } from './rbac.js'
 import {
   getActiveTenantCookieName,
@@ -59,10 +59,11 @@ export async function resolvePayloadFromCookieHeader(cookieHeader) {
     }
 
     logger.debug('Socket auth: access token expired, attempting refresh')
-    const newTokens = await refreshAccessToken(refreshToken)
-    if (!newTokens?.access_token) {
+    const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
+    if (!refreshResult.ok || !refreshResult.tokens?.access_token) {
       throw error
     }
+    const newTokens = refreshResult.tokens
 
     const payload = await verifyToken(newTokens.access_token)
     return { payload, newTokens }

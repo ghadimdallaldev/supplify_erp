@@ -1,5 +1,14 @@
 import express from 'express'
-import { requireAuth, requireRole, getRequestTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  getRequestTenant,
+  resolveTenantContext,
+  resolveAdminContext,
+  requireAnyPermission,
+  requirePermission,
+} from '../lib/rbac.js'
+import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
 import { query } from '../lib/db.js'
 import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
@@ -28,111 +37,121 @@ const auditListSchema = z.object({
 })
 
 // Get audit logs (admin only)
-router.get('/audit', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const params = auditListSchema.parse(req.query)
+router.get(
+  '/audit',
+  requireAuth,
+  requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission(P.ADMIN_ACCESS),
+  async (req, res) => {
+    try {
+      const params = auditListSchema.parse(req.query)
 
-    const whereConditions = []
-    const queryParams = []
-    let paramIndex = 1
+      const whereConditions = []
+      const queryParams = []
+      let paramIndex = 1
 
-    // Actor filter
-    if (params.actor) {
-      whereConditions.push(`actor_sub = $${paramIndex}`)
-      queryParams.push(params.actor)
-      paramIndex++
-    }
+      // Actor filter
+      if (params.actor) {
+        whereConditions.push(`actor_sub = $${paramIndex}`)
+        queryParams.push(params.actor)
+        paramIndex++
+      }
 
-    // Action filter
-    if (params.action) {
-      whereConditions.push(`action = $${paramIndex}`)
-      queryParams.push(params.action)
-      paramIndex++
-    }
+      // Action filter
+      if (params.action) {
+        whereConditions.push(`action = $${paramIndex}`)
+        queryParams.push(params.action)
+        paramIndex++
+      }
 
-    // Resource filter
-    if (params.resource) {
-      whereConditions.push(`resource = $${paramIndex}`)
-      queryParams.push(params.resource)
-      paramIndex++
-    }
+      // Resource filter
+      if (params.resource) {
+        whereConditions.push(`resource = $${paramIndex}`)
+        queryParams.push(params.resource)
+        paramIndex++
+      }
 
-    // Date range filter
-    if (params.startDate) {
-      whereConditions.push(`created_at >= $${paramIndex}`)
-      queryParams.push(params.startDate)
-      paramIndex++
-    }
+      // Date range filter
+      if (params.startDate) {
+        whereConditions.push(`created_at >= $${paramIndex}`)
+        queryParams.push(params.startDate)
+        paramIndex++
+      }
 
-    if (params.endDate) {
-      whereConditions.push(`created_at <= $${paramIndex}`)
-      queryParams.push(params.endDate)
-      paramIndex++
-    }
+      if (params.endDate) {
+        whereConditions.push(`created_at <= $${paramIndex}`)
+        queryParams.push(params.endDate)
+        paramIndex++
+      }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const sql = `
+      const sql = `
       SELECT * FROM admin_audit_log
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
-    queryParams.push(params.limit, params.offset)
+      queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+      const { rows } = await query(sql, queryParams)
 
-    // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM admin_audit_log ${whereClause}`
-    const countParams = queryParams.slice(0, -2)
-    const { rows: countRows } = await query(countSql, countParams)
+      // Get total count
+      const countSql = `SELECT COUNT(*) as total FROM admin_audit_log ${whereClause}`
+      const countParams = queryParams.slice(0, -2)
+      const { rows: countRows } = await query(countSql, countParams)
 
-    res.json({
-      ok: true,
-      data: {
-        logs: rows,
-        pagination: {
-          total: parseInt(countRows[0].total),
-          limit: params.limit,
-          offset: params.offset,
+      res.json({
+        ok: true,
+        data: {
+          logs: rows,
+          pagination: {
+            total: parseInt(countRows[0].total),
+            limit: params.limit,
+            offset: params.offset,
+          },
         },
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid query parameters',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Get audit logs error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid query parameters',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get audit logs',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Get audit logs error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get audit logs',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Get dashboard statistics (role-aware; respects impersonation)
 router.get(
   '/dashboard',
   requireAuth,
   requireRole(['ADMIN', 'RESTAURANT', 'SUPPLIER']),
+  resolveTenantContext,
+  resolveAdminContext,
+  requireAnyPermission(P.ADMIN_ACCESS, P.CATALOG_VIEW, P.ORDERS_VIEW),
   async (req, res) => {
     const userRole = req.userData.role
     try {
@@ -207,7 +226,19 @@ router.get(
           { rows: completedOrders },
           { rows: totalSpent },
         ] = await Promise.all([
-          query('SELECT COUNT(*) as count FROM product'),
+          query(
+            `SELECT COUNT(*) as count
+             FROM product p
+             WHERE EXISTS (
+               SELECT 1 FROM supplier_follow sf
+               WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM supplier_blocklist sb
+               WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1
+             )`,
+            [restaurantId]
+          ),
           query('SELECT COUNT(*) as count FROM customer_order WHERE restaurant_id = $1', [
             restaurantId,
           ]),
@@ -246,6 +277,7 @@ router.get(
           query('SELECT COUNT(*) as count FROM supplier'),
           query('SELECT COUNT(*) as count FROM restaurant'),
           query('SELECT COUNT(*) as count FROM product'),
+
           query('SELECT COUNT(*) as count FROM customer_order'),
           query(
             "SELECT COUNT(*) as count FROM customer_order WHERE status IN ('PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')"
@@ -313,6 +345,8 @@ router.get(
   '/dashboard/summary',
   requireAuth,
   requireRole(['RESTAURANT', 'SUPPLIER']),
+  resolveTenantContext,
+  requireAnyPermission(P.CATALOG_VIEW, P.ORDERS_VIEW),
   async (req, res) => {
     try {
       const tenant = await getRequestTenant(req)

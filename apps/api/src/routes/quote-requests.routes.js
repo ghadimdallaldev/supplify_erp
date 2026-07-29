@@ -66,28 +66,34 @@ const submitResponseSchema = z.object({
 router.use(requireAuth, resolveTenantContext)
 
 // Supplier routes first (more specific paths)
-router.get('/supplier/inbox', requireRole(['SUPPLIER']), async (req, res, next) => {
-  try {
-    const supplierId = await getSupplierIdForRequest(req)
-    if (!supplierId) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'VALIDATION_ERROR', message: 'Supplier not found' },
-        requestId: req.requestId,
-      })
+router.get(
+  '/supplier/inbox',
+  requireRole(['SUPPLIER']),
+  requirePermission(P.ORDERS_VIEW),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const params = listQuerySchema.parse(req.query)
+      const data = await listSupplierQuoteRequests(supplierId, params)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
     }
-    const params = listQuerySchema.parse(req.query)
-    const data = await listSupplierQuoteRequests(supplierId, params)
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (error) {
-    next(error)
   }
-})
+)
 
 router.get(
   '/supplier/inbox/:quoteRequestSupplierId',
   requireRole(['SUPPLIER']),
+  requirePermission(P.ORDERS_VIEW),
   async (req, res, next) => {
     try {
       const supplierId = await getSupplierIdForRequest(req)
@@ -113,6 +119,7 @@ router.get(
 router.post(
   '/supplier/inbox/:quoteRequestSupplierId/respond',
   requireRole(['SUPPLIER']),
+  requirePermission(P.ORDERS_MANAGE),
   async (req, res, next) => {
     try {
       const supplierId = await getSupplierIdForRequest(req)

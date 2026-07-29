@@ -16,7 +16,15 @@ function isAllowedOrigin(req) {
   if (!origin) {
     const referer = req.headers.referer
     if (!referer) return false
-    return config.WEB_ORIGINS.some((allowed) => referer.startsWith(allowed))
+    // Compare parsed origins, not string prefixes: a prefix match would accept
+    // https://app.example.com.attacker.test for an allowed https://app.example.com.
+    let refererOrigin
+    try {
+      refererOrigin = new URL(referer).origin
+    } catch {
+      return false
+    }
+    return config.WEB_ORIGINS.includes(refererOrigin)
   }
   return config.WEB_ORIGINS.includes(origin)
 }
