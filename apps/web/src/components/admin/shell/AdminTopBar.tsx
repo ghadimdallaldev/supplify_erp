@@ -57,6 +57,8 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
   const handleLogout = useCallback(async () => {
     try {
       const data = await logout().unwrap()
+      const { stopAuthSessionRefresh } = await import('../../../lib/authSessionRefresh')
+      stopAuthSessionRefresh()
       dispatch(api.util.resetApiState())
       toast.success(t('common.logoutSuccess'))
       window.location.href = data?.keycloakLogoutUrl || '/login'

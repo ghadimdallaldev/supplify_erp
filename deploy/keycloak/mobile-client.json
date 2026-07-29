@@ -16,6 +16,8 @@
   "protocol": "openid-connect",
   "attributes": {
     "pkce.code.challenge.method": "S256",
+    "access.token.lifespan": "1200",
+    "access.token.lifespan.for.implicit.flow": "1200",
     "post.logout.redirect.uris": "supplify://auth/logout"
   },
   "defaultClientScopes": ["web-origins", "profile", "roles", "email"],

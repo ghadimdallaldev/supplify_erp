@@ -9,6 +9,7 @@ import { getRegisterCompletePath } from '../lib/referralToken'
 import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
 import { changeAppLanguage, readStoredLocale } from '../i18n'
 import { isSupportedLocale } from '../i18n/config'
+import { startAuthSessionRefresh, stopAuthSessionRefresh } from '../lib/authSessionRefresh'
 import type { ReactNode } from 'react'
 
 interface AuthGuardProps {
@@ -84,6 +85,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
     if (error) {
+      stopAuthSessionRefresh()
       dispatch(clearUser())
       dispatch(setLoading(false))
       navigate('/login')
@@ -93,6 +95,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     dispatch(setUser(data))
     dispatch(setLoading(false))
+    startAuthSessionRefresh(
+      data.accessTokenExpiresAt ?? null,
+      data.proactiveRefreshEnabled !== false
+    )
 
     if (data.role === 'STAFF_PORTAL' && isAppRoute) {
       navigate('/staff/dashboard', { replace: true })

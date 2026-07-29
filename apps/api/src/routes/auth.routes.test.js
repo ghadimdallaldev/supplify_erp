@@ -24,6 +24,7 @@ vi.mock('../lib/logger.js', () => ({
 
 vi.mock('../lib/auth.js', () => ({
   getAuthorizationUrl: vi.fn().mockResolvedValue('https://keycloak.example.com/auth'),
+  getRegistrationUrl: vi.fn().mockResolvedValue('https://keycloak.example.com/registrations'),
   exchangeCodeForTokens: vi.fn().mockResolvedValue({
     access_token: 'access-token',
     refresh_token: 'refresh-token',
@@ -38,9 +39,22 @@ vi.mock('../lib/auth.js', () => ({
     access_token: 'new-access-token',
     refresh_token: 'new-refresh-token',
   }),
+  refreshAccessTokenSingleFlight: vi.fn().mockResolvedValue({
+    ok: true,
+    tokens: {
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 1200,
+    },
+  }),
+  getAccessTokenExpiresAtMs: vi.fn().mockReturnValue(Date.now() + 1_200_000),
   getKeycloakLogoutUrl: vi
     .fn()
     .mockResolvedValue('https://keycloak.example.com/logout?post_logout_redirect_uri=...'),
+}))
+
+vi.mock('../lib/auth-session-events.js', () => ({
+  emitAuthSessionEvent: vi.fn(),
 }))
 
 vi.mock('../lib/rbac.js', async (importOriginal) => {
@@ -434,7 +448,7 @@ describe('Auth Routes', () => {
   describe('POST /auth/refresh', () => {
     it('should refresh access token', async () => {
       const cookieParser = (await import('cookie-parser')).default
-      const { refreshAccessToken } = await import('../lib/auth.js')
+      const { refreshAccessTokenSingleFlight } = await import('../lib/auth.js')
       const { setAuthCookies } = await import('../lib/rbac.js')
 
       // Add cookie-parser middleware to app
@@ -449,10 +463,13 @@ describe('Auth Routes', () => {
       const { errorHandler } = await import('../middlewares/errorHandler.js')
       appWithCookies.use(errorHandler)
 
-      // Mock refreshAccessToken to return new tokens
-      vi.mocked(refreshAccessToken).mockResolvedValueOnce({
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
+      vi.mocked(refreshAccessTokenSingleFlight).mockResolvedValueOnce({
+        ok: true,
+        tokens: {
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 1200,
+        },
       })
 
       const response = await request(appWithCookies)
@@ -460,9 +477,10 @@ describe('Auth Routes', () => {
         .set('Cookie', 'refresh_token=valid-refresh-token')
         .expect(200)
 
-      expect(refreshAccessToken).toHaveBeenCalledWith('valid-refresh-token')
+      expect(refreshAccessTokenSingleFlight).toHaveBeenCalledWith('valid-refresh-token')
       expect(setAuthCookies).toHaveBeenCalled()
       expect(response.body.ok).toBe(true)
+      expect(response.body.data.accessTokenExpiresAt).toBeTruthy()
     })
 
     it('should reject invalid refresh token', async () => {
@@ -471,16 +489,50 @@ describe('Auth Routes', () => {
       expect(response.body.ok).toBe(false)
       expect(response.body.error.name).toBe('UNAUTHORIZED')
     })
+
+    it('returns 503 without clearing cookies on transient Keycloak failure', async () => {
+      const cookieParser = (await import('cookie-parser')).default
+      const { refreshAccessTokenSingleFlight } = await import('../lib/auth.js')
+      const { clearAuthCookies } = await import('../lib/rbac.js')
+
+      const appWithCookies = express()
+      appWithCookies.use(cookieParser())
+      appWithCookies.use(express.json())
+      appWithCookies.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        next()
+      })
+      appWithCookies.use('/auth', authRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      appWithCookies.use(errorHandler)
+
+      vi.mocked(refreshAccessTokenSingleFlight).mockResolvedValueOnce({
+        ok: false,
+        reason: 'transient',
+        status: 503,
+      })
+      clearAuthCookies.mockClear?.()
+
+      const response = await request(appWithCookies)
+        .post('/auth/refresh')
+        .set('Cookie', 'refresh_token=valid-refresh-token')
+        .expect(503)
+
+      expect(response.body.error.name).toBe('AUTH_TEMPORARILY_UNAVAILABLE')
+    })
   })
 
   describe('POST /auth/mobile/refresh', () => {
     it('returns JSON tokens for mobile clients', async () => {
-      const { refreshAccessToken } = await import('../lib/auth.js')
+      const { refreshAccessTokenSingleFlight } = await import('../lib/auth.js')
 
-      vi.mocked(refreshAccessToken).mockResolvedValueOnce({
-        access_token: 'new-access-token',
-        refresh_token: 'new-refresh-token',
-        expires_in: 3600,
+      vi.mocked(refreshAccessTokenSingleFlight).mockResolvedValueOnce({
+        ok: true,
+        tokens: {
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 1200,
+        },
       })
 
       const response = await request(app)
@@ -488,7 +540,7 @@ describe('Auth Routes', () => {
         .send({ refresh_token: 'valid-refresh-token' })
         .expect(200)
 
-      expect(refreshAccessToken).toHaveBeenCalledWith('valid-refresh-token')
+      expect(refreshAccessTokenSingleFlight).toHaveBeenCalledWith('valid-refresh-token')
       expect(response.body.ok).toBe(true)
       expect(response.body.data.access_token).toBe('new-access-token')
       expect(response.body.data.refresh_token).toBe('new-refresh-token')

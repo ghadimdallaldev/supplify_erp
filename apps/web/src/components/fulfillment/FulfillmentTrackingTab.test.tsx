@@ -4,6 +4,7 @@ import { FulfillmentTrackingTab } from './FulfillmentTrackingTab'
 import { renderWithFulfillmentI18n } from './test-utils'
 
 vi.mock('../../services/api', () => ({
+  useGetMeQuery: () => ({ data: undefined }),
   useGetOrderTrackingQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useGetSupplierDeliveryBoardQuery: () => ({
     data: {

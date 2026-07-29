@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('./auth.js', () => ({
   verifyToken: vi.fn(),
   refreshAccessToken: vi.fn(),
+  refreshAccessTokenSingleFlight: vi.fn(),
+  getAccessTokenExpiresAtMs: vi.fn().mockReturnValue(Date.now() + 1_200_000),
 }))
 
-import { verifyToken, refreshAccessToken } from './auth.js'
+import { verifyToken, refreshAccessTokenSingleFlight } from './auth.js'
 import { parseCookieHeader, resolvePayloadFromCookieHeader } from './socket-auth.js'
 
 describe('socket-auth', () => {
@@ -27,7 +29,7 @@ describe('socket-auth', () => {
 
     expect(result.payload.sub).toBe('user-sub')
     expect(result.newTokens).toBeNull()
-    expect(refreshAccessToken).not.toHaveBeenCalled()
+    expect(refreshAccessTokenSingleFlight).not.toHaveBeenCalled()
   })
 
   it('refreshes expired access token using refresh cookie', async () => {
@@ -36,16 +38,19 @@ describe('socket-auth', () => {
     expired.code = 'ERR_JWT_EXPIRED'
 
     vi.mocked(verifyToken).mockRejectedValueOnce(expired).mockResolvedValueOnce({ sub: 'user-sub' })
-    vi.mocked(refreshAccessToken).mockResolvedValueOnce({
-      access_token: 'new-access',
-      refresh_token: 'new-refresh',
+    vi.mocked(refreshAccessTokenSingleFlight).mockResolvedValueOnce({
+      ok: true,
+      tokens: {
+        access_token: 'new-access',
+        refresh_token: 'new-refresh',
+      },
     })
 
     const result = await resolvePayloadFromCookieHeader(
       'access_token=expired.jwt; refresh_token=refresh.jwt'
     )
 
-    expect(refreshAccessToken).toHaveBeenCalledWith('refresh.jwt')
+    expect(refreshAccessTokenSingleFlight).toHaveBeenCalledWith('refresh.jwt')
     expect(result.payload.sub).toBe('user-sub')
     expect(result.newTokens?.access_token).toBe('new-access')
   })

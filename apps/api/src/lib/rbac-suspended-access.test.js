@@ -68,9 +68,23 @@ vi.mock('./singleflight.js', () => ({
 vi.mock('./auth.js', () => ({
   verifyToken: vi.fn(),
   refreshAccessToken: vi.fn(),
+  refreshAccessTokenSingleFlight: vi.fn(),
+  getAccessTokenExpiresAtMs: vi.fn().mockReturnValue(Date.now() + 1_200_000),
+}))
+vi.mock('./auth-session-events.js', () => ({
+  emitAuthSessionEvent: vi.fn(),
 }))
 vi.mock('../config/env.js', () => ({
-  config: { NODE_ENV: 'test', ALLOW_AUTO_SUPER_ADMIN: false },
+  config: {
+    NODE_ENV: 'test',
+    ALLOW_AUTO_SUPER_ADMIN: false,
+    AUTH_ACCESS_COOKIE_MAX_AGE_MS: 20 * 60 * 1000,
+    AUTH_REFRESH_COOKIE_MAX_AGE_MS: 30 * 24 * 60 * 60 * 1000,
+    AUTH_PROACTIVE_REFRESH: true,
+    COOKIE_SECURE: false,
+    COOKIE_SAME_SITE: 'lax',
+    COOKIE_DOMAIN: '',
+  },
 }))
 
 function mockRes() {

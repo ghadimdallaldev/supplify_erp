@@ -21,6 +21,12 @@ vi.mock('./db.js', () => ({
 vi.mock('./auth.js', () => ({
   verifyToken: vi.fn(),
   refreshAccessToken: vi.fn(),
+  refreshAccessTokenSingleFlight: vi.fn(),
+  getAccessTokenExpiresAtMs: vi.fn().mockReturnValue(Date.now() + 1_200_000),
+}))
+
+vi.mock('./auth-session-events.js', () => ({
+  emitAuthSessionEvent: vi.fn(),
 }))
 
 vi.mock('./logger.js', () => ({

@@ -63,10 +63,12 @@ sequenceDiagram
 
 Set in `setAuthCookies()` (`apps/api/src/lib/rbac.js`):
 
-| Cookie          | TTL    | Content                |
-| --------------- | ------ | ---------------------- |
-| `access_token`  | 1 hour | Keycloak JWT           |
-| `refresh_token` | 7 days | Keycloak refresh token |
+| Cookie          | TTL     | Content                |
+| --------------- | ------- | ---------------------- |
+| `access_token`  | 20 min  | Keycloak JWT           |
+| `refresh_token` | 30 days | Keycloak refresh token |
+
+Cookie TTLs align with Keycloak session policy (see `docs/features/auth-session-management.md`). Keycloak SSO idle/max remain authoritative.
 
 Options: `httpOnly`, `secure` (`COOKIE_SECURE`), `sameSite` (`COOKIE_SAME_SITE`), optional `domain` (`COOKIE_DOMAIN`).
 

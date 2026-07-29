@@ -1,9 +1,12 @@
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 import http from 'http'
 import https from 'https'
+import { createHash } from 'crypto'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
 import axios from 'axios'
+import { singleflight, hasInflight } from './singleflight.js'
+import { emitAuthSessionEvent } from './auth-session-events.js'
 
 /** Timeout for outbound HTTP calls to Keycloak (ms). Prevents hung requests. */
 const KEYCLOAK_HTTP_TIMEOUT_MS = 10000
@@ -163,10 +166,70 @@ export async function exchangePasswordForTokens(username, password) {
   return response.data
 }
 
-// Refresh access token
-export async function refreshAccessToken(refreshToken) {
+/**
+ * Decode JWT `exp` (ms) without verifying signature — used for cookie/session scheduling only.
+ * @param {string | null | undefined} token
+ * @returns {number | null}
+ */
+export function getAccessTokenExpiresAtMs(token) {
+  if (!token || typeof token !== 'string') return null
+  const parts = token.split('.')
+  if (parts.length < 2) return null
   try {
-    const config = await getKeycloakConfig()
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString())
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * @param {unknown} error
+ * @returns {'invalid' | 'transient' | 'reuse'}
+ */
+export function classifyRefreshFailure(error) {
+  const status = error?.response?.status
+  const data = error?.response?.data
+  const errCode = String(data?.error || '').toLowerCase()
+  const desc = String(data?.error_description || data?.error || error?.message || '').toLowerCase()
+
+  if (
+    errCode === 'invalid_grant' ||
+    desc.includes('token is not active') ||
+    desc.includes('invalid refresh') ||
+    desc.includes('session not active') ||
+    desc.includes('expired')
+  ) {
+    if (desc.includes('reuse') || desc.includes('revoked') || desc.includes('already used')) {
+      return 'reuse'
+    }
+    return 'invalid'
+  }
+  if (status === 400 || status === 401) return 'invalid'
+  if (!status || status >= 500 || status === 408 || status === 429) return 'transient'
+  if (
+    error?.code === 'ECONNABORTED' ||
+    error?.code === 'ETIMEDOUT' ||
+    error?.code === 'ENOTFOUND' ||
+    error?.code === 'ECONNREFUSED' ||
+    error?.message?.includes('timeout')
+  ) {
+    return 'transient'
+  }
+  return 'invalid'
+}
+
+/**
+ * Refresh with structured outcome (preferred for session hardening).
+ * @param {string} refreshToken
+ * @returns {Promise<{ ok: true, tokens: object } | { ok: false, reason: 'invalid'|'transient'|'reuse', status?: number, message?: string }>}
+ */
+export async function refreshAccessTokenDetailed(refreshToken) {
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return { ok: false, reason: 'invalid', message: 'Missing refresh token' }
+  }
+  try {
+    const kcConfig = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues()
 
     const params = new URLSearchParams({
@@ -176,20 +239,48 @@ export async function refreshAccessToken(refreshToken) {
       refresh_token: refreshToken,
     })
 
-    const response = await keycloakHttp.post(config.token_endpoint, params, {
+    const response = await keycloakHttp.post(kcConfig.token_endpoint, params, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
-    const tokens = response.data
     logger.debug('Token refreshed')
-    return tokens
+    return { ok: true, tokens: response.data }
   } catch (error) {
-    logger.error('Error refreshing token:', error.message)
-    return null
+    const reason = classifyRefreshFailure(error)
+    logger.error('Error refreshing token:', {
+      message: error.message,
+      reason,
+      status: error?.response?.status,
+    })
+    return {
+      ok: false,
+      reason,
+      status: error?.response?.status,
+      message: error.message,
+    }
   }
+}
+
+/**
+ * Single-flight Keycloak refresh per refresh-token fingerprint (rotation-safe concurrency).
+ * @param {string} refreshToken
+ */
+export async function refreshAccessTokenSingleFlight(refreshToken) {
+  const key = `kc-refresh:${createHash('sha256').update(refreshToken).digest('hex').slice(0, 32)}`
+  if (hasInflight(key)) {
+    emitAuthSessionEvent('AUTH_REFRESH_SINGLE_FLIGHT_JOINED')
+  }
+  return singleflight(key, () => refreshAccessTokenDetailed(refreshToken))
+}
+
+/** Legacy helper: tokens or null (null covers invalid + transient — prefer Detailed). */
+export async function refreshAccessToken(refreshToken) {
+  const result = await refreshAccessTokenSingleFlight(refreshToken)
+  if (!result.ok) return null
+  return result.tokens
 }
 
 // Normalize issuer for comparison (Keycloak may use with or without trailing slash)

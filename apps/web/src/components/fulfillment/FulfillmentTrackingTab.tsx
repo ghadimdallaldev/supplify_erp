@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Map, Truck, Navigation } from 'lucide-react'
 import { Button } from '../ui/button'
@@ -6,7 +6,8 @@ import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { TableScroll } from '../ui/table-scroll'
 import { responsiveDataListClasses } from '../ui/responsive-data-list'
-import { useGetSupplierDeliveryBoardQuery } from '../../services/api'
+import { useGetMeQuery, useGetSupplierDeliveryBoardQuery } from '../../services/api'
+import { getAppSocket } from '../../lib/appSocket'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 import { formatOrderRef, formatScheduledAt } from './fulfillmentDispatchUtils'
@@ -20,6 +21,7 @@ export function FulfillmentTrackingTab() {
   const { t } = useTranslation('fulfillment')
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('board')
+  const { data: me } = useGetMeQuery()
   const { data, isLoading, isError, refetch } = useGetSupplierDeliveryBoardQuery(
     { status: 'active_delivery' },
     { pollingInterval: 30_000, skipPollingIfUnfocused: true }
@@ -27,6 +29,20 @@ export function FulfillmentTrackingTab() {
 
   const orders = data?.orders ?? []
 
+  useEffect(() => {
+    const liveEventsEnabled = import.meta.env.VITE_GPS_LIVE_EVENTS_ENABLED === 'true'
+    if (!liveEventsEnabled || !me?.id) return
+    const socket = getAppSocket(me.id)
+    const refresh = () => {
+      void refetch()
+    }
+    socket.on('driver_location_updated', refresh)
+    socket.on('driver_tracking_status', refresh)
+    return () => {
+      socket.off('driver_location_updated', refresh)
+      socket.off('driver_tracking_status', refresh)
+    }
+  }, [me?.id, refetch])
   return (
     <>
       <section
