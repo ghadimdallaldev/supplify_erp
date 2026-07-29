@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { getLatestDriverLocation } from '../lib/driver-location-redis.js'
 import { config } from '../config/env.js'
 import { ValidationError, ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
 import { getActiveDriverAssignment, assertSupplierOwnsOrder } from './driver-fulfillment.service.js'
@@ -285,6 +286,8 @@ function mapLatestLocation(row) {
 }
 
 export async function getLatestLocationForDriver(driverId) {
+  const cached = await getLatestDriverLocation({ driverId })
+  if (cached) return cached
   const { rows } = await query(`SELECT * FROM driver_latest_location WHERE driver_id = $1`, [
     driverId,
   ])
@@ -323,7 +326,7 @@ async function loadActiveRouteForOrder(orderId, supplierId) {
   return rows[0] ?? null
 }
 
-/** Batch read for dispatch board, delivery board, and route detail — avoid per-card queries. */
+/** Batch read for dispatch board, delivery board, and route detail â€” avoid per-card queries. */
 export async function getLatestLocationsForDrivers(driverIds) {
   if (!driverIds?.length) return new Map()
   const { rows } = await query(

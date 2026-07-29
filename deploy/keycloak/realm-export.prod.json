@@ -15,6 +15,17 @@
   "quickLoginCheckMilliSeconds": 1000,
   "maxDeltaTimeSeconds": 43200,
   "failureFactor": 5,
+  "rememberMe": false,
+  "accessTokenLifespan": 1200,
+  "accessTokenLifespanForImplicitFlow": 1200,
+  "ssoSessionIdleTimeout": 604800,
+  "ssoSessionMaxLifespan": 2592000,
+  "ssoSessionIdleTimeoutRememberMe": 0,
+  "ssoSessionMaxLifespanRememberMe": 0,
+  "clientSessionIdleTimeout": 604800,
+  "clientSessionMaxLifespan": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "clients": [
     {
       "clientId": "supplify-api",
@@ -40,6 +51,8 @@
       ],
       "protocol": "openid-connect",
       "attributes": {
+        "access.token.lifespan": "1200",
+        "access.token.lifespan.for.implicit.flow": "1200",
         "post.logout.redirect.uris": "https://app.supplifyerp.com/login##https://app.supplifyerp.com/*##https://api.supplifyerp.com/auth/register?continue=1##https://api.supplifyerp.com/auth/register##https://api.supplifyerp.com/*##https://supplify-web-prod-production.up.railway.app/login##https://supplify-web-prod-production.up.railway.app/*"
       },
       "defaultClientScopes": ["web-origins", "profile", "roles", "email"],

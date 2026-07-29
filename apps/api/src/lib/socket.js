@@ -5,6 +5,7 @@ import { persistMessageFromSocket } from '../services/chatSocket.service.js'
 import { userCanAccessConversation } from './chat-access.js'
 import { resolveSocketUserFromCookieHeader } from './socket-auth.js'
 import { attachSocketRedisAdapter } from './socket-redis-adapter.js'
+import { query } from './db.js'
 
 let io = null
 
@@ -15,6 +16,9 @@ function userRoom(userId) {
 function restaurantRoom(restaurantId) {
   return `restaurant_${restaurantId}`
 }
+function supplierRoom(supplierId) {
+  return `supplier_${supplierId}`
+}
 
 /**
  * @param {string} restaurantId
@@ -24,6 +28,46 @@ function restaurantRoom(restaurantId) {
 export function emitToRestaurant(restaurantId, event, payload) {
   if (!io || !restaurantId) return
   io.to(restaurantRoom(restaurantId)).emit(event, payload)
+}
+/** Broadcast only after durable acceptance; PostgreSQL remains the source of truth. */
+export async function emitDriverLocationUpdated({ supplierId, orderId = null, payload }) {
+  if (!io || !supplierId || config.GPS_LIVE_EVENTS_ENABLED !== true) return
+  io.to(supplierRoom(supplierId)).emit('driver_location_updated', payload)
+  if (!orderId) return
+  const { rows } = await query(
+    `SELECT o.restaurant_id
+     FROM customer_order o
+     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $2
+     WHERE o.id = $1 LIMIT 1`,
+    [orderId, supplierId]
+  )
+  const restaurantId = rows[0]?.restaurant_id
+  if (restaurantId) {
+    io.to(restaurantRoom(restaurantId)).emit('driver_location_updated', {
+      sessionId: payload.sessionId,
+      driverId: payload.driverId,
+      orderId,
+      location: payload.location,
+    })
+  }
+}
+
+export function emitDriverTrackingStatus({
+  supplierId,
+  routeId = null,
+  driverId,
+  status,
+  reason = null,
+}) {
+  if (!io || !supplierId || config.GPS_LIVE_EVENTS_ENABLED !== true) return
+  io.to(supplierRoom(supplierId)).emit('driver_tracking_status', {
+    supplierId,
+    routeId,
+    driverId,
+    status,
+    reason,
+    at: new Date().toISOString(),
+  })
 }
 
 /**
@@ -133,6 +177,9 @@ export async function initializeSocket(server) {
     }
     if (socket.data.tenantId && socket.data.role === 'RESTAURANT') {
       socket.join(restaurantRoom(socket.data.tenantId))
+    }
+    if (socket.data.tenantId && (socket.data.role === 'SUPPLIER' || socket.data.role === 'ADMIN')) {
+      socket.join(supplierRoom(socket.data.tenantId))
     }
 
     logger.info({

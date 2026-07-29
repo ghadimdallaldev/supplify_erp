@@ -5,12 +5,13 @@ import {
   exchangeCodeForTokens,
   getUserInfo,
   revokeToken,
-  refreshAccessToken,
+  refreshAccessTokenSingleFlight,
   getKeycloakLogoutUrl,
+  getAccessTokenExpiresAtMs,
 } from '../lib/auth.js'
 import { userNeedsTenantSetup } from '../lib/register-account.js'
 import { upsertUser } from '../lib/rbac.js'
-import { setAuthCookies, clearAuthCookies } from '../lib/rbac.js'
+import { setAuthCookies, clearAuthCookies, getSessionMetaFromAccessToken } from '../lib/rbac.js'
 import { clearImpersonationCookie } from '../lib/impersonation.js'
 import { clearActiveTenantCookie } from '../lib/tenant-switch.js'
 import {
@@ -38,6 +39,8 @@ import {
   ADMIN_LANDING_TABS,
   ADMIN_THEME_PREFERENCES,
 } from '../lib/admin-user-preferences.js'
+import { emitAuthSessionEvent } from '../lib/auth-session-events.js'
+import { extractAccessToken } from '../lib/mobile-auth.js'
 
 const legalAcceptanceSchema = {
   packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
@@ -287,12 +290,15 @@ router.get('/session', optionalAuth, async (req, res) => {
   if (!user) {
     return res.json({ ok: true, data: null, error: null, requestId: req.requestId })
   }
+  const accessToken = extractAccessToken(req)
+  const sessionMeta = getSessionMetaFromAccessToken(accessToken)
   return res.json({
     ok: true,
     data: {
       id: user.id,
       email: user.email,
       displayName: user.display_name || user.displayName || user.email,
+      ...sessionMeta,
     },
     error: null,
     requestId: req.requestId,
@@ -441,6 +447,9 @@ router.get('/me', requireAuth, async (req, res) => {
       })
     }
 
+    const accessToken = extractAccessToken(req)
+    const sessionMeta = getSessionMetaFromAccessToken(accessToken || req.cookies?.access_token)
+
     res.json({
       ok: true,
       data: {
@@ -459,6 +468,8 @@ router.get('/me', requireAuth, async (req, res) => {
         legalStatus,
         adminPreferences,
         preferredLocale: user.preferred_locale || 'en',
+        accessTokenExpiresAt: req.accessTokenExpiresAt ?? sessionMeta.accessTokenExpiresAt ?? null,
+        proactiveRefreshEnabled: sessionMeta.proactiveRefreshEnabled,
         ...additionalData,
       },
       error: null,
@@ -530,7 +541,8 @@ router.post('/legal-acceptance', requireAuth, async (req, res) => {
 // Refresh access token
 router.post('/refresh', async (req, res) => {
   try {
-    const refreshToken = req.cookies.refresh_token
+    const refreshToken = req.cookies?.refresh_token
+    const proactive = req.get('x-auth-refresh-reason') === 'proactive'
 
     if (!refreshToken) {
       return res.status(401).json({
@@ -544,10 +556,32 @@ router.post('/refresh', async (req, res) => {
       })
     }
 
-    const newTokens = await refreshAccessToken(refreshToken)
+    if (proactive) {
+      emitAuthSessionEvent('AUTH_PROACTIVE_REFRESH_TRIGGERED')
+    }
 
-    if (!newTokens) {
+    const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
+
+    if (!refreshResult.ok) {
+      if (refreshResult.reason === 'transient') {
+        emitAuthSessionEvent('AUTH_OFFLINE_REFRESH_DEFERRED')
+        emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', { reason: 'transient' })
+        return res.status(503).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+            message: 'Authentication service temporarily unavailable. Retry shortly.',
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (refreshResult.reason === 'reuse') {
+        emitAuthSessionEvent('AUTH_REFRESH_TOKEN_REUSED')
+      }
       clearAuthCookies(res)
+      emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', { reason: refreshResult.reason })
+      emitAuthSessionEvent('AUTH_SESSION_EXPIRED', { reason: refreshResult.reason })
       return res.status(401).json({
         ok: false,
         data: null,
@@ -559,25 +593,35 @@ router.post('/refresh', async (req, res) => {
       })
     }
 
+    const newTokens = refreshResult.tokens
     setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+    emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', {
+      source: proactive ? 'proactive' : 'explicit',
+    })
+
+    const expiresAt = getAccessTokenExpiresAtMs(newTokens.access_token)
 
     res.json({
       ok: true,
       data: {
         message: 'Token refreshed successfully',
+        accessTokenExpiresAt: expiresAt,
+        expires_in: newTokens.expires_in ?? null,
+        proactiveRefreshEnabled: config.AUTH_PROACTIVE_REFRESH !== false,
       },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('Refresh error', { error: error.message })
-    clearAuthCookies(res)
-    res.status(401).json({
+    // Unexpected errors: do not clear cookies (may be transient)
+    emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', { reason: 'unexpected' })
+    res.status(503).json({
       ok: false,
       data: null,
       error: {
-        name: 'UNAUTHORIZED',
-        message: 'Token refresh failed',
+        name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+        message: 'Token refresh failed temporarily',
       },
       requestId: req.requestId,
     })
@@ -605,9 +649,28 @@ router.post('/mobile/refresh', async (req, res) => {
       })
     }
 
-    const newTokens = await refreshAccessToken(refreshToken)
+    const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
 
-    if (!newTokens) {
+    if (!refreshResult.ok) {
+      if (refreshResult.reason === 'transient') {
+        emitAuthSessionEvent('AUTH_OFFLINE_REFRESH_DEFERRED', { source: 'mobile' })
+        return res.status(503).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+            message: 'Authentication service temporarily unavailable. Retry shortly.',
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (refreshResult.reason === 'reuse') {
+        emitAuthSessionEvent('AUTH_REFRESH_TOKEN_REUSED', { source: 'mobile' })
+      }
+      emitAuthSessionEvent('AUTH_TOKEN_REFRESH_FAILED', {
+        reason: refreshResult.reason,
+        source: 'mobile',
+      })
       return res.status(401).json({
         ok: false,
         data: null,
@@ -619,25 +682,29 @@ router.post('/mobile/refresh', async (req, res) => {
       })
     }
 
+    const newTokens = refreshResult.tokens
+    emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'mobile' })
+
     res.json({
       ok: true,
       data: {
         access_token: newTokens.access_token,
         refresh_token: newTokens.refresh_token,
-        expires_in: newTokens.expires_in ?? 3600,
+        expires_in: newTokens.expires_in ?? 1200,
         token_type: 'Bearer',
+        accessTokenExpiresAt: getAccessTokenExpiresAtMs(newTokens.access_token),
       },
       error: null,
       requestId: req.requestId,
     })
   } catch (error) {
     logger.error('Mobile refresh error', { error: error.message })
-    res.status(401).json({
+    res.status(503).json({
       ok: false,
       data: null,
       error: {
-        name: 'UNAUTHORIZED',
-        message: 'Token refresh failed',
+        name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+        message: 'Token refresh failed temporarily',
       },
       requestId: req.requestId,
     })
@@ -651,8 +718,8 @@ router.post('/logout', requireAuth, async (req, res) => {
   const postLogoutRedirectUri = `${webOrigin}/login`
 
   try {
-    const accessToken = req.cookies.access_token
-    const refreshToken = req.cookies.refresh_token
+    const accessToken = req.cookies?.access_token
+    const refreshToken = req.cookies?.refresh_token
 
     // Revoke tokens in Keycloak
     if (accessToken) {
@@ -684,6 +751,8 @@ router.post('/logout', requireAuth, async (req, res) => {
     }
 
     logger.info('User logged out', { userId: req.userData?.id })
+    emitAuthSessionEvent('AUTH_LOGOUT_COMPLETED', { userId: req.userData?.id || null })
+    emitAuthSessionEvent('AUTH_SESSION_REVOKED', { source: 'logout' })
 
     res.json({
       ok: true,

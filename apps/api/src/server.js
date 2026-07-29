@@ -55,6 +55,7 @@ import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
+import { driverTrackingRoutes } from './routes/driver-tracking.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
 import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
 import { supplierGrowthRoutes, growthPublicRoutes } from './routes/supplier-growth.routes.js'
@@ -456,6 +457,7 @@ app.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
 app.use('/api/public/invitations', branchInvitationsPublicRoutes)
 app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
+app.use('/api/driver', driverTrackingRoutes)
 app.use('/api/drivers', driversRoutes)
 app.use('/api/supplier', supplierOpsRoutes)
 app.use('/api/supplier/growth', supplierGrowthRoutes)
