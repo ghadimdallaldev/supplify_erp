@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { resolveUpgradeUrl } from '../../lib/externallyControlledFeatures'
 import { getApiBase } from '../../lib/env'
+import { refreshAuthSession, stopAuthSessionRefresh } from '../../lib/authSessionRefresh'
 
 const API_URL = getApiBase()
 
@@ -18,6 +19,7 @@ function requestPath(args: unknown): string {
 function isSessionExpiredAuthError(error: ApiErrorBody['error']): boolean {
   if (!error?.name) return false
   if (error.name === 'JWT_EXPIRED') return true
+  if (error.name === 'AUTH_TEMPORARILY_UNAVAILABLE') return false
   if (error.name !== 'UNAUTHORIZED') return false
   const msg = (error.message || '').toLowerCase()
   return msg.includes('expired') || msg.includes('refresh failed') || msg.includes('invalid token')
@@ -31,6 +33,7 @@ function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: s
   if (requestUrl === '/auth/me' && !isSessionExpiredAuthError(error)) {
     return
   }
+  stopAuthSessionRefresh()
   const suffix = isSessionExpiredAuthError(error) ? '?expired=true' : ''
   window.location.href = `/login${suffix}`
 }
@@ -51,18 +54,67 @@ function sanitizeRecommendedPlans(value: unknown): string[] {
 
 // Custom baseQuery to unwrap API response envelope
 const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
-  const result = await fetchBaseQuery({
+  const rawBaseQuery = fetchBaseQuery({
     baseUrl: API_URL,
     credentials: 'include',
     prepareHeaders: (headers) => {
       headers.set('X-Requested-With', 'Supplify')
       return headers
     },
-  })(args, api, extraOptions)
+  })
+
+  let result = await rawBaseQuery(args, api, extraOptions)
 
   const requestUrl = requestPath(args)
 
-  // Handle 401 - distinguish "not logged in" from "session expired"
+  // Network / offline: do not treat as logout
+  if (result.error && result.error.status === 'FETCH_ERROR') {
+    return result
+  }
+
+  const firstErr = result.error as { status?: number | string; data?: unknown } | undefined
+  if (firstErr?.status === 503) {
+    const errorData = firstErr.data
+    if (typeof errorData === 'object' && errorData !== null) {
+      const apiError = (errorData as ApiErrorBody).error
+      if (apiError?.name === 'AUTH_TEMPORARILY_UNAVAILABLE') {
+        return result
+      }
+    }
+  }
+
+  // 401 fallback: single-flight cookie refresh then retry once
+  if (firstErr?.status === 401 && requestUrl !== '/auth/refresh' && requestUrl !== '/auth/logout') {
+    const errorData = firstErr.data
+    const apiError =
+      typeof errorData === 'object' && errorData !== null
+        ? (errorData as ApiErrorBody).error
+        : undefined
+    if (apiError?.name === 'UNAUTHORIZED' || apiError?.name === 'JWT_EXPIRED') {
+      const refreshed = await refreshAuthSession('fallback')
+      if (refreshed.ok) {
+        result = await rawBaseQuery(args, api, extraOptions)
+      } else if (refreshed.reason === 'transient') {
+        return {
+          error: {
+            status: 503,
+            data: {
+              ok: false,
+              error: {
+                name: 'AUTH_TEMPORARILY_UNAVAILABLE',
+                message: 'Authentication service temporarily unavailable',
+              },
+            },
+          },
+        }
+      } else {
+        redirectToLoginForAuthError(apiError, requestUrl)
+        return { ...result }
+      }
+    }
+  }
+
+  // Handle remaining 401 - distinguish "not logged in" from "session expired"
   const err = result.error as { status?: number | string; data?: unknown } | undefined
   if (err?.status === 401) {
     const errorData = err.data

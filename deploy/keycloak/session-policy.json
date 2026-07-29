@@ -1,0 +1,21 @@
+{
+  "accessTokenLifespan": 1200,
+  "accessTokenLifespanForImplicitFlow": 1200,
+  "ssoSessionIdleTimeout": 604800,
+  "ssoSessionMaxLifespan": 2592000,
+  "clientSessionIdleTimeout": 604800,
+  "clientSessionMaxLifespan": 2592000,
+  "ssoSessionIdleTimeoutRememberMe": 0,
+  "ssoSessionMaxLifespanRememberMe": 0,
+  "rememberMe": false,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clientAccessTokenLifespanSeconds": 1200,
+  "notes": {
+    "accessTokenLifespan": "20 minutes — ERP human users (supplify-api / supplify-mobile)",
+    "ssoSessionIdleTimeout": "7 days idle without refresh activity",
+    "ssoSessionMaxLifespan": "30 days absolute session maximum",
+    "revokeRefreshToken": "Rotation enabled; pair with API/web single-flight",
+    "outOfScope": "Consumer diner JWT, staff magic-link, admin-cli, cron"
+  }
+}

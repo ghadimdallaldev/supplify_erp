@@ -10,8 +10,12 @@ type Props = {
   trackableCount: number
   permissionDenied: boolean
   gpsError?: string | null
+  pendingLocationCount?: number
+  lastSyncedAt?: string | null
   isLoading: boolean
   onRefresh: () => void
+  onStartTracking?: () => void
+  onStopTracking?: () => void
 }
 
 export function DriverDeliveriesHeader({
@@ -21,8 +25,12 @@ export function DriverDeliveriesHeader({
   trackableCount,
   permissionDenied,
   gpsError,
+  pendingLocationCount = 0,
+  lastSyncedAt = null,
   isLoading,
   onRefresh,
+  onStartTracking,
+  onStopTracking,
 }: Props) {
   const gpsLabel = getDriverGpsBannerLabel({
     trackableCount,
@@ -38,16 +46,28 @@ export function DriverDeliveriesHeader({
         description="Tap a button when you arrive"
         size="compact"
         actions={
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-xl"
-            onClick={onRefresh}
-            disabled={isLoading}
-            aria-label="Refresh deliveries"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {trackableCount > 0 && (onStartTracking || onStopTracking) ? (
+              <Button
+                variant={trackingActive ? 'outline' : 'default'}
+                size="sm"
+                className="h-10 rounded-xl"
+                onClick={() => (trackingActive ? onStopTracking?.() : onStartTracking?.())}
+              >
+                {trackingActive ? 'Stop sharing' : 'Start sharing'}
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl"
+              onClick={onRefresh}
+              disabled={isLoading}
+              aria-label="Refresh deliveries"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         }
       />
 
@@ -60,6 +80,19 @@ export function DriverDeliveriesHeader({
             {doneCount} done
           </span>
         ) : null}
+        {pendingLocationCount > 0 ? (
+          <span
+            className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+            data-testid="driver-gps-pending-count"
+          >
+            {pendingLocationCount} location{pendingLocationCount === 1 ? '' : 's'} waiting to sync
+          </span>
+        ) : null}
+        {lastSyncedAt ? (
+          <span className="text-xs text-[var(--text-muted)]">
+            Last sync {new Date(lastSyncedAt).toLocaleTimeString()}
+          </span>
+        ) : null}{' '}
         {gpsLabel ? (
           <span
             className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${

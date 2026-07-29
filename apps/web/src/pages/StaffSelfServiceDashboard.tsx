@@ -245,6 +245,8 @@ export function StaffSelfServiceDashboard() {
       return
     }
     try {
+      const { stopAuthSessionRefresh } = await import('../lib/authSessionRefresh')
+      stopAuthSessionRefresh()
       await logout().unwrap()
     } catch {
       /* still redirect */

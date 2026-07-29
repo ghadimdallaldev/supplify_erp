@@ -23,6 +23,35 @@ Setup: [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../railway/keycloak/RAILWAY_
 
 After deploy, apply redirect URIs from the matching realm export if URLs change. Set API `KEYCLOAK_CLIENT_SECRET` (`changeme` for dev import; strong secrets for preprod/prod).
 
+## Session policy (ERP humans)
+
+Canonical values live in [`session-policy.json`](./session-policy.json):
+
+| Setting                   | Value                                                         |
+| ------------------------- | ------------------------------------------------------------- |
+| Access token lifespan     | 20 minutes                                                    |
+| SSO / client session idle | 7 days                                                        |
+| SSO / client session max  | 30 days                                                       |
+| Refresh token rotation    | enabled (`revokeRefreshToken=true`, `refreshTokenMaxReuse=0`) |
+| Remember Me               | disabled                                                      |
+
+Realm JSON files encode these fields for **new** imports. Existing realms are **not** updated by `--import-realm`. Apply to a live realm:
+
+```bash
+# From repo root (example: development)
+export KEYCLOAK_BASE_URL=https://keycloak-dev.supplifyerp.com
+export KEYCLOAK_REALM=Supplify
+export KEYCLOAK_ADMIN=admin
+export KEYCLOAK_ADMIN_PASSWORD='…'
+node deploy/keycloak/apply-session-policy.mjs
+```
+
+Dry run: `DRY_RUN=1 node deploy/keycloak/apply-session-policy.mjs`
+
+Consumer diner JWT and staff magic-link sessions are **out of scope** for this policy.
+
+See [`docs/runbooks/keycloak-session-configuration.md`](../../docs/runbooks/keycloak-session-configuration.md).
+
 ## Local Docker
 
 `docker-compose.yml` imports `realm-export.json` (realm **Supplify**). Preprod/prod exports are for hosted environments only.

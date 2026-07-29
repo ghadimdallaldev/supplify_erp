@@ -102,8 +102,16 @@ export function DriverDeliveriesPage() {
     .filter((o) => isTrackableDeliveryStatus(o.deliveryStatus))
     .map((o) => ({ orderId: o.orderId, deliveryStatus: o.deliveryStatus }))
 
-  const { trackingActive, gpsError, permissionDenied, trackableCount } =
-    useDriverLocationTracking(trackableDeliveries)
+  const {
+    trackingActive,
+    gpsError,
+    permissionDenied,
+    trackableCount,
+    pendingLocationCount,
+    lastSyncedAt,
+    startTracking,
+    stopTracking,
+  } = useDriverLocationTracking(trackableDeliveries)
 
   const handleRefresh = () => {
     refetch()
@@ -275,8 +283,14 @@ export function DriverDeliveriesPage() {
           trackableCount={trackableCount}
           permissionDenied={permissionDenied}
           gpsError={gpsError}
+          pendingLocationCount={pendingLocationCount}
+          lastSyncedAt={lastSyncedAt}
           isLoading={isLoading || routeLoading}
           onRefresh={handleRefresh}
+          onStartTracking={startTracking}
+          onStopTracking={() => {
+            void stopTracking()
+          }}
         />
 
         {(gpsError || permissionDenied) && (
