@@ -45,14 +45,14 @@ public final class EmailOtpRequiredAction implements RequiredActionProvider {
         context.getAuthenticationSession().setAuthNote(OtpSupport.EXPIRES_NOTE, Long.toString(System.currentTimeMillis() + config.ttlSeconds * 1000L));
         context.getAuthenticationSession().setAuthNote(OtpSupport.ATTEMPTS_NOTE, "0");
         context.getAuthenticationSession().setAuthNote(OtpSupport.SENT_NOTE, Long.toString(System.currentTimeMillis()));
-        try { mail.send(email, code, purpose, context.getSession().getContext().getLocale().toLanguageTag(), context.getAuthenticationSession().getParentSession().getId()); }
+        try { mail.send(email, code, purpose, OtpSupport.languageTag(context.getSession(), context.getUser()), context.getAuthenticationSession().getParentSession().getId()); }
         catch (RuntimeException e) { clear(context); challenge(context, "We could not send a verification code. Try again later."); return; }
         challenge(context, null);
     }
     private void challenge(RequiredActionContext context, String error) {
         var form = context.form().setAttribute("otpLength", config.length).setAttribute("otpTtlSeconds", config.ttlSeconds);
         if (error != null) form.setError(error);
-        context.challenge(form.createLoginOtp());
+        context.challenge(form.createForm("login-otp.ftl"));
     }
     private static long parseLong(String raw) { try { return Long.parseLong(raw == null ? "0" : raw); } catch (NumberFormatException ignored) { return 0; } }
     private static void clear(RequiredActionContext context) { for (String n : new String[]{OtpSupport.CODE_NOTE, OtpSupport.PURPOSE_NOTE, OtpSupport.EXPIRES_NOTE, OtpSupport.ATTEMPTS_NOTE, OtpSupport.SENT_NOTE}) context.getAuthenticationSession().removeAuthNote(n); }

@@ -4,8 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.UserModel;
 
 /** Stateless OTP primitives. Authentication-session notes hold only the digest. */
 final class OtpSupport {
@@ -38,5 +41,15 @@ final class OtpSupport {
     static boolean matches(String expected, String actual) {
         if (expected == null || actual == null) return false;
         return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), actual.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Keycloak 24 exposes locale via resolveLocale(user), not getLocale(). */
+    static String languageTag(KeycloakSession session, UserModel user) {
+        try {
+            Locale locale = session.getContext().resolveLocale(user);
+            return locale != null ? locale.toLanguageTag() : "en";
+        } catch (RuntimeException ignored) {
+            return "en";
+        }
     }
 }
