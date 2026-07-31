@@ -1,0 +1,72 @@
+package com.supplify.keycloak.emailotp;
+
+import java.util.Collections;
+import java.util.List;
+import org.keycloak.authentication.AuthenticationFlowError;
+import org.keycloak.authentication.AuthenticationFlowContext;
+import org.keycloak.authentication.Authenticator;
+import org.keycloak.forms.login.LoginFormsPages;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.KeycloakSessionModel;
+import org.keycloak.models.UserModel;
+import jakarta.ws.rs.core.MultivaluedMap;
+
+public final class EmailOtpAuthenticator implements Authenticator {
+    private final KeycloakSession session;
+    private final EmailOtpConfig config;
+    private final OtpMailClient mail;
+    EmailOtpAuthenticator(KeycloakSession session, EmailOtpConfig config) { this.session = session; this.config = config; this.mail = new OtpMailClient(config); }
+
+    public void authenticate(AuthenticationFlowContext context) {
+        if (!config.enabled) { context.success(); return; }
+        UserModel user = context.getUser();
+        if (user == null || user.getEmail() == null || user.getEmail().trim().isEmpty()) { context.failure(AuthenticationFlowError.INVALID_USER); return; }
+        // Drivers open the operational app frequently. The API sets this attribute only while
+        // the user has a current supplier Driver assignment; never trust a browser-supplied value.
+        if (config.driverLoginBypass && "true".equalsIgnoreCase(user.getFirstAttribute("supplify_driver_login"))) {
+            context.success();
+            return;
+        }
+        if (!user.isEmailVerified()) user.addRequiredAction(EmailOtpRequiredActionFactory.ID);
+        issue(context, user, false);
+    }
+    public void action(AuthenticationFlowContext context) {
+        if (!config.enabled) { context.success(); return; }
+        MultivaluedMap<String, String> form = context.getHttpRequest().getDecodedFormParameters();
+        if (form.containsKey("resend")) { issue(context, context.getUser(), true); return; }
+        String code = form.getFirst("otp");
+        String expected = context.getAuthenticationSession().getAuthNote(OtpSupport.CODE_NOTE);
+        String purpose = context.getAuthenticationSession().getAuthNote(OtpSupport.PURPOSE_NOTE);
+        long expires = parseLong(context.getAuthenticationSession().getAuthNote(OtpSupport.EXPIRES_NOTE));
+        int attempts = (int) parseLong(context.getAuthenticationSession().getAuthNote(OtpSupport.ATTEMPTS_NOTE));
+        if (!"login_email_mfa".equals(purpose) || expected == null || expires < System.currentTimeMillis()) { fail(context, "The code expired. Request a new code."); return; }
+        if (attempts >= config.maxAttempts) { fail(context, "Too many attempts. Request a new code."); return; }
+        context.getAuthenticationSession().setAuthNote(OtpSupport.ATTEMPTS_NOTE, Integer.toString(attempts + 1));
+        String actual = OtpSupport.hmac(config.hmacSecret, purpose, context.getUser().getEmail().trim().toLowerCase(), code == null ? "" : code.trim());
+        if (OtpSupport.matches(expected, actual)) { clear(context); context.success(); return; }
+        fail(context, "That code is not valid.");
+    }
+    private void issue(AuthenticationFlowContext context, UserModel user, boolean resend) {
+        String email = user.getEmail().trim().toLowerCase();
+        long lastSent = parseLong(context.getAuthenticationSession().getAuthNote(OtpSupport.SENT_NOTE));
+        if (resend && System.currentTimeMillis() - lastSent < config.resendCooldownSeconds * 1000L) { fail(context, "Please wait before requesting another code."); return; }
+        String code = OtpSupport.generateCode(config.length);
+        String purpose = "login_email_mfa";
+        String challengeId = context.getAuthenticationSession().getParentSession().getId();
+        context.getAuthenticationSession().setAuthNote(OtpSupport.CODE_NOTE, OtpSupport.hmac(config.hmacSecret, purpose, email, code));
+        context.getAuthenticationSession().setAuthNote(OtpSupport.PURPOSE_NOTE, purpose);
+        context.getAuthenticationSession().setAuthNote(OtpSupport.EXPIRES_NOTE, Long.toString(System.currentTimeMillis() + config.ttlSeconds * 1000L));
+        context.getAuthenticationSession().setAuthNote(OtpSupport.ATTEMPTS_NOTE, "0");
+        context.getAuthenticationSession().setAuthNote(OtpSupport.SENT_NOTE, Long.toString(System.currentTimeMillis()));
+        try { mail.send(email, code, purpose, context.getSession().getContext().getLocale().toLanguageTag(), challengeId); }
+        catch (RuntimeException e) { clear(context); context.failureChallenge(AuthenticationFlowError.INTERNAL_ERROR, context.form().setError("We could not send a verification code. Try again later.").createLoginOtp()); return; }
+        context.challenge(context.form().setAttribute("otpLength", config.length).setAttribute("otpTtlSeconds", config.ttlSeconds).createLoginOtp());
+    }
+    private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createLoginOtp()); }
+    private static long parseLong(String raw) { try { return Long.parseLong(raw == null ? "0" : raw); } catch (NumberFormatException ignored) { return 0; } }
+    private static void clear(AuthenticationFlowContext context) { for (String n : new String[]{OtpSupport.CODE_NOTE, OtpSupport.PURPOSE_NOTE, OtpSupport.EXPIRES_NOTE, OtpSupport.ATTEMPTS_NOTE, OtpSupport.SENT_NOTE}) context.getAuthenticationSession().removeAuthNote(n); }
+    public boolean requiresUser() { return true; }
+    public boolean configuredFor(KeycloakSession session, UserModel user) { return true; }
+    public void setRequiredActions(KeycloakSession session, UserModel user) {}
+    public void close() {}
+}
