@@ -33,55 +33,53 @@
       "description": "Supplify browser login with email OTP",
       "providerId": "basic-flow",
       "topLevel": true,
-      "builtIn": false
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "supplify-browser-email-otp-forms",
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 30,
+          "userSetupAllowed": false
+        }
+      ]
     },
     {
       "alias": "supplify-browser-email-otp-forms",
       "description": "Username/password followed by Supplify email OTP",
       "providerId": "basic-flow",
       "topLevel": false,
-      "builtIn": false
-    }
-  ],
-  "authenticationExecutions": [
-    {
-      "authenticator": "auth-cookie",
-      "authenticatorFlow": false,
-      "flowAlias": "supplify-browser-email-otp",
-      "requirement": "ALTERNATIVE",
-      "priority": 10,
-      "userSetupAllowed": false
-    },
-    {
-      "authenticator": "identity-provider-redirector",
-      "authenticatorFlow": false,
-      "flowAlias": "supplify-browser-email-otp",
-      "requirement": "ALTERNATIVE",
-      "priority": 20,
-      "userSetupAllowed": false
-    },
-    {
-      "flowAlias": "supplify-browser-email-otp-forms",
-      "authenticatorFlow": true,
-      "requirement": "REQUIRED",
-      "priority": 30,
-      "userSetupAllowed": false
-    },
-    {
-      "authenticator": "auth-username-password-form",
-      "authenticatorFlow": false,
-      "flowAlias": "supplify-browser-email-otp-forms",
-      "requirement": "REQUIRED",
-      "priority": 10,
-      "userSetupAllowed": false
-    },
-    {
-      "authenticator": "email-otp-login",
-      "authenticatorFlow": false,
-      "flowAlias": "supplify-browser-email-otp-forms",
-      "requirement": "REQUIRED",
-      "priority": 20,
-      "userSetupAllowed": false
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "email-otp-login",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
     }
   ],
   "browserFlow": "supplify-browser-email-otp",
