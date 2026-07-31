@@ -43,7 +43,7 @@ x-api-environment: &api-environment
   EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@supplify.local}
   EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
   EMAIL_TEST_TO: ${EMAIL_TEST_TO:-}
-  AUTH_EMAIL_OTP_ENABLED: ${AUTH_EMAIL_OTP_ENABLED:-false}
+  AUTH_EMAIL_OTP_ENABLED: ${AUTH_EMAIL_OTP_ENABLED:-true}
   AUTH_EMAIL_OTP_INTERNAL_SECRET: ${AUTH_EMAIL_OTP_INTERNAL_SECRET:-dev-email-otp-internal-secret}
   SMTP_HOST: ${SMTP_HOST:-mailpit}
   SMTP_PORT: ${SMTP_PORT:-1025}
@@ -162,7 +162,11 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      AUTH_EMAIL_OTP_ENABLED: ${AUTH_EMAIL_OTP_ENABLED:-true}
       AUTH_EMAIL_OTP_DRIVER_BYPASS: ${AUTH_EMAIL_OTP_DRIVER_BYPASS:-true}
+      AUTH_EMAIL_OTP_HMAC_SECRET: ${AUTH_EMAIL_OTP_HMAC_SECRET:-dev-email-otp-hmac-secret-change-me}
+      SUPPLIFY_OTP_MAIL_URL: ${SUPPLIFY_OTP_MAIL_URL:-http://host.docker.internal:4000/api/internal/auth/otp/email}
+      SUPPLIFY_OTP_MAIL_SECRET: ${SUPPLIFY_OTP_MAIL_SECRET:-dev-email-otp-internal-secret}
     command:
       - start
       - --import-realm
