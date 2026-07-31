@@ -97,6 +97,7 @@ import {
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
 import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
+import { internalAuthRoutes } from './routes/internal-auth.routes.js'
 
 validateProductionConfig()
 logEmailBootMode()
@@ -444,6 +445,7 @@ app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
+app.use('/api/internal', internalAuthRoutes)
 app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
 app.use('/api/consumer', consumerRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)

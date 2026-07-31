@@ -27,7 +27,8 @@ function resolveActiveProvider() {
 }
 
 function resolveFromHeader() {
-  const email = config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SMTP_FROM
+  const email =
+    config.EMAIL_FROM_AUTH || config.EMAIL_FROM_ADDRESS || config.EMAIL_FROM || config.SMTP_FROM
   const name = config.EMAIL_FROM_NAME || 'Supplify'
   if (email && name) return `"${name}" <${email}>`
   return email || undefined
@@ -74,6 +75,7 @@ export async function sendEmail({
   entityId = null,
   skipDedup = false,
   throwOnError = false,
+  sensitive = false,
   retryPayload = null,
 }) {
   logEmailBootMode()
@@ -123,14 +125,16 @@ export async function sendEmail({
     from: resolveFromHeader(),
   }
 
-  const storedRetryPayload = retryPayload || {
-    to: recipients,
-    subject,
-    html,
-    text: text || null,
-    tenantId,
-    entityId,
-  }
+  const storedRetryPayload = sensitive
+    ? null
+    : retryPayload || {
+        to: recipients,
+        subject,
+        html,
+        text: text || null,
+        tenantId,
+        entityId,
+      }
   if (logId) {
     await persistRetryPayload(logId, storedRetryPayload)
   }
@@ -143,7 +147,7 @@ export async function sendEmail({
       entityId,
       recipients: recipients.map(redactRecipient),
       subject,
-      textPreview: (text || subject || '').slice(0, 500),
+      textPreview: sensitive ? '[redacted]' : (text || subject || '').slice(0, 500),
     })
     await finalizeEmailDelivery({ eventKey, logId, status: 'log_only' })
     return { sent: true, logOnly: true, provider: 'log_only' }
@@ -213,6 +217,7 @@ export async function sendTemplateEmail({
   entityId = null,
   skipDedup = false,
   throwOnError = false,
+  sensitive = false,
 }) {
   const resolvedLocale = resolveLocale(locale || data.locale || data.preferred_locale || data.user)
   const rendered = renderTemplate(
@@ -235,6 +240,7 @@ export async function sendTemplateEmail({
     entityId,
     skipDedup,
     throwOnError,
+    sensitive,
     retryPayload: {
       template,
       data,

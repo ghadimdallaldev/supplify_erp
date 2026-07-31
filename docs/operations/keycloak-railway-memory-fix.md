@@ -20,13 +20,13 @@ Not caused by: API crons, Postgres keepalive, or idle web tabs.
 
 ## Current configuration (all envs)
 
-|                          | dev / preprod / staging                      | production                       |
-| ------------------------ | -------------------------------------------- | -------------------------------- |
-| `KEYCLOAK_USE_OPTIMIZED` | `false`                                      | `true`                           |
-| Start                    | `kc.sh start --db=postgres` + JDBC           | `kc.sh start --optimized` + JDBC |
-| JVM                      | `-Xmx512m`, metaspace 192m                   | `MaxRAMPercentage=60`            |
-| Metrics                  | off                                          | on                               |
-| Start command            | `railway-entrypoint.sh start --import-realm` | same                             |
+|                          | dev / preprod / staging                      | production                                   |
+| ------------------------ | -------------------------------------------- | -------------------------------------------- |
+| `KEYCLOAK_USE_OPTIMIZED` | `false`                                      | `false` (runtime postgres; same as non-prod) |
+| Start                    | `kc.sh start --db=postgres` + JDBC           | same                                         |
+| JVM                      | `-Xmx512m`, metaspace 192m                   | `-Xmx512m`, metaspace 192m (fixed; no %)     |
+| Metrics                  | off                                          | on                                           |
+| Start command            | `railway-entrypoint.sh start --import-realm` | same                                         |
 
 Dockerfile (all envs): `kc.sh build --db=postgres --health-enabled=true`.
 
@@ -45,9 +45,9 @@ PGPASSWORD=${{Postgres-<env>.PGPASSWORD}}
 KEYCLOAK_USE_OPTIMIZED=false
 JAVA_OPTS_APPEND=-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
 
-# Prod
-KEYCLOAK_USE_OPTIMIZED=true
-JAVA_OPTS_APPEND=-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:MaxMetaspaceSize=256m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
+# Prod (same fixed heap — MaxRAMPercentage caused multi-GB Railway bills)
+KEYCLOAK_USE_OPTIMIZED=false
+JAVA_OPTS_APPEND=-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
 ```
 
 **Remove from dashboard:** `KC_PROXY`, `KC_DB`, `DATABASE_URL`.

@@ -19,6 +19,15 @@ const ensureTenantSystemRoles = vi.fn().mockResolvedValue(undefined)
 const assignTenantUserRole = vi.fn().mockResolvedValue(undefined)
 const assertCanAssignRole = vi.fn().mockResolvedValue({ id: 'role-1', name: 'Manager' })
 const assertCanGrantPermissions = vi.fn()
+const { syncDriverLoginPolicyForUser, invalidateDriverLoginPolicyCache } = vi.hoisted(() => ({
+  syncDriverLoginPolicyForUser: vi.fn().mockResolvedValue(undefined),
+  invalidateDriverLoginPolicyCache: vi.fn(),
+}))
+
+vi.mock('../lib/driver-login-policy.js', () => ({
+  syncDriverLoginPolicyForUser,
+  invalidateDriverLoginPolicyCache,
+}))
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: vi.fn(async (req, res, next) => {

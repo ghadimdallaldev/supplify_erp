@@ -43,6 +43,8 @@ x-api-environment: &api-environment
   EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@supplify.local}
   EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
   EMAIL_TEST_TO: ${EMAIL_TEST_TO:-}
+  AUTH_EMAIL_OTP_ENABLED: ${AUTH_EMAIL_OTP_ENABLED:-false}
+  AUTH_EMAIL_OTP_INTERNAL_SECRET: ${AUTH_EMAIL_OTP_INTERNAL_SECRET:-dev-email-otp-internal-secret}
   SMTP_HOST: ${SMTP_HOST:-mailpit}
   SMTP_PORT: ${SMTP_PORT:-1025}
   SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -138,7 +140,13 @@ services:
       - supplify
 
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0
+    build:
+      context: .
+      dockerfile: deploy/railway/keycloak/Dockerfile
+      args:
+        REALM_EXPORT_FILE: deploy/keycloak/realm-export.json
+        REALM_IMPORT_FILENAME: Supplify-realm.json
+    image: supplify-keycloak:24.0-otp
     container_name: supplify-keycloak
     environment:
       # Cap JVM heap for local dev (default Keycloak dev mode can exceed 1.5 GiB RSS)
@@ -154,8 +162,9 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
+      AUTH_EMAIL_OTP_DRIVER_BYPASS: ${AUTH_EMAIL_OTP_DRIVER_BYPASS:-true}
     command:
-      - start-dev
+      - start
       - --import-realm
     volumes:
       - keycloak_data:/opt/keycloak/data

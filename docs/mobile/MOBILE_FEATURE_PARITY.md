@@ -109,3 +109,10 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 - **Scope**: Denser `/app/orders` table layout (`OrdersResponsiveList`): compact type/padding, `#ID` nowrap, horizontal action row, table from `lg`.
 - **Reason**: Visual density for web laptop cockpits; no API or order lifecycle changes. Mobile order lists unchanged.
+
+## 2026-07-31 — Keycloak email OTP login
+
+- **Interactive login**: Mobile continues to use the hosted Keycloak OIDC pages. Password login may be followed by the localized six-digit email OTP page.
+- **Refresh parity**: POST /auth/mobile/refresh never invokes OTP. Rotation, transient refresh handling, and token expiry behavior are unchanged.
+- **Signup**: Hosted registration may show the same email verification required action before the API accepts tenant completion.
+- **Out of scope**: B2C consumer JWT and staff magic-link flows do not use this OTP feature.

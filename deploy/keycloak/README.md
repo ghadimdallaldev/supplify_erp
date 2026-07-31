@@ -103,3 +103,21 @@ Then confirm `https://keycloak-development-4942.up.railway.app/realms/Supplify/.
 Start command (Railway): `/opt/keycloak/bin/railway-entrypoint.sh start --import-realm`  
 Entrypoint blocks `start-dev`; non-prod uses runtime `--db=postgres` (`KEYCLOAK_USE_OPTIMIZED=false`).  
 Realm JSON is baked at `/opt/keycloak/data/import/<name>-realm.json`. Import skips if realm already exists in DB.
+
+## Email OTP flow
+
+The realm exports now include the Supplify browser flow and the
+email-otp-verify-email required action. Existing realms need the Admin API apply
+step because realm import skips an already-created realm.
+
+Run: node deploy/keycloak/apply-email-otp-flows.mjs
+
+Apply the session policy and OTP flow independently; both are required for the
+full human-login posture. Configure AUTH_EMAIL_OTP_ENABLED and the API/Keycloak
+OTP secrets before binding the flow. Roll back with
+rollback-email-otp-flows.mjs and set KEYCLOAK_ROLLBACK_BROWSER_FLOW to the prior
+browser-flow alias.
+
+## Driver login friction
+
+For high-frequency operational users, `AUTH_EMAIL_OTP_DRIVER_BYPASS=true` enables the driver-only reduced-friction policy. The API writes the marker only for users with an active supplier `Driver` role; missing synchronization fails closed to normal OTP.

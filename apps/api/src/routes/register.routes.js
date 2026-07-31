@@ -5,6 +5,7 @@ import { completeTenantRegistration, userNeedsTenantSetup } from '../lib/registe
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { isUniqueViolation } from '../lib/identity-normalize.js'
+import { config } from '../config/env.js'
 
 const router = express.Router()
 
@@ -46,6 +47,17 @@ router.post('/complete', requireAuth, async (req, res) => {
   try {
     const body = completeSchema.parse(req.body)
     const user = req.userData
+    if (config.AUTH_EMAIL_OTP_ENABLED && req.user?.email_verified !== true) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'EMAIL_NOT_VERIFIED',
+          message: 'Verify your email before completing registration',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const needsSetup = await userNeedsTenantSetup(user)
     if (!needsSetup) {

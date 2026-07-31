@@ -13,6 +13,11 @@ const resolveWorkspaceScope = vi.fn()
 const assertUserCanJoinWorkspace = vi.fn()
 const bindUserToWorkspace = vi.fn()
 const invalidateUserAuthCaches = vi.fn()
+const syncDriverLoginPolicyForUser = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('./driver-login-policy.js', () => ({
+  syncDriverLoginPolicyForUser: (...args) => syncDriverLoginPolicyForUser(...args),
+}))
 
 vi.mock('./db.js', () => ({
   query: (...args) => queryMock(...args),

@@ -165,6 +165,8 @@ router.get('/register', async (req, res) => {
 
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
+    req.session.registrationFlow = true
+
     req.session.save((err) => {
       if (err) logger.error('Error saving session', { error: err.message })
     })
@@ -228,6 +230,7 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
+    delete req.session.registrationFlow
     // Clear the state from session after successful verification
     delete req.session.oauthState
 
@@ -238,6 +241,16 @@ router.get('/callback', async (req, res) => {
 
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
+
+    if (
+      req.session.registrationFlow &&
+      config.AUTH_EMAIL_OTP_ENABLED &&
+      userInfo.email_verified !== true
+    ) {
+      delete req.session.registrationFlow
+      const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+      return res.redirect(origin + '/login?error=email_not_verified')
+    }
 
     // Decode the access token to get roles from realm_access and resource_access
     const tokenParts = tokens.access_token.split('.')
@@ -250,6 +263,13 @@ router.get('/callback', async (req, res) => {
 
     // Upsert user in database
     const user = await upsertUser(userInfo, roles)
+
+    // Existing driver accounts are backfilled on their next successful login. The provider
+    // still requires OTP for that first synchronization; subsequent driver logins are quiet.
+    if (config.AUTH_EMAIL_OTP_ENABLED) {
+      const { syncDriverLoginPolicyForUser } = await import('../lib/driver-login-policy.js')
+      await syncDriverLoginPolicyForUser(user.id)
+    }
 
     // Set auth cookies
     setAuthCookies(res, tokens.access_token, tokens.refresh_token)
