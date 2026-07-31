@@ -6,7 +6,7 @@
   <artifactId>email-otp</artifactId>
   <version>1.0.0</version>
   <properties>
-    <maven.compiler.release>11</maven.compiler.release>
+    <maven.compiler.release>17</maven.compiler.release>
     <keycloak.version>24.0.0</keycloak.version>
   </properties>
   <dependencies>
@@ -25,10 +25,6 @@
     <dependency>
       <groupId>org.keycloak</groupId><artifactId>keycloak-core</artifactId>
       <version>${keycloak.version}</version><scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.keycloak</groupId><artifactId>keycloak-server-spi</artifactId>
-      <version>${keycloak.version}</version><classifier>tests</classifier><scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId>

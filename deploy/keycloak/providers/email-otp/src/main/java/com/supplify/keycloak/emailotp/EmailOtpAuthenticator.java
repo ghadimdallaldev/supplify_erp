@@ -5,9 +5,8 @@ import java.util.List;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
-import org.keycloak.forms.login.LoginFormsPages;
 import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.KeycloakSessionModel;
+import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import jakarta.ws.rs.core.MultivaluedMap;
 
@@ -58,15 +57,15 @@ public final class EmailOtpAuthenticator implements Authenticator {
         context.getAuthenticationSession().setAuthNote(OtpSupport.EXPIRES_NOTE, Long.toString(System.currentTimeMillis() + config.ttlSeconds * 1000L));
         context.getAuthenticationSession().setAuthNote(OtpSupport.ATTEMPTS_NOTE, "0");
         context.getAuthenticationSession().setAuthNote(OtpSupport.SENT_NOTE, Long.toString(System.currentTimeMillis()));
-        try { mail.send(email, code, purpose, context.getSession().getContext().getLocale().toLanguageTag(), challengeId); }
-        catch (RuntimeException e) { clear(context); context.failureChallenge(AuthenticationFlowError.INTERNAL_ERROR, context.form().setError("We could not send a verification code. Try again later.").createLoginOtp()); return; }
-        context.challenge(context.form().setAttribute("otpLength", config.length).setAttribute("otpTtlSeconds", config.ttlSeconds).createLoginOtp());
+        try { mail.send(email, code, purpose, OtpSupport.languageTag(context.getSession(), user), challengeId); }
+        catch (RuntimeException e) { clear(context); context.failureChallenge(AuthenticationFlowError.INTERNAL_ERROR, context.form().setError("We could not send a verification code. Try again later.").createForm("login-otp.ftl")); return; }
+        context.challenge(context.form().setAttribute("otpLength", config.length).setAttribute("otpTtlSeconds", config.ttlSeconds).createForm("login-otp.ftl"));
     }
-    private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createLoginOtp()); }
+    private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createForm("login-otp.ftl")); }
     private static long parseLong(String raw) { try { return Long.parseLong(raw == null ? "0" : raw); } catch (NumberFormatException ignored) { return 0; } }
     private static void clear(AuthenticationFlowContext context) { for (String n : new String[]{OtpSupport.CODE_NOTE, OtpSupport.PURPOSE_NOTE, OtpSupport.EXPIRES_NOTE, OtpSupport.ATTEMPTS_NOTE, OtpSupport.SENT_NOTE}) context.getAuthenticationSession().removeAuthNote(n); }
     public boolean requiresUser() { return true; }
-    public boolean configuredFor(KeycloakSession session, UserModel user) { return true; }
-    public void setRequiredActions(KeycloakSession session, UserModel user) {}
+    public boolean configuredFor(KeycloakSession session, RealmModel realm, UserModel user) { return true; }
+    public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {}
     public void close() {}
 }
