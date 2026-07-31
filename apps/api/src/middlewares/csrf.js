@@ -76,7 +76,7 @@ export async function csrfProtection(req, res, next) {
   }
 
   // E2E helpers use shared secret header, not session cookies
-  if (req.path.startsWith('/api/e2e')) {
+  if (req.path === '/api/internal/auth/otp/email' || req.path.startsWith('/api/e2e')) {
     return next()
   }
 

@@ -22,6 +22,10 @@ import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
 import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
 import { syncDriverLinkForRoleAssignment } from '../lib/driver-user-link.js'
+import {
+  invalidateDriverLoginPolicyCache,
+  syncDriverLoginPolicyForUser,
+} from '../lib/driver-login-policy.js'
 import { sendTemplateEmail } from '../services/email/email.service.js'
 import { buildAppUrl } from '../lib/app-url.js'
 
@@ -454,6 +458,8 @@ router.post(
           driverId: driverId ?? undefined,
           createDriverProfile: createDriverProfile ?? true,
         })
+        invalidateDriverLoginPolicyCache(targetUserId)
+        void syncDriverLoginPolicyForUser(targetUserId)
       }
 
       const tenantTable = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'

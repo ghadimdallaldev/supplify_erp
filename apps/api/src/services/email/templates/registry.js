@@ -40,6 +40,29 @@ function register(map, id, fn) {
 /** @type {Record<string, (data: object, locale?: string) => { subject: string, html: string, text: string }>} */
 export const TEMPLATE_REGISTRY = {}
 
+register(TEMPLATE_REGISTRY, 'auth.email_otp_login', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.email_otp_login.subject', lng),
+    title: t('emails.auth.email_otp_login.title', lng),
+    message: t('emails.auth.email_otp_login.message', lng, { code: d.code }),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'auth.email_otp_verify', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.email_otp_verify.subject', lng),
+    title: t('emails.auth.email_otp_verify.title', lng),
+    message: t('emails.auth.email_otp_verify.message', lng, { code: d.code }),
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
 register(TEMPLATE_REGISTRY, 'auth.welcome', (d, locale = 'en') => {
   const lng = resolveLocale(locale)
   const messageKey =

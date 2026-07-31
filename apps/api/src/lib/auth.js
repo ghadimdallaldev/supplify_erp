@@ -403,6 +403,7 @@ function userInfoFromClaims(payload) {
     given_name: payload.given_name,
     family_name: payload.family_name,
     preferred_username: payload.preferred_username,
+    email_verified: payload.email_verified === true,
   }
 }
 

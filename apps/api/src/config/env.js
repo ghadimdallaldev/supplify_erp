@@ -112,6 +112,17 @@ export const config = {
   ),
   /** Web proactive refresh scheduler (frontend reads via /auth/me). */
   AUTH_PROACTIVE_REFRESH: envBool(process.env.AUTH_PROACTIVE_REFRESH, true),
+  AUTH_EMAIL_OTP_ENABLED: envBool(process.env.AUTH_EMAIL_OTP_ENABLED, false),
+  AUTH_EMAIL_OTP_INTERNAL_SECRET: process.env.AUTH_EMAIL_OTP_INTERNAL_SECRET || '',
+  AUTH_EMAIL_OTP_LENGTH: envInt(process.env.AUTH_EMAIL_OTP_LENGTH, 6),
+  AUTH_EMAIL_OTP_TTL_SECONDS: envInt(process.env.AUTH_EMAIL_OTP_TTL_SECONDS, 600),
+  AUTH_EMAIL_OTP_MAX_ATTEMPTS: envInt(process.env.AUTH_EMAIL_OTP_MAX_ATTEMPTS, 5),
+  AUTH_EMAIL_OTP_RESEND_COOLDOWN_SECONDS: envInt(
+    process.env.AUTH_EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
+    60
+  ),
+  AUTH_EMAIL_OTP_SEND_WINDOW_MS: envInt(process.env.AUTH_EMAIL_OTP_SEND_WINDOW_MS, 60 * 60 * 1000),
+  AUTH_EMAIL_OTP_SEND_MAX: envInt(process.env.AUTH_EMAIL_OTP_SEND_MAX, 10),
   SESSION_SECRET:
     process.env.SESSION_SECRET || (isProductionNode ? '' : 'dev-session-secret-change-me'),
   /** JWT signing for B2C diner sessions (consumer_auth_token cookie). Separate from Keycloak. */
@@ -205,6 +216,7 @@ export const config = {
   EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO || '',
   EMAIL_TEST_TO: process.env.EMAIL_TEST_TO || '',
   EMAIL_FROM: process.env.EMAIL_FROM || '',
+  EMAIL_FROM_AUTH: process.env.EMAIL_FROM_AUTH || '',
   SMTP_FROM:
     process.env.SMTP_FROM ||
     process.env.EMAIL_FROM_ADDRESS ||

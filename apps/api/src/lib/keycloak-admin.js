@@ -178,6 +178,7 @@ export async function createKeycloakUserWithPassword({
   realmRoleName = 'SUPPLIER',
   reuseExisting = false,
   resetPasswordOnExisting = false,
+  emailVerified = false,
 }) {
   const adminToken = await getKeycloakAdminToken()
   const normalizedEmail = normalizeKeycloakEmail(email)
@@ -186,10 +187,12 @@ export async function createKeycloakUserWithPassword({
   const useExistingUser = async (existing) => {
     if (resetPasswordOnExisting && password) {
       await resetKeycloakUserPassword(adminToken, existing.id, password, false)
+      if (emailVerified) await setKeycloakUserEmailVerified(adminToken, existing.id, true)
       await ensureRealmRoleForUser(adminToken, existing.id, realmRoleName)
       return { userId: existing.id, created: false, passwordUpdated: true }
     }
     if (reuseExisting) {
+      if (emailVerified) await setKeycloakUserEmailVerified(adminToken, existing.id, true)
       await ensureRealmRoleForUser(adminToken, existing.id, realmRoleName)
       return { userId: existing.id, created: false }
     }
@@ -215,7 +218,8 @@ export async function createKeycloakUserWithPassword({
         firstName: firstName || '',
         lastName: lastName || '',
         enabled: true,
-        emailVerified: true,
+        emailVerified,
+        requiredActions: emailVerified ? [] : ['email-otp-verify-email'],
         credentials: [{ type: 'password', value: password, temporary: false }],
       },
       {
@@ -251,6 +255,17 @@ export async function createKeycloakUserWithPassword({
   }
 }
 
+export async function setKeycloakUserEmailVerified(adminToken, userId, verified) {
+  const url = base() + '/admin/realms/' + config.KEYCLOAK_REALM + '/users/' + userId
+  await keycloakAdminHttp.put(
+    url,
+    {
+      emailVerified: Boolean(verified),
+      requiredActions: verified ? [] : ['email-otp-verify-email'],
+    },
+    { headers: { Authorization: 'Bearer ' + adminToken, 'Content-Type': 'application/json' } }
+  )
+}
 /** Enable resource-owner password grant on supplify-api (invite signup auto-login). */
 export async function ensureApiClientDirectAccessGrants() {
   const token = await getKeycloakAdminToken()
@@ -381,4 +396,24 @@ export async function ensureKeycloakRealmRole(email, roleName) {
     logger.error('ensureKeycloakRealmRole failed', { email, roleName, error: err.message })
     return false
   }
+}
+
+/**
+ * Mark a Keycloak user as a currently assigned driver for the login OTP policy.
+ * This attribute is written only by server-side role synchronization; clients never provide it.
+ */
+export async function setKeycloakUserDriverLogin(adminToken, userId, enabled) {
+  const url = base() + '/admin/realms/' + config.KEYCLOAK_REALM + '/users/' + userId
+  const { data: existing } = await keycloakAdminHttp.get(url, {
+    headers: { Authorization: 'Bearer ' + adminToken },
+  })
+  const attributes = { ...(existing?.attributes || {}) }
+  if (enabled) attributes.supplify_driver_login = ['true']
+  else delete attributes.supplify_driver_login
+
+  await keycloakAdminHttp.put(
+    url,
+    { attributes },
+    { headers: { Authorization: 'Bearer ' + adminToken, 'Content-Type': 'application/json' } }
+  )
 }
