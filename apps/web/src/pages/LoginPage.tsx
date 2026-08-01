@@ -43,6 +43,8 @@ export function LoginPage() {
       setInviteRegistered(true)
     } else if (expiredParam === 'true') {
       setError(t('sessionExpired'))
+    } else if (errorParam === 'email_not_verified') {
+      setError(t('emailNotVerified'))
     } else if (errorParam) {
       setError(t('authFailed'))
     }
