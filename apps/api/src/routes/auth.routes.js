@@ -41,6 +41,7 @@ import {
 } from '../lib/admin-user-preferences.js'
 import { emitAuthSessionEvent } from '../lib/auth-session-events.js'
 import { extractAccessToken } from '../lib/mobile-auth.js'
+import { mustBlockUnverifiedEmail } from '../lib/email-verification-gate.js'
 
 const legalAcceptanceSchema = {
   packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
@@ -230,8 +231,9 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
+    // Capture before clearing — previously deleted first, so the OTP gate never ran.
+    const wasRegistrationFlow = Boolean(req.session.registrationFlow)
     delete req.session.registrationFlow
-    // Clear the state from session after successful verification
     delete req.session.oauthState
 
     const redirectUri = `${callbackOrigin(req)}/auth/callback`
@@ -243,13 +245,17 @@ router.get('/callback', async (req, res) => {
     const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
 
     if (
-      req.session.registrationFlow &&
-      config.AUTH_EMAIL_OTP_ENABLED &&
-      userInfo.email_verified !== true
+      wasRegistrationFlow &&
+      mustBlockUnverifiedEmail({
+        otpEnabled: config.AUTH_EMAIL_OTP_ENABLED,
+        emailVerified: userInfo.email_verified,
+      })
     ) {
-      delete req.session.registrationFlow
+      logger.warn('Blocking registration until email OTP verification completes', {
+        email: userInfo.email,
+      })
       const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
-      return res.redirect(origin + '/login?error=email_not_verified')
+      return res.redirect(`${origin}/login?error=email_not_verified`)
     }
 
     // Decode the access token to get roles from realm_access and resource_access
@@ -475,6 +481,7 @@ router.get('/me', requireAuth, async (req, res) => {
       data: {
         id: user.id,
         email: user.email,
+        emailVerified: req.user?.email_verified === true,
         displayName: user.display_name,
         role: user.role,
         accessType,

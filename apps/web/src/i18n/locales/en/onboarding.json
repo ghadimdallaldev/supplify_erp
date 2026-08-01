@@ -13,14 +13,18 @@
     "phoneLabel": "Phone (optional)",
     "phonePlaceholder": "+961 3 000 000",
     "submit": "Continue to Supplify",
-    "creatingWorkspace": "Creating your workspaceâ€¦",
-    "almostDone": "Almost doneâ€¦",
+    "creatingWorkspace": "Creating your workspace…",
+    "almostDone": "Almost done…",
+    "verifyEmailTitle": "Check your email",
+    "verifyEmailDescription": "We sent a verification code to {{email}}. Sign out and sign in again to enter the code, then you can finish setting up your organization.",
+    "verifyEmailCta": "Sign in to verify",
     "errors": {
       "chooseAccountType": "Please choose whether you are a restaurant or a supplier.",
       "legalRequired": "Please accept all required legal agreements before continuing.",
-      "serverRestart": "The server restarted while saving your profile. Your account may already be set up â€” refresh this page, or try submitting once more.",
+      "serverRestart": "The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.",
       "generic": "Could not complete registration. Please try again.",
-      "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment."
+      "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment.",
+      "emailNotVerified": "Check your email for a verification code, then sign in again to continue."
     }
   },
   "activation": {

@@ -23,6 +23,7 @@ import {
 } from '../components/legal/LegalAcceptancePanel'
 import { buildLegalAcceptancePayload, type LegalDocumentSlug } from '../lib/legalDocuments'
 import { clearReferralToken } from '../lib/referralToken'
+import { redirectToLogout } from '../lib/authRedirect'
 import { ensureNamespace } from '../i18n'
 
 type AccountType = 'RESTAURANT' | 'SUPPLIER'
@@ -163,6 +164,13 @@ export function RegisterCompletePage() {
         return
       }
 
+      const errName = (err as { data?: { error?: { name?: string; message?: string } } })?.data
+        ?.error?.name
+      if (errName === 'EMAIL_NOT_VERIFIED') {
+        setError(t('registerComplete.errors.emailNotVerified'))
+        return
+      }
+
       const message =
         (err as { data?: { error?: { message?: string } } })?.data?.error?.message ||
         t('registerComplete.errors.generic')
@@ -179,6 +187,27 @@ export function RegisterCompletePage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-[var(--brand-mid)]" />
+      </div>
+    )
+  }
+
+  if (user.emailVerified === false) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-ultra)] via-[var(--surface)] to-[var(--brand-ultra)] p-6">
+        <Card className="w-full max-w-xl border-2 shadow-xl">
+          <CardHeader className="pb-0">
+            <PageHeader
+              title={t('registerComplete.verifyEmailTitle')}
+              description={t('registerComplete.verifyEmailDescription', { email: user.email })}
+              className="text-center sm:flex-col sm:items-center [&_p]:mx-auto"
+            />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button type="button" className="w-full" onClick={() => redirectToLogout()}>
+              {t('registerComplete.verifyEmailCta')}
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }

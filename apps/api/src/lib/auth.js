@@ -422,7 +422,11 @@ export async function getUserInfo(accessToken, idToken = null) {
       timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
-    return response.data
+    const data = response.data || {}
+    return {
+      ...data,
+      email_verified: data.email_verified === true || data.email_verified === 'true',
+    }
   } catch (error) {
     const status = error.response?.status
     const body = error.response?.data
