@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userNeedsTenantSetup = vi.fn()
 const completeTenantRegistration = vi.fn()
+const authState = { emailVerified: true }
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => {
@@ -13,6 +14,7 @@ vi.mock('../lib/rbac.js', () => ({
       role: 'PENDING',
       keycloak_sub: 'kc-sub',
     }
+    req.user = { email_verified: authState.emailVerified }
     next()
   },
 }))
@@ -24,6 +26,10 @@ vi.mock('../lib/register-account.js', () => ({
 
 vi.mock('../lib/logger.js', () => ({
   logger: { error: vi.fn(), info: vi.fn() },
+}))
+
+vi.mock('../config/env.js', () => ({
+  config: { AUTH_EMAIL_OTP_ENABLED: true },
 }))
 
 const legalAcceptance = {
@@ -46,6 +52,7 @@ describe('register.routes', () => {
   beforeEach(async () => {
     userNeedsTenantSetup.mockReset()
     completeTenantRegistration.mockReset()
+    authState.emailVerified = true
 
     app = express()
     app.use(express.json())
@@ -121,6 +128,24 @@ describe('register.routes', () => {
         businessName: 'My Supply Co',
       })
     )
+  })
+
+  it('POST /complete returns 403 when email is not verified and OTP is enabled', async () => {
+    authState.emailVerified = false
+    userNeedsTenantSetup.mockResolvedValue(true)
+
+    const res = await request(app)
+      .post('/api/register/complete')
+      .send({
+        accountType: 'RESTAURANT',
+        businessName: 'My Rest',
+        legalAcceptance,
+      })
+      .expect(403)
+
+    expect(res.body.error.name).toBe('EMAIL_NOT_VERIFIED')
+    expect(res.body.error.message).toMatch(/Check your email/i)
+    expect(completeTenantRegistration).not.toHaveBeenCalled()
   })
 
   it('POST /complete returns 409 when already set up', async () => {

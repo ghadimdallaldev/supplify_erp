@@ -123,6 +123,18 @@ vi.mock('../lib/tenant-roles.js', () => ({
   assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
 }))
 
+const { authConfigState } = vi.hoisted(() => ({
+  authConfigState: {
+    AUTH_EMAIL_OTP_ENABLED: false,
+  },
+}))
+
+vi.mock('../config/env.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  Object.assign(authConfigState, actual.config, { AUTH_EMAIL_OTP_ENABLED: false })
+  return { config: authConfigState }
+})
+
 // Import routes after mocks
 import { authRoutes } from './auth.routes.js'
 
@@ -132,6 +144,7 @@ describe('Auth Routes', () => {
 
   beforeEach(async () => {
     clearAllMocks()
+    authConfigState.AUTH_EMAIL_OTP_ENABLED = false
     db = setupMocks()
 
     // Sync db mocks
@@ -332,6 +345,62 @@ describe('Auth Routes', () => {
       if (originalKeycloakClient !== undefined)
         process.env.KEYCLOAK_CLIENT_ID = originalKeycloakClient
       else delete process.env.KEYCLOAK_CLIENT_ID
+    })
+
+    it('blocks unverified email on registration callback when OTP is enabled', async () => {
+      authConfigState.AUTH_EMAIL_OTP_ENABLED = true
+      const session = { oauthState: 'test-state', registrationFlow: true }
+      const appWithSession = express()
+      appWithSession.use(express.json())
+      appWithSession.use((req, res, next) => {
+        req.session = { ...session }
+        req.sessionID = 'test-session-id'
+        req.session.save = (callback) => {
+          if (callback) callback(null)
+        }
+        req.requestId = 'test-request'
+        try {
+          Object.defineProperty(req, 'protocol', { value: 'http', configurable: true })
+        } catch (_) {
+          /* ignore */
+        }
+        req.get = (header) => (header === 'host' ? 'localhost:4000' : null)
+        next()
+      })
+      appWithSession.use('/auth', authRoutes)
+
+      const { exchangeCodeForTokens, getUserInfo } = await import('../lib/auth.js')
+      const rbacModule = await import('../lib/rbac.js')
+      const payload = { sub: 'sub-123', email: 'new@example.com' }
+      const mockAccessToken =
+        Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url') +
+        '.' +
+        Buffer.from(JSON.stringify(payload)).toString('base64url') +
+        '.signature'
+
+      vi.mocked(exchangeCodeForTokens).mockResolvedValueOnce({
+        access_token: mockAccessToken,
+        refresh_token: 'refresh-token',
+      })
+      vi.mocked(getUserInfo).mockResolvedValueOnce({
+        sub: 'sub-123',
+        email: 'new@example.com',
+        email_verified: false,
+      })
+
+      const originalWebOrigin = process.env.WEB_ORIGIN
+      process.env.WEB_ORIGIN = 'http://localhost:3000'
+
+      const response = await request(appWithSession)
+        .get('/auth/callback?code=test-code&state=test-state')
+        .expect(302)
+
+      expect(response.headers.location).toBe('http://localhost:3000/login?error=email_not_verified')
+      expect(rbacModule.setAuthCookies).not.toHaveBeenCalled()
+      expect(rbacModule.upsertUser).not.toHaveBeenCalled()
+
+      if (originalWebOrigin !== undefined) process.env.WEB_ORIGIN = originalWebOrigin
+      else delete process.env.WEB_ORIGIN
     })
 
     it('should reject callback with invalid state', async () => {

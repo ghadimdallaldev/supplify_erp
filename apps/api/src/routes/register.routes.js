@@ -53,7 +53,8 @@ router.post('/complete', requireAuth, async (req, res) => {
         data: null,
         error: {
           name: 'EMAIL_NOT_VERIFIED',
-          message: 'Verify your email before completing registration',
+          message:
+            'Check your email for a verification code, then sign in again to continue registration',
         },
         requestId: req.requestId,
       })
