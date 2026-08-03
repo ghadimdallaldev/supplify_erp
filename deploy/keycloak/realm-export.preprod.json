@@ -52,7 +52,7 @@
         {
           "flowAlias": "supplify-browser-email-otp-forms",
           "authenticatorFlow": true,
-          "requirement": "REQUIRED",
+          "requirement": "ALTERNATIVE",
           "priority": 30,
           "userSetupAllowed": false
         }

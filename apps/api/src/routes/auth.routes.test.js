@@ -347,13 +347,18 @@ describe('Auth Routes', () => {
       else delete process.env.KEYCLOAK_CLIENT_ID
     })
 
-    it('blocks unverified email on registration callback when OTP is enabled', async () => {
+    it('blocks unverified email on any callback when OTP is enabled and clears SSO via logout', async () => {
       authConfigState.AUTH_EMAIL_OTP_ENABLED = true
-      const session = { oauthState: 'test-state', registrationFlow: true }
+      const session = {
+        oauthState: 'test-state',
+        registrationFlow: true,
+        destroy: (cb) => cb && cb(),
+      }
       const appWithSession = express()
       appWithSession.use(express.json())
       appWithSession.use((req, res, next) => {
         req.session = { ...session }
+        req.session.destroy = session.destroy
         req.sessionID = 'test-session-id'
         req.session.save = (callback) => {
           if (callback) callback(null)
@@ -369,7 +374,9 @@ describe('Auth Routes', () => {
       })
       appWithSession.use('/auth', authRoutes)
 
-      const { exchangeCodeForTokens, getUserInfo } = await import('../lib/auth.js')
+      const { exchangeCodeForTokens, getUserInfo, getKeycloakLogoutUrl } = await import(
+        '../lib/auth.js'
+      )
       const rbacModule = await import('../lib/rbac.js')
       const payload = { sub: 'sub-123', email: 'new@example.com' }
       const mockAccessToken =
@@ -387,6 +394,9 @@ describe('Auth Routes', () => {
         email: 'new@example.com',
         email_verified: false,
       })
+      vi.mocked(getKeycloakLogoutUrl).mockResolvedValueOnce(
+        'https://keycloak.example.com/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A4000%2Fauth%2Flogin'
+      )
 
       const originalWebOrigin = process.env.WEB_ORIGIN
       process.env.WEB_ORIGIN = 'http://localhost:3000'
@@ -395,9 +405,75 @@ describe('Auth Routes', () => {
         .get('/auth/callback?code=test-code&state=test-state')
         .expect(302)
 
-      expect(response.headers.location).toBe('http://localhost:3000/login?error=email_not_verified')
+      expect(response.headers.location).toContain('keycloak.example.com/logout')
+      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith('http://localhost:4000/auth/login')
       expect(rbacModule.setAuthCookies).not.toHaveBeenCalled()
       expect(rbacModule.upsertUser).not.toHaveBeenCalled()
+
+      if (originalWebOrigin !== undefined) process.env.WEB_ORIGIN = originalWebOrigin
+      else delete process.env.WEB_ORIGIN
+    })
+
+    it('blocks unverified email on login callback when OTP is enabled', async () => {
+      authConfigState.AUTH_EMAIL_OTP_ENABLED = true
+      const session = {
+        oauthState: 'test-state',
+        destroy: (cb) => cb && cb(),
+      }
+      const appWithSession = express()
+      appWithSession.use(express.json())
+      appWithSession.use((req, res, next) => {
+        req.session = { ...session }
+        req.session.destroy = session.destroy
+        req.sessionID = 'test-session-id'
+        req.session.save = (callback) => {
+          if (callback) callback(null)
+        }
+        req.requestId = 'test-request'
+        try {
+          Object.defineProperty(req, 'protocol', { value: 'http', configurable: true })
+        } catch (_) {
+          /* ignore */
+        }
+        req.get = (header) => (header === 'host' ? 'localhost:4000' : null)
+        next()
+      })
+      appWithSession.use('/auth', authRoutes)
+
+      const { exchangeCodeForTokens, getUserInfo, getKeycloakLogoutUrl } = await import(
+        '../lib/auth.js'
+      )
+      const rbacModule = await import('../lib/rbac.js')
+      const payload = { sub: 'sub-456', email: 'unverified@example.com' }
+      const mockAccessToken =
+        Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url') +
+        '.' +
+        Buffer.from(JSON.stringify(payload)).toString('base64url') +
+        '.signature'
+
+      vi.mocked(exchangeCodeForTokens).mockResolvedValueOnce({
+        access_token: mockAccessToken,
+        refresh_token: 'refresh-token',
+      })
+      vi.mocked(getUserInfo).mockResolvedValueOnce({
+        sub: 'sub-456',
+        email: 'unverified@example.com',
+        email_verified: false,
+      })
+      vi.mocked(getKeycloakLogoutUrl).mockResolvedValueOnce(
+        'https://keycloak.example.com/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A4000%2Fauth%2Flogin'
+      )
+
+      const originalWebOrigin = process.env.WEB_ORIGIN
+      process.env.WEB_ORIGIN = 'http://localhost:3000'
+
+      const response = await request(appWithSession)
+        .get('/auth/callback?code=test-code&state=test-state')
+        .expect(302)
+
+      expect(response.headers.location).toContain('keycloak.example.com/logout')
+      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith('http://localhost:4000/auth/login')
+      expect(rbacModule.setAuthCookies).not.toHaveBeenCalled()
 
       if (originalWebOrigin !== undefined) process.env.WEB_ORIGIN = originalWebOrigin
       else delete process.env.WEB_ORIGIN

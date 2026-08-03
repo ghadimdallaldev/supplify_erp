@@ -10,4 +10,9 @@ class OtpSupportTest {
         assertTrue(OtpSupport.matches(a, OtpSupport.hmac("secret", "login_email_mfa", "a@example.com", "123456")));
         assertFalse(OtpSupport.matches(a, OtpSupport.hmac("secret", "signup_email_verification", "a@example.com", "123456")));
     }
+    @Test void signupAndLoginPurposesMustNotCollide() {
+        String signup = OtpSupport.hmac("secret", "signup_email_verification", "user@example.com", "654321");
+        String login = OtpSupport.hmac("secret", "login_email_mfa", "user@example.com", "654321");
+        assertFalse(OtpSupport.matches(signup, login));
+    }
 }

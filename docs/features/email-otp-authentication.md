@@ -9,6 +9,11 @@ Codes are six digits, expire after ten minutes, allow five attempts, and can be
 resent after 60 seconds. A resend invalidates the previous code. Only an HMAC
 digest is held by Keycloak, and API logs/audits redact the code.
 
+Unverified accounts use the signup required action only (`signup_email_verification`).
+Verified accounts use the login authenticator (`login_email_mfa`). The API rejects
+OAuth callbacks when `email_verified` is not true and clears Keycloak SSO before
+re-entering hosted login so a stale cookie cannot skip the OTP page.
+
 OTP is not used for access-token refresh, proactive refresh, `requireAuth`
 renewal, B2C consumer sessions, service accounts, or staff magic links. The
 existing [session management feature](auth-session-management.md) continues to

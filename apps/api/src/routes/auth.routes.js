@@ -85,6 +85,33 @@ function clearLocalAuthSession(req, res) {
   })
 }
 
+function saveSession(req) {
+  return new Promise((resolve, reject) => {
+    if (!req.session) {
+      resolve()
+      return
+    }
+    req.session.save((err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
+/**
+ * Unverified OTP gate: clear app session and Keycloak SSO, then re-enter login
+ * so the user hits password + OTP / signup required action (not a dead-end SPA page).
+ */
+async function redirectUnverifiedEmailToLogin(req, res) {
+  await clearLocalAuthSession(req, res)
+  const loginContinue = `${callbackOrigin(req)}/auth/login`
+  const logoutUrl = await getKeycloakLogoutUrl(loginContinue)
+  logger.warn('Blocking auth until email OTP verification completes', {
+    next: loginContinue,
+  })
+  return res.redirect(logoutUrl)
+}
+
 /**
  * Origin the OAuth callback must live on. The callback has to land first-party
  * on the web host so auth cookies aren't third-party (mobile Chrome blocks those).
@@ -128,13 +155,9 @@ router.get('/login', async (req, res) => {
     // Generate CSRF token for this session
     const state = randomBytes(32).toString('hex')
 
-    // Store state in session and force save
+    // Store state in session and force save before redirect (avoids lost oauthState).
     req.session.oauthState = state
-    req.session.save((err) => {
-      if (err) {
-        logger.error('Error saving session', { error: err.message })
-      }
-    })
+    await saveSession(req)
 
     logger.info('Login initiated')
 
@@ -167,10 +190,7 @@ router.get('/register', async (req, res) => {
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
     req.session.registrationFlow = true
-
-    req.session.save((err) => {
-      if (err) logger.error('Error saving session', { error: err.message })
-    })
+    await saveSession(req)
 
     const redirectUri = `${callbackOrigin(req)}/auth/callback`
     const registrationUrl = await getRegistrationUrl(redirectUri, state)
@@ -231,8 +251,6 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
-    // Capture before clearing — previously deleted first, so the OTP gate never ran.
-    const wasRegistrationFlow = Boolean(req.session.registrationFlow)
     delete req.session.registrationFlow
     delete req.session.oauthState
 
@@ -244,18 +262,18 @@ router.get('/callback', async (req, res) => {
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
 
+    // Block any OAuth completion while email OTP verification is incomplete —
+    // not only registrationFlow (login SSO could otherwise skip the OTP page).
     if (
-      wasRegistrationFlow &&
       mustBlockUnverifiedEmail({
         otpEnabled: config.AUTH_EMAIL_OTP_ENABLED,
         emailVerified: userInfo.email_verified,
       })
     ) {
-      logger.warn('Blocking registration until email OTP verification completes', {
+      logger.warn('Blocking auth until email OTP verification completes', {
         email: userInfo.email,
       })
-      const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
-      return res.redirect(`${origin}/login?error=email_not_verified`)
+      return redirectUnverifiedEmailToLogin(req, res)
     }
 
     // Decode the access token to get roles from realm_access and resource_access

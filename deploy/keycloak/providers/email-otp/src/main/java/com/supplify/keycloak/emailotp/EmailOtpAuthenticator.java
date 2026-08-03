@@ -1,7 +1,5 @@
 package com.supplify.keycloak.emailotp;
 
-import java.util.Collections;
-import java.util.List;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.Authenticator;
@@ -26,7 +24,13 @@ public final class EmailOtpAuthenticator implements Authenticator {
             context.success();
             return;
         }
-        if (!user.isEmailVerified()) user.addRequiredAction(EmailOtpRequiredActionFactory.ID);
+        // Unverified users must complete signup email OTP (required action) only.
+        // Do not also issue login_email_mfa — purposes are HMAC-bound and dual codes strand users.
+        if (!user.isEmailVerified()) {
+            user.addRequiredAction(EmailOtpRequiredActionFactory.ID);
+            context.success();
+            return;
+        }
         issue(context, user, false);
     }
     public void action(AuthenticationFlowContext context) {
