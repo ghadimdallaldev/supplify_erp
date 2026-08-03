@@ -14,7 +14,10 @@
 6. After changing OTP flows, re-run
    `node deploy/keycloak/apply-email-otp-flows.mjs` and confirm the browser
    flow's forms subflow contains both `auth-username-password-form` and
-   `email-otp-login` (not an empty nested flow).
+   `email-otp-login` (not an empty nested flow). If Sign In jumps straight to
+   "We are sorry... Invalid username or password" with no login form, the
+   browser flow likely has Cookie/IDP DISABLED or the forms subflow unbound —
+   re-run the apply script (it re-enables steps and re-links orphaned forms).
 
 Refresh failures do not imply an OTP failure. Follow the
 [auth-session troubleshooting runbook](auth-session-troubleshooting.md) for
