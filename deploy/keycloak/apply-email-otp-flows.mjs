@@ -37,12 +37,14 @@ async function listExecutions(accessToken, flowAlias) {
   if (!res.ok) throw new Error(`List executions for ${flowAlias} failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
-async function setRequirement(accessToken, execution, requirement) {
+async function setRequirement(accessToken, flowAlias, execution, requirement) {
   if (!execution?.id || execution.requirement === requirement) return execution
+  // Keycloak expects PUT .../flows/{flowAlias}/executions with { id, requirement }
+  // (not .../flows/executions/{id}, which 404s and leaves steps DISABLED).
   const res = await adminFetch(
     accessToken,
-    `/admin/realms/${encodeURIComponent(realm)}/authentication/flows/executions/${execution.id}`,
-    { method: 'PUT', body: JSON.stringify({ ...execution, requirement }) }
+    `/admin/realms/${encodeURIComponent(realm)}/authentication/flows/${encodeURIComponent(flowAlias)}/executions`,
+    { method: 'PUT', body: JSON.stringify({ id: execution.id, requirement }) }
   )
   if (!res.ok) throw new Error(`Set requirement failed: ${res.status} ${await res.text()}`)
   return { ...execution, requirement }
@@ -50,7 +52,7 @@ async function setRequirement(accessToken, execution, requirement) {
 async function ensureAuthenticator(accessToken, flowAlias, provider, requirement = 'REQUIRED') {
   const current = await listExecutions(accessToken, flowAlias)
   const existing = current.find((execution) => execution.providerId === provider)
-  if (existing) return setRequirement(accessToken, existing, requirement)
+  if (existing) return setRequirement(accessToken, flowAlias, existing, requirement)
   const res = await adminFetch(
     accessToken,
     `/admin/realms/${encodeURIComponent(realm)}/authentication/flows/${encodeURIComponent(flowAlias)}/executions/execution`,
@@ -59,11 +61,22 @@ async function ensureAuthenticator(accessToken, flowAlias, provider, requirement
   if (!res.ok && res.status !== 409) throw new Error(`Add ${provider} to ${flowAlias} failed: ${res.status} ${await res.text()}`)
   const updated = await listExecutions(accessToken, flowAlias)
   const created = updated.find((execution) => execution.providerId === provider)
-  return setRequirement(accessToken, created, requirement)
+  return setRequirement(accessToken, flowAlias, created, requirement)
 }
+async function findFlowByAlias(accessToken, alias) {
+  const res = await adminFetch(
+    accessToken,
+    `/admin/realms/${encodeURIComponent(realm)}/partial-export?exportClients=false&exportGroupsAndRoles=false`,
+    { method: 'POST' }
+  )
+  if (!res.ok) throw new Error(`Partial export failed: ${res.status} ${await res.text()}`)
+  const data = await res.json()
+  return (data.authenticationFlows || []).find((flow) => flow.alias === alias) || null
+}
+
 /**
  * Ensure a nested forms subflow under the browser flow, then wire password + OTP
- * inside that same subflow. Never create an orphan top-level flow with the same alias.
+ * inside that same subflow. Re-link orphaned forms flows that exist but are unbound.
  */
 async function ensureFormsSubflow(accessToken, browserAlias, formsAlias, requirement = 'ALTERNATIVE') {
   const parentPath = `/admin/realms/${encodeURIComponent(realm)}/authentication/flows/${encodeURIComponent(browserAlias)}/executions`
@@ -90,7 +103,31 @@ async function ensureFormsSubflow(accessToken, browserAlias, formsAlias, require
     current = await listExecutions(accessToken, browserAlias)
     formsExec = current.find((execution) => execution.authenticationFlow && execution.displayName === formsAlias)
   }
-  if (formsExec) await setRequirement(accessToken, formsExec, requirement)
+  // Alias exists but is not nested under the browser flow (prior apply bugs left orphans).
+  if (!formsExec) {
+    const browserFlow = (await getFlows(accessToken)).find((flow) => flow.alias === browserAlias)
+    const formsFlow = await findFlowByAlias(accessToken, formsAlias)
+    if (!browserFlow?.id || !formsFlow?.id) {
+      throw new Error(`Forms subflow ${formsAlias} exists but could not be linked under ${browserAlias}`)
+    }
+    const link = await adminFetch(accessToken, `/admin/realms/${encodeURIComponent(realm)}/authentication/executions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        parentFlow: browserFlow.id,
+        flowId: formsFlow.id,
+        authenticatorFlow: true,
+        requirement,
+        priority: 30,
+      }),
+    })
+    if (!link.ok && link.status !== 409) {
+      throw new Error(`Link subflow ${formsAlias} failed: ${link.status} ${await link.text()}`)
+    }
+    current = await listExecutions(accessToken, browserAlias)
+    formsExec = current.find((execution) => execution.authenticationFlow && execution.displayName === formsAlias)
+  }
+  if (!formsExec) throw new Error(`Forms subflow ${formsAlias} is still missing under ${browserAlias}`)
+  await setRequirement(accessToken, browserAlias, formsExec, requirement)
 
   await ensureAuthenticator(accessToken, formsAlias, 'auth-username-password-form', 'REQUIRED')
   await ensureAuthenticator(accessToken, formsAlias, 'email-otp-login', 'REQUIRED')
