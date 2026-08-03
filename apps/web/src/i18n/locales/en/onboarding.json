@@ -16,7 +16,7 @@
     "creatingWorkspace": "Creating your workspace…",
     "almostDone": "Almost done…",
     "verifyEmailTitle": "Check your email",
-    "verifyEmailDescription": "We sent a verification code to {{email}}. Sign out and sign in again to enter the code, then you can finish setting up your organization.",
+    "verifyEmailDescription": "We sent a verification code to {{email}}. Sign in again — you will enter the code on the next screen, then finish setting up your organization.",
     "verifyEmailCta": "Sign in to verify",
     "errors": {
       "chooseAccountType": "Please choose whether you are a restaurant or a supplier.",
@@ -24,7 +24,7 @@
       "serverRestart": "The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.",
       "generic": "Could not complete registration. Please try again.",
       "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment.",
-      "emailNotVerified": "Check your email for a verification code, then sign in again to continue."
+      "emailNotVerified": "Sign in again to enter the verification code on the next screen, then continue."
     }
   },
   "activation": {
