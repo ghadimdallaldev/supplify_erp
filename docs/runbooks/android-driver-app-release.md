@@ -33,6 +33,15 @@ Install and launch:
     adb install -r app\build\outputs\apk\debug\app-debug.apk
     adb shell am start -n com.supplify.driver/.MainActivity
 
+With exactly one emulator or device connected, verify both hosted auth entry
+points against the environment embedded by the last sync:
+
+    cd ..
+    pnpm.cmd run android:smoke:auth
+
+Set ANDROID_SERIAL when more than one Android target is connected.
+The command requires a debuggable APK and clears its app data before each flow.
+
 ## Signed release APK and AAB
 
 Release signing reads the ignored apps/web/android/keystore.properties file:
@@ -63,11 +72,6 @@ driver, start a session, grant location and notification permissions, lock the
 screen, move through a short route, verify the foreground notification, and
 confirm points and stale state on the supplier map. Stop the session and verify
 the server marks it stopped.
-
-The Android instrumentation regression covers both auth entry points. With an
-emulator running and after syncing the intended environment:
-
-    .\gradlew.bat :app:connectedDebugAndroidTest --no-daemon --max-workers=1 '-Pandroid.testInstrumentationRunnerArguments.class=com.supplify.driver.DriverAuthSmokeTest'
 
 ## Rollback
 

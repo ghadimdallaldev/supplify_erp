@@ -21,7 +21,8 @@
     "analyze": "vite build --mode analyze",
     "android:sync:development": "node scripts/sync-capacitor-android.mjs development",
     "android:sync:preprod": "node scripts/sync-capacitor-android.mjs preprod",
-    "android:sync:production": "node scripts/sync-capacitor-android.mjs production"
+    "android:sync:production": "node scripts/sync-capacitor-android.mjs production",
+    "android:smoke:auth": "node scripts/smoke-driver-android-auth.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",
