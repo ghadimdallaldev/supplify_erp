@@ -28,14 +28,14 @@
 | Metric                  | Value | Source                             |
 | ----------------------- | ----: | ---------------------------------- |
 | API routes              |   554 | `docs/audits/route-inventory.json` |
-| SQL migrations          |   179 | `apps/api/db/migrations/`          |
+| SQL migrations          |   195 | `apps/api/db/migrations/`          |
 | API test files          |   213 | bootstrap-metrics                  |
 | Web test files          |   309 | bootstrap-metrics                  |
 | Playwright e2e specs    |    16 | `tests/e2e/suites/`                |
 | Frontend routes         |   ~80 | `apps/web/src/App.tsx`             |
-| Permission keys         |    52 | `permission-keys.js`               |
-| Restaurant feature keys |    26 | `feature-keys.js`                  |
-| Supplier feature keys   |    24 | `feature-keys.js`                  |
+| Permission keys         |    56 | `permission-keys.js`               |
+| Restaurant feature keys |    27 | `feature-keys.js`                  |
+| Supplier feature keys   |    26 | `feature-keys.js`                  |
 
 ---
 

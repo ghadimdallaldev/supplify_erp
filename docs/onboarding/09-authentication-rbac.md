@@ -95,7 +95,7 @@ Options: `httpOnly`, `secure` (`COOKIE_SECURE`), `sameSite` (`COOKIE_SAME_SITE`)
 
 ---
 
-## Permission keys (52)
+## Permission keys (56)
 
 Canonical constants: `apps/api/src/lib/permission-keys.js` (`PERMISSION_KEYS`).
 
@@ -118,6 +118,7 @@ Canonical constants: `apps/api/src/lib/permission-keys.js` (`PERMISSION_KEYS`).
 | Customers     | `CUSTOMERS_IMPORT`, `CUSTOMERS_MANAGE`                                                           |
 | Growth        | `GROWTH_VIEW`                                                                                    |
 | Driver        | `DRIVER_DELIVERIES_VIEW`, `DRIVER_DELIVERIES_MANAGE`                                             |
+| Recipes       | `RECIPES_VIEW`, `RECIPES_VIEW_COSTS`, `RECIPES_EDIT`, `RECIPES_MANAGE`                           |
 | Admin         | `ADMIN_ACCESS`, `ADMIN_TENANTS`, `ADMIN_PLANS`, `ADMIN_SUPPORT`, `ADMIN_FINANCE`, `ADMIN_GROWTH` |
 
 **`hasPermission(permissions, required)`** (`permissions.js`): exact match, or holder has domain `_MANAGE` when checking `_VIEW` / `_EDIT` / etc.
@@ -165,6 +166,10 @@ Legend: ✓ = granted, — = denied. Owner has all keys (omitted for brevity).
 | `SETTINGS_MANAGE`               |        —         |     —     |     —     |     —      |     —     |  —  |
 | `CHAT_VIEW` / `CHAT_SEND`       |        ✓         |     ✓     |     —     |     —      | view only |  —  |
 | `RESERVATIONS_*`                | view/create/edit |     —     |     —     |     —      |   view    |  ✓  |
+| `RECIPES_VIEW`                  |        ✓         |     ✓     |     —     |     ✓      |     —     |  —  |
+| `RECIPES_VIEW_COSTS`            |        ✓         |     —     |     —     |     ✓      |     —     |  —  |
+| `RECIPES_EDIT`                  |        ✓         |     ✓     |     —     |     —      |     —     |  —  |
+| `RECIPES_MANAGE`                |        ✓         |     —     |     —     |     —      |     —     |  —  |
 
 Verified by `apps/api/src/lib/tenant-role-matrix.test.js`.
 

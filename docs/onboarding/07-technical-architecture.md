@@ -50,7 +50,7 @@ flowchart TB
 | Cache / pub-sub | Redis (`ioredis`)                            | `apps/api/src/lib/cache.js`, `socket-redis-adapter.js` |
 | Object storage  | Local filesystem or S3-compatible (MinIO)    | `apps/api/src/services/storage/`                       |
 | Real-time       | Socket.IO on shared HTTP server              | `apps/api/src/lib/socket.js`                           |
-| DB              | PostgreSQL 16, 175 SQL migrations            | `apps/api/db/migrations/`                              |
+| DB              | PostgreSQL 16, 195 SQL migrations            | `apps/api/db/migrations/`                              |
 
 ---
 
@@ -365,7 +365,7 @@ Full list: `apps/api/src/config/env.js`.
 
 | Claim                      | Source                                                               |
 | -------------------------- | -------------------------------------------------------------------- |
-| 175 SQL migrations         | `apps/api/db/migrations/*.sql` (count verified 2026-06-17)           |
+| 195 SQL migrations         | `apps/api/db/migrations/*.sql` (count verified 2026-08-06)           |
 | 18 cron jobs registered    | `register-cron-jobs.js` `jobs.length` + `cron-runner.js` `CRON_JOBS` |
 | Middleware order           | `apps/api/src/server.js` lines 149–442                               |
 | RTK store shape            | `apps/web/src/store/index.ts`                                        |

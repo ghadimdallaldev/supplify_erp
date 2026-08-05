@@ -426,6 +426,12 @@ Tenant-scoped permissions (from `apps/api/src/lib/permissions.js`):
 | Warehouses       | `WAREHOUSES_VIEW`, `WAREHOUSES_EDIT`, `WAREHOUSES_MANAGE`                                        |
 | Receiving        | `RECEIVING_VIEW`, `RECEIVING_MANAGE`                                                             |
 | Payments         | `PAYMENTS_VIEW`, `PAYMENTS_MANAGE`                                                               |
+| Fulfillment      | `FULFILLMENT_VIEW`, `FULFILLMENT_MANAGE`                                                         |
+| Promotions       | `PROMOTIONS_VIEW`, `PROMOTIONS_MANAGE`                                                           |
+| Customers        | `CUSTOMERS_IMPORT`, `CUSTOMERS_MANAGE`                                                           |
+| Growth           | `GROWTH_VIEW`                                                                                    |
+| Driver           | `DRIVER_DELIVERIES_VIEW`, `DRIVER_DELIVERIES_MANAGE`                                             |
+| Recipes          | `RECIPES_VIEW`, `RECIPES_VIEW_COSTS`, `RECIPES_EDIT`, `RECIPES_MANAGE`                           |
 | Admin (platform) | `ADMIN_ACCESS`, `ADMIN_TENANTS`, `ADMIN_PLANS`, `ADMIN_SUPPORT`, `ADMIN_FINANCE`, `ADMIN_GROWTH` |
 
 Default roles seeded: restaurant owner, supplier owner, admin roles (see migrations `0041`, `0042`).
@@ -438,63 +444,68 @@ Canonical keys in `apps/api/src/lib/feature-keys.js`:
 
 ### Restaurant plan features
 
-| Key                    | Display name                                            |
-| ---------------------- | ------------------------------------------------------- |
-| `chat`                 | Chat                                                    |
-| `order_calendar`       | Order calendar                                          |
-| `reports`              | Reports & analytics                                     |
-| `smart_reorder`        | Smart reorder                                           |
-| `multi_branch`         | Multi-branch                                            |
-| `receiving_quality`    | Receiving & quality                                     |
-| `finance_invoices`     | Finance & invoices                                      |
-| `quick_lists`          | Quick lists                                             |
-| `inventory_management` | Inventory management                                    |
-| `waste_tracking`       | Waste tracking (inventory tab + analytics)              |
-| `advanced_roles`       | Named tenant roles & custom role builder                |
-| `disputes_returns`     | Disputes & returns                                      |
-| `supplier_deals`       | Browse/redeem supplier deals                            |
-| `order_amendments`     | Post-place order amendments                             |
-| `order_calendar`       | Order calendar                                          |
-| `supplier_reviews`     | Supplier reviews                                        |
-| `push_notifications`   | Web push (PWA)                                          |
-| `tenant_audit_log`     | Tenant activity log                                     |
-| `waitlist_auto_promo`  | Waitlist auto-promotion                                 |
-| `notifications`        | Notifications (tier: email / email+WhatsApp / +webhook) |
-| `api_integrations`     | API integrations                                        |
-| `support_sla`          | Support SLA                                             |
-| `custom_branding`      | Custom branding                                         |
-| `feature_flags_access` | Feature flag admin (tenant)                             |
+| Key                     | Display name                                            |
+| ----------------------- | ------------------------------------------------------- |
+| `chat`                  | Chat                                                    |
+| `order_calendar`        | Order calendar                                          |
+| `reports`               | Reports & analytics                                     |
+| `smart_reorder`         | Smart reorder                                           |
+| `multi_branch`          | Multi-branch                                            |
+| `receiving_quality`     | Receiving & quality                                     |
+| `finance_invoices`      | Finance & invoices                                      |
+| `quick_lists`           | Quick lists                                             |
+| `inventory_management`  | Inventory management                                    |
+| `waste_tracking`        | Waste tracking (inventory tab + analytics)              |
+| `advanced_roles`        | Named tenant roles & custom role builder                |
+| `disputes_returns`      | Disputes & returns                                      |
+| `supplier_deals`        | Browse/redeem supplier deals                            |
+| `supplier_deals_redeem` | Supplier deal redemptions (metered)                     |
+| `order_amendments`      | Post-place order amendments                             |
+| `supplier_reviews`      | Supplier reviews                                        |
+| `push_notifications`    | Web push (PWA)                                          |
+| `tenant_audit_log`      | Tenant activity log                                     |
+| `waitlist_auto_promo`   | Waitlist auto-promotion                                 |
+| `notifications`         | Notifications (tier: email / email+WhatsApp / +webhook) |
+| `api_integrations`      | API integrations                                        |
+| `support_sla`           | Support SLA                                             |
+| `custom_branding`       | Custom branding                                         |
+| `feature_flags_access`  | Feature flag admin (tenant)                             |
+| `recipe_costing`        | Recipe costing & cost analysis                          |
+| `fulfillment_tools`     | Fulfillment tools                                       |
+| `ai_platform`           | AI platform (LLM reorder assistant)                     |
 
 **Removed keys (not in catalog):** `approvals_budgets`
 
 ### Supplier plan features
 
-| Key                                                       | Display name                                          |
-| --------------------------------------------------------- | ----------------------------------------------------- |
-| `chat`                                                    | Chat                                                  |
-| `order_calendar`                                          | Order calendar                                        |
-| `reports`                                                 | Reports & analytics                                   |
-| `multi_branch`                                            | Multi-branch org accounts                             |
-| `warehouses`                                              | Warehouses                                            |
-| `multi_warehouse`                                         | Multi-warehouse fulfillment                           |
-| `fulfillment_tools`                                       | Fulfillment tools                                     |
-| `disputes_returns`                                        | Disputes & returns                                    |
-| `quick_lists`                                             | Quick lists                                           |
-| `inventory_management`                                    | Inventory management                                  |
-| `advanced_roles`                                          | Named tenant roles                                    |
-| `notifications`                                           | Notifications                                         |
-| `api_integrations`                                        | API integrations                                      |
-| `support_sla`                                             | Support SLA                                           |
-| `custom_branding`                                         | Custom branding                                       |
-| `feature_flags_access`                                    | Feature flag admin                                    |
-| `promotions`                                              | Deals (supplier plan feature; internal key unchanged) |
-| `disputes_returns`                                        | Disputes & returns                                    |
-| `order_amendments`                                        | Order amendments                                      |
-| `order_calendar`                                          | Order calendar                                        |
-| `push_notifications`                                      | Web push                                              |
-| `tenant_audit_log`                                        | Activity log                                          |
-| `warehouses` / `multi_warehouse`                          | Warehouse fulfillment                                 |
-| `fulfillment` / `fulfillment_tools` / `driver_management` | Logistics                                             |
+| Key                    | Display name                                          |
+| ---------------------- | ----------------------------------------------------- |
+| `chat`                 | Chat                                                  |
+| `order_calendar`       | Order calendar                                        |
+| `reports`              | Reports & analytics                                   |
+| `smart_reorder`        | Smart reorder                                         |
+| `ai_platform`          | AI platform (LLM reorder assistant)                   |
+| `multi_branch`         | Multi-branch org accounts                             |
+| `warehouses`           | Warehouses                                            |
+| `multi_warehouse`      | Multi-warehouse fulfillment                           |
+| `fulfillment_tools`    | Fulfillment tools                                     |
+| `fulfillment`          | Fulfillment (alias → `fulfillment_tools`)             |
+| `driver_management`    | Driver management (alias → `fulfillment_tools`)       |
+| `disputes_returns`     | Disputes & returns                                    |
+| `finance_invoices`     | Finance & invoices                                    |
+| `quick_lists`          | Quick lists                                           |
+| `inventory_management` | Inventory management                                  |
+| `advanced_roles`       | Named tenant roles                                    |
+| `notifications`        | Notifications                                         |
+| `api_integrations`     | API integrations                                      |
+| `support_sla`          | Support SLA                                           |
+| `custom_branding`      | Custom branding                                       |
+| `feature_flags_access` | Feature flag admin                                    |
+| `promotions`           | Deals (supplier plan feature; internal key unchanged) |
+| `push_notifications`   | Web push                                              |
+| `order_amendments`     | Order amendments                                      |
+| `tenant_audit_log`     | Activity log                                          |
+| `supplier_growth`      | Customer growth & referrals                           |
 
 **Admin overrides:** global defaults + per-tenant overrides via Admin → Features tab.
 

@@ -11,7 +11,7 @@
 | Domains covered         |                 **22** |
 | API routes (discovered) |                **554** |
 | Frontend route entries  |                 **80** |
-| Permission keys         |                 **52** |
+| Permission keys         |                 **56** |
 | Subscription tiers      | **4** × 2 tenant types |
 
 ### Status legend
@@ -39,7 +39,7 @@
 | Tenancy       | Register complete     | PENDING users  | `RegisterCompletePage`         | `/api/register/*`                  | `register-account.js`   | `restaurant`/`supplier`   | —                   | pending_activation     | —                  | `register-account.test.js`          | Full    | Blocked until activation            | `register.routes.js`                   |
 | Tenancy       | Trial expiry lock     | Trial tenants  | Billing banners                | global middleware                  | `billingAccess.js`      | `subscription`            | —                   | free                   | —                  | `billingAccess.test.js`             | Full    | GET allowed; writes 402             | `docs/features/free-trial-expiry.md`   |
 | Tenancy       | Active tenant switch  | Multi-branch   | `BranchSwitcher`               | `/api/branches/switch`             | `tenant-switch.js`      | `tenant_account_link`     | SETTINGS            | multi_branch           | —                  | `branches.routes.test.js`           | Full    | JWT cookie 30d TTL                  | `tenant-switch.js`                     |
-| RBAC          | Permission resolution | Team members   | `usePermissions`               | `resolveTenantContext`             | `permissions.js`        | `tenant_role_permissions` | 52 keys             | Separate from features | —                  | `rbac-full-app.test.js`             | Full    | 5-min Redis cache                   | `permission-keys.js`                   |
+| RBAC          | Permission resolution | Team members   | `usePermissions`               | `resolveTenantContext`             | `permissions.js`        | `tenant_role_permissions` | 56 keys             | Separate from features | —                  | `rbac-full-app.test.js`             | Full    | 5-min Redis cache                   | `permission-keys.js`                   |
 | RBAC          | Custom roles          | Owners Gold+   | `TeamRolesPanel`               | `/api/roles`                       | `tenant-roles.js`       | `tenant_roles`            | SETTINGS_MANAGE     | advanced_roles         | —                  | `tenant-roles.routes.test.js`       | Partial | Free/Silver system roles only in UI | `role-matrix.js`                       |
 | Impersonation | Admin view-as         | Platform admin | `ImpersonationBanner`          | `/api/admin-dashboard/impersonate` | `impersonation.js`      | `admin_audit_log`         | ADMIN_ACCESS        | Respects billing       | —                  | `impersonation.test.js`             | Full    | Billing mutations blocked           | `docs/features/admin-impersonation.md` |
 | Invitations   | Branch invites        | Org owner      | `/invite/branch`               | `/api/org/invitations`             | `branch-invitations.js` | `branch_invitations`      | Owner               | multi_branch           | None (manual link) | `branch-invitations.routes.test.js` | Partial | No email delivery                   | `docs/features/branch-invitations.md`  |
