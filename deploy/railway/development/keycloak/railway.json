@@ -7,7 +7,7 @@
       "REALM_EXPORT_FILE": "deploy/keycloak/realm-export.json",
       "REALM_IMPORT_FILENAME": "Supplify-realm.json",
       "KC_METRICS_ENABLED": "false",
-      "KEYCLOAK_BUILD_ID": "postgres-v7-otp-no-sorry"
+      "KEYCLOAK_BUILD_ID": "postgres-v8-otp-email-recovery"
     },
     "watchPatterns": ["deploy/keycloak/**", "deploy/railway/keycloak/**"]
   },

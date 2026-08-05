@@ -17,19 +17,19 @@ public final class EmailOtpAuthenticator implements Authenticator {
     public void authenticate(AuthenticationFlowContext context) {
         if (!config.enabled) { context.success(); return; }
         UserModel user = context.getUser();
-        // Never use context.failure(INVALID_USER): Keycloak renders the dead-end
-        // "We are sorry... Invalid username or password" page with no form to recover.
         if (user == null) {
-            context.challenge(context.form()
-                .setError("Your sign-in session expired. Please enter your username and password again.")
-                .createLoginUsernamePassword());
+            // Restart with a fresh execution URL. Rendering the password form from this
+            // already-consumed OTP execution makes its Register link immediately expire.
+            context.resetFlow();
             return;
         }
         String email = resolveEmail(user);
         if (email == null) {
-            context.challenge(context.form()
-                .setError("This account has no email address for verification. Contact support or register again with an email.")
-                .createLoginUsernamePassword());
+            // Legacy username-only accounts must be recoverable without weakening MFA.
+            // Keycloak runs UPDATE_PROFILE (priority 40) before our OTP action (priority 50),
+            // so the user supplies an email and then proves ownership in the same login.
+            requireEmailRecovery(user);
+            context.success();
             return;
         }
         // Drivers open the operational app frequently. The API sets this attribute only while
@@ -51,16 +51,13 @@ public final class EmailOtpAuthenticator implements Authenticator {
         if (!config.enabled) { context.success(); return; }
         UserModel user = context.getUser();
         if (user == null) {
-            context.challenge(context.form()
-                .setError("Your sign-in session expired. Please enter your username and password again.")
-                .createLoginUsernamePassword());
+            context.resetFlow();
             return;
         }
         String email = resolveEmail(user);
         if (email == null) {
-            context.challenge(context.form()
-                .setError("This account has no email address for verification. Contact support or register again with an email.")
-                .createLoginUsernamePassword());
+            requireEmailRecovery(user);
+            context.resetFlow();
             return;
         }
         MultivaluedMap<String, String> form = context.getHttpRequest().getDecodedFormParameters();
@@ -103,6 +100,10 @@ public final class EmailOtpAuthenticator implements Authenticator {
             return username.trim().toLowerCase();
         }
         return null;
+    }
+    static void requireEmailRecovery(UserModel user) {
+        user.addRequiredAction(UserModel.RequiredAction.UPDATE_PROFILE.name());
+        user.addRequiredAction(EmailOtpRequiredActionFactory.ID);
     }
     private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createForm("login-otp.ftl")); }
     private static long parseLong(String raw) { try { return Long.parseLong(raw == null ? "0" : raw); } catch (NumberFormatException ignored) { return 0; } }

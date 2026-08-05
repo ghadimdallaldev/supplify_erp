@@ -1,0 +1,148 @@
+import express from 'express'
+import request from 'supertest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
+
+// Setup mocks at top level
+vi.mock('../lib/db.js', () => {
+  const queryMock = vi.fn()
+  const withTransactionMock = vi.fn()
+  return {
+    query: queryMock,
+    withTransaction: withTransactionMock,
+    pool: { query: queryMock },
+    __queryMock: queryMock,
+    __withTransactionMock: withTransactionMock,
+  }
+})
+
+vi.mock('../lib/rbac.js', async (importOriginal) => {
+  const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
+  return loadRbacRouteMock(importOriginal)
+})
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (_req, _res, next) => next(),
+  checkLimit: vi
+    .fn()
+    .mockResolvedValue({ allowed: true, current: 0, limit: 100, isOverLimit: false }),
+  incrementUsage: vi.fn().mockResolvedValue(true),
+  isFeatureEnabled: vi.fn().mockResolvedValue(true),
+}))
+
+vi.mock('../lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}))
+
+// Import routes after mocks
+import { invoicesRoutes } from './invoices.routes.js'
+
+describe('Invoices Routes', () => {
+  let app
+  let db
+
+  beforeEach(async () => {
+    clearAllMocks()
+    db = setupMocks()
+    const dbModule = await import('../lib/db.js')
+    vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
+    vi.mocked(dbModule.withTransaction).mockImplementation((handler) => db.withTransaction(handler))
+
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test-request-id'
+      req.user = mockUser
+      req.userData = { ...mockUser, role: 'SUPPLIER', email: 'supplier@example.com' } // Use SUPPLIER role
+      next()
+    })
+    app.use('/api/invoices', invoicesRoutes)
+    const { errorHandler } = await import('../middlewares/errorHandler.js')
+    app.use(errorHandler)
+  })
+
+  describe('GET /api/invoices', () => {
+    it('should return list of invoices', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'invoice-1',
+              order_id: 'order-1',
+              total_amount: 100.5,
+              status: 'PENDING',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ total: 1 }],
+        })
+
+      const response = await request(app).get('/api/invoices').expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.invoices).toHaveLength(1)
+      expect(response.body.data.pagination).toEqual({
+        total: 1,
+        limit: 50,
+        offset: 0,
+      })
+    })
+
+    it('should honor limit and offset query params', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ total: 25 }] })
+
+      const response = await request(app).get('/api/invoices?limit=10&offset=20').expect(200)
+
+      expect(response.body.data.pagination).toEqual({
+        total: 25,
+        limit: 10,
+        offset: 20,
+      })
+    })
+  })
+
+  describe('GET /api/invoices/:id', () => {
+    it('should return invoice details', async () => {
+      const invoiceRow = {
+        id: 'invoice-1',
+        order_id: 'order-1',
+        total_amount: 100.5,
+        balance_due: 100.5,
+        status: 'ISSUED',
+        supplier_id: 'supplier-1',
+        restaurant_id: 'restaurant-1',
+        restaurant_name: 'Test Restaurant',
+        supplier_name: 'Test Supplier',
+        total_paid: 0,
+      }
+
+      db.query
+        .mockResolvedValueOnce({ rows: [invoiceRow] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'line-1',
+              invoice_id: 'invoice-1',
+              product_id: 'prod-1',
+              quantity: 10,
+              unit_price: 10.05,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+
+      const response = await request(app).get('/api/invoices/invoice-1').expect(200)
+
+      expect(response.body.ok).toBe(true)
+      expect(response.body.data.invoice.id).toBe('invoice-1')
+      expect(response.body.data.lineItems).toHaveLength(1)
+    })
+  })
+})
