@@ -26,6 +26,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      ;(() => {
+        const appEnv = '%VITE_APP_ENV%'
+        const resetToken = '%VITE_CLIENT_STATE_RESET_TOKEN%'
+        const markerKey = 'supplify.dev.client-state-reset-token'
+
+        if (appEnv !== 'dev' || !resetToken || resetToken.startsWith('%VITE_')) return
+
+        try {
+          if (localStorage.getItem(markerKey) === resetToken) return
+          localStorage.clear()
+          sessionStorage.clear()
+          localStorage.setItem(markerKey, resetToken)
+        } catch {
+          // Storage can be unavailable in private browsing; the app can still start.
+        }
+
+        if ('caches' in window) {
+          void caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
