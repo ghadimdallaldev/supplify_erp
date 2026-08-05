@@ -20,17 +20,17 @@ This is not optional. Do not mark any task complete, do not close any loop, do n
 
 ### What triggers a required mobile update
 
-| Change type                                       | What to do in both mobile repos                                                                       |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| New or changed API endpoint                       | Update API client calls, request/response types                                                       |
-| Auth / session / token changes                    | Update auth flow, token storage, session guards                                                       |
-| RBAC / permission key added or changed            | Update permission checks and navigation guards                                                        |
-| Plan feature key added or changed                 | Update feature gates and upgrade prompts                                                              |
-| Order / fulfillment lifecycle change              | Update restaurant, supplier, driver flows                                                             |
-| GPS / ETA / delivery tracking change              | Update tracking hooks and ETA display helpers                                                         |
-| Notification event or payload change              | Update notification handlers and deep-link routing                                                    |
-| New env var required by mobile                    | Add to `mobile-work/.env.example`, `supplify-mobile/.env.example`, `supplify-mobile-ios/.env.example` |
-| Type or interface change in `apps/web/src/types/` | Port the type change to mobile                                                                        |
+| Change type                                       | What to do in both mobile repos                                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| New or changed API endpoint                       | Update API client calls, request/response types                                                          |
+| Auth / session / token changes                    | Update auth flow, token storage, session guards                                                          |
+| RBAC / permission key added or changed            | Update permission checks and navigation guards                                                           |
+| Plan feature key added or changed                 | Update feature gates and upgrade prompts                                                                 |
+| Order / fulfillment lifecycle change              | Update restaurant, supplier, driver flows                                                                |
+| GPS / ETA / delivery tracking change              | Update tracking hooks and ETA display helpers                                                            |
+| Notification event or payload change              | Update notification handlers and deep-link routing                                                       |
+| New env var required by mobile                    | Add to `C:/myProjects/supplify-mobile/.env.example` and `C:/myProjects/supplify-mobile-ios/.env.example` |
+| Type or interface change in `apps/web/src/types/` | Port the type change to mobile                                                                           |
 
 ### What does NOT require a mobile update
 
@@ -71,18 +71,17 @@ Before declaring any API/auth/feature task complete, confirm each item:
 
 ## Key paths
 
-| What                  | Where                                    |
-| --------------------- | ---------------------------------------- |
-| API routes            | `apps/api/src/routes/`                   |
-| Permission keys       | `apps/api/src/lib/permission-keys.js`    |
-| Feature keys          | `apps/api/src/lib/feature-keys.js`       |
-| Role matrix           | `apps/api/src/lib/role-matrix.js`        |
-| Web types             | `apps/web/src/types/index.ts`            |
-| Mobile (Android)      | `C:/myProjects/supplify-mobile`          |
-| Mobile (iOS)          | `C:/myProjects/supplify-mobile-ios`      |
-| Mobile (in-repo Expo) | `mobile-work/`                           |
-| Parity log            | `docs/mobile/MOBILE_FEATURE_PARITY.md`   |
-| Parity checklist      | `docs/mobile/MOBILE_PARITY_CHECKLIST.md` |
+| What             | Where                                    |
+| ---------------- | ---------------------------------------- |
+| API routes       | `apps/api/src/routes/`                   |
+| Permission keys  | `apps/api/src/lib/permission-keys.js`    |
+| Feature keys     | `apps/api/src/lib/feature-keys.js`       |
+| Role matrix      | `apps/api/src/lib/role-matrix.js`        |
+| Web types        | `apps/web/src/types/index.ts`            |
+| Mobile (Android) | `C:/myProjects/supplify-mobile`          |
+| Mobile (iOS)     | `C:/myProjects/supplify-mobile-ios`      |
+| Parity log       | `docs/mobile/MOBILE_FEATURE_PARITY.md`   |
+| Parity checklist | `docs/mobile/MOBILE_PARITY_CHECKLIST.md` |
 
 ---
 

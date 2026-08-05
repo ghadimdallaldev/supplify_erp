@@ -103,6 +103,21 @@ describe('branches.routes (linked accounts)', () => {
     expect(response.body.ok).toBe(true)
     expect(response.body.data.activeAccountId).toBe('restaurant-2')
     expect(response.headers['set-cookie']?.[0]).toContain('active_tenant_token=')
+    expect(response.body.data.activeTenantToken).toBeUndefined()
+  })
+
+  it('POST /switch returns the active tenant token to bearer clients', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 'restaurant-2', name: 'Uptown' }],
+    })
+
+    const response = await request(app)
+      .post('/api/branches/switch')
+      .set('Authorization', 'Bearer mobile-access-token')
+      .send({ tenantId: 'restaurant-2', tenantType: 'RESTAURANT' })
+      .expect(200)
+
+    expect(response.body.data.activeTenantToken).toBe('signed-token')
   })
 
   it('DELETE /:childTenantId unlinks a branch account', async () => {

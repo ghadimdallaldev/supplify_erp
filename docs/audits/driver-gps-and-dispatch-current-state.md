@@ -96,4 +96,4 @@ The current tests verify legacy endpoint authorization, coordinate validation, s
 
 ## Targeted upgrade boundary
 
-The implementation should add a session and telemetry layer around the existing route/stop/assignment model, preserve the order endpoint, use Socket.IO rooms for authorized live events, add Redis as an optional latest-location accelerator with PostgreSQL fallback, and add Capacitor/Android only as a native shell around the existing driver UI. It must not replace dispatch or Leaflet.
+The implementation should add a session and telemetry layer around the existing route/stop/assignment model, preserve the order endpoint, use Socket.IO rooms for authorized live events, and add Redis as an optional latest-location accelerator with PostgreSQL fallback. The native client now lives in the standalone Expo repositories; the retired Capacitor shell is historical only. Dispatch and Leaflet remain unchanged.

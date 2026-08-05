@@ -1,11 +1,13 @@
-﻿# Driver live tracking implementation report
+# Driver live tracking implementation report
+
+> Historical note (2026-08-06): the Capacitor Android shell described below was retired. Native mobile development now lives only in C:/myProjects/supplify-mobile and C:/myProjects/supplify-mobile-ios.
 
 ## Delivered
 
 - Current-state audit and target plan for driver, route, stop, assignment, GPS, and dispatch flows.
 - Session and point persistence migration with validation, duplicate protection, lifecycle states, and diagnostics.
 - Session REST endpoints, bounded client queue, Redis latest-location cache, Socket.IO supplier/restaurant events, and routing-provider abstraction with Haversine fallback.
-- Web/native provider boundary, generated Capacitor Android project, foreground location service, permissions, and notification manifest configuration.
+- Browser/mobile provider boundary plus standalone Expo Android and iOS foreground-location permissions and build configuration.
 - Geofence threshold utilities that only suggest arrival; they do not mutate delivery status.
 - Feature documentation, troubleshooting, release runbook, and focused tests.
 

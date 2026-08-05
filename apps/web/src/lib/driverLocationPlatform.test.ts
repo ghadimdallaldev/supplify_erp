@@ -1,14 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
-import { createDriverLocationProvider, isNativeAndroidRuntime } from './driverLocationPlatform'
+import { describe, expect, it } from 'vitest'
+import { createDriverLocationProvider } from './driverLocationPlatform'
+import { WebDriverLocationProvider } from './webDriverLocationProvider'
 
 describe('driver location platform', () => {
-  it('uses the browser provider by default', () => {
-    expect(isNativeAndroidRuntime()).toBe(false)
-    expect(createDriverLocationProvider()).toBeTruthy()
-  })
-
-  it('does not select native tracking from a browser flag alone', () => {
-    vi.stubGlobal('Capacitor', { isNativePlatform: () => false, getPlatform: () => 'web' })
-    expect(isNativeAndroidRuntime()).toBe(false)
+  it('uses the browser provider', () => {
+    expect(createDriverLocationProvider()).toBeInstanceOf(WebDriverLocationProvider)
   })
 })

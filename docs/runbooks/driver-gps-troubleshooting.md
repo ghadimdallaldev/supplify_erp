@@ -15,9 +15,9 @@ Check the point timestamp, coordinate range, accuracy, speed, heading, and clien
 
 Confirm `GPS_LIVE_EVENTS_ENABLED=true` for Socket.IO updates. The fulfillment tracking view retains polling fallback. Check Redis availability, then query `driver_latest_location`; PostgreSQL is authoritative when Redis is unavailable.
 
-## Android does not continue in background
+## Installed mobile app stops updating in background
 
-Verify location permission, notification permission on Android 13+, battery-optimization exclusions, the foreground notification, and that the app was built from `apps/web/android` after `cap sync android`. Test on a physical device; an emulator alone is insufficient for release sign-off.
+This is expected: the standalone Android and iOS apps request foreground location only and upload while the app is active. Verify foreground location permission and an assigned, trackable delivery. Build and test from `C:/myProjects/supplify-mobile` or `C:/myProjects/supplify-mobile-ios`; no native app is built from the ERP.
 
 ## Privacy and safety
 

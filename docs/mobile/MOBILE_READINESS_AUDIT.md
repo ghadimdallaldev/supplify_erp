@@ -59,7 +59,7 @@ The API is **largely mobile-ready** for restaurant ordering/tracking, supplier f
 
 1. Today's deliveries + route stops
 2. Status: picked up → on the way → delivered
-3. GPS background pings (`POST .../location`)
+3. GPS foreground pings while the app is active (`POST .../location`)
 4. Proof of delivery photo
 5. Problem reporting
 
@@ -88,7 +88,7 @@ The API is **largely mobile-ready** for restaurant ordering/tracking, supplier f
 | Impersonation  | Admin cookie                       | N/A on mobile v1                                                          |
 | STAFF_PORTAL   | Separate realm                     | Out of scope v1                                                           |
 
-**Status (2026-06-07 → active):** Phase 2 complete. Mobile app ships as `mobile-work/` (Expo, v1.1.0 / versionCode 11). Auth, push registration, GPS, and driver flows are operational. See `mobile-work/eas.json` for EAS build profiles (`development`, `preview`, `ios-simulator`, `production`).
+**Status (2026-08-06):** Phase 2 is maintained in the standalone `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios` Expo repositories. Auth, push registration, foreground GPS, and role-specific flows are operational.
 
 ## PWA baseline (existing)
 

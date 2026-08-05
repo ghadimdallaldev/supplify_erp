@@ -1,80 +1,41 @@
-# Android driver app release
+# Android mobile app release
+
+The Android app is maintained in the standalone repository:
+
+    C:\\myProjects\\supplify-mobile
+
+No Android application project is generated or released from `apps/web`. The web ERP remains a browser/PWA application.
 
 ## Prerequisites
 
-- Android SDK 35 and Build Tools 35 are installed.
-- Android Studio's bundled JDK 21 is available.
-- ANDROID_HOME and ANDROID_SDK_ROOT point to the Android SDK.
-- GPS native tracking and session flags are enabled only in the intended environment.
-- A physical test device has location and notification permissions available.
+- Node.js 22 LTS
+- Android Studio with the Android SDK and an Android Virtual Device
+- EAS CLI for cloud builds, or the local Android toolchain for debug builds
+- A configured Keycloak public client named `supplify-mobile`
 
-## Sync an environment
+## Development and emulator
 
-From apps/web:
+From `C:\\myProjects\\supplify-mobile`:
 
-    pnpm.cmd run android:sync:development
-    # or: android:sync:preprod / android:sync:production
+    npm install
+    npm run typecheck
+    npm test -- --runInBand
+    npx expo start --android
 
-The sync command writes a strict hosted-origin profile into the generated Android
-configuration. Development loads app-dev.supplifyerp.com and allows only
-keycloak-dev.supplifyerp.com for the OAuth screen. Preprod and production use
-their matching first-party hosts. The app requires network access.
+The checked-in `eas.json` contains development, preview, and production profiles. Environment setup and emulator networking are documented in `docs/mobile/MOBILE_SETUP.md` in that repository.
 
-## Local debug build
+## Internal APK
 
-From apps/web/android:
+After authenticating EAS CLI:
 
-    $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-    $env:GRADLE_USER_HOME = 'C:\myProjects\supplify_erp\.gradle-user-home'
-    .\gradlew.bat assembleDebug --no-daemon --max-workers=1 '-Pkotlin.incremental=false' '-Pkotlin.compiler.execution.strategy=in-process'
+    eas build --platform android --profile preview
 
-Install and launch:
+The preview profile produces an installable internal-test APK. Use the production profile for the Play Store AAB:
 
-    adb install -r app\build\outputs\apk\debug\app-debug.apk
-    adb shell am start -n com.supplify.driver/.MainActivity
+    eas build --platform android --profile production
 
-With exactly one emulator or device connected, verify both hosted auth entry
-points against the environment embedded by the last sync:
+## Release checks
 
-    cd ..
-    pnpm.cmd run android:smoke:auth
+Verify restaurant, supplier, and driver accounts separately. For drivers, verify today’s route, navigation, delivery-state transitions, foreground GPS while the app is open, proof-of-delivery photo/signature/GPS, and problem reporting. The app requests foreground location only and does not claim persistent background tracking.
 
-Set ANDROID_SERIAL when more than one Android target is connected.
-The command requires a debuggable APK and clears its app data before each flow.
-
-## Signed release APK and AAB
-
-Release signing reads the ignored apps/web/android/keystore.properties file:
-
-    storeFile=keystores/supplify-driver-release.jks
-    storePassword=<secret>
-    keyAlias=supplify-driver
-    keyPassword=<secret>
-
-Keep the keystore and passwords in the organization's password manager and secure
-backup. Losing the keystore prevents signing upgrades for the same Android app.
-
-After syncing the intended environment:
-
-    .\gradlew.bat :app:assembleRelease :app:bundleRelease --no-daemon --max-workers=1 '-Pkotlin.incremental=false' '-Pkotlin.compiler.execution.strategy=in-process'
-
-- Share the signed APK with direct-install testers.
-- Upload the signed AAB to Google Play internal testing or a client release.
-- Verify the APK with apksigner verify --verbose --print-certs.
-- Verify the AAB with jarsigner -verify -certs.
-- Never ship the debug APK.
-
-## Smoke test
-
-Install on an emulator first and verify Sign in and Register remain inside the
-WebView and reach the matching Keycloak host. On a physical device, sign in as a
-driver, start a session, grant location and notification permissions, lock the
-screen, move through a short route, verify the foreground notification, and
-confirm points and stale state on the supplier map. Stop the session and verify
-the server marks it stopped.
-
-## Rollback
-
-Disable the session and live-event flags and keep the legacy browser endpoint
-available. This returns web tracking to the existing order-location path while
-leaving stored session data intact.
+The equivalent iOS source is maintained separately in `C:\\myProjects\\supplify-mobile-ios`.

@@ -17,7 +17,7 @@ Points are checked for coordinate range, timestamp skew, accuracy, speed, headin
 
 ## Client providers
 
-The web provider uses browser geolocation. Android uses the generated Capacitor project and a foreground location service with a visible notification. The web queue is bounded and local-only; native background upload requires the authenticated WebView bridge to be available and should be validated on a physical device before release.
+The ERP web/PWA uses browser geolocation. Android and iOS use the standalone Expo repositories and foreground location while the app is active. The retired Capacitor WebView bridge is no longer part of the ERP.
 
 ## Configuration
 

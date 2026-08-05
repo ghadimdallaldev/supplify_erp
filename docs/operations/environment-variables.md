@@ -143,29 +143,28 @@ See [../operations/cron-jobs.md](../operations/cron-jobs.md) for the full job in
 
 ### Delivery GPS / live tracking (API)
 
-| Variable                             | Used by | Default  | Notes                                                                           |
-| ------------------------------------ | ------- | -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `GPS_TRACKING_ENABLED`               | API     | `true`   | Legacy master switch for ingest + tracking reads                                |
-| `GPS_TRACKING_SESSIONS_ENABLED`      | API     | `false`  | Enable GPS session creation (committed `true` in all Railway `api.env`)         |
-| `GPS_NATIVE_TRACKING_ENABLED`        | API     | `false`  | Enable native-app GPS tracking path (committed `true` in all Railway `api.env`) |
-| `GPS_LIVE_EVENTS_ENABLED`            | API     | `false`  | Enable live GPS event streaming (committed `true` in all Railway `api.env`)     |
-| `GPS_OFFLINE_QUEUE_ENABLED`          | API     | `false`  | Enable offline GPS event queue for drivers without connectivity                 |
-| `GPS_GEOFENCE_ENABLED`               | API     | `false`  | Enable geofence alerts on delivery arrival                                      |
-| `GPS_STALE_AFTER_SECONDS`            | API     | `300`    | Stale threshold on `tracking.isStale`                                           |
-| `GPS_UPDATE_INTERVAL_SECONDS`        | API     | `15`     | Driver client poll hint                                                         |
-| `GPS_MIN_ACCURACY_METERS`            | API     | `100`    | Low-accuracy ping filtering                                                     |
-| `GPS_LOCATION_RETENTION_DAYS`        | API     | `90`     | Retention policy (cron TBD)                                                     |
-| `GPS_ALLOW_RESTAURANT_LIVE_TRACKING` | API     | `true`   | Restaurant `GET /api/orders/:id/tracking`                                       |
-| `GPS_RESTAURANT_SHOW_DRIVER_NAME`    | API     | `true`   | Include driver name in restaurant payload                                       |
-| `GPS_RESTAURANT_SHOW_DRIVER_PHONE`   | API     | `false`  | Hide driver phone unless enabled                                                |
-| `GPS_ALLOW_DRIVER_BACKGROUND_HINT`   | API     | `true`   | Driver UX hint                                                                  |
-| `MAP_PROVIDER`                       | API     | `google` | Map provider for server-side embed helpers                                      |
-| `GOOGLE_MAPS_API_KEY`                | API     | —        | Optional server map key                                                         |
-| `MAPBOX_ACCESS_TOKEN`                | API     | —        | Optional Mapbox                                                                 |
-| `DELIVERY_ETA_CITY_SPEED_KMH`        | API     | optional | `40`                                                                            | Average city speed used by server-side ETA calculation |
-| `DELIVERY_ETA_MIN_MULTIPLIER`        | API     | optional | `1.0`                                                                           | Minimum ETA multiplier                                 |
-| `DELIVERY_ETA_MAX_MULTIPLIER`        | API     | optional | `2.0`                                                                           | Maximum ETA multiplier                                 |
-| `DELIVERY_ETA_SERVICE_TIME_MINUTES`  | API     | optional | `5`                                                                             | Per-stop service time added to route ETA               |
+| Variable                             | Used by | Default  | Notes                                                                       |
+| ------------------------------------ | ------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `GPS_TRACKING_ENABLED`               | API     | `true`   | Legacy master switch for ingest + tracking reads                            |
+| `GPS_TRACKING_SESSIONS_ENABLED`      | API     | `false`  | Enable GPS session creation (committed `true` in all Railway `api.env`)     |
+| `GPS_LIVE_EVENTS_ENABLED`            | API     | `false`  | Enable live GPS event streaming (committed `true` in all Railway `api.env`) |
+| `GPS_OFFLINE_QUEUE_ENABLED`          | API     | `false`  | Enable offline GPS event queue for drivers without connectivity             |
+| `GPS_GEOFENCE_ENABLED`               | API     | `false`  | Enable geofence alerts on delivery arrival                                  |
+| `GPS_STALE_AFTER_SECONDS`            | API     | `300`    | Stale threshold on `tracking.isStale`                                       |
+| `GPS_UPDATE_INTERVAL_SECONDS`        | API     | `15`     | Driver client poll hint                                                     |
+| `GPS_MIN_ACCURACY_METERS`            | API     | `100`    | Low-accuracy ping filtering                                                 |
+| `GPS_LOCATION_RETENTION_DAYS`        | API     | `90`     | Retention policy (cron TBD)                                                 |
+| `GPS_ALLOW_RESTAURANT_LIVE_TRACKING` | API     | `true`   | Restaurant `GET /api/orders/:id/tracking`                                   |
+| `GPS_RESTAURANT_SHOW_DRIVER_NAME`    | API     | `true`   | Include driver name in restaurant payload                                   |
+| `GPS_RESTAURANT_SHOW_DRIVER_PHONE`   | API     | `false`  | Hide driver phone unless enabled                                            |
+| `GPS_ALLOW_DRIVER_BACKGROUND_HINT`   | API     | `true`   | Driver UX hint                                                              |
+| `MAP_PROVIDER`                       | API     | `google` | Map provider for server-side embed helpers                                  |
+| `GOOGLE_MAPS_API_KEY`                | API     | —        | Optional server map key                                                     |
+| `MAPBOX_ACCESS_TOKEN`                | API     | —        | Optional Mapbox                                                             |
+| `DELIVERY_ETA_CITY_SPEED_KMH`        | API     | optional | `40`                                                                        | Average city speed used by server-side ETA calculation |
+| `DELIVERY_ETA_MIN_MULTIPLIER`        | API     | optional | `1.0`                                                                       | Minimum ETA multiplier                                 |
+| `DELIVERY_ETA_MAX_MULTIPLIER`        | API     | optional | `2.0`                                                                       | Maximum ETA multiplier                                 |
+| `DELIVERY_ETA_SERVICE_TIME_MINUTES`  | API     | optional | `5`                                                                         | Per-stop service time added to route ETA               |
 
 Spec: [../features/drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
 
@@ -211,7 +210,6 @@ Legacy aliases still supported: `S3_*` → `STORAGE_*`, `API_PUBLIC_URL` = `PUBL
 | `VITE_MAP_PROVIDER`                  | Web       | optional      | `google`                   | Map provider                                                                                                                                                                    |
 | `VITE_GPS_TRACKING_SESSIONS_ENABLED` | Web       | optional      | `false`                    | Mirror of API GPS sessions flag for UI gating                                                                                                                                   |
 | `VITE_GPS_LIVE_EVENTS_ENABLED`       | Web       | optional      | `false`                    | Mirror of API GPS live events flag                                                                                                                                              |
-| `VITE_GPS_NATIVE_TRACKING_ENABLED`   | Web       | optional      | `false`                    | Mirror of API GPS native tracking flag                                                                                                                                          |
 | `VITE_CLIENT_STATE_RESET_TOKEN`      | Web       | optional      | —                          | Bump this value on deploy to force all clients to clear persisted RTK/Redux state. Change any time a breaking store shape change is deployed. Set in Railway dev web env.       |
 | `NGINX_API_UPSTREAM`                 | Web/nginx | hosted        | `http://api:4000`          | Overrides the API upstream in the nginx same-origin proxy config. Used in Railway dev to work around TLS timing on custom domains. Set in `deploy/railway/development/web.env`. |
 

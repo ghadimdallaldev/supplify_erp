@@ -16,7 +16,6 @@ alwaysApply: true
 - `C:/myProjects/supplify-mobile` — React Native / Expo (Android)
 - `C:/myProjects/supplify-mobile-ios` — React Native / Expo (iOS)
 
-There is also an in-repo Expo workspace at `mobile-work/` — update it too when it contains relevant code.
 
 ---
 
@@ -31,7 +30,7 @@ There is also an in-repo Expo workspace at `mobile-work/` — update it too when
 | Order or fulfillment lifecycle change | Update restaurant / supplier / driver flows |
 | GPS / ETA / delivery tracking change | Update tracking hooks; keep `deliveryEtaDisplay` helpers in sync |
 | Notification event or push payload change | Update notification handlers and deep-link routing |
-| New required env var | Add to `mobile-work/.env.example`, `C:/myProjects/supplify-mobile/.env.example`, `C:/myProjects/supplify-mobile-ios/.env.example` |
+| New required env var | Add to `C:/myProjects/supplify-mobile/.env.example` and `C:/myProjects/supplify-mobile-ios/.env.example` |
 | Type change in `apps/web/src/types/index.ts` | Port the change to mobile type definitions |
 
 ---
@@ -64,7 +63,6 @@ After any qualifying change, update:
 
 - [ ] `C:/myProjects/supplify-mobile` updated **or** skip reason documented
 - [ ] `C:/myProjects/supplify-mobile-ios` updated **or** skip reason documented
-- [ ] `mobile-work/` updated if it contains relevant code
 - [ ] Types in sync with `apps/web/src/types/index.ts`
 - [ ] Mobile typecheck passes: `cd C:/myProjects/supplify-mobile && npx tsc --noEmit`
 - [ ] `docs/mobile/MOBILE_FEATURE_PARITY.md` has a dated entry for this change

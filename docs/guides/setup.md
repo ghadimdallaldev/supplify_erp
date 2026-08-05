@@ -115,7 +115,7 @@ supplify_erp/
 │   │   │   ├── migrations/ # SQL migration files
 │   │   │   └── seed/       # Seed data
 │   │   └── scripts/        # Migration and utility scripts
-│   ├── web/                # React web application (also packaged as Android via Capacitor)
+│   ├── web/                # React web/PWA application
 │   │   ├── src/
 │   │   │   ├── components/ # React components
 │   │   │   ├── features/   # Redux slices
@@ -123,7 +123,6 @@ supplify_erp/
 │   │   │   ├── services/   # RTK Query API
 │   │   │   └── types/      # TypeScript types
 │   │   └── public/         # Static assets
-│   ├── android/            # Capacitor Android build output
 │   └── api-gateway/        # API gateway service
 ├── packages/               # Shared workspace packages (auth, config, database, types, utils, …)
 ├── deploy/                 # Railway env templates, Keycloak realm exports
@@ -237,7 +236,6 @@ NODE_ENV=development
 
 # Driver live tracking (feature-flagged; set to true to enable each capability)
 GPS_TRACKING_SESSIONS_ENABLED=false
-GPS_NATIVE_TRACKING_ENABLED=false
 GPS_OFFLINE_QUEUE_ENABLED=false
 GPS_LIVE_EVENTS_ENABLED=false
 GPS_GEOFENCE_ENABLED=false

@@ -2,7 +2,7 @@
 
 Supplify remains a **Progressive Web App** — these changes improve the existing web/PWA experience on phones without a native app or architecture rewrite.
 
-**Native Expo mobile development is active** — `mobile-work/` (v1.1.0, versionCode 11) ships driver, restaurant, and supplier flows. PWA remains the fallback for users without the installed app.
+**Native Expo mobile development is active** in the standalone Android and iOS repositories. They ship driver, restaurant, and supplier flows; the PWA remains the fallback for users without the installed app.
 
 ## What was improved
 
@@ -59,11 +59,11 @@ Supplify remains a **Progressive Web App** — these changes improve the existin
 
 ## PWA limitations
 
-- **PWA only:** No offline order creation or background GPS when the PWA is backgrounded/killed (browser/OS limits). The native Expo app handles background GPS via `expo-location`.
+- **PWA only:** No offline order creation or GPS when the PWA is backgrounded/killed (browser/OS limits). The standalone native apps use foreground location while open; persistent background tracking is intentionally not claimed.
 - No push notifications on PWA unless already configured server-side
 - Native camera/POD capture not added to PWA (existing flows only)
 - Table-heavy admin pages unchanged
 
 ## Native app status
 
-Expo/native mobile development is **active**. Build with `eas build --profile preview` (internal APK) or `--profile production`. Driver GPS tracking, push registration, and OTP login are operational in `mobile-work/`. See `mobile-work/eas.json` for build profiles.
+Expo/native mobile development is **active** in `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`. Build from the relevant standalone repository with its checked-in `eas.json` profiles.

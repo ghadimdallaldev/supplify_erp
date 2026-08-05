@@ -73,7 +73,6 @@ Before marking any API/auth/feature task done, confirm:
 | Web types       | `apps/web/src/types/index.ts`          |
 | Android mobile  | `C:/myProjects/supplify-mobile`        |
 | iOS mobile      | `C:/myProjects/supplify-mobile-ios`    |
-| In-repo Expo    | `mobile-work/`                         |
 | Parity log      | `docs/mobile/MOBILE_FEATURE_PARITY.md` |
 
 ## General rules

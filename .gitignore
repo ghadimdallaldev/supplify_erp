@@ -128,12 +128,5 @@ backups-preprod/
 
 # Android / Gradle machine state and signing material
 /.gradle-user-home/
-apps/web/android/local.properties
-apps/web/android/.gradle/
-apps/web/android/app/build/
-apps/web/android/build/
-apps/web/android/keystore.properties
-apps/web/android/keystores/
-/artifacts/android/
 *.jks
 *.keystore

@@ -1,5 +1,7 @@
 # Driver live tracking upgrade plan
 
+> Historical note (2026-08-06): the Capacitor Android shell described below was retired. Native mobile development now lives only in C:/myProjects/supplify-mobile and C:/myProjects/supplify-mobile-ios.
+
 ## Architecture decision
 
 Use the existing `delivery_route` as the delivery run and `route_stop` as the ordered stop model. Add `driver_tracking_session` as the single active stream per driver/run, while retaining `driver_assignments` and the legacy `POST /api/orders/:id/location` endpoint during migration.
@@ -27,8 +29,8 @@ Use the existing `delivery_route` as the delivery run and `route_stop` as the or
 - `apps/api/src/lib/driver-location-redis.js` and tests
 - `apps/api/src/lib/routing-provider.js` and tests (Haversine adapter first)
 - `apps/web/src/lib/driverLocationProvider.ts`, `webDriverLocationProvider.ts`, and tests
-- `apps/web/src/lib/nativeDriverLocationProvider.ts` (Capacitor bridge; safe web fallback)
-- `apps/web/capacitor.config.ts`, Android project scaffolding, and native plugin/service bridge
+- Standalone Expo location provider in both mobile repositories; the ERP keeps its browser provider
+- Android and iOS build configuration in their standalone repositories
 - the mandated feature, runbook, release, and implementation report documents
 
 ## Database migration
@@ -41,11 +43,11 @@ Keep `POST /api/orders/:id/location` operational. When sessions are enabled, the
 
 ## Frontend changes
 
-Create a platform-neutral provider interface. The web provider wraps the current `watchPosition` flow. The native provider delegates to a Capacitor plugin and keeps local queue/sync semantics behind the provider. The driver page gets explicit start/stop controls, current run/next stop/remaining stops, permission and connectivity diagnostics, pending count, last sync, and action guidance. Existing status and POD actions remain the business-logic source of truth.
+Keep the ERP browser provider around the current `watchPosition` flow. The standalone Expo apps own native location access. The driver experience provides start/stop controls, current run/next stop/remaining stops, permission and connectivity diagnostics, last sync, and action guidance. Existing status and POD actions remain the business-logic source of truth.
 
-## Android/Capacitor changes
+## Standalone mobile changes
 
-Add Capacitor to `apps/web`, generate the Android project, and use a native foreground location service with a visible notification, precise/coarse permission handling, provider-disabled and battery-optimization diagnostics, restart recovery, and one active service guard. Native code must not be imported directly by shared components; it is accessed through the provider abstraction. Physical-device tests remain required for lock screen, Maps, calls, process restart, permission, GPS, network, and battery cases.
+Maintain Android in `C:/myProjects/supplify-mobile` and iOS in `C:/myProjects/supplify-mobile-ios`. Both use Expo foreground location, permission diagnostics, and one active watcher while the app is open. Physical-device tests remain required for Maps, calls, permission, GPS, and network cases.
 
 ## Redis changes
 
@@ -57,7 +59,7 @@ Use authenticated Socket.IO rather than adding another realtime protocol. Room j
 
 ## Rollout flags
 
-Preserve `GPS_TRACKING_ENABLED`, restaurant privacy flags, stale thresholds, and browser flags. Add `GPS_NATIVE_TRACKING_ENABLED`, `GPS_TRACKING_SESSIONS_ENABLED`, `GPS_OFFLINE_QUEUE_ENABLED`, `GPS_LIVE_EVENTS_ENABLED`, `GPS_GEOFENCE_ENABLED`, `GPS_MAX_ACCURACY_METERS`, `GPS_MAX_SPEED_KPH`, `GPS_BATCH_MAX_SIZE`, `GPS_MIN_SEND_INTERVAL_SECONDS`, `GPS_MIN_MOVEMENT_METERS`, and validated geofence thresholds. Defaults are conservative: sessions/events/native/geofences off until explicitly enabled; legacy browser tracking remains available.
+Preserve `GPS_TRACKING_ENABLED`, restaurant privacy flags, stale thresholds, and browser flags. Add `GPS_TRACKING_SESSIONS_ENABLED`, `GPS_OFFLINE_QUEUE_ENABLED`, `GPS_LIVE_EVENTS_ENABLED`, `GPS_GEOFENCE_ENABLED`, `GPS_MAX_ACCURACY_METERS`, `GPS_MAX_SPEED_KPH`, `GPS_BATCH_MAX_SIZE`, `GPS_MIN_SEND_INTERVAL_SECONDS`, `GPS_MIN_MOVEMENT_METERS`, and validated geofence thresholds. Defaults are conservative: sessions/events/native/geofences off until explicitly enabled; legacy browser tracking remains available.
 
 ## Testing strategy
 
@@ -81,7 +83,7 @@ One stream per driver reduces multi-order writes. Batch uploads and Redis latest
 2. Add additive schema, validation, Redis helpers, provider abstraction, and focused tests.
 3. Add session APIs and Socket.IO events while preserving legacy APIs.
 4. Wire browser provider and driver diagnostics/start-stop UI.
-5. Add Capacitor Android shell/native service and document device verification.
+5. Add standalone Expo Android/iOS tracking and document device verification.
 6. Add supplier live-event refresh and retain polling fallback.
 7. Add geofence assistance and routing abstraction behind flags.
 8. Run tests, review security/privacy, deploy migration, and enable flags gradually.

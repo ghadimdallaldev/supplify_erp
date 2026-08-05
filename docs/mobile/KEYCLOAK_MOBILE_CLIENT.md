@@ -30,7 +30,7 @@ Mobile obtains `activeTenantToken` from the `POST /api/branches/switch` JSON res
 
 ## Mobile environment variables
 
-Set these in `mobile-work/.env` (Expo):
+Set these in `C:/myProjects/supplify-mobile/.env` and `C:/myProjects/supplify-mobile-ios/.env` (Expo):
 
 ```env
 EXPO_PUBLIC_API_URL=https://your-api.railway.app

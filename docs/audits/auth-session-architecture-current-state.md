@@ -96,7 +96,7 @@ Deployed examples: preprod/prod often `COOKIE_SECURE=true`, `COOKIE_SAME_SITE=no
 
 - Auth cookies use **maxAge** (persistent), not session cookies → survive browser/PWA close.
 - Service worker (`apps/web/static/sw.js`) **skips** `/api` and `/auth` — no token caching.
-- Capacitor driver shell (`apps/web/capacitor.config.ts`) uses the same cookie/OAuth web path; no separate Capacitor auth plugin.
+- Standalone Expo apps use the public `supplify-mobile` Keycloak client with PKCE and bearer tokens. The retired Capacitor shell no longer exists in the ERP.
 - Session restore = cookies present + Keycloak still accepts refresh.
 
 ---

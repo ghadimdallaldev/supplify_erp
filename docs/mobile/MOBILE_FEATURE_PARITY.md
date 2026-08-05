@@ -1,6 +1,14 @@
-Mobile parity audit — source of truth for this repo. Native Expo app lives in `mobile-work/` (v1.1.0, versionCode 11).
+Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
+
+## 2026-08-06 — Standalone mobile repository consolidation
+
+- **Repository boundary**: Removed the retired Capacitor `com.supplify.driver` shell, generated Android project, native bridge, Gradle release plumbing, and old APK/AAB outputs from `apps/web`. No native mobile application source remains in the ERP.
+- **Android**: The complete operational app is `C:/myProjects/supplify-mobile`.
+- **iOS**: The independent parity app is `C:/myProjects/supplify-mobile-ios`.
+- **ERP retained**: API contracts, browser/PWA driver UI, browser geolocation, dispatch, tracking sessions, maps, and telemetry storage remain shared backend/web functionality.
+- **Location policy**: Both native apps request foreground location only; persistent background tracking is not claimed.
 
 ## 2026-07-01 — Recipe Costing (web-only)
 
@@ -123,7 +131,7 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 - **Driver identity hardening** (`fix(auth): preserve driver identity metadata`, `feat(android): harden driver auth and release builds`): Driver Keycloak attribute `supplify_driver_login=true` is now preserved across token refresh and re-login flows. The attribute is set on driver assignment via `setKeycloakUserDriverLogin()` in `keycloak-admin.js` and cleared on unassignment. This prevents the OTP bypass being lost on session rotation.
 - **Android emulator smoke test** (`test(android): automate driver auth smoke flow`): Auth smoke flow is now automated for the Android build pipeline. The emulator redirect URI `exp://10.0.2.2:8081/--/auth/callback` must be in the Keycloak client's Valid redirect URIs for dev builds — see `KEYCLOAK_MOBILE_CLIENT.md`.
-- **Mobile**: Driver flows in `mobile-work/` inherit the identity fix automatically (server-side). No mobile code change required.
+- **Mobile**: Driver flows in both standalone mobile repositories inherit the identity fix automatically (server-side). No mobile code change required.
 
 ## 2026-08-05 — Billing trial notification deep link (web)
 
