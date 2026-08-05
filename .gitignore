@@ -93,8 +93,8 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
-.cursor/
-!.cursor/rules/
+.cursor/*
+!.cursor/rules
 .superpowers/
 .cursorrules
 .claude/
