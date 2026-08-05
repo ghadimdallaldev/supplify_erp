@@ -112,6 +112,11 @@ step because realm import skips an already-created realm.
 
 Run: node deploy/keycloak/apply-email-otp-flows.mjs
 
+The apply step also enables Keycloak's `UPDATE_PROFILE` required action at
+priority 40. This is the recovery path for legacy username-only accounts: after
+their password succeeds, they add an email and verify its OTP instead of being
+sent back to a stale password form whose Register link immediately expires.
+
 Apply the session policy and OTP flow independently; both are required for the
 full human-login posture. Configure AUTH_EMAIL_OTP_ENABLED and the API/Keycloak
 OTP secrets before binding the flow. Roll back with
