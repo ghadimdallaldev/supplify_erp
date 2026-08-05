@@ -23,7 +23,7 @@ ARG REALM_IMPORT_FILENAME=Supplify-realm.json
 # Build-time only; override per env via railway.json buildArgs.
 ARG KC_METRICS_ENABLED=false
 # Bump to invalidate Railway Docker layer cache when build logic changes.
-ARG KEYCLOAK_BUILD_ID=postgres-v9-otp-email-capture
+ARG KEYCLOAK_BUILD_ID=postgres-v10-auth-history-guard
 
 COPY ${REALM_EXPORT_FILE} /opt/keycloak/data/import/${REALM_IMPORT_FILENAME}
 COPY --from=email-otp-build /workspace/target/email-otp-1.0.0.jar /opt/keycloak/providers/email-otp.jar

@@ -2,6 +2,7 @@ package com.supplify.keycloak.emailotp;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +43,21 @@ class OtpSupportTest {
         assertNull(EmailOtpRequiredAction.normalizeEmail("missing-domain@"));
         assertNull(EmailOtpRequiredAction.normalizeEmail("two@@example.com"));
         assertNull(EmailOtpRequiredAction.normalizeEmail("space @example.com"));
+    }
+    @Test void loginThemePackagesTheBackForwardHistoryGuard() throws Exception {
+        String theme = resource("/theme/email-otp/login/theme.properties");
+        String guard = resource("/theme/email-otp/login/resources/js/auth-history-guard.js");
+
+        assertTrue(theme.contains("scripts=js/auth-history-guard.js"));
+        assertTrue(guard.contains("pageshow"));
+        assertTrue(guard.contains("back_forward"));
+        assertTrue(guard.contains("window.history.forward()"));
+    }
+    private static String resource(String path) throws Exception {
+        try (var stream = OtpSupportTest.class.getResourceAsStream(path)) {
+            assertNotNull(stream, "Missing provider resource " + path);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
     private static UserModel userWith(String email, String username, Set<String> requiredActions) {
         return userWith(email, username, requiredActions, new AtomicBoolean(false));

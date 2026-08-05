@@ -118,6 +118,11 @@ the OTP required action captures and persists an email after password success,
 then verifies its OTP instead of trusting stale `emailVerified` flags or sending
 the user back to a dead-end profile/login form.
 
+The login theme also guards completed single-use authentication pages restored
+by Chrome's back-forward cache. A Back navigation from the authenticated app is
+forwarded to the existing app history entry instead of exposing an expired
+Keycloak profile or OTP form.
+
 Apply the session policy and OTP flow independently; both are required for the
 full human-login posture. Configure AUTH_EMAIL_OTP_ENABLED and the API/Keycloak
 OTP secrets before binding the flow. Roll back with
