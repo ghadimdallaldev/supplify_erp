@@ -189,8 +189,8 @@ router.get('/register', async (req, res) => {
       const hasAppSession = Boolean(
         req.cookies?.access_token || req.cookies?.refresh_token || idTokenHint
       )
-      await clearLocalAuthSession(req, res)
       if (hasAppSession) {
+        await clearLocalAuthSession(req, res)
         const continueUrl = `${callbackOrigin(req)}/auth/register?continue=1`
         const logoutUrl = await getKeycloakLogoutUrl(continueUrl, idTokenHint)
         logger.info('Registration: clearing Keycloak SSO session before signup', {

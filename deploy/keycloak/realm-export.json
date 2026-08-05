@@ -79,6 +79,14 @@
   "registrationFlow": "registration",
   "requiredActions": [
     {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40
+    },
+    {
       "alias": "email-otp-verify-email",
       "name": "Verify email with Supplify OTP",
       "providerId": "email-otp-verify-email",

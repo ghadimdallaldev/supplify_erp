@@ -154,6 +154,7 @@ async function main() {
       browserAlias,
       formsAlias,
       formsRequirement: 'ALTERNATIVE',
+      profileRecoveryAction: 'UPDATE_PROFILE',
       requiredAction: 'email-otp-verify-email',
       preserveSessionPolicy: true,
     }, null, 2))
@@ -166,6 +167,17 @@ async function main() {
   await ensureFormsSubflow(accessToken, browserAlias, formsAlias, 'ALTERNATIVE')
 
   const requiredActions = Array.isArray(currentRealm.requiredActions) ? currentRealm.requiredActions : []
+  const profileAction = requiredActions.find((item) => item.alias === 'UPDATE_PROFILE') || {
+    alias: 'UPDATE_PROFILE',
+    providerId: 'UPDATE_PROFILE',
+    name: 'Update Profile',
+    enabled: true,
+    defaultAction: false,
+    priority: 40,
+  }
+  profileAction.enabled = true
+  profileAction.defaultAction = false
+  profileAction.priority = 40
   const action = requiredActions.find((item) => item.alias === 'email-otp-verify-email') || {
     alias: 'email-otp-verify-email',
     providerId: 'email-otp-verify-email',
@@ -179,8 +191,14 @@ async function main() {
   await patchRealm(accessToken, currentRealm, {
     loginTheme: 'email-otp',
     browserFlow: browserAlias,
-    requiredActions: [...requiredActions.filter((item) => item.alias !== action.alias), action],
+    requiredActions: [
+      ...requiredActions.filter(
+        (item) => item.alias !== profileAction.alias && item.alias !== action.alias
+      ),
+      profileAction,
+      action,
+    ],
   })
-  console.log(`Applied ${browserAlias} with nested ${formsAlias} (password + email-otp-login); session-policy fields preserved`)
+  console.log(`Applied ${browserAlias} with nested ${formsAlias} (password + email-otp-login); username-only recovery and session-policy fields preserved`)
 }
 main().catch((error) => { console.error(error.message || error); process.exit(1) })
