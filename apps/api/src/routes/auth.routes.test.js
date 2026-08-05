@@ -207,6 +207,60 @@ describe('Auth Routes', () => {
     })
   })
 
+  describe('GET /auth/register', () => {
+    it('keeps the OAuth session when no app login exists', async () => {
+      const session = {}
+      const appWithSession = express()
+      appWithSession.use(express.json())
+      appWithSession.use((req, res, next) => {
+        req.cookies = {}
+        req.session = session
+        req.session.save = (callback) => callback?.(null)
+        req.session.destroy = (callback) => {
+          req.session = undefined
+          callback?.(null)
+        }
+        req.requestId = 'test-request'
+        next()
+      })
+      appWithSession.use('/auth', authRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      appWithSession.use(errorHandler)
+
+      const response = await request(appWithSession).get('/auth/register').expect(302)
+
+      expect(response.headers.location).toBe('https://keycloak.example.com/registrations')
+      expect(session.oauthState).toBeDefined()
+      expect(session.registrationFlow).toBe(true)
+    })
+
+    it('destroys an existing app session before the Keycloak logout hop', async () => {
+      let sessionDestroyed = false
+      const appWithSession = express()
+      appWithSession.use(express.json())
+      appWithSession.use((req, res, next) => {
+        req.cookies = { access_token: 'existing-access-token' }
+        req.session = {
+          destroy(callback) {
+            sessionDestroyed = true
+            req.session = undefined
+            callback?.(null)
+          },
+        }
+        req.requestId = 'test-request'
+        next()
+      })
+      appWithSession.use('/auth', authRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      appWithSession.use(errorHandler)
+
+      const response = await request(appWithSession).get('/auth/register').expect(302)
+
+      expect(sessionDestroyed).toBe(true)
+      expect(response.headers.location).toContain('keycloak.example.com/logout')
+    })
+  })
+
   describe('OAuth redirect_uri origin', () => {
     afterEach(() => {
       delete process.env.OAUTH_CALLBACK_BASE_URL
