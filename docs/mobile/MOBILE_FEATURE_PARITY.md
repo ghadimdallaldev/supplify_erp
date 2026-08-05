@@ -116,4 +116,5 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Refresh parity**: POST /auth/mobile/refresh never invokes OTP. Rotation, transient refresh handling, and token expiry behavior are unchanged.
 - **Signup**: Hosted registration may show the same email verification required action before the API accepts tenant completion.
 - **Unverified recovery** (2026-08-03): Unverified users no longer get a dual login+signup OTP; login defers to the signup required action only. API callback clears Keycloak SSO and re-enters hosted login when `email_verified` is false. Mobile still uses the same hosted pages.
+- **Silent SSO clear** (2026-08-05): Web stores `id_token` cookie and passes `id_token_hint` on Keycloak logout so signup/recovery does not show "Do you want to log out?". Mobile should pass `id_token` into the Keycloak end-session URL when opening `keycloakLogoutUrl` if it retains one; otherwise Keycloak may still confirm logout in the system browser.
 - **Out of scope**: B2C consumer JWT and staff magic-link flows do not use this OTP feature.

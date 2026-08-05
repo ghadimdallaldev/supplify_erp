@@ -12,7 +12,9 @@ digest is held by Keycloak, and API logs/audits redact the code.
 Unverified accounts use the signup required action only (`signup_email_verification`).
 Verified accounts use the login authenticator (`login_email_mfa`). The API rejects
 OAuth callbacks when `email_verified` is not true and clears Keycloak SSO before
-re-entering hosted login so a stale cookie cannot skip the OTP page.
+re-entering hosted login so a stale cookie cannot skip the OTP page. SSO clear
+uses Keycloak end-session with `id_token_hint` (from the OAuth `id_token` / cookie)
+so users are not shown a "Do you want to log out?" confirmation.
 
 OTP is not used for access-token refresh, proactive refresh, `requireAuth`
 renewal, B2C consumer sessions, service accounts, or staff magic links. The

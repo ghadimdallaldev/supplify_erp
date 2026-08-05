@@ -94,12 +94,16 @@ function authCookieOptions(maxAge) {
   return opts
 }
 
-// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts)
-export function setAuthCookies(res, accessToken, refreshToken) {
+// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts).
+// id_token is optional but required for silent Keycloak logout (id_token_hint).
+export function setAuthCookies(res, accessToken, refreshToken, idToken = null) {
   const accessMaxAge = config.AUTH_ACCESS_COOKIE_MAX_AGE_MS
   const refreshMaxAge = config.AUTH_REFRESH_COOKIE_MAX_AGE_MS
   res.cookie('access_token', accessToken, authCookieOptions(accessMaxAge))
   res.cookie('refresh_token', refreshToken, authCookieOptions(refreshMaxAge))
+  if (idToken && typeof idToken === 'string') {
+    res.cookie('id_token', idToken, authCookieOptions(refreshMaxAge))
+  }
 }
 
 export function getSessionMetaFromAccessToken(accessToken) {
@@ -120,6 +124,7 @@ export function clearAuthCookies(res) {
   }
   res.clearCookie('access_token', opts)
   res.clearCookie('refresh_token', opts)
+  res.clearCookie('id_token', opts)
 }
 
 // Get user from database by Keycloak sub (short TTL cache — hot path on every authenticated request)
@@ -414,7 +419,7 @@ export async function requireAuth(req, res, next) {
       emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'requireAuth' })
 
       // Set new cookies
-      setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+      setAuthCookies(res, newTokens.access_token, newTokens.refresh_token, newTokens.id_token)
 
       // Verify the new token
       const payload = await verifyToken(newTokens.access_token)
@@ -502,7 +507,7 @@ export async function optionalAuth(req, res, next) {
 
           if (refreshResult.ok) {
             const newTokens = refreshResult.tokens
-            setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+            setAuthCookies(res, newTokens.access_token, newTokens.refresh_token, newTokens.id_token)
             emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'optionalAuth' })
 
             const payload = await verifyToken(newTokens.access_token)

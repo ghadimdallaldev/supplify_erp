@@ -18,6 +18,18 @@
    "We are sorry... Invalid username or password" with no login form, the
    browser flow likely has Cookie/IDP DISABLED or the forms subflow unbound —
    re-run the apply script (it re-enables steps and re-links orphaned forms).
+7. If Create account or post-OTP recovery shows Keycloak's
+   **"Do you want to log out?"** page, the API must pass `id_token_hint` on the
+   end-session URL (stored as the `id_token` cookie after a successful login).
+   Confirm the API deploy includes that cookie and that logout URLs include
+   `id_token_hint`. Without the hint, Keycloak always confirms when an SSO
+   cookie is present.
+8. If you see **"We are sorry... Invalid username or password"** on
+   `login-actions/authenticate` (not the red error on the login form), the
+   email-OTP authenticator likely aborted the flow (`context.failure`). That
+   was fixed to re-show the login form instead; redeploy Keycloak so the
+   provider JAR updates. Also clear Keycloak cookies / use a private window
+   in case the auth session tab is stale.
 
 Refresh failures do not imply an OTP failure. Follow the
 [auth-session troubleshooting runbook](auth-session-troubleshooting.md) for

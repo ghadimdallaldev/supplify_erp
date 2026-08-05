@@ -388,6 +388,7 @@ describe('Auth Routes', () => {
       vi.mocked(exchangeCodeForTokens).mockResolvedValueOnce({
         access_token: mockAccessToken,
         refresh_token: 'refresh-token',
+        id_token: 'id-token-unverified',
       })
       vi.mocked(getUserInfo).mockResolvedValueOnce({
         sub: 'sub-123',
@@ -406,7 +407,10 @@ describe('Auth Routes', () => {
         .expect(302)
 
       expect(response.headers.location).toContain('keycloak.example.com/logout')
-      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith('http://localhost:4000/auth/login')
+      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith(
+        'http://localhost:4000/auth/login',
+        'id-token-unverified'
+      )
       expect(rbacModule.setAuthCookies).not.toHaveBeenCalled()
       expect(rbacModule.upsertUser).not.toHaveBeenCalled()
 
@@ -454,6 +458,7 @@ describe('Auth Routes', () => {
       vi.mocked(exchangeCodeForTokens).mockResolvedValueOnce({
         access_token: mockAccessToken,
         refresh_token: 'refresh-token',
+        id_token: 'id-token-login-unverified',
       })
       vi.mocked(getUserInfo).mockResolvedValueOnce({
         sub: 'sub-456',
@@ -472,7 +477,10 @@ describe('Auth Routes', () => {
         .expect(302)
 
       expect(response.headers.location).toContain('keycloak.example.com/logout')
-      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith('http://localhost:4000/auth/login')
+      expect(getKeycloakLogoutUrl).toHaveBeenCalledWith(
+        'http://localhost:4000/auth/login',
+        'id-token-login-unverified'
+      )
       expect(rbacModule.setAuthCookies).not.toHaveBeenCalled()
 
       if (originalWebOrigin !== undefined) process.env.WEB_ORIGIN = originalWebOrigin

@@ -358,6 +358,18 @@ describe('RBAC Utilities', () => {
         })
       )
     })
+
+    it('should set id_token cookie when provided for silent Keycloak logout', () => {
+      setAuthCookies(res, 'access-token', 'refresh-token', 'id-token')
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'id_token',
+        'id-token',
+        expect.objectContaining({
+          httpOnly: true,
+        })
+      )
+    })
   })
 
   describe('clearAuthCookies', () => {
@@ -370,6 +382,10 @@ describe('RBAC Utilities', () => {
       )
       expect(res.clearCookie).toHaveBeenCalledWith(
         'refresh_token',
+        expect.objectContaining({ path: '/' })
+      )
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'id_token',
         expect.objectContaining({ path: '/' })
       )
     })
