@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Proxy;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.keycloak.models.UserModel;
 
@@ -23,23 +24,40 @@ class OtpSupportTest {
         UserModel user = userWith(null, "Legacy.User@Example.com", null);
         assertEquals("legacy.user@example.com", EmailOtpAuthenticator.resolveEmail(user));
     }
-    @Test void usernameOnlyAccountQueuesProfileAndOtpRecovery() {
+    @Test void usernameOnlyAccountQueuesVerifiedEmailCapture() {
         Set<String> requiredActions = new HashSet<>();
-        UserModel user = userWith(null, "legacy-user", requiredActions);
+        AtomicBoolean emailVerified = new AtomicBoolean(true);
+        UserModel user = userWith(null, "legacy-user", requiredActions, emailVerified);
 
         assertNull(EmailOtpAuthenticator.resolveEmail(user));
         EmailOtpAuthenticator.requireEmailRecovery(user);
 
-        assertTrue(requiredActions.contains(UserModel.RequiredAction.UPDATE_PROFILE.name()));
+        assertFalse(emailVerified.get());
         assertTrue(requiredActions.contains(EmailOtpRequiredActionFactory.ID));
     }
+    @Test void recoveryEmailIsNormalizedAndValidated() {
+        assertEquals("ghadi.mdallal@kaseya.com", EmailOtpRequiredAction.normalizeEmail("  Ghadi.Mdallal@Kaseya.com "));
+        assertNull(EmailOtpRequiredAction.normalizeEmail(null));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("missing-at.example.com"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("missing-domain@"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("two@@example.com"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("space @example.com"));
+    }
     private static UserModel userWith(String email, String username, Set<String> requiredActions) {
+        return userWith(email, username, requiredActions, new AtomicBoolean(false));
+    }
+    private static UserModel userWith(String email, String username, Set<String> requiredActions, AtomicBoolean emailVerified) {
         return (UserModel) Proxy.newProxyInstance(
             UserModel.class.getClassLoader(),
             new Class<?>[]{UserModel.class},
             (proxy, method, args) -> {
                 if (method.getName().equals("getEmail")) return email;
                 if (method.getName().equals("getUsername")) return username;
+                if (method.getName().equals("isEmailVerified")) return emailVerified.get();
+                if (method.getName().equals("setEmailVerified")) {
+                    emailVerified.set((boolean) args[0]);
+                    return null;
+                }
                 if (method.getName().equals("addRequiredAction") && requiredActions != null) {
                     requiredActions.add(String.valueOf(args[0]));
                     return null;
