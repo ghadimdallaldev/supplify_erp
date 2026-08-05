@@ -6,13 +6,16 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 
 ## A. Environment overview
 
-| Environment | Git branch (typical) | Railway environment | Purpose                                    |
-| ----------- | -------------------- | ------------------- | ------------------------------------------ |
-| **dev**     | `dev`                | `dev`               | Local/Railway development, mocks, debug    |
-| **preprod** | `preprod`            | `preprod`           | QA, demos, test payments, prod-like config |
-| **prod**    | `prod`               | `prod`              | Live customers, strict security            |
+| Environment | Git branch (typical) | Railway environment | Purpose                                                         |
+| ----------- | -------------------- | ------------------- | --------------------------------------------------------------- |
+| **dev**     | `dev`                | `dev`               | Local/Railway development, mocks, debug                         |
+| **preprod** | `preprod`            | `preprod`           | QA, demos, test payments, prod-like config                      |
+| **staging** | —                    | `staging`           | Keycloak UAT only — no API/Web; shares `supplify-preprod` realm |
+| **prod**    | `prod`               | `prod`              | Live customers, strict security                                 |
 
 **Never share** `DATABASE_URL`, Keycloak realms, storage buckets, or payment keys across environments.
+
+> **Staging environment note:** `deploy/railway/staging/` contains Keycloak-only config (no `api.env` or `web.env`). The staging Railway environment is used for Keycloak UAT and testing Keycloak upgrades in isolation; it shares the `supplify-preprod` realm. It has no API or Web services — only the Keycloak service deploys there.
 
 ## B. What dev is for
 

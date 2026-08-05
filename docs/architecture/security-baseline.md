@@ -19,7 +19,7 @@ The app implements **solid baseline security** (auth, headers, rate limiting, co
 
 - **Helmet**: Content-Security-Policy, X-DNS-Prefetch-Control, etc.
 - **CORS**: Restricted to `WEB_ORIGIN`, `credentials: true`, explicit methods and headers (including `X-CSRF-Token`).
-- **Rate limiting**: General limiter (e.g. 1000/15min) and stricter auth limiter (e.g. 500/15min) on `/auth`.
+- **Rate limiting**: Multiple limiters applied per route group — general API (1000/15min per IP), auth (`/auth`: 500/15min), public API (`/api/public`: 200/15min), chat send (`/api/chat` POST: 300/15min).
 - **Authorization**: Routes use `requireAuth` and `requireRole`; tenant isolation (e.g. supplier/restaurant by email) on sensitive data.
 - **SQL**: Queries use parameterized `query(text, params)` (pg); no string concatenation of user input into SQL.
 
@@ -38,7 +38,9 @@ The app implements **solid baseline security** (auth, headers, rate limiting, co
 
 ### 1. Dependency vulnerabilities (high priority)
 
-`pnpm audit` reports **14 issues** (5 high, 5 moderate, 4 low). Most important:
+> **⚠️ Point-in-time snapshot** — this table was accurate at audit time but packages may have been upgraded since. Always run `pnpm audit` before a release and resolve new findings.
+
+The audit at the time of writing reported 14 issues (5 high, 5 moderate, 4 low). Representative examples:
 
 | Severity | Package                                  | Issue                                 | Action                                        |
 | -------- | ---------------------------------------- | ------------------------------------- | --------------------------------------------- |
@@ -51,7 +53,7 @@ The app implements **solid baseline security** (auth, headers, rate limiting, co
 | Moderate | **lodash / lodash-es / js-yaml**         | Prototype pollution                   | In dev/tooling; upgrade or overrides          |
 | Low      | **aws-sdk** v2                           | Region validation                     | Prefer migrating to AWS SDK v3                |
 
-Apply dependency upgrades and, where needed, `pnpm overrides` for transitive packages (see below).
+Apply dependency upgrades and, where needed, `pnpm overrides` for transitive packages (see below). **Run `pnpm audit --prod` before every release** to catch new issues.
 
 ### 2. CSRF on API routes
 
