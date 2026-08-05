@@ -1,4 +1,4 @@
-﻿package com.supplify.driver
+package com.supplify.driver
 
 import android.Manifest
 import android.content.Context
@@ -8,9 +8,11 @@ import androidx.core.content.ContextCompat
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
+import com.getcapacitor.PluginMethod
+import com.getcapacitor.PermissionState
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
-import com.getcapacitor.annotation.PluginMethod
+import com.getcapacitor.annotation.PermissionCallback
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -37,7 +39,7 @@ class DriverLocationPlugin : Plugin() {
 
   @PluginMethod
   fun startTracking(call: PluginCall) {
-    if (!hasPermission("location")) {
+    if (!hasLocationPermission()) {
       requestPermissionForAlias("location", call, "locationPermissionCallback")
       return
     }
@@ -66,7 +68,7 @@ class DriverLocationPlugin : Plugin() {
       put("active", active)
       put("provider", "native-android")
       put("sessionId", sessionId)
-      put("gpsState", if (hasPermission("location")) if (active) "TRACKING_ACTIVE" else "READY" else "LOCATION_PERMISSION_DENIED")
+      put("gpsState", if (hasLocationPermission()) if (active) "TRACKING_ACTIVE" else "READY" else "LOCATION_PERMISSION_DENIED")
       put("networkState", "online")
       put("pendingLocationCount", pendingPoints().length())
       put("lastSyncedAt", null)
@@ -136,10 +138,14 @@ class DriverLocationPlugin : Plugin() {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(PENDING_KEY, points.toString()).apply()
   }
 
+  @PermissionCallback
   private fun locationPermissionCallback(call: PluginCall) {
-    if (hasPermission("location")) startTracking(call)
+    if (hasLocationPermission()) startTracking(call)
     else call.reject("Location permission denied", "LOCATION_PERMISSION_DENIED")
   }
+
+  private fun hasLocationPermission(): Boolean =
+    getPermissionState("location") == PermissionState.GRANTED
 
   companion object {
     private const val PREFS_NAME = "supplify_driver_tracking"

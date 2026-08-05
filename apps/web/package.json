@@ -18,7 +18,10 @@
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "analyze": "vite build --mode analyze"
+    "analyze": "vite build --mode analyze",
+    "android:sync:development": "node scripts/sync-capacitor-android.mjs development",
+    "android:sync:preprod": "node scripts/sync-capacitor-android.mjs preprod",
+    "android:sync:production": "node scripts/sync-capacitor-android.mjs production"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.0",

@@ -1,4 +1,4 @@
-﻿package com.supplify.driver
+package com.supplify.driver
 
 import android.content.BroadcastReceiver
 import android.content.Context
