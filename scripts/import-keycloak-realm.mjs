@@ -126,6 +126,47 @@ async function partialImport(url, token, realmName, realmExport) {
   return res.json()
 }
 
+async function ensureDriverLoginUserAttribute(url, token, realmName) {
+  const endpoint = `${url}/admin/realms/${encodeURIComponent(realmName)}/users/profile`
+  const currentResponse = await adminFetch(endpoint, token)
+  if (!currentResponse.ok) {
+    const text = await currentResponse.text()
+    throw new Error(`Read Keycloak user profile failed (${currentResponse.status}): ${text}`)
+  }
+
+  const profile = await currentResponse.json()
+  const attributes = Array.isArray(profile.attributes) ? profile.attributes : []
+  if (!attributes.some((attribute) => attribute.name === 'supplify_driver_login')) {
+    attributes.push({
+      name: 'supplify_driver_login',
+      displayName: 'Supplify driver login policy',
+      multivalued: false,
+      permissions: {
+        view: ['admin'],
+        edit: ['admin'],
+      },
+      validations: {
+        options: {
+          options: ['true', 'false'],
+        },
+      },
+      annotations: {},
+    })
+
+    const updateResponse = await adminFetch(endpoint, token, {
+      method: 'PUT',
+      body: JSON.stringify({ ...profile, attributes }),
+    })
+    if (!updateResponse.ok) {
+      const text = await updateResponse.text()
+      throw new Error(
+        `Update Keycloak user profile failed (${updateResponse.status}): ${text}`
+      )
+    }
+    console.log('Added admin-only Keycloak user attribute "supplify_driver_login"')
+  }
+}
+
 async function waitForKeycloak(url, attempts = 60) {
   for (let i = 1; i <= attempts; i += 1) {
     try {
@@ -163,6 +204,7 @@ async function main() {
   if (!exists) {
     console.log(`Creating realm "${realmName}" from ${file}`)
     await createRealm(url, token, realmExport)
+    await ensureDriverLoginUserAttribute(url, token, realmName)
     console.log(`Realm "${realmName}" created`)
     return
   }
@@ -177,6 +219,7 @@ async function main() {
     console.error('Partial import reported errors:', result.error)
     process.exit(1)
   }
+  await ensureDriverLoginUserAttribute(url, token, realmName)
 }
 
 main().catch((err) => {

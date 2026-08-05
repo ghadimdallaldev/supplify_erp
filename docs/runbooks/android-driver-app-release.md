@@ -47,7 +47,7 @@ backup. Losing the keystore prevents signing upgrades for the same Android app.
 
 After syncing the intended environment:
 
-    .\gradlew.bat assembleRelease bundleRelease --no-daemon --max-workers=1 '-Pkotlin.incremental=false' '-Pkotlin.compiler.execution.strategy=in-process'
+    .\gradlew.bat :app:assembleRelease :app:bundleRelease --no-daemon --max-workers=1 '-Pkotlin.incremental=false' '-Pkotlin.compiler.execution.strategy=in-process'
 
 - Share the signed APK with direct-install testers.
 - Upload the signed AAB to Google Play internal testing or a client release.
@@ -63,6 +63,11 @@ driver, start a session, grant location and notification permissions, lock the
 screen, move through a short route, verify the foreground notification, and
 confirm points and stale state on the supplier map. Stop the session and verify
 the server marks it stopped.
+
+The Android instrumentation regression covers both auth entry points. With an
+emulator running and after syncing the intended environment:
+
+    .\gradlew.bat :app:connectedDebugAndroidTest --no-daemon --max-workers=1 '-Pandroid.testInstrumentationRunnerArguments.class=com.supplify.driver.DriverAuthSmokeTest'
 
 ## Rollback
 
