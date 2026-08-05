@@ -17,7 +17,21 @@ public final class EmailOtpAuthenticator implements Authenticator {
     public void authenticate(AuthenticationFlowContext context) {
         if (!config.enabled) { context.success(); return; }
         UserModel user = context.getUser();
-        if (user == null || user.getEmail() == null || user.getEmail().trim().isEmpty()) { context.failure(AuthenticationFlowError.INVALID_USER); return; }
+        // Never use context.failure(INVALID_USER): Keycloak renders the dead-end
+        // "We are sorry... Invalid username or password" page with no form to recover.
+        if (user == null) {
+            context.challenge(context.form()
+                .setError("Your sign-in session expired. Please enter your username and password again.")
+                .createLoginUsernamePassword());
+            return;
+        }
+        String email = resolveEmail(user);
+        if (email == null) {
+            context.challenge(context.form()
+                .setError("This account has no email address for verification. Contact support or register again with an email.")
+                .createLoginUsernamePassword());
+            return;
+        }
         // Drivers open the operational app frequently. The API sets this attribute only while
         // the user has a current supplier Driver assignment; never trust a browser-supplied value.
         if (config.driverLoginBypass && "true".equalsIgnoreCase(user.getFirstAttribute("supplify_driver_login"))) {
@@ -31,12 +45,26 @@ public final class EmailOtpAuthenticator implements Authenticator {
             context.success();
             return;
         }
-        issue(context, user, false);
+        issue(context, user, email, false);
     }
     public void action(AuthenticationFlowContext context) {
         if (!config.enabled) { context.success(); return; }
+        UserModel user = context.getUser();
+        if (user == null) {
+            context.challenge(context.form()
+                .setError("Your sign-in session expired. Please enter your username and password again.")
+                .createLoginUsernamePassword());
+            return;
+        }
+        String email = resolveEmail(user);
+        if (email == null) {
+            context.challenge(context.form()
+                .setError("This account has no email address for verification. Contact support or register again with an email.")
+                .createLoginUsernamePassword());
+            return;
+        }
         MultivaluedMap<String, String> form = context.getHttpRequest().getDecodedFormParameters();
-        if (form.containsKey("resend")) { issue(context, context.getUser(), true); return; }
+        if (form.containsKey("resend")) { issue(context, user, email, true); return; }
         String code = form.getFirst("otp");
         String expected = context.getAuthenticationSession().getAuthNote(OtpSupport.CODE_NOTE);
         String purpose = context.getAuthenticationSession().getAuthNote(OtpSupport.PURPOSE_NOTE);
@@ -45,12 +73,11 @@ public final class EmailOtpAuthenticator implements Authenticator {
         if (!"login_email_mfa".equals(purpose) || expected == null || expires < System.currentTimeMillis()) { fail(context, "The code expired. Request a new code."); return; }
         if (attempts >= config.maxAttempts) { fail(context, "Too many attempts. Request a new code."); return; }
         context.getAuthenticationSession().setAuthNote(OtpSupport.ATTEMPTS_NOTE, Integer.toString(attempts + 1));
-        String actual = OtpSupport.hmac(config.hmacSecret, purpose, context.getUser().getEmail().trim().toLowerCase(), code == null ? "" : code.trim());
+        String actual = OtpSupport.hmac(config.hmacSecret, purpose, email, code == null ? "" : code.trim());
         if (OtpSupport.matches(expected, actual)) { clear(context); context.success(); return; }
         fail(context, "That code is not valid.");
     }
-    private void issue(AuthenticationFlowContext context, UserModel user, boolean resend) {
-        String email = user.getEmail().trim().toLowerCase();
+    private void issue(AuthenticationFlowContext context, UserModel user, String email, boolean resend) {
         long lastSent = parseLong(context.getAuthenticationSession().getAuthNote(OtpSupport.SENT_NOTE));
         if (resend && System.currentTimeMillis() - lastSent < config.resendCooldownSeconds * 1000L) { fail(context, "Please wait before requesting another code."); return; }
         String code = OtpSupport.generateCode(config.length);
@@ -64,6 +91,18 @@ public final class EmailOtpAuthenticator implements Authenticator {
         try { mail.send(email, code, purpose, OtpSupport.languageTag(context.getSession(), user), challengeId); }
         catch (RuntimeException e) { clear(context); context.failureChallenge(AuthenticationFlowError.INTERNAL_ERROR, context.form().setError("We could not send a verification code. Try again later.").createForm("login-otp.ftl")); return; }
         context.challenge(context.form().setAttribute("otpLength", config.length).setAttribute("otpTtlSeconds", config.ttlSeconds).createForm("login-otp.ftl"));
+    }
+    /** Prefer Keycloak email; fall back to username when it looks like an email. */
+    static String resolveEmail(UserModel user) {
+        if (user == null) return null;
+        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+            return user.getEmail().trim().toLowerCase();
+        }
+        String username = user.getUsername();
+        if (username != null && username.contains("@")) {
+            return username.trim().toLowerCase();
+        }
+        return null;
     }
     private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createForm("login-otp.ftl")); }
     private static long parseLong(String raw) { try { return Long.parseLong(raw == null ? "0" : raw); } catch (NumberFormatException ignored) { return 0; } }
