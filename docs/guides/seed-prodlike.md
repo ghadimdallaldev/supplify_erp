@@ -2,7 +2,7 @@
 
 This seed populates the database with a **prod-like full dataset** so the UI feels "alive" across Invoices, Restaurant/Supplier Inventories, Reservations, Warehouses, and Orders.
 
-**Alternative (tier matrix):** `pnpm run seed:tier-catalog` wipes commercial data and seeds **one restaurant + one supplier per Free/Silver/Gold** with named team logins (`*-manager`, `*-purchaser`) and activity-log backfill. Use when testing plan tiers and Settings → Team / Activity. See [SETUP.md](SETUP.md) and [tenant-audit-log.md](../features/tenant-audit-log.md).
+**Alternative (tier matrix):** `pnpm run seed:tier-catalog` wipes commercial data and seeds **one restaurant + one supplier per Free/Silver/Gold** with named team logins (`*-manager`, `*-purchaser`) and activity-log backfill. Use when testing plan tiers and Settings → Team / Activity. See [setup.md](setup.md) and [tenant-audit-log.md](../features/tenant-audit-log.md).
 
 ## Run instructions
 

@@ -4,11 +4,11 @@ SQL migrations live in `apps/api/db/migrations/` and run in lexical order. Appli
 
 ## Running migrations
 
-| Environment                      | Command                                                                                                                                                      |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Docker stack (recommended)       | `scripts\run-local.cmd seed` or automatic via `supplify-migrate` on `docker compose up`                                                                      |
-| Host against Docker Postgres     | `DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify node apps/api/scripts/run-migration.js` (port must match `docker/.env` `POSTGRES_PORT`) |
-| pnpm (uses `migrate.js` wrapper) | `pnpm db:migrate`                                                                                                                                            |
+| Environment                      | Command                                                                                                                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker stack (recommended)       | `scripts\run-local.cmd seed` or automatic via `supplify-migrate` on `docker compose up`                                                                                    |
+| Host against Docker Postgres     | `DATABASE_URL=postgresql://postgres:postgres@localhost:5432/supplify node apps/api/scripts/run-migration.js` (port must match `docker/.env` `POSTGRES_PORT`, default 5432) |
+| pnpm (uses `migrate.js` wrapper) | `pnpm db:migrate`                                                                                                                                                          |
 
 `apps/api/scripts/migrate.js` runs:
 

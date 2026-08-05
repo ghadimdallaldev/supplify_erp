@@ -8,9 +8,9 @@ Admin health signals and financial overview for operators.
 
 Returns:
 
-- **jobFailures:** Placeholder (no jobs table); null or [].
-- **webhookFailures:** Placeholder (no webhook tracking); null or [].
-- **emailFailures:** Placeholder (no email failure table); null or [].
+- **jobFailures:** In-memory cron failure log from `getRecentCronFailures()`. Returns last N failures with job name, error message, and timestamp.
+- **webhookFailures:** Placeholder (webhook tracking not yet implemented); returns [].
+- **emailFailures:** Last 20 failed/retryable rows from `email_delivery_log` via `getAdminEmailHealthFailures()` (requires migration 0136). Includes `recipientRedacted` field.
 - **recentApiErrors:** Last 50 rows from `system_event` where `severity = 'error'` (type, source, message, created_at).
 - **dbPool:** If the DB client exposes pool stats: `{ total, idle, waiting }`; otherwise null.
 

@@ -24,7 +24,7 @@ Team members receive the same in-app (and email/push when enabled) alerts as the
 | Web Push | Opt-in `push_enabled` + VAPID keys (see below)                                                           |
 | Webhook  | Platinum tier — outbound signed HTTP to tenant-configured URL (`notification/webhook.js`)                |
 
-Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, etc.) are **in-app only** — email and WhatsApp are suppressed per ping (`skipEmail` + `skipWhatsapp` on metadata).
+Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, `failed_delivery`, `delivery_rescheduled`) are **in-app only** — email and WhatsApp are suppressed per ping (`skipEmail` + `skipWhatsapp` on metadata). `delivery_rescheduled` also triggers a `delivery_rollover` batch notification to the supplier team via the delivery-rollover cron job.
 
 ## Order events
 
@@ -40,6 +40,14 @@ See [ordering-decline.md](./ordering-decline.md).
 ## Other tenant-wide events
 
 Messages, invoices (issued/overdue/reminders), payments, inventory (low/out of stock), disputes, staff PTO/swap, scheduled quick lists, reservation staff events, guest reservation updates, post-receiving review prompts, order amendments, billing lifecycle events, supplier reorder reminders, team role changes.
+
+**Quote requests:** `quote_request_received` → supplier team; `quote_response_received` → restaurant team. Both are deduplicated within a 60-minute window per (quote-request, supplier) row. Both use the `notify_order_new` preference gate.
+
+**Deals:** `deal_submitted` → supplier team + all platform admins; `deal_approved` → all following/targeted restaurants; `deal_rejected` → supplier team (with optional reason); `deal_expired` → supplier team.
+
+**Admin new-tenant:** `admin_new_tenant` → all platform-admin users on every new restaurant/supplier registration.
+
+**Delivery rollover:** `delivery_rollover` → supplier team (one batch notification after the rollover cron, summarising rescheduled count).
 
 ## Billing events
 
@@ -183,13 +191,13 @@ Generate: `npx web-push generate-vapid-keys` (from `apps/api`).
 
 After `notification_log` write, `sendWebPushToUser` when VAPID configured and `push_enabled` true. Stale endpoints (`410`/`404`) remove `push_subscriptions` rows.
 
-**Payload:** `{ title, body, url, referenceId, referenceType }`
+**Payload:** `{ title, message, url, referenceId, referenceType }`
 
 ### Frontend
 
 - Hook: `usePushNotifications.ts`
 - Service worker: `apps/web/static/sw.js`
-- Settings toggle → `push_enabled` (opt-in, default false)
+- Settings toggle → `push_enabled` (default true; users can disable in Settings → Notifications)
 
 Migration: `0073_push_subscriptions.sql`.
 

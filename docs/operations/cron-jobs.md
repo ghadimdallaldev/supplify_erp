@@ -49,6 +49,11 @@ Scheduled quick lists additionally use a **`quick_list_execution` ledger** (one 
 | `EMAIL_RETRY_MAX_ATTEMPTS`               | `3`                                    | Max retry attempts per failed email row.                                  |
 | `NOTIFICATION_LOG_RETENTION_DAYS`        | `90`                                   | Log retention job purge threshold (0 = skip).                             |
 | `EMAIL_DELIVERY_LOG_RETENTION_DAYS`      | `180`                                  | Purge sent/skipped email log rows.                                        |
+| `CRON_EMAIL_RETRY_INTERVAL_MS`           | `3600000` (1 h)                        | Email retry job poll interval.                                            |
+| `CRON_EMAIL_DIGEST_INTERVAL_MS`          | `86400000` (24 h)                      | Email digest job poll interval.                                           |
+| `CRON_STALE_GPS_INTERVAL_MS`             | `900000` (15 min)                      | Stale GPS alerts job poll interval.                                       |
+| `CRON_LOG_RETENTION_INTERVAL_MS`         | `86400000` (24 h)                      | Log retention job poll interval.                                          |
+| `EMAIL_DIGEST_LOOKBACK_HOURS`            | `24`                                   | Lookback window for the email digest job.                                 |
 
 ## Manual trigger (HTTP)
 
@@ -104,6 +109,6 @@ Due dates and `preferred_time` for quick lists are still evaluated in **UTC**. R
 - Migration **0168** (`catalog_image_import_job`, `product.image_thumb_url`) must be applied before **Import Product Images** (bulk ZIP) is available — not a cron job; see [bulk-product-image-import.md](../features/bulk-product-image-import.md) and in-process worker `image-import-worker.js`.
 - Migration **0152** (`billing_trial_reminder_log`) must be applied before trial-ending-soon reminders are active.
 - Migration **0153** must be applied before email retry/digest, stale GPS dedup, restaurant timezone, and log retention jobs are active.
-- Run `pnpm db:migrate` per environment; Railway uses `RUN_MIGRATIONS_ON_START=false`.
+- Run `pnpm db:migrate` per environment; Railway uses `RUN_MIGRATIONS_ON_START=true` (committed default in all `deploy/railway/*/api.env` files).
 - Inspect runs: `SELECT * FROM quick_list_execution ORDER BY created_at DESC LIMIT 50;`
 - Logs: search for `event: cron.started` / `cron.completed` / `cron.skipped`.

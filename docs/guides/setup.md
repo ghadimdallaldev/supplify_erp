@@ -14,7 +14,7 @@ A modern restaurant & F&B supplier marketplace built with React, Node.js, and Po
 
 ```bash
 git clone <repository-url>
-cd supplify-v2
+cd supplify_erp
 pnpm install
 ```
 
@@ -37,7 +37,8 @@ docker compose up -d
 This starts:
 
 - PostgreSQL (port 5432)
-- Keycloak (port 8080)
+- Redis (port 6379)
+- Keycloak (port 8180)
 - MinIO (port 9000, console 9001)
 
 ### 4. Database Setup
@@ -51,12 +52,13 @@ pnpm db:seed
 ```
 
 **Optional: Prodlike seed (full dataset + login accounts)**  
-For a rich dev dataset (invoices, orders, inventories, reservations, quick lists) and Keycloak accounts for every restaurant/supplier, see [SEED_PRODLIKE.md](SEED_PRODLIKE.md). From repo root:
+For a rich dev dataset (invoices, orders, inventories, reservations, quick lists) and Keycloak accounts for every restaurant/supplier, see [seed-prodlike.md](seed-prodlike.md). From repo root:
 
 ```bash
 ALLOW_PRODLIKE_SEED=true pnpm run seed:prodlike
 pnpm run seed:accounts    # Keycloak logins for all tenants (password: Supplify1!)
 pnpm run seed:quick-lists # Quick lists for all restaurants
+pnpm run seed:chats       # Conversations + messages between restaurant–supplier pairs
 ```
 
 **Optional: Tier catalog (clean slate, 3 users per tenant)**  
@@ -83,7 +85,7 @@ pnpm --filter @supplify/web dev
 
 - **Web App**: http://localhost:5173
 - **API**: http://localhost:4000
-- **Keycloak Admin**: http://localhost:8080 (admin/admin)
+- **Keycloak Admin**: http://localhost:8180 (admin/admin)
 - **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
 
 ## 🏗️ Architecture
@@ -101,7 +103,7 @@ pnpm --filter @supplify/web dev
 ### Project Structure
 
 ```
-supplify-v2/
+supplify_erp/
 ├── apps/
 │   ├── api/                 # Node.js API server
 │   │   ├── src/
@@ -113,14 +115,17 @@ supplify-v2/
 │   │   │   ├── migrations/ # SQL migration files
 │   │   │   └── seed/       # Seed data
 │   │   └── scripts/        # Migration and utility scripts
-│   └── web/                # React web application
-│       ├── src/
-│       │   ├── components/ # React components
-│       │   ├── features/   # Redux slices
-│       │   ├── pages/      # Page components
-│       │   ├── services/   # RTK Query API
-│       │   └── types/      # TypeScript types
-│       └── public/         # Static assets
+│   ├── web/                # React web application (also packaged as Android via Capacitor)
+│   │   ├── src/
+│   │   │   ├── components/ # React components
+│   │   │   ├── features/   # Redux slices
+│   │   │   ├── pages/      # Page components
+│   │   │   ├── services/   # RTK Query API
+│   │   │   └── types/      # TypeScript types
+│   │   └── public/         # Static assets
+│   ├── android/            # Capacitor Android build output
+│   └── api-gateway/        # API gateway service
+├── packages/               # Shared workspace packages (auth, config, database, types, utils, …)
 ├── deploy/                 # Railway env templates, Keycloak realm exports
 ├── docker/                 # Local Docker stack config
 ├── scripts/                # Dev, promote, Railway sync scripts
@@ -200,7 +205,10 @@ The API follows RESTful conventions with:
 - `pnpm dev` - Start both API and web development servers
 - `pnpm build` - Build all applications
 - `pnpm lint` - Lint all code
-- `pnpm test` - Run all tests
+- `pnpm test` - Run all tests in **watch mode** (use `pnpm test:all` / `pnpm test:ci` for CI)
+- `pnpm test:all` - Run all tests once (alias for `pnpm test:ci`)
+- `pnpm qa` - Full pre-deploy gate: lint + typecheck + tests + build
+- `pnpm local:infra` - Start Docker infra only (no API/web)
 - `pnpm db:migrate` - Run database migrations
 - `pnpm db:seed` - Seed database with sample data
 - `pnpm db:reset` - Reset database (drop, migrate, seed)
@@ -212,8 +220,9 @@ The API follows RESTful conventions with:
 ```bash
 PORT=4000
 WEB_ORIGIN=http://localhost:5173
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/supplify
-KEYCLOAK_BASE_URL=http://localhost:8080
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/supplify
+KEYCLOAK_BASE_URL=http://localhost:8180
+KEYCLOAK_PUBLIC_URL=http://localhost:8180
 KEYCLOAK_REALM=Supplify
 KEYCLOAK_CLIENT_ID=supplify-api
 KEYCLOAK_CLIENT_SECRET=changeme
@@ -225,6 +234,17 @@ S3_BUCKET=supplify
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 NODE_ENV=development
+
+# Driver live tracking (feature-flagged; set to true to enable each capability)
+GPS_TRACKING_SESSIONS_ENABLED=false
+GPS_NATIVE_TRACKING_ENABLED=false
+GPS_OFFLINE_QUEUE_ENABLED=false
+GPS_LIVE_EVENTS_ENABLED=false
+GPS_GEOFENCE_ENABLED=false
+GPS_MAX_ACCURACY_METERS=250
+GPS_MAX_SPEED_KPH=160
+GPS_BATCH_MAX_SIZE=100
+GPS_MIN_SEND_INTERVAL_SECONDS=15
 ```
 
 #### Web (.env)

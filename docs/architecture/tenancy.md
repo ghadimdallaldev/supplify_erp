@@ -412,4 +412,4 @@ GET /api/inventory?warehouse_id=xyz-789
 
 ---
 
-Last Updated: [Current Date]
+Last Updated: 2026-08-06

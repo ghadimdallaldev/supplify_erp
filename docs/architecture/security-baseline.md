@@ -11,7 +11,7 @@ The app implements **solid baseline security** (auth, headers, rate limiting, co
 ### Authentication & session
 
 - **OIDC with Keycloak**: Authorization code flow, state parameter for CSRF on login, tokens from Keycloak.
-- **Tokens in cookies**: Access/refresh tokens stored in **httpOnly** cookies (not accessible to JS), **secure** in production, **sameSite: 'lax'**.
+- **Tokens in cookies**: Access/refresh tokens stored in **httpOnly** cookies (not accessible to JS), **secure** in production, **sameSite** configurable via `COOKIE_SAME_SITE` (defaults to `'lax'`; must be `'none'` when web and API are on different domains, e.g. Railway cross-origin deployments).
 - **Session**: Express session with **SESSION_SECRET**, **httpOnly** session cookie, **secure** in production.
 - **JWT**: Verified with `jose` and remote JWKS (Keycloak), with timeout on Keycloak HTTP calls.
 

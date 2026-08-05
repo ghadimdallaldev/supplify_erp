@@ -13,10 +13,10 @@ Paths: **API** = `apps/api/`, **Web** = `apps/web/`. Example files: `.env.{dev,p
 | Keycloak Railway env       | `../../deploy/railway/development/keycloak.env`                | `../../deploy/railway/preprod/keycloak.env`       | `../../deploy/railway/production/keycloak.env` |
 | Keycloak optimized start   | `false` (runtime postgres)                                     | `false`                                           | `true`                                         |
 | `PAYMENTS_MODE`            | `mock`                                                         | `test`                                            | `live`                                         |
-| `STORAGE_DRIVER`           | `local`                                                        | `s3` (recommended)                                | `s3` (required)                                |
+| `STORAGE_DRIVER`           | `s3` (Railway Bucket)                                          | `s3` (recommended)                                | `s3` (required)                                |
 | E2E / debug routes         | allowed (dev only)                                             | disabled                                          | disabled                                       |
 | Demo seed / DB reset       | allowed                                                        | disabled                                          | disabled                                       |
-| Email (`EMAIL_LOG_ONLY`)   | `true` (log only)                                              | `false` + `SMTP_PASS` secret                      | `false` + `SMTP_PASS` secret                   |
+| Email (`EMAIL_LOG_ONLY`)   | `false` (real email via Resend)                                | `false` + `SMTP_PASS` secret                      | `false` + `SMTP_PASS` secret                   |
 | Email config source        | `../../deploy/railway/development/api.env`                     | `../../deploy/railway/preprod/api.env`            | `../../deploy/railway/production/api.env`      |
 | Delivery GPS (API)         | `GPS_TRACKING_ENABLED=true` (typical)                          | same + map keys in secrets if using embed         | prod map keys in Railway secrets               |
 | Delivery GPS (Web)         | `VITE_GPS_*`, optional `VITE_GOOGLE_MAPS_API_KEY`              | same                                              | same                                           |

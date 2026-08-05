@@ -88,7 +88,7 @@ The API is **largely mobile-ready** for restaurant ordering/tracking, supplier f
 | Impersonation  | Admin cookie                       | N/A on mobile v1                                                          |
 | STAFF_PORTAL   | Separate realm                     | Out of scope v1                                                           |
 
-**Status (2026-06-07):** Mobile auth unblocker implemented in API — Bearer + mobile refresh + tenant header. Proceed with Expo app (Phase 2).
+**Status (2026-06-07 → active):** Phase 2 complete. Mobile app ships as `mobile-work/` (Expo, v1.1.0 / versionCode 11). Auth, push registration, GPS, and driver flows are operational. See `mobile-work/eas.json` for EAS build profiles (`development`, `preview`, `ios-simulator`, `production`).
 
 ## PWA baseline (existing)
 

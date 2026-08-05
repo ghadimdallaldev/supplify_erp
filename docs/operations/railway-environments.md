@@ -17,7 +17,7 @@ Repo paths: API = `apps/api/`, Web = `apps/web/`. Env templates: `apps/api/.env.
 ## B. What dev is for
 
 - Developer testing and UI iteration
-- `PAYMENTS_MODE=mock`, `STORAGE_DRIVER=local`
+- `PAYMENTS_MODE=mock`, `STORAGE_DRIVER=s3` (Railway Bucket)
 - Relaxed rate limits, debug logging, optional `E2E_SECRET` with `ENABLE_DEBUG_ROUTES=true`
 - Safe test data only
 
@@ -94,19 +94,19 @@ Docker builds use `pnpm --filter @supplify/api...` and `pnpm --filter @supplify/
 
 See `apps/api/.env.<env>.example` and [environment-variables.md](./environment-variables.md).
 
-| Variable                              | dev                 | preprod            | prod             |
-| ------------------------------------- | ------------------- | ------------------ | ---------------- |
-| `APP_ENV`                             | `dev`               | `preprod`          | `prod`           |
-| `DATABASE_URL`                        | dev plugin          | preprod plugin     | prod plugin      |
-| `CORS_ORIGIN` / `PUBLIC_FRONTEND_URL` | localhost + dev URL | preprod URL only   | prod URL only    |
-| `SESSION_SECRET`                      | dev-only            | strong 32+         | strong 32+       |
-| `KEYCLOAK_REALM`                      | `supplify-dev`      | `supplify-preprod` | `supplify-prod`  |
-| `STORAGE_DRIVER`                      | `local`             | `s3`               | `s3`             |
-| `PAYMENTS_MODE`                       | `mock`              | `test`             | `live`           |
-| `ENABLE_DEBUG_ROUTES`                 | `true`              | `false`            | `false`          |
-| `REDIS_URL`                           | recommended         | recommended        | recommended      |
-| `EMAIL_LOG_ONLY`                      | `true` (log only)   | `false`            | `false`          |
-| `SMTP_PASS`                           | dashboard secret    | dashboard secret   | dashboard secret |
+| Variable                              | dev                             | preprod            | prod             |
+| ------------------------------------- | ------------------------------- | ------------------ | ---------------- |
+| `APP_ENV`                             | `dev`                           | `preprod`          | `prod`           |
+| `DATABASE_URL`                        | dev plugin                      | preprod plugin     | prod plugin      |
+| `CORS_ORIGIN` / `PUBLIC_FRONTEND_URL` | localhost + dev URL             | preprod URL only   | prod URL only    |
+| `SESSION_SECRET`                      | dev-only                        | strong 32+         | strong 32+       |
+| `KEYCLOAK_REALM`                      | `Supplify`                      | `supplify-preprod` | `supplify-prod`  |
+| `STORAGE_DRIVER`                      | `s3`                            | `s3`               | `s3`             |
+| `PAYMENTS_MODE`                       | `mock`                          | `test`             | `live`           |
+| `ENABLE_DEBUG_ROUTES`                 | `true`                          | `false`            | `false`          |
+| `REDIS_URL`                           | recommended                     | recommended        | recommended      |
+| `EMAIL_LOG_ONLY`                      | `false` (real email via Resend) | `false`            | `false`          |
+| `SMTP_PASS`                           | dashboard secret                | dashboard secret   | dashboard secret |
 
 Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [../features/email-system.md](../features/email-system.md).
 

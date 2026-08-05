@@ -2,7 +2,7 @@
 
 Supplify remains a **Progressive Web App** — these changes improve the existing web/PWA experience on phones without a native app or architecture rewrite.
 
-**Native Expo mobile development is paused** — phone workflows are served through the installed PWA and mobile browser until native parity justifies the investment again.
+**Native Expo mobile development is active** — `mobile-work/` (v1.1.0, versionCode 11) ships driver, restaurant, and supplier flows. PWA remains the fallback for users without the installed app.
 
 ## What was improved
 
@@ -57,13 +57,13 @@ Supplify remains a **Progressive Web App** — these changes improve the existin
 4. **Supplier**: **Fulfillment** → dispatch **Track delivery**; **Routes** tab → open a route on a ~390px viewport and verify stacked stop cards, **Show details**, and primary actions.
 5. **Install PWA**: Chrome (Android) → Add to Home screen; Safari → Share → Add to Home Screen. Confirm icon, theme color, and standalone launch.
 
-## Mobile limitations (deferred)
+## PWA limitations
 
-- No offline order creation or background GPS when the PWA is killed (browser/OS limits)
-- No push notifications unless already configured server-side
-- Native camera/POD capture not added (existing flows only)
+- **PWA only:** No offline order creation or background GPS when the PWA is backgrounded/killed (browser/OS limits). The native Expo app handles background GPS via `expo-location`.
+- No push notifications on PWA unless already configured server-side
+- Native camera/POD capture not added to PWA (existing flows only)
 - Table-heavy admin pages unchanged
 
 ## Native app status
 
-Expo/native mobile work is **paused / deferred**, not removed. Resume when PWA gaps (background location, store distribution, device integrations) block operations.
+Expo/native mobile development is **active**. Build with `eas build --profile preview` (internal APK) or `--profile production`. Driver GPS tracking, push registration, and OTP login are operational in `mobile-work/`. See `mobile-work/eas.json` for build profiles.

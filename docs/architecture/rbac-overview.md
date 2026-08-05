@@ -7,24 +7,37 @@ Tenant-scoped RBAC provides a clean foundation for mapping subscription features
 - **RESTAURANT** – Restaurant tenant (branches, reservations, staff, orders, etc.).
 - **SUPPLIER** – Supplier tenant (catalog, warehouses, orders, invoices, etc.).
 - **ADMIN** – Global admin (no tenant_id; platform-wide access).
+- **STAFF_PORTAL** – Staff self-service app users (`staff_portal` / `staff_portal_user` Keycloak realm roles map to `STAFF_PORTAL_APP_ROLE`). Routes using `assertStaffPortalRouteAccess` restrict these users to staff-portal paths only.
 
 ## Roles
 
-### Restaurant roles
+### Restaurant roles (7)
 
-| Code               | Name               | Description                                                |
-| ------------------ | ------------------ | ---------------------------------------------------------- |
-| RESTAURANT_OWNER   | Restaurant Owner   | Full access to restaurant tenant                           |
-| RESTAURANT_MANAGER | Restaurant Manager | Operations, staff, orders; no settings/subscription manage |
-| RESTAURANT_STAFF   | Restaurant Staff   | Day-to-day: orders, inventory, reservations, chat          |
+Role identifiers are name strings (not uppercase codes) as defined in `role-matrix.js`.
 
-### Supplier roles
+| Name               | Description                                                    |
+| ------------------ | -------------------------------------------------------------- |
+| Owner              | Full access to restaurant tenant                               |
+| Restaurant Manager | Operations, staff, orders, inventory; no subscription manage   |
+| Purchaser          | Ordering, quick lists, inventory, receiving; no staff/settings |
+| Receiving Staff    | Receiving and inventory only                                   |
+| Accountant         | Invoices, payments, reports; read-only orders and inventory    |
+| Viewer             | Read-only across all tenant areas                              |
+| FOH Staff          | Reservations and front-of-house only                           |
 
-| Code             | Name             | Description                                                   |
-| ---------------- | ---------------- | ------------------------------------------------------------- |
-| SUPPLIER_OWNER   | Supplier Owner   | Full access to supplier tenant                                |
-| SUPPLIER_MANAGER | Supplier Manager | Catalog, orders, fulfillment; no settings/subscription manage |
-| SUPPLIER_STAFF   | Supplier Staff   | Fulfillment and support                                       |
+### Supplier roles (9)
+
+| Name                    | Description                                                      |
+| ----------------------- | ---------------------------------------------------------------- |
+| Owner                   | Full access to supplier tenant                                   |
+| Supplier Manager        | Catalog, orders, fulfillment, warehouses; no subscription manage |
+| Warehouse Manager       | Warehouse operations, receiving, fulfillment; no catalog billing |
+| Order Fulfillment Staff | Fulfillment board only; cannot edit warehouse or catalog         |
+| Driver                  | Driver deliveries and GPS tracking only                          |
+| Catalog Manager         | Product catalog and images; no orders or fulfillment             |
+| Promotions Manager      | Deals and promotions; no orders or catalog manage                |
+| Accountant              | Invoices, payments, reports; read-only orders                    |
+| Viewer                  | Read-only across all supplier areas                              |
 
 ### Admin roles
 
@@ -79,18 +92,61 @@ Permission codes are string enums used in code and DB. `*_MANAGE` implies all ac
 
 - `WAREHOUSES_VIEW`, `WAREHOUSES_EDIT`, `WAREHOUSES_MANAGE`
 
+### Receiving
+
+- `RECEIVING_VIEW`, `RECEIVING_MANAGE`
+
+### Payments
+
+- `PAYMENTS_VIEW`, `PAYMENTS_MANAGE`
+
+### Fulfillment (supplier)
+
+- `FULFILLMENT_VIEW`, `FULFILLMENT_MANAGE`
+
+### Promotions (supplier)
+
+- `PROMOTIONS_VIEW`, `PROMOTIONS_MANAGE`
+
+### Customers (supplier)
+
+- `CUSTOMERS_IMPORT`, `CUSTOMERS_MANAGE`
+
+### Growth (supplier)
+
+- `GROWTH_VIEW`
+
+### Driver deliveries
+
+- `DRIVER_DELIVERIES_VIEW`, `DRIVER_DELIVERIES_MANAGE`
+
+### Recipes (restaurant)
+
+- `RECIPES_VIEW`, `RECIPES_VIEW_COSTS`, `RECIPES_EDIT`, `RECIPES_MANAGE`
+
 ### Admin
 
 - `ADMIN_ACCESS`, `ADMIN_TENANTS`, `ADMIN_PLANS`, `ADMIN_SUPPORT`, `ADMIN_FINANCE`, `ADMIN_GROWTH`
 
 ## Database
 
-- **role** – `id`, `code` (UNIQUE), `name`, `tenant_type` (RESTAURANT | SUPPLIER | ADMIN), `description`
-- **permission** – `id`, `code` (UNIQUE), `name`, `domain`, `description`
-- **role_permission** – `(role_id, permission_id)` PK; which permissions each role has
-- **user_role** – `user_id`, `role_id`, `tenant_id`, `tenant_type`, optional `branch_id`/`warehouse_id`; UNIQUE `(user_id, role_id, tenant_id, tenant_type)`
+**Primary schema** (used for RESTAURANT/SUPPLIER tenant-role checks):
 
-Indexes: `user_role(user_id, tenant_type, tenant_id)`, `role_permission(role_id)`.
+- `tenant_roles` – `id`, `name`, `tenant_id`, `tenant_type`, `is_system`
+- `tenant_role_permissions` – `(role_id, permission)`
+- `tenant_user_roles` – `user_id`, `role_id`, `tenant_id`, `tenant_type`
+
+**Legacy schema** (used for ADMIN type and as fallback):
+
+- `role` – `id`, `code` (UNIQUE), `name`, `tenant_type`, `description`
+- `permission` – `id`, `code` (UNIQUE), `name`, `domain`, `description`
+- `role_permission` – `(role_id, permission_id)` PK
+- `user_role` – `user_id`, `role_id`, `tenant_id`, `tenant_type`; UNIQUE `(user_id, role_id, tenant_id, tenant_type)`
+
+**Org scope** (merged into effective permissions by `getPermissionsForUser`):
+
+- `org_user_roles` – org-level supplier permissions resolved by `getOrgRolePermissions`
+- `restaurant_org_user_roles` – org-level restaurant permissions resolved by `getRestaurantOrgRolePermissions`
 
 For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 
@@ -108,7 +164,7 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 ### requirePermission(permissionKey)
 
 - Uses `req.tenantContext.permissions` or `req.adminContext.permissions` and `hasPermission(perms, key)` (exact or `*_MANAGE` for same domain).
-- Bypass: if `req.userData.role === 'ADMIN'` and (impersonating **or** no tenant context but has admin context), access is allowed.
+- **Permission resolution order**: (1) if `tenantContext.roles` includes `'Owner'` → allow; (2) if `hasPermission(tenantContext.permissions ?? adminContext.permissions, permissionKey)` → allow; (3) otherwise 403. When an admin is impersonating, `resolveTenantContext` injects the effective tenant permissions (full Owner set or view-as-role) into `tenantContext.permissions`.
 - **requireRole:** ADMIN may call restaurant-only or supplier-only routes when impersonating that `tenantType` (`getEffectiveTenant`).
 
 ## API

@@ -138,8 +138,8 @@ Subscription **plans** define default features; admins can override globally or 
 Copy the example environment files and configure:
 
 ```bash
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env
+cp apps/api/env.example apps/api/.env
+cp apps/web/env.example apps/web/.env
 ```
 
 For Docker, root `.env` is created automatically by `run-local.cmd` from defaults.

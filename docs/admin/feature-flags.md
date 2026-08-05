@@ -72,13 +72,38 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 ## Canonical feature keys
 
-**RESTAURANT** (23 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals
+**RESTAURANT** (27 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals, **recipe_costing**, **fulfillment_tools**, supplier_deals_redeem
 
 `ai_platform` enables genuine LLM **explain / ask / ai-recommend** for Smart Reorder when `AI_ENABLED`, provider credentials, and AI quota are available. Forecast and heuristic paths never consume quota. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row follows `trial_target_plan_id` and the trial AI pool.
 
+`recipe_costing` — menu profitability and supplier price impact at `/app/recipes` (Gold+).
+
+`fulfillment_tools` — dispatch board, pick lists, GPS tracking, driver management. Canonical key for `fulfillment` and `driver_management` aliases (see Feature aliases below).
+
+`supplier_deals_redeem` — legacy migration-only key; restaurants redeeming deals. Not shown in admin UI.
+
 **Removed:** `approvals_budgets` (not shown in admin UI)
 
-**SUPPLIER** (22 keys): chat, order_calendar, reports, multi_branch, warehouses, multi_warehouse, fulfillment_tools, fulfillment, driver_management, disputes_returns, quick_lists, inventory_management, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, promotions, push_notifications, order_amendments, tenant_audit_log
+**SUPPLIER** (26 keys): chat, order_calendar, reports, multi_branch, warehouses, multi_warehouse, fulfillment_tools, fulfillment, driver_management, disputes_returns, quick_lists, inventory_management, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, promotions, push_notifications, order_amendments, tenant_audit_log, **smart_reorder**, **ai_platform**, **finance_invoices**, **supplier_growth**
+
+`smart_reorder` — reorder-assistance and AI features for supplier inventory.
+
+`ai_platform` — same LLM gate as restaurant side; supplier Smart Reorder AI paths.
+
+`finance_invoices` — supplier invoice management and accounting export.
+
+`supplier_growth` — customer import, referral invites, sponsored onboarding, growth dashboard.
+
+## Feature aliases
+
+`requireFeature` resolves aliases before checking plan JSON:
+
+| Alias               | Resolves to         |
+| ------------------- | ------------------- |
+| `fulfillment`       | `fulfillment_tools` |
+| `driver_management` | `fulfillment_tools` |
+
+This means calling `requireFeature('driver_management')` or `requireFeature('fulfillment')` is equivalent to checking `fulfillment_tools` on the plan. Alias logic lives in `FEATURE_ALIASES` in `feature-flags.js`.
 
 ## Real-time refresh
 

@@ -12,4 +12,4 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [ ] Was `MOBILE_FEATURE_PARITY.md` updated if something is deferred?
 - [ ] Supplier bulk image import changed? → Web-only; document in parity file (see 2026-06-15 entry).
 
-Mobile repo: `../supplify-mobile`
+Mobile repo: `mobile-work/` (Expo, untracked — see `mobile-work/app.json`)

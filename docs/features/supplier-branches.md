@@ -77,7 +77,7 @@ All routes: `requireAuth`, supplier role, org membership (except admin with `org
 | POST   | `/api/org/users/:userId/role`                 | Org Owner                       | Assign org role                 |
 | POST   | `/api/org/context/switch`                     | Branch access                   | Set active branch cookie        |
 
-Restaurant linked accounts remain on `/api/branches`.
+The shared linked-accounts API (`/api/branches`) also handles basic branch list, create, switch, and unlink for both restaurants **and** suppliers. It accepts `{ tenantId, tenantType }` on `POST /api/branches/switch`; bearer-authenticated clients additionally receive `{ activeTenantToken }` in the JSON response. The `/api/org` routes above are the authoritative supplier org-management API.
 
 ## Feature flag
 

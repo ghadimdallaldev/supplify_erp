@@ -1,6 +1,4 @@
-Copy of mobile parity audit — source of truth: `supplify-mobile/docs/mobile/MOBILE_FEATURE_PARITY.md`
-
-See that file for the full feature matrix (restaurant, supplier, driver, admin).
+Mobile parity audit — source of truth for this repo. Native Expo app lives in `mobile-work/` (v1.1.0, versionCode 11).
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
@@ -116,5 +114,18 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Refresh parity**: POST /auth/mobile/refresh never invokes OTP. Rotation, transient refresh handling, and token expiry behavior are unchanged.
 - **Signup**: Hosted registration may show the same email verification required action before the API accepts tenant completion.
 - **Unverified recovery** (2026-08-03): Unverified users no longer get a dual login+signup OTP; login defers to the signup required action only. API callback clears Keycloak SSO and re-enters hosted login when `email_verified` is false. Mobile still uses the same hosted pages.
-- **Silent SSO clear** (2026-08-05): Web stores `id_token` cookie and passes `id_token_hint` on Keycloak logout so signup/recovery does not show "Do you want to log out?". Mobile should pass `id_token` into the Keycloak end-session URL when opening `keycloakLogoutUrl` if it retains one; otherwise Keycloak may still confirm logout in the system browser.
+- **Silent SSO clear** (2026-08-05): Web stores `id_token` cookie and passes `id_token_hint` on Keycloak logout so signup/recovery does not show "Do you want to log out?". Mobile passes `id_token_hint` via `endKeycloakSession(idToken)` on logout (implemented in `keycloakAuth.ts`). The `id_token` is persisted alongside `access_token` and `refresh_token` in secure storage.
+- **Driver OTP bypass**: Drivers with an active supplier assignment skip email MFA. The API sets the Keycloak attribute `supplify_driver_login=true` via `setKeycloakUserDriverLogin()` when a driver is assigned; it is cleared on unassignment. The OTP step is controlled by `AUTH_EMAIL_OTP_DRIVER_BYPASS` (default `true`). Mobile clients need no change — the bypass is server-side only.
+- **Mobile branch switch**: `POST /api/branches/switch` returns `{ activeTenantToken: "<jwt>" }` in the JSON response body for bearer-authenticated requests (mobile path). Clients must store this token and send it as `X-Active-Tenant-Token` on subsequent requests. Web clients continue to use the `HttpOnly` cookie and receive no `activeTenantToken` field.
 - **Out of scope**: B2C consumer JWT and staff magic-link flows do not use this OTP feature.
+
+## 2026-08-05 — Driver auth hardening & Android smoke automation
+
+- **Driver identity hardening** (`fix(auth): preserve driver identity metadata`, `feat(android): harden driver auth and release builds`): Driver Keycloak attribute `supplify_driver_login=true` is now preserved across token refresh and re-login flows. The attribute is set on driver assignment via `setKeycloakUserDriverLogin()` in `keycloak-admin.js` and cleared on unassignment. This prevents the OTP bypass being lost on session rotation.
+- **Android emulator smoke test** (`test(android): automate driver auth smoke flow`): Auth smoke flow is now automated for the Android build pipeline. The emulator redirect URI `exp://10.0.2.2:8081/--/auth/callback` must be in the Keycloak client's Valid redirect URIs for dev builds — see `KEYCLOAK_MOBILE_CLIENT.md`.
+- **Mobile**: Driver flows in `mobile-work/` inherit the identity fix automatically (server-side). No mobile code change required.
+
+## 2026-08-05 — Billing trial notification deep link (web)
+
+- **Scope**: Trial/billing in-app + email CTAs pointed at dead `/app/billing`. Now use `/app/settings?tab=subscription` (or `?tab=plan` for suppliers). Web `resolveNotificationUrl` honors `metadata.ctaUrl` / remaps legacy `/app/billing`.
+- **Reason**: Web cockpit settings hosts billing; no dedicated billing route. Mobile inherits corrected API `ctaUrl`/`link` on new notifications if it navigates from metadata; no mobile UI change required for this fix.

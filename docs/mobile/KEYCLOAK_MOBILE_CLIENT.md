@@ -4,25 +4,33 @@ Configure this **once** in Keycloak before running the Supplify mobile app again
 
 ## Client settings
 
-| Setting                       | Value                                                                                                                                        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Client ID**                 | `supplify-mobile`                                                                                                                            |
-| **Client type**               | OpenID Connect                                                                                                                               |
-| **Access type**               | Public (no client secret)                                                                                                                    |
-| **Standard flow**             | Enabled                                                                                                                                      |
-| **Direct access grants**      | Disabled (use PKCE only)                                                                                                                     |
-| **PKCE**                      | Required (S256)                                                                                                                              |
-| **Valid redirect URIs**       | `supplify://auth/callback` (native); `exp://localhost:8081/--/auth/callback` (Expo Go); `http://localhost:8081/auth/callback` (Expo web dev) |
-| **Web origins**               | Leave empty (native app)                                                                                                                     |
-| **Post logout redirect URIs** | `supplify://auth/logout` (optional)                                                                                                          |
+| Setting                       | Value                                                                                                                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Client ID**                 | `supplify-mobile`                                                                                                                                                                                                               |
+| **Client type**               | OpenID Connect                                                                                                                                                                                                                  |
+| **Access type**               | Public (no client secret)                                                                                                                                                                                                       |
+| **Standard flow**             | Enabled                                                                                                                                                                                                                         |
+| **Direct access grants**      | Disabled (use PKCE only)                                                                                                                                                                                                        |
+| **PKCE**                      | Required (S256)                                                                                                                                                                                                                 |
+| **Valid redirect URIs**       | `supplify://auth/callback` (native); `exp://127.0.0.1:8081/--/auth/callback` (Expo Go iOS/web dev); `exp://10.0.2.2:8081/--/auth/callback` (Expo Go Android emulator dev); `http://localhost:8081/auth/callback` (Expo web dev) |
+| **Web origins**               | Leave empty (native app)                                                                                                                                                                                                        |
+| **Post logout redirect URIs** | `supplify://auth/logout` (optional)                                                                                                                                                                                             |
 
 ## Realm
 
 Use the same realm as the web app (default: `Supplify`).
 
+## Driver OTP bypass
+
+The `EMAIL_OTP` authenticator skips MFA for users whose Keycloak attribute `supplify_driver_login=true` is set. The attribute is managed server-side by `setKeycloakUserDriverLogin()` in `keycloak-admin.js` and is gated by the API env var `AUTH_EMAIL_OTP_DRIVER_BYPASS` (default `true`). Setting `AUTH_EMAIL_OTP_DRIVER_BYPASS=false` forces drivers through OTP on every login.
+
+## Mobile branch switch
+
+Mobile obtains `activeTenantToken` from the `POST /api/branches/switch` JSON response body (field `data.activeTenantToken`). This field is only present for bearer-authenticated requests; web clients receive the token via an `HttpOnly` cookie instead. Store the token and attach it as `X-Active-Tenant-Token` on subsequent requests.
+
 ## Mobile environment variables
 
-Set these in `supplify-mobile/.env`:
+Set these in `mobile-work/.env` (Expo):
 
 ```env
 EXPO_PUBLIC_API_URL=https://your-api.railway.app

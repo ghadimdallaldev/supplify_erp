@@ -20,7 +20,7 @@ Single-tenant checklist for regression and release testing. For **routes, roles,
 
 - [ ] **API and Web** running (e.g. `pnpm dev` from monorepo or run api + web separately).
 
-- [ ] **Keycloak** running (e.g. port 8080) if using real auth.
+- [ ] **Keycloak** running (e.g. port 8180) if using real auth.
 
 **Notes:**
 
