@@ -1,27 +1,76 @@
 ---
-description: Evaluate web/API changes for Supplify mobile impact
+description: MANDATORY mobile parity — all API/auth/feature changes must propagate to both mobile repos and update docs
 globs:
   - apps/api/**
   - apps/web/**
-  - docs/mobile/**
-alwaysApply: false
+  - docs/**
+alwaysApply: true
 ---
 
-# Supplify web/mobile parity
+# ⛔ HARD RULE — Supplify Mobile Parity
 
-Every Supplify web or API change must be evaluated for mobile impact.
+**This rule is non-negotiable. Every qualifying change must be reflected in BOTH mobile repos and in the documentation before the task is done.**
 
-1. If a feature is added or changed on web, check whether mobile needs the same behavior.
-2. If API response types change, update mobile types and API client in `supplify-mobile`.
-3. If auth/session/RBAC/plan gating changes, update mobile guards and navigation.
-4. If order lifecycle changes, update restaurant/supplier/driver mobile flows.
-5. If fulfillment, GPS, ETA, maps, route planning, driver assignment, delivery tracking, or proof-of-delivery changes, update mobile too.
-6. If a web-only change does not apply to mobile, document the reason in `docs/mobile/MOBILE_FEATURE_PARITY.md`.
-7. Do not finish a task until the mobile parity checklist is completed.
-8. Run mobile typecheck/build/tests when mobile-related files are affected (`cd supplify-mobile && npm run typecheck && npm test`).
-9. Keep web and mobile API types aligned with `apps/web/src/types/index.ts`.
-10. Never let delivery/GPS/ETA behavior drift between web and mobile — server is source of truth; mobile uses ported `deliveryEtaDisplay` helpers.
+## Mobile repos (BOTH must be updated)
 
-Checklist: [MOBILE_PARITY_CHECKLIST.md](../../docs/mobile/MOBILE_PARITY_CHECKLIST.md)
+- `C:/myProjects/supplify-mobile` — React Native / Expo (Android)
+- `C:/myProjects/supplify-mobile-ios` — React Native / Expo (iOS)
 
-Mobile app path: `../supplify-mobile` (sibling repo)
+There is also an in-repo Expo workspace at `mobile-work/` — update it too when it contains relevant code.
+
+---
+
+## What ALWAYS requires updating both mobile repos
+
+| Change in this repo | Required mobile action |
+|---|---|
+| New or modified API endpoint | Update API client, request/response types in both mobile repos |
+| Auth flow change (OIDC, token, session, OTP, driver bypass) | Update auth hooks, token storage, session guards |
+| New or changed RBAC permission key | Update permission checks and navigation guards |
+| New or changed feature flag key | Update feature gates and upgrade prompts |
+| Order or fulfillment lifecycle change | Update restaurant / supplier / driver flows |
+| GPS / ETA / delivery tracking change | Update tracking hooks; keep `deliveryEtaDisplay` helpers in sync |
+| Notification event or push payload change | Update notification handlers and deep-link routing |
+| New required env var | Add to `mobile-work/.env.example`, `C:/myProjects/supplify-mobile/.env.example`, `C:/myProjects/supplify-mobile-ios/.env.example` |
+| Type change in `apps/web/src/types/index.ts` | Port the change to mobile type definitions |
+
+---
+
+## When mobile can be skipped (explicit documentation required)
+
+These change types do NOT require mobile updates:
+
+- Admin-only platform features (no mobile admin surface)
+- Web-only layout, animation, or CSS changes
+- Server-side cron, migration, or infra changes with no client contract change
+
+**Even when skipping: you MUST add a dated entry to `docs/mobile/MOBILE_FEATURE_PARITY.md` stating what changed and why mobile is not affected.**
+
+---
+
+## ⛔ MANDATORY — Docs must be updated
+
+After any qualifying change, update:
+
+1. **`docs/mobile/MOBILE_FEATURE_PARITY.md`** — dated entry always (implemented or skipped-with-reason)
+2. **Domain docs** (`docs/features/`, `docs/architecture/`, `docs/operations/`) — update if the change affects documented behavior
+3. **`docs/guides/environment-variables.md`** — add any new env vars
+4. **`docs/admin/feature-flags.md`** — add any new feature keys
+5. **`docs/architecture/rbac-overview.md`** — add any new permission keys or roles
+
+---
+
+## Completion checklist (must satisfy before "done")
+
+- [ ] `C:/myProjects/supplify-mobile` updated **or** skip reason documented
+- [ ] `C:/myProjects/supplify-mobile-ios` updated **or** skip reason documented
+- [ ] `mobile-work/` updated if it contains relevant code
+- [ ] Types in sync with `apps/web/src/types/index.ts`
+- [ ] Mobile typecheck passes: `cd C:/myProjects/supplify-mobile && npx tsc --noEmit`
+- [ ] `docs/mobile/MOBILE_FEATURE_PARITY.md` has a dated entry for this change
+- [ ] All affected domain docs updated
+
+---
+
+Parity log: [MOBILE_FEATURE_PARITY.md](../../docs/mobile/MOBILE_FEATURE_PARITY.md)
+Parity checklist: [MOBILE_PARITY_CHECKLIST.md](../../docs/mobile/MOBILE_PARITY_CHECKLIST.md)
