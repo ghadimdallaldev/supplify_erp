@@ -8,7 +8,7 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Android**: The complete operational app is `C:/myProjects/supplify-mobile`.
 - **iOS**: The independent parity app is `C:/myProjects/supplify-mobile-ios`.
 - **ERP retained**: API contracts, browser/PWA driver UI, browser geolocation, dispatch, tracking sessions, maps, and telemetry storage remain shared backend/web functionality.
-- **Location policy**: Both native apps request foreground location only; persistent background tracking is not claimed.
+- **Permission policy**: Both native apps request foreground location only; persistent background tracking, microphone recording, and Android system-overlay access are not requested.
 
 ## 2026-07-01 — Recipe Costing (web-only)
 
