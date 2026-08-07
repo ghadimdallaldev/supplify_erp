@@ -26,8 +26,7 @@ public final class EmailOtpAuthenticator implements Authenticator {
         String email = resolveEmail(user);
         if (email == null) {
             // Legacy username-only accounts must be recoverable without weakening MFA.
-            // Keycloak runs UPDATE_PROFILE (priority 40) before our OTP action (priority 50),
-            // so the user supplies an email and then proves ownership in the same login.
+            // Our required action captures, persists, and verifies an email in one flow.
             requireEmailRecovery(user);
             context.success();
             return;
@@ -102,7 +101,9 @@ public final class EmailOtpAuthenticator implements Authenticator {
         return null;
     }
     static void requireEmailRecovery(UserModel user) {
-        user.addRequiredAction(UserModel.RequiredAction.UPDATE_PROFILE.name());
+        // Legacy imports can contain the impossible state email=null + verified=true.
+        // Fail closed so the required action captures and verifies a real address.
+        user.setEmailVerified(false);
         user.addRequiredAction(EmailOtpRequiredActionFactory.ID);
     }
     private void fail(AuthenticationFlowContext context, String message) { context.challenge(context.form().setError(message).createForm("login-otp.ftl")); }

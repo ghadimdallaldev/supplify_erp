@@ -16,6 +16,70 @@ async function token() {
 async function adminFetch(accessToken, path, options = {}) {
   return fetch(`${base}${path}`, { ...options, headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', ...(options.headers || {}) } })
 }
+async function listRequiredActions(accessToken) {
+  const res = await adminFetch(
+    accessToken,
+    `/admin/realms/${encodeURIComponent(realm)}/authentication/required-actions`
+  )
+  if (!res.ok) throw new Error(`List required actions failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+async function ensureRequiredAction(accessToken, desired) {
+  let actions = await listRequiredActions(accessToken)
+  let existing = actions.find(
+    (item) => item.alias === desired.alias || item.providerId === desired.providerId
+  )
+
+  if (!existing) {
+    const availableRes = await adminFetch(
+      accessToken,
+      `/admin/realms/${encodeURIComponent(realm)}/authentication/unregistered-required-actions`
+    )
+    if (!availableRes.ok) {
+      throw new Error(
+        `List unregistered required actions failed: ${availableRes.status} ${await availableRes.text()}`
+      )
+    }
+    const available = await availableRes.json()
+    if (!available.some((item) => item.providerId === desired.providerId)) {
+      throw new Error(`Required action provider ${desired.providerId} is not available`)
+    }
+
+    const registerRes = await adminFetch(
+      accessToken,
+      `/admin/realms/${encodeURIComponent(realm)}/authentication/register-required-action`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ providerId: desired.providerId, name: desired.name }),
+      }
+    )
+    if (!registerRes.ok && registerRes.status !== 409) {
+      throw new Error(
+        `Register required action ${desired.providerId} failed: ${registerRes.status} ${await registerRes.text()}`
+      )
+    }
+    actions = await listRequiredActions(accessToken)
+    existing = actions.find(
+      (item) => item.alias === desired.alias || item.providerId === desired.providerId
+    )
+  }
+
+  if (!existing?.alias) {
+    throw new Error(`Required action ${desired.providerId} was not registered`)
+  }
+  const updated = { ...existing, ...desired, alias: existing.alias }
+  const updateRes = await adminFetch(
+    accessToken,
+    `/admin/realms/${encodeURIComponent(realm)}/authentication/required-actions/${encodeURIComponent(existing.alias)}`,
+    { method: 'PUT', body: JSON.stringify(updated) }
+  )
+  if (!updateRes.ok) {
+    throw new Error(
+      `Update required action ${existing.alias} failed: ${updateRes.status} ${await updateRes.text()}`
+    )
+  }
+  return updated
+}
 async function getFlows(accessToken) {
   const res = await adminFetch(accessToken, `/admin/realms/${encodeURIComponent(realm)}/authentication/flows`)
   if (!res.ok) throw new Error(`List flows failed: ${res.status} ${await res.text()}`)
@@ -166,38 +230,25 @@ async function main() {
   await ensureAuthenticator(accessToken, browserAlias, 'identity-provider-redirector', 'ALTERNATIVE')
   await ensureFormsSubflow(accessToken, browserAlias, formsAlias, 'ALTERNATIVE')
 
-  const requiredActions = Array.isArray(currentRealm.requiredActions) ? currentRealm.requiredActions : []
-  const profileAction = requiredActions.find((item) => item.alias === 'UPDATE_PROFILE') || {
+  await ensureRequiredAction(accessToken, {
     alias: 'UPDATE_PROFILE',
     providerId: 'UPDATE_PROFILE',
     name: 'Update Profile',
     enabled: true,
     defaultAction: false,
     priority: 40,
-  }
-  profileAction.enabled = true
-  profileAction.defaultAction = false
-  profileAction.priority = 40
-  const action = requiredActions.find((item) => item.alias === 'email-otp-verify-email') || {
+  })
+  await ensureRequiredAction(accessToken, {
     alias: 'email-otp-verify-email',
     providerId: 'email-otp-verify-email',
     name: 'Verify email with Supplify OTP',
     enabled: true,
     defaultAction: true,
     priority: 50,
-  }
-  action.enabled = true
-  action.defaultAction = true
+  })
   await patchRealm(accessToken, currentRealm, {
     loginTheme: 'email-otp',
     browserFlow: browserAlias,
-    requiredActions: [
-      ...requiredActions.filter(
-        (item) => item.alias !== profileAction.alias && item.alias !== action.alias
-      ),
-      profileAction,
-      action,
-    ],
   })
   console.log(`Applied ${browserAlias} with nested ${formsAlias} (password + email-otp-login); username-only recovery and session-policy fields preserved`)
 }

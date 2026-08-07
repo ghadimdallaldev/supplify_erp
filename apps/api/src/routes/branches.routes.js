@@ -5,6 +5,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
   resolveTenantContext,
+  isBearerAuthRequest,
 } from '../lib/rbac.js'
 import { settingsMutationGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
@@ -201,7 +202,11 @@ router.post('/switch', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res)
       })
       return res.json({
         ok: true,
-        data: { activeAccountId: null, cleared: true },
+        data: {
+          activeAccountId: null,
+          cleared: true,
+          ...(isBearerAuthRequest(req) ? { activeTenantToken: null } : {}),
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -257,7 +262,14 @@ router.post('/switch', requireRole(['RESTAURANT', 'SUPPLIER']), async (req, res)
 
     res.json({
       ok: true,
-      data: { activeAccountId: tenantId, tenantName: rows[0].name, tenantType: resolvedType },
+      data: {
+        activeAccountId: tenantId,
+        tenantName: rows[0].name,
+        tenantType: resolvedType,
+        // Native clients cannot read the HttpOnly cookie. Only return the scoped
+        // tenant token when the request authenticated with a bearer token.
+        ...(isBearerAuthRequest(req) ? { activeTenantToken: token } : {}),
+      },
       error: null,
       requestId: req.requestId,
     })

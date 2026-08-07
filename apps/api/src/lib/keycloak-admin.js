@@ -411,9 +411,20 @@ export async function setKeycloakUserDriverLogin(adminToken, userId, enabled) {
   if (enabled) attributes.supplify_driver_login = ['true']
   else delete attributes.supplify_driver_login
 
-  await keycloakAdminHttp.put(
-    url,
-    { attributes },
-    { headers: { Authorization: 'Bearer ' + adminToken, 'Content-Type': 'application/json' } }
-  )
+  await keycloakAdminHttp.put(url, buildDriverLoginUserUpdate(existing, attributes), {
+    headers: { Authorization: 'Bearer ' + adminToken, 'Content-Type': 'application/json' },
+  })
+}
+
+/** Keep identity fields intact: Keycloak user updates replace omitted profile fields. */
+export function buildDriverLoginUserUpdate(existing, attributes) {
+  return {
+    username: existing?.username,
+    email: existing?.email,
+    firstName: existing?.firstName,
+    lastName: existing?.lastName,
+    enabled: existing?.enabled,
+    emailVerified: existing?.emailVerified,
+    attributes,
+  }
 }

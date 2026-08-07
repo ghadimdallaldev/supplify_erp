@@ -2,8 +2,10 @@ package com.supplify.keycloak.emailotp;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.keycloak.models.UserModel;
 
@@ -23,23 +25,55 @@ class OtpSupportTest {
         UserModel user = userWith(null, "Legacy.User@Example.com", null);
         assertEquals("legacy.user@example.com", EmailOtpAuthenticator.resolveEmail(user));
     }
-    @Test void usernameOnlyAccountQueuesProfileAndOtpRecovery() {
+    @Test void usernameOnlyAccountQueuesVerifiedEmailCapture() {
         Set<String> requiredActions = new HashSet<>();
-        UserModel user = userWith(null, "legacy-user", requiredActions);
+        AtomicBoolean emailVerified = new AtomicBoolean(true);
+        UserModel user = userWith(null, "legacy-user", requiredActions, emailVerified);
 
         assertNull(EmailOtpAuthenticator.resolveEmail(user));
         EmailOtpAuthenticator.requireEmailRecovery(user);
 
-        assertTrue(requiredActions.contains(UserModel.RequiredAction.UPDATE_PROFILE.name()));
+        assertFalse(emailVerified.get());
         assertTrue(requiredActions.contains(EmailOtpRequiredActionFactory.ID));
     }
+    @Test void recoveryEmailIsNormalizedAndValidated() {
+        assertEquals("ghadi.mdallal@kaseya.com", EmailOtpRequiredAction.normalizeEmail("  Ghadi.Mdallal@Kaseya.com "));
+        assertNull(EmailOtpRequiredAction.normalizeEmail(null));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("missing-at.example.com"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("missing-domain@"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("two@@example.com"));
+        assertNull(EmailOtpRequiredAction.normalizeEmail("space @example.com"));
+    }
+    @Test void loginThemePackagesTheBackForwardHistoryGuard() throws Exception {
+        String theme = resource("/theme/email-otp/login/theme.properties");
+        String guard = resource("/theme/email-otp/login/resources/js/auth-history-guard.js");
+
+        assertTrue(theme.contains("scripts=js/auth-history-guard.js"));
+        assertTrue(guard.contains("pageshow"));
+        assertTrue(guard.contains("back_forward"));
+        assertTrue(guard.contains("window.history.forward()"));
+    }
+    private static String resource(String path) throws Exception {
+        try (var stream = OtpSupportTest.class.getResourceAsStream(path)) {
+            assertNotNull(stream, "Missing provider resource " + path);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
     private static UserModel userWith(String email, String username, Set<String> requiredActions) {
+        return userWith(email, username, requiredActions, new AtomicBoolean(false));
+    }
+    private static UserModel userWith(String email, String username, Set<String> requiredActions, AtomicBoolean emailVerified) {
         return (UserModel) Proxy.newProxyInstance(
             UserModel.class.getClassLoader(),
             new Class<?>[]{UserModel.class},
             (proxy, method, args) -> {
                 if (method.getName().equals("getEmail")) return email;
                 if (method.getName().equals("getUsername")) return username;
+                if (method.getName().equals("isEmailVerified")) return emailVerified.get();
+                if (method.getName().equals("setEmailVerified")) {
+                    emailVerified.set((boolean) args[0]);
+                    return null;
+                }
                 if (method.getName().equals("addRequiredAction") && requiredActions != null) {
                     requiredActions.add(String.valueOf(args[0]));
                     return null;
