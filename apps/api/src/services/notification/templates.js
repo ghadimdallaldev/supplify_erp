@@ -2,6 +2,7 @@ import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { t, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
+import { getUpgradePathForTenant } from '../../lib/subscription/plans.js'
 import { notifyTenantUsers, sendNotification } from './in-app.js'
 
 /**
@@ -1145,6 +1146,7 @@ async function notifyBillingEvent(
   locale = DEFAULT_LOCALE
 ) {
   try {
+    const billingPath = getUpgradePathForTenant(tenantType)
     const sent = await notifyTenantUsers({
       tenantId,
       tenantType,
@@ -1153,7 +1155,7 @@ async function notifyBillingEvent(
       contentForLocale,
       referenceType: 'SUBSCRIPTION',
       referenceId: metadata.subscriptionId || null,
-      metadata: { ctaUrl: '/app/billing', ...metadata },
+      metadata: { ...metadata, ctaUrl: billingPath, link: billingPath },
     })
     return sent
   } catch (err) {

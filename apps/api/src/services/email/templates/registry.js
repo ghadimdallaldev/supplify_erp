@@ -305,7 +305,7 @@ for (const status of billingTemplates) {
       subject: d.subject || t(emailKey(id, 'subject'), lng),
       title: t(emailKey(id, 'title'), lng),
       message: d.message,
-      ctaUrl: d.ctaUrl || '/app/billing',
+      ctaUrl: d.ctaUrl || '/app/settings?tab=subscription',
       ctaLabel: t('emails.cta.manageBilling', lng),
       tenantName: d.tenantName,
       data: d,
@@ -467,8 +467,14 @@ const growthTemplates = {
   'growth.connection_declined': { cta: '/app/restaurants', ctaLabel: 'viewRestaurants' },
   'growth.referral_registered': { cta: '/app', ctaLabel: 'openSupplify' },
   'growth.referral_reward': { cta: '/app/promotions', ctaLabel: 'viewDeals' },
-  'growth.sponsorship_gift': { cta: '/app/billing', ctaLabel: 'manageBilling' },
-  'growth.sponsorship_expired': { cta: '/app/billing', ctaLabel: 'manageBilling' },
+  'growth.sponsorship_gift': {
+    cta: '/app/settings?tab=subscription',
+    ctaLabel: 'manageBilling',
+  },
+  'growth.sponsorship_expired': {
+    cta: '/app/settings?tab=subscription',
+    ctaLabel: 'manageBilling',
+  },
 }
 for (const [id, { cta, ctaLabel }] of Object.entries(growthTemplates)) {
   register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {

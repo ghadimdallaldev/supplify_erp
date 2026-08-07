@@ -13,15 +13,48 @@ export type NotificationLike = {
   is_read?: boolean
 }
 
+/** Billing lives under Settings — `/app/billing` was never a route. */
+const BILLING_SETTINGS_PATH = '/app/settings?tab=subscription'
+
+function normalizeNotificationPath(path: string): string {
+  if (path === '/app/billing' || path.startsWith('/app/billing?')) {
+    return BILLING_SETTINGS_PATH
+  }
+  return path
+}
+
+function pathFromMetaUrl(raw: string | null): string | null {
+  if (!raw) return null
+  if (raw.startsWith('/')) return normalizeNotificationPath(raw)
+  if (!/^https?:\/\//i.test(raw)) return null
+  try {
+    const url = new URL(raw)
+    return normalizeNotificationPath(`${url.pathname}${url.search}`)
+  } catch {
+    return null
+  }
+}
+
+function notificationMetadata(metadata: unknown): Record<string, unknown> | null {
+  if (!metadata) return null
+  if (typeof metadata === 'object') return metadata as Record<string, unknown>
+  if (typeof metadata !== 'string') return null
+  try {
+    const parsed = JSON.parse(metadata)
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
 export function resolveNotificationUrl(notification: NotificationLike): string {
   const type = String(notification.reference_type || '').toUpperCase()
   const id = notification.reference_id
-  const meta =
-    notification.metadata && typeof notification.metadata === 'object'
-      ? (notification.metadata as Record<string, unknown>)
-      : null
+  const meta = notificationMetadata(notification.metadata)
   const metaLink = typeof meta?.link === 'string' ? meta.link : null
-  if (metaLink?.startsWith('/')) return metaLink
+  const metaCta = typeof meta?.ctaUrl === 'string' ? meta.ctaUrl : null
+  const fromMeta = pathFromMetaUrl(metaLink) || pathFromMetaUrl(metaCta)
+  if (fromMeta) return fromMeta
 
   if (type === 'ORDER' && id) return `/app/orders/${id}`
   if (type === 'DISPUTE' && id) return `/app/disputes/${id}`
@@ -32,6 +65,7 @@ export function resolveNotificationUrl(notification: NotificationLike): string {
   if (type === 'INVENTORY_EXPIRY') return '/app/inventory?tab=expiry'
   if (type === 'PRODUCT') return '/app/products'
   if (type === 'STAFF_PTO' || type === 'STAFF_SWAP') return '/app/staff'
+  if (type === 'SUBSCRIPTION' || type === 'BILLING') return BILLING_SETTINGS_PATH
   return '/app/notifications'
 }
 
