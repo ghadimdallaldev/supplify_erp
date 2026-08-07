@@ -294,7 +294,6 @@ export const config = {
     24 * 60 * 60 * 1000
   ),
   GPS_TRACKING_ENABLED: envBool(process.env.GPS_TRACKING_ENABLED, true),
-  GPS_NATIVE_TRACKING_ENABLED: envBool(process.env.GPS_NATIVE_TRACKING_ENABLED, false),
   GPS_TRACKING_SESSIONS_ENABLED: envBool(process.env.GPS_TRACKING_SESSIONS_ENABLED, false),
   GPS_OFFLINE_QUEUE_ENABLED: envBool(process.env.GPS_OFFLINE_QUEUE_ENABLED, false),
   GPS_LIVE_EVENTS_ENABLED: envBool(process.env.GPS_LIVE_EVENTS_ENABLED, false),

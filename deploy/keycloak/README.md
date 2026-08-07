@@ -113,9 +113,15 @@ step because realm import skips an already-created realm.
 Run: node deploy/keycloak/apply-email-otp-flows.mjs
 
 The apply step also enables Keycloak's `UPDATE_PROFILE` required action at
-priority 40. This is the recovery path for legacy username-only accounts: after
-their password succeeds, they add an email and verify its OTP instead of being
-sent back to a stale password form whose Register link immediately expires.
+priority 40 for general profile recovery. For legacy username-only accounts,
+the OTP required action captures and persists an email after password success,
+then verifies its OTP instead of trusting stale `emailVerified` flags or sending
+the user back to a dead-end profile/login form.
+
+The login theme also guards completed single-use authentication pages restored
+by Chrome's back-forward cache. A Back navigation from the authenticated app is
+forwarded to the existing app history entry instead of exposing an expired
+Keycloak profile or OTP form.
 
 Apply the session policy and OTP flow independently; both are required for the
 full human-login posture. Configure AUTH_EMAIL_OTP_ENABLED and the API/Keycloak

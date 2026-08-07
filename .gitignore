@@ -93,7 +93,8 @@ temp/
 # Editor directories and files
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/rules
 .superpowers/
 .cursorrules
 .claude/
@@ -124,3 +125,8 @@ docker/.env.vapid
 /deploy/backups/
 backups-dev/
 backups-preprod/
+
+# Android / Gradle machine state and signing material
+/.gradle-user-home/
+*.jks
+*.keystore
