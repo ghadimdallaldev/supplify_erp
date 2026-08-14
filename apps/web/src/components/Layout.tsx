@@ -33,6 +33,7 @@ import { isBillingAlertVisible, LayoutTenantAlerts } from './LayoutTenantAlerts'
 import { useNotificationAlerts } from '../hooks/useNotificationAlerts'
 import { TooltipProvider } from './ui/tooltip'
 import { AdminShell } from './admin/shell'
+import { AssistantFab } from './assistant/AssistantFab'
 
 export function Layout() {
   const location = useLocation()
@@ -304,6 +305,7 @@ export function Layout() {
                 <SupplierMobileNav />
               </>
             )}
+            <AssistantFab />
           </div>
         </BranchProvider>
       </TooltipProvider>

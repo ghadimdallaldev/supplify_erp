@@ -10,6 +10,7 @@ import './endpoints/warehouses'
 import './endpoints/dashboard'
 import './endpoints/files'
 import './endpoints/chat'
+import './endpoints/assistant'
 import './endpoints/restaurantInventory'
 import './endpoints/receiving'
 import './endpoints/quickLists'
@@ -179,6 +180,10 @@ export const {
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
+  useGetAssistantCapabilitiesQuery,
+  useGetAssistantConversationsQuery,
+  useGetAssistantMessagesQuery,
+  useSendAssistantMessageMutation,
   useMarkConversationReadMutation,
   useMarkMessageReadMutation,
   usePinConversationMutation,
