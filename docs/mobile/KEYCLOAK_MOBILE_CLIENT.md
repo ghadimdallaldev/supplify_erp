@@ -39,6 +39,10 @@ EXPO_PUBLIC_KEYCLOAK_REALM=Supplify
 EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=supplify-mobile
 ```
 
+Both standalone mobile repositories default local Keycloak to `http://localhost:8180`, matching the ERP development stack. Their committed `.env.example` files carry the same value. Use a reachable LAN address or hosted URL for a physical device.
+
+These are Expo public configuration values, not secrets. Never place Keycloak client secrets or Apple/Expo signing credentials in a mobile `.env` file.
+
 ## Auth flow (PKCE)
 
 1. Mobile opens Keycloak authorize URL via `expo-auth-session` with PKCE code challenge.

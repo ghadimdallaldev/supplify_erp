@@ -2,6 +2,8 @@
 
 Restaurant reorder assistance combines deterministic forecasting with an optional genuine LLM layer. Forecast and rule-based output stays available for core ordering workflows, but it must be labeled as forecast or heuristic output, not AI.
 
+> **Not the same product as Supplify Assistant.** Reorder `explain` / `ask` / `ai-recommend` stay on inventory reorder flows. The multi-domain conversational chatbot lives under [ai-assistant.md](./ai-assistant.md) (`/api/assistant`). Both share `ai_platform`, OpenAI env vars, and `ai_requests_per_day` metering.
+
 ## Commercial Model
 
 The current public plans are tenant-specific Growth and Scale plans. Internal plan codes are preserved for compatibility, so capability resolution must use plan feature values and effective limits rather than public display names.

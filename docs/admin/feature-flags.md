@@ -74,7 +74,7 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 **RESTAURANT** (27 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals, **recipe_costing**, **fulfillment_tools**, supplier_deals_redeem
 
-`ai_platform` enables genuine LLM **explain / ask / ai-recommend** for Smart Reorder when `AI_ENABLED`, provider credentials, and AI quota are available. Forecast and heuristic paths never consume quota. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row follows `trial_target_plan_id` and the trial AI pool.
+`ai_platform` enables genuine LLM for **Supplify Assistant** (`/api/assistant`) and Smart Reorder **explain / ask / ai-recommend** when `AI_ENABLED`, provider credentials, and AI quota are available. Forecast and heuristic paths never consume quota. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row follows `trial_target_plan_id` and the trial AI pool. Display name: **AI platform (assistant + reorder LLM)**.
 
 `recipe_costing` — menu profitability and supplier price impact at `/app/recipes` (Gold+).
 

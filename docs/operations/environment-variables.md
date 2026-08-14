@@ -123,7 +123,7 @@ See [../features/notifications-and-alerts.md](../features/notifications-and-aler
 | `AI_MODEL`                           | API     | optional    | `gpt-4o-mini` | OpenAI chat model                                     |
 | `AI_MAX_REQUESTS_PER_TENANT_PER_DAY` | API     | optional    | `50`          | Hard ceiling; plan `ai_requests_per_day` also applies |
 
-Tenant gating: plan feature `ai_platform` + admin global/per-tenant overrides. See [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md).
+Tenant gating: plan feature `ai_platform` + admin global/per-tenant overrides. Powers Smart Reorder LLM and the Supplify Assistant chatbot. See [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md) and [../features/ai-assistant.md](../features/ai-assistant.md).
 
 See [../operations/cron-jobs.md](../operations/cron-jobs.md) for the full job inventory.
 

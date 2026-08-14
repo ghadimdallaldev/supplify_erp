@@ -33,6 +33,7 @@ import { ordersRoutes } from './routes/orders.routes.js'
 import { filesRoutes } from './routes/files.routes.js'
 import { adminRoutes } from './routes/admin.routes.js'
 import { chatRoutes } from './routes/chat.routes.js'
+import { assistantRoutes } from './routes/assistant.routes.js'
 import { invoicesRoutes } from './routes/invoices.routes.js'
 import { paymentsRoutes } from './routes/payments.routes.js'
 import { quickListsRoutes } from './routes/quick-lists.routes.js'
@@ -426,6 +427,13 @@ app.use('/api/files', filesRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/chat', chatSendLimiter)
 app.use('/api/chat', chatRoutes)
+const assistantSendLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(120, 'Too many assistant requests, please try again later.', {
+      storePrefix: 'rl:assistant',
+    })
+  : noopLimiter
+app.use('/api/assistant', assistantSendLimiter)
+app.use('/api/assistant', assistantRoutes)
 app.use('/api/invoices', invoicesRoutes)
 app.use('/api/payments', paymentsRoutes)
 app.use('/api/quick-lists', quickListsRoutes)

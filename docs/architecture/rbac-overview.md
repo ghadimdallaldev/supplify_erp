@@ -79,6 +79,7 @@ Permission codes are string enums used in code and DB. `*_MANAGE` implies all ac
 ### Chat
 
 - `CHAT_VIEW`, `CHAT_SEND`, `CHAT_MANAGE`
+- Supplify Assistant (`/api/assistant`) does **not** add a new permission key; each tool reuses existing view permissions (`INVENTORY_VIEW`, `ORDERS_VIEW`, `INVOICES_VIEW`, `RECIPES_VIEW`, `FULFILLMENT_VIEW`, `DRIVER_DELIVERIES_VIEW`, `ADMIN_ACCESS`, …) plus plan feature `ai_platform`.
 
 ### Subscriptions
 

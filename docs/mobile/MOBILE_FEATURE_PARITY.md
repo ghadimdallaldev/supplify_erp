@@ -2,6 +2,32 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-08-14 — Supplify Assistant (AI chatbot)
+
+- **API**: New `/api/assistant` tool-calling chatbot (read-only). Migration `0195_assistant_conversations.sql`. Gated by `ai_platform` + `AI_ENABLED`.
+- **Web**: Floating Assistant FAB + Sheet (not human Chat). Types in `apps/web/src/types/assistant.ts`.
+- **Mobile (Android + iOS)**: Assistant screen with `ai_platform` feature gate; entry from More (restaurant/supplier) and driver Tools. API client + types synced in both repos.
+- **Admin mobile skip**: Admin overview tools remain web-only; `AdminNavigator` stays deferred (no mobile admin surface).
+- **Docs**: `docs/features/ai-assistant.md`.
+
+## 2026-08-11 — iOS EAS project link and simulator build
+
+- **Auth unblock**: Expo/EAS login completed as `ghadimdallal` (owner on `supplify-team`).
+- **EAS project**: Created and linked `@supplify-team/supplify-mobile-ios` (`projectId` `34a9b878-8cde-4fc8-8321-2790db6e8dd4`) in `supplify-mobile-ios/app.json`.
+- **Simulator binary**: `ios-simulator` EAS build **FINISHED** and artifact inspected on Windows (`Supplify.app` with Hermes, `main.jsbundle`, Expo Location/Notifications frameworks, bundle id `com.supplify.mobile`): https://expo.dev/accounts/supplify-team/projects/supplify-mobile-ios/builds/60da2790-2544-4161-a928-f7aa3c9897dd
+- **Device / TestFlight still blocked**: `preview` / `production` iOS builds need interactive Apple credential setup (`eas credentials -p ios`). No app contract or API change; mobile source parity unchanged.
+- **Skip reason for Android**: Distribution/config change is iOS-repo EAS metadata only; `supplify-mobile` Android client behavior is unaffected.
+
+## 2026-08-09 — iOS release gate and mobile entitlement contract
+
+- **Repository parity**: Audited both standalone mobile repositories. Restaurant, supplier, and driver application source remains synchronized; the iOS checkout is an Expo SDK 56 application rather than the obsolete Capacitor scaffold described by its former README.
+- **Entitlements contract**: Mobile now unwraps `GET /api/subscriptions/entitlements` from `data.entitlements`. Feature values preserve booleans and tier strings instead of incorrectly assuming a top-level `Record<string, boolean>`.
+- **Plan-aware UX**: Added a Plan & features screen and feature gates for chat, receiving, quick lists, finance, inventory, deals, disputes, supplier fulfillment, and push registration. The API remains the enforcement authority; unavailable mobile screens now explain plan access before issuing gated domain requests.
+- **Billing deep links**: `SUBSCRIPTION` / `BILLING` events and `/app/settings?tab=subscription` notification payloads route to mobile Plan & features instead of notification preferences.
+- **Expo release health**: Aligned `expo`, `expo-image-picker`, `expo-location`, and `expo-notifications` to the SDK 56 compatibility matrix; removed the unsupported Metro `server.host` option; restored `.expo/` ignore coverage in iOS; synchronized the iOS env example and local Keycloak default to port `8180`.
+- **Verification**: iOS TypeScript, 18 Jest suites / 60 tests, Expo Doctor 18/18, and production Hermes export pass. Android received the same contract, feature, navigation, dependency, and Metro changes.
+- **Native distribution boundary**: Simulator/TestFlight/App Store signing still requires the organization's Expo project link and Apple credentials; those secrets are not stored in source control.
+
 ## 2026-08-06 — Standalone mobile repository consolidation
 
 - **Repository boundary**: Removed the retired Capacitor `com.supplify.driver` shell, generated Android project, native bridge, Gradle release plumbing, and old APK/AAB outputs from `apps/web`. No native mobile application source remains in the ERP.
