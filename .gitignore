@@ -89,6 +89,8 @@ public
 # Temporary folders
 tmp/
 temp/
+tmp_kayls*
+__pycache__/
 
 # Editor directories and files
 .vscode/

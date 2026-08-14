@@ -240,6 +240,7 @@ export const api = createApi({
     'RestaurantInventory',
     'RestaurantWaste',
     'Chat',
+    'Assistant',
     'Receiving',
     'RestaurantFinance',
     'Notification',

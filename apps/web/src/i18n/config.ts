@@ -32,6 +32,7 @@ export const LAZY_NAMESPACES = [
   'staff',
   'reservations',
   'chat',
+  'assistant',
   'onboarding',
   'quotes',
   'legal',
