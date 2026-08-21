@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-08-21 — Production ship hardening (web/API pass)
+
+- **API/Web**: RBAC tenant checks, warehouse stock source-of-truth/fail-closed ordering, deal-boost payment activation through the existing stub/manual gateway, and settings dead-button cleanup.
+- **Mobile**: Deferred by explicit request for this pass. Android and iOS repositories were not changed; mobile parity follow-up is required before adding mobile deal-boost payment UI or relying on the tightened tenant behavior.
+- **Safety**: Sponsorship, featured placement, invoice payment, subscription checkout, and gateway providers remain unchanged.
+
+## 2026-08-21 — Transactional email redesign (API-only)
+
+Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/AR copy polish for high-traffic templates (`layout.js` / `registry.js` / `emails.json`).
+
+- **Mobile:** skipped — emails are server-rendered by the API; no mobile client contract change.
+
 ## 2026-08-14 — Supplify Assistant (AI chatbot)
 
 - **API**: New `/api/assistant` tool-calling chatbot (read-only). Migration `0195_assistant_conversations.sql`. Gated by `ai_platform` + `AI_ENABLED`.

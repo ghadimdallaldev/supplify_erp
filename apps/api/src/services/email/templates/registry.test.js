@@ -15,6 +15,7 @@ describe('email template registry', () => {
     expect(rendered.subject).toContain('Bistro One')
     expect(rendered.html).toContain('https://app.supplify.test/invite?token=abc')
     expect(rendered.text).toContain('Sam')
+    expect(rendered.html).toContain('#7c3aed')
   })
 
   it('renders staff invite with temporary password copy', async () => {
@@ -35,5 +36,36 @@ describe('email template registry', () => {
       tenantType: 'RESTAURANT',
     })
     expect(rendered.html).toContain('https://app.supplify.test/app')
+  })
+
+  it('renders OTP with code hero', async () => {
+    const { renderTemplate } = await import('./registry.js')
+    const rendered = renderTemplate('auth.email_otp_login', { code: '123456' })
+    expect(rendered.html).toContain('123456')
+    expect(rendered.html).toContain('#ede9fe')
+    expect(rendered.text).toContain('123456')
+    expect(rendered.html).not.toContain('background:#7c3aed')
+  })
+
+  it('includes order detail strip when order fields present', async () => {
+    const { renderTemplate } = await import('./registry.js')
+    const rendered = renderTemplate('order.placed', {
+      message: 'A new order arrived.',
+      orderId: 'ORD-9',
+      status: 'Placed',
+      amount: '$42.00',
+      ctaUrl: '/app/orders/ORD-9',
+    })
+    expect(rendered.html).toContain('ORD-9')
+    expect(rendered.html).toContain('#7c3aed')
+    expect(rendered.html).toContain('border-top:1px solid #e2e8f0')
+  })
+
+  it('omits detail strip when no structured fields', async () => {
+    const { renderTemplate } = await import('./registry.js')
+    const rendered = renderTemplate('order.placed', {
+      message: 'A new order arrived.',
+    })
+    expect(rendered.html).not.toContain('border-top:1px solid #e2e8f0')
   })
 })

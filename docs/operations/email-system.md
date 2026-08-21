@@ -10,6 +10,17 @@ Transactional email architecture, providers, and env gates.
 
 **Admin visibility:** Operations tab email logs — [admin-operations-console.md](../admin/admin-operations-console.md).
 
+## Layout
+
+Shared transactional shell lives in `apps/api/src/services/email/templates/layout.js`:
+
+- Stripe-like canvas (`#f8fafc`), violet wordmark (`#5b21b6`), violet CTA (`#7c3aed`)
+- `renderOtpCode` — large code hero for `auth.email_otp_*` (no CTA)
+- `renderDetailStrip` — optional key/value rows for invites, orders, invoices, billing when payload fields exist
+- Copy: `apps/api/src/i18n/locales/{en,ar}/emails.json`
+
+Design: [2026-08-21-transactional-email-design.md](../superpowers/specs/2026-08-21-transactional-email-design.md).
+
 ## Coverage (high level)
 
 | Domain       | Templates (examples)                                                             | Dispatch                                 |
