@@ -214,12 +214,14 @@ export async function upsertUser(userInfo, roles = []) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
       const emailLower = normalizedEmail
-      if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
-        explicitRole = 'ADMIN'
-      } else if (emailLower === 'supplier@supplify.com') {
-        explicitRole = 'SUPPLIER'
-      } else if (emailLower === 'restaurant@supplify.com') {
-        explicitRole = 'RESTAURANT'
+      if (config.APP_ENV === 'dev') {
+        if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
+          explicitRole = 'ADMIN'
+        } else if (emailLower === 'supplier@supplify.com') {
+          explicitRole = 'SUPPLIER'
+        } else if (emailLower === 'restaurant@supplify.com') {
+          explicitRole = 'RESTAURANT'
+        }
       }
     }
     const insertRole = explicitRole || 'PENDING'

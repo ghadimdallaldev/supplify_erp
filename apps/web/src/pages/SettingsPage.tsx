@@ -5,21 +5,12 @@ import { Button } from '../components/ui/button'
 import { Switch } from '../components/ui/switch'
 import { Badge } from '../components/ui/badge'
 import { AppPanel } from '../components/ui/app-panel'
-import {
-  User,
-  Mail,
-  Shield,
-  Bell,
-  Loader2,
-  Save,
-  LogIn,
-  ExternalLink,
-  Languages,
-} from 'lucide-react'
+import { User, Shield, Bell, Loader2, Save, LogIn, ExternalLink, Languages } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
+import { SupportContactCard } from '../components/support/SupportContactCard'
 import { SupplierSettingsPage } from './SupplierSettingsPage'
 import { RestaurantOnboardingPage } from './RestaurantOnboardingPage'
 import {
@@ -66,18 +57,6 @@ const NOTIFICATION_FIELD_KEYS: Array<keyof typeof DEFAULT_NOTIFICATION_PREFS> = 
   'notifyMessageReceived',
   'notifyLowStock',
 ]
-
-const ADMIN_COMING_SOON_PREF_KEYS = [
-  'notifications.comingSoon.systemAlerts',
-  'notifications.comingSoon.billingAlerts',
-  'notifications.comingSoon.productUpdates',
-] as const
-
-const ADMIN_PREF_KEYS = [
-  'admin.preferences.landingPage',
-  'admin.preferences.compactMode',
-  'admin.preferences.theme',
-] as const
 
 function LanguageSettingsCard() {
   const { t } = useTranslation('settings')
@@ -135,35 +114,24 @@ function SettingsToggleRow({
   checked,
   onCheckedChange,
   disabled,
-  comingSoon,
 }: {
   label: string
   description: string
   checked: boolean
   onCheckedChange?: () => void
   disabled?: boolean
-  comingSoon?: boolean
 }) {
-  const { t } = useTranslation('settings')
-
   return (
     <div
       className={cn(
         splitRowClass,
         'items-start rounded-lg border p-3',
-        comingSoon
-          ? 'border-dashed border-[var(--app-border)] opacity-70'
-          : 'border-[var(--app-border)]'
+        'border-[var(--app-border)]'
       )}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-[var(--text)]">{label}</p>
-          {comingSoon && (
-            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-              {t('comingSoon')}
-            </Badge>
-          )}
         </div>
         <p className="mt-0.5 text-xs text-[var(--text-muted)]">{description}</p>
       </div>
@@ -172,7 +140,7 @@ function SettingsToggleRow({
         checked={checked}
         onCheckedChange={onCheckedChange}
         aria-label={label}
-        disabled={disabled || comingSoon}
+        disabled={disabled}
       />
     </div>
   )
@@ -274,43 +242,9 @@ function AdminSettingsContent({
           </div>
         </AppPanel>
 
-        <AppPanel
-          title={t('admin.preferences.title')}
-          description={t('admin.preferences.description')}
-          testId="admin-settings-preferences"
-        >
-          <div className="space-y-2">
-            {ADMIN_PREF_KEYS.map((prefKey) => (
-              <div
-                key={prefKey}
-                className="rounded-lg border border-dashed border-[var(--app-border)] p-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-[var(--text)]">{t(`${prefKey}.label`)}</p>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                    {t('comingSoon')}
-                  </Badge>
-                </div>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                  {t(`${prefKey}.description`)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </AppPanel>
-
-        <AppPanel
-          title={t('admin.support.title')}
-          description={t('admin.support.description')}
-          testId="admin-settings-support"
-          className="md:col-span-2"
-        >
-          <p className="mb-4 text-sm text-[var(--text-mid)]">{t('admin.support.hint')}</p>
-          <Button variant="outline" size="sm" className="inline-flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            {t('admin.support.contact')}
-          </Button>
-        </AppPanel>
+        <div className="md:col-span-2">
+          <SupportContactCard />
+        </div>
       </div>
 
       <AppPanel
@@ -352,15 +286,6 @@ function AdminSettingsContent({
                 checked={notificationPrefs[key]}
                 onCheckedChange={() => onToggleNotification(key)}
                 disabled={!canEditSettings}
-              />
-            ))}
-            {ADMIN_COMING_SOON_PREF_KEYS.map((prefKey) => (
-              <SettingsToggleRow
-                key={prefKey}
-                label={t(`${prefKey}.label`)}
-                description={t(`${prefKey}.description`)}
-                checked={false}
-                comingSoon
               />
             ))}
           </div>
@@ -629,20 +554,7 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="px-4 py-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Mail className="h-4 w-4" />
-              {t('support.title')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
-            <p className="mb-3 text-sm text-[var(--text-muted)]">{t('support.hint')}</p>
-            <Button variant="outline" size="sm">
-              {t('support.contact')}
-            </Button>
-          </CardContent>
-        </Card>
+        <SupportContactCard />
       </div>
     </PageShell>
   )

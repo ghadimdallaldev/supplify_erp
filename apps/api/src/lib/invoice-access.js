@@ -1,5 +1,6 @@
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireRestaurantId, requireSupplierId } from './tenant-resolve.js'
+import { getEffectiveTenant } from './impersonation.js'
 
 /**
  * Assert the authenticated user may access this invoice row.
@@ -8,7 +9,17 @@ import { requireRestaurantId, requireSupplierId } from './tenant-resolve.js'
  */
 export async function assertInvoiceTenantAccess(req, invoice) {
   const role = req.userData?.role
-  if (role === 'ADMIN') return
+  if (role === 'ADMIN') {
+    const effectiveTenant = getEffectiveTenant(req)
+    if (!effectiveTenant) return
+    const matchesSupplier =
+      effectiveTenant.tenantType === 'SUPPLIER' && effectiveTenant.tenantId === invoice.supplier_id
+    const matchesRestaurant =
+      effectiveTenant.tenantType === 'RESTAURANT' &&
+      effectiveTenant.tenantId === invoice.restaurant_id
+    if (matchesSupplier || matchesRestaurant) return
+    throw new NotFoundError('Invoice not found')
+  }
   if (role === 'SUPPLIER') {
     const supplierId = await requireSupplierId(req)
     if (supplierId !== invoice.supplier_id) {
