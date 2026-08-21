@@ -28,6 +28,7 @@ const mockConfig = vi.hoisted(() => ({
   E2E_SECRET: '',
   PAYMENTS_WEBHOOK_SECRET: 'whsec_test',
   REDIS_URL: 'redis://localhost:6379',
+  ALLOW_AUTO_SUPER_ADMIN: false,
 }))
 
 vi.mock('../config/env.js', () => ({
@@ -54,6 +55,7 @@ describe('validateProductionConfig prod safety', () => {
       E2E_SECRET: '',
       COOKIE_SECURE: true,
       RATE_LIMIT_ENABLED: true,
+      ALLOW_AUTO_SUPER_ADMIN: false,
     })
   })
 
@@ -66,6 +68,12 @@ describe('validateProductionConfig prod safety', () => {
     mockConfig.PAYMENTS_MODE = 'mock'
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).toThrow(/mock/)
+  })
+
+  it('rejects ALLOW_AUTO_SUPER_ADMIN in prod', async () => {
+    mockConfig.ALLOW_AUTO_SUPER_ADMIN = true
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/ALLOW_AUTO_SUPER_ADMIN/)
   })
 
   it('rejects STORAGE_DRIVER=local in prod', async () => {

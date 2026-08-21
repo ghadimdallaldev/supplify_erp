@@ -688,123 +688,131 @@ router.post(
 )
 
 // Update restaurant
-router.patch('/:id', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params
-    const updateData = restaurantUpdateSchema.parse(req.body)
+router.patch(
+  '/:id',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const updateData = restaurantUpdateSchema.parse(req.body)
 
-    // Check permissions
-    const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
+      // Check permissions
+      const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
 
-    if (restaurants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const restaurant = restaurants[0]
-
-    if (req.userData.role === 'RESTAURANT' && restaurant.contact_email !== req.userData.email) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const {
-      fields: updateFields,
-      values: updateValues,
-      nextIndex: paramIndex,
-    } = buildWhitelistedUpdate(
-      updateData,
-      {
-        name: 'name',
-        slug: 'slug',
-        tradeLicenseNo: 'trade_license_no',
-        contactEmail: 'contact_email',
-        phone: 'phone',
-        address: 'address_json',
-      },
-      {
-        valueTransform: (dbField, value) =>
-          dbField === 'address_json' ? JSON.stringify(value) : value,
+      if (restaurants.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
       }
-    )
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'VALIDATION_ERROR',
-          message: 'No fields to update',
+      const restaurant = restaurants[0]
+
+      const tenantRestaurantId = await getRestaurantIdForRequest(req)
+      if (!tenantRestaurantId || tenantRestaurantId !== id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const {
+        fields: updateFields,
+        values: updateValues,
+        nextIndex: paramIndex,
+      } = buildWhitelistedUpdate(
+        updateData,
+        {
+          name: 'name',
+          slug: 'slug',
+          tradeLicenseNo: 'trade_license_no',
+          contactEmail: 'contact_email',
+          phone: 'phone',
+          address: 'address_json',
         },
-        requestId: req.requestId,
-      })
-    }
+        {
+          valueTransform: (dbField, value) =>
+            dbField === 'address_json' ? JSON.stringify(value) : value,
+        }
+      )
 
-    updateFields.push(`updated_at = now()`)
-    updateValues.push(id)
+      if (updateFields.length === 0) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'No fields to update',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const { rows } = await query(
-      `
+      updateFields.push(`updated_at = now()`)
+      updateValues.push(id)
+
+      const { rows } = await query(
+        `
       UPDATE restaurant 
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
       RETURNING *
     `,
-      updateValues
-    )
+        updateValues
+      )
 
-    logger.info('Restaurant updated', {
-      restaurantId: rows[0].id,
-      actor: req.userData.id,
-    })
+      logger.info('Restaurant updated', {
+        restaurantId: rows[0].id,
+        actor: req.userData.id,
+      })
 
-    await invalidateTenantProfileCache(id, 'RESTAURANT')
+      await invalidateTenantProfileCache(id, 'RESTAURANT')
 
-    res.json({
-      ok: true,
-      data: { restaurant: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.json({
+        ok: true,
+        data: { restaurant: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid update data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Update restaurant error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid update data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to update restaurant',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Update restaurant error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update restaurant',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 export { router as restaurantsRoutes }

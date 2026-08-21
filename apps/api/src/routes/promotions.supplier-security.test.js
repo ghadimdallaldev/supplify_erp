@@ -3,6 +3,23 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 
+const mockGateway = vi.hoisted(() => ({ charge: vi.fn() }))
+
+vi.mock('../lib/billing/gateway-registry.js', () => ({
+  getBillingGateway: vi.fn(() => ({ id: 'stub', charge: mockGateway.charge })),
+}))
+
+vi.mock('../services/deal-publish.service.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    isBoostPaymentWaived: vi.fn(() => false),
+    publishDealAfterApproval: vi.fn(async (deal) => ({
+      deal: { ...deal, status: 'active', payment_status: 'paid' },
+    })),
+  }
+})
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   return {
@@ -101,6 +118,63 @@ describe('promotions.routes supplier security', () => {
 
     expect(res.body.error.name).toBe('NOT_FOUND')
     expect(res.status).toBe(404)
+  })
+
+  it('POST /:id/pay-activation charges the supplier and activates the boost', async () => {
+    mockGateway.charge.mockResolvedValueOnce({
+      status: 'succeeded',
+      providerPaymentId: 'pi_stub_1',
+    })
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'deal-1',
+            supplier_id: 'supplier-1',
+            status: 'approved_pending_payment',
+            payment_status: 'pending',
+            boost_price_snapshot: '25',
+            boost_pricing_key: 'boost_basic',
+            boost_duration_days: 7,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'subscription-1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'payment-method-1',
+            provider: 'stub',
+            provider_payment_method_id: 'pm_stub_1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'billing-payment-1', status: 'PROCESSING' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'deal-1',
+            supplier_id: 'supplier-1',
+            status: 'active',
+            payment_status: 'paid',
+            boost_price_snapshot: '25',
+          },
+        ],
+      })
+
+    const res = await request(app).post('/api/promotions/deal-1/pay-activation').expect(200)
+
+    expect(mockGateway.charge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 25,
+        providerPaymentMethodId: 'pm_stub_1',
+        metadata: { type: 'DEAL_BOOST', promotionId: 'deal-1' },
+      })
+    )
+    expect(res.body.data.promotion.status).toBe('active')
+    expect(res.body.data.promotion.payment_status).toBe('paid')
   })
 
   it('POST /:id/resume rejects unpaid activation', async () => {

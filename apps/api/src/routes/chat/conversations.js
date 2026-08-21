@@ -793,6 +793,18 @@ router.post(
 router.patch('/conversations/:conversationId/read', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params
+    const { rows: conversations } = await query(
+      'SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1',
+      [conversationId]
+    )
+    if (!conversations.length || !(await userCanAccessConversation(req, conversations[0]))) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Conversation not found' },
+        requestId: req.requestId,
+      })
+    }
 
     // Reset unread count
     const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -884,6 +896,18 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
     }
 
     const message = messages[0]
+    const { rows: conversations } = await query(
+      'SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1',
+      [message.conversation_id]
+    )
+    if (!conversations.length || !(await userCanAccessConversation(req, conversations[0]))) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Message not found' },
+        requestId: req.requestId,
+      })
+    }
 
     // Only mark as read if the current user is the receiver (not the sender)
     const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'

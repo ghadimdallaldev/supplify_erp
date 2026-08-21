@@ -1,6 +1,13 @@
 # Production readiness (consolidated)
 
-This document merges the **status report**, **API findings**, and **PR-sized fix plan** that previously lived in three separate files at the repo root.
+## This document merges the **status report**, **API findings**, and **PR-sized fix plan** that previously lived in three separate files at the repo root.
+
+## 2026-08-21 ship-hardening checkpoint
+
+- **RBAC:** Demo email role shortcuts are dev-only; production rejects ALLOW_AUTO_SUPER_ADMIN=true; restaurant settings, invoice access during admin impersonation, chat read receipts, and branch query overrides are tenant-scoped.
+- **Warehouse correctness:** Public supplier catalog availability uses the unified stock display helper. Warehouse mode requires the entitlement and at least one active warehouse; warehouse order placement fails closed rather than deducting legacy stock.
+- **Deal boosts:** Supplier pay-activation uses the existing billing payment-method and stub/manual gateway path, records idempotent billing payment state, and activates the approved deal only after a successful charge. Sponsorship, featured placement, invoice payment, and subscription payment remain separate.
+- **Known boundary:** Mobile changes are deferred for this pass and must be completed before exposing the new deal-boost payment contract on native clients. No environment promotion is authorized by this checkpoint.
 
 ---
 

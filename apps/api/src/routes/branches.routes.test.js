@@ -64,7 +64,16 @@ describe('branches.routes (linked accounts)', () => {
     app.use(express.json())
     app.use((req, res, next) => {
       req.requestId = 'test-request'
-      req.userData = { ...mockUser, email: 'owner@restaurant.com', role: 'RESTAURANT' }
+      req.userData = req.headers['x-admin-test']
+        ? { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+        : { ...mockUser, email: 'owner@restaurant.com', role: 'RESTAURANT' }
+      if (req.headers['x-admin-test']) {
+        req.impersonationContext = {
+          adminUserId: 'admin-1',
+          tenantId: 'restaurant-1',
+          tenantType: 'RESTAURANT',
+        }
+      }
       next()
     })
     app.use('/api/branches', branchesRoutes)
@@ -125,5 +134,14 @@ describe('branches.routes (linked accounts)', () => {
 
     expect(response.body.ok).toBe(true)
     expect(response.body.data.removed).toBe(true)
+  })
+
+  it('does not let an impersonating admin query another tenant', async () => {
+    const response = await request(app)
+      .get('/api/branches?restaurant_id=restaurant-2')
+      .set('x-admin-test', 'true')
+      .expect(400)
+
+    expect(response.body.error.name).toBe('BAD_REQUEST')
   })
 })

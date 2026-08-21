@@ -18,6 +18,23 @@ describe('invoice-access', () => {
       .toBeUndefined
   })
 
+  it('scopes an impersonating admin to the effective tenant', async () => {
+    const req = {
+      userData: { id: 'admin-1', role: 'ADMIN' },
+      impersonationContext: {
+        adminUserId: 'admin-1',
+        tenantId: 'sup-1',
+        tenantType: 'SUPPLIER',
+      },
+    }
+    await expect(
+      assertInvoiceTenantAccess(req, { supplier_id: 'sup-2', restaurant_id: 'rest-1' })
+    ).rejects.toThrow(NotFoundError)
+    await expect(
+      assertInvoiceTenantAccess(req, { supplier_id: 'sup-1', restaurant_id: 'rest-1' })
+    ).resolves.toBeUndefined()
+  })
+
   it('blocks supplier from other supplier invoice', async () => {
     const { requireSupplierId } = await import('./tenant-resolve.js')
     vi.mocked(requireSupplierId).mockResolvedValue('sup-1')

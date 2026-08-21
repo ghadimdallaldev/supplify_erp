@@ -99,58 +99,17 @@ router.patch(
   requireRole(['SUPPLIER']),
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
-    try {
-      const { warehouse_id: warehouseId, notes } = req.body
-      const { rows: existing } = await query(
-        `SELECT * FROM order_warehouse_assignment WHERE id = $1 AND order_id = $2`,
-        [req.params.assignmentId, req.params.id]
-      )
-      if (!existing.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: { name: 'NOT_FOUND', message: 'Assignment not found' },
-          requestId: req.requestId,
-        })
-      }
-      if (!['pending', 'picking'].includes(existing[0].status)) {
-        return res.status(409).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'INVALID_STATUS',
-            message: 'Can only reassign while pending or picking',
-          },
-          requestId: req.requestId,
-        })
-      }
-      const { rows } = await query(
-        `UPDATE order_warehouse_assignment
-         SET warehouse_id = COALESCE($1, warehouse_id),
-             assigned_by = 'manual',
-             notes = COALESCE($2, notes),
-             assigned_at = now()
-         WHERE id = $3 RETURNING *`,
-        [warehouseId, notes, req.params.assignmentId]
-      )
-      res.json({
-        ok: true,
-        data: { assignment: rows[0] },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Reassign warehouse error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to reassign warehouse' },
-        requestId: req.requestId,
-      })
-    }
+    res.status(409).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'WAREHOUSE_REASSIGNMENT_UNAVAILABLE',
+        message: 'Warehouse reassignment is disabled until release and reserve are atomic',
+      },
+      requestId: req.requestId,
+    })
   }
 )
-
 router.post(
   '/:id/warehouses/:assignmentId/dispatch',
   requireRole(['SUPPLIER']),

@@ -20,12 +20,17 @@ describe('driver-location-validation', () => {
   })
 
   it('rejects impossible movement speeds', () => {
+    const now = Date.now()
     const point = validateTrackingPoint({
       latitude: 33.9,
       longitude: 35.5,
-      recordedAt: '2026-07-29T10:00:10.000Z',
+      recordedAt: new Date(now - 10_000).toISOString(),
     })
-    const previous = { latitude: 33.89, longitude: 35.5, recorded_at: '2026-07-29T10:00:00.000Z' }
+    const previous = {
+      latitude: 33.89,
+      longitude: 35.5,
+      recorded_at: new Date(now - 20_000).toISOString(),
+    }
     expect(distanceMeters(point, previous)).toBeGreaterThan(500)
     expect(validateMovement(point, previous, { maxSpeedKph: 100 }).accepted).toBe(false)
   })

@@ -107,6 +107,21 @@ describe('Restaurants Routes', () => {
     })
   })
 
+  describe('PATCH /api/restaurants/:id', () => {
+    it('denies an authenticated user from updating another tenant restaurant', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'restaurant-other', name: 'Other Restaurant' }],
+      })
+
+      const response = await request(app)
+        .patch('/api/restaurants/restaurant-other')
+        .send({ name: 'Hijacked' })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+  })
+
   describe('GET /api/restaurants/:id', () => {
     it('should return restaurant details', async () => {
       // Mock: restaurant query with order stats

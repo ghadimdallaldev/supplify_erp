@@ -20,7 +20,7 @@ describe('usePermissions impersonation', () => {
     mockUseImpersonation.mockReturnValue({ isImpersonating: true })
   })
 
-  it('allows tenant nav permissions while impersonating with empty tenantPermissions', () => {
+  it('denies tenant nav permissions while tenant permissions are unavailable', () => {
     mockUseAppSelector.mockImplementation((selector) =>
       selector({
         auth: {
@@ -34,8 +34,8 @@ describe('usePermissions impersonation', () => {
     )
 
     const { result } = renderHook(() => usePermissions())
-    expect(result.current.can('ORDERS_VIEW')).toBe(true)
-    expect(result.current.can('CATALOG_VIEW')).toBe(true)
+    expect(result.current.can('ORDERS_VIEW')).toBe(false)
+    expect(result.current.can('CATALOG_VIEW')).toBe(false)
   })
 
   it('respects tenantPermissions when impersonating with hydrated /me', () => {

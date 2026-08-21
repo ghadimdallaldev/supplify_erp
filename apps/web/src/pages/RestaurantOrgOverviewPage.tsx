@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Building2, Plus, ShoppingCart } from 'lucide-react'
+import { Building2, Plus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   useGetRestaurantOrgQuery,
@@ -24,19 +24,6 @@ function formatMoney(n: number) {
   }).format(n || 0)
 }
 
-function hasCentralPurchasing(
-  entitlements:
-    | {
-        features?: Record<string, unknown>
-        planFeatures?: Record<string, unknown>
-      }
-    | null
-    | undefined
-) {
-  const v = entitlements?.features?.multi_branch ?? entitlements?.planFeatures?.multi_branch
-  return v === 'central_purchasing'
-}
-
 export function RestaurantOrgOverviewPage() {
   const { t } = useTranslation('reports')
 
@@ -50,7 +37,7 @@ export function RestaurantOrgOverviewPage() {
   const canManageOrg = can('SETTINGS_MANAGE')
   const { entitlements } = useEntitlements()
   const multiBranch = multiBranchEnabled(entitlements)
-  const centralPurchasing = hasCentralPurchasing(entitlements)
+
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
   })
@@ -100,15 +87,6 @@ export function RestaurantOrgOverviewPage() {
         })}
         actions={
           <div className="flex flex-wrap gap-2">
-            {centralPurchasing ? (
-              <Link
-                to="/app/org/central-purchasing"
-                className="inline-flex items-center gap-2 rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Central purchasing
-              </Link>
-            ) : null}
             {canManageOrg ? (
               <button
                 type="button"

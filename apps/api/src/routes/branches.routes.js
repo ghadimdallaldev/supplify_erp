@@ -5,9 +5,11 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
   resolveTenantContext,
+  resolveAdminContext,
   isBearerAuthRequest,
 } from '../lib/rbac.js'
 import { settingsMutationGuard } from '../lib/route-permissions.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
@@ -33,14 +35,37 @@ const multiBranchFeature = requireFeature(
   (req) => req.tenantContext?.tenantType || req.userData?.role || 'RESTAURANT'
 )
 
-router.use(requireAuth, resolveTenantContext, settingsMutationGuard)
+router.use(requireAuth, resolveTenantContext, resolveAdminContext, settingsMutationGuard)
 
 async function resolveParentTenant(req) {
   if (req.userData.role === 'ADMIN') {
     const restaurantId = req.query.restaurant_id
     const supplierId = req.query.supplier_id
-    if (restaurantId) return { parentId: restaurantId, parentType: 'RESTAURANT' }
-    if (supplierId) return { parentId: supplierId, parentType: 'SUPPLIER' }
+    const effectiveTenant = getEffectiveTenant(req)
+    if (effectiveTenant) {
+      if (
+        restaurantId &&
+        (effectiveTenant.tenantType !== 'RESTAURANT' || restaurantId !== effectiveTenant.tenantId)
+      ) {
+        return null
+      }
+      if (
+        supplierId &&
+        (effectiveTenant.tenantType !== 'SUPPLIER' || supplierId !== effectiveTenant.tenantId)
+      ) {
+        return null
+      }
+      return { parentId: effectiveTenant.tenantId, parentType: effectiveTenant.tenantType }
+    }
+    const adminPermissions = req.adminContext?.permissions || []
+    const canQueryAnyTenant =
+      adminPermissions.includes('ADMIN_TENANTS') || adminPermissions.includes('ADMIN_ACCESS')
+    if (restaurantId && canQueryAnyTenant) {
+      return { parentId: restaurantId, parentType: 'RESTAURANT' }
+    }
+    if (supplierId && canQueryAnyTenant) {
+      return { parentId: supplierId, parentType: 'SUPPLIER' }
+    }
     return null
   }
 

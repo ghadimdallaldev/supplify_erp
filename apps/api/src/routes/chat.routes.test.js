@@ -263,4 +263,19 @@ describe('Chat Routes', () => {
       expect(response.body.data.message.content).toBe('Hello')
     })
   })
+
+  describe('PATCH read receipts', () => {
+    it('does not mark an inaccessible conversation as read', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getSupplierIdForRequest).mockResolvedValueOnce('supplier-other')
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'conv-1', supplier_id: 'supplier-1', restaurant_id: 'restaurant-1' }],
+      })
+
+      const response = await request(app).patch('/api/chat/conversations/conv-1/read').expect(404)
+
+      expect(response.body.error?.name).toBe('NOT_FOUND')
+      expect(db.query).toHaveBeenCalledTimes(1)
+    })
+  })
 })

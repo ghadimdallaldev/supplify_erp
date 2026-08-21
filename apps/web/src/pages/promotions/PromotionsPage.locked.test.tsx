@@ -39,6 +39,7 @@ vi.mock('../../services/api', () => ({
     refetch: vi.fn(),
   }),
   useCreatePromotionMutation: () => [vi.fn(), { isLoading: false }],
+  usePayActivationMutation: () => [vi.fn(), { isLoading: false }],
   usePausePromotionMutation: () => [vi.fn(), { isLoading: false }],
   useResumePromotionMutation: () => [vi.fn(), { isLoading: false }],
   useDeletePromotionMutation: () => [vi.fn(), { isLoading: false }],

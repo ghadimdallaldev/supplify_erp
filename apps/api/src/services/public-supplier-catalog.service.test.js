@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const queryMock = vi.fn()
 const columnExistsMock = vi.fn()
 const getTenantBrandingMock = vi.fn()
+const listSupplierStockDisplayMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
@@ -20,6 +21,10 @@ vi.mock('./branding.service.js', () => ({
   getTenantBranding: (...args) => getTenantBrandingMock(...args),
 }))
 
+vi.mock('./supplier-stock.service.js', () => ({
+  listSupplierStockDisplay: (...args) => listSupplierStockDisplayMock(...args),
+}))
+
 import {
   getPublicSupplierProfile,
   listPublicSupplierProducts,
@@ -33,6 +38,8 @@ describe('public-supplier-catalog.service', () => {
     queryMock.mockReset()
     columnExistsMock.mockReset()
     getTenantBrandingMock.mockReset()
+    listSupplierStockDisplayMock.mockReset()
+    listSupplierStockDisplayMock.mockResolvedValue([])
     columnExistsMock.mockImplementation((_table, column) =>
       Promise.resolve(
         ['public_catalog_enabled', 'slug', 'minimum_order_amount', 'payment_terms'].includes(column)
@@ -107,6 +114,9 @@ describe('public-supplier-catalog.service', () => {
   })
 
   it('listPublicSupplierProducts excludes prices', async () => {
+    listSupplierStockDisplayMock.mockResolvedValueOnce([
+      { product_id: 'product-1', available_qty: 4 },
+    ])
     queryMock
       .mockResolvedValueOnce({
         rows: [

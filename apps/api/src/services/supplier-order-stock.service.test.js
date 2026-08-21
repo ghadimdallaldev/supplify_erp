@@ -69,6 +69,23 @@ describe('supplier-order-stock.service', () => {
     expect(assignWarehousesToOrder).not.toHaveBeenCalled()
   })
 
+  it('fails closed when warehouse mode cannot assign stock', async () => {
+    supplierUsesWarehouseInventory.mockResolvedValue(true)
+    assignWarehousesToOrder.mockResolvedValueOnce({ mode: 'none', assignments: [] })
+    const client = { query: vi.fn() }
+
+    await expect(
+      reserveStockForPlacedOrder(client, {
+        supplierId: 'sup-1',
+        supplier: { id: 'sup-1', default_warehouse_id: 'wh-1' },
+        order: { id: 'ord-1' },
+        orderItems: [{ product_id: 'p-1', quantity: 2 }],
+        legacyLineItems: [{ productId: 'p-1', quantity: 2 }],
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(assertAndDeductSupplierStockBatch).not.toHaveBeenCalled()
+  })
+
   it('releases warehouse stock when assignments exist', async () => {
     const client = {
       query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'owa-1' }] }),

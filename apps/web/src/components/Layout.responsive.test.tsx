@@ -56,6 +56,7 @@ vi.mock('../hooks/redux', () => ({
 vi.mock('../services/api', () => ({
   useGetEntitlementsQuery: () => ({ data: undefined }),
   useGetBillingStatusQuery: () => ({ data: undefined }),
+  useGetAssistantCapabilitiesQuery: () => ({ data: undefined, isFetching: false }),
   useRecordConversionEventMutation: () => [vi.fn()],
   api: { util: { invalidateTags: vi.fn() } },
 }))

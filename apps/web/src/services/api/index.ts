@@ -415,6 +415,7 @@ export const {
   useCreatePromotionMutation,
   useUpdatePromotionMutation,
   useActivatePromotionMutation,
+  usePayActivationMutation,
   usePausePromotionMutation,
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
