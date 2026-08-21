@@ -117,7 +117,7 @@ export async function applyBoostSelectionToDeal(dealId, supplierId, pricingKey, 
  */
 export async function publishDealAfterApproval(
   deal,
-  { targetAudience = { all: true }, waivePayment = true } = {}
+  { targetAudience = { all: true }, waivePayment = true, paymentConfirmed = false } = {}
 ) {
   if (!deal.boost_pricing_key && !deal.boost_package_id) {
     throw new Error('Deal has no boost package selected')
@@ -126,8 +126,8 @@ export async function publishDealAfterApproval(
   const now = new Date()
   const window = computeBoostWindow(deal, { now })
   const budget = Number(deal.boost_price_snapshot) || 0
-  const billingStatus = waivePayment ? 'waived' : 'pending'
-  const campaignStatus = waivePayment ? 'active' : 'draft'
+  const billingStatus = waivePayment ? 'waived' : paymentConfirmed ? 'paid' : 'pending'
+  const campaignStatus = waivePayment || paymentConfirmed ? 'active' : 'draft'
 
   return withTransaction(async (client) => {
     const { rows: pkgRows } = await client.query(

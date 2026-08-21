@@ -6,6 +6,7 @@ import {
   requirePermission,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { invoicesMutationGuard } from '../lib/route-permissions.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -43,7 +44,10 @@ router.use(
 async function resolveInvoiceDetailContext(req) {
   const role = req.userData?.role
   if (role === 'ADMIN') {
-    return { adminBypass: true }
+    const effectiveTenant = getEffectiveTenant(req)
+    return effectiveTenant
+      ? { tenantId: effectiveTenant.tenantId, tenantType: effectiveTenant.tenantType }
+      : { adminBypass: true }
   }
   if (role === 'SUPPLIER') {
     return { tenantId: await requireSupplierId(req), tenantType: 'SUPPLIER' }
@@ -107,7 +111,8 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
       LEFT JOIN payment p ON p.invoice_id = i.id
     `
 
-    if (req.userData.role === 'ADMIN') {
+    const effectiveTenant = req.userData.role === 'ADMIN' ? getEffectiveTenant(req) : null
+    if (req.userData.role === 'ADMIN' && !effectiveTenant) {
       const countSql = `SELECT COUNT(*)::int AS total FROM invoice i`
       const listSql = `
         ${invoiceSelect}
@@ -134,8 +139,9 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
       })
     }
 
-    const supplierId = await getSupplierIdForRequest(req)
-    if (!supplierId) {
+    const tenantId = effectiveTenant?.tenantId || (await getSupplierIdForRequest(req))
+    const tenantType = effectiveTenant?.tenantType || 'SUPPLIER'
+    if (!tenantId) {
       return res.json({
         ok: true,
         data: {
@@ -147,18 +153,19 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
       })
     }
 
-    const countSql = `SELECT COUNT(*)::int AS total FROM invoice i WHERE i.supplier_id = $1`
+    const tenantColumn = tenantType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id'
+    const countSql = `SELECT COUNT(*)::int AS total FROM invoice i WHERE i.${tenantColumn} = $1`
     const listSql = `
       ${invoiceSelect}
-      WHERE i.supplier_id = $1
+      WHERE i.${tenantColumn} = $1
       GROUP BY i.id, r.name, o.id, o.status
       ORDER BY i.issue_date DESC, i.invoice_number DESC
       LIMIT $2 OFFSET $3
     `
 
     const [{ rows }, { rows: countRows }] = await Promise.all([
-      query(listSql, [supplierId, params.limit, params.offset]),
-      query(countSql, [supplierId]),
+      query(listSql, [tenantId, params.limit, params.offset]),
+      query(countSql, [tenantId]),
     ])
 
     res.json({

@@ -30,6 +30,7 @@ type SupplierDealRowProps = {
   onPause: (id: string) => void
   onResume: (id: string) => void
   onAnalytics: (id: string) => void
+  onPayActivation: (id: string) => void
 }
 
 export function SupplierDealRow({
@@ -40,6 +41,7 @@ export function SupplierDealRow({
   onPause,
   onResume,
   onAnalytics,
+  onPayActivation,
 }: SupplierDealRowProps) {
   const { t } = useTranslation('deals')
   const id = String(p.id)
@@ -143,6 +145,13 @@ export function SupplierDealRow({
             {status === 'paused' && (
               <Button size="sm" onClick={() => onResume(id)}>
                 {t('supplierRow.resume')}
+              </Button>
+            )}
+            {status === 'approved_pending_payment' && (
+              <Button size="sm" onClick={() => onPayActivation(id)}>
+                {t('supplierRow.payActivation', {
+                  price: Number(p.boost_price_snapshot || 0).toFixed(2),
+                })}
               </Button>
             )}
             {(status === 'rejected' || status === 'expired') && (

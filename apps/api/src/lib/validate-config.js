@@ -108,6 +108,9 @@ function validatePreprodRules(issues) {
 
 function validateProdRules(issues) {
   validateHostedSafetyRules(issues, 'production')
+  if (config.ALLOW_AUTO_SUPER_ADMIN) {
+    issues.push('ALLOW_AUTO_SUPER_ADMIN must be false in production')
+  }
   if (!config.REDIS_URL) {
     issues.push('REDIS_URL must be set in production')
   }

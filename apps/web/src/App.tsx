@@ -161,10 +161,7 @@ const ConsumerLoyaltyPage = lazyNamedPage(
   'ConsumerLoyaltyPage'
 )
 const OrgOverviewPage = lazyNamedPage(() => import('./pages/OrgOverviewPage'), 'OrgOverviewPage')
-const CentralPurchasingPage = lazyNamedPage(
-  () => import('./pages/CentralPurchasingPage'),
-  'CentralPurchasingPage'
-)
+
 const BranchDetailPage = lazyNamedPage(() => import('./pages/BranchDetailPage'), 'BranchDetailPage')
 const LegalHubPage = lazyNamedPage(() => import('./pages/LegalDocumentPage'), 'LegalHubPage')
 const LegalDocumentPage = lazyNamedPage(
@@ -830,14 +827,7 @@ const router = createBrowserRouter([
           </LazyPage>
         ),
       },
-      {
-        path: 'app/org/central-purchasing',
-        element: (
-          <LazyPage>
-            <CentralPurchasingPage />
-          </LazyPage>
-        ),
-      },
+
       {
         path: 'app/org/branches/:supplierId',
         element: (

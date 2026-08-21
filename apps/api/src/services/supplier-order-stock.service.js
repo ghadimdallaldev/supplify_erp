@@ -24,7 +24,8 @@ function toValidationError(error) {
   if (
     message.includes('Insufficient stock') ||
     message.includes('No default warehouse') ||
-    message.includes('no warehouse inventory row')
+    message.includes('no warehouse inventory row') ||
+    message.includes('Warehouse stock could not be assigned')
   ) {
     return new ValidationError(message)
   }
@@ -100,11 +101,7 @@ export async function reserveStockForPlacedOrder(
     })
 
     if (!fulfillment?.assignments?.length || fulfillment.mode === 'none') {
-      await assertAndDeductSupplierStockBatch(
-        client,
-        lines.map((line) => ({ ...line, reserve: reserveLegacy || Boolean(line.reserve) }))
-      )
-      return { mode: 'legacy', fulfillment }
+      throw new ValidationError('Warehouse stock could not be assigned; order was not placed')
     }
 
     return { mode: 'warehouse', fulfillment }

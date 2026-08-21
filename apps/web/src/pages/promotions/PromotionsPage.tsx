@@ -20,6 +20,7 @@ import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import {
   useGetPromotionsQuery,
   useCreatePromotionMutation,
+  usePayActivationMutation,
   usePausePromotionMutation,
   useResumePromotionMutation,
   useDeletePromotionMutation,
@@ -43,6 +44,7 @@ import { SUPPLIER_CTA_TYPES, SUPPLIER_DEAL_TYPES } from '../../lib/dealDisplayLa
 
 export function PromotionsPage() {
   const { t } = useTranslation('cart')
+  const { t: dealT } = useTranslation('deals')
   const { persona } = useWorkspaceRole()
   const copy = {
     title: persona.promotionsCopy?.title ?? t('promotions.title'),
@@ -127,6 +129,7 @@ export function PromotionsPage() {
     statusFilter ? { status: statusFilter } : undefined
   )
   const [createPromotion, { isLoading: creating }] = useCreatePromotionMutation()
+  const [payActivation] = usePayActivationMutation()
   const [pausePromotion] = usePausePromotionMutation()
   const [resumePromotion] = useResumePromotionMutation()
   const [deletePromotion] = useDeletePromotionMutation()
@@ -319,6 +322,16 @@ export function PromotionsPage() {
                     await deletePromotion(id).unwrap()
                     toast.success(t('promotions.toastDeleted'))
                     refetch()
+                  }}
+                  onPayActivation={async (id) => {
+                    try {
+                      await payActivation({ id }).unwrap()
+                      toast.success(dealT('supplierRow.paymentSuccess'))
+                      refetch()
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || dealT('supplierRow.paymentFailed'))
+                    }
                   }}
                   onPause={async (id) => {
                     await pausePromotion(id).unwrap()
