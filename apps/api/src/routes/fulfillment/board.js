@@ -116,19 +116,21 @@ router.get('/board', async (req, res) => {
               AND dr.status IN ('PLANNED', 'IN_PROGRESS')
           ) AS out_for_delivery,
           (
-            SELECT COUNT(*)::int
-            FROM route_stop rs
-            JOIN delivery_route dr ON dr.id = rs.route_id
-            WHERE dr.supplier_id = $1
-              AND rs.status = 'COMPLETED'
-              AND rs.completed_at >= date_trunc('day', now())
-          ) +
-          (
-            SELECT COUNT(*)::int
-            FROM proof_of_delivery pod
-            JOIN customer_order o ON o.id = pod.order_id
-            JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-            WHERE pod.delivery_timestamp >= date_trunc('day', now())
+            SELECT COUNT(DISTINCT order_id)::int
+            FROM (
+              SELECT rs.order_id
+              FROM route_stop rs
+              JOIN delivery_route dr ON dr.id = rs.route_id
+              WHERE dr.supplier_id = $1
+                AND rs.status = 'COMPLETED'
+                AND rs.completed_at >= date_trunc('day', now())
+              UNION
+              SELECT pod.order_id
+              FROM proof_of_delivery pod
+              JOIN customer_order o ON o.id = pod.order_id
+              JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+              WHERE pod.delivery_timestamp >= date_trunc('day', now())
+            ) delivered_orders
           ) AS delivered_today
         `,
         [supplierId]

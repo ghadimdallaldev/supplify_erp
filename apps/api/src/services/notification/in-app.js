@@ -1,5 +1,5 @@
 import { query } from '../../lib/db.js'
-import { getCache, setCache, deleteCache } from '../../lib/cache.js'
+import { getCache, setCache, deleteCache, deleteCacheByPrefix } from '../../lib/cache.js'
 import { singleflight } from '../../lib/singleflight.js'
 import { mapWithConcurrency } from '../../lib/concurrency.js'
 import { logger } from '../../lib/logger.js'
@@ -505,16 +505,13 @@ export function notificationUnreadCacheKey(userId, userType) {
 export async function invalidateUserNotificationsListCache(userId, userType = null) {
   if (!userId) return
   const userTypes = userType ? [userType] : ['RESTAURANT', 'SUPPLIER', 'ADMIN', 'PENDING']
-  const limits = [25, 50]
-  const keys = []
-  for (const type of userTypes) {
-    keys.push(notificationUnreadCacheKey(userId, type))
-    for (const limit of limits) {
-      keys.push(notificationListCacheKey(userId, type, limit, 0, false))
-      keys.push(notificationListCacheKey(userId, type, limit, 0, true))
-    }
-  }
-  await Promise.all(keys.map((key) => deleteCache(key).catch(() => {})))
+  await Promise.all(
+    userTypes.flatMap((type) => [
+      deleteCache(notificationUnreadCacheKey(userId, type)).catch(() => {}),
+      // Prefix clears all limit/offset/unreadOnly list pages for this user
+      deleteCacheByPrefix(`notif:list:${userId}:${type}:`).catch(() => {}),
+    ])
+  )
 }
 
 const NOTIFICATION_UNREAD_CACHE_TTL_SECONDS = 30
