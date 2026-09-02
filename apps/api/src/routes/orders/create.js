@@ -69,6 +69,7 @@ import {
   collectOrdersCalendarTenantIdsFromOrder,
   scheduleOrdersCalendarCacheInvalidation,
 } from '../../lib/orders-calendar-cache.js'
+import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
 
 const router = express.Router()
 
@@ -209,6 +210,38 @@ router.post(
           throw new ValidationError(
             `Cannot order from blocked supplier${blockedSuppliers.length > 1 ? 's' : ''}: ${names}`
           )
+        }
+
+        // Require follow or prior order (parity with product detail / supplier manual order)
+        const { rows: linkedSuppliers } = await query(
+          `
+          SELECT s.id AS supplier_id, s.name AS supplier_name
+          FROM supplier s
+          WHERE s.id = ANY($2::uuid[])
+            AND (
+              EXISTS (
+                SELECT 1 FROM supplier_follow sf
+                WHERE sf.supplier_id = s.id AND sf.restaurant_id = $1
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM customer_order o
+                JOIN order_item oi ON oi.order_id = o.id
+                WHERE o.restaurant_id = $1 AND oi.supplier_id = s.id
+              )
+            )
+          `,
+          [restaurantId, cartSupplierIds]
+        )
+        const linkedIds = new Set(linkedSuppliers.map((r) => r.supplier_id))
+        const unlinked = cartSupplierIds.filter((id) => !linkedIds.has(id))
+        if (unlinked.length > 0) {
+          const { rows: names } = await query(
+            `SELECT name FROM supplier WHERE id = ANY($1::uuid[])`,
+            [unlinked]
+          )
+          const label = names.map((r) => r.name).join(', ') || unlinked.join(', ')
+          throw new ValidationError(`Follow the supplier before ordering: ${label}`)
         }
       }
 
@@ -541,6 +574,15 @@ router.post(
         { reason: 'order.created', requestId: req.requestId }
       )
 
+      const dashboardTenants = [{ tenantType: 'RESTAURANT', tenantId: restaurantId }]
+      for (const order of result) {
+        const supplierId = order.items?.[0]?.supplier_id
+        if (supplierId) {
+          dashboardTenants.push({ tenantType: 'SUPPLIER', tenantId: supplierId })
+        }
+      }
+      void invalidateDashboardSummaryCache(dashboardTenants)
+
       orderCreateTimings.totalHandlerMs = elapsedMsSince(handlerStartedAt)
       if (req._perf?.stages) {
         const s = req._perf.stages
@@ -810,6 +852,11 @@ router.post(
         reason: 'order.manual_created',
         requestId: req.requestId,
       })
+
+      void invalidateDashboardSummaryCache([
+        { tenantType: 'RESTAURANT', tenantId: result.restaurant_id },
+        { tenantType: 'SUPPLIER', tenantId: supplierId },
+      ])
 
       res.status(201).json({
         ok: true,

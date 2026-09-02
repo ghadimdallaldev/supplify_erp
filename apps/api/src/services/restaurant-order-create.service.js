@@ -76,26 +76,32 @@ export async function createRestaurantOrdersInTransaction({
     const orderItems = await insertOrderItemsBatch({ query: q }, order.id, supplierId, items)
     timings.orderItemsInsertMs += elapsedMsSince(phaseStart)
 
-    phaseStart = performance.now()
-    const multiActive = supplierMultiWarehouse.get(supplierId) === true
-    const { mode: stockMode, fulfillment } = await reserveStockForPlacedOrder(
-      { query: q },
-      {
-        supplierId,
-        supplier,
-        order: { ...order, restaurant_id: restaurantId },
-        orderItems,
-        multiWarehouseActive: multiActive,
-        legacyLineItems: items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          sku: item.product.sku,
-        })),
-      }
-    )
-    const stockMs = elapsedMsSince(phaseStart)
-    timings.stockLockAndReserveMs += stockMs
-    if (stockMode === 'warehouse') timings.warehouseRoutingMs += stockMs
+    let stockMode = 'legacy'
+    let fulfillment = null
+    if (orderStatus === 'PLACED') {
+      phaseStart = performance.now()
+      const multiActive = supplierMultiWarehouse.get(supplierId) === true
+      const reserved = await reserveStockForPlacedOrder(
+        { query: q },
+        {
+          supplierId,
+          supplier,
+          order: { ...order, restaurant_id: restaurantId },
+          orderItems,
+          multiWarehouseActive: multiActive,
+          legacyLineItems: items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            sku: item.product.sku,
+          })),
+        }
+      )
+      stockMode = reserved.mode
+      fulfillment = reserved.fulfillment
+      const stockMs = elapsedMsSince(phaseStart)
+      timings.stockLockAndReserveMs += stockMs
+      if (stockMode === 'warehouse') timings.warehouseRoutingMs += stockMs
+    }
 
     let totalAmount = orderItems.reduce((sum, row) => sum + Number(row.line_total), 0)
 
