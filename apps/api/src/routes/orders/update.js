@@ -64,6 +64,7 @@ import {
   handleOrderDelivery,
 } from './orders.helpers.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
+import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
 
 const router = express.Router()
 
@@ -355,6 +356,10 @@ router.patch('/:id', async (req, res) => {
         reason: 'order.updated',
         requestId: req.requestId,
       })
+      void invalidateDashboardSummaryCache([
+        { tenantType: 'RESTAURANT', tenantId: rows[0].restaurant_id },
+        { tenantType: 'SUPPLIER', tenantId: order.supplier_id },
+      ])
     }
 
     res.json({

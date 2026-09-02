@@ -17,11 +17,9 @@ import {
   computeSupplierStockFlags,
   DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
 } from '../lib/supplier-stock-status.js'
-import {
-  listSupplierStockDisplay,
-  supplierUsesWarehouseInventory,
-} from '../services/supplier-stock.service.js'
+import { supplierUsesWarehouseInventory } from '../services/supplier-stock.service.js'
 import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const router = express.Router()
 
@@ -42,6 +40,99 @@ const inventoryListSchema = z.object({
 router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
     const params = inventoryListSchema.parse(req.query)
+
+    // For suppliers on warehouse SoT: product-anchored list (includes WH-only SKUs)
+    if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.json({
+          ok: true,
+          data: {
+            inventory: [],
+            pagination: { total: 0, limit: params.limit, offset: params.offset },
+          },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      if (await supplierUsesWarehouseInventory(supplierId)) {
+        const supplierCol = await getWarehouseSupplierColumn()
+        const listSql = `
+          SELECT
+            p.id,
+            p.id AS product_id,
+            NULL::uuid AS warehouse_id,
+            COALESCE(stock.available_qty, 0) AS available_qty,
+            COALESCE(stock.reserved_qty, 0) AS reserved_qty,
+            p.updated_at,
+            p.name AS product_name,
+            p.sku,
+            p.supplier_id,
+            s.name AS supplier_name,
+            COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD}) AS low_stock_threshold,
+            NULL::text AS warehouse_name,
+            NULL::text AS warehouse_code
+          FROM product p
+          JOIN supplier s ON s.id = p.supplier_id
+          LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+          LEFT JOIN LATERAL (
+            SELECT
+              COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty,
+              COALESCE(SUM(wi.quantity_reserved), 0)::numeric AS reserved_qty
+            FROM warehouse_inventory wi
+            JOIN warehouse w ON w.id = wi.warehouse_id
+            WHERE wi.product_id = p.id
+              AND w.${supplierCol} = $1
+              AND w.is_active = TRUE
+          ) stock ON true
+          WHERE p.supplier_id = $1
+          ORDER BY p.name
+          LIMIT $2 OFFSET $3
+        `
+        const countSql = `
+          SELECT COUNT(*)::int AS total
+          FROM product p
+          WHERE p.supplier_id = $1
+        `
+        const [{ rows }, { rows: countRows }] = await Promise.all([
+          query(listSql, [supplierId, params.limit, params.offset]),
+          query(countSql, [supplierId]),
+        ])
+
+        const formattedInventory = rows.map((row) => {
+          const availableQty = Number(row.available_qty || 0)
+          const reservedQty = Number(row.reserved_qty || 0)
+          const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
+          return {
+            ...row,
+            available_qty: availableQty,
+            reserved_qty: reservedQty,
+            stock_source: 'warehouse_inventory',
+            low_stock_threshold: flags.lowStockThreshold,
+            isLowStock: flags.isLowStock,
+            isOutOfStock: flags.isOutOfStock,
+            isInStock: flags.isInStock,
+            stockStatus: flags.stockStatus,
+          }
+        })
+
+        return res.json({
+          ok: true,
+          data: {
+            inventory: formattedInventory,
+            pagination: {
+              total: countRows[0]?.total ?? 0,
+              limit: params.limit,
+              offset: params.offset,
+            },
+          },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+    }
+
     let inventoryQuery = `
       SELECT 
         i.product_id as id,
@@ -101,44 +192,16 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       query(`${countQueryBase}${whereClause}`, queryParams),
     ])
 
-    // When warehouse inventory is the SoT, overlay aggregated warehouse qty onto legacy rows.
-    // Missing WH rows mean 0 available (do not fall back to legacy — that caused false "in stock").
-    let warehouseQtyByProduct = null
-    if (req.userData.role === 'SUPPLIER' && queryParams[0]) {
-      const supplierId = queryParams[0]
-      if (await supplierUsesWarehouseInventory(supplierId)) {
-        const stockRows = await listSupplierStockDisplay(supplierId, {
-          productIds: rows.map((r) => r.product_id),
-        })
-        warehouseQtyByProduct = new Map(
-          stockRows.map((r) => [
-            r.product_id,
-            {
-              available_qty: Number(r.available_qty || 0),
-              reserved_qty: Number(r.reserved_qty || 0),
-              source: r.source,
-            },
-          ])
-        )
-      }
-    }
-
-    // Format the data for frontend
+    // Format the data for frontend (legacy inventory SoT)
     const formattedInventory = rows.map((row) => {
-      const overlay = warehouseQtyByProduct?.get(row.product_id)
-      const availableQty = warehouseQtyByProduct
-        ? Number(overlay?.available_qty ?? 0)
-        : row.available_qty
-      const reservedQty = warehouseQtyByProduct
-        ? Number(overlay?.reserved_qty ?? 0)
-        : row.reserved_qty
+      const availableQty = row.available_qty
+      const reservedQty = row.reserved_qty
       const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
       return {
         ...row,
         available_qty: availableQty,
         reserved_qty: reservedQty,
-        stock_source:
-          overlay?.source || (warehouseQtyByProduct ? 'warehouse_inventory' : 'inventory'),
+        stock_source: 'inventory',
         low_stock_threshold: flags.lowStockThreshold,
         isLowStock: flags.isLowStock,
         isOutOfStock: flags.isOutOfStock,
