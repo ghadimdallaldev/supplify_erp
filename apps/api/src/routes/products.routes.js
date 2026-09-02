@@ -54,11 +54,12 @@ function buildInventoryJoin(scopedSupplierId, supplierParamIndex) {
         GROUP BY i.product_id
       ) inv ON inv.product_id = p.id`
   }
-  return `LEFT JOIN (
-        SELECT product_id, SUM(available_qty) as total_available
-        FROM inventory
-        GROUP BY product_id
-      ) inv ON inv.product_id = p.id`
+  // Unscoped catalog: correlate per product instead of scanning/aggregating all inventory rows.
+  return `LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(i.available_qty), 0) as total_available
+        FROM inventory i
+        WHERE i.product_id = p.id
+      ) inv ON true`
 }
 
 function catalogCategoriesCacheKey(supplierId) {

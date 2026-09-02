@@ -46,6 +46,10 @@ import {
   getDefaultCatalogPricesBatch,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
+import {
+  assertLineQuantityRules,
+  assertSupplierMinimumOrderAmount,
+} from '../../lib/order-quantity-rules.js'
 import { reserveStockForPlacedOrder } from '../../services/supplier-order-stock.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
@@ -103,9 +107,17 @@ router.post(
       const [{ rows: products }, catalogByProductId] = await Promise.all([
         query(
           `
-      SELECT id, supplier_id, sku, category_id, name
-      FROM product
-      WHERE id = ANY($1)
+      SELECT
+        p.id,
+        p.supplier_id,
+        p.sku,
+        p.category_id,
+        p.name,
+        COALESCE(pis.moq, 1) AS moq,
+        COALESCE(pis.order_multiple, 1) AS order_multiple
+      FROM product p
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      WHERE p.id = ANY($1)
       `,
           [productIds]
         ),
@@ -157,6 +169,13 @@ router.post(
         if (resolved?.unitPrice == null) {
           throw new ValidationError(`No valid price found for product ${product.sku}`)
         }
+        assertLineQuantityRules({
+          quantity: item.quantity,
+          moq: product.moq,
+          orderMultiple: product.order_multiple,
+          sku: product.sku,
+          productId: product.id,
+        })
         if (!supplierGroups.has(product.supplier_id)) {
           supplierGroups.set(product.supplier_id, [])
         }
@@ -226,11 +245,25 @@ router.post(
         const supplierIds = [...supplierGroups.keys()]
         if (supplierIds.length) {
           const { rows: supplierRows } = await query(
-            `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name
+            `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name,
+                    minimum_order_amount
              FROM supplier WHERE id = ANY($1::uuid[])`,
             [supplierIds]
           )
           supplierProfiles = new Map(supplierRows.map((row) => [row.id, row]))
+
+          for (const [supplierId, items] of supplierGroups.entries()) {
+            const supplier = supplierProfiles.get(supplierId)
+            const subtotal = items.reduce(
+              (sum, line) => sum + Number(line.unitPrice) * Number(line.quantity),
+              0
+            )
+            assertSupplierMinimumOrderAmount({
+              subtotal,
+              minimumOrderAmount: supplier?.minimum_order_amount,
+              supplierName: supplier?.name,
+            })
+          }
 
           const supplierSubscriptions = await Promise.all(
             supplierIds.map(async (supplierId) => [

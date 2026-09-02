@@ -765,7 +765,8 @@ router.get(
 // Get monthly expense breakdown
 router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
-    const { period = '30' } = req.query
+    const rawPeriod = Number.parseInt(String(req.query.period ?? '30'), 10)
+    const periodDays = Number.isFinite(rawPeriod) ? Math.min(365, Math.max(1, rawPeriod)) : 30
 
     const restaurantId = await requireRestaurantId(req)
 
@@ -783,11 +784,11 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN payment p ON p.invoice_id = i.id AND p.status = 'COMPLETED'
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '${period} days'
+        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
       GROUP BY s.id, s.name
       ORDER BY total_spent DESC
     `,
-      [restaurantId]
+      [restaurantId, periodDays]
     )
 
     // Get expense breakdown by category (from products)
@@ -800,11 +801,11 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       JOIN invoice_line_item ili ON ili.invoice_id = i.id
       LEFT JOIN product p ON p.id = ili.product_id
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '${period} days'
+        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
       GROUP BY p.category
       ORDER BY total_spent DESC
     `,
-      [restaurantId]
+      [restaurantId, periodDays]
     )
 
     // Get monthly trend
@@ -829,7 +830,7 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
         bySupplier,
         byCategory,
         monthlyTrend,
-        period: parseInt(period),
+        period: periodDays,
       },
       error: null,
       requestId: req.requestId,
