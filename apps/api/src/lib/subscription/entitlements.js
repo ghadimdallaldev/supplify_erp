@@ -82,7 +82,7 @@ const ENTITLEMENTS_CACHE_TTL = 300
  * until TTL expiry or explicit invalidation (plan/subscription changes). Hits younger than
  * ENTITLEMENTS_FRESH_USAGE_SEC skip usage re-count and return the cached snapshot as-is.
  */
-const ENTITLEMENTS_FRESH_USAGE_SEC = 60
+const ENTITLEMENTS_FRESH_USAGE_SEC = 180
 
 function stripEntitlementsCacheMeta(cached) {
   if (!cached || typeof cached !== 'object') return cached

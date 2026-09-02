@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Speed + correctness hardening (API)
+
+- **Security**: Parameterized restaurant finance `/expenses` period filter (removed SQL string interpolation).
+- **Checkout correctness**: Order create now enforces product MOQ / pack multiples and supplier `minimum_order_amount` server-side (`order-quantity-rules.js`). Mobile already surfaces API `ValidationError` messages; optional client-side MOQ UX can follow without contract change.
+- **Performance**: Supplier order list rewritten to `EXISTS` (no `DISTINCT` item joins); unscoped catalog stock uses `LATERAL` inventory; entitlements usage refresh window raised to 180s; dispatch board bucket limit 200 + cache invalidation on driver assign/status/reassign; grace-period account lock now invalidates subscription caches.
+- **Mobile action**: No API client shape change required. Confirm cart/checkout screens display the new validation messages. Android/iOS source unchanged this pass.
+
 ## 2026-08-21 — Production ship hardening (web/API pass)
 
 - **API/Web**: RBAC tenant checks, warehouse stock source-of-truth/fail-closed ordering, deal-boost payment activation through the existing stub/manual gateway, and settings dead-button cleanup.

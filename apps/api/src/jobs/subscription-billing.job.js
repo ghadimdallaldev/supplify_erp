@@ -362,6 +362,7 @@ export async function runSubscriptionBillingJob() {
 
       if (didLock) {
         locked++
+        await invalidateTenantSubscriptionCache(sub.tenant_id, sub.tenant_type)
         notifyBillingAccountLocked({
           tenantId: sub.tenant_id,
           tenantType: sub.tenant_type,

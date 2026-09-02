@@ -4,6 +4,7 @@ import { buildObjectPublicUrl } from './storage/storage.service.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
+import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
   assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
@@ -135,6 +136,7 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
     /* non-blocking */
   }
 
+  await invalidateDispatchCacheForSupplier(supplierId)
   return assignment
 }
 
@@ -169,7 +171,7 @@ export async function updateDeliveryStatus({
     }
   }
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
     const params = [status, notes ?? null]
 
@@ -292,6 +294,9 @@ export async function updateDeliveryStatus({
 
     return updatedAssignment[0]
   })
+
+  await invalidateDispatchCacheForSupplier(supplierId)
+  return result
 }
 
 export async function reassignDriver({ supplierId, orderId, driverId, reason, assignedByUserId }) {
@@ -330,6 +335,9 @@ export async function reassignDriver({ supplierId, orderId, driverId, reason, as
       ]
     )
     return created[0]
+  }).then(async (created) => {
+    await invalidateDispatchCacheForSupplier(supplierId)
+    return created
   })
 }
 
