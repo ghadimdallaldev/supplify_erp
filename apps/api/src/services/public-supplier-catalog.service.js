@@ -74,9 +74,9 @@ export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query)
   return rows[0]
 }
 
-async function canExposeBranding(supplierId, dbQuery = query) {
+async function canExposeBranding(supplierId) {
   try {
-    const enabled = await isFeatureEnabled('custom_branding', supplierId, 'SUPPLIER')
+    const enabled = await isFeatureEnabled(supplierId, 'SUPPLIER', 'custom_branding')
     return enabled
   } catch {
     return false

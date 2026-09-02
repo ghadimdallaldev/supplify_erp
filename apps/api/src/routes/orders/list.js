@@ -158,6 +158,13 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
+    // Restaurant filter (supplier/admin scoped lists — never bypass restaurant-tenant scope)
+    if (params.restaurant && tenant?.tenantType !== 'RESTAURANT') {
+      whereConditions.push(`o.restaurant_id = $${paramIndex}`)
+      queryParams.push(params.restaurant)
+      paramIndex++
+    }
+
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
     // Supplier/search filters use EXISTS (no DISTINCT + item joins).

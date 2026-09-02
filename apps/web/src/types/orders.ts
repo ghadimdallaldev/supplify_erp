@@ -300,6 +300,7 @@ export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'>
 export interface OrderFilters {
   status?: string
   supplier?: string
+  restaurant?: string
   q?: string
   from?: string
   to?: string
