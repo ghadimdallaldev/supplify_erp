@@ -882,9 +882,15 @@ describe('Admin Dashboard Routes', () => {
 
   describe('GET /conversion-stats', () => {
     it('returns conversion stats when conversion_event table exists', async () => {
+      // Promise.all: byType (windowed), byFeature, byLimit
       query
-        .mockResolvedValueOnce({ rows: [{ c: '25' }] })
-        .mockResolvedValueOnce({ rows: [{ c: '5' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { event_type: 'BLOCKED_FEATURE', c7: '8', c_window: '15' },
+            { event_type: 'BLOCKED_LIMIT', c7: '4', c_window: '10' },
+            { event_type: 'UPGRADE_SUCCESS', c7: '2', c_window: '5' },
+          ],
+        })
         .mockResolvedValueOnce({
           rows: [
             { key: 'reports', c: '10' },

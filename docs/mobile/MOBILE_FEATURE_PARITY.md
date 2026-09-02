@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Supplier profile LATERAL stats + admin conversion query cut
+
+- **Correctness**: `GET /suppliers/:id/statistics` excludes DRAFT/CANCELLED from order count; spend and AOV use delivered line totals only.
+- **Perf**: Supplier-by-id product_count/avg_price via LATERAL (aligned with catalog list); admin `conversion-stats` collapses ~10 scans into windowed event counts + top feature/limit queries.
+- **Mobile:** skipped — no mobile client uses supplier statistics; conversion-stats is admin-only.
+
 ## 2026-09-02 — Supplier restaurants stats + search blocklist + invoice detail
 
 - **Correctness**: Supplier restaurant list aggregates order/spend via supplier line items; search products honor blocklist; invoice detail uses LATERAL paid sum (no payment JOIN+GROUP BY).
