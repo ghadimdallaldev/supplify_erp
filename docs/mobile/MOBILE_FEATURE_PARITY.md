@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Checkout status lock + relationship gate + WH inventory list
+
+- **Correctness**: Restaurant create accepts only `DRAFT`/`PLACED`; stock reserved only for `PLACED`; checkout requires follow/prior-order (parity with product detail); WH-mode inventory list is product-anchored (includes WH-only SKUs).
+- **Perf**: Supplier low-stock dashboard preview uses SQL LIMIT 3 (no full catalog scan); dashboard summary cache invalidated on order create.
+- **Mobile:** Cart already sends `status: 'PLACED'`. New validation errors if ordering from unfollowed suppliers — no type/shape change required. Android/iOS source unchanged this pass.
+
 ## 2026-09-02 — In-stock catalog page fill
 
 - **Correctness**: `GET /products?inStock=true` scans ahead with authoritative stock overlay so offset pages fill to `limit` instead of shrinking after post-filter.

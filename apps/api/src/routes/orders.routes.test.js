@@ -111,6 +111,48 @@ vi.mock('../services/delivery-routes.service.js', () => ({
   releaseOrderFromPlannedRoutes: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../services/dashboard-summary.service.js', () => ({
+  buildDashboardSummary: vi.fn(),
+  dashboardSummaryCacheKey: vi.fn(
+    (tenantType, tenantId) => `dashboard:summary:v1:${tenantType}:${tenantId}`
+  ),
+  invalidateDashboardSummaryCache: vi.fn().mockResolvedValue(undefined),
+}))
+
+/** Shared checkout preflight mocks: product → blocklist → follow/link → supplier profile */
+function mockRestaurantCheckoutPreflight(db, { productId, supplierId }) {
+  db.query
+    .mockResolvedValueOnce({
+      rows: [
+        {
+          id: productId,
+          supplier_id: supplierId,
+          sku: 'SKU001',
+          current_price: 10.05,
+          currency: 'USD',
+          moq: 1,
+          order_multiple: 1,
+        },
+      ],
+    })
+    .mockResolvedValueOnce({ rows: [] }) // blocklist empty
+    .mockResolvedValueOnce({
+      rows: [{ supplier_id: supplierId, supplier_name: 'Supplier' }],
+    }) // follow/prior-order linked
+    .mockResolvedValueOnce({
+      rows: [
+        {
+          id: supplierId,
+          default_warehouse_id: 'wh-1',
+          fulfillment_mode: 'single',
+          multi_warehouse_enabled: false,
+          name: 'Supplier',
+          minimum_order_amount: 0,
+        },
+      ],
+    })
+}
+
 // Import routes after mocks
 import { ordersRoutes } from './orders.routes.js'
 
@@ -451,19 +493,6 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      // Mock: product query (for each item), checkLimit, then transaction queries
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ], // Product query for first item
-      })
-
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
       )
@@ -479,17 +508,7 @@ describe('Orders Routes', () => {
         },
       ])
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: supplierId,
-            default_warehouse_id: 'wh-1',
-            fulfillment_mode: 'single',
-            multi_warehouse_enabled: false,
-            name: 'Supplier',
-          },
-        ],
-      })
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
 
       const response = await request(app)
         .post('/api/orders')
@@ -528,18 +547,6 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ],
-      })
-
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
       )
@@ -555,17 +562,7 @@ describe('Orders Routes', () => {
         },
       ])
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: supplierId,
-            default_warehouse_id: 'wh-1',
-            fulfillment_mode: 'single',
-            multi_warehouse_enabled: false,
-            name: 'Supplier',
-          },
-        ],
-      })
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
 
       const { notifyOrderStatusChange } = await import('../services/notification.service.js')
       vi.mocked(notifyOrderStatusChange).mockRejectedValueOnce(new Error('notify failed'))
@@ -608,18 +605,6 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ],
-      })
-
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
       )
@@ -635,17 +620,7 @@ describe('Orders Routes', () => {
         },
       ])
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: supplierId,
-            default_warehouse_id: 'wh-1',
-            fulfillment_mode: 'single',
-            multi_warehouse_enabled: false,
-            name: 'Supplier',
-          },
-        ],
-      })
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
 
       const { notifyOrderStatusChange } = await import('../services/notification.service.js')
       vi.mocked(notifyOrderStatusChange).mockImplementationOnce(() => {
@@ -678,18 +653,6 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ],
-      })
-
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
       )
@@ -705,17 +668,7 @@ describe('Orders Routes', () => {
         },
       ])
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: supplierId,
-            default_warehouse_id: 'wh-1',
-            fulfillment_mode: 'single',
-            multi_warehouse_enabled: false,
-            name: 'Supplier',
-          },
-        ],
-      })
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
 
       let resolveAudit
       const auditDone = new Promise((resolve) => {
@@ -758,18 +711,6 @@ describe('Orders Routes', () => {
       const rbac = await import('../lib/rbac.js')
       vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: productId,
-            supplier_id: supplierId,
-            sku: 'SKU001',
-            current_price: 10.05,
-            currency: 'USD',
-          },
-        ],
-      })
-
       const { resolveProductPricesBatch } = await import(
         '../services/resolve-product-price.service.js'
       )
@@ -785,17 +726,7 @@ describe('Orders Routes', () => {
         },
       ])
 
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: supplierId,
-            default_warehouse_id: 'wh-1',
-            fulfillment_mode: 'single',
-            multi_warehouse_enabled: false,
-            name: 'Supplier',
-          },
-        ],
-      })
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
 
       let resolveNotify
       const notifyDone = new Promise((resolve) => {

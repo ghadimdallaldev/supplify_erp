@@ -217,21 +217,7 @@ const orderCreateSchema = z.object({
       })
     )
     .optional(),
-  status: z
-    .enum([
-      'DRAFT',
-      'PLACED',
-      'ACKNOWLEDGED',
-      'PROCESSING',
-      'SHIPPED',
-      'DELIVERED',
-      'RECEIVED_PARTIAL',
-      'RECEIVED_FULL',
-      'INVOICED',
-      'COMPLETED',
-      'CANCELLED',
-    ])
-    .default('PLACED'),
+  status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
 })
 
 const supplierOrderCreateSchema = z.object({
