@@ -4,6 +4,7 @@ import {
   computeSupplierStockFlags,
   DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
 } from '../lib/supplier-stock-status.js'
+import { listSupplierStockDisplay } from './supplier-stock.service.js'
 
 const RECENT_ORDER_LIMIT = 7
 const LOW_STOCK_PREVIEW_LIMIT = 3
@@ -175,32 +176,44 @@ async function fetchRestaurantSpendTrend(restaurantId, days = SPEND_TREND_DAYS) 
 }
 
 async function fetchSupplierLowStockPreview(supplierId) {
+  const stockRows = await listSupplierStockDisplay(supplierId)
+  const candidates = stockRows.filter((row) => Number(row.available_qty) > 0)
+  if (!candidates.length) return []
+
+  const productIds = candidates.map((row) => row.product_id)
+  const availableById = new Map(
+    candidates.map((row) => [row.product_id, Number(row.available_qty) || 0])
+  )
+
   const { rows } = await query(
     `SELECT
-       i.product_id AS id,
+       p.id,
        p.name AS product_name,
-       i.available_qty,
        COALESCE(pis.low_stock_threshold, $2)::int AS low_stock_threshold
-     FROM inventory i
-     JOIN product p ON p.id = i.product_id
+     FROM product p
      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
      WHERE p.supplier_id = $1
-       AND i.available_qty > 0
-       AND i.available_qty <= COALESCE(pis.low_stock_threshold, $2)
-     ORDER BY i.available_qty ASC, p.name ASC
-     LIMIT $3`,
-    [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, LOW_STOCK_PREVIEW_LIMIT]
+       AND p.id = ANY($3::uuid[])`,
+    [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, productIds]
   )
-  return rows.map((row) => {
-    const flags = computeSupplierStockFlags(row.available_qty, row.low_stock_threshold)
-    return {
-      id: row.id,
-      product_name: row.product_name,
-      available_qty: row.available_qty,
-      low_stock_threshold: flags.lowStockThreshold,
-      isLowStock: flags.isLowStock,
-    }
-  })
+
+  return rows
+    .map((row) => {
+      const available_qty = availableById.get(row.id) ?? 0
+      const flags = computeSupplierStockFlags(available_qty, row.low_stock_threshold)
+      return {
+        id: row.id,
+        product_name: row.product_name,
+        available_qty,
+        low_stock_threshold: flags.lowStockThreshold,
+        isLowStock: flags.isLowStock,
+      }
+    })
+    .filter((row) => row.isLowStock && row.available_qty > 0)
+    .sort(
+      (a, b) => a.available_qty - b.available_qty || a.product_name.localeCompare(b.product_name)
+    )
+    .slice(0, LOW_STOCK_PREVIEW_LIMIT)
 }
 
 /**

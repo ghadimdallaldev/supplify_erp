@@ -23,6 +23,7 @@ import {
   seedMissingWarehouseInventoryForSupplier,
   transferWarehouseInventory,
 } from '../services/supplier-stock.service.js'
+import { syncLegacyMirrorFromWarehouse } from '../services/supplier-order-stock.service.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { withTransaction } from '../lib/db.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
@@ -844,6 +845,12 @@ router.patch(
           reorder_quantity ?? null,
         ]
       )
+
+      await syncLegacyMirrorFromWarehouse(query, {
+        supplierId,
+        productId: req.params.productId,
+      })
+
       res.json({ ok: true, data: { inventory: rows[0] }, error: null, requestId: req.requestId })
     } catch (error) {
       if (error instanceof NotFoundError) {
