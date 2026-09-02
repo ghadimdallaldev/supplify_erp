@@ -1,0 +1,367 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  staffMutationGuard,
+  orgStructureGuard,
+  reviewsAccessGuard,
+  restaurantSupplierMutationGuard,
+  ordersRouterMutationGuard,
+  chatSendGuard,
+  notificationsMutationGuard,
+  resolveAdminDashboardPermission,
+  adminDashboardPermissionGuard,
+} from './route-permissions.js'
+import { PERMISSION_KEYS as P } from './permission-keys.js'
+import { RESTAURANT_SYSTEM_ROLES, SUPPLIER_SYSTEM_ROLES } from './role-matrix.js'
+import { resolveRolePermissionList } from './tenant-roles.js'
+import { hasPermission } from './permissions.js'
+
+const next = vi.fn()
+const res = {}
+
+function mockReq(method, path) {
+  return { method, path }
+}
+
+function mockResWithPerms(permissions) {
+  return {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn(),
+    req: {
+      tenantContext: { permissions },
+      userData: { role: 'RESTAURANT' },
+    },
+  }
+}
+
+vi.mock('./rbac.js', () => ({
+  requirePermission: (key) => (req, res, nextFn) => {
+    const perms = req.tenantContext?.permissions ?? []
+    if (perms.includes(key) || perms.includes(key.replace(/_VIEW$/, '_MANAGE'))) {
+      return nextFn()
+    }
+    return res.status(403).json({ error: key })
+  },
+  requireAnyPermission:
+    (...keys) =>
+    (req, res, nextFn) => {
+      const perms = req.tenantContext?.permissions ?? []
+      if (keys.some((k) => perms.includes(k))) return nextFn()
+      return res.status(403).json({ error: keys.join('|') })
+    },
+}))
+
+describe('staffMutationGuard', () => {
+  beforeEach(() => {
+    next.mockReset()
+  })
+
+  it('allows GET without write permissions', () => {
+    const req = { ...mockReq('GET', '/shifts'), tenantContext: { permissions: ['STAFF_VIEW'] } }
+    staffMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST for viewer with only STAFF_VIEW', () => {
+    const req = { ...mockReq('POST', '/pto'), tenantContext: { permissions: ['STAFF_VIEW'] } }
+    const r = mockResWithPerms(['STAFF_VIEW'])
+    staffMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST for staff with STAFF_EDIT', () => {
+    const req = {
+      ...mockReq('POST', '/pto'),
+      tenantContext: { permissions: ['STAFF_VIEW', 'STAFF_EDIT'] },
+    }
+    staffMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
+describe('orgStructureGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET /branches for viewer with any tenant context', () => {
+    const req = { ...mockReq('GET', '/branches'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
+    orgStructureGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST /branches for viewer', () => {
+    const req = {
+      ...mockReq('POST', '/branches'),
+      tenantContext: { permissions: [P.SETTINGS_VIEW] },
+    }
+    const r = mockResWithPerms([P.SETTINGS_VIEW])
+    orgStructureGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST /users/:id/role with STAFF_MANAGE', () => {
+    const req = {
+      ...mockReq('POST', '/users/u1/role'),
+      tenantContext: { permissions: [P.STAFF_MANAGE] },
+    }
+    orgStructureGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
+describe('reviewsAccessGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('blocks POST review for viewer', () => {
+    const req = {
+      ...mockReq('POST', '/suppliers/s1'),
+      tenantContext: { permissions: [P.ORDERS_VIEW] },
+    }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    reviewsAccessGuard(req, r, next)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
+
+describe('ordersRouterMutationGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET with ORDERS_VIEW only', () => {
+    const req = { ...mockReq('GET', '/'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST / without ORDERS_CREATE or ORDERS_MANAGE', () => {
+    const req = { ...mockReq('POST', '/'), tenantContext: { permissions: [P.ORDERS_VIEW] } }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    ordersRouterMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST / with ORDERS_CREATE', () => {
+    const req = {
+      ...mockReq('POST', '/'),
+      tenantContext: { permissions: [P.ORDERS_VIEW, P.ORDERS_CREATE] },
+    }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows POST /manual with ORDERS_MANAGE', () => {
+    const req = {
+      ...mockReq('POST', '/manual'),
+      tenantContext: { permissions: [P.ORDERS_VIEW, P.ORDERS_MANAGE] },
+    }
+    ordersRouterMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks PATCH without ORDERS_EDIT', () => {
+    const req = {
+      ...mockReq('PATCH', '/order-1'),
+      tenantContext: { permissions: [P.ORDERS_VIEW] },
+    }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    ordersRouterMutationGuard(req, r, next)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
+
+describe('chatSendGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET conversations with CHAT_VIEW only', () => {
+    const req = {
+      ...mockReq('GET', '/conversations'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks POST message without CHAT_SEND', () => {
+    const req = {
+      ...mockReq('POST', '/conversations/c1/messages'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    const r = mockResWithPerms([P.CHAT_VIEW])
+    chatSendGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows POST message with CHAT_SEND', () => {
+    const req = {
+      ...mockReq('POST', '/conversations/c1/messages'),
+      tenantContext: { permissions: [P.CHAT_VIEW, P.CHAT_SEND] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows PATCH read without CHAT_SEND', () => {
+    const req = {
+      ...mockReq('PATCH', '/conversations/c1/read'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
+describe('adminDashboardPermissionGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('maps finance routes to ADMIN_FINANCE', () => {
+    expect(resolveAdminDashboardPermission('/financial-overview')).toBe(P.ADMIN_FINANCE)
+  })
+
+  it('maps plans routes to ADMIN_PLANS', () => {
+    expect(resolveAdminDashboardPermission('/plans')).toBe(P.ADMIN_PLANS)
+    expect(resolveAdminDashboardPermission('/subscriptions')).toBe(P.ADMIN_PLANS)
+  })
+
+  it('blocks finance admin from plans API', () => {
+    const req = {
+      ...mockReq('GET', '/plans'),
+      tenantContext: { permissions: [P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS] },
+    }
+    const r = mockResWithPerms([P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS])
+    adminDashboardPermissionGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows finance admin on financial-overview', () => {
+    const req = {
+      ...mockReq('GET', '/financial-overview'),
+      tenantContext: { permissions: [P.ADMIN_ACCESS, P.ADMIN_FINANCE, P.ADMIN_TENANTS] },
+    }
+    adminDashboardPermissionGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
+describe('restaurantSupplierMutationGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('blocks follow for viewer', () => {
+    const req = {
+      ...mockReq('POST', '/s1/follow'),
+      tenantContext: { permissions: [P.ORDERS_VIEW] },
+    }
+    const r = mockResWithPerms([P.ORDERS_VIEW])
+    restaurantSupplierMutationGuard(req, r, next)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
+
+describe('role matrix write restrictions', () => {
+  function rolePerms(name, tenantType) {
+    const list = tenantType === 'SUPPLIER' ? SUPPLIER_SYSTEM_ROLES : RESTAURANT_SYSTEM_ROLES
+    const def = list.find((r) => r.name === name)
+    return resolveRolePermissionList(def, tenantType)
+  }
+
+  const writeKeys = [
+    P.ORDERS_CREATE,
+    P.ORDERS_EDIT,
+    P.ORDERS_MANAGE,
+    P.STAFF_INVITE,
+    P.STAFF_MANAGE,
+    P.SETTINGS_MANAGE,
+    P.SETTINGS_EDIT,
+    P.INVOICES_CREATE,
+    P.RECEIVING_MANAGE,
+    P.FULFILLMENT_MANAGE,
+    P.CHAT_SEND,
+    P.CHAT_MANAGE,
+    P.RESERVATIONS_CREATE,
+    P.RESERVATIONS_EDIT,
+    P.RESERVATIONS_MANAGE,
+  ]
+
+  it('restaurant Viewer cannot perform any write action', () => {
+    const perms = rolePerms('Viewer', 'RESTAURANT')
+    for (const key of writeKeys) {
+      expect(hasPermission(perms, key)).toBe(false)
+    }
+    expect(hasPermission(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.RESERVATIONS_VIEW)).toBe(true)
+  })
+
+  it('supplier Viewer cannot perform any write action', () => {
+    const perms = rolePerms('Viewer', 'SUPPLIER')
+    const supplierWriteKeys = [
+      ...writeKeys,
+      P.CATALOG_EDIT,
+      P.CATALOG_MANAGE,
+      P.INVENTORY_EDIT,
+      P.INVENTORY_MANAGE,
+      P.WAREHOUSES_EDIT,
+      P.WAREHOUSES_MANAGE,
+      P.PROMOTIONS_MANAGE,
+      P.RECEIVING_MANAGE,
+      P.PAYMENTS_MANAGE,
+      P.SUBSCRIPTIONS_MANAGE,
+    ]
+    for (const key of supplierWriteKeys) {
+      expect(hasPermission(perms, key)).toBe(false)
+    }
+    expect(hasPermission(perms, P.ORDERS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.CATALOG_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.FULFILLMENT_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.WAREHOUSES_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.PROMOTIONS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.SETTINGS_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.STAFF_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.CHAT_VIEW)).toBe(true)
+    for (const code of perms) {
+      expect(code.endsWith('_VIEW') || code.startsWith('ADMIN_')).toBe(true)
+    }
+  })
+
+  it('restaurant Accountant cannot access staff or settings admin', () => {
+    const perms = rolePerms('Accountant', 'RESTAURANT')
+    expect(hasPermission(perms, P.INVOICES_VIEW)).toBe(true)
+    expect(hasPermission(perms, P.STAFF_VIEW)).toBe(false)
+    expect(hasPermission(perms, P.SETTINGS_MANAGE)).toBe(false)
+    expect(hasPermission(perms, P.ORDERS_CREATE)).toBe(false)
+  })
+
+  it('restaurant Owner has full access', () => {
+    const perms = rolePerms('Owner', 'RESTAURANT')
+    expect(hasPermission(perms, P.SETTINGS_MANAGE)).toBe(true)
+    expect(hasPermission(perms, P.STAFF_MANAGE)).toBe(true)
+  })
+})
+
+describe('notificationsMutationGuard', () => {
+  beforeEach(() => {
+    next.mockReset()
+  })
+
+  it('allows platform admin to PATCH preferences without tenant permissions', () => {
+    const req = {
+      ...mockReq('PATCH', '/preferences'),
+      userData: { role: 'ADMIN' },
+      tenantContext: null,
+    }
+    notificationsMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('requires settings permission for tenant users', () => {
+    const req = {
+      ...mockReq('PATCH', '/preferences'),
+      userData: { role: 'RESTAURANT' },
+      tenantContext: { permissions: ['SETTINGS_VIEW'] },
+    }
+    const r = mockResWithPerms(['SETTINGS_VIEW'])
+    notificationsMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+})
