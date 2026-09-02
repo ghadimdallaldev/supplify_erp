@@ -921,17 +921,31 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
       })
     }
 
-    // Mark message as read
-    await query(
+    // Mark message as read and keep participant unread_count in sync
+    const { rows: marked } = await query(
       `
       UPDATE message
       SET is_read = true,
           read_at = now(),
           updated_at = now()
       WHERE id = $1 AND is_read = false
+      RETURNING id
     `,
       [messageId]
     )
+
+    if (marked.length > 0) {
+      await query(
+        `
+        UPDATE conversation_participant
+        SET unread_count = GREATEST(unread_count - 1, 0),
+            last_read_at = now(),
+            updated_at = now()
+        WHERE conversation_id = $1 AND participant_type = $2
+      `,
+        [message.conversation_id, participantType]
+      )
+    }
 
     // Emit socket event for real-time read receipt update
     try {

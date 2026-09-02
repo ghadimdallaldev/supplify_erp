@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Chat unread correctness + notification/email health cuts
+
+- **Correctness**: Deal-message path uses `getOrCreateConversation` (participant backfill); per-message read decrements `conversation_participant.unread_count`; support initial message uses tenant `sender_id` so unread does not self-increment.
+- **Perf**: Notification list reuses shared unread COUNT cache; admin email 24h stats + health failures cached 60s (overview/summary/health share).
+- **Mobile:** skipped — server-side chat/notification/admin fixes; response shapes unchanged.
+
 ## 2026-09-02 — Supplier profile LATERAL stats + admin conversion query cut
 
 - **Correctness**: `GET /suppliers/:id/statistics` excludes DRAFT/CANCELLED from order count; spend and AOV use delivered line totals only.
