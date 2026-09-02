@@ -79,7 +79,13 @@ router.get('/', async (req, res) => {
       queryParams.push(tenant.tenantId)
       paramIndex++
     } else if (tenant?.tenantType === 'SUPPLIER') {
-      whereConditions.push(`p.supplier_id = $${paramIndex}`)
+      whereConditions.push(`EXISTS (
+        SELECT 1
+        FROM order_item oi_s
+        JOIN product p_s ON p_s.id = oi_s.product_id
+        WHERE oi_s.order_id = o.id
+          AND p_s.supplier_id = $${paramIndex}
+      )`)
       queryParams.push(tenant.tenantId)
       paramIndex++
     } else if (req.userData.role === 'RESTAURANT' || req.userData.role === 'SUPPLIER') {
@@ -141,33 +147,21 @@ router.get('/', async (req, res) => {
 
     // Supplier filter (for admin when not impersonating)
     if (params.supplier && req.userData.role === 'ADMIN' && !tenant) {
-      whereConditions.push(`p.supplier_id = $${paramIndex}`)
+      whereConditions.push(`EXISTS (
+        SELECT 1
+        FROM order_item oi_a
+        JOIN product p_a ON p_a.id = oi_a.product_id
+        WHERE oi_a.order_id = o.id
+          AND p_a.supplier_id = $${paramIndex}
+      )`)
       queryParams.push(params.supplier)
       paramIndex++
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const needsItemJoin =
-      tenant?.tenantType === 'SUPPLIER' ||
-      (params.supplier && req.userData.role === 'ADMIN' && !tenant) ||
-      Boolean(params.q?.trim())
-
-    const sql = needsItemJoin
-      ? `
-      SELECT DISTINCT
-        o.*,
-        r.name as restaurant_name,
-        r.slug as restaurant_slug
-      FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
-      LEFT JOIN order_item oi ON oi.order_id = o.id
-      LEFT JOIN product p ON p.id = oi.product_id
-      ${whereClause}
-      ORDER BY o.created_at DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `
-      : `
+    // Supplier/search filters use EXISTS (no DISTINCT + item joins).
+    const sql = `
       SELECT
         o.*,
         r.name as restaurant_name,
@@ -181,15 +175,7 @@ router.get('/', async (req, res) => {
 
     queryParams.push(params.limit, params.offset)
 
-    const countSql = needsItemJoin
-      ? `
-      SELECT COUNT(DISTINCT o.id) as total
-      FROM customer_order o
-      LEFT JOIN order_item oi ON oi.order_id = o.id
-      LEFT JOIN product p ON p.id = oi.product_id
-      ${whereClause}
-    `
-      : `
+    const countSql = `
       SELECT COUNT(*)::int as total
       FROM customer_order o
       JOIN restaurant r ON r.id = o.restaurant_id
