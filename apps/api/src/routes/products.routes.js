@@ -460,9 +460,7 @@ router.get('/', async (req, res) => {
     }
 
     const useKeyset = Boolean(cursorTuple)
-    const fetchLimit = useKeyset ? params.limit + 1 : params.limit
-
-    const sql = `
+    const listSelectSql = `
       SELECT 
         ${PRODUCT_LIST_COLUMNS},
         s.id as supplier_id,
@@ -487,14 +485,7 @@ router.get('/', async (req, res) => {
       ) pr ON true
       ${whereClause}
       ORDER BY ${orderByClause}${useKeyset ? ', p.id DESC' : ''}
-      LIMIT $${paramIndex}${useKeyset ? '' : ` OFFSET $${paramIndex + 1}`}
     `
-
-    if (useKeyset) {
-      queryParams.push(fetchLimit)
-    } else {
-      queryParams.push(params.limit, params.offset)
-    }
 
     const countNeedsPriceJoin = params.minPrice !== undefined || params.maxPrice !== undefined
     const countSql = `
@@ -516,34 +507,103 @@ router.get('/', async (req, res) => {
       ${whereClause}
     `
 
-    const [mainResult, countResult] = await Promise.all([
-      query(sql, queryParams),
-      useKeyset ? Promise.resolve({ rows: [{ total: null }] }) : query(countSql, countParams),
-    ])
-    let { rows } = mainResult
-    const { rows: countRows } = countResult
+    /**
+     * inStock filters after warehouse-authoritative overlay, so SQL LIMIT/OFFSET
+     * alone under-fills pages. Scan ahead in batches until the page is filled.
+     */
+    const fetchInStockOffsetPage = async () => {
+      const page = []
+      let skipped = 0
+      let dbOffset = 0
+      const batchSize = Math.max(params.limit * 4, 40)
+      let exhausted = false
+      let safety = 0
+      while (page.length < params.limit && !exhausted && safety < 25) {
+        safety += 1
+        const batchParams = [...queryParams, batchSize, dbOffset]
+        const { rows: batchRows } = await query(
+          `${listSelectSql}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+          batchParams
+        )
+        if (batchRows.length < batchSize) exhausted = true
+        dbOffset += batchRows.length
+        if (batchRows.length === 0) break
 
+        let enriched = batchRows
+        if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
+          enriched = await enrichProductsWithResolvedPricing(enriched, restaurantId)
+        }
+        enriched = await overlayProductRowsWithAuthoritativeStock(enriched)
+        enriched = enriched.filter((row) => Number(row.available_qty || 0) > 0)
+
+        for (const row of enriched) {
+          if (skipped < params.offset) {
+            skipped += 1
+            continue
+          }
+          page.push(row)
+          if (page.length >= params.limit) break
+        }
+      }
+      return { rows: page, exhausted, scannedPastPage: skipped >= params.offset }
+    }
+
+    let rows
+    let countRows
     let nextCursor = null
-    if (useKeyset && rows.length > params.limit) {
-      const lastKept = rows[params.limit - 1]
-      nextCursor = encodeProductCursor(lastKept.created_at, lastKept.id)
-      rows = rows.slice(0, params.limit)
-    } else if (!useKeyset && rows.length > 0) {
-      const total = parseInt(countRows[0].total, 10)
-      if (params.offset + rows.length < total) {
+
+    if (params.inStock && !useKeyset) {
+      const filled = await fetchInStockOffsetPage()
+      rows = filled.rows
+      // Exact in-stock total requires a full authoritative scan; report a lower bound
+      // that still drives nextCursor when more in-stock rows may exist.
+      const lowerBound = params.offset + rows.length + (filled.exhausted ? 0 : 1)
+      countRows = [{ total: String(lowerBound) }]
+      if (!filled.exhausted && rows.length > 0) {
         const last = rows[rows.length - 1]
         nextCursor = encodeProductCursor(last.created_at, last.id)
       }
-    }
+    } else {
+      const fetchLimit = useKeyset
+        ? params.inStock
+          ? Math.max(params.limit * 4, params.limit + 1)
+          : params.limit + 1
+        : params.limit
+      const sql = `${listSelectSql}
+      LIMIT $${paramIndex}${useKeyset ? '' : ` OFFSET $${paramIndex + 1}`}`
+      const listParams = useKeyset
+        ? [...queryParams, fetchLimit]
+        : [...queryParams, params.limit, params.offset]
 
-    if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
-      rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
-    }
+      const [mainResult, countResult] = await Promise.all([
+        query(sql, listParams),
+        useKeyset ? Promise.resolve({ rows: [{ total: null }] }) : query(countSql, countParams),
+      ])
+      rows = mainResult.rows
+      countRows = countResult.rows
 
-    if (params.includeStock || params.inStock) {
-      rows = await overlayProductRowsWithAuthoritativeStock(rows)
-      if (params.inStock) {
-        rows = rows.filter((row) => Number(row.available_qty || 0) > 0)
+      if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
+        rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
+      }
+
+      if (params.includeStock || params.inStock) {
+        rows = await overlayProductRowsWithAuthoritativeStock(rows)
+        if (params.inStock) {
+          rows = rows.filter((row) => Number(row.available_qty || 0) > 0)
+        }
+      }
+
+      if (useKeyset && rows.length > params.limit) {
+        const lastKept = rows[params.limit - 1]
+        nextCursor = encodeProductCursor(lastKept.created_at, lastKept.id)
+        rows = rows.slice(0, params.limit)
+      } else if (!useKeyset && rows.length > 0) {
+        const total = parseInt(countRows[0].total, 10)
+        if (params.offset + rows.length < total) {
+          const last = rows[rows.length - 1]
+          nextCursor = encodeProductCursor(last.created_at, last.id)
+        }
       }
     }
 
@@ -552,7 +612,7 @@ router.get('/', async (req, res) => {
       data: {
         products: rows,
         pagination: {
-          total: useKeyset ? null : parseInt(countRows[0].total),
+          total: useKeyset ? null : parseInt(countRows[0].total, 10),
           limit: params.limit,
           offset: useKeyset ? null : params.offset,
           nextCursor,
