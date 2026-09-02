@@ -108,7 +108,8 @@ describe('supplier-order-stock.service', () => {
     const result = await releaseStockForOrder(client, 'ord-1')
     expect(result.mode).toBe('legacy')
     expect(releaseInventoryForOrder).not.toHaveBeenCalled()
-    expect(client.query.mock.calls[2][0]).toContain('available_qty = available_qty + $1')
+    expect(client.query.mock.calls[2][0]).toContain('FROM unnest($1::uuid[], $2::numeric[])')
+    expect(client.query.mock.calls[2][0]).toContain('available_qty = inv.available_qty + src.qty')
   })
 
   it('maps warehouse insufficient stock to ValidationError', async () => {
