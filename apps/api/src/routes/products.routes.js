@@ -25,6 +25,10 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import {
+  getSupplierProductAvailableQty,
+  overlayProductRowsWithAuthoritativeStock,
+} from '../services/supplier-stock.service.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
@@ -393,10 +397,8 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
-    // In stock filter
-    if (params.inStock) {
-      whereConditions.push(`inv.total_available > 0`)
-    }
+    // In-stock filtering uses checkout-authoritative qty after overlay (warehouse fail-closed).
+    // Do not filter on legacy inventory here — that falsely includes WH-mode products with stale legacy qty.
 
     const cursorTuple = params.cursor ? decodeProductCursor(params.cursor) : null
     if (params.cursor && !cursorTuple) {
@@ -477,24 +479,8 @@ router.get('/', async (req, res) => {
       queryParams.push(params.limit, params.offset)
     }
 
-    const countSql = params.inStock
-      ? `
+    const countSql = `
       SELECT COUNT(*)::int as total
-      FROM product p
-      JOIN supplier s ON s.id = p.supplier_id
-      ${inventoryJoin}
-      LEFT JOIN LATERAL (
-        SELECT amount
-        FROM price
-        WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
-        LIMIT 1
-      ) pr ON true
-      ${whereClause}
-    `
-      : `
-      SELECT COUNT(*) as total
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN LATERAL (
@@ -530,6 +516,13 @@ router.get('/', async (req, res) => {
 
     if (tenant?.tenantType === 'RESTAURANT' && restaurantId) {
       rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
+    }
+
+    if (params.includeStock || params.inStock) {
+      rows = await overlayProductRowsWithAuthoritativeStock(rows)
+      if (params.inStock) {
+        rows = rows.filter((row) => Number(row.available_qty || 0) > 0)
+      }
     }
 
     res.json({
@@ -888,6 +881,8 @@ router.get('/:id', async (req, res) => {
       const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
       product = enriched
     }
+
+    product.available_qty = await getSupplierProductAvailableQty(product.supplier_id, product.id)
 
     delete product.supplier_email
     delete product.contact_email

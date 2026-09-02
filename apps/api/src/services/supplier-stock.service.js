@@ -104,6 +104,49 @@ export async function listSupplierStockDisplay(
 }
 
 /**
+ * Overlay product list/detail rows with checkout-authoritative stock.
+ * When a supplier uses warehouse inventory, missing WH rows mean 0 (fail-closed),
+ * never fall back to legacy `inventory` qty.
+ *
+ * @param {Array<{ id: string, supplier_id?: string, available_qty?: number }>} productRows
+ * @returns {Promise<typeof productRows>}
+ */
+export async function overlayProductRowsWithAuthoritativeStock(productRows) {
+  if (!Array.isArray(productRows) || productRows.length === 0) return productRows
+
+  const bySupplier = new Map()
+  for (const row of productRows) {
+    const supplierId = row.supplier_id
+    if (!supplierId || !row.id) continue
+    if (!bySupplier.has(supplierId)) bySupplier.set(supplierId, [])
+    bySupplier.get(supplierId).push(row)
+  }
+
+  const authoritativeQty = new Map()
+  await Promise.all(
+    [...bySupplier.entries()].map(async ([supplierId, products]) => {
+      if (!(await supplierUsesWarehouseInventory(supplierId))) return
+      const productIds = products.map((p) => p.id)
+      const stockRows = await listSupplierStockDisplay(supplierId, { productIds })
+      const seen = new Set()
+      for (const stock of stockRows) {
+        authoritativeQty.set(stock.product_id, Number(stock.available_qty ?? 0))
+        seen.add(stock.product_id)
+      }
+      for (const product of products) {
+        if (!seen.has(product.id)) authoritativeQty.set(product.id, 0)
+      }
+    })
+  )
+
+  if (authoritativeQty.size === 0) return productRows
+
+  return productRows.map((row) =>
+    authoritativeQty.has(row.id) ? { ...row, available_qty: authoritativeQty.get(row.id) } : row
+  )
+}
+
+/**
  * Heal products that have legacy (or inactive-warehouse) stock but no active warehouse_inventory row.
  * Prefer transferring stock from inactive warehouses; otherwise seed from legacy inventory.
  * Skips products that already have stock on any active warehouse (multi-WH intentional placement).
