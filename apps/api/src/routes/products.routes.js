@@ -387,6 +387,19 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
+    // Hide blocklisted suppliers from restaurant catalog (match search/detail)
+    if (restaurantId) {
+      whereConditions.push(`
+        NOT EXISTS (
+          SELECT 1 FROM supplier_blocklist sb
+          WHERE sb.supplier_id = p.supplier_id
+            AND sb.restaurant_id = $${paramIndex}
+        )
+      `)
+      queryParams.push(restaurantId)
+      paramIndex++
+    }
+
     // Price range filter
     if (params.minPrice !== undefined) {
       whereConditions.push(`pr.amount >= $${paramIndex}`)
@@ -483,18 +496,23 @@ router.get('/', async (req, res) => {
       queryParams.push(params.limit, params.offset)
     }
 
+    const countNeedsPriceJoin = params.minPrice !== undefined || params.maxPrice !== undefined
     const countSql = `
       SELECT COUNT(*)::int as total
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
-      LEFT JOIN LATERAL (
+      ${
+        countNeedsPriceJoin
+          ? `LEFT JOIN LATERAL (
         SELECT amount
         FROM price
         WHERE price.product_id = p.id
           AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
         ORDER BY valid_from DESC
         LIMIT 1
-      ) pr ON true
+      ) pr ON true`
+          : ''
+      }
       ${whereClause}
     `
 

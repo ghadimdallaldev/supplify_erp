@@ -72,7 +72,19 @@ async function buildRestaurantStats(restaurantId) {
     { rows: totalSpent },
     { rows: totalSuppliers },
   ] = await Promise.all([
-    query('SELECT COUNT(*)::int AS count FROM product'),
+    query(
+      `SELECT COUNT(*)::int AS count
+       FROM product p
+       WHERE EXISTS (
+         SELECT 1 FROM supplier_follow sf
+         WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM supplier_blocklist sb
+         WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1
+       )`,
+      [restaurantId]
+    ),
     query('SELECT COUNT(*)::int AS count FROM customer_order WHERE restaurant_id = $1', [
       restaurantId,
     ]),
