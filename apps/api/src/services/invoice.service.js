@@ -409,13 +409,17 @@ const INVOICE_DETAIL_SELECT = `
     o.id AS linked_order_id,
     o.status AS order_status,
     o.placed_at AS order_placed_at,
-    COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) AS total_paid
+    COALESCE(paid.total_paid, 0) AS total_paid
   FROM invoice i
   LEFT JOIN restaurant r ON r.id = i.restaurant_id
   LEFT JOIN supplier s ON s.id = i.supplier_id
   LEFT JOIN branch b ON b.id = i.branch_id
   LEFT JOIN customer_order o ON o.id = i.order_id
-  LEFT JOIN payment p ON p.invoice_id = i.id
+  LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(payment_amount) FILTER (WHERE status = 'COMPLETED'), 0) AS total_paid
+    FROM payment
+    WHERE invoice_id = i.id
+  ) paid ON true
 `
 
 export async function getInvoiceDetail(
@@ -434,9 +438,6 @@ export async function getInvoiceDetail(
     `
     ${INVOICE_DETAIL_SELECT}
     WHERE i.id = $1${tenantFilter}
-    GROUP BY i.id, r.name, r.contact_name, r.email, r.phone,
-      s.name, s.contact_email, s.phone, s.address_json,
-      b.name, o.id, o.status, o.placed_at
     `,
     params
   )
