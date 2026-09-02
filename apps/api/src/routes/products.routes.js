@@ -46,7 +46,9 @@ const PRODUCT_LIST_COLUMNS = `
   p.image_thumb_url,
   p.tags,
   p.created_at,
-  p.updated_at
+  p.updated_at,
+  COALESCE(pis.moq, 1) AS moq,
+  COALESCE(pis.order_multiple, 1) AS order_multiple
 `
 
 function buildInventoryJoin(scopedSupplierId, supplierParamIndex) {
@@ -453,12 +455,14 @@ router.get('/', async (req, res) => {
         s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,
+        s.minimum_order_amount as supplier_minimum_order_amount,
         ${availableQtyExpr},
         ${favoritedExpr},
         pr.amount as current_price,
         pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       ${inventoryJoin}
       LEFT JOIN LATERAL (
         SELECT amount, currency
@@ -793,11 +797,15 @@ router.get('/:id', async (req, res) => {
         s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,
+        s.minimum_order_amount as supplier_minimum_order_amount,
+        COALESCE(pis.moq, 1) AS moq,
+        COALESCE(pis.order_multiple, 1) AS order_multiple,
         i.available_qty,
         pr.amount as current_price,
         pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN inventory i ON i.product_id = p.id
       LEFT JOIN price pr ON pr.product_id = p.id 
         AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)

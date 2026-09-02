@@ -6,6 +6,7 @@ import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
 import { getSupplierGrowthMetrics } from './supplier-growth-metrics.service.js'
 import { DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD } from '../lib/supplier-stock-status.js'
+import { listSupplierStockDisplay } from './supplier-stock.service.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 const COMMAND_CENTER_CACHE_TTL_SECONDS = 45
@@ -146,27 +147,42 @@ async function countOrdersNeedingSupplierAction(supplierId) {
 }
 
 async function getLowStockProducts(supplierId) {
+  const stockRows = await listSupplierStockDisplay(supplierId)
+  const candidates = stockRows.filter((row) => Number(row.available_qty) > 0)
+  if (!candidates.length) return []
+
+  const productIds = candidates.map((row) => row.product_id)
+  const availableById = new Map(
+    candidates.map((row) => [row.product_id, Number(row.available_qty) || 0])
+  )
+
   const { rows } = await query(
     `
-    SELECT p.id, p.name, p.sku, i.available_qty, COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD}) AS reorder_point
+    SELECT p.id, p.name, p.sku,
+           COALESCE(pis.low_stock_threshold, $2) AS reorder_point
     FROM product p
-    JOIN inventory i ON i.product_id = p.id
     LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
     WHERE p.supplier_id = $1
-      AND i.available_qty > 0
-      AND i.available_qty <= COALESCE(pis.low_stock_threshold, ${DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD})
-    ORDER BY i.available_qty ASC
-    LIMIT 20
+      AND p.id = ANY($3::uuid[])
     `,
-    [supplierId]
+    [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, productIds]
   )
-  return rows.map((r) => ({
-    productId: r.id,
-    name: r.name,
-    sku: r.sku,
-    availableQty: parseFloat(r.available_qty) || 0,
-    reorderPoint: parseFloat(r.reorder_point) || 0,
-  }))
+
+  return rows
+    .map((r) => {
+      const availableQty = availableById.get(r.id) || 0
+      const reorderPoint = parseFloat(r.reorder_point) || 0
+      return {
+        productId: r.id,
+        name: r.name,
+        sku: r.sku,
+        availableQty,
+        reorderPoint,
+      }
+    })
+    .filter((r) => r.availableQty > 0 && r.availableQty <= r.reorderPoint)
+    .sort((a, b) => a.availableQty - b.availableQty)
+    .slice(0, 20)
 }
 
 async function countOpenDisputes(supplierId) {

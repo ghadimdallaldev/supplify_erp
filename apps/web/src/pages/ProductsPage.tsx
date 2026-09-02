@@ -33,6 +33,7 @@ import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
+import { getProductMoq } from '../lib/orderQuantityRules'
 import {
   EMPTY_PRODUCT_FORM,
   ProductsPageLoading,
@@ -244,7 +245,7 @@ export function ProductsPage() {
   }
 
   const handleAddToCart = (product: any) => {
-    addItem({ productId: product.id, product, quantity: 1 })
+    addItem({ productId: product.id, product, quantity: getProductMoq(product) })
     toast.success(t('toast.addedToCart'))
   }
 

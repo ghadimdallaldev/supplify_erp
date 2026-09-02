@@ -1,6 +1,8 @@
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { notifyTenantUsers } from './notification.service.js'
+import { releaseStockForOrder, reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
+import { isFeatureEnabled } from '../lib/subscription.js'
 
 export const MUTABLE_ORDER_STATUSES = new Set([
   'PLACED',
@@ -37,12 +39,28 @@ export async function assertNoPendingAmendment(orderId, client = query) {
   }
 }
 
+/**
+ * Recompute order total from line items, preserving already-applied promotion discounts.
+ * Server remains authority; amendments must not wipe checkout deals.
+ */
 export async function recalculateOrderTotal(orderId, client) {
   const { rows } = await client.query(
     `SELECT COALESCE(SUM(line_total), 0)::numeric AS total FROM order_item WHERE order_id = $1`,
     [orderId]
   )
-  const total = Number(rows[0]?.total || 0)
+  const subtotal = Number(rows[0]?.total || 0)
+
+  const { rows: discountRows } = await client.query(
+    `
+    SELECT COALESCE(SUM(discount_applied), 0)::numeric AS discount
+    FROM promotion_usages
+    WHERE order_id = $1
+    `,
+    [orderId]
+  )
+  const discount = Number(discountRows[0]?.discount || 0)
+  const total = Math.max(0, subtotal - discount)
+
   await client.query(
     `UPDATE customer_order SET total_amount = $1, updated_at = NOW() WHERE id = $2`,
     [total, orderId]
@@ -118,6 +136,46 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
   return recalculateOrderTotal(orderId, client)
 }
 
+async function rereserveOrderStock(client, orderId) {
+  const { rows: orderRows } = await client.query(`SELECT * FROM customer_order WHERE id = $1`, [
+    orderId,
+  ])
+  const order = orderRows[0]
+  if (!order) return
+
+  const { rows: orderItems } = await client.query(
+    `
+    SELECT oi.*, p.sku
+    FROM order_item oi
+    JOIN product p ON p.id = oi.product_id
+    WHERE oi.order_id = $1
+    `,
+    [orderId]
+  )
+  if (!orderItems.length) return
+
+  const supplierId = orderItems[0].supplier_id
+  if (!supplierId) return
+
+  const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
+    supplierId,
+  ])
+  const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+
+  await reserveStockForPlacedOrder(client, {
+    supplierId,
+    supplier: supplierRows[0] || { id: supplierId },
+    order: { ...order, restaurant_id: order.restaurant_id },
+    orderItems,
+    multiWarehouseActive: multiActive,
+    legacyLineItems: orderItems.map((oi) => ({
+      productId: oi.product_id,
+      quantity: oi.quantity,
+      sku: oi.sku,
+    })),
+  })
+}
+
 export async function notifyAmendmentParty(order, amendment, action) {
   const supplierId = order.supplier_id
   const restaurantId = order.restaurant_id
@@ -177,7 +235,10 @@ export async function acceptAmendment(amendmentId, orderId, responderUserId, res
       throw new ValidationError('You cannot accept your own amendment request')
     }
 
+    // Release pre-amendment reservations, apply line changes, then reserve for new quantities.
+    await releaseStockForOrder(client, orderId)
     const newTotal = await applyAmendmentItems(client, orderId, amendmentId)
+    await rereserveOrderStock(client, orderId)
 
     const { rows: updated } = await client.query(
       `

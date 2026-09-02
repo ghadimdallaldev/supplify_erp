@@ -30,6 +30,12 @@ export interface Product {
   contract_valid_from?: string | null
   contract_valid_until?: string | null
   contract_min_order_quantity?: number | null
+  /** Supplier MOQ from product_inventory_settings */
+  moq?: number
+  /** Pack / order multiple */
+  order_multiple?: number
+  /** Supplier minimum order amount (catalog join) */
+  supplier_minimum_order_amount?: number | null
 }
 
 export interface CreateProductRequest {
