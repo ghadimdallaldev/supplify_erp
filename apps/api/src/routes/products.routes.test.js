@@ -265,25 +265,25 @@ describe('Products Routes', () => {
     it('should filter to in-stock rows when inStock=true', async () => {
       const stock = await import('../services/supplier-stock.service.js')
       vi.mocked(stock.overlayProductRowsWithAuthoritativeStock).mockResolvedValueOnce([
-        { id: 'p1', available_qty: 5 },
-        { id: 'p2', available_qty: 0 },
+        { id: 'p1', available_qty: 5, created_at: '2026-01-01T00:00:00.000Z' },
+        { id: 'p2', available_qty: 0, created_at: '2026-01-01T00:00:00.000Z' },
       ])
 
-      db.query
-        .mockResolvedValueOnce({
-          rows: [
-            { id: 'p1', available_qty: 5 },
-            { id: 'p2', available_qty: 0 },
-          ],
-          rowCount: 2,
-        })
-        .mockResolvedValueOnce({ rows: [{ total: '2' }] })
+      // inStock offset fill: one batch query (no separate COUNT)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          { id: 'p1', available_qty: 5, created_at: '2026-01-01T00:00:00.000Z' },
+          { id: 'p2', available_qty: 0, created_at: '2026-01-01T00:00:00.000Z' },
+        ],
+        rowCount: 2,
+      })
 
       const response = await request(app).get('/api/products?inStock=true').expect(200)
 
       expect(stock.overlayProductRowsWithAuthoritativeStock).toHaveBeenCalled()
       expect(response.body.data.products).toHaveLength(1)
       expect(response.body.data.products[0].id).toBe('p1')
+      expect(response.body.data.pagination.total).toBe(1)
     })
   })
 

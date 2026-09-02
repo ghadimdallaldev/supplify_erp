@@ -2,6 +2,11 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — In-stock catalog page fill
+
+- **Correctness**: `GET /products?inStock=true` scans ahead with authoritative stock overlay so offset pages fill to `limit` instead of shrinking after post-filter.
+- **Mobile:** skipped — mobile catalog uses `includeStock`, not `inStock` filter; server pagination semantics only.
+
 ## 2026-09-02 — Checkout blocklist + catalog/dashboard/fulfillment correctness
 
 - **Correctness**: Restaurant checkout rejects blocklisted suppliers; product list hides blocklisted suppliers; restaurant dashboard `totalProducts` scoped to followed/non-blocked; fulfillment `deliveredToday` counts distinct orders (no route+PoD double-count).
