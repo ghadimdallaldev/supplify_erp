@@ -308,9 +308,68 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
 }
 
 export async function loadDealDetailForRestaurant(dealId, restaurantId) {
-  const deals = await discoverDealsForRestaurant(restaurantId, {})
-  const deal = deals.find((d) => String(d.id) === String(dealId))
+  const restaurant = await loadRestaurantForTargeting(restaurantId)
+  if (!restaurant) return null
+
+  const { rows } = await query(
+    `
+    SELECT
+      p.*,
+      s.name AS supplier_name,
+      s.slug AS supplier_slug,
+      EXISTS (
+        SELECT 1 FROM supplier_follow sf
+        WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
+      ) AS is_followed,
+      dp.id AS deal_promotion_id,
+      dp.budget AS promotion_budget,
+      dp.starts_at AS promotion_starts_at,
+      dp.ends_at AS promotion_ends_at,
+      dp.target_audience AS promotion_target_audience,
+      (dp.id IS NOT NULL) AS is_sponsored
+    FROM promotions p
+    JOIN supplier s ON s.id = p.supplier_id
+    LEFT JOIN LATERAL (
+      SELECT dp2.*
+      FROM deal_promotions dp2
+      WHERE dp2.deal_id = p.id
+        AND dp2.status = 'active'
+        AND dp2.starts_at <= NOW()
+        AND (dp2.ends_at IS NULL OR dp2.ends_at > NOW())
+      ORDER BY dp2.created_at DESC
+      LIMIT 1
+    ) dp ON TRUE
+    WHERE p.id = $2
+      AND p.status = 'active'
+      AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+      AND p.boost_start_at IS NOT NULL
+      AND p.boost_start_at <= NOW()
+      AND p.boost_end_at IS NOT NULL
+      AND p.boost_end_at > NOW()
+      AND p.starts_at <= NOW()
+      AND (p.ends_at IS NULL OR p.ends_at > NOW())
+      AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
+      AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+      AND (
+        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
+        OR EXISTS (
+          SELECT 1 FROM promotion_restaurant_targets prt
+          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
+        )
+      )
+      AND dp.id IS NOT NULL
+    `,
+    [restaurantId, dealId]
+  )
+
+  const deal = rows[0]
   if (!deal) return null
+  if (!matchesRestaurantTargeting(deal, restaurant)) return null
+  if (deal.is_sponsored && deal.deal_promotion_id) {
+    const raw = deal.promotion_target_audience || deal.target_audience
+    const audience = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!matchesPromotionAudience(audience, restaurant)) return null
+  }
 
   const { rows: targets } = await query(
     `
