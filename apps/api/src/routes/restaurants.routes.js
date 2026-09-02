@@ -70,6 +70,7 @@ router.get('/', requireAuth, async (req, res) => {
     const whereConditions = []
     const queryParams = []
     let paramIndex = 1
+    let supplierParamIndex = null
 
     // Role-based filtering
     if (req.userData.role === 'SUPPLIER') {
@@ -109,6 +110,7 @@ router.get('/', requireAuth, async (req, res) => {
         )
       `)
       queryParams.push(supplierId)
+      supplierParamIndex = paramIndex
       paramIndex++
     } else if (req.userData.role !== 'ADMIN') {
       // Other roles (RESTAURANT) have no access
@@ -140,9 +142,43 @@ router.get('/', requireAuth, async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const sql = `
-      SELECT 
-        r.*,
+    const statsSelect =
+      supplierParamIndex != null
+        ? `
+        (SELECT COUNT(DISTINCT o.id)::int
+         FROM customer_order o
+         JOIN order_item oi ON oi.order_id = o.id
+         WHERE o.restaurant_id = r.id AND oi.supplier_id = $${supplierParamIndex}
+        ) as total_orders,
+        (SELECT COALESCE(SUM(oi.line_total), 0)
+         FROM customer_order o
+         JOIN order_item oi ON oi.order_id = o.id
+         WHERE o.restaurant_id = r.id
+           AND oi.supplier_id = $${supplierParamIndex}
+           AND ${deliveredOrderStatusInSql('o.status')}
+        ) as total_spent,
+        (
+          SELECT json_build_object(
+            'id', o.id,
+            'status', o.status,
+            'total_amount', (
+              SELECT COALESCE(SUM(oi2.line_total), 0)
+              FROM order_item oi2
+              WHERE oi2.order_id = o.id AND oi2.supplier_id = $${supplierParamIndex}
+            ),
+            'placed_at', o.placed_at,
+            'created_at', o.created_at
+          )
+          FROM customer_order o
+          WHERE o.restaurant_id = r.id
+            AND EXISTS (
+              SELECT 1 FROM order_item oi
+              WHERE oi.order_id = o.id AND oi.supplier_id = $${supplierParamIndex}
+            )
+          ORDER BY COALESCE(o.placed_at, o.created_at) DESC
+          LIMIT 1
+        ) as latest_order`
+        : `
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as total_orders,
         (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
         (
@@ -157,7 +193,12 @@ router.get('/', requireAuth, async (req, res) => {
           WHERE o.restaurant_id = r.id
           ORDER BY COALESCE(o.placed_at, o.created_at) DESC
           LIMIT 1
-        ) as latest_order
+        ) as latest_order`
+
+    const sql = `
+      SELECT 
+        r.*,
+        ${statsSelect}
       FROM restaurant r
       ${whereClause}
       ORDER BY r.created_at DESC
