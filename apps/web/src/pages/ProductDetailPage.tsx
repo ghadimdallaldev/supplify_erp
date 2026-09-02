@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { ProductSubstitutesSection } from '../components/supplier/ProductSubstitutesSection'
+import { getProductMoq } from '../lib/orderQuantityRules'
 
 export function ProductDetailPage() {
   const { t } = useTranslation('products')
@@ -28,7 +29,7 @@ export function ProductDetailPage() {
       addItem({
         productId: data.product.id,
         product: data.product,
-        quantity: 1,
+        quantity: getProductMoq(data.product),
       })
       toast.success(t('toast.addedToCart'))
     }

@@ -42,6 +42,7 @@ import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
+import { stepCartQuantity, validateCartItems } from '../lib/orderQuantityRules'
 
 export function CartPage() {
   const { t } = useTranslation('cart')
@@ -197,6 +198,24 @@ export function CartPage() {
   const handlePlaceOrder = async () => {
     if (groups.length === 0) {
       toast.error(t('toast.cartEmpty'))
+      return
+    }
+
+    const ruleErrors = validateCartItems(
+      groups.flatMap((group) =>
+        group.items.map((item) => ({
+          product: {
+            ...item.product,
+            supplier_minimum_order_amount:
+              item.product.supplier_minimum_order_amount ??
+              (item.product as { minimumOrderAmount?: number | null }).minimumOrderAmount,
+          },
+          quantity: item.quantity,
+        }))
+      )
+    )
+    if (ruleErrors.length) {
+      toast.error(ruleErrors[0])
       return
     }
 
@@ -433,9 +452,11 @@ export function CartPage() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity - 1)
+                                handleUpdateQuantity(
+                                  item.productId,
+                                  stepCartQuantity(item.quantity, -1, item.product)
+                                )
                               }
-                              disabled={item.quantity <= 1}
                             >
                               <Minus className="h-4 w-4" />
                             </Button>
@@ -444,7 +465,10 @@ export function CartPage() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity + 1)
+                                handleUpdateQuantity(
+                                  item.productId,
+                                  stepCartQuantity(item.quantity, 1, item.product)
+                                )
                               }
                             >
                               <Plus className="h-4 w-4" />

@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Client MOQ/pack cart UX + amendment stock/totals
+
+- **API**: Product list/detail expose `moq`, `order_multiple`, `supplier_minimum_order_amount`. Accepted order amendments release then re-reserve stock and preserve promotion discounts when recalculating totals. Supplier low-stock dashboard/command-center use warehouse-aware `listSupplierStockDisplay`.
+- **Web**: Shared `orderQuantityRules` snaps cart qty to MOQ/pack; cart validates before place; catalog add defaults to MOQ.
+- **Mobile (Android + iOS)**: Same rules in cart store, CatalogScreen MOQ hints, CartScreen step/validate before checkout. Types extended on `Product`.
+
 ## 2026-09-02 — Documentation currency audit (ERP docs only)
 
 - **Docs**: Refreshed living onboarding, RBAC, feature catalogs, env/ops, API route inventory, and strategy count claims against current code (`permission-keys.js` 56 keys, `feature-keys.js` 27/26, 196 migrations, 657 discovered routes).

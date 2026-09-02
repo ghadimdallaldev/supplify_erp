@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { CartItem, CartGroup } from '../../types'
 import { loadCartFromStorage, saveCartToStorage } from './cartPersistence'
+import { getProductMoq, normalizeCartQuantity } from '../../lib/orderQuantityRules'
 
 interface CartState {
   items: CartItem[]
@@ -66,11 +67,16 @@ const cartSlice = createSlice({
     addItem: (state, action: PayloadAction<{ item: CartItem; ownerEmail?: string | null }>) => {
       const { item, ownerEmail } = action.payload
       const existingItem = state.items.find((i) => i.productId === item.productId)
+      const delta = item.quantity > 0 ? item.quantity : getProductMoq(item.product)
 
       if (existingItem) {
-        existingItem.quantity += item.quantity
+        existingItem.quantity = normalizeCartQuantity(existingItem.quantity + delta, item.product)
+        existingItem.product = item.product
       } else {
-        state.items.push(item)
+        state.items.push({
+          ...item,
+          quantity: normalizeCartQuantity(delta, item.product),
+        })
       }
 
       recomputeGroups(state)
@@ -94,7 +100,7 @@ const cartSlice = createSlice({
         if (quantity <= 0) {
           state.items = state.items.filter((i) => i.productId !== productId)
         } else {
-          item.quantity = quantity
+          item.quantity = normalizeCartQuantity(quantity, item.product)
         }
         recomputeGroups(state)
         persist(state, ownerEmail)
