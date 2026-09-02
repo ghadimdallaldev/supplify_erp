@@ -107,21 +107,12 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    // Build the SELECT with proper type handling
+    // Build the SELECT with joined aggregates (no per-row correlated subqueries)
     let sql = `
       SELECT 
         s.*,
-        COALESCE(
-          (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id), 
-          0
-        ) as product_count,
-        COALESCE(
-          (SELECT AVG(pr.amount) FROM product p 
-           JOIN price pr ON pr.product_id = p.id 
-           WHERE p.supplier_id = s.id 
-             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
-          0
-        ) as avg_price
+        COALESCE(stats.product_count, 0) as product_count,
+        COALESCE(stats.avg_price, 0) as avg_price
     `
 
     // Add follow status check for restaurants
@@ -139,26 +130,30 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     sql += `,
-        EXISTS (
-          SELECT 1 FROM supplier_featured_placements fp
-          WHERE fp.supplier_id = s.id
-            AND fp.status = 'active'
-            AND fp.starts_at <= NOW()
-            AND fp.ends_at > NOW()
-        ) as is_featured`
+        (feat.is_featured IS TRUE) as is_featured`
 
     sql += `
       FROM supplier s
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT p.id)::int AS product_count,
+          COALESCE(AVG(pr.amount), 0) AS avg_price
+        FROM product p
+        LEFT JOIN price pr ON pr.product_id = p.id
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE p.supplier_id = s.id
+      ) stats ON true
+      LEFT JOIN LATERAL (
+        SELECT TRUE AS is_featured
+        FROM supplier_featured_placements fp
+        WHERE fp.supplier_id = s.id
+          AND fp.status = 'active'
+          AND fp.starts_at <= NOW()
+          AND fp.ends_at > NOW()
+        LIMIT 1
+      ) feat ON true
       ${whereClause}
-      ORDER BY (
-        EXISTS (
-          SELECT 1 FROM supplier_featured_placements fp
-          WHERE fp.supplier_id = s.id
-            AND fp.status = 'active'
-            AND fp.starts_at <= NOW()
-            AND fp.ends_at > NOW()
-        )
-      ) DESC, s.created_at DESC
+      ORDER BY (feat.is_featured IS TRUE) DESC, s.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 

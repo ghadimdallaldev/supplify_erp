@@ -283,6 +283,7 @@ const orderUpdateSchema = z.object({
 const orderListSchema = z.object({
   status: z.string().optional(),
   supplier: z.string().uuid().optional(),
+  restaurant: z.string().uuid().optional(),
   q: z.string().max(200).optional(),
   from: z.string().optional(),
   to: z.string().optional(),
