@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Checkout blocklist + catalog/dashboard/fulfillment correctness
+
+- **Correctness**: Restaurant checkout rejects blocklisted suppliers; product list hides blocklisted suppliers; restaurant dashboard `totalProducts` scoped to followed/non-blocked; fulfillment `deliveredToday` counts distinct orders (no route+PoD double-count).
+- **Perf/hardening**: Notification list cache invalidates all pages via prefix; mark-read requires `user_type`; product COUNT skips price LATERAL unless price filters apply.
+- **Mobile:** skipped — server enforcement/metrics only; response shapes unchanged (blocklist now matches search/detail).
+
 ## 2026-09-02 — Chat unread correctness + notification/email health cuts
 
 - **Correctness**: Deal-message path uses `getOrCreateConversation` (participant backfill); per-message read decrements `conversation_participant.unread_count`; support initial message uses tenant `sender_id` so unread does not self-increment.

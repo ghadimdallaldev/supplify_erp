@@ -191,6 +191,27 @@ router.post(
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
+      // Enforce supplier blocklist (parity with supplier manual-order eligibility)
+      const cartSupplierIds = [...supplierGroups.keys()]
+      if (cartSupplierIds.length > 0) {
+        const { rows: blockedSuppliers } = await query(
+          `
+          SELECT sb.supplier_id, s.name AS supplier_name
+          FROM supplier_blocklist sb
+          JOIN supplier s ON s.id = sb.supplier_id
+          WHERE sb.restaurant_id = $1
+            AND sb.supplier_id = ANY($2::uuid[])
+          `,
+          [restaurantId, cartSupplierIds]
+        )
+        if (blockedSuppliers.length > 0) {
+          const names = blockedSuppliers.map((r) => r.supplier_name || r.supplier_id).join(', ')
+          throw new ValidationError(
+            `Cannot order from blocked supplier${blockedSuppliers.length > 1 ? 's' : ''}: ${names}`
+          )
+        }
+      }
+
       // Resolve daily limit + supplier preflight (reuse req.subscription when available)
       phaseStart = performance.now()
       let dailyMeterEnforcement = null
