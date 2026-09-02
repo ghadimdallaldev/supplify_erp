@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Reorder suggestions + deal detail + Quick Lists fetch cuts
+
+- **API**: `GET /restaurant-inventory/reorder-suggestions` rewritten to candidate filter + aggregated movement CTEs (no per-SKU correlated scans); LIMIT 50; prefer order-item last qty for suggestions.
+- **API**: `loadDealDetailForRestaurant` loads one deal by id instead of scanning the full boosted catalog.
+- **Web**: Quick Lists product picker loads only when dialog opens (`limit: 50` + server `q`).
+- **Mobile:** skipped — dashboard reorder widget / deal detail / Quick Lists picker are web cockpit paths; mobile inventory/reorder screens unchanged.
+
 ## 2026-09-02 — Client MOQ/pack cart UX + amendment stock/totals
 
 - **API**: Product list/detail expose `moq`, `order_multiple`, `supplier_minimum_order_amount`. Accepted order amendments release then re-reserve stock and preserve promotion discounts when recalculating totals. Supplier low-stock dashboard/command-center use warehouse-aware `listSupplierStockDisplay`.
