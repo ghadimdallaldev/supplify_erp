@@ -46,6 +46,19 @@ vi.mock('../lib/subscription.js', () => ({
   isFeatureEnabled: vi.fn().mockResolvedValue(true),
 }))
 
+vi.mock('../services/supplier-stock.service.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getSupplierProductAvailableQty: vi.fn().mockResolvedValue(25),
+    overlayProductRowsWithAuthoritativeStock: vi.fn(async (rows) => rows),
+  }
+})
+
+vi.mock('../services/resolve-product-price.service.js', () => ({
+  enrichProductsWithResolvedPricing: vi.fn(async (rows) => rows),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -250,35 +263,51 @@ describe('Products Routes', () => {
     })
 
     it('should filter to in-stock rows when inStock=true', async () => {
+      const stock = await import('../services/supplier-stock.service.js')
+      vi.mocked(stock.overlayProductRowsWithAuthoritativeStock).mockResolvedValueOnce([
+        { id: 'p1', available_qty: 5 },
+        { id: 'p2', available_qty: 0 },
+      ])
+
       db.query
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { id: 'p1', available_qty: 5 },
+            { id: 'p2', available_qty: 0 },
+          ],
+          rowCount: 2,
+        })
+        .mockResolvedValueOnce({ rows: [{ total: '2' }] })
 
-      await request(app).get('/api/products?inStock=true').expect(200)
+      const response = await request(app).get('/api/products?inStock=true').expect(200)
 
-      const listSql = db.query.mock.calls[0][0]
-      expect(listSql).toContain('inv.total_available > 0')
+      expect(stock.overlayProductRowsWithAuthoritativeStock).toHaveBeenCalled()
+      expect(response.body.data.products).toHaveLength(1)
+      expect(response.body.data.products[0].id).toBe('p1')
     })
   })
 
   describe('GET /api/products/:id', () => {
     it('should return product by id', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'prod-1',
-            sku: 'SKU001',
-            name: 'Test Product',
-            description: 'Test Description',
-            supplier_id: 'supplier-1',
-          },
-        ],
-      })
+      db.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'prod-1',
+              sku: 'SKU001',
+              name: 'Test Product',
+              description: 'Test Description',
+              supplier_id: 'supplier-1',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // restaurant access link
 
       const response = await request(app).get('/api/products/prod-1').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.product.id).toBe('prod-1')
+      expect(response.body.data.product.available_qty).toBe(25)
     })
 
     it('should return 404 when supplier cannot access another suppliers product', async () => {

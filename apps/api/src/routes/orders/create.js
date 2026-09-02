@@ -286,23 +286,40 @@ router.post(
               ? await hasActiveSupplierOrderPromotionsBatch(query, supplierIds, restaurantId)
               : new Map()
 
+          // Deduplicate feature resolution by billing tenant (org branches share one).
+          const multiWarehouseByBillingId = new Map()
+          const uniqueBillingEntries = []
+          for (const supplierId of supplierIds) {
+            const billingId = billingIdBySupplier.get(supplierId)
+            supplierPromoEligibility.set(
+              supplierId,
+              restaurantDealsEnabled ? promoBySupplier.get(supplierId) === true : false
+            )
+            if (!billingId || multiWarehouseByBillingId.has(billingId)) continue
+            multiWarehouseByBillingId.set(billingId, null)
+            uniqueBillingEntries.push({
+              billingId,
+              planFeatures: supplierSubById.get(supplierId)?.features,
+            })
+          }
           await Promise.all(
-            supplierIds.map(async (supplierId) => {
-              const supplierSub = supplierSubById.get(supplierId)
-              const supplierBillingId = billingIdBySupplier.get(supplierId)
-              supplierPromoEligibility.set(
-                supplierId,
-                restaurantDealsEnabled ? promoBySupplier.get(supplierId) === true : false
-              )
+            uniqueBillingEntries.map(async ({ billingId, planFeatures }) => {
               const multiWarehouseFeature = await resolveFeatureEnabled(
-                supplierBillingId,
+                billingId,
                 'SUPPLIER',
                 'multi_warehouse',
-                supplierSub?.features
+                planFeatures
               )
-              supplierMultiWarehouse.set(supplierId, multiWarehouseFeature.enabled)
+              multiWarehouseByBillingId.set(billingId, multiWarehouseFeature.enabled)
             })
           )
+          for (const supplierId of supplierIds) {
+            const billingId = billingIdBySupplier.get(supplierId)
+            supplierMultiWarehouse.set(
+              supplierId,
+              multiWarehouseByBillingId.get(billingId) === true
+            )
+          }
         }
       }
       orderCreateTimings.dailyLimitCheckMs = elapsedMsSince(phaseStart)

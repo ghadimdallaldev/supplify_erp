@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Quote list aggregates + checkout feature dedupe + test repair
+
+- **API**: Quote request lists use LATERAL count aggregates; checkout dedupes `multi_warehouse` feature resolve by billing tenant.
+- **Tests**: Products inStock/detail and supplier command-center mocks aligned with warehouse stock SoT.
+- **Mobile:** skipped — no mobile client contract change.
+
 ## 2026-09-02 — Restaurant detail correctness + supplier/invoice list perf
 
 - **Correctness**: Public catalog branding gate now calls `isFeatureEnabled(tenantId, tenantType, featureKey)` with correct arg order. Restaurant detail loads one restaurant + restaurant-scoped orders; supplier revenue uses line totals for that supplier only.

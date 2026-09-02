@@ -20,6 +20,7 @@ vi.mock('../lib/subscription.js', () => ({
     current: 0,
     isOverLimit: false,
   }),
+  isFeatureEnabled: vi.fn().mockResolvedValue(false),
 }))
 
 vi.mock('../lib/cache.js', () => ({
