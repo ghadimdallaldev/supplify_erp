@@ -49,12 +49,14 @@ export async function getOrCreateSupportConversation({
   )
 
   if (initialMessage) {
+    // sender_id must match participant_id (tenant) so the unread trigger
+    // does not increment the sender's own conversation_participant row.
     await query(
       `
       INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type)
       VALUES ($1, $2, $3, $4, 'TEXT')
       `,
-      [conversation.id, tenantType, userId, initialMessage]
+      [conversation.id, tenantType, tenantId, initialMessage]
     )
   }
 

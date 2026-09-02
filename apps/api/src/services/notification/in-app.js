@@ -589,20 +589,15 @@ export async function getUserNotifications(
       [...params, limit, offset]
     )
 
-    const countQuery = query(
-      `
-    SELECT COUNT(*)::int AS count
-    FROM notification_log
-    WHERE user_id = $1 AND user_type = $2 AND is_read = false
-  `,
-      [userId, userType]
-    )
-
-    const [{ rows }, { rows: countRows }] = await Promise.all([listQuery, countQuery])
+    // Share unread cache/singleflight with GET /notifications/unread-count
+    const [{ rows }, unread] = await Promise.all([
+      listQuery,
+      getUnreadNotificationCount(userId, userType),
+    ])
 
     const result = {
       notifications: rows,
-      unreadCount: countRows[0]?.count ?? 0,
+      unreadCount: unread.unreadCount ?? 0,
     }
 
     await setCache(cacheKey, result, NOTIFICATION_LIST_CACHE_TTL_SECONDS).catch(() => {})
