@@ -33,6 +33,7 @@ import {
   verifyTenantCustomDomain,
 } from '../../services/custom-domain.service.js'
 import { hasBrandingCapability } from '../../lib/branding-tier.js'
+import { deliveredOrderStatusInSql } from '../../lib/order-statuses.js'
 import {
   mapSupplierBusinessSettingsRow,
   serializeOperatingHoursForDb,
@@ -564,13 +565,19 @@ router.get(
         })
       }
 
-      // Calculate statistics from orders
-      // Count distinct orders that have items from this supplier
+      // Calculate statistics from orders (exclude drafts/cancels; spend = delivered only)
       const { rows: orderStats } = await query(
         `
       SELECT 
-        COUNT(DISTINCT o.id) as total_orders,
-        COALESCE(SUM(oi.line_total), 0) as total_spent
+        COUNT(DISTINCT o.id) FILTER (
+          WHERE o.status NOT IN ('DRAFT', 'CANCELLED')
+        )::int as total_orders,
+        COUNT(DISTINCT o.id) FILTER (
+          WHERE ${deliveredOrderStatusInSql('o.status')}
+        )::int as delivered_orders,
+        COALESCE(SUM(oi.line_total) FILTER (
+          WHERE ${deliveredOrderStatusInSql('o.status')}
+        ), 0)::numeric as total_spent
       FROM customer_order o
       INNER JOIN order_item oi ON oi.order_id = o.id
       WHERE o.restaurant_id = $1 
@@ -580,8 +587,9 @@ router.get(
       )
 
       const totalOrders = parseInt(orderStats[0]?.total_orders || 0)
+      const deliveredOrders = parseInt(orderStats[0]?.delivered_orders || 0)
       const totalSpent = parseFloat(orderStats[0]?.total_spent || 0)
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
+      const averageOrderValue = deliveredOrders > 0 ? totalSpent / deliveredOrders : 0
 
       res.json({
         ok: true,
@@ -632,21 +640,12 @@ async function handleGetSupplierById(req, res) {
       restaurantId = await getRestaurantIdForRequest(req)
     }
 
-    // Build query with product_count and avg_price
+    // Build query with product_count and avg_price via LATERAL (match catalog list)
     let sql = `
       SELECT 
         s.*,
-        COALESCE(
-          (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id), 
-          0
-        ) as product_count,
-        COALESCE(
-          (SELECT AVG(pr.amount) FROM product p 
-           JOIN price pr ON pr.product_id = p.id 
-           WHERE p.supplier_id = s.id 
-             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
-          0
-        ) as avg_price
+        COALESCE(stats.product_count, 0) as product_count,
+        COALESCE(stats.avg_price, 0) as avg_price
     `
 
     // Add follow status if restaurant
@@ -664,11 +663,39 @@ async function handleGetSupplierById(req, res) {
             AND sb.restaurant_id = $2
         ) as is_blocked
       `
-      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id, restaurantId])
+      const result = await query(
+        `${sql}
+      FROM supplier s
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT p.id)::int AS product_count,
+          COALESCE(AVG(pr.amount), 0) AS avg_price
+        FROM product p
+        LEFT JOIN price pr ON pr.product_id = p.id
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE p.supplier_id = s.id
+      ) stats ON true
+      WHERE s.id = $1`,
+        [id, restaurantId]
+      )
       rows = result.rows
     } else {
       sql += `, false as is_followed, false as is_blocked`
-      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id])
+      const result = await query(
+        `${sql}
+      FROM supplier s
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT p.id)::int AS product_count,
+          COALESCE(AVG(pr.amount), 0) AS avg_price
+        FROM product p
+        LEFT JOIN price pr ON pr.product_id = p.id
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE p.supplier_id = s.id
+      ) stats ON true
+      WHERE s.id = $1`,
+        [id]
+      )
       rows = result.rows
     }
 

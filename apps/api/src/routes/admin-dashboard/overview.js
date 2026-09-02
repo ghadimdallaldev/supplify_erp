@@ -148,25 +148,18 @@ router.get('/conversion-stats', async (req, res) => {
       const since7 = new Date()
       since7.setDate(since7.getDate() - 7)
 
-      const [
-        blockCount,
-        upgradeCount,
-        byFeature,
-        byLimit,
-        perType7,
-        perType30,
-        funnel7,
-        funnel30,
-        rec7,
-        rec30,
-      ] = await Promise.all([
+      const [byType, byFeature, byLimit] = await Promise.all([
         query(
-          `SELECT COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT') AND created_at >= $1`,
-          [since]
-        ),
-        query(
-          `SELECT COUNT(*) as c FROM conversion_event WHERE event_type = 'UPGRADE_SUCCESS' AND created_at >= $1`,
-          [since]
+          `
+          SELECT
+            event_type,
+            COUNT(*) FILTER (WHERE created_at >= $2)::int AS c7,
+            COUNT(*)::int AS c_window
+          FROM conversion_event
+          WHERE created_at >= $1
+          GROUP BY event_type
+          `,
+          [since, since7]
         ),
         query(
           `SELECT metadata_json->>'featureKey' as key, COUNT(*) as c FROM conversion_event WHERE event_type = 'BLOCKED_FEATURE' AND created_at >= $1 GROUP BY metadata_json->>'featureKey' ORDER BY c DESC LIMIT 5`,
@@ -176,34 +169,38 @@ router.get('/conversion-stats', async (req, res) => {
           `SELECT metadata_json->>'limitKey' as key, COUNT(*) as c FROM conversion_event WHERE event_type = 'BLOCKED_LIMIT' AND created_at >= $1 GROUP BY metadata_json->>'limitKey' ORDER BY c DESC LIMIT 5`,
           [since]
         ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE created_at >= $1 GROUP BY event_type`,
-          [since7]
-        ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE created_at >= $1 GROUP BY event_type`,
-          [since]
-        ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT', 'OPEN_UPGRADE', 'CLICK_UPGRADE', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
-          [since7]
-        ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('BLOCKED_FEATURE', 'BLOCKED_LIMIT', 'OPEN_UPGRADE', 'CLICK_UPGRADE', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
-          [since]
-        ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('RECOMMENDATION_SHOWN', 'RECOMMENDATION_CLICKED', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
-          [since7]
-        ),
-        query(
-          `SELECT event_type, COUNT(*) as c FROM conversion_event WHERE event_type IN ('RECOMMENDATION_SHOWN', 'RECOMMENDATION_CLICKED', 'UPGRADE_SUCCESS') AND created_at >= $1 GROUP BY event_type`,
-          [since]
-        ),
       ])
 
-      totalBlocks = parseInt(blockCount.rows[0]?.c || 0)
-      totalUpgrades = parseInt(upgradeCount.rows[0]?.c || 0)
+      const applyFunnel = (target, eventType, count) => {
+        if (eventType === 'BLOCKED_FEATURE' || eventType === 'BLOCKED_LIMIT')
+          target.blocked += count
+        else if (eventType === 'OPEN_UPGRADE') target.openUpgrade = count
+        else if (eventType === 'CLICK_UPGRADE') target.clickUpgrade = count
+        else if (eventType === 'UPGRADE_SUCCESS') target.upgradeSuccess = count
+      }
+      const applyRec = (target, eventType, count) => {
+        if (eventType === 'RECOMMENDATION_SHOWN') target.shown = count
+        else if (eventType === 'RECOMMENDATION_CLICKED') target.clicked = count
+        else if (eventType === 'UPGRADE_SUCCESS') target.upgradeSuccess = count
+      }
+
+      for (const row of byType.rows) {
+        const c7 = parseInt(row.c7 || 0)
+        const cWindow = parseInt(row.c_window || 0)
+        countsPerEventType7d[row.event_type] = c7
+        countsPerEventType30d[row.event_type] = cWindow
+        applyFunnel(funnelDropOff7d, row.event_type, c7)
+        applyFunnel(funnelDropOff30d, row.event_type, cWindow)
+        applyRec(recommendationFunnel7d, row.event_type, c7)
+        applyRec(recommendationFunnel30d, row.event_type, cWindow)
+        if (row.event_type === 'BLOCKED_FEATURE' || row.event_type === 'BLOCKED_LIMIT') {
+          totalBlocks += cWindow
+        }
+        if (row.event_type === 'UPGRADE_SUCCESS') {
+          totalUpgrades = cWindow
+        }
+      }
+
       if (totalBlocks > 0) {
         blocksToUpgradesConversionPercent = Math.round((totalUpgrades / totalBlocks) * 100)
       }
@@ -211,43 +208,6 @@ router.get('/conversion-stats', async (req, res) => {
       mostBlockedLimit = byLimit.rows[0]?.key || null
       blocksByFeature = byFeature.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
       blocksByLimit = byLimit.rows.map((r) => ({ key: r.key, count: parseInt(r.c) }))
-
-      perType7.rows.forEach((r) => {
-        countsPerEventType7d[r.event_type] = parseInt(r.c)
-      })
-      perType30.rows.forEach((r) => {
-        countsPerEventType30d[r.event_type] = parseInt(r.c)
-      })
-
-      funnel7.rows.forEach((r) => {
-        const c = parseInt(r.c)
-        if (r.event_type === 'BLOCKED_FEATURE' || r.event_type === 'BLOCKED_LIMIT')
-          funnelDropOff7d.blocked += c
-        else if (r.event_type === 'OPEN_UPGRADE') funnelDropOff7d.openUpgrade = c
-        else if (r.event_type === 'CLICK_UPGRADE') funnelDropOff7d.clickUpgrade = c
-        else if (r.event_type === 'UPGRADE_SUCCESS') funnelDropOff7d.upgradeSuccess = c
-      })
-      funnel30.rows.forEach((r) => {
-        const c = parseInt(r.c)
-        if (r.event_type === 'BLOCKED_FEATURE' || r.event_type === 'BLOCKED_LIMIT')
-          funnelDropOff30d.blocked += c
-        else if (r.event_type === 'OPEN_UPGRADE') funnelDropOff30d.openUpgrade = c
-        else if (r.event_type === 'CLICK_UPGRADE') funnelDropOff30d.clickUpgrade = c
-        else if (r.event_type === 'UPGRADE_SUCCESS') funnelDropOff30d.upgradeSuccess = c
-      })
-
-      rec7.rows.forEach((r) => {
-        const c = parseInt(r.c)
-        if (r.event_type === 'RECOMMENDATION_SHOWN') recommendationFunnel7d.shown = c
-        else if (r.event_type === 'RECOMMENDATION_CLICKED') recommendationFunnel7d.clicked = c
-        else if (r.event_type === 'UPGRADE_SUCCESS') recommendationFunnel7d.upgradeSuccess = c
-      })
-      rec30.rows.forEach((r) => {
-        const c = parseInt(r.c)
-        if (r.event_type === 'RECOMMENDATION_SHOWN') recommendationFunnel30d.shown = c
-        else if (r.event_type === 'RECOMMENDATION_CLICKED') recommendationFunnel30d.clicked = c
-        else if (r.event_type === 'UPGRADE_SUCCESS') recommendationFunnel30d.upgradeSuccess = c
-      })
     } catch (e) {
       if (e.code !== '42P01') throw e
     }
