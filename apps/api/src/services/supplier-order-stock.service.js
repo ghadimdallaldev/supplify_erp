@@ -131,17 +131,22 @@ export async function releaseStockForOrder(client, orderId) {
     [orderId]
   )
 
-  for (const item of items) {
-    const qty = Number(item.quantity)
-    if (!qty || qty <= 0) continue
+  const releaseRows = items
+    .map((item) => ({
+      productId: item.product_id,
+      quantity: Number(item.quantity),
+    }))
+    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
 
+  if (releaseRows.length > 0) {
     await client.query(
-      `UPDATE inventory
-       SET available_qty = available_qty + $1,
-           reserved_qty = GREATEST(0, reserved_qty - $1),
+      `UPDATE inventory AS inv
+       SET available_qty = inv.available_qty + src.qty,
+           reserved_qty = GREATEST(0, inv.reserved_qty - src.qty),
            updated_at = now()
-       WHERE product_id = $2`,
-      [qty, item.product_id]
+       FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
+       WHERE inv.product_id = src.product_id`,
+      [releaseRows.map((row) => row.productId), releaseRows.map((row) => row.quantity)]
     )
   }
 

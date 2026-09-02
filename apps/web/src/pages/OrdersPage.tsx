@@ -120,7 +120,7 @@ export function OrdersPage() {
       to: dateTo || undefined,
       limit: ORDERS_PAGE_SIZE,
       offset,
-      includeItems: true,
+      includeItems: false,
     },
     {
       refetchOnMountOrArgChange: false,
