@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Restaurant detail correctness + supplier/invoice list perf
+
+- **Correctness**: Public catalog branding gate now calls `isFeatureEnabled(tenantId, tenantType, featureKey)` with correct arg order. Restaurant detail loads one restaurant + restaurant-scoped orders; supplier revenue uses line totals for that supplier only.
+- **Perf**: Supplier catalog list uses LATERAL aggregates (product_count/avg_price/featured) instead of correlated subqueries; invoice list uses LATERAL payment sum (no JOIN+GROUP BY).
+- **API**: Orders list accepts optional `restaurant` UUID filter for supplier/admin scopes.
+- **Mobile:** skipped — restaurant detail over-fetch and supplier browse/invoice list are web cockpit paths; additive `restaurant` order filter unused by mobile.
+
 ## 2026-09-02 — Reorder suggestions + deal detail + Quick Lists fetch cuts
 
 - **API**: `GET /restaurant-inventory/reorder-suggestions` rewritten to candidate filter + aggregated movement CTEs (no per-SKU correlated scans); LIMIT 50; prefer order-item last qty for suggestions.
