@@ -209,6 +209,9 @@ export function AdminOverviewTab({
         refreshing={overviewFetching}
         lastUpdated={overviewLastUpdated}
         canNavigateTab={(tab) => canAdminTab[tab as keyof AdminCanTabMap] ?? false}
+        recentApiErrors={
+          Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors : []
+        }
       />
 
       <AppPanel

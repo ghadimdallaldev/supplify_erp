@@ -137,16 +137,79 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
 
     const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '100'), 10) || 100, 1), 500)
     const offset = Math.max(parseInt(String(req.query.offset ?? '0'), 10) || 0, 0)
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+    const status =
+      typeof req.query.status === 'string' &&
+      ['IN_STOCK', 'LOW_STOCK', 'OUT_OF_STOCK'].includes(req.query.status)
+        ? req.query.status
+        : null
+    const supplierId =
+      typeof req.query.supplierId === 'string' && req.query.supplierId.length > 0
+        ? req.query.supplierId
+        : null
+    const category =
+      typeof req.query.category === 'string' && req.query.category.trim()
+        ? req.query.category.trim()
+        : null
 
-    const [{ rows }, { rows: countRows }] = await Promise.all([
+    const baseClauses = ['ri.restaurant_id = $1']
+    const baseParams = [restaurantId]
+    let paramIndex = 2
+
+    if (q) {
+      baseClauses.push(
+        `(p.name ILIKE $${paramIndex} OR p.sku ILIKE $${paramIndex} OR COALESCE(pc.name, p.category, '') ILIKE $${paramIndex})`
+      )
+      baseParams.push(`%${q}%`)
+      paramIndex++
+    }
+    if (supplierId) {
+      baseClauses.push(`s.id = $${paramIndex}`)
+      baseParams.push(supplierId)
+      paramIndex++
+    }
+    if (category) {
+      baseClauses.push(`COALESCE(pc.name, p.category, '') = $${paramIndex}`)
+      baseParams.push(category)
+      paramIndex++
+    }
+
+    const filterClauses = [...baseClauses]
+    const filterParams = [...baseParams]
+    let listParamIndex = paramIndex
+    if (status === 'OUT_OF_STOCK') {
+      filterClauses.push(`ri.quantity = 0`)
+    } else if (status === 'LOW_STOCK') {
+      filterClauses.push(
+        `ri.quantity > 0 AND COALESCE(ri.low_stock_threshold, 0) > 0 AND ri.quantity <= ri.low_stock_threshold`
+      )
+    } else if (status === 'IN_STOCK') {
+      filterClauses.push(
+        `(ri.quantity > 0 AND (COALESCE(ri.low_stock_threshold, 0) = 0 OR ri.quantity > ri.low_stock_threshold))`
+      )
+    }
+
+    const filterWhere = filterClauses.join(' AND ')
+    const summaryWhere = baseClauses.join(' AND ')
+    const listParams = [...filterParams, limit, offset]
+    const limitParam = listParamIndex
+    const offsetParam = listParamIndex + 1
+
+    const [{ rows }, { rows: countRows }, { rows: summaryRows }] = await Promise.all([
       query(
         `
-      WITH page_skus AS (
-        SELECT product_id
-        FROM restaurant_inventory
-        WHERE restaurant_id = $1
-        ORDER BY updated_at DESC, created_at DESC
-        LIMIT $2 OFFSET $3
+      WITH filtered AS (
+        SELECT
+          ri.product_id,
+          ri.updated_at,
+          ri.created_at
+        FROM restaurant_inventory ri
+        JOIN product p ON p.id = ri.product_id
+        LEFT JOIN product_category pc ON pc.id = p.category_id
+        JOIN supplier s ON s.id = p.supplier_id
+        WHERE ${filterWhere}
+        ORDER BY ri.updated_at DESC, ri.created_at DESC
+        LIMIT $${limitParam} OFFSET $${offsetParam}
       ),
       usage AS (
         SELECT
@@ -154,7 +217,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           iml.product_id,
           COALESCE(SUM(ABS(iml.quantity)), 0) / 30.0 AS avg_daily_usage
         FROM inventory_movement_log iml
-        INNER JOIN page_skus ps ON ps.product_id = iml.product_id
+        INNER JOIN filtered f ON f.product_id = iml.product_id
         WHERE iml.restaurant_id = $1
           AND iml.type = 'SUBTRACT'
           AND iml.created_at >= NOW() - INTERVAL '30 days'
@@ -181,7 +244,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           ELSE NULL
         END AS days_of_stock
       FROM restaurant_inventory ri
-      INNER JOIN page_skus ps ON ps.product_id = ri.product_id
+      INNER JOIN filtered f ON f.product_id = ri.product_id
       JOIN product p ON p.id = ri.product_id
       LEFT JOIN product_category pc ON pc.id = p.category_id
       JOIN supplier s ON s.id = p.supplier_id
@@ -192,17 +255,51 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       WHERE ri.restaurant_id = $1
       ORDER BY ri.updated_at DESC, ri.created_at DESC
     `,
-        [restaurantId, limit, offset],
+        listParams,
         req
       ),
       query(
-        `SELECT COUNT(*)::int AS total FROM restaurant_inventory WHERE restaurant_id = $1`,
-        [restaurantId],
+        `
+        SELECT COUNT(*)::int AS total
+        FROM restaurant_inventory ri
+        JOIN product p ON p.id = ri.product_id
+        LEFT JOIN product_category pc ON pc.id = p.category_id
+        JOIN supplier s ON s.id = p.supplier_id
+        WHERE ${filterWhere}
+        `,
+        filterParams,
+        req
+      ),
+      query(
+        `
+        SELECT
+          COUNT(*) FILTER (WHERE ri.quantity = 0)::int AS out_of_stock,
+          COUNT(*) FILTER (
+            WHERE ri.quantity > 0
+              AND COALESCE(ri.low_stock_threshold, 0) > 0
+              AND ri.quantity <= ri.low_stock_threshold
+          )::int AS low_stock,
+          COUNT(*) FILTER (
+            WHERE ri.quantity > 0
+              AND (COALESCE(ri.low_stock_threshold, 0) = 0 OR ri.quantity > ri.low_stock_threshold)
+          )::int AS in_stock
+        FROM restaurant_inventory ri
+        JOIN product p ON p.id = ri.product_id
+        LEFT JOIN product_category pc ON pc.id = p.category_id
+        JOIN supplier s ON s.id = p.supplier_id
+        WHERE ${summaryWhere}
+        `,
+        baseParams,
         req
       ),
     ])
 
     const total = countRows[0]?.total ?? 0
+    const summary = {
+      inStock: summaryRows[0]?.in_stock ?? 0,
+      lowStock: summaryRows[0]?.low_stock ?? 0,
+      outOfStock: summaryRows[0]?.out_of_stock ?? 0,
+    }
 
     // Compute reorder suggestion via the shared canonical formula so the list,
     // the assistance panel and the dashboard widget all agree.
@@ -223,7 +320,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
     mark(req, 'handler')
     res.json({
       ok: true,
-      data: { inventory, total, limit, offset },
+      data: { inventory, total, limit, offset, summary },
       error: null,
       requestId: req.requestId,
     })
