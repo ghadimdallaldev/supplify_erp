@@ -31,6 +31,7 @@ export function AdminOverviewExtras({
   refreshing,
   lastUpdated,
   canNavigateTab,
+  recentApiErrors,
 }: {
   overview: Record<string, unknown> | undefined
   onNavigateTab: (tab: string) => void
@@ -38,11 +39,14 @@ export function AdminOverviewExtras({
   refreshing?: boolean
   lastUpdated?: Date | null
   canNavigateTab?: (tab: string) => boolean
+  recentApiErrors?: unknown[]
 }) {
   const { t } = useTranslation('admin')
   const { data: dealInsights } = useGetAdminDealInsightsQuery()
   const { data: pendingDealsData } = useGetAdminPendingDealsQuery()
-  const { data: healthData } = useGetAdminHealthQuery()
+  const { data: healthData } = useGetAdminHealthQuery(undefined, {
+    skip: Array.isArray(recentApiErrors),
+  })
   const {
     data: activityData,
     isLoading: activityLoading,
@@ -56,7 +60,11 @@ export function AdminOverviewExtras({
 
   const insights = dealInsights?.insights as Record<string, number> | undefined
   const pendingDeals = Array.isArray(pendingDealsData?.deals) ? pendingDealsData.deals : []
-  const recentErrors = Array.isArray(healthData?.recentApiErrors) ? healthData.recentApiErrors : []
+  const recentErrors = Array.isArray(recentApiErrors)
+    ? recentApiErrors
+    : Array.isArray(healthData?.recentApiErrors)
+      ? healthData.recentApiErrors
+      : []
   const recentEvents = Array.isArray(activityData?.events) ? activityData.events : []
 
   const attentionItems = buildAttentionItems(overview, {

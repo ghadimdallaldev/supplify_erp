@@ -86,6 +86,9 @@ describe('restaurant-inventory list pagination', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockQuery.mockImplementation((sql) => {
+      if (String(sql).includes('FILTER (WHERE')) {
+        return Promise.resolve({ rows: [{ out_of_stock: 0, low_stock: 0, in_stock: 42 }] })
+      }
       if (String(sql).includes('COUNT(*)')) {
         return Promise.resolve({ rows: [{ total: 42 }] })
       }
@@ -120,5 +123,26 @@ describe('restaurant-inventory list pagination', () => {
       500,
       10,
     ])
+  })
+
+  it('applies server-side q and status filters', async () => {
+    mockQuery.mockImplementation((sql) => {
+      if (String(sql).includes('FILTER (WHERE')) {
+        return Promise.resolve({ rows: [{ out_of_stock: 1, low_stock: 2, in_stock: 3 }] })
+      }
+      if (String(sql).includes('COUNT(*)')) {
+        return Promise.resolve({ rows: [{ total: 2 }] })
+      }
+      return Promise.resolve({ rows: [{ product_id: 'p1', quantity: 0 }] })
+    })
+    const { restaurantInventoryRoutes: router } = await import('./restaurant-inventory.routes.js')
+    const app = express().use(router)
+    const res = await request(app).get('/?q=tomato&status=OUT_OF_STOCK').expect(200)
+    expect(res.body.data.total).toBe(2)
+    expect(res.body.data.summary).toEqual({ inStock: 3, lowStock: 2, outOfStock: 1 })
+    const listCall = mockQuery.mock.calls.find((c) => String(c[0]).includes('WITH filtered'))
+    expect(listCall?.[0]).toMatch(/ILIKE \$2/)
+    expect(listCall?.[0]).toMatch(/ri\.quantity = 0/)
+    expect(listCall?.[1]).toEqual(['restaurant-1', '%tomato%', 100, 0])
   })
 })

@@ -15,7 +15,10 @@ vi.mock('../lib/warehouse-helpers.js', () => ({
   isDefaultWarehouse: vi.fn(),
 }))
 
-import { supplierUsesWarehouseInventory } from './supplier-stock.service.js'
+import {
+  overlayProductRowsWithAuthoritativeStock,
+  supplierUsesWarehouseInventory,
+} from './supplier-stock.service.js'
 
 describe('supplier stock source of truth', () => {
   beforeEach(() => {
@@ -37,5 +40,28 @@ describe('supplier stock source of truth', () => {
     featureMock.mockResolvedValue(false)
     queryMock.mockResolvedValueOnce({ rows: [{ c: 1 }] })
     await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(false)
+  })
+
+  it('overlays warehouse qty and fail-closes missing rows', async () => {
+    featureMock.mockResolvedValue(true)
+    queryMock
+      // overlay -> supplierUsesWarehouseInventory
+      .mockResolvedValueOnce({ rows: [{ c: 1 }] })
+      // listSupplierStockDisplay -> supplierUsesWarehouseInventory
+      .mockResolvedValueOnce({ rows: [{ c: 1 }] })
+      // listSupplierStockDisplay warehouse aggregate (only product a)
+      .mockResolvedValueOnce({
+        rows: [{ product_id: 'a', available_qty: 7, reserved_qty: 0, on_hand_qty: 7 }],
+      })
+
+    const rows = await overlayProductRowsWithAuthoritativeStock([
+      { id: 'a', supplier_id: 's1', available_qty: 99 },
+      { id: 'b', supplier_id: 's1', available_qty: 99 },
+    ])
+
+    expect(rows).toEqual([
+      { id: 'a', supplier_id: 's1', available_qty: 7 },
+      { id: 'b', supplier_id: 's1', available_qty: 0 },
+    ])
   })
 })

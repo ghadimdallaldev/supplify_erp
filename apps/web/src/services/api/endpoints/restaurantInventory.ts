@@ -46,12 +46,25 @@ export type RestaurantInventoryImportResult = {
 export const restaurantInventoryApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getRestaurantInventory: builder.query<
-      { inventory: unknown[]; total?: number; limit?: number; offset?: number },
-      { limit?: number; offset?: number } | void
+      {
+        inventory: unknown[]
+        total?: number
+        limit?: number
+        offset?: number
+        summary?: { inStock: number; lowStock: number; outOfStock: number }
+      },
+      {
+        limit?: number
+        offset?: number
+        q?: string
+        status?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+        supplierId?: string
+        category?: string
+      } | void
     >({
       query: (params) => ({
         url: '/api/restaurant-inventory',
-        params: params ?? { limit: 500 },
+        params: params ?? { limit: 100 },
       }),
       providesTags: ['RestaurantInventory'],
     }),

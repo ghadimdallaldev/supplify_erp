@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Documentation currency audit (ERP docs only)
+
+- **Docs**: Refreshed living onboarding, RBAC, feature catalogs, env/ops, API route inventory, and strategy count claims against current code (`permission-keys.js` 56 keys, `feature-keys.js` 27/26, 196 migrations, 657 discovered routes).
+- **Mobile:** skipped — documentation-only; no API, auth, RBAC, or client-contract change.
+
+## 2026-09-02 — Catalog stock authority + inventory list filters
+
+- **Bugfix**: Product catalog/detail stock now overlays warehouse inventory when multi-warehouse is active (fail-closed: missing WH row → 0), matching checkout authority.
+- **Perf**: Restaurant inventory list supports server-side `q` / `status` / `supplierId` / `category` + pagination + summary counts; web InventoryTab no longer loads 500 rows to filter client-side.
+- **Admin**: Overview extras reuses parent health errors instead of a duplicate health fetch.
+- **Mobile**: API additive query params only; default list behavior unchanged. Optional follow-up to pass filters from mobile inventory screens. Android/iOS source unchanged this pass.
+
 ## 2026-09-02 — Speed + correctness hardening (API)
 
 - **Security**: Parameterized restaurant finance `/expenses` period filter (removed SQL string interpolation).
