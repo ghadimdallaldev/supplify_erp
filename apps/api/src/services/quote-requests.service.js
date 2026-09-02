@@ -160,13 +160,22 @@ export async function listRestaurantQuoteRequests(
     `
     SELECT
       qr.*,
-      (SELECT COUNT(*)::int FROM quote_request_items qri WHERE qri.quote_request_id = qr.id) AS item_count,
-      (SELECT COUNT(*)::int FROM quote_request_suppliers qrs WHERE qrs.quote_request_id = qr.id) AS supplier_count,
-      (
-        SELECT COUNT(*)::int FROM quote_request_suppliers qrs
-        WHERE qrs.quote_request_id = qr.id AND qrs.status = 'responded'
-      ) AS response_count
+      COALESCE(item_stats.item_count, 0) AS item_count,
+      COALESCE(supplier_stats.supplier_count, 0) AS supplier_count,
+      COALESCE(supplier_stats.response_count, 0) AS response_count
     FROM quote_requests qr
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS item_count
+      FROM quote_request_items qri
+      WHERE qri.quote_request_id = qr.id
+    ) item_stats ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS supplier_count,
+        COUNT(*) FILTER (WHERE qrs.status = 'responded')::int AS response_count
+      FROM quote_request_suppliers qrs
+      WHERE qrs.quote_request_id = qr.id
+    ) supplier_stats ON true
     WHERE qr.restaurant_id = $1${statusFilter}
     ORDER BY qr.created_at DESC
     LIMIT ${safeLimit} OFFSET ${offset}
@@ -328,10 +337,15 @@ export async function listSupplierQuoteRequests(
       qr.needed_by,
       qr.created_at AS quote_request_created_at,
       r.name AS restaurant_name,
-      (SELECT COUNT(*)::int FROM quote_request_items qri WHERE qri.quote_request_id = qr.id) AS item_count
+      COALESCE(item_stats.item_count, 0) AS item_count
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS item_count
+      FROM quote_request_items qri
+      WHERE qri.quote_request_id = qr.id
+    ) item_stats ON true
     WHERE qrs.supplier_id = $1${statusFilter}
     ORDER BY qrs.created_at DESC
     LIMIT ${safeLimit} OFFSET ${offset}
