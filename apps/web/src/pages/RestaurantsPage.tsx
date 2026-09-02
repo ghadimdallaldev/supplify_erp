@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useGetOrdersQuery, useGetRestaurantsQuery } from '../services/api'
+import { useGetRestaurantsQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -51,88 +51,36 @@ export function RestaurantsPage() {
   const [sortBy, setSortBy] = useState<'name' | 'orders' | 'revenue' | 'recent'>('name')
   const [filterBy, setFilterBy] = useState<'all' | 'active' | 'new'>('all')
   const isSupplier = user?.role === 'SUPPLIER'
-  const supplierId =
-    user?.workspace?.tenantType === 'SUPPLIER' ? user.workspace.tenantId : undefined
 
   useEffect(() => {
     void ensureNamespace('restaurants')
   }, [])
 
-  // Get orders to find restaurants (filter by supplier if supplier)
-  const { data: ordersData } = useGetOrdersQuery(
-    {
-      limit: 1000,
-      offset: 0,
-      includeItems: true,
-    },
-    { skip: !isSupplier }
-  )
-
-  // Get all restaurants
   const {
     data: restaurantsData,
     isLoading,
     error,
   } = useGetRestaurantsQuery({
-    limit: 1000,
+    limit: 100,
     offset: 0,
   })
 
-  // Supplier view: API returns restaurants that ordered from or follow this supplier
+  // API returns supplier-scoped totals for suppliers (line_total) and global for admin.
   const restaurantsWithOrders = useMemo(() => {
-    if (!isSupplier || !restaurantsData?.restaurants || !supplierId) return []
-
-    const supplierOrders = (ordersData?.orders || []).filter((order) =>
-      order.items?.some((item: any) => item.supplier_id === supplierId)
-    )
-
-    return restaurantsData.restaurants.map((restaurant) => {
-      const restaurantOrders = supplierOrders.filter(
-        (order) => order.restaurant_id === restaurant.id
-      )
-
-      const totalOrders = restaurantOrders.length
-      const totalSpent = restaurantOrders.reduce((sum, order) => {
-        const supplierItemsTotal =
-          order.items
-            ?.filter((item: any) => item.supplier_id === supplierId)
-            .reduce((itemSum: number, item: any) => itemSum + (item.line_total || 0), 0) || 0
-        return sum + supplierItemsTotal
-      }, 0)
-
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
-
-      const latestOrder = restaurantOrders.sort(
-        (a, b) =>
-          new Date(b.placed_at || b.created_at).getTime() -
-          new Date(a.placed_at || a.created_at).getTime()
-      )[0]
-
-      const productCount = new Map()
-      restaurantOrders.forEach((order) => {
-        order.items
-          ?.filter((item: any) => item.supplier_id === supplierId)
-          .forEach((item: any) => {
-            productCount.set(
-              item.product_id,
-              (productCount.get(item.product_id) || 0) + item.quantity
-            )
-          })
-      })
-
-      const mostPurchasedProduct = Array.from(productCount.entries()).sort((a, b) => b[1] - a[1])[0]
-
+    return (restaurantsData?.restaurants || []).map((restaurant: any) => {
+      const totalOrders = Number(restaurant.totalOrders ?? restaurant.total_orders ?? 0)
+      const totalSpent = Number(restaurant.totalSpent ?? restaurant.total_spent ?? 0)
+      const latestOrder = restaurant.latestOrder ?? restaurant.latest_order ?? null
       return {
         ...restaurant,
         totalOrders,
         totalSpent,
-        averageOrderValue,
+        averageOrderValue: totalOrders > 0 ? totalSpent / totalOrders : 0,
         latestOrder,
-        mostPurchasedProduct,
         isFollowerOnly: totalOrders === 0,
       }
     })
-  }, [ordersData, restaurantsData, supplierId, isSupplier])
+  }, [restaurantsData])
 
   // Filter and sort restaurants
   const filteredAndSortedRestaurants = useMemo(() => {
@@ -140,7 +88,6 @@ export function RestaurantsPage() {
 
     // Filter by status
     if (filterBy === 'active') {
-      // Active = ordered in last 30 days
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       restaurants = restaurants.filter(
@@ -149,13 +96,11 @@ export function RestaurantsPage() {
           new Date(r.latestOrder.placed_at || r.latestOrder.created_at) > thirtyDaysAgo
       )
     } else if (filterBy === 'new') {
-      // New = restaurant joined in last 30 days
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
       restaurants = restaurants.filter((r: any) => new Date(r.created_at) > thirtyDaysAgo)
     }
 
-    // Search filter
     if (search.trim()) {
       const searchLower = search.toLowerCase()
       restaurants = restaurants.filter(
@@ -168,7 +113,6 @@ export function RestaurantsPage() {
       )
     }
 
-    // City filter
     if (cityFilter.trim()) {
       const cityLower = cityFilter.toLowerCase()
       restaurants = restaurants.filter((r: any) =>
@@ -176,7 +120,6 @@ export function RestaurantsPage() {
       )
     }
 
-    // Sort
     restaurants = [...restaurants].sort((a: any, b: any) => {
       switch (sortBy) {
         case 'name':
@@ -300,7 +243,7 @@ export function RestaurantsPage() {
     )
   }
 
-  if (isLoading || (isSupplier && !supplierId)) {
+  if (isLoading) {
     return <DetailPageSkeleton />
   }
 

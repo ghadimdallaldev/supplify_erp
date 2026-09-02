@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-02 — Supplier restaurants stats + search blocklist + invoice detail
+
+- **Correctness**: Supplier restaurant list aggregates order/spend via supplier line items; search products honor blocklist; invoice detail uses LATERAL paid sum (no payment JOIN+GROUP BY).
+- **Perf**: RestaurantsPage drops 1000-order includeItems fetch; search suppliers use LATERAL product_count.
+- **Mobile:** skipped — web supplier cockpit / search / invoice detail paths.
+
 ## 2026-09-02 — Quote list aggregates + checkout feature dedupe + test repair
 
 - **API**: Quote request lists use LATERAL count aggregates; checkout dedupes `multi_warehouse` feature resolve by billing tenant.
