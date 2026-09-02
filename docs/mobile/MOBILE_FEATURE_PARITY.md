@@ -6,7 +6,7 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 - **Security**: Parameterized restaurant finance `/expenses` period filter (removed SQL string interpolation).
 - **Checkout correctness**: Order create now enforces product MOQ / pack multiples and supplier `minimum_order_amount` server-side (`order-quantity-rules.js`). Mobile already surfaces API `ValidationError` messages; optional client-side MOQ UX can follow without contract change.
-- **Performance**: Supplier order list rewritten to `EXISTS` (no `DISTINCT` item joins); unscoped catalog stock uses `LATERAL` inventory; entitlements usage refresh window raised to 180s; dispatch board bucket limit 200 + cache invalidation on driver assign/status/reassign; grace-period account lock now invalidates subscription caches.
+- **Performance**: Supplier order list rewritten to `EXISTS` (no `DISTINCT` item joins); unscoped catalog stock uses `LATERAL` inventory; entitlements usage refresh window raised to 180s; dispatch board bucket limit 200 + cache invalidation on driver assign/status/reassign; grace-period account lock now invalidates subscription caches; legacy stock release batched via `unnest`; web Orders list no longer embeds line items.
 - **Mobile action**: No API client shape change required. Confirm cart/checkout screens display the new validation messages. Android/iOS source unchanged this pass.
 
 ## 2026-08-21 — Production ship hardening (web/API pass)
