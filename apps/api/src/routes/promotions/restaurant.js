@@ -33,6 +33,7 @@ import {
   isPendingAdminReview,
   shouldResetApprovalOnEdit,
 } from '../../services/deal-lifecycle.service.js'
+import { getOrCreateConversation } from '../chat/chat.helpers.js'
 import {
   applyBoostSelectionToDeal,
   publishDealAfterApproval,
@@ -642,26 +643,10 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
 
-      const { rows: conversations } = await query(
-        `SELECT * FROM conversation WHERE supplier_id = $1 AND restaurant_id = $2`,
-        [deal.supplier_id, restaurantId]
-      )
-
-      let conversation
-      if (!conversations.length) {
-        const { rows: newConversations } = await query(
-          `INSERT INTO conversation (supplier_id, restaurant_id) VALUES ($1, $2) RETURNING *`,
-          [deal.supplier_id, restaurantId]
-        )
-        conversation = newConversations[0]
-        await query(
-          `INSERT INTO conversation_participant (conversation_id, participant_type, participant_id)
-           VALUES ($1, 'SUPPLIER', $2), ($1, 'RESTAURANT', $3)`,
-          [conversation.id, deal.supplier_id, restaurantId]
-        )
-      } else {
-        conversation = conversations[0]
-      }
+      // Shared helper backfills missing participant rows so unread triggers work
+      const conversation = await getOrCreateConversation(deal.supplier_id, restaurantId, {
+        enforceOpenLimit: false,
+      })
 
       const initialMessage = `Hello, I am interested in your deal: ${deal.name}`
       const { rows: messages } = await query(
