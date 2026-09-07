@@ -173,7 +173,14 @@ router.get('/tenants/suppliers', async (req, res) => {
         COALESCE(ad.active_deals_count, 0)::int AS active_deals_count,
         COALESCE(st.storage_mb_used, 0)::int AS storage_mb_used
       FROM supplier s
-      LEFT JOIN subscription sub ON sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN LATERAL (
+        SELECT sub.*
+        FROM subscription sub
+        WHERE sub.tenant_id = s.id AND sub.tenant_type = 'SUPPLIER' AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY CASE sub.status WHEN 'ACTIVE' THEN 1 WHEN 'TRIALING' THEN 2 ELSE 3 END,
+          sub.created_at DESC
+        LIMIT 1
+      ) sub ON true
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
       LEFT JOIN (
         SELECT supplier_id, COUNT(*)::int AS product_count FROM product GROUP BY supplier_id
@@ -273,7 +280,14 @@ router.get('/tenants/restaurants', async (req, res) => {
         COALESCE(inv.inventory_skus_count, 0)::int AS inventory_skus_count,
         COALESCE(st.storage_mb_used, 0)::int AS storage_mb_used
       FROM restaurant r
-      LEFT JOIN subscription sub ON sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
+      LEFT JOIN LATERAL (
+        SELECT sub.*
+        FROM subscription sub
+        WHERE sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT' AND sub.status IN ('ACTIVE', 'TRIALING')
+        ORDER BY CASE sub.status WHEN 'ACTIVE' THEN 1 WHEN 'TRIALING' THEN 2 ELSE 3 END,
+          sub.created_at DESC
+        LIMIT 1
+      ) sub ON true
       LEFT JOIN subscription_plan sp ON sp.id = sub.plan_id
       LEFT JOIN (
         SELECT

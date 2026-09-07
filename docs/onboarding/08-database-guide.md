@@ -1,6 +1,6 @@
-# 08 — Database Guide
+﻿# 08 â€” Database Guide
 
-Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`apps/api/db/migrations/`). Schema changes are forward-only; **175 migrations** exist as of migration `0175_free_trial_supplier_growth_parity.sql`. Application code uses the `pg` pool (`apps/api/src/lib/db.js`) with optional statement timeouts and Railway-oriented pool keepalive.
+Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`apps/api/db/migrations/`). Schema changes are forward-only; **196 migrations** exist as of migration `0196_public_catalog_product_indexes.sql`. Application code uses the `pg` pool (`apps/api/src/lib/db.js`) with optional statement timeouts and Railway-oriented pool keepalive.
 
 ---
 
@@ -8,8 +8,8 @@ Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`app
 
 | Concept       | Detail                                                                                          |
 | ------------- | ----------------------------------------------------------------------------------------------- |
-| Tracker table | `schema_migrations(version, applied_at)` — created in `0000_schema_migrations.sql`              |
-| Runner        | `apps/api/scripts/migrate.js` — `pnpm db:migrate`                                               |
+| Tracker table | `schema_migrations(version, applied_at)` â€” created in `0000_schema_migrations.sql`            |
+| Runner        | `apps/api/scripts/migrate.js` â€” `pnpm db:migrate`                                             |
 | Startup       | `runFullStartupMigrations()` after HTTP listen; `/ready` returns `503 migrating` until complete |
 | DDL URL       | `DATABASE_MIGRATION_URL` bypasses poolers that block `ALTER TABLE`                              |
 | Naming        | `NNNN_snake_case_description.sql`                                                               |
@@ -20,7 +20,7 @@ Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`app
 
 ## Schemas & naming conventions
 
-- **Single database**, `public` schema — no per-tenant Postgres schemas.
+- **Single database**, `public` schema â€” no per-tenant Postgres schemas.
 - **Tenant isolation** is logical: `restaurant_id`, `supplier_id`, `tenant_id` + `tenant_type` columns and query filters.
 - **UUID primary keys** via `gen_random_uuid()` (`pgcrypto`).
 - **Timestamps:** `created_at`, `updated_at` on most business tables.
@@ -43,9 +43,9 @@ Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`app
 | ----------------------------------------- | ------------------------------------------------------------------------------------- |
 | `tenant_roles`                            | Named roles per `(tenant_id, tenant_type)`; `is_system` for defaults                  |
 | `tenant_role_permissions`                 | `permission` text codes (see `permission-keys.js`)                                    |
-| `tenant_user_roles`                       | User ↔ role assignment within a tenant                                               |
+| `tenant_user_roles`                       | User â†” role assignment within a tenant                                              |
 | `role` / `permission` / `role_permission` | Legacy global role catalog + **admin** roles (`0042_rbac_seed_roles_permissions.sql`) |
-| `user_role`                               | Legacy user ↔ global role (merged at permission resolution)                          |
+| `user_role`                               | Legacy user â†” global role (merged at permission resolution)                         |
 
 ### Catalog & supplier inventory
 
@@ -58,11 +58,11 @@ Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`app
 
 ### Restaurant inventory
 
-| Table                           | Purpose                                                                        |
-| ------------------------------- | ------------------------------------------------------------------------------ |
-| `restaurant_inventory`          | Par levels per `(restaurant_id, product_id)` — `0004_restaurant_inventory.sql` |
-| `restaurant_inventory_lot`      | Batch/expiry tracking (`0133_restaurant_inventory_lots.sql`)                   |
-| `restaurant_inventory_settings` | Tenant-level inventory prefs                                                   |
+| Table                           | Purpose                                                                          |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `restaurant_inventory`          | Par levels per `(restaurant_id, product_id)` â€” `0004_restaurant_inventory.sql` |
+| `restaurant_inventory_lot`      | Batch/expiry tracking (`0133_restaurant_inventory_lots.sql`)                     |
+| `restaurant_inventory_settings` | Tenant-level inventory prefs                                                     |
 
 ### Orders & commercial flow
 
@@ -70,7 +70,7 @@ Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`app
 | ------------------------------- | ------------------------------------------------ |
 | `customer_order`                | Restaurant purchase order; `status order_status` |
 | `order_item`                    | Lines with `supplier_id`, qty, pricing           |
-| `invoice` / `invoice_line_item` | AR/AP documents — `0009_finance_billing.sql`     |
+| `invoice` / `invoice_line_item` | AR/AP documents â€” `0009_finance_billing.sql`   |
 | `credit_note`                   | Adjustments linked to invoices/orders            |
 | `subscription_plan`             | Plan catalog (limits/features JSONB)             |
 | `subscription`                  | Tenant subscription state                        |
@@ -151,7 +151,7 @@ Evolved across `0001_init.sql`, `0028_order_status_enhancements.sql`, `0069_appr
 
 ### Invoice `status` (TEXT CHECK)
 
-`DRAFT` → `ISSUED` → `PARTIALLY_PAID` / `PAID` / `OVERDUE` / `VOID`
+`DRAFT` â†’ `ISSUED` â†’ `PARTIALLY_PAID` / `PAID` / `OVERDUE` / `VOID`
 
 ### Subscription `status`
 
@@ -254,10 +254,10 @@ erDiagram
 
 ## Key relationships (query mental model)
 
-1. **Order → suppliers:** One restaurant order may span multiple suppliers via `order_item.supplier_id`.
-2. **Invoice → order:** Optional `invoice.order_id`; line items may reference `order_item_id`.
+1. **Order â†’ suppliers:** One restaurant order may span multiple suppliers via `order_item.supplier_id`.
+2. **Invoice â†’ order:** Optional `invoice.order_id`; line items may reference `order_item_id`.
 3. **Inventory types:** `inventory` = supplier sellable stock; `restaurant_inventory` = restaurant on-hand after receiving.
-4. **Subscription:** Polymorphic `tenant_id` + `tenant_type IN ('SUPPLIER','RESTAURANT')` — not a FK to keep one table.
+4. **Subscription:** Polymorphic `tenant_id` + `tenant_type IN ('SUPPLIER','RESTAURANT')` â€” not a FK to keep one table.
 5. **Delivery:** `driver_assignments` is the operational delivery record; `delivery_route` / `route_stop` support planning; `proof_of_delivery` stores confirmation artifacts.
 
 ---
@@ -288,7 +288,7 @@ Supporting modules: `apps/api/scripts/seed/businessDemoData.js`, `tierDefinition
 
 Hot-path indexes added in later migrations, e.g.:
 
-- `0139_railway_hot_path_indexes.sql` — restaurant inventory, orders
+- `0139_railway_hot_path_indexes.sql` â€” restaurant inventory, orders
 - `0142_order_create_hot_path_indexes.sql`
 - `0091_performance_indexes.sql`
 
@@ -300,7 +300,7 @@ Use `EXPLAIN ANALYZE` on slow list endpoints; check `SLOW_REQUEST_MS` logs for s
 
 | Claim                     | Source                                                                        |
 | ------------------------- | ----------------------------------------------------------------------------- |
-| 175 migrations            | `apps/api/db/migrations/*.sql`                                                |
+| 196 migrations            | `apps/api/db/migrations/*.sql`                                                |
 | Initial schema            | `0001_init.sql`                                                               |
 | `order_status` extensions | `0028`, `0069`, `0110`                                                        |
 | Invoice schema            | `0009_finance_billing.sql`                                                    |
@@ -323,6 +323,6 @@ psql $DATABASE_URL -c "SELECT version FROM schema_migrations ORDER BY version DE
 
 ## Related docs
 
-- [07-technical-architecture.md](./07-technical-architecture.md) — Postgres pool, Redis, deployment
-- [09-authentication-rbac.md](./09-authentication-rbac.md) — `tenant_roles` permission model
-- [docs/operations/cron-jobs.md](../operations/cron-jobs.md) — jobs that mutate subscription/invoice state
+- [07-technical-architecture.md](./07-technical-architecture.md) â€” Postgres pool, Redis, deployment
+- [09-authentication-rbac.md](./09-authentication-rbac.md) â€” `tenant_roles` permission model
+- [docs/operations/cron-jobs.md](../operations/cron-jobs.md) â€” jobs that mutate subscription/invoice state

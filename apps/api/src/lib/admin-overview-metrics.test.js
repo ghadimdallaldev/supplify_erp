@@ -58,7 +58,7 @@ describe('admin-overview-metrics', () => {
           ],
         })
         .mockResolvedValueOnce({
-          rows: [{ mrr: 198, paid_active_subscriptions: 2, paid_active_only: 1 }],
+          rows: [{ mrr: 198, paid_active_or_trialing: 2, paid_active_only: 1 }],
         })
         .mockResolvedValueOnce({
           rows: [{ today: 3, week: 8, month: 12, total: 50 }],
@@ -92,7 +92,9 @@ describe('admin-overview-metrics', () => {
       expect(data.totalActiveProducts).toBe(100)
       expect(data.totalQuickLists).toBe(7)
       expect(data.revenue.mrr).toBe(198)
-      expect(data.revenue.paidActiveSubscriptions).toBe(2)
+      expect(data.revenue.paidActiveSubscriptions).toBe(1)
+      expect(data.revenue.activeSubscriptions).toBe(1)
+      expect(data.revenue.paidActiveOrTrialing).toBe(2)
       expect(data.subscriptionStats.ACTIVE).toBe(2)
       expect(data.reservations.today).toBe(2)
     })
@@ -119,7 +121,7 @@ describe('admin-overview-metrics', () => {
               month: 0,
               total: 0,
               mrr: 0,
-              paid_active_subscriptions: 0,
+              paid_active_or_trialing: 0,
               paid_active_only: 0,
               new_suppliers: 0,
               new_restaurants: 0,

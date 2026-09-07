@@ -123,10 +123,8 @@ describe('Search Routes', () => {
       const supplierSql = String(db.query.mock.calls[1][0])
       expect(productSql).not.toContain('p.*')
       expect(productSql).toContain('p.image_thumb_url')
-      expect(supplierSql).toContain('GROUP BY supplier_id')
-      expect(supplierSql).not.toContain(
-        'SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id'
-      )
+      expect(supplierSql).toContain('LEFT JOIN LATERAL')
+      expect(supplierSql).toContain('COALESCE(stats.product_count, 0)')
     })
   })
 })

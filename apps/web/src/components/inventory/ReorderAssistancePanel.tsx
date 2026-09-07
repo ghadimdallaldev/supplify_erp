@@ -405,8 +405,16 @@ export function ReorderAssistancePanel({
               )}
             </div>
             {compact && suggestions.length > (maxItems ?? 0) && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/app/inventory#reorder-assistance">View all</Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  document
+                    .getElementById('reorder-assistance')
+                    ?.scrollIntoView({ behavior: 'smooth' })
+                }
+              >
+                View all
               </Button>
             )}
           </div>

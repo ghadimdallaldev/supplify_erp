@@ -11,6 +11,7 @@ import {
   getRestaurantIdForRequest,
 } from '../../lib/rbac.js'
 import { query, withTransaction } from '../../lib/db.js'
+import { getCache, setCache } from '../../lib/cache.js'
 import { logger } from '../../lib/logger.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../../services/promotions.service.js'
@@ -214,8 +215,17 @@ router.get('/admin/deals', ...adminDealGuards, async (req, res, next) => {
   }
 })
 
+const ADMIN_DEAL_INSIGHTS_CACHE_KEY = 'admin:deal-insights:v1'
+const ADMIN_DEAL_INSIGHTS_CACHE_TTL_SECONDS = 180
+const ADMIN_DEAL_INSIGHTS_WINDOW = `90 days`
+
 router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) => {
   try {
+    const cached = await getCache(ADMIN_DEAL_INSIGHTS_CACHE_KEY)
+    if (cached) {
+      return res.json({ ok: true, data: cached, error: null, requestId: req.requestId })
+    }
+
     const { rows: summary } = await query(
       `
       SELECT
@@ -235,6 +245,7 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
         COUNT(*)::int AS total_interactions,
         COUNT(*) FILTER (WHERE interaction_type IN ('order', 'order_created', 'order_completed'))::int AS order_interactions
       FROM deal_interactions
+      WHERE created_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       `
     )
     const { rows: revenueStats } = await query(
@@ -245,6 +256,7 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
         COALESCE(SUM(co.total_amount), 0)::numeric AS total_revenue
       FROM promotion_usages pu
       JOIN customer_order co ON co.id = pu.order_id
+      WHERE pu.applied_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       `
     )
     const { rows: topDeals } = await query(
@@ -255,24 +267,27 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
       FROM promotions p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN promotion_usages pu ON pu.promotion_id = p.id
+        AND pu.applied_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       GROUP BY p.id, p.name, p.status, s.name
       ORDER BY orders_count DESC
       LIMIT 5
       `
     )
-    res.json({
-      ok: true,
-      data: {
-        insights: {
-          ...summary[0],
-          ...interactionStats[0],
-          ...revenueStats[0],
-          topDeals,
-        },
+    const data = {
+      insights: {
+        ...summary[0],
+        ...interactionStats[0],
+        ...revenueStats[0],
+        topDeals,
       },
-      error: null,
-      requestId: req.requestId,
-    })
+    }
+    await setCache(
+      ADMIN_DEAL_INSIGHTS_CACHE_KEY,
+      data,
+      ADMIN_DEAL_INSIGHTS_CACHE_TTL_SECONDS
+    ).catch(() => {})
+
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
@@ -287,6 +302,7 @@ router.get('/admin/pending', ...adminDealGuards, async (req, res, next) => {
       JOIN supplier s ON s.id = p.supplier_id
       WHERE p.status IN ('pending_approval', 'pending_admin_approval')
       ORDER BY p.created_at ASC
+      LIMIT 100
       `
     )
     res.json({ ok: true, data: { deals: rows }, error: null, requestId: req.requestId })

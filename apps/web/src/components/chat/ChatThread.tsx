@@ -197,6 +197,8 @@ export function ChatThread({
                                       <img
                                         src={String(att.fileUrl)}
                                         alt={String(att.fileName || t('thread.attachmentAlt'))}
+                                        loading="lazy"
+                                        decoding="async"
                                         className="max-h-56 max-w-full cursor-pointer rounded-lg object-cover"
                                       />
                                     </a>

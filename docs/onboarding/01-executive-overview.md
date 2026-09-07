@@ -1,4 +1,4 @@
-# Supplify — Executive Overview
+﻿# Supplify â€” Executive Overview
 
 **Audience:** Executives, product leaders, solution architects, and onboarding partners who need a concise but accurate picture of what Supplify is, who it serves, and how the platform is built.
 
@@ -8,18 +8,18 @@
 
 ## What Supplify Is
 
-Supplify is a **restaurant–supplier marketplace and operations platform**. It connects food-service buyers (restaurants) with distributors and producers (suppliers) in a single, role-based system where ordering, catalog management, fulfillment, receiving, finance, reservations, staff operations, and platform administration share one data model and one API.
+Supplify is a **restaurantâ€“supplier marketplace and operations platform**. It connects food-service buyers (restaurants) with distributors and producers (suppliers) in a single, role-based system where ordering, catalog management, fulfillment, receiving, finance, reservations, staff operations, and platform administration share one data model and one API.
 
 The product is not a lightweight ordering widget. It is an end-to-end B2B supply chain workspace with:
 
-- **Unified ordering** — Restaurants browse supplier catalogs, build carts, place orders, schedule re-orders via quick lists, and track status through delivery and invoicing.
-- **Supplier operations** — Suppliers manage products, warehouses, fulfillment boards, driver dispatch, GPS tracking, promotions, and receivables.
-- **Restaurant operations** — Restaurants receive goods, record quality, manage on-hand inventory, run front-of-house reservations, and reconcile invoices.
-- **Monetization** — Tenant-specific Growth / Scale subscriptions plus a 30-day Free Trial gate features and usage meters (see [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md)).
-- **Growth and discovery** — Supplier customer import, referral programs, public mini-store catalogs, quote requests, and consumer B2C ordering extend reach beyond logged-in B2B users.
-- **Platform control** — Admins manage tenants, plans, feature flags, limit overrides, deal approvals, impersonation, and observability.
+- **Unified ordering** â€” Restaurants browse supplier catalogs, build carts, place orders, schedule re-orders via quick lists, and track status through delivery and invoicing.
+- **Supplier operations** â€” Suppliers manage products, warehouses, fulfillment boards, driver dispatch, GPS tracking, promotions, and receivables.
+- **Restaurant operations** â€” Restaurants receive goods, record quality, manage on-hand inventory, run front-of-house reservations, and reconcile invoices.
+- **Monetization** â€” Tenant-specific Growth / Scale subscriptions plus a 30-day Free Trial gate features and usage meters (see [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md)).
+- **Growth and discovery** â€” Supplier customer import, referral programs, public mini-store catalogs, quote requests, and consumer B2C ordering extend reach beyond logged-in B2B users.
+- **Platform control** â€” Admins manage tenants, plans, feature flags, limit overrides, deal approvals, impersonation, and observability.
 
-The canonical product description in code aligns with `docs/product/overview.md`: _"Supplify is a restaurant–supplier marketplace: ordering, receiving, fulfillment, finance, reservations, and platform admin."_
+The canonical product description in code aligns with `docs/product/overview.md`: _"Supplify is a restaurantâ€“supplier marketplace: ordering, receiving, fulfillment, finance, reservations, and platform admin."_
 
 ---
 
@@ -44,10 +44,10 @@ Each restaurant and supplier tenant is a **workspace** with its own subscription
 | **Driver**                 | Supplier workspace role `Driver` with `DRIVER_DELIVERIES_*` permissions | Assigned deliveries, status updates, proof of delivery |
 | **Restaurant staff (FOH)** | Role `FOH Staff` or `Receiving Staff`                                   | Reservations, receiving, limited order visibility      |
 | **Accountant**             | Role `Accountant` on either side                                        | Invoices, payments, subscription view                  |
-| **Staff portal user**      | Keycloak `staff_portal` → `STAFF_PORTAL` app role                       | PTO, shift swaps, self-service dashboard at `/staff`   |
+| **Staff portal user**      | Keycloak `staff_portal` â†’ `STAFF_PORTAL` app role                     | PTO, shift swaps, self-service dashboard at `/staff`   |
 | **Reservation guest**      | Public, unauthenticated                                                 | Book, confirm, cancel, waitlist at `/reserve`          |
 | **Consumer (B2C)**         | Public storefront at `/order/:restaurantSlug`                           | Menu browse, checkout, order tracking, loyalty         |
-| **Prospective tenant**     | `PENDING` until registration completes                                  | `/register/complete` → `/app/activate`                 |
+| **Prospective tenant**     | `PENDING` until registration completes                                  | `/register/complete` â†’ `/app/activate`               |
 
 Team members inside a tenant are not separate Keycloak platform roles; they are **users assigned tenant roles** (`tenant_user_roles`) with granular permissions from `permission-keys.js`.
 
@@ -59,25 +59,25 @@ Team members inside a tenant are not separate Keycloak platform roles; they are 
 
 Restaurants gain a **single pane of glass** for procurement and back-of-house coordination:
 
-- **Less friction in ordering** — Browse linked supplier catalogs, save quick lists, schedule recurring orders, and chat in context next to products and orders.
-- **Visibility through delivery** — Track in-flight orders, view supplier GPS when enabled, and record receiving with optional quality photos (plan-gated `receiving_quality`).
-- **Financial clarity** — Invoices tied to orders; payment recording; supplier account statements (with known limitations documented in the product guide).
-- **Operational breadth** — Inventory and waste tracking, disputes, deals redemptions, contract pricing, quote requests, and FOH reservations on one platform.
-- **Scalable controls** — Multi-branch inventory, advanced roles, and smart reorder unlock as restaurants move from Growth to Scale (suppliers: Growth → Scale with active customer location metering).
+- **Less friction in ordering** â€” Browse linked supplier catalogs, save quick lists, schedule recurring orders, and chat in context next to products and orders.
+- **Visibility through delivery** â€” Track in-flight orders, view supplier GPS when enabled, and record receiving with optional quality photos (plan-gated `receiving_quality`).
+- **Financial clarity** â€” Invoices tied to orders; payment recording; supplier account statements (with known limitations documented in the product guide).
+- **Operational breadth** â€” Inventory and waste tracking, disputes, deals redemptions, contract pricing, quote requests, and FOH reservations on one platform.
+- **Scalable controls** â€” Multi-branch inventory, advanced roles, and smart reorder unlock as restaurants move from Growth to Scale (suppliers: Growth â†’ Scale with active customer location metering).
 
 ### Suppliers
 
 Suppliers reduce missed orders and manual coordination:
 
-- **Centralized order intake** — All restaurant orders in one fulfillment workflow with decline reasons, amendments, and calendar views.
-- **Catalog and pricing power** — Product CRUD, bulk CSV import, image ZIP import, contract pricing, and optional public mini-store at `/supplier/:slug`.
-- **Logistics** — Warehouse management, multi-warehouse routing (Supplier Scale), delivery board, driver assignment, route planning, and GPS tracking.
-- **Revenue tools** — Invoicing from delivered orders, promotions/deals with admin approval, growth program for customer acquisition, and command-center analytics.
-- **Relationship management** — Chat, reviews, disputes resolution, and restaurant connection requests.
+- **Centralized order intake** â€” All restaurant orders in one fulfillment workflow with decline reasons, amendments, and calendar views.
+- **Catalog and pricing power** â€” Product CRUD, bulk CSV import, image ZIP import, contract pricing, and optional public mini-store at `/supplier/:slug`.
+- **Logistics** â€” Warehouse management, multi-warehouse routing (Supplier Scale), delivery board, driver assignment, route planning, and GPS tracking.
+- **Revenue tools** â€” Invoicing from delivered orders, promotions/deals with admin approval, growth program for customer acquisition, and command-center analytics.
+- **Relationship management** â€” Chat, reviews, disputes resolution, and restaurant connection requests.
 
 ### Drivers
 
-Drivers interact through a focused **delivery-only surface** (`/app/driver-deliveries`) with permissions limited to viewing and updating assigned deliveries. They do not access catalog, billing, or team administration — reducing training burden and security exposure.
+Drivers interact through a focused **delivery-only surface** (`/app/driver-deliveries`) with permissions limited to viewing and updating assigned deliveries. They do not access catalog, billing, or team administration â€” reducing training burden and security exposure.
 
 ### Platform administrators
 
@@ -162,20 +162,20 @@ Feature gates and meter limits are enforced server-side via `requireFeature()` m
 
 | Domain                 | Restaurant | Supplier |  Admin  |    Public    |
 | ---------------------- | :--------: | :------: | :-----: | :----------: |
-| Auth & registration    |     ✓      |    ✓     |    ✓    |      —       |
-| Catalog & pricing      |   browse   |  manage  |    —    |  mini-store  |
-| Ordering & quick lists |     ✓      | fulfill  |    —    |   B2C menu   |
-| Fulfillment & GPS      |   track    |    ✓     |    —    |  B2C track   |
-| Receiving & disputes   |     ✓      |   view   |    —    |      —       |
-| Finance & invoices     |     ✓      |    ✓     |    —    |      —       |
-| Deals & promotions     |   redeem   |  manage  | approve |      —       |
-| Reservations           |     ✓      |    —     |    —    | guest portal |
-| Staff & labour         |     ✓      |   team   |    —    | self-service |
-| Chat & notifications   |     ✓      |    ✓     |    —    |      —       |
-| Growth & referrals     |  benefit   |    ✓     | config  | register ref |
-| Quote requests         |     ✓      | respond  |    —    |      —       |
-| Reports                |     ✓      |    ✓     | metrics |      —       |
-| Subscriptions          |     ✓      |    ✓     | manage  |      —       |
+| Auth & registration    |    âœ“     |   âœ“    |   âœ“   |     â€”      |
+| Catalog & pricing      |   browse   |  manage  |   â€”   |  mini-store  |
+| Ordering & quick lists |    âœ“     | fulfill  |   â€”   |   B2C menu   |
+| Fulfillment & GPS      |   track    |   âœ“    |   â€”   |  B2C track   |
+| Receiving & disputes   |    âœ“     |   view   |   â€”   |     â€”      |
+| Finance & invoices     |    âœ“     |   âœ“    |   â€”   |     â€”      |
+| Deals & promotions     |   redeem   |  manage  | approve |     â€”      |
+| Reservations           |    âœ“     |   â€”    |   â€”   | guest portal |
+| Staff & labour         |    âœ“     |   team   |   â€”   | self-service |
+| Chat & notifications   |    âœ“     |   âœ“    |   â€”   |     â€”      |
+| Growth & referrals     |  benefit   |   âœ“    | config  | register ref |
+| Quote requests         |    âœ“     | respond  |   â€”   |     â€”      |
+| Reports                |    âœ“     |   âœ“    | metrics |     â€”      |
+| Subscriptions          |    âœ“     |   âœ“    | manage  |     â€”      |
 
 ---
 
@@ -262,11 +262,11 @@ The **supplier growth program** (migration `0169`) turns suppliers into acquisit
 
 ### For operations
 
-A **single PostgreSQL schema** with 195 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
+A **single PostgreSQL schema** with 196 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
 
 ### For engineering
 
-RBAC is **permission-first**: route guards resolve `tenant_user_roles` → permissions, with system roles seeded from `role-matrix.js` per tenant. Admin impersonation uses a separate token path without weakening tenant isolation for normal users.
+RBAC is **permission-first**: route guards resolve `tenant_user_roles` â†’ permissions, with system roles seeded from `role-matrix.js` per tenant. Admin impersonation uses a separate token path without weakening tenant isolation for normal users.
 
 ---
 
@@ -274,11 +274,11 @@ RBAC is **permission-first**: route guards resolve `tenant_user_roles` → permi
 
 The following items are **implemented partially** or **disabled by default**. Full detail appears in the Complete Product Guide.
 
-| Area                                   | Status                                                                                   |
-| -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Supplier Settings → Delivery Zones tab | UI exists; tab hidden (`DELIVERY_ZONES_ENABLED = false`); warehouse zone API is separate |
-| Restaurant finance opening balance     | Hardcoded `0` in account statement summary (`TODO` in API)                               |
-| Delivery rollover cron                 | Registered but no-op unless `DELIVERY_ROLLOVER_ENABLED=true`                             |
+| Area                                     | Status                                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Supplier Settings â†’ Delivery Zones tab | UI exists; tab hidden (`DELIVERY_ZONES_ENABLED = false`); warehouse zone API is separate |
+| Restaurant finance opening balance       | Hardcoded `0` in account statement summary (`TODO` in API)                               |
+| Delivery rollover cron                   | Registered but no-op unless `DELIVERY_ROLLOVER_ENABLED=true`                             |
 
 These are product honesty markers, not blockers for core B2B ordering flows.
 

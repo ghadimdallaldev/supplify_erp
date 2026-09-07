@@ -352,7 +352,7 @@ const mountLocalUploadsStatic =
   (config.NODE_ENV !== 'production' || config.STORAGE_PUBLIC_READ)
 if (mountLocalUploadsStatic) {
   const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
-  app.use('/uploads', express.static(uploadsDir))
+  app.use('/uploads', express.static(uploadsDir, { maxAge: '1y', immutable: true }))
 }
 
 app.get('/health', async (req, res) => {

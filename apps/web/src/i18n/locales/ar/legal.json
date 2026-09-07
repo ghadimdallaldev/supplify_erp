@@ -20,7 +20,8 @@
       "reference": "الفوترة والعروض"
     },
     "footerInquiries": "للاستفسارات القانونية تواصل مع",
-    "footerPrivacy": "الخصوصية:"
+    "footerPrivacy": "الخصوصية:",
+    "footerAgreement": "باستخدامك سبلفاي فإنك توافق على <terms>الشروط والأحكام</terms> و<privacy>سياسة الخصوصية</privacy> و<legal>الاتفاقيات القانونية الأخرى</legal>."
   },
   "reaccept": {
     "title": "اتفاقيات قانونية محدّثة",

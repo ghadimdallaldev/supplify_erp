@@ -37,7 +37,7 @@ import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -298,7 +298,7 @@ export function CartPage() {
                 <button
                   onClick={() => {
                     toast.dismiss(id)
-                    window.location.href = '/app/settings'
+                    navigate('/app/settings')
                   }}
                   className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
@@ -329,7 +329,7 @@ export function CartPage() {
           icon={<ShoppingCart className="h-6 w-6" aria-hidden />}
           action={
             <Button asChild>
-              <a href="/app/products">{t('page.browseProducts')}</a>
+              <Link to="/app/products">{t('page.browseProducts')}</Link>
             </Button>
           }
         />

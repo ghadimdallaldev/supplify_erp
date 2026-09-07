@@ -53,6 +53,7 @@ export function MenuItemCard({
             alt=""
             className="h-[72px] w-[72px] shrink-0 rounded-xl object-cover"
             loading="lazy"
+            decoding="async"
           />
         ) : (
           <div

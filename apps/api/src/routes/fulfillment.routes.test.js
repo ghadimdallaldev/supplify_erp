@@ -159,7 +159,7 @@ describe('Fulfillment routes — delivery route planning', () => {
 
     expect(res.body.ok).toBe(true)
     expect(res.body.data.windowDays).toBe(7)
-    expect(res.body.data.bucketLimit).toBe(500)
+    expect(res.body.data.bucketLimit).toBe(200)
     const sqlCalls = query.mock.calls.map((c) => c[0])
     expect(sqlCalls.some((sql) => sql.includes("INTERVAL '1 day'"))).toBe(true)
     expect(sqlCalls.some((sql) => sql.includes('LIMIT'))).toBe(true)

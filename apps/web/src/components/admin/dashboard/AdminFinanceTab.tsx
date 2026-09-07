@@ -29,10 +29,11 @@ type RevenueByPlanRow = {
 }
 
 type TenantRevenueRow = {
-  tenant_id?: string
-  tenant_type?: string
+  tenantId?: string
+  tenantType?: string
+  tenantName?: string
   revenue?: number
-  overdue_amount?: number
+  overdueAmount?: number
 }
 
 function tenantTypeTone(type?: string): string {
@@ -204,7 +205,7 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                 <ul className="divide-y divide-[var(--app-border)]">
                   {topTenants.slice(0, 8).map((tenant, i) => (
                     <li
-                      key={`${tenant.tenant_id}-${i}`}
+                      key={`${tenant.tenantId}-${tenant.tenantType}-${i}`}
                       className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
                     >
                       <div className="flex min-w-0 items-center gap-2">
@@ -212,20 +213,20 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                           #{i + 1}
                         </span>
                         <span
-                          className="truncate font-mono text-sm text-[var(--text)]"
-                          title={tenant.tenant_id}
+                          className="truncate text-sm text-[var(--text)]"
+                          title={tenant.tenantId}
                         >
-                          {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                          {tenant.tenantName || tenant.tenantId?.slice(0, 8) || '?'}
                         </span>
-                        {tenant.tenant_type && (
+                        {tenant.tenantType && (
                           <Badge
                             variant="outline"
                             className={cn(
                               'shrink-0 text-xs capitalize',
-                              tenantTypeTone(tenant.tenant_type)
+                              tenantTypeTone(tenant.tenantType)
                             )}
                           >
-                            {tenant.tenant_type.toLowerCase()}
+                            {tenant.tenantType.toLowerCase()}
                           </Badge>
                         )}
                       </div>
@@ -249,27 +250,27 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                 <div className="space-y-3 lg:hidden">
                   {overdueTenants.map((tenant, i) => (
                     <article
-                      key={`${tenant.tenant_id}-${i}-card`}
+                      key={`${tenant.tenantId}-${tenant.tenantType}-${i}-card`}
                       className="flex items-center justify-between gap-3 rounded-md border border-[var(--app-border)] p-4"
                     >
                       <div>
-                        <span className="font-mono text-xs text-[var(--text)]">
-                          {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                        <span className="text-xs text-[var(--text)]" title={tenant.tenantId}>
+                          {tenant.tenantName || tenant.tenantId?.slice(0, 8) || '?'}
                         </span>
-                        {tenant.tenant_type && (
+                        {tenant.tenantType && (
                           <Badge
                             variant="outline"
                             className={cn(
                               'ml-2 text-xs capitalize',
-                              tenantTypeTone(tenant.tenant_type)
+                              tenantTypeTone(tenant.tenantType)
                             )}
                           >
-                            {tenant.tenant_type.toLowerCase()}
+                            {tenant.tenantType.toLowerCase()}
                           </Badge>
                         )}
                       </div>
                       <span className="font-semibold tabular-nums text-[var(--red)]">
-                        {formatCurrency(tenant.overdue_amount ?? 0)}
+                        {formatCurrency(tenant.overdueAmount ?? 0)}
                       </span>
                     </article>
                   ))}
@@ -296,25 +297,22 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                     <tbody className="divide-y divide-[var(--app-border)]">
                       {overdueTenants.map((tenant, i) => (
                         <tr
-                          key={`${tenant.tenant_id}-${i}`}
+                          key={`${tenant.tenantId}-${tenant.tenantType}-${i}`}
                           className="transition-colors hover:bg-[var(--brand-ultra)]/35"
                         >
                           <td className="px-4 py-3.5">
-                            <span
-                              className="font-mono text-xs text-[var(--text)]"
-                              title={tenant.tenant_id}
-                            >
-                              {tenant.tenant_id?.slice(0, 8) ?? '?'}
+                            <span className="text-xs text-[var(--text)]" title={tenant.tenantId}>
+                              {tenant.tenantName || tenant.tenantId?.slice(0, 8) || '?'}
                             </span>
-                            {tenant.tenant_type && (
+                            {tenant.tenantType && (
                               <Badge
                                 variant="outline"
                                 className={cn(
                                   'ml-2 text-xs capitalize sm:hidden',
-                                  tenantTypeTone(tenant.tenant_type)
+                                  tenantTypeTone(tenant.tenantType)
                                 )}
                               >
-                                {tenant.tenant_type.toLowerCase()}
+                                {tenant.tenantType.toLowerCase()}
                               </Badge>
                             )}
                           </td>
@@ -324,22 +322,22 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                               responsiveDataListClasses.columnSecondary
                             )}
                           >
-                            {tenant.tenant_type ? (
+                            {tenant.tenantType ? (
                               <Badge
                                 variant="outline"
                                 className={cn(
                                   'text-xs capitalize',
-                                  tenantTypeTone(tenant.tenant_type)
+                                  tenantTypeTone(tenant.tenantType)
                                 )}
                               >
-                                {tenant.tenant_type.toLowerCase()}
+                                {tenant.tenantType.toLowerCase()}
                               </Badge>
                             ) : (
                               <span className="text-[var(--text-muted)]">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-right font-semibold tabular-nums text-[var(--red)]">
-                            {formatCurrency(tenant.overdue_amount ?? 0)}
+                            {formatCurrency(tenant.overdueAmount ?? 0)}
                           </td>
                         </tr>
                       ))}

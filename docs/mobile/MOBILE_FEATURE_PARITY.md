@@ -2,7 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
-## 2026-09-02 — Checkout status lock + relationship gate + WH inventory list
+## 2026-09-07 — Branded 404/500 pages, broken-link fixes, admin analytics correctness
+
+- **Web UX**: New Supplify-branded 404 (`*` catch-all) and 500 (router `errorElement`) pages (`apps/web/src/pages/ErrorPages.tsx`), EN+AR. `LegalFooterLinks` now i18n'd via `Trans` (was hardcoded English). Privacy policy already existed at `/legal/privacy_policy`.
+- **Broken links (web)**: notification fallback `/app/notifications` → `/app`; stale Header title-map entries removed; reorder-assistance and expiry links retargeted to `/app/restaurant-inventory`; deep-link params wired (`/app/orders?restaurant=`, `/app/products?supplier=`, `/app/fulfillment?tab=`, `/app/restaurant-inventory?tab=`); tenant-aware upgrade CTA in AssistantFab; SPA `Link`/`navigate` instead of full reloads; hash-anchor scrolling added in Layout.
+- **Admin analytics (API+web)**: MRR/ARR count ACTIVE only and include yearly-only plans; subscription counts wired to correct columns; reservations week bounded; health `recentApiErrors` limited to 24h and past-due billing downgraded to Degraded; conversion-stats window key reflects `days`; audit limit/offset clamped and UTC-consistent date bounds; tenant lists deduped via LATERAL; usage-meter over/near-limit restricted to current period; `/admin-dashboard/subscriptions` paginated (default 200, cap 500); promotions `/admin/pending` LIMIT 100 and `/admin/deals/insights` 90-day window + 180s cache; finance top-tenants include suppliers with tenant names (camelCase).
+- **Mobile:** skipped — admin dashboard has no mobile surface; link/error-page changes are web-only UI. No shared type or client-contract changes affecting mobile.
+
+## 2026-09-07 — Public endpoint perf pass (caching, parallel queries, indexes)
+
+- **Perf (API)**: `columnExists` results cached per process; public supplier catalog column checks and products/count/categories queries parallelized; `Cache-Control` added to anonymous public GETs (restaurant/supplier profiles, public products, resolve-host, consumer menu); `/uploads` static served with 1y immutable; migration `0196` adds `product (supplier_id, name)` and `(supplier_id, category)` indexes.
+- **Perf (web)**: Vite es2022 target + prod console strip, React Query defaults (60s staleTime, no focus refetch), nginx gzip level 6 + no-cache index.html; RegisterComplete/LegalReaccept/Invite/BranchInvite pages, ConsumerShell, and the custom-domain catalog page moved out of the eager bundle (lazy chunks); `loading="lazy" decoding="async"` on list/grid images; logo `fetchpriority=high`; `ProductCatalogRow` memoized.
+- **Mobile:** skipped — no API contract, auth, RBAC, or type changes; response bodies unchanged (headers only). Mobile clients benefit transparently from HTTP caching.
 
 - **Correctness**: Restaurant create accepts only `DRAFT`/`PLACED`; stock reserved only for `PLACED`; checkout requires follow/prior-order (parity with product detail); WH-mode inventory list is product-anchored (includes WH-only SKUs).
 - **Perf**: Supplier low-stock dashboard preview uses SQL LIMIT 3 (no full catalog scan); dashboard summary cache invalidated on order create.

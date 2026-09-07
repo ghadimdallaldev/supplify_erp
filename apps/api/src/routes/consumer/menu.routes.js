@@ -102,6 +102,8 @@ router.get('/', async (req, res) => {
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
     const menu = await getPublicMenu(restaurant.id, branchId || null)
+    // Anonymous public content — safe for CDN/browser caching.
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
     jsonOk(res, { restaurant, menu })
   } catch (error) {
     logger.error('Public consumer menu fetch failed', { error: error.message })

@@ -191,6 +191,10 @@ function isUuid(str) {
   return typeof str === 'string' && uuidRegex.test(str)
 }
 
+/** CDN/browser caching for anonymous public content — only set on 200 responses. */
+const PUBLIC_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+const RESOLVE_HOST_CACHE_CONTROL = 'public, max-age=300, s-maxage=300, stale-while-revalidate=600'
+
 router.get('/restaurants/:idOrSlug', async (req, res) => {
   try {
     const { idOrSlug } = req.params
@@ -212,6 +216,7 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
       })
     }
 
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({
       ok: true,
       data: rows[0],
@@ -256,6 +261,7 @@ router.get('/resolve-host', async (req, res) => {
         requestId: req.requestId,
       })
     }
+    res.set('Cache-Control', RESOLVE_HOST_CACHE_CONTROL)
     res.json({ ok: true, data: resolved, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('resolve-host failed', { error: error.message })
@@ -271,6 +277,7 @@ router.get('/resolve-host', async (req, res) => {
 router.get('/suppliers/:idOrSlug', async (req, res) => {
   try {
     const data = await getPublicSupplierProfile(req.params.idOrSlug)
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'NotFoundError') {
@@ -296,6 +303,7 @@ router.get('/suppliers/:idOrSlug/products', async (req, res) => {
     const params = publicSupplierProductsSchema.parse(req.query)
     const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
     const data = await listPublicSupplierProducts(supplier.id, params)
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'NotFoundError') {

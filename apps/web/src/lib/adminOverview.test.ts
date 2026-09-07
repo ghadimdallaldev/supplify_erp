@@ -45,7 +45,8 @@ describe('adminOverview', () => {
 
   it('derives system health from errors and alerts', () => {
     expect(deriveSystemHealth(sample, 0)).toBe('healthy')
-    expect(deriveSystemHealth({ alerts: { pastDueSubscriptions: 1 } }, 0)).toBe('critical')
+    expect(deriveSystemHealth({ alerts: { pastDueSubscriptions: 1 } }, 0)).toBe('degraded')
+    expect(deriveSystemHealth({ alerts: { pastDueSubscriptions: 1 } }, 2)).toBe('critical')
     expect(deriveSystemHealth({ operational: { emailFailed24h: 6 } }, 0)).toBe('degraded')
   })
 
