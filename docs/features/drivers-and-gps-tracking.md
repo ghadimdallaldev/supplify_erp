@@ -141,6 +141,38 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 - **Non-ready stops on activate:** route still moves to `IN_PROGRESS`; waiting stops keep `assigned` until order reaches `PROCESSING`/`SHIPPED`
 - **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
 - **Dispatch board selection:** checkbox disabled when order is already on a route, or status is not eligible for planning
+- **Un-routing releases the driver:** removing a stop, cancelling a route (via `DELETE`
+  or `PATCH status=CANCELLED`) and `releaseOrderFromPlannedRoutes` all flip the order's
+  still-`assigned` driver leg to `reassigned`. Without this the dispatch board keeps
+  the order in the **Assigned** bucket under a driver who no longer has a route for it.
+  Legs already `picked_up` / `out_for_delivery` are deliberately left alone.
+- **Route date wins over today:** `syncDriverAssignment` stamps
+  `driver_assignments.scheduled_delivery_date` from the route's `scheduled_date`, not
+  `CURRENT_DATE`. A route planned for tomorrow must not be swept up by tonight's
+  [delivery rollover](./delivery-rollover.md) job.
+- **Reassignment:** `reassignDriver` carries `scheduled_delivery_date` onto the new leg
+  (a NULL there drops the order out of the rollover partial index and the driver's
+  today list) and deletes the now-stale stop from the previous driver's live route.
+
+### Dispatch cache invalidation
+
+`GET /api/fulfillment/dispatch` is cached for 45s per supplier under
+`fulfillment:dispatch:v1:<supplierId>:<days>:<warehouseId>`. **Every** mutation that
+changes a bucket, an assignment or `has_pod` must call
+`invalidateDispatchCacheForSupplier` (`apps/api/src/lib/dispatch-cache.js`) — route
+create / add stops / remove stop / update / activate / cancel / build-from-assignments,
+driver assign / status / reassign, POD submit, and both manual and cron rollover.
+Skipping it leaves the board showing an order as unassigned for up to 45 seconds after
+a driver has been routed.
+
+### Proof of delivery
+
+One POD row per order, enforced by a unique index on `proof_of_delivery(order_id)`
+(migration `0200`); the service upserts with `ON CONFLICT (order_id) DO UPDATE` and
+`COALESCE`, so a driver retrying on a flaky connection tops up the existing proof
+instead of stacking duplicates. A POD must carry at least one of a photo
+(`file_key`), a signature (`signature_file_key`) or a `recipient_name` — the web
+dialog disables save until one is present and the API rejects the rest with a 400.
 
 ### Rollback notes
 

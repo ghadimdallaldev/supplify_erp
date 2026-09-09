@@ -101,11 +101,22 @@ export function previewCustomerImport(csvText) {
   }
 }
 
+/**
+ * Quote a value for CSV and neutralise spreadsheet formula injection.
+ * The report is built from client-supplied text and then downloaded and opened in
+ * Excel/Sheets, where a leading =, +, -, @, TAB or CR is executed as a formula.
+ */
+function csvCell(value) {
+  const text = value == null ? '' : String(value)
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return `"${safe.replace(/"/g, '""')}"`
+}
+
 export function buildCustomerImportErrorReportCsv(errors = []) {
   const lines = ['row_number,field,message']
-  for (const row of errors) {
-    for (const e of row.errors || []) {
-      lines.push(`${row.rowNumber},"${e.field}","${String(e.message).replace(/"/g, '""')}"`)
+  for (const row of Array.isArray(errors) ? errors : []) {
+    for (const e of row?.errors || []) {
+      lines.push([csvCell(row?.rowNumber), csvCell(e?.field), csvCell(e?.message)].join(','))
     }
   }
   return lines.join('\n')

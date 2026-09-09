@@ -25,18 +25,47 @@ Restaurants send **multi-supplier quote requests** (RFQ) for catalog products. S
 
 ## API — Supplier (`/api/quote-requests`)
 
-| Method | Path                                              | Description                                       |
-| ------ | ------------------------------------------------- | ------------------------------------------------- |
-| GET    | `/supplier/inbox`                                 | Inbox list (`status`: pending/responded/declined) |
-| GET    | `/supplier/inbox/:quoteRequestSupplierId`         | Detail for response form                          |
-| POST   | `/supplier/inbox/:quoteRequestSupplierId/respond` | Submit response (`items[]`, optional `note`)      |
+| Method | Path                                              | Description                                                                 |
+| ------ | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| GET    | `/supplier/inbox`                                 | Inbox list — see query params below                                         |
+| GET    | `/supplier/inbox/:quoteRequestSupplierId`         | Detail for response form (marks the entry as viewed)                        |
+| POST   | `/supplier/inbox/:quoteRequestSupplierId/respond` | Submit response (`items[]`, optional `note`)                                |
+| POST   | `/supplier/inbox/:quoteRequestSupplierId/decline` | Decline to quote, optional `reason` (max 500 chars) shown to the restaurant |
+
+`GET /supplier/inbox` query params:
+
+| Param    | Values                                 | Notes                                                                   |
+| -------- | -------------------------------------- | ----------------------------------------------------------------------- |
+| `status` | `pending` \| `responded` \| `declined` | Supplier-side row status only. Restaurant-side values are rejected 400. |
+| `search` | free text, max 120                     | Restaurant name, `ILIKE`                                                |
+| `sort`   | `newest` \| `oldest` \| `needed_by`    | `needed_by` sorts undated requests last                                 |
+| `page`   | ≥ 1                                    | —                                                                       |
+| `limit`  | 1–50                                   | Default 20                                                              |
+
+The response carries `inbox[]`, `pagination`, and a whole-inbox `counts` object
+(`total`, `pending`, `responded`, `declined`, `unread`, `urgent`) that is **not**
+scoped to the current page or filter — it drives the tab badges and the unread dot.
+`urgent` counts pending entries on an open request needed within 2 days.
 
 Response items support: `isAvailable`, `unitPrice`, `quantity`, `deliveryDate`, `note`, `substituteProductId`.
+
+### Response and decline rules
+
+- A response is refused once the restaurant's `quote_requests.status` leaves `open`
+  (closed or cancelled). The detail payload exposes `canRespond` so the client can
+  lock the form instead of failing on submit.
+- Decline moves the row to `declined` and stores `decline_reason`. It is idempotent,
+  is refused after the supplier has already responded, and is refused on a
+  non-`open` request.
+- Opening the detail endpoint stamps `viewed_at` once; that is what makes an entry
+  stop counting as unread.
 
 ## Notifications
 
 - **Supplier:** `quote_request_received` on create (deduped per supplier/request).
 - **Restaurant:** `quote_response_received` when a supplier submits a response.
+- **Restaurant:** `quote_request_declined` when a supplier declines to quote; the
+  optional reason is appended to the message and carried in `metadata.declineReason`.
 
 In-app only (no dedicated email template v1).
 
@@ -71,6 +100,8 @@ Migrations:
 
 - `0153_quote_requests_and_public_catalog.sql` — quote tables + `supplier.public_catalog_enabled`
 - `0155_ensure_quote_request_schema.sql` — idempotent schema repair
+- `0202_quote_request_supplier_decline.sql` — `quote_request_suppliers.decline_reason`,
+  `.viewed_at`, and a partial index for the unread-pending count
 
 Tables: `quote_requests`, `quote_request_items`, `quote_request_suppliers`, `quote_responses`, `quote_response_items`.
 

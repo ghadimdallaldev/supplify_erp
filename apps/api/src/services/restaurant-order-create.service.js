@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks'
 import { incrementDailyUsageMeterInTransaction } from '../lib/subscription.js'
 import { insertOrderItemsBatch } from './order-create.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
+import { resolveSupplierDeliveryDate } from '../lib/supplier-last-order.js'
 
 function elapsedMsSince(start) {
   return Math.round(performance.now() - start)
@@ -60,16 +61,21 @@ export async function createRestaurantOrdersInTransaction({
     const supplier = supplierProfiles.get(supplierId) ?? { id: supplierId }
 
     let phaseStart = performance.now()
+    const deliveryResolution = resolveSupplierDeliveryDate(
+      supplier,
+      orderData?.deliveryDate ?? null
+    )
     const {
       rows: [order],
     } = await q(
       `
-          INSERT INTO customer_order (restaurant_id, currency, status)
-          VALUES ($1, 'USD', $2)
+          INSERT INTO customer_order (restaurant_id, currency, status, notes, requested_delivery_date)
+          VALUES ($1, 'USD', $2, $3, $4::date)
           RETURNING *
         `,
-      [restaurantId, orderStatus]
+      [restaurantId, orderStatus, orderData?.notes || null, deliveryResolution.deliveryDate]
     )
+    order.deliveryResolution = deliveryResolution
     timings.orderHeaderInsertMs += elapsedMsSince(phaseStart)
 
     phaseStart = performance.now()

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
   useGetConsumerOrdersQuery,
+  useUpdateConsumerMenuItemMutation,
   useUpdateConsumerOrderStatusMutation,
   type ConsumerOrderSummary,
 } from '../../services/consumerApi'
@@ -71,14 +72,22 @@ function OrderCard({
   order,
   updating,
   onAdvance,
+  on86Item,
+  onRestoreItem,
   t,
   canManageOrders,
+  can86Items,
+  item86ing,
 }: {
   order: ConsumerOrderSummary
   updating: boolean
   onAdvance: (id: string, current: string) => void
+  on86Item: (menuItemId: string, itemName: string) => void
+  onRestoreItem: (menuItemId: string, itemName: string) => void
   t: TFunction<'consumer'>
   canManageOrders: boolean
+  can86Items: boolean
+  item86ing: string | null
 }) {
   const nextStatus = getNextConsumerOrderStatus(order.status)
   const lines = order.lines ?? []
@@ -104,13 +113,45 @@ function OrderCard({
           <ul className="space-y-1.5 border-t pt-2 text-xs">
             {lines.map((line) => {
               const modifierText = formatModifiers(line as ConsumerOrderLine)
+              const menuItemId = line.menu_item_id
               return (
                 <li key={line.id} className="space-y-0.5">
                   <div className="flex justify-between gap-2">
                     <span className="min-w-0">
                       {line.quantity}× {line.item_name}
                     </span>
-                    <span className="shrink-0">{formatPrice(Number(line.line_total))}</span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {can86Items && menuItemId ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-[10px] font-bold uppercase tracking-wide text-destructive hover:text-destructive"
+                            disabled={item86ing === menuItemId}
+                            onClick={() => on86Item(menuItemId, line.item_name)}
+                            title={t('orders.eightySixHint', { name: line.item_name })}
+                          >
+                            {t('orders.eightySix')}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-[10px] font-bold uppercase tracking-wide text-[var(--mint)]"
+                            disabled={item86ing === menuItemId}
+                            onClick={() => onRestoreItem(menuItemId, line.item_name)}
+                            title={t('orders.restoreHint', {
+                              name: line.item_name,
+                              defaultValue: 'Make {{name}} available again',
+                            })}
+                          >
+                            {t('orders.restore', { defaultValue: 'Avail' })}
+                          </Button>
+                        </>
+                      ) : null}
+                      <span>{formatPrice(Number(line.line_total))}</span>
+                    </div>
                   </div>
                   {modifierText && <p className="text-muted-foreground">+ {modifierText}</p>}
                   {line.notes && <p className="italic text-muted-foreground">{line.notes}</p>}
@@ -148,8 +189,9 @@ function OrderCard({
 
 export function ConsumerOrdersPage() {
   const { t } = useTranslation('consumer')
-  const { can } = usePermissions()
+  const { can, canAny } = usePermissions()
   const canManageOrders = can('ORDERS_MANAGE')
+  const can86Items = canAny('CATALOG_EDIT', 'CATALOG_MANAGE')
 
   useEffect(() => {
     void ensureNamespace('consumer')
@@ -172,6 +214,8 @@ export function ConsumerOrdersPage() {
     skipPollingIfUnfocused: true,
   })
   const [updateStatus, { isLoading: updating }] = useUpdateConsumerOrderStatusMutation()
+  const [updateMenuItem] = useUpdateConsumerMenuItemMutation()
+  const [item86ing, setItem86ing] = useState<string | null>(null)
 
   const orders = useMemo(() => data?.orders ?? [], [data?.orders])
 
@@ -242,6 +286,33 @@ export function ConsumerOrdersPage() {
       refetch()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || t('orders.unableToUpdate'))
+    }
+  }
+
+  const handle86Item = async (menuItemId: string, itemName: string) => {
+    if (!window.confirm(t('orders.confirmEightySix', { name: itemName }))) return
+    setItem86ing(menuItemId)
+    try {
+      await updateMenuItem({ id: menuItemId, isAvailable: false }).unwrap()
+      toast.success(t('orders.eightySixed', { name: itemName }))
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || t('orders.unableEightySix'))
+    } finally {
+      setItem86ing(null)
+    }
+  }
+
+  const handleRestoreItem = async (menuItemId: string, itemName: string) => {
+    setItem86ing(menuItemId)
+    try {
+      await updateMenuItem({ id: menuItemId, isAvailable: true }).unwrap()
+      toast.success(
+        t('orders.itemRestored', { name: itemName, defaultValue: '{{name}} is available again' })
+      )
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || t('orders.unableEightySix'))
+    } finally {
+      setItem86ing(null)
     }
   }
 
@@ -326,8 +397,12 @@ export function ConsumerOrdersPage() {
                       order={order}
                       updating={updating}
                       onAdvance={advanceStatus}
+                      on86Item={handle86Item}
+                      onRestoreItem={handleRestoreItem}
                       t={t}
                       canManageOrders={canManageOrders}
+                      can86Items={can86Items}
+                      item86ing={item86ing}
                     />
                   ))}
                   {!ordersByStatus[columnStatus]?.length && (
@@ -349,8 +424,12 @@ export function ConsumerOrdersPage() {
                 order={order}
                 updating={updating}
                 onAdvance={advanceStatus}
+                on86Item={handle86Item}
+                onRestoreItem={handleRestoreItem}
                 t={t}
                 canManageOrders={canManageOrders}
+                can86Items={can86Items}
+                item86ing={item86ing}
               />
             ))}
           </div>
@@ -376,8 +455,12 @@ export function ConsumerOrdersPage() {
                   order={order}
                   updating={updating}
                   onAdvance={advanceStatus}
+                  on86Item={handle86Item}
+                  onRestoreItem={handleRestoreItem}
                   t={t}
                   canManageOrders={canManageOrders}
+                  can86Items={can86Items}
+                  item86ing={item86ing}
                 />
               ))}
             </div>

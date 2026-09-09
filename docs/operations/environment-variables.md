@@ -81,10 +81,13 @@ See [../features/notifications-and-alerts.md](../features/notifications-and-aler
 | `WHATSAPP_APP_SECRET`           | API     | webhook   | —       | Inbound signature verification   |
 
 See [../features/notifications-and-alerts.md](../features/notifications-and-alerts.md) § WhatsApp.
-| `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod** |
-| `BILLING_GATEWAY` | API | optional | `stub` | Overrides mode mapping |
-| `PAYMENTS_PROVIDER` | API | live | `stripe` | Future provider id |
-| `PAYMENTS_WEBHOOK_SECRET` | API | live | secret | Webhook verification |
+| `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod**; **live never waives boost/featured payment** |
+| `BILLING_GATEWAY` | API | optional | `stub` | `stub` \| `manual` \| `stripe` (stripe requires secret key) |
+| `PAYMENTS_PROVIDER` | API | live | `stripe` | Preferred PSP id when live |
+| `PAYMENTS_SECRET_KEY` / `STRIPE_SECRET_KEY` | API | live card | secret | Stripe secret (`sk_…`); registers Visa/MC gateway |
+| `PAYMENTS_PUBLIC_KEY` | API | live card | — | Stripe publishable key for Elements (web) |
+| `PAYMENTS_WEBHOOK_SECRET` / `STRIPE_WEBHOOK_SECRET` | API | live | secret | Stripe webhook signing secret (`whsec_…`) for `POST /webhooks/stripe` (disputes) |
+| `ALLOW_WAIVE_DEAL_PROMOTION_PAYMENT` | API | non-live only | unset | Ignored when `PAYMENTS_MODE=live`; may waive in production+non-live only if explicitly `true` |
 | `LOG_LEVEL` | API | all | `debug`/`info`/`warn` | |
 | `ENABLE_REQUEST_LOGGING` | API | all | `true`/`false` | HTTP request logs |
 | `SENTRY_DSN` | API | optional | URL | Optional monitoring |

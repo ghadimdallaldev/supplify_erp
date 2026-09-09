@@ -186,6 +186,213 @@ export async function commitDispatchInventoryForOrder(client, orderId) {
   )
 }
 
+/**
+ * Atomically move an assignment to another warehouse: release old reservation, reserve at new.
+ * Allowed only while status is pending or picking (not packed/dispatched/delivered/failed).
+ */
+export async function reassignOrderWarehouseAssignment(
+  client,
+  { orderId, assignmentId, newWarehouseId, supplierId, assignedBy = 'manual' }
+) {
+  if (!newWarehouseId) {
+    throw new Error('newWarehouseId is required')
+  }
+
+  const { rows: locked } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE id = $1 AND order_id = $2
+     FOR UPDATE`,
+    [assignmentId, orderId]
+  )
+  if (!locked.length) return null
+
+  const assignment = locked[0]
+  if (!['pending', 'picking'].includes(assignment.status)) {
+    const err = new Error('Assignment can only be reassigned while pending or picking')
+    err.code = 'INVALID_STATUS'
+    throw err
+  }
+
+  if (assignment.warehouse_id === newWarehouseId) {
+    return assignment
+  }
+
+  const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
+  const { rows: targetRows } = await client.query(
+    `SELECT id FROM warehouse
+     WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
+    [newWarehouseId, supplierId]
+  )
+  if (!targetRows.length) {
+    const err = new Error('Target warehouse not found or inactive')
+    err.code = 'WAREHOUSE_NOT_FOUND'
+    throw err
+  }
+
+  const lines = await lineItemsForAssignment(client, orderId, assignment)
+  for (const line of lines) {
+    await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+  }
+
+  await reserveWarehouseStockBatch(
+    client,
+    newWarehouseId,
+    lines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
+    { supplierId }
+  )
+
+  const { rows: updated } = await client.query(
+    `UPDATE order_warehouse_assignment
+     SET warehouse_id = $1,
+         assigned_by = $2,
+         assigned_at = now(),
+         status = CASE WHEN status = 'picking' THEN 'picking' ELSE 'pending' END
+     WHERE id = $3
+     RETURNING *`,
+    [newWarehouseId, assignedBy, assignmentId]
+  )
+  return updated[0] ?? null
+}
+
+/**
+ * Release reserved stock for a single warehouse assignment and mark it failed.
+ */
+export async function releaseInventoryForAssignment(client, orderId, assignmentId) {
+  const { rows } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed')
+     FOR UPDATE`,
+    [assignmentId, orderId]
+  )
+  if (!rows.length) return null
+
+  const assignment = rows[0]
+  if (assignment.status !== 'dispatched') {
+    const lines = await lineItemsForAssignment(client, orderId, assignment)
+    for (const line of lines) {
+      await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+    }
+  }
+
+  const { rows: updated } = await client.query(
+    `UPDATE order_warehouse_assignment
+     SET status = 'failed'
+     WHERE id = $1
+     RETURNING *`,
+    [assignmentId]
+  )
+  return updated[0] ?? null
+}
+
+/**
+ * Mark a warehouse assignment delivered after committing reserved stock (if still open).
+ */
+export async function markWarehouseAssignmentDelivered(client, orderId, assignmentId) {
+  const { rows } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed')
+     FOR UPDATE`,
+    [assignmentId, orderId]
+  )
+  if (!rows.length) return null
+
+  const assignment = rows[0]
+  if (['pending', 'picking', 'packed'].includes(assignment.status)) {
+    const lines = await lineItemsForAssignment(client, orderId, assignment)
+    for (const line of lines) {
+      await commitWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+    }
+  }
+
+  const { rows: updated } = await client.query(
+    `UPDATE order_warehouse_assignment
+     SET status = 'delivered',
+         dispatched_at = COALESCE(dispatched_at, now())
+     WHERE id = $1
+     RETURNING *`,
+    [assignmentId]
+  )
+  return updated[0] ?? null
+}
+
+/**
+ * True when every warehouse assignment for the order is terminal (delivered/failed),
+ * or there are no assignments at all.
+ */
+export async function allWarehouseAssignmentsTerminal(client, orderId) {
+  const { rows } = await client.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status IN ('delivered', 'failed'))::int AS terminal
+     FROM order_warehouse_assignment
+     WHERE order_id = $1`,
+    [orderId]
+  )
+  const total = Number(rows[0]?.total || 0)
+  const terminal = Number(rows[0]?.terminal || 0)
+  return total === 0 || total === terminal
+}
+
+/**
+ * Commit reserved stock and mark a single warehouse assignment as dispatched.
+ */
+export async function commitDispatchInventoryForAssignment(client, orderId, assignmentId) {
+  const { rows } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE id = $1 AND order_id = $2 AND status IN ('pending', 'picking', 'packed')
+     FOR UPDATE`,
+    [assignmentId, orderId]
+  )
+  if (!rows.length) return null
+
+  const assignment = rows[0]
+  const lines = await lineItemsForAssignment(client, orderId, assignment)
+  for (const line of lines) {
+    await commitWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+  }
+
+  const { rows: updated } = await client.query(
+    `UPDATE order_warehouse_assignment
+     SET status = 'dispatched', dispatched_at = now()
+     WHERE id = $1
+     RETURNING *`,
+    [assignmentId]
+  )
+  return updated[0] ?? null
+}
+
+/**
+ * Release reserved stock for open assignments on an order, then mark them failed.
+ * Call this before/while marking delivery failed so reservations are not left dangling.
+ */
+export async function releaseInventoryForFailedDelivery(client, orderId) {
+  const { rows: assignments } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')
+     FOR UPDATE`,
+    [orderId]
+  )
+
+  for (const assignment of assignments) {
+    if (assignment.status === 'dispatched') {
+      // Already committed on-hand — do not restore available; just mark failed.
+      continue
+    }
+    const lines = await lineItemsForAssignment(client, orderId, assignment)
+    for (const line of lines) {
+      await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+    }
+  }
+
+  await client.query(
+    `UPDATE order_warehouse_assignment
+     SET status = 'failed'
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+    [orderId]
+  )
+}
+
 const PICKING_ORDER_STATUSES = new Set(['ACKNOWLEDGED', 'PROCESSING'])
 const DISPATCH_ORDER_STATUSES = new Set(['SHIPPED', 'COMPLETED', 'DELIVERED'])
 const RELEASE_ORDER_STATUSES = new Set(['CANCELLED', 'REJECTED'])

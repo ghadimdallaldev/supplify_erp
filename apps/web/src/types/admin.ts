@@ -364,6 +364,27 @@ export interface SupplierQuoteInboxEntry {
   createdAt: string
   restaurantName: string
   itemCount: number
+  declineReason?: string | null
+  viewedAt?: string | null
+  respondedAt?: string | null
+}
+
+export type SupplierQuoteInboxStatus = 'pending' | 'responded' | 'declined'
+export type SupplierQuoteInboxSort = 'newest' | 'oldest' | 'needed_by'
+
+export interface SupplierQuoteInboxCounts {
+  total: number
+  pending: number
+  responded: number
+  declined: number
+  unread: number
+  urgent: number
+}
+
+export interface SupplierQuoteInboxResponse {
+  inbox: SupplierQuoteInboxEntry[]
+  counts: SupplierQuoteInboxCounts
+  pagination: { page: number; limit: number; total: number }
 }
 
 export interface SupplierQuoteRequestDetail {
@@ -373,7 +394,12 @@ export interface SupplierQuoteRequestDetail {
   restaurantId: string
   restaurantName: string
   quoteRequestNote?: string | null
+  quoteRequestStatus?: string
+  canRespond?: boolean
   neededBy?: string | null
+  createdAt?: string
+  declineReason?: string | null
+  viewedAt?: string | null
   items: QuoteRequestItem[]
   response?: {
     id: string
@@ -414,6 +440,14 @@ export interface PublicAvailabilityResponse {
     openTime?: string
     closeTime?: string
   } | null
+  minPartySize?: number
+  maxPartySize?: number
+  blackout?: boolean
+  blackoutReason?: string | null
+  depositMode?: 'none' | 'fixed' | 'percent'
+  depositPolicyText?: string
+  cancelWindowHours?: number
+  partySizeRejected?: boolean
 }
 
 export interface PublicReservationSummary {
@@ -433,13 +467,41 @@ export interface PublicReservationDetails {
   status: string
   customer_name: string
   customer_phone?: string | null
+  customer_email?: string | null
   party_size: number
   scheduled_at: string
   duration_minutes: number
   notes?: string | null
+  occasion?: string | null
+  allergies?: string | null
   waitlist: boolean
   auto_confirmed: boolean
   public_token: string
+  restaurantName?: string
+  restaurantSlug?: string
+  manageToken?: string
+}
+
+export interface PublicReservationManagePayload {
+  reservation: PublicReservationDetails
+  review?: {
+    id: string
+    overallRating: number
+    foodRating?: number | null
+    serviceRating?: number | null
+    ambianceRating?: number | null
+    comment?: string | null
+    staffReply?: string | null
+    createdAt?: string
+  } | null
+  ratingSummary?: {
+    review_count: number
+    avg_overall: number
+    avg_food?: number | null
+    avg_service?: number | null
+    avg_ambiance?: number | null
+  }
+  canReview?: boolean
 }
 
 export interface StaffPortalSession {

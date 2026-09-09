@@ -72,9 +72,12 @@ Used in:
 
 - `GET /api/products` (restaurant tenant enrichment)
 - `GET /api/products/:id`
+- `GET /api/search` (restaurant enrichment)
 - `POST /api/orders` (restaurant checkout)
 - `POST /api/orders/manual` (supplier phone orders)
 - `POST /api/restaurant-pricing/resolve` (cart preview)
+- Scheduled quick-list order creation (`createOrderFromQuickList`)
+- Public supplier catalog when restaurant session is present
 
 ## APIs
 
@@ -160,7 +163,9 @@ Use `POST /api/restaurant-pricing/bulk` for multi-product entry in UI/API today.
 - [ ] Restaurant A sees “Your price” in catalog and My Prices
 - [ ] Restaurant B sees default catalog price only
 - [ ] Restaurant A adds product to cart — cart shows contract price
+- [ ] Cart refresh/rehydrate still shows contract price (not stale catalog)
 - [ ] Checkout/order — `order_item.unit_price` = contract price, `pricing_source` = `CONTRACT_PRICE`
+- [ ] Scheduled quick list with auto-create uses contract price on order lines
 - [ ] Supplier edits/deactivates contract price
 - [ ] Expired/inactive price no longer applies in catalog or orders
 - [ ] Min quantity contract applies only when cart qty ≥ threshold

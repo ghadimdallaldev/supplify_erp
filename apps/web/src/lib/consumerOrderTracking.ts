@@ -71,6 +71,7 @@ export type ConsumerOrderLineModifier = {
 
 export type ConsumerOrderLine = {
   id: string
+  menu_item_id?: string | null
   item_name: string
   quantity: number
   unit_price: number

@@ -8,6 +8,7 @@ import {
   isDeliveryDateEligibleForRollover,
 } from '../lib/delivery-rollover-time.js'
 import { notifyDeliveryRolloverBatch } from './notification.service.js'
+import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 
 export const ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES = [
   'assigned',
@@ -439,6 +440,7 @@ export async function runDeliveryRolloverJob(opts = {}) {
   }
 
   for (const [supplierId, items] of bySupplier) {
+    await invalidateDispatchCacheForSupplier(supplierId)
     try {
       await notifyDeliveryRolloverBatch({
         supplierId,

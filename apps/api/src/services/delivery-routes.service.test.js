@@ -360,9 +360,10 @@ describe('delivery-routes.service', () => {
       completed_at: null,
     }
 
+    // The UPDATE and the driver release now run on the transaction client, so only
+    // the two getDeliveryRoute reads go through `query`.
     queryMock
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, driver_name: 'Alex' }] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED', driver_name: 'Alex' }] })
@@ -371,6 +372,44 @@ describe('delivery-routes.service', () => {
 
     const route = await cancelDeliveryRoute('s1', 'r1')
     expect(route.status).toBe('CANCELLED')
+  })
+
+  it('cancelling a route releases the drivers still holding its stops', async () => {
+    const { cancelDeliveryRoute } = await import('./delivery-routes.service.js')
+    const baseRoute = {
+      id: 'r1',
+      route_number: 'R-1',
+      route_label: 'R-1',
+      area: null,
+      driver_id: 'd1',
+      driver_name: 'Alex',
+      vehicle_info: null,
+      status: 'PLANNED',
+      scheduled_date: '2026-05-28',
+      started_at: null,
+      completed_at: null,
+    }
+    const stopRows = [
+      { id: 'st1', route_id: 'r1', order_id: 'o1', status: 'PLANNED', sequence_number: 1 },
+      { id: 'st2', route_id: 'r1', order_id: 'o2', status: 'PLANNED', sequence_number: 2 },
+    ]
+
+    queryMock
+      .mockResolvedValueOnce({ rows: [baseRoute] })
+      .mockResolvedValueOnce({ rows: stopRows })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await cancelDeliveryRoute('s1', 'r1')
+
+    const releaseCall = clientQueryMock.mock.calls.find(([sql]) =>
+      sql.includes("SET status = 'reassigned'")
+    )
+    expect(releaseCall).toBeDefined()
+    expect(releaseCall[1][0]).toBe('s1')
+    expect(releaseCall[1][1]).toEqual(['o1', 'o2'])
   })
 
   it('buildDriverRouteFromAssignments requires at least 2 eligible deliveries', async () => {

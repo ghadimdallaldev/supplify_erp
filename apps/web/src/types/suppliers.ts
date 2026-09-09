@@ -50,6 +50,12 @@ export interface SupplierBusinessSettings {
   paymentTerms: string
   returnPolicy: string
   termsAndConditions: string
+  lastOrderMode?: 'none' | 'cutoff'
+  lastOrderCutoffType?: 'absolute_time' | 'minutes_before_window' | null
+  lastOrderCutoffTime?: string | null
+  lastOrderCutoffMinutes?: number | null
+  lastOrderRolloverDays?: number
+  lastOrderTimezone?: string
 }
 
 export interface UpdateSupplierBusinessSettingsRequest {
@@ -58,6 +64,12 @@ export interface UpdateSupplierBusinessSettingsRequest {
   paymentTerms?: string | null
   returnPolicy?: string | null
   termsAndConditions?: string | null
+  lastOrderMode?: 'none' | 'cutoff'
+  lastOrderCutoffType?: 'absolute_time' | 'minutes_before_window' | null
+  lastOrderCutoffTime?: string | null
+  lastOrderCutoffMinutes?: number | null
+  lastOrderRolloverDays?: number
+  lastOrderTimezone?: string
 }
 
 export interface CreateSupplierRequest {

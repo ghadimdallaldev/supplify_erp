@@ -50,7 +50,13 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 - **Products/categories:** `applies_to` + `promotion_targets` (supplier UI: DealTargetingPickers)
 - **Restaurants:** empty `promotion_restaurant_targets` = all eligible; otherwise restricted list
-- **Boost audience:** `deal_promotions.target_audience` JSON (`all`, `restaurantTypes`, `areas`)
+- **Audience (types + areas):**
+  - Deal columns: `promotions.target_restaurant_types`, `promotions.target_areas`
+  - Boost copy: on publish, `deal_promotions.target_audience` is built from those columns via `buildBoostTargetAudienceFromDeal` (`{ all: true }` when both empty; otherwise `{ all: false, restaurantTypes, areas }`)
+  - Shared matcher: `apps/api/src/lib/restaurant-targeting.js`
+  - **Types:** canonical list `fine_dining | casual_dining | fast_food | cafe | bakery | hotel | catering | cloud_kitchen`. Legacy profile value `restaurant` (and aliases) normalize to `casual_dining` on save and when matching.
+  - **Areas:** free-text tokens matched case-insensitively against restaurant location haystack: `address_json.city`, `area` / `neighborhood` / `district`, `region` / `state`, `country`, `street`, plus `delivery_location_label`. Empty targets = all restaurants.
+  - Restaurants must set **business type** and **area/neighborhood** on Business profile (`PATCH /api/restaurants/:id` with `businessType` + `address.area`) so supplier targeting can resolve correctly.
 - **Schedule:** `starts_at` / `ends_at`; `usage_limit` / `usage_count`; optional `stock_quantity`
 
 ## Visibility
@@ -146,7 +152,14 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 
 - `promotion_pricing_config` — admin-configurable boost packages (`amount`, `duration_days`, `badge_label`, `estimated_reach_label`, `is_recommended`, `is_active`, `sort_order`)
 - `deal_promotions` — campaign row + purchase snapshots (`price_paid`, etc.)
-- `deal_promotions.billing_status` — `pending`, `paid`, `waived`, etc. (payment stub: boosts activate with `waivePayment` until billing wired)
+- **Promotion ad billing** (`apps/api/src/lib/billing/promotion-ad-billing.js`) — boosts and featured placements create `billing_invoice` rows (`metadata.type` = `deal_boost` | `featured_placement`), charge via `getBillingGateway()`, and always set `billing_payment.invoice_id`
+- Columns: `promotions.billing_invoice_id`, `deal_promotions.billing_invoice_id`, `supplier_featured_placements.billing_invoice_id` (migration `0197`)
+- **Waive gate:** payment is waived only when `PAYMENTS_MODE !== 'live'` and (non-production **or** `ALLOW_WAIVE_DEAL_PROMOTION_PAYMENT=true`). Live mode never auto-waives.
+- **Stripe:** registered when `STRIPE_SECRET_KEY` or `PAYMENTS_SECRET_KEY` is set (`BILLING_GATEWAY=stripe`); supports Visa/Mastercard PaymentIntents + refunds
+- **Disputes / chargebacks:** `POST /webhooks/stripe` (raw body + `Stripe-Signature`) uses `PAYMENTS_WEBHOOK_SECRET` / `STRIPE_WEBHOOK_SECRET`. On `charge.dispute.*`, marks invoice disputed, sets `payment_status=disputed`, pauses active boost / cancels featured (migration `0203`)
+- **Idempotency:** clients should send `idempotencyKey` on `POST /api/promotions/:id/pay-activation` and featured purchase/pay
+- Admin: `POST /api/promotions/admin/:id/mark-boost-paid`, `POST /api/promotions/admin/:id/refund-boost`; insights include `total_ad_spend` / `boost_ad_spend` / `featured_ad_spend`
+- Featured: `POST /api/suppliers/featured-placement/purchase`, `.../:id/pay`, admin `.../:id/refund`
 - Feature gates: supplier `promotions`, restaurant `supplier_deals` (Silver+ on paid tiers)
 
 ## Background job
@@ -155,11 +168,13 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 
 ## Database
 
-| Migration                         | Tables                                                                                         |
-| --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `0074_promotions.sql`             | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`          |
-| `0095_deal_promotions_system.sql` | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config` |
-| `0123_deal_boost_packages.sql`    | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing               |
+| Migration                         | Tables                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `0074_promotions.sql`             | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`             |
+| `0095_deal_promotions_system.sql` | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config`    |
+| `0123_deal_boost_packages.sql`    | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing                  |
+| `0197_promotion_ad_billing.sql`   | `billing_invoice_id` on promotions, deal_promotions, featured placements; refunded payment status |
+| `0203_promotion_ad_disputed.sql`  | `disputed` payment_status for promotions + featured; `DISPUTED` on billing_payment                |
 
 ## Frontend
 

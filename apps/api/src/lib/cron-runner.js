@@ -24,6 +24,7 @@ export const CRON_JOBS = {
   REORDER_FORECAST: 'reorder_forecast',
   RECIPE_RECALC: 'recipe_recalc',
   GROWTH_PROGRAM_MAINTENANCE: 'growth_program_maintenance',
+  RESERVATION_GUEST_COMMS: 'reservation_guest_comms',
 }
 
 /** Manual HTTP/CLI triggers — bypass CRONS_ENABLED but still use advisory lock. */

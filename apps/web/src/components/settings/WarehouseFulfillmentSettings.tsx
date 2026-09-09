@@ -39,10 +39,15 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
 
   const handleSimulate = async () => {
     try {
-      const result = await simulateRouting({ deliveryArea: simulateArea || undefined }).unwrap()
+      const result = await simulateRouting({
+        items: [],
+        postal_code: simulateArea.trim() || undefined,
+      }).unwrap()
+      const first = result?.preview?.[0]
+      const warehouseName = result?.warehouseName || first?.warehouseName
       toast.success(
-        result?.warehouseName
-          ? t('toast.routeWouldRouteTo', { warehouseName: result.warehouseName })
+        warehouseName
+          ? t('toast.routeWouldRouteTo', { warehouseName })
           : t('toast.simulationComplete')
       )
     } catch (e: any) {
@@ -91,11 +96,11 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <Label htmlFor="simulate-area">Simulate routing (delivery area)</Label>
+            <Label htmlFor="simulate-area">Simulate routing (postal / area code)</Label>
             <Input
               id="simulate-area"
               className="mt-1"
-              placeholder="e.g. Downtown"
+              placeholder="e.g. 1100 or Downtown postal"
               value={simulateArea}
               onChange={(e) => setSimulateArea(e.target.value)}
             />

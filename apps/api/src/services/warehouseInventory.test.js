@@ -7,6 +7,10 @@ vi.mock('./supplier-stock.service.js', () => ({
   }),
 }))
 
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+}))
+
 import {
   syncWarehouseFulfillmentOnOrderStatus,
   releaseInventoryForOrder,
@@ -93,5 +97,66 @@ describe('warehouseInventory', () => {
     expect(client.query.mock.calls.some((c) => String(c[0]).includes('quantity_reserved'))).toBe(
       true
     )
+  })
+
+  it('atomically reassigns warehouse: release old then reserve new', async () => {
+    const queries = []
+    const client = {
+      query: vi.fn(async (sql, params) => {
+        queries.push({ sql, params })
+        if (sql.includes('FROM order_warehouse_assignment') && sql.includes('FOR UPDATE')) {
+          return {
+            rows: [
+              {
+                id: 'a1',
+                order_id: 'order-1',
+                order_item_id: null,
+                warehouse_id: 'wh-old',
+                status: 'pending',
+              },
+            ],
+          }
+        }
+        if (sql.includes('FROM warehouse') && sql.includes('is_active = TRUE')) {
+          return { rows: [{ id: 'wh-new' }] }
+        }
+        if (sql.includes('FROM order_item')) {
+          return { rows: [{ product_id: 'p1', quantity: 3 }] }
+        }
+        if (sql.includes('FROM warehouse_inventory') && sql.includes('FOR UPDATE')) {
+          return { rows: [{ product_id: 'p1', quantity_available: 10 }] }
+        }
+        if (sql.includes('UPDATE order_warehouse_assignment')) {
+          return {
+            rows: [
+              {
+                id: 'a1',
+                order_id: 'order-1',
+                warehouse_id: 'wh-new',
+                status: 'pending',
+                assigned_by: 'manual',
+              },
+            ],
+          }
+        }
+        return { rows: [] }
+      }),
+    }
+
+    const { reassignOrderWarehouseAssignment } = await import('./warehouseInventory.js')
+    const result = await reassignOrderWarehouseAssignment(client, {
+      orderId: 'order-1',
+      assignmentId: 'a1',
+      newWarehouseId: 'wh-new',
+      supplierId: 'sup-1',
+    })
+
+    expect(result.warehouse_id).toBe('wh-new')
+    expect(
+      queries.some((q) => String(q.sql).includes('quantity_available = quantity_available +'))
+    ).toBe(true)
+    expect(
+      queries.some((q) => String(q.sql).includes('quantity_reserved = wi.quantity_reserved +'))
+    ).toBe(true)
   })
 })

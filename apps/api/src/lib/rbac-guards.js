@@ -33,8 +33,15 @@ export function isPermissionSubset(actorPermissions, targetPermissions) {
 }
 
 function actorHasManageWildcard(actor, permissionKey) {
-  const base = String(permissionKey).replace(/_VIEW$|_CREATE$|_EDIT$|_MANAGE$/, '')
-  return actor.has(`${base}_MANAGE`)
+  const base = String(permissionKey).replace(
+    /_VIEW$|_CREATE$|_EDIT$|_SEND$|_IMPORT$|_MANAGE$|_COSTS$/,
+    ''
+  )
+  // RECIPES_VIEW_COSTS → RECIPES_MANAGE
+  const manageKey = permissionKey.endsWith('_COSTS')
+    ? `${String(permissionKey).replace(/_VIEW_COSTS$/, '')}_MANAGE`
+    : `${base}_MANAGE`
+  return actor.has(manageKey) || actor.has(`${base}_MANAGE`)
 }
 
 export async function countOwnersInOrganization(organizationId, workspaceType, client = null) {

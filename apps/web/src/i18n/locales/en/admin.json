@@ -478,15 +478,22 @@
       "totalViews": "Total views",
       "dealRedemptions": "Deal redemptions",
       "boostRevenue": "Boost revenue",
+      "boostAdSpend": "Ad spend (boosts+featured)",
+      "orderGmv": "Order GMV from deals",
+      "openAdInvoices": "Open ad invoices",
       "discountAmount": "Discount amount"
     },
     "toasts": {
       "approved": "Deal approved",
       "rejected": "Deal rejected",
       "paused": "Deal paused",
+      "markedPaid": "Boost marked paid and published",
+      "refunded": "Boost refunded and deal paused",
       "approveFailed": "Failed to approve deal",
       "rejectFailed": "Failed to reject deal",
-      "pauseFailed": "Failed to pause deal"
+      "pauseFailed": "Failed to pause deal",
+      "markPaidFailed": "Failed to mark boost paid",
+      "refundFailed": "Failed to refund boost"
     },
     "collapseDetails": "Collapse details",
     "expandDetails": "Expand details"

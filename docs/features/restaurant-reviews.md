@@ -1,13 +1,14 @@
 # Restaurant Reviews (Consumer)
 
-Diners can rate restaurants after a completed **consumer order** (Track E guest ordering). Ratings aggregate per restaurant and are exposed on public review endpoints.
+Diners can rate restaurants after a completed **consumer order** (Track E guest ordering) or a completed **reservation**. Ratings aggregate per restaurant and are exposed on public review endpoints.
 
 **Plan gate:** None on review endpoints; consumer ordering itself is restaurant-configured.
 
 ## Rules
 
-- One review per `consumer_order` (unique `consumer_order_id`).
+- One review per `consumer_order` (unique `consumer_order_id`) **or** per `reservation` (unique `reservation_id`).
 - Order must be in a delivered lifecycle status (`COMPLETED`, `DELIVERED`, etc. — same set as supplier reviews via `DELIVERED_ORDER_STATUSES`).
+- Reservation must be `COMPLETED`; guests submit via manage token (`POST /api/public/reservations/manage/review`). Staff reply via `POST /api/reservations/reviews/:id/reply`.
 - Authors may **edit** their review within **7 days**; **delete** anytime (own reviews only, matched by `reviewer_user_id`).
 - `restaurant_rating_summaries` is maintained by a DB trigger on `restaurant_reviews` insert/update/delete.
 - Public list endpoints omit PII beyond optional `reviewer_name`.

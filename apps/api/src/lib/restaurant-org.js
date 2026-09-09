@@ -2,10 +2,14 @@
  * Restaurant organization layer: org roles, branch access, and branch lifecycle.
  */
 import { query, withTransaction } from './db.js'
-import { PERMISSION_KEYS } from './permission-keys.js'
 import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
-import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
+import {
+  ensureTenantSystemRoles,
+  assignOwnerRoleForUser,
+  getOwnerRoleId,
+  getAllPermissionsForTenantType,
+} from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { RESTAURANT_VIEWER } from './role-matrix.js'
@@ -91,17 +95,8 @@ const BRANCH_ORDER_STATS_SELECT = `
    FROM tenant_user_roles tur
    WHERE tur.tenant_id = r.id AND tur.tenant_type = 'RESTAURANT') AS staff_count`
 
-const ALL_RESTAURANT_PERMISSIONS = Object.values(PERMISSION_KEYS).filter(
-  (k) =>
-    !k.startsWith('ADMIN_') &&
-    !k.startsWith('CATALOG_') &&
-    !k.startsWith('WAREHOUSES_') &&
-    !k.startsWith('FULFILLMENT_') &&
-    !k.startsWith('PROMOTIONS_')
-)
-
 function resolveOrgRolePermissions(roleDef) {
-  if (roleDef.permissions === 'ALL') return [...ALL_RESTAURANT_PERMISSIONS]
+  if (roleDef.permissions === 'ALL') return getAllPermissionsForTenantType('RESTAURANT')
   return roleDef.permissions
 }
 

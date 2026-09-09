@@ -38,6 +38,12 @@ function emptyBusinessForm(): SupplierBusinessSettings {
     paymentTerms: '',
     returnPolicy: '',
     termsAndConditions: '',
+    lastOrderMode: 'none',
+    lastOrderCutoffType: 'absolute_time',
+    lastOrderCutoffTime: '15:00',
+    lastOrderCutoffMinutes: 30,
+    lastOrderRolloverDays: 1,
+    lastOrderTimezone: 'UTC',
   }
 }
 
@@ -60,6 +66,12 @@ export function SupplierBusinessTab() {
         paymentTerms: data.business.paymentTerms ?? '',
         returnPolicy: data.business.returnPolicy ?? '',
         termsAndConditions: data.business.termsAndConditions ?? '',
+        lastOrderMode: data.business.lastOrderMode ?? 'none',
+        lastOrderCutoffType: data.business.lastOrderCutoffType ?? 'absolute_time',
+        lastOrderCutoffTime: data.business.lastOrderCutoffTime ?? '15:00',
+        lastOrderCutoffMinutes: data.business.lastOrderCutoffMinutes ?? 30,
+        lastOrderRolloverDays: data.business.lastOrderRolloverDays ?? 1,
+        lastOrderTimezone: data.business.lastOrderTimezone ?? 'UTC',
       })
     }
   }, [data?.business])
@@ -116,6 +128,12 @@ export function SupplierBusinessTab() {
         paymentTerms: form.paymentTerms.trim() || null,
         returnPolicy: form.returnPolicy.trim() || null,
         termsAndConditions: form.termsAndConditions.trim() || null,
+        lastOrderMode: form.lastOrderMode ?? 'none',
+        lastOrderCutoffType: form.lastOrderCutoffType ?? null,
+        lastOrderCutoffTime: form.lastOrderCutoffTime ?? null,
+        lastOrderCutoffMinutes: form.lastOrderCutoffMinutes ?? null,
+        lastOrderRolloverDays: form.lastOrderRolloverDays ?? 1,
+        lastOrderTimezone: form.lastOrderTimezone ?? 'UTC',
       }).unwrap()
       toast.success(t('business.toast.saved'))
     } catch (err: unknown) {
@@ -188,6 +206,139 @@ export function SupplierBusinessTab() {
                   </Button>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="border-t pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">
+                {t('business.lastOrder.title', { defaultValue: 'Restaurant last-order rules' })}
+              </h3>
+              <Badge variant="outline">
+                {t('business.lastOrder.badge', { defaultValue: 'Delivery timing' })}
+              </Badge>
+            </div>
+            <p className="text-sm text-[var(--text-muted)]">
+              {t('business.lastOrder.description', {
+                defaultValue:
+                  'Choose no cutoff (restaurants can order anytime for the next day) or a cutoff that rolls delivery to tomorrow, day-after, or a period you set.',
+              })}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="last-order-mode">
+                  {t('business.lastOrder.mode', { defaultValue: 'Mode' })}
+                </Label>
+                <select
+                  id="last-order-mode"
+                  className="flex h-10 w-full rounded-md border border-[var(--app-border)] bg-transparent px-3 text-sm"
+                  value={form.lastOrderMode ?? 'none'}
+                  disabled={isBusy}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      lastOrderMode: event.target.value as 'none' | 'cutoff',
+                    }))
+                  }
+                >
+                  <option value="none">
+                    {t('business.lastOrder.modeNone', { defaultValue: 'No last-order time' })}
+                  </option>
+                  <option value="cutoff">
+                    {t('business.lastOrder.modeCutoff', { defaultValue: 'Enforce cutoff' })}
+                  </option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last-order-rollover">
+                  {t('business.lastOrder.rolloverDays', {
+                    defaultValue: 'Roll delivery forward (days)',
+                  })}
+                </Label>
+                <Input
+                  id="last-order-rollover"
+                  type="number"
+                  min={1}
+                  max={14}
+                  value={form.lastOrderRolloverDays ?? 1}
+                  disabled={isBusy || form.lastOrderMode !== 'cutoff'}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      lastOrderRolloverDays: Number(event.target.value) || 1,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last-order-cutoff-type">
+                  {t('business.lastOrder.cutoffType', { defaultValue: 'Cutoff type' })}
+                </Label>
+                <select
+                  id="last-order-cutoff-type"
+                  className="flex h-10 w-full rounded-md border border-[var(--app-border)] bg-transparent px-3 text-sm"
+                  value={form.lastOrderCutoffType ?? 'absolute_time'}
+                  disabled={isBusy || form.lastOrderMode !== 'cutoff'}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      lastOrderCutoffType: event.target.value as
+                        | 'absolute_time'
+                        | 'minutes_before_window',
+                    }))
+                  }
+                >
+                  <option value="absolute_time">
+                    {t('business.lastOrder.absoluteTime', {
+                      defaultValue: 'Clock time (e.g. 15:00)',
+                    })}
+                  </option>
+                  <option value="minutes_before_window">
+                    {t('business.lastOrder.minutesBefore', {
+                      defaultValue: 'Minutes before delivery day',
+                    })}
+                  </option>
+                </select>
+              </div>
+              {form.lastOrderCutoffType === 'minutes_before_window' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="last-order-minutes">
+                    {t('business.lastOrder.minutes', { defaultValue: 'Minutes before window' })}
+                  </Label>
+                  <Input
+                    id="last-order-minutes"
+                    type="number"
+                    min={1}
+                    max={1440}
+                    value={form.lastOrderCutoffMinutes ?? 30}
+                    disabled={isBusy || form.lastOrderMode !== 'cutoff'}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        lastOrderCutoffMinutes: Number(event.target.value) || 30,
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="last-order-time">
+                    {t('business.lastOrder.time', { defaultValue: 'Cutoff time' })}
+                  </Label>
+                  <Input
+                    id="last-order-time"
+                    type="time"
+                    value={form.lastOrderCutoffTime ?? '15:00'}
+                    disabled={isBusy || form.lastOrderMode !== 'cutoff'}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        lastOrderCutoffTime: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              )}
             </div>
           </div>
 

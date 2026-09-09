@@ -23,6 +23,10 @@ vi.mock('../services/reservationsApi', () => ({
     isLoading: false,
   }),
   useGetReservationWaitlistQuery: () => ({
+    useGetReservationReviewsQuery: () => ({
+      data: { reviews: [] },
+      isLoading: false,
+    }),
     data: { waitlist: [] },
     isLoading: false,
     refetch: vi.fn(),

@@ -5,6 +5,7 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { formatPrice } from '../../utils/format'
 import type { ConsumerMenuItem, ConsumerOrderingMode } from '../../services/consumerApi'
+import { MenuItemTagBadges } from './MenuItemTagBadges'
 import { cn } from '../../lib/utils'
 import { ensureNamespace } from '../../i18n'
 
@@ -12,12 +13,14 @@ type MenuItemCardProps = {
   item: ConsumerMenuItem
   onSelect: (item: ConsumerMenuItem) => void
   orderingMode?: ConsumerOrderingMode
+  disabled?: boolean
   className?: string
 }
 
 export function MenuItemCard({
   item,
   onSelect,
+  disabled = false,
   orderingMode = 'LIVE',
   className,
 }: MenuItemCardProps) {
@@ -27,7 +30,7 @@ export function MenuItemCard({
   const soldOut = item.is_available === false
   const orderingClosed = orderingMode === 'CLOSED'
   const preorderOnly = orderingMode === 'PREORDER_ONLY'
-  const addDisabled = soldOut || orderingClosed
+  const addDisabled = disabled || soldOut || orderingClosed
 
   useEffect(() => {
     void ensureNamespace('consumer')
@@ -82,6 +85,7 @@ export function MenuItemCard({
               {item.description}
             </p>
           )}
+          <MenuItemTagBadges allergens={item.allergens} dietaryTags={item.dietary_tags} />
           {hasModifiers && !soldOut && (
             <p className="mt-1.5 flex items-center gap-1 text-xs text-[var(--text-mid)]">
               <SlidersHorizontal className="h-3 w-3 shrink-0" aria-hidden />

@@ -4,10 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 
 const mockGateway = vi.hoisted(() => ({ charge: vi.fn() }))
+const mockPromoBilling = vi.hoisted(() => ({
+  createDealBoostInvoice: vi.fn(),
+  chargePromotionAdInvoice: vi.fn(),
+  isPromotionAdPaymentWaived: vi.fn(() => false),
+  DEAL_BOOST_INVOICE_TYPE: 'deal_boost',
+}))
 
 vi.mock('../lib/billing/gateway-registry.js', () => ({
   getBillingGateway: vi.fn(() => ({ id: 'stub', charge: mockGateway.charge })),
 }))
+
+vi.mock('../lib/billing/promotion-ad-billing.js', () => mockPromoBilling)
 
 vi.mock('../services/deal-publish.service.js', async (importOriginal) => {
   const actual = await importOriginal()
@@ -16,6 +24,7 @@ vi.mock('../services/deal-publish.service.js', async (importOriginal) => {
     isBoostPaymentWaived: vi.fn(() => false),
     publishDealAfterApproval: vi.fn(async (deal) => ({
       deal: { ...deal, status: 'active', payment_status: 'paid' },
+      campaign: { id: 'campaign-1' },
     })),
   }
 })
@@ -121,9 +130,14 @@ describe('promotions.routes supplier security', () => {
   })
 
   it('POST /:id/pay-activation charges the supplier and activates the boost', async () => {
-    mockGateway.charge.mockResolvedValueOnce({
-      status: 'succeeded',
-      providerPaymentId: 'pi_stub_1',
+    mockPromoBilling.createDealBoostInvoice.mockResolvedValueOnce({
+      invoice: { id: 'inv-boost-1', status: 'OPEN', amount: 25 },
+      created: true,
+    })
+    mockPromoBilling.chargePromotionAdInvoice.mockResolvedValueOnce({
+      success: true,
+      invoice: { id: 'inv-boost-1', status: 'PAID', amount: 25 },
+      payment: { id: 'pay-1' },
     })
     db.query
       .mockResolvedValueOnce({
@@ -136,22 +150,10 @@ describe('promotions.routes supplier security', () => {
             boost_price_snapshot: '25',
             boost_pricing_key: 'boost_basic',
             boost_duration_days: 7,
+            billing_invoice_id: null,
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [{ id: 'subscription-1' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'payment-method-1',
-            provider: 'stub',
-            provider_payment_method_id: 'pm_stub_1',
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: 'billing-payment-1', status: 'PROCESSING' }] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -160,17 +162,20 @@ describe('promotions.routes supplier security', () => {
             status: 'active',
             payment_status: 'paid',
             boost_price_snapshot: '25',
+            billing_invoice_id: 'inv-boost-1',
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
 
     const res = await request(app).post('/api/promotions/deal-1/pay-activation').expect(200)
 
-    expect(mockGateway.charge).toHaveBeenCalledWith(
+    expect(mockPromoBilling.createDealBoostInvoice).toHaveBeenCalled()
+    expect(mockPromoBilling.chargePromotionAdInvoice).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: 25,
-        providerPaymentMethodId: 'pm_stub_1',
-        metadata: { type: 'DEAL_BOOST', promotionId: 'deal-1' },
+        invoiceId: 'inv-boost-1',
+        supplierId: 'supplier-1',
+        expectedType: 'deal_boost',
       })
     )
     expect(res.body.data.promotion.status).toBe('active')

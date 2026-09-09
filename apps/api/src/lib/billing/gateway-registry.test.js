@@ -42,4 +42,23 @@ describe('billing gateway registry', () => {
     registerBillingGateway('custom-test', custom)
     expect(getBillingGateway('custom-test').id).toBe('custom-test')
   })
+
+  it('registers stripe when secret key is configured', async () => {
+    vi.resetModules()
+    process.env.STRIPE_SECRET_KEY = 'sk_test_registry'
+    vi.doMock('../../config/env.js', () => ({
+      config: {
+        APP_ENV: 'dev',
+        PAYMENTS_MODE: 'test',
+        BILLING_GATEWAY: 'stripe',
+        PAYMENTS_SECRET_KEY: 'sk_test_registry',
+      },
+    }))
+    const { listBillingGateways, getBillingGateway } = await import('./gateway-registry.js')
+    expect(listBillingGateways()).toContain('stripe')
+    expect(getBillingGateway('stripe').id).toBe('stripe')
+    delete process.env.STRIPE_SECRET_KEY
+    vi.doUnmock('../../config/env.js')
+    vi.resetModules()
+  })
 })

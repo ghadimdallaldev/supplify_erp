@@ -35,7 +35,7 @@ Role identifiers are name strings (not uppercase codes) as defined in `role-matr
 | Order Fulfillment Staff | Fulfillment board only; cannot edit warehouse or catalog         |
 | Driver                  | Driver deliveries and GPS tracking only                          |
 | Catalog Manager         | Product catalog and images; no orders or fulfillment             |
-| Promotions Manager      | Deals and promotions; no orders or catalog manage                |
+| Promotions Manager      | Deals/promotions with order manage + catalog view for deal ops   |
 | Accountant              | Invoices, payments, reports; read-only orders                    |
 | Viewer                  | Read-only across all supplier areas                              |
 

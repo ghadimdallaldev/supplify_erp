@@ -12,6 +12,8 @@ export type ConsumerMenuItem = {
   base_price: number
   image_url?: string | null
   is_available: boolean
+  allergens?: string[]
+  dietary_tags?: string[]
   modifierGroups?: Array<{
     id: string
     name: string
@@ -311,6 +313,8 @@ export const consumerApi = api.injectEndpoints({
         description?: string
         branchId?: string | null
         imageUrl?: string | null
+        allergens?: string[]
+        dietaryTags?: string[]
       }
     >({
       query: (body) => ({ url: '/api/consumer/menu/items', method: 'POST', body }),
@@ -327,6 +331,8 @@ export const consumerApi = api.injectEndpoints({
         branchId?: string | null
         isAvailable?: boolean
         imageUrl?: string | null
+        allergens?: string[]
+        dietaryTags?: string[]
       }
     >({
       query: ({ id, ...body }) => ({

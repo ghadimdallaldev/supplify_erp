@@ -46,6 +46,15 @@ export function DealsPerformanceSummary({ title, days = 30 }: Props) {
       label: 'Conversion',
       value: summary.conversionRate != null ? `${Number(summary.conversionRate)}%` : '—',
     },
+    { label: 'Ad spend', value: formatCurrency(Number(summary.adSpend || 0)) },
+    {
+      label: 'ROAS',
+      value: summary.roas != null ? `${Number(summary.roas).toFixed(2)}x` : '—',
+    },
+    {
+      label: 'Attributed GMV',
+      value: formatCurrency(Number(summary.attributedGmv || 0)),
+    },
     { label: 'Coupon uses', value: summary.couponUses },
     { label: 'Discount given', value: formatCurrency(Number(summary.totalDiscount || 0)) },
     { label: 'Pending approval', value: summary.pendingDeals },

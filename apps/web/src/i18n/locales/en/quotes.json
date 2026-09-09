@@ -94,7 +94,38 @@
     "items_other": "{{count}} items",
     "neededBy": "Needed by {{date}}",
     "viewResponse": "View response",
-    "respond": "Respond"
+    "respond": "Respond",
+    "unread": "Unread",
+    "decline": "Decline",
+    "declinePrompt": "Decline the quote request from {{restaurant}}? Add an optional reason the restaurant will see.",
+    "declineSuccess": "Quote request declined",
+    "declineFailed": "Could not decline this quote request",
+    "declinedReason": "Declined: {{reason}}",
+    "overdue": "Overdue",
+    "dueToday": "Due today",
+    "dueInDays_one": "Due in {{count}} day",
+    "dueInDays_other": "Due in {{count}} days",
+    "searchPlaceholder": "Search by restaurant…",
+    "noMatchesTitle": "No matching requests",
+    "noMatchesDescription": "Try a different search or filter.",
+    "urgentSummary_one": "{{count}} request needs a price in the next 2 days.",
+    "urgentSummary_other": "{{count}} requests need a price in the next 2 days.",
+    "pendingSummary_one": "{{count}} request is waiting on your price.",
+    "pendingSummary_other": "{{count}} requests are waiting on your price.",
+    "pageOf": "Page {{page}} of {{pageCount}} · {{total}} total",
+    "previous": "Previous",
+    "next": "Next",
+    "tabs": {
+      "all": "All",
+      "pending": "Pending",
+      "responded": "Responded",
+      "declined": "Declined"
+    },
+    "sort": {
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "needed_by": "Needed by"
+    }
   },
   "response": {
     "notFoundTitle": "Quote request not found",
@@ -112,6 +143,14 @@
     "overallNotePlaceholder": "Optional message to the restaurant",
     "sendResponse": "Send response",
     "sentSuccess": "Response sent",
-    "sendFailed": "Failed to send response"
+    "sendFailed": "Failed to send response",
+    "decline": "Decline to quote",
+    "declinePrompt": "Decline this quote request? Add an optional reason the restaurant will see.",
+    "declineSuccess": "Quote request declined",
+    "declineFailed": "Could not decline this quote request",
+    "missingPrice_one": "Enter a unit price for {{count}} available item, or mark it unavailable.",
+    "missingPrice_other": "Enter a unit price for {{count}} available items, or mark them unavailable.",
+    "lockedDeclined": "You declined this quote request. It can no longer be priced.",
+    "lockedClosed": "This quote request is {{status}} and no longer accepts responses."
   }
 }

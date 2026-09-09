@@ -43,10 +43,10 @@ On assignment in multi mode, stock is reserved: `quantity_available` decreases, 
 
 Order place / cancel / reject / dispatch use **one** stock path via `supplier-order-stock.service.js`:
 
-| Mode        | Condition                                | Place                              | Cancel / Reject         | Dispatch                  |
-| ----------- | ---------------------------------------- | ---------------------------------- | ----------------------- | ------------------------- |
-| `warehouse` | Active warehouse(s) or `multi_warehouse` | Reserve `warehouse_inventory` only | Release WH reservations | Commit reserved → on-hand |
-| `legacy`    | No warehouses                            | Deduct `inventory` only            | Restore `inventory`     | N/A                       |
+| Mode        | Condition                                                     | Place                              | Cancel / Reject         | Dispatch                  |
+| ----------- | ------------------------------------------------------------- | ---------------------------------- | ----------------------- | ------------------------- |
+| `warehouse` | `warehouses` or `multi_warehouse` plan feature + ≥1 active WH | Reserve `warehouse_inventory` only | Release WH reservations | Commit reserved → on-hand |
+| `legacy`    | No warehouses feature / no active warehouses                  | Deduct `inventory` only            | Restore `inventory`     | N/A                       |
 
 Legacy `inventory` is kept for UI/compatibility. Adjustments mirror into default warehouse stock when in warehouse mode. Ops tooling:
 
@@ -59,22 +59,22 @@ Design: `docs/superpowers/specs/2026-07-23-inventory-source-of-truth-design.md`.
 
 All warehouse routes: `requireAuth` → `requireFeature('warehouses')` → `requirePermission(...)`.
 
-| Method                | Path                                                | Notes                               |
-| --------------------- | --------------------------------------------------- | ----------------------------------- |
-| GET                   | `/api/warehouses`                                   | List + summary counts               |
-| POST                  | `/api/warehouses`                                   | First warehouse auto-default        |
-| PATCH                 | `/api/warehouses/:id`                               | Update                              |
-| DELETE                | `/api/warehouses/:id`                               | Soft deactivate                     |
-| POST                  | `/api/warehouses/:id/set-default`                   | Atomic default swap                 |
-| GET/PATCH             | `/api/warehouses/:id/inventory`                     | Per-warehouse stock                 |
-| GET                   | `/api/warehouses/:id/orders`                        | Open assignments                    |
-| GET/POST/PATCH/DELETE | `/api/warehouses/:id/zones`                         | `delivery_zone` rows                |
-| GET/POST/PATCH/DELETE | `/api/warehouses/routing/rules`                     | `requireFeature('multi_warehouse')` |
-| POST                  | `/api/warehouses/routing/simulate`                  | Preview only, no writes             |
-| GET/PATCH             | `/api/suppliers/me/fulfillment`                     | Toggle + mode                       |
-| GET                   | `/api/orders/:id/warehouses`                        | Assignments (all modes)             |
-| PATCH                 | `/api/orders/:id/warehouses/:assignmentId`          | Manual reassign (pending/picking)   |
-| POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched                     |
+| Method                | Path                                                | Notes                                                  |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------ |
+| GET                   | `/api/warehouses`                                   | List + summary counts                                  |
+| POST                  | `/api/warehouses`                                   | First warehouse auto-default                           |
+| PATCH                 | `/api/warehouses/:id`                               | Update                                                 |
+| DELETE                | `/api/warehouses/:id`                               | Soft deactivate                                        |
+| POST                  | `/api/warehouses/:id/set-default`                   | Atomic default swap                                    |
+| GET/PATCH             | `/api/warehouses/:id/inventory`                     | Per-warehouse stock                                    |
+| GET                   | `/api/warehouses/:id/orders`                        | Open assignments                                       |
+| GET/POST/PATCH/DELETE | `/api/warehouses/:id/zones`                         | `delivery_zone` rows                                   |
+| GET/POST/PATCH/DELETE | `/api/warehouses/routing/rules`                     | `requireFeature('multi_warehouse')`                    |
+| POST                  | `/api/warehouses/routing/simulate`                  | Preview only, no writes                                |
+| GET/PATCH             | `/api/suppliers/me/fulfillment`                     | Toggle + mode                                          |
+| GET                   | `/api/orders/:id/warehouses`                        | Assignments (all modes)                                |
+| PATCH                 | `/api/orders/:id/warehouses/:assignmentId`          | Atomic reassign (`warehouse_id`); pending/picking only |
+| POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched + commit reserved stock                |
 
 Order creation (`POST /api/orders`, supplier manual create) calls `reserveStockForPlacedOrder` in the **same transaction** (warehouse reserve XOR legacy deduct); failure rolls back the order.
 
@@ -99,7 +99,7 @@ Service: `pick-lists.service.js`
 
 ## Simulation
 
-`POST /api/warehouses/routing/simulate` with `{ items: [{ product_id, quantity }], restaurant_id }` returns `{ preview: [{ productId, warehouseId, reason }] }` with no database side effects.
+`POST /api/warehouses/routing/simulate` accepts `{ items: [{ product_id, quantity }], restaurant_id?, postal_code? }`. Empty `items` returns the supplier default warehouse preview. Response: `{ preview: [...], warehouseName? }` with no database side effects.
 
 ## Schema notes
 

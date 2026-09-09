@@ -36,14 +36,33 @@ export function ReservationCreateDrawer({
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
+    customerEmail: '',
     partySize: 2,
     scheduledAt: new Date().toISOString().slice(0, 16),
     durationMinutes: DEFAULT_DURATION,
     notes: '',
+    occasion: '',
+    allergies: '',
+    bookingSource: 'staff' as 'staff' | 'walk_in',
     tableId: '',
   })
 
   const [createReservation, { isLoading }] = useCreateReservationMutation()
+
+  const resetForm = () =>
+    setForm({
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      partySize: 2,
+      scheduledAt: new Date().toISOString().slice(0, 16),
+      durationMinutes: DEFAULT_DURATION,
+      notes: '',
+      occasion: '',
+      allergies: '',
+      bookingSource: 'staff',
+      tableId: '',
+    })
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -51,25 +70,21 @@ export function ReservationCreateDrawer({
     try {
       await createReservation({
         customerName: form.customerName,
-        customerPhone: form.customerPhone,
+        customerPhone: form.customerPhone || undefined,
+        customerEmail: form.customerEmail || undefined,
         partySize: Number(form.partySize),
         scheduledAt: new Date(form.scheduledAt).toISOString(),
         durationMinutes: Number(form.durationMinutes),
         branchId,
-        notes: form.notes,
+        notes: form.notes || undefined,
+        occasion: form.occasion || undefined,
+        allergies: form.allergies || undefined,
+        bookingSource: form.bookingSource,
         tableIds: form.tableId ? [form.tableId] : [],
       }).unwrap()
       toast.success(t('createDrawer.toasts.created'))
       setOpen(false)
-      setForm({
-        customerName: '',
-        customerPhone: '',
-        partySize: 2,
-        scheduledAt: new Date().toISOString().slice(0, 16),
-        durationMinutes: DEFAULT_DURATION,
-        notes: '',
-        tableId: '',
-      })
+      resetForm()
       onCreated?.()
     } catch (error: any) {
       toast.error(error?.data?.message || t('createDrawer.toasts.createFailed'))
@@ -107,6 +122,41 @@ export function ReservationCreateDrawer({
                 }
                 placeholder={t('createDrawer.contactPlaceholder')}
               />
+            </div>
+            <div>
+              <Label className="text-xs uppercase">
+                {t('createDrawer.email', { defaultValue: 'Email' })}
+              </Label>
+              <Input
+                type="email"
+                value={form.customerEmail}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, customerEmail: event.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase">
+                {t('createDrawer.source', { defaultValue: 'Source' })}
+              </Label>
+              <Select
+                value={form.bookingSource}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    bookingSource: (event.target as HTMLInputElement).value as 'staff' | 'walk_in',
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <option value="staff">
+                    {t('createDrawer.sourceStaff', { defaultValue: 'Phone / staff' })}
+                  </option>
+                  <option value="walk_in">
+                    {t('createDrawer.sourceWalkIn', { defaultValue: 'Walk-in' })}
+                  </option>
+                </SelectTrigger>
+              </Select>
             </div>
             <div>
               <Label className="text-xs uppercase">{t('createDrawer.partySize')}</Label>
@@ -165,6 +215,32 @@ export function ReservationCreateDrawer({
                   ))}
                 </SelectTrigger>
               </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase">
+                {t('createDrawer.occasion', { defaultValue: 'Occasion' })}
+              </Label>
+              <Input
+                value={form.occasion}
+                onChange={(event) => setForm((prev) => ({ ...prev, occasion: event.target.value }))}
+                placeholder={t('createDrawer.occasionPlaceholder', {
+                  defaultValue: 'Birthday, anniversary…',
+                })}
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase">
+                {t('createDrawer.allergies', { defaultValue: 'Allergies' })}
+              </Label>
+              <Input
+                value={form.allergies}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, allergies: event.target.value }))
+                }
+                placeholder={t('createDrawer.allergiesPlaceholder', {
+                  defaultValue: 'Nuts, gluten…',
+                })}
+              />
             </div>
           </div>
           <div>

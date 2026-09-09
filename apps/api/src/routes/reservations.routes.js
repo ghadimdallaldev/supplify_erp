@@ -25,6 +25,12 @@ import {
 } from '../lib/reservation-booking-hours.js'
 import { readBookingMeta } from '../lib/reservation-availability.js'
 import { getLocalDayBounds, parseBoardDateParam } from '../lib/reservation-board-date.js'
+import {
+  upsertReservationGuest,
+  recordGuestVisit,
+  listRestaurantReservationReviews,
+  replyToReservationReview,
+} from '../services/reservation-guest-reviews.service.js'
 
 const router = express.Router()
 
@@ -87,14 +93,35 @@ const reservationCreateSchema = z.object({
   durationMinutes: z.number().min(30).max(240).default(90),
   branchId: z.string().uuid().optional(),
   notes: z.string().optional(),
+  occasion: z.string().max(120).optional(),
+  allergies: z.string().max(500).optional(),
+  bookingSource: z.enum(['staff', 'public', 'walk_in']).optional().default('staff'),
   tableIds: z.array(z.string().uuid()).optional(),
   allowWaitlist: z.boolean().optional().default(true),
 })
 
 const reservationStatusSchema = z.object({
-  status: z.enum(['PENDING', 'CONFIRMED', 'SEATED', 'COMPLETED', 'CANCELLED', 'WAITLIST']),
+  status: z.enum([
+    'PENDING',
+    'CONFIRMED',
+    'SEATED',
+    'COMPLETED',
+    'CANCELLED',
+    'WAITLIST',
+    'NO_SHOW',
+  ]),
   notes: z.string().optional(),
   cancellationReason: z.string().optional(),
+})
+
+const reviewReplySchema = z.object({
+  reply: z.string().min(1).max(2000),
+})
+
+const blackoutSchema = z.object({
+  blackoutDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reason: z.string().max(500).optional(),
+  branchId: z.string().uuid().nullable().optional(),
 })
 
 const analyticsQuerySchema = z.object({
@@ -224,6 +251,14 @@ const publicBookingSettingsSchema = z.object({
   closeTime: bookingTimeSchema,
   durationMinutes: z.coerce.number().min(30).max(240).optional(),
   slotIntervalMinutes: z.coerce.number().min(15).max(60).optional(),
+  minPartySize: z.coerce.number().min(1).max(50).optional(),
+  maxPartySize: z.coerce.number().min(1).max(100).optional(),
+  maxCoversPerSlot: z.coerce.number().min(1).max(500).optional(),
+  cancelWindowHours: z.coerce.number().min(0).max(168).optional(),
+  depositMode: z.enum(['none', 'fixed', 'percent']).optional(),
+  depositAmount: z.coerce.number().min(0).optional(),
+  depositPercent: z.coerce.number().min(0).max(100).optional(),
+  depositPolicyText: z.string().max(1000).optional(),
 })
 
 async function loadPublicBookingSettings(restaurantId) {
@@ -232,14 +267,22 @@ async function loadPublicBookingSettings(restaurantId) {
   ])
   const operatingHours = parseOperatingHours(rows[0]?.operating_hours)
   const summary = summarizeBookingHours(operatingHours)
-  const { durationMinutes, slotIntervalMinutes } = readBookingMeta(operatingHours)
+  const bookingMeta = readBookingMeta(operatingHours)
   const tables = await fetchTables(restaurantId)
   const activeTables = tables.filter((table) => table.is_active)
   const totalCapacity = activeTables.reduce((sum, table) => sum + Number(table.capacity || 0), 0)
   return {
     ...summary,
-    durationMinutes,
-    slotIntervalMinutes,
+    durationMinutes: bookingMeta.durationMinutes,
+    slotIntervalMinutes: bookingMeta.slotIntervalMinutes,
+    minPartySize: bookingMeta.minPartySize,
+    maxPartySize: bookingMeta.maxPartySize,
+    maxCoversPerSlot: bookingMeta.maxCoversPerSlot,
+    cancelWindowHours: bookingMeta.cancelWindowHours,
+    depositMode: bookingMeta.depositMode,
+    depositAmount: bookingMeta.depositAmount,
+    depositPercent: bookingMeta.depositPercent,
+    depositPolicyText: bookingMeta.depositPolicyText,
     tableCount: activeTables.length,
     totalCapacity,
   }
@@ -288,12 +331,26 @@ router.patch('/public-booking-settings', requireRole(['RESTAURANT', 'ADMIN']), a
       (await query(`SELECT operating_hours FROM restaurant WHERE id = $1`, [restaurantId])).rows[0]
         ?.operating_hours
     )
-    const { durationMinutes, slotIntervalMinutes } = readBookingMeta(existing)
+    const existingMeta = readBookingMeta(existing)
     const operatingHours = {
       ...buildUniformOperatingHours(payload.openTime, payload.closeTime),
       _booking: {
-        durationMinutes: payload.durationMinutes ?? durationMinutes,
-        slotIntervalMinutes: payload.slotIntervalMinutes ?? slotIntervalMinutes,
+        durationMinutes: payload.durationMinutes ?? existingMeta.durationMinutes,
+        slotIntervalMinutes: payload.slotIntervalMinutes ?? existingMeta.slotIntervalMinutes,
+        minPartySize: payload.minPartySize ?? existingMeta.minPartySize,
+        maxPartySize: payload.maxPartySize ?? existingMeta.maxPartySize,
+        maxCoversPerSlot:
+          payload.maxCoversPerSlot !== undefined
+            ? payload.maxCoversPerSlot
+            : existingMeta.maxCoversPerSlot,
+        cancelWindowHours:
+          payload.cancelWindowHours !== undefined
+            ? payload.cancelWindowHours
+            : existingMeta.cancelWindowHours,
+        depositMode: payload.depositMode ?? existingMeta.depositMode,
+        depositAmount: payload.depositAmount ?? existingMeta.depositAmount,
+        depositPercent: payload.depositPercent ?? existingMeta.depositPercent,
+        depositPolicyText: payload.depositPolicyText ?? existingMeta.depositPolicyText,
       },
     }
     await query(
@@ -493,6 +550,15 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
       const status = autoConfirm ? 'CONFIRMED' : payload.allowWaitlist ? 'WAITLIST' : 'PENDING'
       const waitlist = status === 'WAITLIST'
 
+      const guest = await upsertReservationGuest(client, {
+        restaurantId,
+        displayName: payload.customerName,
+        phone: payload.customerPhone,
+        email: payload.customerEmail,
+        allergies: payload.allergies,
+        notes: payload.notes,
+      })
+
       const { rows } = await client.query(
         `
             INSERT INTO reservation (
@@ -507,13 +573,17 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
               scheduled_at,
               duration_minutes,
               notes,
+              occasion,
+              allergies,
+              booking_source,
+              guest_id,
               waitlist,
               auto_confirmed,
               created_by,
               public_token,
               public_token_expires_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, gen_random_uuid(), now() + interval '180 days')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, gen_random_uuid(), now() + interval '180 days')
             RETURNING *
           `,
         [
@@ -528,9 +598,13 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
           scheduledAt.toISOString(),
           payload.durationMinutes,
           payload.notes || null,
+          payload.occasion || null,
+          payload.allergies || null,
+          payload.bookingSource || 'staff',
+          guest?.id || null,
           waitlist,
           autoConfirm,
-          req.userData.id || null,
+          req.user?.id || null,
         ]
       )
 
@@ -686,6 +760,10 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
                 WHEN $1 = 'CANCELLED' THEN COALESCE($5, cancellation_reason)
                 ELSE cancellation_reason
               END,
+              no_show_marked_at = CASE
+                WHEN $1 = 'NO_SHOW' THEN COALESCE(no_show_marked_at, now())
+                ELSE no_show_marked_at
+              END,
               updated_at = now()
           WHERE id = $3 AND restaurant_id = $4
           RETURNING *
@@ -703,6 +781,21 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
     }
 
     const reservation = rows[0]
+
+    if (payload.status === 'COMPLETED' && reservation.guest_id) {
+      try {
+        await recordGuestVisit({ query }, reservation.guest_id, { noShow: false })
+      } catch (guestError) {
+        logger.warn('Guest visit update failed', { error: guestError.message })
+      }
+    }
+    if (payload.status === 'NO_SHOW' && reservation.guest_id) {
+      try {
+        await recordGuestVisit({ query }, reservation.guest_id, { noShow: true })
+      } catch (guestError) {
+        logger.warn('Guest no-show update failed', { error: guestError.message })
+      }
+    }
 
     if (payload.status === 'CANCELLED') {
       try {
@@ -946,6 +1039,7 @@ router.get('/analytics', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) 
             ${bucketExpr} AS hour_slot,
             COUNT(*) FILTER (WHERE status = 'CONFIRMED') AS confirmed,
             COUNT(*) FILTER (WHERE status = 'CANCELLED') AS cancelled,
+            COUNT(*) FILTER (WHERE status = 'NO_SHOW') AS no_shows,
             COUNT(*) FILTER (WHERE waitlist) AS waitlisted,
             SUM(party_size) AS total_covers
           FROM reservation
@@ -994,6 +1088,134 @@ router.get('/analytics', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) 
       ok: false,
       data: null,
       error: { name: 'ANALYTICS_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/reviews', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await requireRestaurantId(req)
+    const limit = Math.min(Number(req.query.limit) || 50, 100)
+    const offset = Math.max(Number(req.query.offset) || 0, 0)
+    const reviews = await listRestaurantReservationReviews(restaurantId, { limit, offset })
+    res.json({
+      ok: true,
+      data: { reviews },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Reservation reviews list failed', { error: error.message })
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'RESERVATION_REVIEWS_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reviews/:id/reply', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await requireRestaurantId(req)
+    const payload = reviewReplySchema.parse(req.body)
+    const review = await replyToReservationReview({
+      reviewId: req.params.id,
+      restaurantId,
+      userId: req.user?.id || req.userData?.id || null,
+      reply: payload.reply,
+    })
+    res.json({
+      ok: true,
+      data: { review },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    const status = error.statusCode || 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: error.name || 'REVIEW_REPLY_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.get('/blackouts', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await requireRestaurantId(req)
+    const { rows } = await query(
+      `
+      SELECT id, restaurant_id, branch_id, blackout_date, reason, created_at
+      FROM reservation_blackout
+      WHERE restaurant_id = $1
+        AND blackout_date >= CURRENT_DATE - INTERVAL '7 days'
+      ORDER BY blackout_date ASC
+      `,
+      [restaurantId]
+    )
+    res.json({ ok: true, data: { blackouts: rows }, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BLACKOUT_LIST_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/blackouts', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await requireRestaurantId(req)
+    const payload = blackoutSchema.parse(req.body)
+    const { rows } = await query(
+      `
+      INSERT INTO reservation_blackout (restaurant_id, branch_id, blackout_date, reason)
+      VALUES ($1, $2, $3::date, $4)
+      RETURNING *
+      `,
+      [restaurantId, payload.branchId || null, payload.blackoutDate, payload.reason || null]
+    )
+    res.status(201).json({
+      ok: true,
+      data: { blackout: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BLACKOUT_CREATE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.delete('/blackouts/:id', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+  try {
+    const restaurantId = await requireRestaurantId(req)
+    const { rows } = await query(
+      `DELETE FROM reservation_blackout WHERE id = $1 AND restaurant_id = $2 RETURNING id`,
+      [req.params.id, restaurantId]
+    )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Blackout not found' },
+        requestId: req.requestId,
+      })
+    }
+    res.json({ ok: true, data: { id: rows[0].id }, error: null, requestId: req.requestId })
+  } catch (error) {
+    res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BLACKOUT_DELETE_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }

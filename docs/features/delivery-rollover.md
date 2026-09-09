@@ -36,6 +36,12 @@ An assignment is rolled when:
 
 Effective delivery date = `scheduled_delivery_date` → active route `scheduled_date` → `assigned_at` date.
 
+`scheduled_delivery_date` is stamped from the **route's** `scheduled_date` when the
+assignment is created by route planning, and is carried forward on reassignment. Both
+matter here: stamping `CURRENT_DATE` instead would make a route planned for tomorrow
+eligible for rollover tonight, and a NULL would drop the assignment out of the
+`idx_driver_assignments_scheduled_delivery_date` partial index this job scans.
+
 ## Result
 
 For each eligible assignment:
@@ -47,6 +53,9 @@ For each eligible assignment:
 5. If `DELIVERY_ROLLOVER_KEEP_DRIVER=true`, order appended to a planned route `Rollover {date}` for that driver
 6. Audit log: `delivery.rollover` — _Delivery rolled over to next day because it was not delivered before cutoff._
 7. **Order status unchanged** (stays `PROCESSING` / `SHIPPED`, etc.)
+8. The supplier's dispatch cache is invalidated (per supplier, after the batch for the
+   cron job; immediately for the manual action) so the board reflects the new day
+   rather than serving up to 45s of stale buckets.
 
 ## GPS / ETA / tracking
 

@@ -11,6 +11,8 @@ import {
   useApproveAdminDealMutation,
   useRejectAdminDealMutation,
   usePauseAdminDealMutation,
+  useMarkAdminBoostPaidMutation,
+  useRefundAdminBoostMutation,
 } from '../../services/api'
 import { toast } from 'sonner'
 import { Loader2, Check, X, Pause, Search, RefreshCw, FilterX, ChevronRight } from 'lucide-react'
@@ -82,6 +84,8 @@ export function AdminDealsPanel() {
   const [approveDeal] = useApproveAdminDealMutation()
   const [rejectDeal] = useRejectAdminDealMutation()
   const [pauseDeal] = usePauseAdminDealMutation()
+  const [markBoostPaid] = useMarkAdminBoostPaidMutation()
+  const [refundBoost] = useRefundAdminBoostMutation()
 
   const deals = useMemo(() => data?.deals || [], [data?.deals])
   const insights = insightsData?.insights
@@ -157,6 +161,28 @@ export function AdminDealsPanel() {
     }
   }
 
+  const handleMarkBoostPaid = async (id: string) => {
+    try {
+      await markBoostPaid({ id, reason: 'admin_manual_pay' }).unwrap()
+      toast.success(t('deals.toasts.markedPaid'))
+      refetch()
+    } catch (e: unknown) {
+      const err = e as { data?: { error?: { message?: string } } }
+      toast.error(err?.data?.error?.message || t('deals.toasts.markPaidFailed'))
+    }
+  }
+
+  const handleRefundBoost = async (id: string) => {
+    try {
+      await refundBoost({ id, reason: 'admin_refund' }).unwrap()
+      toast.success(t('deals.toasts.refunded'))
+      refetch()
+    } catch (e: unknown) {
+      const err = e as { data?: { error?: { message?: string } } }
+      toast.error(err?.data?.error?.message || t('deals.toasts.refundFailed'))
+    }
+  }
+
   return (
     <div className="space-y-6">
       <AdminSectionHeader
@@ -184,12 +210,20 @@ export function AdminDealsPanel() {
             { label: t('deals.insights.totalViews'), value: insights.total_views },
             { label: t('deals.insights.dealRedemptions'), value: insights.orders_from_deals },
             {
-              label: t('deals.insights.boostRevenue'),
+              label: t('deals.insights.boostAdSpend'),
+              value: `$${Number(insights.total_ad_spend || insights.boost_ad_spend || 0).toFixed(0)}`,
+            },
+            {
+              label: t('deals.insights.orderGmv'),
               value: `$${Number(insights.total_revenue || 0).toFixed(0)}`,
             },
             {
               label: t('deals.insights.discountAmount'),
               value: `$${Number(insights.total_discount_given || 0).toFixed(0)}`,
+            },
+            {
+              label: t('deals.insights.openAdInvoices'),
+              value: insights.open_ad_invoices ?? 0,
             },
           ].map(({ label, value }) => (
             <Card key={label}>
@@ -484,6 +518,21 @@ export function AdminDealsPanel() {
                                     </Button>
                                   </>
                                 )}
+                                {status === 'approved_pending_payment' && (
+                                  <Button size="sm" onClick={() => handleMarkBoostPaid(id)}>
+                                    <Check className="h-3 w-3 mr-1" /> Mark paid
+                                  </Button>
+                                )}
+                                {(status === 'active' || status === 'scheduled') &&
+                                  String(deal.payment_status || '') === 'paid' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleRefundBoost(id)}
+                                    >
+                                      Refund boost
+                                    </Button>
+                                  )}
                                 {(status === 'active' || status === 'scheduled') && (
                                   <Button
                                     size="sm"

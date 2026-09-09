@@ -39,7 +39,10 @@ import {
   ensureTenantSystemRoles,
   assignOwnerRoleForUser,
   userHasOwnerRole,
+  rolesIncludeOwner,
 } from './tenant-roles.js'
+
+export { rolesIncludeOwner }
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 import {
   extractAccessToken,
@@ -1015,7 +1018,7 @@ export function requirePermission(permissionKey) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
-    if (tenant?.roles?.includes('Owner')) {
+    if (rolesIncludeOwner(tenant?.roles)) {
       return next()
     }
     const perms = tenant?.permissions ?? admin?.permissions ?? []
@@ -1039,7 +1042,7 @@ export function requireAnyPermission(...permissionKeys) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
-    if (tenant?.roles?.includes('Owner')) {
+    if (rolesIncludeOwner(tenant?.roles)) {
       return next()
     }
     const perms = tenant?.permissions ?? admin?.permissions ?? []

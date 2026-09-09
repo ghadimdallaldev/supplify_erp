@@ -204,13 +204,17 @@
       "PENDING": "Pending",
       "CONFIRMED": "Confirmed",
       "SEATED": "Seated",
-      "WAITLIST": "Waitlist"
+      "WAITLIST": "Waitlist",
+      "NO_SHOW": "No-show",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
     },
     "actions": {
       "confirm": "Confirm",
       "cancel": "Cancel",
       "seat": "Seat",
-      "complete": "Complete"
+      "complete": "Complete",
+      "noShow": "No-show"
     },
     "statusLower": {
       "PENDING": "pending",
@@ -218,7 +222,8 @@
       "SEATED": "seated",
       "WAITLIST": "waitlist",
       "CANCELLED": "cancelled",
-      "COMPLETED": "completed"
+      "COMPLETED": "completed",
+      "NO_SHOW": "no-show"
     },
     "toasts": {
       "movedTo": "Moved to {{status}}",
@@ -226,10 +231,38 @@
       "completed": "Reservation completed",
       "seated": "Guest seated",
       "cancelled": "Reservation cancelled",
+      "noShow": "Marked as no-show",
       "updated": "Reservation updated",
       "tableAssigned": "Table assigned",
       "assignFailed": "Could not assign table"
     }
+  },
+  "reviews": {
+    "title": "Guest reviews",
+    "description": "Post-visit ratings from completed reservations. Reply to thank guests or recover service issues.",
+    "empty": "No reservation reviews yet. Guests are invited after a completed visit.",
+    "replyPlaceholder": "Write a public reply…",
+    "reply": "Reply",
+    "replying": "Sending…",
+    "replySaved": "Reply posted",
+    "replyFailed": "Could not post reply",
+    "overall": "Overall {{rating}}/5",
+    "party": "{{count}} guests"
+  },
+  "manageReview": {
+    "title": "Rate your visit",
+    "subtitle": "Your feedback helps the restaurant improve.",
+    "overall": "Overall",
+    "food": "Food",
+    "service": "Service",
+    "ambiance": "Ambiance",
+    "comment": "Comments",
+    "submit": "Submit review",
+    "submitting": "Submitting…",
+    "thanks": "Thanks for your review!",
+    "failed": "Could not submit review",
+    "already": "You already reviewed this visit.",
+    "staffReply": "Restaurant reply"
   },
   "assignments": {
     "empty": "No reservations on <strong>{{date}}</strong>. Change the date above or share your booking link with guests.",

@@ -45,6 +45,12 @@ import {
 import { writeAuditLog } from '../../lib/audit.js'
 import { requireFeature, requireWithinLimit } from '../../lib/subscription.js'
 import { getNewDealsBanner, dismissDealBanner } from '../../services/deal-banner.service.js'
+import {
+  createDealBoostInvoice,
+  getPromotionAdSpendSummary,
+  markPromotionAdInvoicePaidManual,
+  markPromotionAdInvoiceRefunded,
+} from '../../lib/billing/promotion-ad-billing.js'
 
 import {
   adminDealGuards,
@@ -72,6 +78,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -95,6 +102,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -112,6 +120,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -259,6 +268,7 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
       WHERE pu.applied_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       `
     )
+    const adSpend = await getPromotionAdSpendSummary({ windowDays: 90 })
     const { rows: topDeals } = await query(
       `
       SELECT p.id, p.name, p.status, s.name AS supplier_name,
@@ -278,6 +288,7 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
         ...summary[0],
         ...interactionStats[0],
         ...revenueStats[0],
+        ...adSpend,
         topDeals,
       },
     }
@@ -364,11 +375,19 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
     )
     let approvedDeal = rows[0]
     let publishResult = null
+    let boostInvoice = null
     const canPublishNow =
       next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED
     if (canPublishNow) {
       publishResult = await publishDealAfterApproval(approvedDeal, { waivePayment })
       approvedDeal = publishResult.deal
+    } else if (next.status === DEAL_STATUSES.APPROVED_PENDING_PAYMENT && boostAmount > 0) {
+      const created = await createDealBoostInvoice({ deal: approvedDeal })
+      boostInvoice = created.invoice
+      const { rows: withInv } = await query(`SELECT * FROM promotions WHERE id = $1`, [
+        approvedDeal.id,
+      ])
+      if (withInv[0]) approvedDeal = withInv[0]
     }
 
     await writeAuditLog(req, {
@@ -381,6 +400,7 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
         boostAmount,
         boostPreview: buildBoostApprovalPreview(deal),
         dealPromotionId: publishResult?.campaign?.id || null,
+        billingInvoiceId: boostInvoice?.id || approvedDeal.billing_invoice_id || null,
       },
     })
 
@@ -433,6 +453,113 @@ router.post('/admin/:id/reject', ...adminDealGuards, async (req, res, next) => {
     const { notifyDealRejected } = await import('../../services/notification.service.js')
     notifyDealRejected(rows[0], { rejectionReason: body.rejectionReason || null }).catch(() => {})
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Admin: mark boost invoice paid without gateway (pilot / bank transfer). */
+router.post('/admin/:id/mark-boost-paid', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const reason = String(req.body?.reason || 'manual_approval').slice(0, 500)
+    const { rows } = await query(`SELECT * FROM promotions WHERE id = $1`, [req.params.id])
+    if (!rows.length) throw new NotFoundError('Deal not found')
+    const deal = rows[0]
+    if (deal.status !== DEAL_STATUSES.APPROVED_PENDING_PAYMENT) {
+      throw new ValidationError('Deal is not awaiting boost payment')
+    }
+    let invoiceId = deal.billing_invoice_id
+    if (!invoiceId) {
+      const created = await createDealBoostInvoice({ deal })
+      invoiceId = created.invoice.id
+    }
+    await markPromotionAdInvoicePaidManual({
+      invoiceId,
+      supplierId: deal.supplier_id,
+      adminUserId: req.userData?.id || null,
+      reason,
+    })
+    const nextStatus = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
+    const { rows: updated } = await query(
+      `UPDATE promotions
+       SET status = $2, payment_status = $3, billing_invoice_id = $4, updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [deal.id, nextStatus.status, nextStatus.payment_status, invoiceId]
+    )
+    const published = await publishDealAfterApproval(updated[0], {
+      waivePayment: false,
+      paymentConfirmed: true,
+    })
+    if (published.campaign?.id) {
+      await query(`UPDATE deal_promotions SET billing_invoice_id = $2 WHERE id = $1`, [
+        published.campaign.id,
+        invoiceId,
+      ]).catch(() => {})
+    }
+    await writeAuditLog(req, {
+      action_type: 'deal.boost_marked_paid',
+      tenant_type: 'ADMIN',
+      target_id: deal.id,
+      payload_json: { invoiceId, reason },
+    })
+    res.json({
+      ok: true,
+      data: { deal: published.deal, invoiceId },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Admin: refund paid boost and pause the deal. */
+router.post('/admin/:id/refund-boost', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const reason = String(req.body?.reason || 'admin_refund').slice(0, 500)
+    const amount =
+      req.body?.amount != null && req.body.amount !== '' ? Number(req.body.amount) : null
+    const { rows } = await query(`SELECT * FROM promotions WHERE id = $1`, [req.params.id])
+    if (!rows.length) throw new NotFoundError('Deal not found')
+    const deal = rows[0]
+    if (!deal.billing_invoice_id) {
+      throw new ValidationError('Deal has no boost invoice to refund')
+    }
+    const refund = await markPromotionAdInvoiceRefunded({
+      invoiceId: deal.billing_invoice_id,
+      supplierId: deal.supplier_id,
+      amount,
+      reason,
+    })
+    const { rows: paused } = await query(
+      `UPDATE promotions SET
+         status = 'paused',
+         payment_status = 'refunded',
+         updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [deal.id]
+    )
+    await query(
+      `UPDATE deal_promotions SET status = 'paused', updated_at = NOW()
+       WHERE deal_id = $1 AND status = 'active'`,
+      [deal.id]
+    ).catch(() => {})
+    await writeAuditLog(req, {
+      action_type: 'deal.boost_refunded',
+      tenant_type: 'ADMIN',
+      target_id: deal.id,
+      payload_json: {
+        invoiceId: deal.billing_invoice_id,
+        reason,
+        refundAmount: refund.refundAmount,
+      },
+    })
+    res.json({
+      ok: true,
+      data: { deal: paused[0], refund },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }
@@ -507,6 +634,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -541,6 +669,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -567,6 +696,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -595,6 +725,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -619,6 +750,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -652,6 +784,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {

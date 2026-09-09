@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { executeScheduledOrders, computeNextExecutionDate } from './scheduled-orders.service.js'
+import {
+  executeScheduledOrders,
+  computeNextExecutionDate,
+  createOrderFromQuickList,
+} from './scheduled-orders.service.js'
 
 const clientQueryMock = vi.fn()
 
@@ -22,10 +26,27 @@ vi.mock('../lib/logger.js', () => ({
 vi.mock('../lib/subscription.js', () => ({
   evaluateScheduledOrderLimit: vi.fn().mockResolvedValue({ allowed: true }),
   incrementUsage: vi.fn(),
+  isFeatureEnabled: vi.fn().mockResolvedValue(false),
 }))
 
 vi.mock('./notification.service.js', () => ({
   notifyScheduledOrderEvent: vi.fn(),
+  notifyOrderStatusChange: vi.fn(),
+}))
+
+vi.mock('./quick-list-ai.service.js', () => ({
+  applySmartQuantitiesToItems: vi.fn(async (_restaurantId, _list, items) => ({
+    items,
+    adjustments: null,
+  })),
+}))
+
+vi.mock('./resolve-product-price.service.js', () => ({
+  resolveProductPricesBatch: vi.fn(),
+}))
+
+vi.mock('./supplier-order-stock.service.js', () => ({
+  reserveStockForPlacedOrder: vi.fn(),
 }))
 
 function dueQuickList(overrides = {}) {
@@ -108,5 +129,83 @@ describe('executeScheduledOrders', () => {
     clientQueryMock.mockRejectedValueOnce(new Error('Database error'))
 
     await expect(executeScheduledOrders()).rejects.toThrow('Database error')
+  })
+
+  it('uses contract unit price (not catalog) when creating scheduled orders', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+    vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+      {
+        productId: 'prod-1',
+        supplierId: 'sup-1',
+        quantity: 2,
+        unitPrice: 7.5,
+        source: 'CONTRACT_PRICE',
+        defaultPrice: 12,
+        contractPriceId: 'cp-1',
+        quoteResponseItemId: null,
+        discountPercent: null,
+        validFrom: null,
+        validUntil: null,
+        currency: 'USD',
+        minOrderQuantity: null,
+      },
+    ])
+
+    const q = vi
+      .fn()
+      // quick list items
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            product_id: 'prod-1',
+            supplier_id: 'sup-1',
+            quantity: 2,
+            notes: '',
+          },
+        ],
+      })
+      // product existence
+      .mockResolvedValueOnce({ rows: [{ id: 'prod-1', sku: 'SKU-1' }] })
+      // insert order
+      .mockResolvedValueOnce({
+        rows: [{ id: 'ord-1', restaurant_id: 'rest-1', total_amount: 15 }],
+      })
+      // insert order item
+      .mockResolvedValueOnce({
+        rows: [{ id: 'oi-1', product_id: 'prod-1', unit_price: 7.5 }],
+      })
+      // supplier row
+      .mockResolvedValueOnce({ rows: [{ id: 'sup-1' }] })
+
+    const result = await createOrderFromQuickList(
+      { id: 'ql-1', restaurant_id: 'rest-1' },
+      { query: q }
+    )
+
+    expect(resolveProductPricesBatch).toHaveBeenCalledWith(
+      {
+        restaurantId: 'rest-1',
+        items: [{ productId: 'prod-1', supplierId: 'sup-1', quantity: 2 }],
+      },
+      expect.any(Function)
+    )
+
+    const orderItemInsert = q.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO order_item')
+    )
+    expect(orderItemInsert?.[1]).toEqual([
+      'ord-1',
+      'prod-1',
+      'sup-1',
+      2,
+      7.5,
+      15,
+      '',
+      'CONTRACT_PRICE',
+      'cp-1',
+      12,
+    ])
+    expect(result.orders).toHaveLength(1)
+    expect(result.orders[0].total_amount).toBe(15)
   })
 })

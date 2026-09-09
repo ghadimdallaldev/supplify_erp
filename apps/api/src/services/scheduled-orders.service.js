@@ -8,6 +8,7 @@ import {
 } from '../lib/subscription.js'
 import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notification.service.js'
 import { applySmartQuantitiesToItems } from './quick-list-ai.service.js'
+import { resolveProductPricesBatch } from './resolve-product-price.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 
 const DUE_LISTS_BATCH_SIZE = 50
@@ -211,8 +212,9 @@ export async function executeScheduledOrders() {
 
 /**
  * Create order from quick list items (within an open transaction when client is passed).
+ * Unit prices come from resolveProductPricesBatch so restaurant contract prices win over catalog.
  */
-async function createOrderFromQuickList(quickList, client) {
+export async function createOrderFromQuickList(quickList, client) {
   const q = client ? client.query.bind(client) : query
 
   const { rows: items } = await q(
@@ -272,28 +274,40 @@ async function createOrderFromQuickList(quickList, client) {
 
     const { rows: products } = await q(
       `
-      SELECT p.*, pr.amount as current_price, pr.currency
+      SELECT p.id, p.sku
       FROM product p
-      LEFT JOIN price pr ON pr.product_id = p.id 
-        AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
       WHERE p.id = ANY($1::uuid[])
     `,
       [productIds]
     )
 
-    const priceMap = new Map(products.map((p) => [p.id, p]))
+    const productMap = new Map(products.map((p) => [p.id, p]))
+
+    const resolvedPrices = await resolveProductPricesBatch(
+      {
+        restaurantId,
+        items: supplierItems.map((item) => ({
+          productId: item.product_id,
+          supplierId,
+          quantity: Number(item.quantity),
+        })),
+      },
+      q
+    )
+    const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
 
     let totalAmount = 0
     const orderItems = []
 
     for (const item of supplierItems) {
-      const product = priceMap.get(item.product_id)
-      if (!product || !product.current_price) {
+      const product = productMap.get(item.product_id)
+      const resolved = resolvedMap.get(item.product_id)
+      if (!product || resolved?.unitPrice == null) {
         logger.warn(`No valid price for product ${item.product_id}, skipping`)
         continue
       }
 
-      const unitPrice = Number(product.current_price)
+      const unitPrice = Number(resolved.unitPrice)
       const quantity = Number(item.quantity)
       const lineTotal = unitPrice * quantity
       totalAmount += lineTotal
@@ -304,6 +318,9 @@ async function createOrderFromQuickList(quickList, client) {
         unitPrice,
         lineTotal,
         notes: item.notes || '',
+        pricingSource: resolved.source || 'DEFAULT_PRICE',
+        contractPriceId: resolved.contractPriceId || null,
+        defaultCatalogPrice: resolved.defaultPrice ?? null,
       })
     }
 
@@ -331,8 +348,9 @@ async function createOrderFromQuickList(quickList, client) {
       } = await q(
         `
         INSERT INTO order_item (
-          order_id, product_id, supplier_id, quantity, unit_price, line_total, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
+          pricing_source, contract_price_id, default_catalog_price
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `,
         [
@@ -343,6 +361,9 @@ async function createOrderFromQuickList(quickList, client) {
           item.unitPrice,
           item.lineTotal,
           item.notes,
+          item.pricingSource,
+          item.contractPriceId,
+          item.defaultCatalogPrice,
         ]
       )
       insertedItems.push(orderItem)

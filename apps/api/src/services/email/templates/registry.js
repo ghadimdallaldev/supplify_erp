@@ -414,6 +414,8 @@ const reservationTemplates = [
   'new',
   'waitlist',
   'waitlist_offer',
+  'reminder',
+  'review_invite',
 ]
 for (const status of reservationTemplates) {
   const id = `reservation.${status}`

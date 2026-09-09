@@ -10,9 +10,12 @@ vi.mock('../lib/db.js', () => ({
   withTransaction: (...args) => withTransactionMock(...args),
 }))
 
+const notifyQuoteRequestDeclinedMock = vi.fn().mockResolvedValue(null)
+
 vi.mock('./notification.service.js', () => ({
   notifyQuoteRequestReceived: (...args) => notifyQuoteRequestReceivedMock(...args),
   notifyQuoteResponseReceived: (...args) => notifyQuoteResponseReceivedMock(...args),
+  notifyQuoteRequestDeclined: (...args) => notifyQuoteRequestDeclinedMock(...args),
 }))
 
 import {
@@ -20,9 +23,10 @@ import {
   listRestaurantQuoteRequests,
   getSupplierQuoteRequestDetail,
   submitQuoteResponse,
+  declineQuoteRequest,
   buildCartPayloadFromResponse,
 } from './quote-requests.service.js'
-import { NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
+import { NotFoundError, ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
 
 describe('quote-requests.service', () => {
   beforeEach(() => {
@@ -30,6 +34,98 @@ describe('quote-requests.service', () => {
     withTransactionMock.mockReset()
     notifyQuoteRequestReceivedMock.mockClear()
     notifyQuoteResponseReceivedMock.mockClear()
+    notifyQuoteRequestDeclinedMock.mockClear()
+  })
+
+  it('refuses a response once the restaurant has closed the quote request', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'qrs-1',
+          quote_request_id: 'qr-1',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'rest-1',
+          quote_request_status: 'closed',
+        },
+      ],
+    })
+
+    await expect(
+      submitQuoteResponse({
+        supplierId: 'supplier-1',
+        quoteRequestSupplierId: 'qrs-1',
+        items: [{ quoteRequestItemId: 'item-1' }],
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(withTransactionMock).not.toHaveBeenCalled()
+    expect(notifyQuoteResponseReceivedMock).not.toHaveBeenCalled()
+  })
+
+  it('declines a pending request, stores the reason and notifies the restaurant', async () => {
+    queryMock
+      // load the inbox row
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            status: 'pending',
+            quote_request_status: 'open',
+          },
+        ],
+      })
+      // the UPDATE
+      .mockResolvedValueOnce({ rows: [] })
+      // getSupplierQuoteRequestDetail: header, items, responses
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'declined',
+            decline_reason: 'Out of stock',
+            quote_request_status: 'open',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await declineQuoteRequest({
+      supplierId: 'supplier-1',
+      quoteRequestSupplierId: 'qrs-1',
+      reason: '  Out of stock  ',
+    })
+
+    const updateCall = queryMock.mock.calls.find(([sql]) => sql.includes("status = 'declined'"))
+    expect(updateCall?.[1]).toEqual(['qrs-1', 'Out of stock'])
+    expect(detail.declineReason).toBe('Out of stock')
+    expect(notifyQuoteRequestDeclinedMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses to decline a request already responded to', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'qrs-1',
+          quote_request_id: 'qr-1',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'rest-1',
+          status: 'responded',
+          quote_request_status: 'open',
+        },
+      ],
+    })
+
+    await expect(
+      declineQuoteRequest({ supplierId: 'supplier-1', quoteRequestSupplierId: 'qrs-1' })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(notifyQuoteRequestDeclinedMock).not.toHaveBeenCalled()
   })
 
   it('creates quote request and notifies suppliers once each', async () => {
@@ -122,6 +218,7 @@ describe('quote-requests.service', () => {
             quote_request_id: 'qr-1',
             supplier_id: 'supplier-1',
             restaurant_id: 'rest-1',
+            quote_request_status: 'open',
           },
         ],
       })

@@ -3,6 +3,7 @@ import {
   resolveWarehouseForItem,
   simulateWarehouseRouting,
   buildSimulationFromPayload,
+  restaurantMatchesZone,
 } from './warehouseRouting.js'
 
 const warehouses = [
@@ -120,6 +121,48 @@ describe('warehouseRouting', () => {
         baseContext({ rules: [], defaultWarehouseId: 'wh-default' })
       )
       expect(result.warehouseId).toBe('wh-default')
+    })
+  })
+
+  describe('restaurantMatchesZone', () => {
+    it('matches postal codes and fails closed without a code', () => {
+      const zone = { zone_type: 'postal_codes', postal_codes: ['1100', '1200'] }
+      expect(restaurantMatchesZone(zone, { postalCode: '1100' })).toBe(true)
+      expect(restaurantMatchesZone(zone, { zip: '9999' })).toBe(false)
+      expect(restaurantMatchesZone(zone, {})).toBe(false)
+    })
+
+    it('matches radius zones with haversine and fails closed without coords', () => {
+      const zone = {
+        zone_type: 'radius',
+        center_lat: 33.89,
+        center_lng: 35.5,
+        radius_km: 5,
+      }
+      expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.51 })).toBe(true)
+      expect(restaurantMatchesZone(zone, { lat: 34.5, lng: 36.5 })).toBe(false)
+      expect(restaurantMatchesZone(zone, {})).toBe(false)
+    })
+
+    it('does not treat presence of geometry alone as a match', () => {
+      const zone = {
+        zone_type: 'polygon',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [35.4, 33.8],
+              [35.6, 33.8],
+              [35.6, 34.0],
+              [35.4, 34.0],
+              [35.4, 33.8],
+            ],
+          ],
+        },
+      }
+      expect(restaurantMatchesZone(zone, {})).toBe(false)
+      expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.5 })).toBe(true)
+      expect(restaurantMatchesZone(zone, { lat: 32.0, lng: 35.5 })).toBe(false)
     })
   })
 

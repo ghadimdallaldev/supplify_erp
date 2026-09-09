@@ -4,18 +4,18 @@ Guest-facing online ordering for restaurants: menu with modifiers, cart, fulfill
 
 ## Web routes
 
-| Route                                          | Purpose                                         |
-| ---------------------------------------------- | ----------------------------------------------- |
-| `/order/:restaurantSlug`                       | Public storefront home                          |
-| `/order/:restaurantSlug/menu`                  | Browse menu, modifiers, cart drawer             |
-| `/order/:restaurantSlug/checkout`              | Fulfillment picker + place order (COD)          |
-| `/order/:restaurantSlug/receipt/:receiptToken` | Live 4-step tracker + receipt (polls every 5s)  |
-| `/order/:restaurantSlug/track`                 | Lookup order by order number + phone/email      |
-| `/order/:restaurantSlug/account`               | Diner login / signup (username + password)      |
-| `/order/:restaurantSlug/rewards`               | Member balance + ledger                         |
-| `/app/consumer-menu`                           | Restaurant workspace — menu + fulfillment admin |
-| `/app/consumer-orders`                         | Kitchen board — kanban by status, advance chain |
-| `/app/consumer-loyalty`                        | Rewards program configuration                   |
+| Route                                          | Purpose                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| `/order/:restaurantSlug`                       | Public storefront home                                                            |
+| `/order/:restaurantSlug/menu`                  | Browse menu, modifiers, cart drawer                                               |
+| `/order/:restaurantSlug/checkout`              | Fulfillment picker + place order (COD)                                            |
+| `/order/:restaurantSlug/receipt/:receiptToken` | Live 4-step tracker + receipt (polls every 5s)                                    |
+| `/order/:restaurantSlug/track`                 | Lookup order by order number + phone/email                                        |
+| `/order/:restaurantSlug/account`               | Diner login / signup (username + password)                                        |
+| `/order/:restaurantSlug/rewards`               | Member balance + ledger                                                           |
+| `/app/consumer-menu`                           | Restaurant workspace — menu + fulfillment admin, allergens/dietary tags, QR share |
+| `/app/consumer-orders`                         | Kitchen board — kanban by status, advance chain, 86 items from tickets            |
+| `/app/consumer-loyalty`                        | Rewards program configuration                                                     |
 
 ## Order status (v1)
 
@@ -43,7 +43,13 @@ Single linear lifecycle for all fulfillment types:
 | Admin orders       | `GET /api/consumer/orders`, `PATCH /api/consumer/orders/:id/status`                |
 | Admin fulfillment  | `GET/PATCH /api/consumer/fulfillment/:branchId`, zone CRUD, live ordering hours    |
 
-Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`, `0164_consumer_ordering_hours.sql`, `0165_supplier_delivery_zone_columns.sql` (unifies `delivery_zone` for B2C + supplier warehouse zones — required for supplier delivery board after B2C rollout)
+Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`, `0164_consumer_ordering_hours.sql`, `0165_supplier_delivery_zone_columns.sql` (unifies `delivery_zone` for B2C + supplier warehouse zones — required for supplier delivery board after B2C rollout), `0201_menu_item_allergens.sql` (allergen + dietary tags).
+
+## Menu quality extras
+
+- Admin and public menu expose `allergens` / `dietary_tags`; guest menu filters and item badges.
+- Menu admin shares a storefront QR image (download + share) for the public `/order/:slug` URL.
+- Kitchen board can **86** an item (`is_available=false`) from an open ticket when the user has `CATALOG_EDIT`.
 
 ## Infrastructure (Keycloak & Docker)
 

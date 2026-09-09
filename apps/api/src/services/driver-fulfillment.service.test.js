@@ -12,6 +12,10 @@ vi.mock('../lib/db.js', () => {
 
 vi.mock('./warehouseInventory.js', () => ({
   syncWarehouseFulfillmentOnOrderStatus: vi.fn(),
+  releaseInventoryForFailedDelivery: vi.fn(),
+  markWarehouseAssignmentDelivered: vi.fn(),
+  releaseInventoryForAssignment: vi.fn(),
+  allWarehouseAssignmentsTerminal: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('../lib/fulfillment-exceptions.js', () => ({

@@ -5,12 +5,15 @@ import type {
   PublicSupplierProductsResponse,
   QuoteRequestSummary,
   QuoteRequestDetail,
-  SupplierQuoteInboxEntry,
+  SupplierQuoteInboxResponse,
+  SupplierQuoteInboxStatus,
+  SupplierQuoteInboxSort,
   SupplierQuoteRequestDetail,
   QuoteCartPayload,
   PublicAvailabilityResponse,
   PublicReservationSummary,
   PublicReservationDetails,
+  PublicReservationManagePayload,
 } from '../../../types'
 export const publicApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -96,11 +99,14 @@ export const publicApi = api.injectEndpoints({
       }),
     }),
     getSupplierQuoteInbox: builder.query<
+      SupplierQuoteInboxResponse,
       {
-        inbox: SupplierQuoteInboxEntry[]
-        pagination: { page: number; limit: number; total: number }
-      },
-      { page?: number; limit?: number; status?: string }
+        page?: number
+        limit?: number
+        status?: SupplierQuoteInboxStatus
+        search?: string
+        sort?: SupplierQuoteInboxSort
+      }
     >({
       query: (params) => ({ url: '/api/quote-requests/supplier/inbox', params }),
       providesTags: ['QuoteRequest'],
@@ -129,6 +135,17 @@ export const publicApi = api.injectEndpoints({
     >({
       query: ({ quoteRequestSupplierId, ...body }) => ({
         url: `/api/quote-requests/supplier/inbox/${quoteRequestSupplierId}/respond`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuoteRequest'],
+    }),
+    declineSupplierQuoteRequest: builder.mutation<
+      SupplierQuoteRequestDetail,
+      { quoteRequestSupplierId: string; reason?: string }
+    >({
+      query: ({ quoteRequestSupplierId, ...body }) => ({
+        url: `/api/quote-requests/supplier/inbox/${quoteRequestSupplierId}/decline`,
         method: 'POST',
         body,
       }),
@@ -178,6 +195,9 @@ export const publicApi = api.injectEndpoints({
         customerEmail: string
         customerPhone: string
         notes?: string
+        occasion?: string
+        allergies?: string
+        depositAcknowledged?: boolean
       }
     >({
       query: (body) => ({
@@ -188,13 +208,33 @@ export const publicApi = api.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'Reservation', id: 'BOARD' }],
     }),
-    getPublicReservationDetails: builder.query<{ reservation: PublicReservationDetails }, string>({
+    getPublicReservationDetails: builder.query<PublicReservationManagePayload, string>({
       query: (token) => ({
         url: '/api/public/reservations/manage',
         params: { token },
         credentials: 'omit',
       }),
       providesTags: (_result, _error, token) => [{ type: 'Reservation', id: token }],
+    }),
+    submitPublicReservationReview: builder.mutation<
+      { review: Record<string, unknown> },
+      {
+        token: string
+        overallRating: number
+        foodRating?: number
+        serviceRating?: number
+        ambianceRating?: number
+        comment?: string
+        reviewerName?: string
+      }
+    >({
+      query: (body) => ({
+        url: '/api/public/reservations/manage/review',
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+      invalidatesTags: (_result, _error, { token }) => [{ type: 'Reservation', id: token }],
     }),
     cancelPublicReservation: builder.mutation<
       { reservation: PublicReservationDetails },

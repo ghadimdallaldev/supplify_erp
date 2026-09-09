@@ -75,7 +75,24 @@ const RESTAURANT_PERMISSIONS = [
   PERMISSION_KEYS.CATALOG_VIEW,
   PERMISSION_KEYS.PROMOTIONS_VIEW,
   PERMISSION_KEYS.PROMOTIONS_MANAGE,
+  PERMISSION_KEYS.RECIPES_VIEW,
+  PERMISSION_KEYS.RECIPES_VIEW_COSTS,
+  PERMISSION_KEYS.RECIPES_EDIT,
+  PERMISSION_KEYS.RECIPES_MANAGE,
 ]
+
+/** Role names that grant full tenant owner access (API + web must stay aligned). */
+export const TENANT_OWNER_ROLE_NAMES = Object.freeze([
+  'Owner',
+  'Org Owner',
+  'RESTAURANT_OWNER',
+  'SUPPLIER_OWNER',
+])
+
+export function rolesIncludeOwner(roles) {
+  if (!Array.isArray(roles) || roles.length === 0) return false
+  return roles.some((name) => TENANT_OWNER_ROLE_NAMES.includes(name))
+}
 
 const SUPPLIER_PERMISSIONS = [
   PERMISSION_KEYS.ORDERS_VIEW,

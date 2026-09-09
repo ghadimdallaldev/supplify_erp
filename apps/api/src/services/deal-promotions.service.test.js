@@ -145,6 +145,24 @@ describe('deal-promotions.service targeting', () => {
       expect(matchesRestaurantTargeting({ target_areas: ['Dubai'] }, restaurant)).toBe(false)
     })
 
+    it('matches neighborhood area and legacy restaurant type alias', () => {
+      const withArea = {
+        business_type: 'restaurant',
+        city: 'Beirut',
+        area: 'Hamra',
+        region: 'Beirut Governorate',
+      }
+      expect(
+        matchesRestaurantTargeting(
+          { target_restaurant_types: ['casual_dining'], target_areas: ['Hamra'] },
+          withArea
+        )
+      ).toBe(true)
+      expect(matchesRestaurantTargeting({ target_areas: ['Beirut Governorate'] }, withArea)).toBe(
+        true
+      )
+    })
+
     it('parses JSON string targets from DB rows', () => {
       const deal = {
         target_restaurant_types: '["fine_dining"]',

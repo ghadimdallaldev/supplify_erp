@@ -24,7 +24,7 @@ export interface Product {
   favorited_at?: string
   /** Catalog list price before contract override */
   catalog_price?: number
-  pricing_source?: 'DEFAULT_PRICE' | 'CONTRACT_PRICE'
+  pricing_source?: 'DEFAULT_PRICE' | 'CONTRACT_PRICE' | 'QUOTE_PRICE'
   contract_price_id?: string | null
   contract_discount_percent?: number | null
   contract_valid_from?: string | null

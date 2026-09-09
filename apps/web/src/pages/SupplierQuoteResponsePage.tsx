@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   useGetSupplierQuoteRequestDetailQuery,
   useSubmitSupplierQuoteResponseMutation,
+  useDeclineSupplierQuoteRequestMutation,
 } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -41,6 +42,7 @@ export function SupplierQuoteResponsePage() {
     { skip: !quoteRequestSupplierId }
   )
   const [submitResponse, { isLoading: submitting }] = useSubmitSupplierQuoteResponseMutation()
+  const [declineQuote, { isLoading: declining }] = useDeclineSupplierQuoteRequestMutation()
 
   const [note, setNote] = useState('')
   const [lines, setLines] = useState<Record<string, LineDraft>>({})
@@ -70,8 +72,35 @@ export function SupplierQuoteResponsePage() {
     }))
   }
 
+  const handleDecline = async () => {
+    if (!quoteRequestSupplierId || !data) return
+    const reason = window.prompt(t('response.declinePrompt'))
+    if (reason === null) return
+    try {
+      await declineQuote({
+        quoteRequestSupplierId,
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+      }).unwrap()
+      toast.success(t('response.declineSuccess'))
+      navigate('/app/quote-requests/supplier')
+    } catch (err: any) {
+      toast.error(err?.data?.error?.message || t('response.declineFailed'))
+    }
+  }
+
   const handleSubmit = async () => {
     if (!quoteRequestSupplierId || !data) return
+
+    // A line marked available with no price is not a quote — catch it here rather
+    // than sending an unusable response the restaurant cannot act on.
+    const missingPrice = Object.values(lines).filter(
+      (line) => line.isAvailable && !(parseFloat(line.unitPrice) >= 0)
+    )
+    if (missingPrice.length) {
+      toast.error(t('response.missingPrice', { count: missingPrice.length }))
+      return
+    }
+
     const items = Object.values(lines).map((line) => ({
       quoteRequestItemId: line.quoteRequestItemId,
       isAvailable: line.isAvailable,
@@ -126,6 +155,14 @@ export function SupplierQuoteResponsePage() {
     .filter(Boolean)
     .join(' · ')
 
+  // `canRespond` is false once the restaurant closes/cancels the RFQ or the
+  // supplier declines it — show why instead of letting the form fail on submit.
+  const readOnly = data.canRespond === false
+  const lockedReason =
+    data.status === 'declined'
+      ? t('response.lockedDeclined')
+      : t('response.lockedClosed', { status: data.quoteRequestStatus ?? '' })
+
   return (
     <PageShell className="space-y-6" data-testid="supplier-quote-response-page">
       <PageHeader
@@ -140,6 +177,17 @@ export function SupplierQuoteResponsePage() {
           </Button>
         }
       />
+
+      {readOnly && (
+        <div
+          role="status"
+          data-testid="quote-response-locked"
+          className="rounded-lg border border-[var(--app-border)] bg-[var(--surface-muted,transparent)] px-3 py-2 text-sm text-[var(--text-mid)]"
+        >
+          {lockedReason}
+          {data.declineReason ? ` — ${data.declineReason}` : ''}
+        </div>
+      )}
 
       {data.quoteRequestNote && (
         <p className="text-sm text-[var(--text)]">{data.quoteRequestNote}</p>
@@ -168,6 +216,7 @@ export function SupplierQuoteResponsePage() {
                     id={`avail-${item.id}`}
                     checked={line.isAvailable}
                     onChange={(e) => updateLine(item.id, { isAvailable: e.target.checked })}
+                    disabled={readOnly}
                     className="rounded"
                   />
                   <Label htmlFor={`avail-${item.id}`}>{t('response.available')}</Label>
@@ -180,7 +229,7 @@ export function SupplierQuoteResponsePage() {
                     step="any"
                     value={line.unitPrice}
                     onChange={(e) => updateLine(item.id, { unitPrice: e.target.value })}
-                    disabled={!line.isAvailable}
+                    disabled={readOnly || !line.isAvailable}
                   />
                 </div>
                 <div className="space-y-2">
@@ -191,7 +240,7 @@ export function SupplierQuoteResponsePage() {
                     step="any"
                     value={line.quantity}
                     onChange={(e) => updateLine(item.id, { quantity: e.target.value })}
-                    disabled={!line.isAvailable}
+                    disabled={readOnly || !line.isAvailable}
                   />
                 </div>
                 <div className="space-y-2">
@@ -200,7 +249,7 @@ export function SupplierQuoteResponsePage() {
                     type="date"
                     value={line.deliveryDate}
                     onChange={(e) => updateLine(item.id, { deliveryDate: e.target.value })}
-                    disabled={!line.isAvailable}
+                    disabled={readOnly || !line.isAvailable}
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
@@ -210,7 +259,7 @@ export function SupplierQuoteResponsePage() {
                     value={line.note}
                     onChange={(e) => updateLine(item.id, { note: e.target.value })}
                     placeholder={t('response.lineNotePlaceholder')}
-                    disabled={!line.isAvailable}
+                    disabled={readOnly || !line.isAvailable}
                   />
                 </div>
               </CardContent>
@@ -229,11 +278,24 @@ export function SupplierQuoteResponsePage() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t('response.overallNotePlaceholder')}
+            disabled={readOnly}
           />
-          <Button disabled={submitting} onClick={handleSubmit}>
-            <Send className="h-4 w-4 mr-2" />
-            {submitting ? t('common.sending') : t('response.sendResponse')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={readOnly || submitting} onClick={handleSubmit}>
+              <Send className="h-4 w-4 mr-2" />
+              {submitting ? t('common.sending') : t('response.sendResponse')}
+            </Button>
+            {!readOnly && data.status === 'pending' && (
+              <Button
+                variant="outline"
+                disabled={declining}
+                onClick={handleDecline}
+                data-testid="quote-response-decline"
+              >
+                {t('response.decline')}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
     </PageShell>

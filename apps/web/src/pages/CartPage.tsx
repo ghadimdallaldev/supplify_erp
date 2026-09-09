@@ -35,7 +35,7 @@ import {
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
@@ -136,26 +136,17 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
-  const handleUpdateQuantity = async (productId: string, quantity: number) => {
-    updateQuantity(productId, quantity)
-    if (quantity <= 0) return
-    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
-    if (!item?.product.supplier_id || item.quoteResponseItemId) return
+  const applyResolvedPrices = async (
+    lineItems: Array<{ productId: string; supplierId: string; quantity: number }>
+  ) => {
+    if (!lineItems.length) return
     try {
-      const result = await resolveContractPrices({
-        items: [
-          {
-            productId,
-            supplierId: item.product.supplier_id,
-            quantity,
-          },
-        ],
-      }).unwrap()
-      const resolved = result.items[0]
-      if (resolved?.unitPrice != null) {
+      const result = await resolveContractPrices({ items: lineItems }).unwrap()
+      for (const resolved of result.items) {
+        if (resolved?.unitPrice == null) continue
         dispatch(
           updateItemResolvedPrice({
-            productId,
+            productId: resolved.productId,
             currentPrice: resolved.unitPrice,
             pricingSource: resolved.source,
             catalogPrice: resolved.defaultPrice ?? undefined,
@@ -166,6 +157,37 @@ export function CartPage() {
     } catch {
       // Order creation re-resolves server-side; cart preview is best-effort
     }
+  }
+
+  // Re-resolve after rehydrate so stale localStorage catalog prices never win over contracts
+  const didResolveCartPrices = useRef(false)
+  useEffect(() => {
+    if (didResolveCartPrices.current) return
+    const resolveTargets = groups
+      .flatMap((g) => g.items)
+      .filter((i) => i.product.supplier_id && !i.quoteResponseItemId)
+      .map((i) => ({
+        productId: i.productId,
+        supplierId: i.product.supplier_id as string,
+        quantity: i.quantity,
+      }))
+    if (!resolveTargets.length) return
+    didResolveCartPrices.current = true
+    void applyResolvedPrices(resolveTargets)
+  }, [groups])
+
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
+    updateQuantity(productId, quantity)
+    if (quantity <= 0) return
+    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
+    if (!item?.product.supplier_id || item.quoteResponseItemId) return
+    await applyResolvedPrices([
+      {
+        productId,
+        supplierId: item.product.supplier_id,
+        quantity,
+      },
+    ])
   }
 
   const handleRemoveItem = (productId: string) => {
@@ -770,6 +792,12 @@ export function CartPage() {
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                 />
+                <p className="text-xs text-[var(--text-muted)]">
+                  {t('page.deliveryDateHint', {
+                    defaultValue:
+                      'Suppliers may enforce a last-order cutoff. If you order past their cutoff, delivery rolls to the next eligible day.',
+                  })}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="delivery-notes">

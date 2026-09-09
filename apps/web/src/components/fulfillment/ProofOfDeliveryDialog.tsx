@@ -159,8 +159,12 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
     reader.readAsDataURL(file)
   }
 
+  // The API rejects a proof with no photo, no signature and no recipient — an empty
+  // POD proves nothing. Gate the button rather than letting the request 400.
+  const hasProof = Boolean(photoFile || hasSignature || recipientName.trim())
+
   const handleSubmit = async () => {
-    if (!orderId) return
+    if (!orderId || !hasProof) return
     try {
       let fileKey: string | undefined
       let signatureFileKey: string | undefined
@@ -320,11 +324,17 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
           </label>
         </div>
 
+        {!hasProof && (
+          <p className="text-sm text-[var(--text-muted)]" data-testid="pod-proof-required">
+            {t('pod.dialog.proofRequired')}
+          </p>
+        )}
+
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('pod.dialog.skip')}
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={submitting}>
+          <Button type="button" onClick={handleSubmit} disabled={submitting || !hasProof}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('pod.dialog.saveProof')}
           </Button>

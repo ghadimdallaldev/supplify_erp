@@ -27,7 +27,7 @@ describe('supplier stock source of truth', () => {
     supplierColumnMock.mockResolvedValue('supplier_id')
   })
 
-  it('requires both the feature and an active warehouse', async () => {
+  it('requires a warehouses/multi_warehouse feature and an active warehouse', async () => {
     featureMock.mockResolvedValue(true)
     queryMock.mockResolvedValueOnce({ rows: [{ c: 0 }] })
     await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(false)
@@ -36,16 +36,23 @@ describe('supplier stock source of truth', () => {
     await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(true)
   })
 
-  it('does not enable warehouse mode from an active warehouse alone', async () => {
+  it('enables warehouse mode with the warehouses feature alone (single-WH Silver)', async () => {
+    // Promise.all([warehouses, multi_warehouse]) — first true, second false
+    featureMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    queryMock.mockResolvedValueOnce({ rows: [{ c: 1 }] })
+    await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(true)
+  })
+
+  it('does not enable warehouse mode without warehouses/multi_warehouse feature', async () => {
     featureMock.mockResolvedValue(false)
     queryMock.mockResolvedValueOnce({ rows: [{ c: 1 }] })
     await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(false)
   })
 
   it('overlays warehouse qty and fail-closes missing rows', async () => {
-    featureMock.mockResolvedValue(true)
+    // overlay -> supplierUsesWarehouseInventory (warehouses + multi_warehouse)
+    featureMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
     queryMock
-      // overlay -> supplierUsesWarehouseInventory
       .mockResolvedValueOnce({ rows: [{ c: 1 }] })
       // listSupplierStockDisplay -> supplierUsesWarehouseInventory
       .mockResolvedValueOnce({ rows: [{ c: 1 }] })
@@ -53,6 +60,8 @@ describe('supplier stock source of truth', () => {
       .mockResolvedValueOnce({
         rows: [{ product_id: 'a', available_qty: 7, reserved_qty: 0, on_hand_qty: 7 }],
       })
+    // listSupplierStockDisplay also calls supplierUsesWarehouseInventory
+    featureMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
 
     const rows = await overlayProductRowsWithAuthoritativeStock([
       { id: 'a', supplier_id: 's1', available_qty: 99 },

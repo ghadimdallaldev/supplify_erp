@@ -302,7 +302,11 @@ export async function getPermissionsForTenantRole(roleId) {
 export function hasPermission(permissions, required) {
   if (!Array.isArray(permissions)) return false
   if (permissions.includes(required)) return true
-  const domain = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_MANAGE$/, '_MANAGE')
+  if (required.endsWith('_VIEW_COSTS')) {
+    const manageKey = `${required.replace(/_VIEW_COSTS$/, '')}_MANAGE`
+    if (permissions.includes(manageKey)) return true
+  }
+  const domain = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_IMPORT$|_MANAGE$/, '_MANAGE')
   if (domain !== required && permissions.includes(domain)) return true
   return false
 }

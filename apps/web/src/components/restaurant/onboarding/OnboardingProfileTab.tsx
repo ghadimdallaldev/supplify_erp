@@ -18,6 +18,10 @@ import {
 import { RestaurantDeliveryLocationCard } from '../RestaurantDeliveryLocationCard'
 import { usePermissions } from '../../../hooks/usePermissions'
 import { normalizeAddress } from '../../../lib/address'
+import {
+  RESTAURANT_BUSINESS_TYPES,
+  coerceRestaurantBusinessType,
+} from '../../../lib/restaurantBusinessTypes'
 import { OnboardingTabLoading, SettingsSection } from './onboardingShared'
 
 export function OnboardingProfileTab() {
@@ -43,7 +47,7 @@ export function OnboardingProfileTab() {
     vat_number: '',
     phone: '',
     contact_email: '',
-    address: { street: '', city: '', region: '', country: '' },
+    address: { street: '', city: '', area: '', region: '', country: '' },
     delivery_instructions: '',
     description: '',
     website: '',
@@ -53,7 +57,7 @@ export function OnboardingProfileTab() {
     if (restaurant) {
       setProfileForm({
         name: restaurant.name || '',
-        business_type: restaurant.business_type || 'restaurant',
+        business_type: coerceRestaurantBusinessType(restaurant.business_type),
         trade_license_no: restaurant.trade_license_no || '',
         tax_id: restaurant.tax_id || '',
         vat_number: restaurant.vat_number || '',
@@ -98,11 +102,18 @@ export function OnboardingProfileTab() {
         id: restaurant.id,
         data: {
           name: profileForm.name,
+          businessType: coerceRestaurantBusinessType(profileForm.business_type),
           tradeLicenseNo: profileForm.trade_license_no,
           phone: profileForm.phone,
           contactEmail: profileForm.contact_email,
-          address: profileForm.address,
-        },
+          address: {
+            street: profileForm.address.street,
+            city: profileForm.address.city,
+            area: profileForm.address.area,
+            region: profileForm.address.region,
+            country: profileForm.address.country,
+          },
+        } as any,
       }).unwrap()
       toast.success(t('restaurantProfile.toasts.updated'))
       refetchRestaurant()
@@ -169,16 +180,13 @@ export function OnboardingProfileTab() {
               >
                 <SelectTrigger id="businessType" />
                 <SelectContent>
-                  <SelectItem value="restaurant">
-                    {t('restaurantProfile.businessTypes.restaurant')}
-                  </SelectItem>
-                  <SelectItem value="cafe">{t('restaurantProfile.businessTypes.cafe')}</SelectItem>
-                  <SelectItem value="hotel">
-                    {t('restaurantProfile.businessTypes.hotel')}
-                  </SelectItem>
-                  <SelectItem value="catering">
-                    {t('restaurantProfile.businessTypes.catering')}
-                  </SelectItem>
+                  {RESTAURANT_BUSINESS_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {t(`restaurantProfile.businessTypes.${type}`, {
+                        defaultValue: type.replace(/_/g, ' '),
+                      })}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -306,6 +314,23 @@ export function OnboardingProfileTab() {
                   })
                 }
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="area">{t('restaurantProfile.fields.area')}</Label>
+              <Input
+                id="area"
+                placeholder={t('restaurantProfile.placeholders.area')}
+                value={profileForm.address.area}
+                onChange={(e) =>
+                  setProfileForm({
+                    ...profileForm,
+                    address: { ...profileForm.address, area: e.target.value },
+                  })
+                }
+              />
+              <p className="text-xs text-[var(--text-muted)]">
+                {t('restaurantProfile.hints.area')}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="region">{t('restaurantProfile.fields.region')}</Label>

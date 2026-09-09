@@ -11,8 +11,7 @@ import { hasPermission } from '../../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
-import { isFeatureEnabled, requireFeature } from '../../lib/subscription.js'
-import { isMultiWarehouseFulfillmentActive } from '../../lib/warehouse-helpers.js'
+import { requireFeature } from '../../lib/subscription.js'
 import { z } from 'zod'
 import {
   listDeliveryRoutes,
@@ -106,16 +105,7 @@ async function warehouseFilterClause(req, supplierId, paramIndex = 1) {
   const warehouseId = parseWarehouseFilter(req)
   if (!warehouseId) return { clause: '', params: [], warehouseId: null }
 
-  const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-  const { rows: supplierRows } = await query(
-    `SELECT multi_warehouse_enabled, fulfillment_mode FROM supplier WHERE id = $1`,
-    [supplierId]
-  )
-  const supplier = supplierRows[0] || {}
-  if (!isMultiWarehouseFulfillmentActive(supplier, multiActive)) {
-    return { clause: '', params: [], warehouseId: null }
-  }
-
+  // Allow filtering whenever assignments exist (single-WH and multi-WH).
   return {
     clause: ` AND EXISTS (
       SELECT 1 FROM order_warehouse_assignment owa

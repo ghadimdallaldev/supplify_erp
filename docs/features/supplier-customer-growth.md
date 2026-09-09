@@ -134,6 +134,38 @@ Requires `SUPPLIER` + `supplier_growth` feature + permissions:
 | POST   | `/sponsorships/:id/retry-payment`  | Retry failed payment                                  |
 | GET    | `/metrics`                         | Growth + sponsorship funnel metrics                   |
 
+`GET /customers/prospects` and `GET /sponsorships` accept `limit` (clamped 1–200,
+default 50) and `offset` (negative values coerced to 0 — a raw negative offset made
+Postgres throw and surfaced as a 500). Prospects also accept `search`, matched
+case-insensitively against restaurant name, email, phone and contact person, and
+`lifecycleStatus`.
+
+### Sponsorship funnel metrics
+
+`GET /metrics` returns a `sponsorship` object. Note what each stage counts:
+
+| Field                                 | Counts                                                            |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `offersCreated`                       | **All** sponsorship rows ever created for this supplier           |
+| `offersOpen`                          | Rows still sitting in `offered` — awaiting the restaurant's reply |
+| `offersAccepted`                      | Accepted through completed (`accepted`…`active`, `completed`)     |
+| `offersDeclined` / `offersExpired`    | Declined by restaurant / lapsed                                   |
+| `paymentsPending` / `paymentsFailed`  | Supplier payment state                                            |
+| `monthsActivated` / `monthsCompleted` | Sponsored months that went live / finished                        |
+| `totalSpend` / `averageValue`         | Paid or scheduled sponsored amounts                               |
+
+`offersCreated` deliberately counts every row rather than only `offered`: scoping it
+to the current status made the funnel's first stage shrink as offers were accepted,
+which allowed `offersAccepted > offersCreated`. The supplier UI renders this funnel
+on the Customer Growth page.
+
+### Import error report
+
+`POST /customers/import/error-report` echoes client-supplied validation errors back as
+a downloadable CSV. Every cell is quoted and any value beginning with `=`, `+`, `-`,
+`@`, TAB or CR is prefixed with `'` — the file is opened in Excel/Sheets, where those
+prefixes would otherwise execute as formulas.
+
 ### Restaurant (`/api/restaurant/growth/*`)
 
 | Method   | Path                                  | Description                                                         |
