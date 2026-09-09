@@ -11,6 +11,7 @@ import {
   getRestaurantIdForRequest,
 } from '../../lib/rbac.js'
 import { query, withTransaction } from '../../lib/db.js'
+import { getCache, setCache } from '../../lib/cache.js'
 import { logger } from '../../lib/logger.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../../services/promotions.service.js'
@@ -33,6 +34,7 @@ import {
   isPendingAdminReview,
   shouldResetApprovalOnEdit,
 } from '../../services/deal-lifecycle.service.js'
+import { getOrCreateConversation } from '../chat/chat.helpers.js'
 import {
   applyBoostSelectionToDeal,
   publishDealAfterApproval,
@@ -43,6 +45,12 @@ import {
 import { writeAuditLog } from '../../lib/audit.js'
 import { requireFeature, requireWithinLimit } from '../../lib/subscription.js'
 import { getNewDealsBanner, dismissDealBanner } from '../../services/deal-banner.service.js'
+import {
+  createDealBoostInvoice,
+  getPromotionAdSpendSummary,
+  markPromotionAdInvoicePaidManual,
+  markPromotionAdInvoiceRefunded,
+} from '../../lib/billing/promotion-ad-billing.js'
 
 import {
   adminDealGuards,
@@ -70,6 +78,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -93,6 +102,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -110,6 +120,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -213,8 +224,17 @@ router.get('/admin/deals', ...adminDealGuards, async (req, res, next) => {
   }
 })
 
+const ADMIN_DEAL_INSIGHTS_CACHE_KEY = 'admin:deal-insights:v1'
+const ADMIN_DEAL_INSIGHTS_CACHE_TTL_SECONDS = 180
+const ADMIN_DEAL_INSIGHTS_WINDOW = `90 days`
+
 router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) => {
   try {
+    const cached = await getCache(ADMIN_DEAL_INSIGHTS_CACHE_KEY)
+    if (cached) {
+      return res.json({ ok: true, data: cached, error: null, requestId: req.requestId })
+    }
+
     const { rows: summary } = await query(
       `
       SELECT
@@ -234,6 +254,7 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
         COUNT(*)::int AS total_interactions,
         COUNT(*) FILTER (WHERE interaction_type IN ('order', 'order_created', 'order_completed'))::int AS order_interactions
       FROM deal_interactions
+      WHERE created_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       `
     )
     const { rows: revenueStats } = await query(
@@ -244,8 +265,10 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
         COALESCE(SUM(co.total_amount), 0)::numeric AS total_revenue
       FROM promotion_usages pu
       JOIN customer_order co ON co.id = pu.order_id
+      WHERE pu.applied_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       `
     )
+    const adSpend = await getPromotionAdSpendSummary({ windowDays: 90 })
     const { rows: topDeals } = await query(
       `
       SELECT p.id, p.name, p.status, s.name AS supplier_name,
@@ -254,24 +277,28 @@ router.get('/admin/deals/insights', ...adminDealGuards, async (req, res, next) =
       FROM promotions p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN promotion_usages pu ON pu.promotion_id = p.id
+        AND pu.applied_at >= NOW() - INTERVAL '${ADMIN_DEAL_INSIGHTS_WINDOW}'
       GROUP BY p.id, p.name, p.status, s.name
       ORDER BY orders_count DESC
       LIMIT 5
       `
     )
-    res.json({
-      ok: true,
-      data: {
-        insights: {
-          ...summary[0],
-          ...interactionStats[0],
-          ...revenueStats[0],
-          topDeals,
-        },
+    const data = {
+      insights: {
+        ...summary[0],
+        ...interactionStats[0],
+        ...revenueStats[0],
+        ...adSpend,
+        topDeals,
       },
-      error: null,
-      requestId: req.requestId,
-    })
+    }
+    await setCache(
+      ADMIN_DEAL_INSIGHTS_CACHE_KEY,
+      data,
+      ADMIN_DEAL_INSIGHTS_CACHE_TTL_SECONDS
+    ).catch(() => {})
+
+    res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
   }
@@ -286,6 +313,7 @@ router.get('/admin/pending', ...adminDealGuards, async (req, res, next) => {
       JOIN supplier s ON s.id = p.supplier_id
       WHERE p.status IN ('pending_approval', 'pending_admin_approval')
       ORDER BY p.created_at ASC
+      LIMIT 100
       `
     )
     res.json({ ok: true, data: { deals: rows }, error: null, requestId: req.requestId })
@@ -347,11 +375,19 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
     )
     let approvedDeal = rows[0]
     let publishResult = null
+    let boostInvoice = null
     const canPublishNow =
       next.status === DEAL_STATUSES.ACTIVE || next.status === DEAL_STATUSES.SCHEDULED
     if (canPublishNow) {
       publishResult = await publishDealAfterApproval(approvedDeal, { waivePayment })
       approvedDeal = publishResult.deal
+    } else if (next.status === DEAL_STATUSES.APPROVED_PENDING_PAYMENT && boostAmount > 0) {
+      const created = await createDealBoostInvoice({ deal: approvedDeal })
+      boostInvoice = created.invoice
+      const { rows: withInv } = await query(`SELECT * FROM promotions WHERE id = $1`, [
+        approvedDeal.id,
+      ])
+      if (withInv[0]) approvedDeal = withInv[0]
     }
 
     await writeAuditLog(req, {
@@ -364,6 +400,7 @@ router.post('/admin/:id/approve', ...adminDealGuards, async (req, res, next) => 
         boostAmount,
         boostPreview: buildBoostApprovalPreview(deal),
         dealPromotionId: publishResult?.campaign?.id || null,
+        billingInvoiceId: boostInvoice?.id || approvedDeal.billing_invoice_id || null,
       },
     })
 
@@ -416,6 +453,113 @@ router.post('/admin/:id/reject', ...adminDealGuards, async (req, res, next) => {
     const { notifyDealRejected } = await import('../../services/notification.service.js')
     notifyDealRejected(rows[0], { rejectionReason: body.rejectionReason || null }).catch(() => {})
     res.json({ ok: true, data: { deal: rows[0] }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Admin: mark boost invoice paid without gateway (pilot / bank transfer). */
+router.post('/admin/:id/mark-boost-paid', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const reason = String(req.body?.reason || 'manual_approval').slice(0, 500)
+    const { rows } = await query(`SELECT * FROM promotions WHERE id = $1`, [req.params.id])
+    if (!rows.length) throw new NotFoundError('Deal not found')
+    const deal = rows[0]
+    if (deal.status !== DEAL_STATUSES.APPROVED_PENDING_PAYMENT) {
+      throw new ValidationError('Deal is not awaiting boost payment')
+    }
+    let invoiceId = deal.billing_invoice_id
+    if (!invoiceId) {
+      const created = await createDealBoostInvoice({ deal })
+      invoiceId = created.invoice.id
+    }
+    await markPromotionAdInvoicePaidManual({
+      invoiceId,
+      supplierId: deal.supplier_id,
+      adminUserId: req.userData?.id || null,
+      reason,
+    })
+    const nextStatus = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
+    const { rows: updated } = await query(
+      `UPDATE promotions
+       SET status = $2, payment_status = $3, billing_invoice_id = $4, updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [deal.id, nextStatus.status, nextStatus.payment_status, invoiceId]
+    )
+    const published = await publishDealAfterApproval(updated[0], {
+      waivePayment: false,
+      paymentConfirmed: true,
+    })
+    if (published.campaign?.id) {
+      await query(`UPDATE deal_promotions SET billing_invoice_id = $2 WHERE id = $1`, [
+        published.campaign.id,
+        invoiceId,
+      ]).catch(() => {})
+    }
+    await writeAuditLog(req, {
+      action_type: 'deal.boost_marked_paid',
+      tenant_type: 'ADMIN',
+      target_id: deal.id,
+      payload_json: { invoiceId, reason },
+    })
+    res.json({
+      ok: true,
+      data: { deal: published.deal, invoiceId },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Admin: refund paid boost and pause the deal. */
+router.post('/admin/:id/refund-boost', ...adminDealGuards, async (req, res, next) => {
+  try {
+    const reason = String(req.body?.reason || 'admin_refund').slice(0, 500)
+    const amount =
+      req.body?.amount != null && req.body.amount !== '' ? Number(req.body.amount) : null
+    const { rows } = await query(`SELECT * FROM promotions WHERE id = $1`, [req.params.id])
+    if (!rows.length) throw new NotFoundError('Deal not found')
+    const deal = rows[0]
+    if (!deal.billing_invoice_id) {
+      throw new ValidationError('Deal has no boost invoice to refund')
+    }
+    const refund = await markPromotionAdInvoiceRefunded({
+      invoiceId: deal.billing_invoice_id,
+      supplierId: deal.supplier_id,
+      amount,
+      reason,
+    })
+    const { rows: paused } = await query(
+      `UPDATE promotions SET
+         status = 'paused',
+         payment_status = 'refunded',
+         updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [deal.id]
+    )
+    await query(
+      `UPDATE deal_promotions SET status = 'paused', updated_at = NOW()
+       WHERE deal_id = $1 AND status = 'active'`,
+      [deal.id]
+    ).catch(() => {})
+    await writeAuditLog(req, {
+      action_type: 'deal.boost_refunded',
+      tenant_type: 'ADMIN',
+      target_id: deal.id,
+      payload_json: {
+        invoiceId: deal.billing_invoice_id,
+        reason,
+        refundAmount: refund.refundAmount,
+      },
+    })
+    res.json({
+      ok: true,
+      data: { deal: paused[0], refund },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }
@@ -490,6 +634,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -524,6 +669,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -550,6 +696,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -578,6 +725,7 @@ router.get(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -602,6 +750,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -635,6 +784,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requireAnyPermission('ORDERS_VIEW', 'CATALOG_VIEW'),
   supplierDealsGate,
   async (req, res, next) => {
     try {
@@ -642,26 +792,10 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
 
-      const { rows: conversations } = await query(
-        `SELECT * FROM conversation WHERE supplier_id = $1 AND restaurant_id = $2`,
-        [deal.supplier_id, restaurantId]
-      )
-
-      let conversation
-      if (!conversations.length) {
-        const { rows: newConversations } = await query(
-          `INSERT INTO conversation (supplier_id, restaurant_id) VALUES ($1, $2) RETURNING *`,
-          [deal.supplier_id, restaurantId]
-        )
-        conversation = newConversations[0]
-        await query(
-          `INSERT INTO conversation_participant (conversation_id, participant_type, participant_id)
-           VALUES ($1, 'SUPPLIER', $2), ($1, 'RESTAURANT', $3)`,
-          [conversation.id, deal.supplier_id, restaurantId]
-        )
-      } else {
-        conversation = conversations[0]
-      }
+      // Shared helper backfills missing participant rows so unread triggers work
+      const conversation = await getOrCreateConversation(deal.supplier_id, restaurantId, {
+        enforceOpenLimit: false,
+      })
 
       const initialMessage = `Hello, I am interested in your deal: ${deal.name}`
       const { rows: messages } = await query(

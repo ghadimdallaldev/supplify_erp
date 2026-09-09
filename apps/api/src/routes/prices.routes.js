@@ -2,6 +2,8 @@ import express from 'express'
 import {
   requireAuth,
   requireRole,
+  resolveTenantContext,
+  requirePermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
@@ -142,188 +144,208 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
 })
 
 // Create price (supplier or admin only)
-router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
-  try {
-    const priceData = priceCreateSchema.parse(req.body)
+router.post(
+  '/',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('CATALOG_EDIT'),
+  async (req, res) => {
+    try {
+      const priceData = priceCreateSchema.parse(req.body)
 
-    // Verify product ownership for suppliers
-    if (req.userData.role === 'SUPPLIER') {
-      const { rows: products } = await query(
-        `
+      // Verify product ownership for suppliers
+      if (req.userData.role === 'SUPPLIER') {
+        const { rows: products } = await query(
+          `
         SELECT p.*, s.contact_email 
         FROM product p 
         JOIN supplier s ON s.id = p.supplier_id 
         WHERE p.id = $1
       `,
-        [priceData.productId]
-      )
+          [priceData.productId]
+        )
 
-      if (products.length === 0) {
-        throw new ValidationError('Product not found')
+        if (products.length === 0) {
+          throw new ValidationError('Product not found')
+        }
+
+        if (products[0].contact_email !== req.userData.email) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: priceErr(req, 'FORBIDDEN', 'accessDeniedSetOwnProducts'),
+            requestId: req.requestId,
+          })
+        }
       }
 
-      if (products[0].contact_email !== req.userData.email) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: priceErr(req, 'FORBIDDEN', 'accessDeniedSetOwnProducts'),
-          requestId: req.requestId,
-        })
-      }
-    }
-
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       INSERT INTO price (product_id, currency, amount, min_qty, valid_from, valid_to)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `,
-      [
+        [
+          priceData.productId,
+          priceData.currency,
+          priceData.amount,
+          priceData.minQty,
+          priceData.validFrom || new Date(),
+          priceData.validTo,
+        ]
+      )
+
+      logger.info('Price created', {
+        priceId: rows[0].id,
+        productId: priceData.productId,
+        actor: req.userData.id,
+      })
+
+      const { hookRecipeCostingAfterCatalogPriceChange } = await import(
+        '../services/recipe-purchasing-hooks.service.js'
+      )
+      hookRecipeCostingAfterCatalogPriceChange(
         priceData.productId,
-        priceData.currency,
-        priceData.amount,
-        priceData.minQty,
-        priceData.validFrom || new Date(),
-        priceData.validTo,
-      ]
-    )
+        Number(priceData.amount),
+        'CATALOG'
+      )
 
-    logger.info('Price created', {
-      priceId: rows[0].id,
-      productId: priceData.productId,
-      actor: req.userData.id,
-    })
+      res.status(201).json({
+        ok: true,
+        data: { price: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            ...priceErr(req, 'VALIDATION_ERROR', 'invalidPriceData'),
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const { hookRecipeCostingAfterCatalogPriceChange } = await import(
-      '../services/recipe-purchasing-hooks.service.js'
-    )
-    hookRecipeCostingAfterCatalogPriceChange(
-      priceData.productId,
-      Number(priceData.amount),
-      'CATALOG'
-    )
-
-    res.status(201).json({
-      ok: true,
-      data: { price: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      logger.error('Create price error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { ...priceErr(req, 'VALIDATION_ERROR', 'invalidPriceData'), details: error.errors },
+        error: priceErr(req, 'INTERNAL_ERROR', 'failedCreatePrice'),
         requestId: req.requestId,
       })
     }
-
-    logger.error('Create price error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: priceErr(req, 'INTERNAL_ERROR', 'failedCreatePrice'),
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Update price
-router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
-  try {
-    const { id } = req.params
-    const updateData = priceUpdateSchema.parse(req.body)
+router.patch(
+  '/:id',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('CATALOG_EDIT'),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const updateData = priceUpdateSchema.parse(req.body)
 
-    // Check ownership for suppliers
-    if (req.userData.role === 'SUPPLIER') {
-      const { rows: prices } = await query(
-        `
+      // Check ownership for suppliers
+      if (req.userData.role === 'SUPPLIER') {
+        const { rows: prices } = await query(
+          `
         SELECT p.*, s.contact_email 
         FROM price p 
         JOIN product pr ON pr.id = p.product_id
         JOIN supplier s ON s.id = pr.supplier_id 
         WHERE p.id = $1
       `,
-        [id]
-      )
+          [id]
+        )
 
-      if (prices.length === 0) {
-        throw new ValidationError('Price not found')
+        if (prices.length === 0) {
+          throw new ValidationError('Price not found')
+        }
+
+        if (prices[0].contact_email !== req.userData.email) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: priceErr(req, 'FORBIDDEN', 'accessDeniedUpdateOwnProducts'),
+            requestId: req.requestId,
+          })
+        }
       }
 
-      if (prices[0].contact_email !== req.userData.email) {
-        return res.status(403).json({
+      const {
+        fields: updateFields,
+        values: updateValues,
+        nextIndex: paramIndex,
+      } = buildWhitelistedUpdate(updateData, {
+        currency: 'currency',
+        amount: 'amount',
+        minQty: 'min_qty',
+        validFrom: 'valid_from',
+        validTo: 'valid_to',
+      })
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({
           ok: false,
           data: null,
-          error: priceErr(req, 'FORBIDDEN', 'accessDeniedUpdateOwnProducts'),
+          error: priceErr(req, 'VALIDATION_ERROR', 'noFieldsToUpdate'),
           requestId: req.requestId,
         })
       }
-    }
 
-    const {
-      fields: updateFields,
-      values: updateValues,
-      nextIndex: paramIndex,
-    } = buildWhitelistedUpdate(updateData, {
-      currency: 'currency',
-      amount: 'amount',
-      minQty: 'min_qty',
-      validFrom: 'valid_from',
-      validTo: 'valid_to',
-    })
+      updateValues.push(id)
 
-    if (updateFields.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: priceErr(req, 'VALIDATION_ERROR', 'noFieldsToUpdate'),
-        requestId: req.requestId,
-      })
-    }
-
-    updateValues.push(id)
-
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       UPDATE price 
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
       RETURNING *
     `,
-      updateValues
-    )
+        updateValues
+      )
 
-    logger.info('Price updated', {
-      priceId: rows[0].id,
-      actor: req.userData.id,
-    })
+      logger.info('Price updated', {
+        priceId: rows[0].id,
+        actor: req.userData.id,
+      })
 
-    res.json({
-      ok: true,
-      data: { price: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.json({
+        ok: true,
+        data: { price: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            ...priceErr(req, 'VALIDATION_ERROR', 'invalidUpdateData'),
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Update price error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { ...priceErr(req, 'VALIDATION_ERROR', 'invalidUpdateData'), details: error.errors },
+        error: priceErr(req, 'INTERNAL_ERROR', 'failedUpdatePrice'),
         requestId: req.requestId,
       })
     }
-
-    logger.error('Update price error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: priceErr(req, 'INTERNAL_ERROR', 'failedUpdatePrice'),
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 export { router as pricesRoutes }

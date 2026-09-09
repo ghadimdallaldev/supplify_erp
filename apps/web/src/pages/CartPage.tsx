@@ -35,13 +35,14 @@ import {
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
+import { stepCartQuantity, validateCartItems } from '../lib/orderQuantityRules'
 
 export function CartPage() {
   const { t } = useTranslation('cart')
@@ -135,26 +136,17 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
-  const handleUpdateQuantity = async (productId: string, quantity: number) => {
-    updateQuantity(productId, quantity)
-    if (quantity <= 0) return
-    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
-    if (!item?.product.supplier_id || item.quoteResponseItemId) return
+  const applyResolvedPrices = async (
+    lineItems: Array<{ productId: string; supplierId: string; quantity: number }>
+  ) => {
+    if (!lineItems.length) return
     try {
-      const result = await resolveContractPrices({
-        items: [
-          {
-            productId,
-            supplierId: item.product.supplier_id,
-            quantity,
-          },
-        ],
-      }).unwrap()
-      const resolved = result.items[0]
-      if (resolved?.unitPrice != null) {
+      const result = await resolveContractPrices({ items: lineItems }).unwrap()
+      for (const resolved of result.items) {
+        if (resolved?.unitPrice == null) continue
         dispatch(
           updateItemResolvedPrice({
-            productId,
+            productId: resolved.productId,
             currentPrice: resolved.unitPrice,
             pricingSource: resolved.source,
             catalogPrice: resolved.defaultPrice ?? undefined,
@@ -165,6 +157,37 @@ export function CartPage() {
     } catch {
       // Order creation re-resolves server-side; cart preview is best-effort
     }
+  }
+
+  // Re-resolve after rehydrate so stale localStorage catalog prices never win over contracts
+  const didResolveCartPrices = useRef(false)
+  useEffect(() => {
+    if (didResolveCartPrices.current) return
+    const resolveTargets = groups
+      .flatMap((g) => g.items)
+      .filter((i) => i.product.supplier_id && !i.quoteResponseItemId)
+      .map((i) => ({
+        productId: i.productId,
+        supplierId: i.product.supplier_id as string,
+        quantity: i.quantity,
+      }))
+    if (!resolveTargets.length) return
+    didResolveCartPrices.current = true
+    void applyResolvedPrices(resolveTargets)
+  }, [groups])
+
+  const handleUpdateQuantity = async (productId: string, quantity: number) => {
+    updateQuantity(productId, quantity)
+    if (quantity <= 0) return
+    const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
+    if (!item?.product.supplier_id || item.quoteResponseItemId) return
+    await applyResolvedPrices([
+      {
+        productId,
+        supplierId: item.product.supplier_id,
+        quantity,
+      },
+    ])
   }
 
   const handleRemoveItem = (productId: string) => {
@@ -197,6 +220,24 @@ export function CartPage() {
   const handlePlaceOrder = async () => {
     if (groups.length === 0) {
       toast.error(t('toast.cartEmpty'))
+      return
+    }
+
+    const ruleErrors = validateCartItems(
+      groups.flatMap((group) =>
+        group.items.map((item) => ({
+          product: {
+            ...item.product,
+            supplier_minimum_order_amount:
+              item.product.supplier_minimum_order_amount ??
+              (item.product as { minimumOrderAmount?: number | null }).minimumOrderAmount,
+          },
+          quantity: item.quantity,
+        }))
+      )
+    )
+    if (ruleErrors.length) {
+      toast.error(ruleErrors[0])
       return
     }
 
@@ -279,7 +320,7 @@ export function CartPage() {
                 <button
                   onClick={() => {
                     toast.dismiss(id)
-                    window.location.href = '/app/settings'
+                    navigate('/app/settings')
                   }}
                   className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
@@ -310,7 +351,7 @@ export function CartPage() {
           icon={<ShoppingCart className="h-6 w-6" aria-hidden />}
           action={
             <Button asChild>
-              <a href="/app/products">{t('page.browseProducts')}</a>
+              <Link to="/app/products">{t('page.browseProducts')}</Link>
             </Button>
           }
         />
@@ -433,9 +474,11 @@ export function CartPage() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity - 1)
+                                handleUpdateQuantity(
+                                  item.productId,
+                                  stepCartQuantity(item.quantity, -1, item.product)
+                                )
                               }
-                              disabled={item.quantity <= 1}
                             >
                               <Minus className="h-4 w-4" />
                             </Button>
@@ -444,7 +487,10 @@ export function CartPage() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                handleUpdateQuantity(item.productId, item.quantity + 1)
+                                handleUpdateQuantity(
+                                  item.productId,
+                                  stepCartQuantity(item.quantity, 1, item.product)
+                                )
                               }
                             >
                               <Plus className="h-4 w-4" />
@@ -746,6 +792,12 @@ export function CartPage() {
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                 />
+                <p className="text-xs text-[var(--text-muted)]">
+                  {t('page.deliveryDateHint', {
+                    defaultValue:
+                      'Suppliers may enforce a last-order cutoff. If you order past their cutoff, delivery rolls to the next eligible day.',
+                  })}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="delivery-notes">

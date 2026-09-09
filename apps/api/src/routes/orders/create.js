@@ -46,6 +46,10 @@ import {
   getDefaultCatalogPricesBatch,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
+import {
+  assertLineQuantityRules,
+  assertSupplierMinimumOrderAmount,
+} from '../../lib/order-quantity-rules.js'
 import { reserveStockForPlacedOrder } from '../../services/supplier-order-stock.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
@@ -65,6 +69,7 @@ import {
   collectOrdersCalendarTenantIdsFromOrder,
   scheduleOrdersCalendarCacheInvalidation,
 } from '../../lib/orders-calendar-cache.js'
+import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
 
 const router = express.Router()
 
@@ -103,9 +108,17 @@ router.post(
       const [{ rows: products }, catalogByProductId] = await Promise.all([
         query(
           `
-      SELECT id, supplier_id, sku, category_id, name
-      FROM product
-      WHERE id = ANY($1)
+      SELECT
+        p.id,
+        p.supplier_id,
+        p.sku,
+        p.category_id,
+        p.name,
+        COALESCE(pis.moq, 1) AS moq,
+        COALESCE(pis.order_multiple, 1) AS order_multiple
+      FROM product p
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      WHERE p.id = ANY($1)
       `,
           [productIds]
         ),
@@ -157,6 +170,13 @@ router.post(
         if (resolved?.unitPrice == null) {
           throw new ValidationError(`No valid price found for product ${product.sku}`)
         }
+        assertLineQuantityRules({
+          quantity: item.quantity,
+          moq: product.moq,
+          orderMultiple: product.order_multiple,
+          sku: product.sku,
+          productId: product.id,
+        })
         if (!supplierGroups.has(product.supplier_id)) {
           supplierGroups.set(product.supplier_id, [])
         }
@@ -171,6 +191,59 @@ router.post(
         })
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
+
+      // Enforce supplier blocklist (parity with supplier manual-order eligibility)
+      const cartSupplierIds = [...supplierGroups.keys()]
+      if (cartSupplierIds.length > 0) {
+        const { rows: blockedSuppliers } = await query(
+          `
+          SELECT sb.supplier_id, s.name AS supplier_name
+          FROM supplier_blocklist sb
+          JOIN supplier s ON s.id = sb.supplier_id
+          WHERE sb.restaurant_id = $1
+            AND sb.supplier_id = ANY($2::uuid[])
+          `,
+          [restaurantId, cartSupplierIds]
+        )
+        if (blockedSuppliers.length > 0) {
+          const names = blockedSuppliers.map((r) => r.supplier_name || r.supplier_id).join(', ')
+          throw new ValidationError(
+            `Cannot order from blocked supplier${blockedSuppliers.length > 1 ? 's' : ''}: ${names}`
+          )
+        }
+
+        // Require follow or prior order (parity with product detail / supplier manual order)
+        const { rows: linkedSuppliers } = await query(
+          `
+          SELECT s.id AS supplier_id, s.name AS supplier_name
+          FROM supplier s
+          WHERE s.id = ANY($2::uuid[])
+            AND (
+              EXISTS (
+                SELECT 1 FROM supplier_follow sf
+                WHERE sf.supplier_id = s.id AND sf.restaurant_id = $1
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM customer_order o
+                JOIN order_item oi ON oi.order_id = o.id
+                WHERE o.restaurant_id = $1 AND oi.supplier_id = s.id
+              )
+            )
+          `,
+          [restaurantId, cartSupplierIds]
+        )
+        const linkedIds = new Set(linkedSuppliers.map((r) => r.supplier_id))
+        const unlinked = cartSupplierIds.filter((id) => !linkedIds.has(id))
+        if (unlinked.length > 0) {
+          const { rows: names } = await query(
+            `SELECT name FROM supplier WHERE id = ANY($1::uuid[])`,
+            [unlinked]
+          )
+          const label = names.map((r) => r.name).join(', ') || unlinked.join(', ')
+          throw new ValidationError(`Follow the supplier before ordering: ${label}`)
+        }
+      }
 
       // Resolve daily limit + supplier preflight (reuse req.subscription when available)
       phaseStart = performance.now()
@@ -226,11 +299,26 @@ router.post(
         const supplierIds = [...supplierGroups.keys()]
         if (supplierIds.length) {
           const { rows: supplierRows } = await query(
-            `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name
+            `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name,
+                    minimum_order_amount, last_order_mode, last_order_cutoff_type, last_order_cutoff_time,
+                    last_order_cutoff_minutes, last_order_rollover_days, last_order_timezone
              FROM supplier WHERE id = ANY($1::uuid[])`,
             [supplierIds]
           )
           supplierProfiles = new Map(supplierRows.map((row) => [row.id, row]))
+
+          for (const [supplierId, items] of supplierGroups.entries()) {
+            const supplier = supplierProfiles.get(supplierId)
+            const subtotal = items.reduce(
+              (sum, line) => sum + Number(line.unitPrice) * Number(line.quantity),
+              0
+            )
+            assertSupplierMinimumOrderAmount({
+              subtotal,
+              minimumOrderAmount: supplier?.minimum_order_amount,
+              supplierName: supplier?.name,
+            })
+          }
 
           const supplierSubscriptions = await Promise.all(
             supplierIds.map(async (supplierId) => [
@@ -253,23 +341,40 @@ router.post(
               ? await hasActiveSupplierOrderPromotionsBatch(query, supplierIds, restaurantId)
               : new Map()
 
+          // Deduplicate feature resolution by billing tenant (org branches share one).
+          const multiWarehouseByBillingId = new Map()
+          const uniqueBillingEntries = []
+          for (const supplierId of supplierIds) {
+            const billingId = billingIdBySupplier.get(supplierId)
+            supplierPromoEligibility.set(
+              supplierId,
+              restaurantDealsEnabled ? promoBySupplier.get(supplierId) === true : false
+            )
+            if (!billingId || multiWarehouseByBillingId.has(billingId)) continue
+            multiWarehouseByBillingId.set(billingId, null)
+            uniqueBillingEntries.push({
+              billingId,
+              planFeatures: supplierSubById.get(supplierId)?.features,
+            })
+          }
           await Promise.all(
-            supplierIds.map(async (supplierId) => {
-              const supplierSub = supplierSubById.get(supplierId)
-              const supplierBillingId = billingIdBySupplier.get(supplierId)
-              supplierPromoEligibility.set(
-                supplierId,
-                restaurantDealsEnabled ? promoBySupplier.get(supplierId) === true : false
-              )
+            uniqueBillingEntries.map(async ({ billingId, planFeatures }) => {
               const multiWarehouseFeature = await resolveFeatureEnabled(
-                supplierBillingId,
+                billingId,
                 'SUPPLIER',
                 'multi_warehouse',
-                supplierSub?.features
+                planFeatures
               )
-              supplierMultiWarehouse.set(supplierId, multiWarehouseFeature.enabled)
+              multiWarehouseByBillingId.set(billingId, multiWarehouseFeature.enabled)
             })
           )
+          for (const supplierId of supplierIds) {
+            const billingId = billingIdBySupplier.get(supplierId)
+            supplierMultiWarehouse.set(
+              supplierId,
+              multiWarehouseByBillingId.get(billingId) === true
+            )
+          }
         }
       }
       orderCreateTimings.dailyLimitCheckMs = elapsedMsSince(phaseStart)
@@ -469,6 +574,15 @@ router.post(
         result.flatMap((order) => collectOrdersCalendarTenantIdsFromOrder(order)),
         { reason: 'order.created', requestId: req.requestId }
       )
+
+      const dashboardTenants = [{ tenantType: 'RESTAURANT', tenantId: restaurantId }]
+      for (const order of result) {
+        const supplierId = order.items?.[0]?.supplier_id
+        if (supplierId) {
+          dashboardTenants.push({ tenantType: 'SUPPLIER', tenantId: supplierId })
+        }
+      }
+      void invalidateDashboardSummaryCache(dashboardTenants)
 
       orderCreateTimings.totalHandlerMs = elapsedMsSince(handlerStartedAt)
       if (req._perf?.stages) {
@@ -739,6 +853,11 @@ router.post(
         reason: 'order.manual_created',
         requestId: req.requestId,
       })
+
+      void invalidateDashboardSummaryCache([
+        { tenantType: 'RESTAURANT', tenantId: result.restaurant_id },
+        { tenantType: 'SUPPLIER', tenantId: supplierId },
+      ])
 
       res.status(201).json({
         ok: true,

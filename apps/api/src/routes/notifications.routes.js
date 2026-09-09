@@ -343,17 +343,18 @@ router.post('/:id/read', async (req, res) => {
   try {
     const { id } = req.params
     const userId = req.userData.id
+    const userType = req.userData.role
 
     await query(
       `
       UPDATE notification_log
       SET is_read = true, read_at = now()
-      WHERE id = $1 AND user_id = $2
+      WHERE id = $1 AND user_id = $2 AND user_type = $3
     `,
-      [id, userId]
+      [id, userId, userType]
     )
 
-    await invalidateUserNotificationsListCache(userId, req.userData.role)
+    await invalidateUserNotificationsListCache(userId, userType)
 
     res.json({
       ok: true,

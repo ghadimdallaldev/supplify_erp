@@ -78,17 +78,19 @@ export async function buildAdminOverviewMetrics() {
            CASE
              WHEN s.billing_cycle = 'YEARLY' AND COALESCE(sp.price_per_year, 0) > 0
                THEN sp.price_per_year / 12.0
+             WHEN COALESCE(sp.price_per_month, 0) = 0 AND COALESCE(sp.price_per_year, 0) > 0
+               THEN sp.price_per_year / 12.0
              ELSE sp.price_per_month
            END
-         ), 0)::float AS mrr,
-         COUNT(*) FILTER (WHERE ${PAID_PLAN_EXCLUDE})::int AS paid_active_subscriptions,
+         ) FILTER (WHERE s.status = 'ACTIVE'), 0)::float AS mrr,
+         COUNT(*) FILTER (WHERE ${PAID_PLAN_EXCLUDE})::int AS paid_active_or_trialing,
          COUNT(*) FILTER (WHERE s.status = 'ACTIVE' AND ${PAID_PLAN_EXCLUDE})::int AS paid_active_only
        FROM subscription s
        JOIN subscription_plan sp ON sp.id = s.plan_id
        WHERE s.status IN ('ACTIVE', 'TRIALING')
          AND ${PAID_PLAN_EXCLUDE}
-         AND COALESCE(sp.price_per_month, 0) > 0`,
-      [{ mrr: 0, paid_active_subscriptions: 0, paid_active_only: 0 }]
+         AND (COALESCE(sp.price_per_month, 0) > 0 OR COALESCE(sp.price_per_year, 0) > 0)`,
+      [{ mrr: 0, paid_active_or_trialing: 0, paid_active_only: 0 }]
     ),
     safeOverviewQuery(
       'orders',
@@ -136,7 +138,9 @@ export async function buildAdminOverviewMetrics() {
       'reservations',
       `SELECT
          COUNT(*) FILTER (WHERE scheduled_at::date = CURRENT_DATE)::int AS today,
-         COUNT(*) FILTER (WHERE scheduled_at >= NOW() - INTERVAL '7 days')::int AS week,
+         COUNT(*) FILTER (
+           WHERE scheduled_at >= NOW() - INTERVAL '7 days' AND scheduled_at <= NOW()
+         )::int AS week,
          COUNT(*) FILTER (WHERE status IN ('CONFIRMED','SEATED'))::int AS confirmed
        FROM reservation`,
       [{ today: 0, week: 0, confirmed: 0 }]
@@ -225,8 +229,9 @@ export async function buildAdminOverviewMetrics() {
     revenue: {
       mrr,
       arr: mrr * 12,
-      activeSubscriptions: parseInt(revenueRow.paid_active_subscriptions, 10) || 0,
-      paidActiveSubscriptions: parseInt(revenueRow.paid_active_subscriptions, 10) || 0,
+      activeSubscriptions: parseInt(revenueRow.paid_active_only, 10) || 0,
+      paidActiveSubscriptions: parseInt(revenueRow.paid_active_only, 10) || 0,
+      paidActiveOrTrialing: parseInt(revenueRow.paid_active_or_trialing, 10) || 0,
       paidActiveOnly: parseInt(revenueRow.paid_active_only, 10) || 0,
     },
     orders: {

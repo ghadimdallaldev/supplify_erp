@@ -2,10 +2,14 @@
  * Supplier organization layer: org roles, branch access, and branch lifecycle.
  */
 import { query, withTransaction } from './db.js'
-import { PERMISSION_KEYS } from './permission-keys.js'
 import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
-import { ensureTenantSystemRoles, assignOwnerRoleForUser, getOwnerRoleId } from './tenant-roles.js'
+import {
+  ensureTenantSystemRoles,
+  assignOwnerRoleForUser,
+  getOwnerRoleId,
+  getAllPermissionsForTenantType,
+} from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
 import { createPendingActivationSubscription } from './billing/subscription-activation.js'
 import { SUPPLIER_VIEWER } from './role-matrix.js'
@@ -83,13 +87,8 @@ const BRANCH_ORDER_STATS_SELECT = `
    JOIN customer_order co ON co.id = oi.order_id
    WHERE oi.supplier_id = s.id) AS last_order_at`
 
-const ALL_SUPPLIER_PERMISSIONS = Object.values(PERMISSION_KEYS).filter(
-  (k) =>
-    !k.startsWith('ADMIN_') && !k.startsWith('RESERVATIONS_') && k !== PERMISSION_KEYS.ORDERS_CREATE
-)
-
 function resolveOrgRolePermissions(roleDef) {
-  if (roleDef.permissions === 'ALL') return [...ALL_SUPPLIER_PERMISSIONS]
+  if (roleDef.permissions === 'ALL') return getAllPermissionsForTenantType('SUPPLIER')
   return roleDef.permissions
 }
 

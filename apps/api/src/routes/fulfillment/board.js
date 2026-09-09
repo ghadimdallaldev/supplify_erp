@@ -40,6 +40,7 @@ import {
 import { rolloverAssignmentToNextDay } from '../../services/delivery-rollover.service.js'
 import { invalidateUserAuthCaches } from '../../lib/access-cache.js'
 import { getCache, setCache } from '../../lib/cache.js'
+import { invalidateDispatchCacheForSupplier } from '../../lib/dispatch-cache.js'
 
 import {
   resolveRouteReorderAccess,
@@ -115,19 +116,21 @@ router.get('/board', async (req, res) => {
               AND dr.status IN ('PLANNED', 'IN_PROGRESS')
           ) AS out_for_delivery,
           (
-            SELECT COUNT(*)::int
-            FROM route_stop rs
-            JOIN delivery_route dr ON dr.id = rs.route_id
-            WHERE dr.supplier_id = $1
-              AND rs.status = 'COMPLETED'
-              AND rs.completed_at >= date_trunc('day', now())
-          ) +
-          (
-            SELECT COUNT(*)::int
-            FROM proof_of_delivery pod
-            JOIN customer_order o ON o.id = pod.order_id
-            JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-            WHERE pod.delivery_timestamp >= date_trunc('day', now())
+            SELECT COUNT(DISTINCT order_id)::int
+            FROM (
+              SELECT rs.order_id
+              FROM route_stop rs
+              JOIN delivery_route dr ON dr.id = rs.route_id
+              WHERE dr.supplier_id = $1
+                AND rs.status = 'COMPLETED'
+                AND rs.completed_at >= date_trunc('day', now())
+              UNION
+              SELECT pod.order_id
+              FROM proof_of_delivery pod
+              JOIN customer_order o ON o.id = pod.order_id
+              JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+              WHERE pod.delivery_timestamp >= date_trunc('day', now())
+            ) delivered_orders
           ) AS delivered_today
         `,
         [supplierId]
@@ -267,6 +270,11 @@ function mapDispatchOrder(row) {
       : row.active_route_status === 'PLANNED'
         ? 'Planned route'
         : null,
+    warehouse_id: row.warehouse_id ?? null,
+    warehouse_name: row.warehouse_name ?? null,
+    warehouse_code: row.warehouse_code ?? null,
+    warehouse_count: row.warehouse_count ?? 0,
+    multi_warehouse: Number(row.warehouse_count || 0) > 1,
     assignment: row.assignment_id
       ? {
           id: row.assignment_id,
@@ -288,12 +296,14 @@ function mapDispatchOrder(row) {
   }
 }
 
-const DISPATCH_BUCKET_LIMIT = 500
+const DISPATCH_BUCKET_LIMIT = 200
 const DISPATCH_CACHE_TTL_SECONDS = 45
 
 function dispatchCacheKey(supplierId, days, warehouseId) {
   return `fulfillment:dispatch:v1:${supplierId}:${days}:${warehouseId || 'all'}`
 }
+
+export { invalidateDispatchCacheForSupplier }
 
 function buildDispatchBaseSelect() {
   return `
@@ -318,7 +328,11 @@ function buildDispatchBaseSelect() {
         (pod.order_id IS NOT NULL) AS has_pod,
         ar.route_id AS active_route_id,
         ar.route_number AS active_route_number,
-        ar.route_status AS active_route_status
+        ar.route_status AS active_route_status,
+        owa_sum.warehouse_id,
+        owa_sum.warehouse_name,
+        owa_sum.warehouse_code,
+        owa_sum.warehouse_count
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
       JOIN restaurant r ON r.id = o.restaurant_id
@@ -345,6 +359,17 @@ function buildDispatchBaseSelect() {
           AND dr.status IN ('PLANNED', 'IN_PROGRESS')
         LIMIT 1
       ) ar ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          (ARRAY_AGG(w.id ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_id,
+          (ARRAY_AGG(w.name ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_name,
+          (ARRAY_AGG(w.code ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_code,
+          COUNT(*)::int AS warehouse_count
+        FROM order_warehouse_assignment owa
+        JOIN warehouse w ON w.id = owa.warehouse_id
+        WHERE owa.order_id = o.id
+          AND owa.status NOT IN ('failed')
+      ) owa_sum ON true
       WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
   `
 }
@@ -555,6 +580,8 @@ router.post(
       }
 
       await invalidateUserAuthCaches({ tenantId: supplierId, tenantType: 'SUPPLIER' })
+      // The rolled-over assignment changes bucket/date on the dispatch board.
+      await invalidateDispatchCacheForSupplier(supplierId)
 
       res.json({
         ok: true,

@@ -4,10 +4,26 @@ import {
   computeSupplierStockFlags,
   DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
 } from '../lib/supplier-stock-status.js'
+import { supplierUsesWarehouseInventory } from './supplier-stock.service.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
+import { deleteCache } from '../lib/cache.js'
 
 const RECENT_ORDER_LIMIT = 7
 const LOW_STOCK_PREVIEW_LIMIT = 3
 const SPEND_TREND_DAYS = 30
+
+export function dashboardSummaryCacheKey(tenantType, tenantId) {
+  return `dashboard:summary:v1:${tenantType}:${tenantId}`
+}
+
+export async function invalidateDashboardSummaryCache(tenants) {
+  const list = Array.isArray(tenants) ? tenants : [tenants]
+  await Promise.all(
+    list
+      .filter((t) => t?.tenantType && t?.tenantId)
+      .map((t) => deleteCache(dashboardSummaryCacheKey(t.tenantType, t.tenantId)).catch(() => {}))
+  )
+}
 
 async function buildSupplierStats(supplierId) {
   const [
@@ -71,7 +87,19 @@ async function buildRestaurantStats(restaurantId) {
     { rows: totalSpent },
     { rows: totalSuppliers },
   ] = await Promise.all([
-    query('SELECT COUNT(*)::int AS count FROM product'),
+    query(
+      `SELECT COUNT(*)::int AS count
+       FROM product p
+       WHERE EXISTS (
+         SELECT 1 FROM supplier_follow sf
+         WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM supplier_blocklist sb
+         WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1
+       )`,
+      [restaurantId]
+    ),
     query('SELECT COUNT(*)::int AS count FROM customer_order WHERE restaurant_id = $1', [
       restaurantId,
     ]),
@@ -175,28 +203,60 @@ async function fetchRestaurantSpendTrend(restaurantId, days = SPEND_TREND_DAYS) 
 }
 
 async function fetchSupplierLowStockPreview(supplierId) {
-  const { rows } = await query(
-    `SELECT
-       i.product_id AS id,
-       p.name AS product_name,
-       i.available_qty,
-       COALESCE(pis.low_stock_threshold, $2)::int AS low_stock_threshold
-     FROM inventory i
-     JOIN product p ON p.id = i.product_id
-     LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
-     WHERE p.supplier_id = $1
-       AND i.available_qty > 0
-       AND i.available_qty <= COALESCE(pis.low_stock_threshold, $2)
-     ORDER BY i.available_qty ASC, p.name ASC
-     LIMIT $3`,
-    [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, LOW_STOCK_PREVIEW_LIMIT]
-  )
+  const useWh = await supplierUsesWarehouseInventory(supplierId)
+  let rows
+  if (useWh) {
+    const supplierCol = await getWarehouseSupplierColumn()
+    ;({ rows } = await query(
+      `
+      SELECT
+        p.id,
+        p.name AS product_name,
+        COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty,
+        COALESCE(pis.low_stock_threshold, $2)::int AS low_stock_threshold
+      FROM product p
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      LEFT JOIN warehouse_inventory wi ON wi.product_id = p.id
+      LEFT JOIN warehouse w ON w.id = wi.warehouse_id
+        AND w.${supplierCol} = $1
+        AND w.is_active = TRUE
+      WHERE p.supplier_id = $1
+      GROUP BY p.id, p.name, pis.low_stock_threshold
+      HAVING COALESCE(SUM(wi.quantity_available), 0) > 0
+         AND COALESCE(SUM(wi.quantity_available), 0) <= COALESCE(pis.low_stock_threshold, $2)
+      ORDER BY COALESCE(SUM(wi.quantity_available), 0) ASC, p.name ASC
+      LIMIT $3
+      `,
+      [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, LOW_STOCK_PREVIEW_LIMIT]
+    ))
+  } else {
+    ;({ rows } = await query(
+      `
+      SELECT
+        p.id,
+        p.name AS product_name,
+        COALESCE(i.available_qty, 0)::numeric AS available_qty,
+        COALESCE(pis.low_stock_threshold, $2)::int AS low_stock_threshold
+      FROM product p
+      LEFT JOIN inventory i ON i.product_id = p.id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+      WHERE p.supplier_id = $1
+        AND COALESCE(i.available_qty, 0) > 0
+        AND COALESCE(i.available_qty, 0) <= COALESCE(pis.low_stock_threshold, $2)
+      ORDER BY COALESCE(i.available_qty, 0) ASC, p.name ASC
+      LIMIT $3
+      `,
+      [supplierId, DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD, LOW_STOCK_PREVIEW_LIMIT]
+    ))
+  }
+
   return rows.map((row) => {
-    const flags = computeSupplierStockFlags(row.available_qty, row.low_stock_threshold)
+    const available_qty = Number(row.available_qty) || 0
+    const flags = computeSupplierStockFlags(available_qty, row.low_stock_threshold)
     return {
       id: row.id,
       product_name: row.product_name,
-      available_qty: row.available_qty,
+      available_qty,
       low_stock_threshold: flags.lowStockThreshold,
       isLowStock: flags.isLowStock,
     }

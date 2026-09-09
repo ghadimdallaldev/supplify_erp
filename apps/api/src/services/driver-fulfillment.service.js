@@ -2,8 +2,15 @@ import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { buildObjectPublicUrl } from './storage/storage.service.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
-import { syncWarehouseFulfillmentOnOrderStatus } from './warehouseInventory.js'
+import {
+  syncWarehouseFulfillmentOnOrderStatus,
+  releaseInventoryForFailedDelivery,
+  markWarehouseAssignmentDelivered,
+  releaseInventoryForAssignment,
+  allWarehouseAssignmentsTerminal,
+} from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
+import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
   assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
@@ -37,7 +44,23 @@ export async function assertRestaurantOwnsOrder(restaurantId, orderId) {
   return rows[0]
 }
 
-export async function getActiveDriverAssignment(orderId) {
+export async function getActiveDriverAssignment(orderId, warehouseAssignmentId = null) {
+  if (warehouseAssignmentId) {
+    const { rows } = await query(
+      `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
+              d.vehicle_type, d.vehicle_plate
+       FROM driver_assignments da
+       JOIN drivers d ON d.id = da.driver_id
+       WHERE da.order_id = $1
+         AND da.warehouse_assignment_id = $2
+         AND da.status = ANY($3::text[])
+       ORDER BY da.assigned_at DESC
+       LIMIT 1`,
+      [orderId, warehouseAssignmentId, ACTIVE_ASSIGNMENT_STATUSES]
+    )
+    return rows[0] ?? null
+  }
+
   const { rows } = await query(
     `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
             d.vehicle_type, d.vehicle_plate
@@ -49,6 +72,19 @@ export async function getActiveDriverAssignment(orderId) {
     [orderId, ACTIVE_ASSIGNMENT_STATUSES]
   )
   return rows[0] ?? null
+}
+
+export async function listActiveDriverAssignments(orderId) {
+  const { rows } = await query(
+    `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
+            d.vehicle_type, d.vehicle_plate
+     FROM driver_assignments da
+     JOIN drivers d ON d.id = da.driver_id
+     WHERE da.order_id = $1 AND da.status = ANY($2::text[])
+     ORDER BY da.assigned_at DESC`,
+    [orderId, ACTIVE_ASSIGNMENT_STATUSES]
+  )
+  return rows
 }
 
 export async function getLatestDriverAssignment(orderId) {
@@ -65,7 +101,14 @@ export async function getLatestDriverAssignment(orderId) {
   return rows[0] ?? null
 }
 
-export async function assignDriverToOrder({ supplierId, orderId, driverId, assignedByUserId }) {
+export async function assignDriverToOrder({
+  supplierId,
+  orderId,
+  driverId,
+  assignedByUserId,
+  warehouseAssignmentId = null,
+  assignAllWarehouseLegs = false,
+}) {
   const order = await assertSupplierOwnsOrder(supplierId, orderId)
 
   const { rows: drivers } = await query(
@@ -75,31 +118,69 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
   )
   if (!drivers.length) throw new ValidationError('Driver not found or inactive')
 
-  const existing = await getActiveDriverAssignment(orderId)
-  if (existing) {
-    throw new ValidationError('Order already has an active driver assignment')
-  }
-
-  const { rows: whRows } = await query(
-    `SELECT id FROM order_warehouse_assignment
-     WHERE order_id = $1
-     ORDER BY assigned_at DESC NULLS LAST
-     LIMIT 1`,
-    [orderId]
+  const { rows: openWhAssignments } = await query(
+    `SELECT id, warehouse_id
+     FROM order_warehouse_assignment
+     WHERE order_id = $1 AND status NOT IN ('failed', 'delivered')
+     ORDER BY
+       CASE WHEN $2::uuid IS NOT NULL AND warehouse_id = $2::uuid THEN 0 ELSE 1 END,
+       assigned_at DESC NULLS LAST`,
+    [orderId, drivers[0].warehouse_id ?? null]
   )
 
-  const assignment = await withTransaction(async (client) => {
-    const current = await getActiveDriverAssignment(orderId)
-    if (current) throw new ValidationError('Order already has an active driver assignment')
+  let targetWhAssignmentIds = []
+  if (warehouseAssignmentId) {
+    const match = openWhAssignments.find((row) => row.id === warehouseAssignmentId)
+    if (!match) {
+      throw new ValidationError('Warehouse assignment not found for this order')
+    }
+    targetWhAssignmentIds = [warehouseAssignmentId]
+  } else if (assignAllWarehouseLegs || openWhAssignments.length > 1) {
+    // Multi-WH: create/link a driver leg for every open warehouse assignment that is free.
+    targetWhAssignmentIds = openWhAssignments.map((row) => row.id)
+  } else if (openWhAssignments.length === 1) {
+    targetWhAssignmentIds = [openWhAssignments[0].id]
+  } else {
+    targetWhAssignmentIds = [null]
+  }
 
-    const { rows: assignments } = await client.query(
-      `INSERT INTO driver_assignments (
-         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
-         scheduled_delivery_date
-       ) VALUES ($1, $2, $3, $4, $5, 'assigned', CURRENT_DATE)
-       RETURNING *`,
-      [orderId, whRows[0]?.id ?? null, driverId, supplierId, assignedByUserId ?? null]
-    )
+  const created = await withTransaction(async (client) => {
+    const results = []
+    for (const whAssignmentId of targetWhAssignmentIds) {
+      if (whAssignmentId) {
+        const { rows: existingForLeg } = await client.query(
+          `SELECT id FROM driver_assignments
+           WHERE order_id = $1
+             AND warehouse_assignment_id = $2
+             AND status = ANY($3::text[])
+           LIMIT 1`,
+          [orderId, whAssignmentId, ACTIVE_ASSIGNMENT_STATUSES]
+        )
+        if (existingForLeg.length) {
+          if (warehouseAssignmentId) {
+            throw new ValidationError('This warehouse leg already has an active driver assignment')
+          }
+          continue
+        }
+      } else {
+        const current = await getActiveDriverAssignment(orderId)
+        if (current) throw new ValidationError('Order already has an active driver assignment')
+      }
+
+      const { rows: assignments } = await client.query(
+        `INSERT INTO driver_assignments (
+           order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
+           scheduled_delivery_date
+         ) VALUES ($1, $2, $3, $4, $5, 'assigned', CURRENT_DATE)
+         RETURNING *`,
+        [orderId, whAssignmentId, driverId, supplierId, assignedByUserId ?? null]
+      )
+      results.push(assignments[0])
+    }
+
+    if (!results.length) {
+      throw new ValidationError('All warehouse legs already have active driver assignments')
+    }
 
     if (['PLACED', 'ACKNOWLEDGED'].includes(order.status)) {
       await client.query(
@@ -109,7 +190,7 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
       await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'PROCESSING', order.status)
     }
 
-    return assignments[0]
+    return results
   })
 
   try {
@@ -135,7 +216,9 @@ export async function assignDriverToOrder({ supplierId, orderId, driverId, assig
     /* non-blocking */
   }
 
-  return assignment
+  await invalidateDispatchCacheForSupplier(supplierId)
+  // Backward compatible: single assignment object when one leg; array when multi.
+  return created.length === 1 ? created[0] : created
 }
 
 export async function updateDeliveryStatus({
@@ -169,9 +252,10 @@ export async function updateDeliveryStatus({
     }
   }
 
-  return withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
     let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
     const params = [status, notes ?? null]
+    let orderMarkedDelivered = false
 
     if (status === 'picked_up') {
       assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
@@ -209,26 +293,39 @@ export async function updateDeliveryStatus({
         [orderId]
       )
       const oldStatus = orders[0]?.status
-      await client.query(
-        `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
-        [orderId]
-      )
-      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', oldStatus)
-      await client.query(
-        `UPDATE order_warehouse_assignment
-         SET status = 'delivered'
-         WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
-        [orderId]
-      )
+
+      if (assignment.warehouse_assignment_id) {
+        await markWarehouseAssignmentDelivered(client, orderId, assignment.warehouse_assignment_id)
+        const allDone = await allWarehouseAssignmentsTerminal(client, orderId)
+        if (allDone) {
+          await client.query(
+            `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
+            [orderId]
+          )
+          orderMarkedDelivered = true
+        }
+      } else {
+        await client.query(
+          `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
+          [orderId]
+        )
+        orderMarkedDelivered = true
+        await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', oldStatus)
+        await client.query(
+          `UPDATE order_warehouse_assignment
+           SET status = 'delivered'
+           WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+          [orderId]
+        )
+      }
     }
 
     if (status === 'failed') {
-      await client.query(
-        `UPDATE order_warehouse_assignment
-         SET status = 'failed'
-         WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
-        [orderId]
-      )
+      if (assignment.warehouse_assignment_id) {
+        await releaseInventoryForAssignment(client, orderId, assignment.warehouse_assignment_id)
+      } else {
+        await releaseInventoryForFailedDelivery(client, orderId)
+      }
       await createFulfillmentException(client, {
         supplierId,
         orderId,
@@ -263,7 +360,9 @@ export async function updateDeliveryStatus({
       if (orderRows[0]) {
         orderRows[0].supplier_id = supplierId
         if (status === 'delivered') {
-          await notifyOrderStatusChange(orderRows[0], 'DELIVERED')
+          if (orderMarkedDelivered) {
+            await notifyOrderStatusChange(orderRows[0], 'DELIVERED')
+          }
           await notifyDriverDeliveryMilestone({
             order: orderRows[0],
             supplierId,
@@ -292,6 +391,9 @@ export async function updateDeliveryStatus({
 
     return updatedAssignment[0]
   })
+
+  await invalidateDispatchCacheForSupplier(supplierId)
+  return result
 }
 
 export async function reassignDriver({ supplierId, orderId, driverId, reason, assignedByUserId }) {
@@ -315,10 +417,13 @@ export async function reassignDriver({ supplierId, orderId, driverId, reason, as
     )
     if (!drivers.length) throw new ValidationError('Driver not found or inactive')
 
+    // Carry the operational delivery day forward — a NULL here drops the order out
+    // of the rollover job's index and out of the driver's "today" list.
     const { rows: created } = await client.query(
       `INSERT INTO driver_assignments (
-         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status, notes
-       ) VALUES ($1, $2, $3, $4, $5, 'assigned', $6)
+         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status, notes,
+         scheduled_delivery_date
+       ) VALUES ($1, $2, $3, $4, $5, 'assigned', $6, COALESCE($7::date, CURRENT_DATE))
        RETURNING *`,
       [
         orderId,
@@ -327,9 +432,28 @@ export async function reassignDriver({ supplierId, orderId, driverId, reason, as
         supplierId,
         assignedByUserId ?? null,
         reason ?? null,
+        assignment.scheduled_delivery_date ?? null,
       ]
     )
+
+    // Keep any live route stop consistent with the new driver: a stop left on the
+    // previous driver's route would show the order under a driver who no longer has it.
+    await client.query(
+      `DELETE FROM route_stop rs
+       USING delivery_route dr
+       WHERE rs.route_id = dr.id
+         AND rs.order_id = $1
+         AND dr.supplier_id = $2
+         AND dr.driver_id IS DISTINCT FROM $3
+         AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+         AND rs.status NOT IN ('COMPLETED', 'FAILED')`,
+      [orderId, supplierId, driverId]
+    )
+
     return created[0]
+  }).then(async (created) => {
+    await invalidateDispatchCacheForSupplier(supplierId)
+    return created
   })
 }
 
@@ -370,6 +494,9 @@ export async function submitProofOfDelivery({
   const deliveryPhotoUrl = photoKey ? buildObjectPublicUrl(photoKey) : null
   const signatureImageUrl = signatureKey ? buildObjectPublicUrl(signatureKey) : null
 
+  // One POD per order: a driver retrying on a flaky connection must update the
+  // existing proof rather than stack up duplicate rows. COALESCE keeps whatever
+  // artefacts an earlier partial submission already captured.
   const { rows } = await query(
     `INSERT INTO proof_of_delivery (
        order_id, driver_assignment_id, delivery_date, delivered_by,
@@ -378,6 +505,18 @@ export async function submitProofOfDelivery({
        notes, delivery_timestamp,
        delivery_gps_lat, delivery_gps_lng
      ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8, $9, now(), $10, $11)
+     ON CONFLICT (order_id) DO UPDATE SET
+       driver_assignment_id = COALESCE(EXCLUDED.driver_assignment_id, proof_of_delivery.driver_assignment_id),
+       delivered_by = COALESCE(EXCLUDED.delivered_by, proof_of_delivery.delivered_by),
+       recipient_name = COALESCE(EXCLUDED.recipient_name, proof_of_delivery.recipient_name),
+       file_key = COALESCE(EXCLUDED.file_key, proof_of_delivery.file_key),
+       signature_file_key = COALESCE(EXCLUDED.signature_file_key, proof_of_delivery.signature_file_key),
+       delivery_photo_url = COALESCE(EXCLUDED.delivery_photo_url, proof_of_delivery.delivery_photo_url),
+       signature_image_url = COALESCE(EXCLUDED.signature_image_url, proof_of_delivery.signature_image_url),
+       notes = COALESCE(EXCLUDED.notes, proof_of_delivery.notes),
+       delivery_gps_lat = COALESCE(EXCLUDED.delivery_gps_lat, proof_of_delivery.delivery_gps_lat),
+       delivery_gps_lng = COALESCE(EXCLUDED.delivery_gps_lng, proof_of_delivery.delivery_gps_lng),
+       delivery_timestamp = now()
      RETURNING *`,
     [
       orderId,
@@ -393,6 +532,8 @@ export async function submitProofOfDelivery({
       gpsLng,
     ]
   )
+  // has_pod is part of the cached dispatch payload.
+  await invalidateDispatchCacheForSupplier(supplierId)
   return rows[0]
 }
 

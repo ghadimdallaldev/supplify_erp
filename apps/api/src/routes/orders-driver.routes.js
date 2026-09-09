@@ -8,6 +8,7 @@ import {
   requirePermission,
   requireAnyPermission,
   getRequestTenant,
+  rolesIncludeOwner,
 } from '../lib/rbac.js'
 import {
   assertDriverAssignmentAccess,
@@ -62,7 +63,11 @@ async function resolveSupplierId(req) {
   )
 }
 
-const assignSchema = z.object({ driver_id: z.string().uuid() })
+const assignSchema = z.object({
+  driver_id: z.string().uuid(),
+  warehouse_assignment_id: z.string().uuid().optional().nullable(),
+  assign_all_warehouse_legs: z.boolean().optional().default(false),
+})
 const deliveryStatusSchema = z.object({
   status: z.enum([
     'assigned',
@@ -79,15 +84,21 @@ const reassignSchema = z.object({
   driver_id: z.string().uuid(),
   reason: z.string().optional().nullable(),
 })
-const podSchema = z.object({
-  file_key: z.string().optional().nullable(),
-  signature_file_key: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  recipient_name: z.string().optional().nullable(),
-  driver_assignment_id: z.string().uuid().optional().nullable(),
-  latitude: z.number().optional().nullable(),
-  longitude: z.number().optional().nullable(),
-})
+const podSchema = z
+  .object({
+    file_key: z.string().optional().nullable(),
+    signature_file_key: z.string().optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+    recipient_name: z.string().max(255).optional().nullable(),
+    driver_assignment_id: z.string().uuid().optional().nullable(),
+    latitude: z.number().min(-90).max(90).optional().nullable(),
+    longitude: z.number().min(-180).max(180).optional().nullable(),
+  })
+  .refine(
+    (b) => Boolean(b.file_key || b.signature_file_key || b.recipient_name?.trim()),
+    // An empty POD is not proof of anything — require a photo, a signature or a recipient.
+    { message: 'Provide a delivery photo, a signature, or a recipient name' }
+  )
 
 const podPresignSchema = z.object({
   fileName: z.string().min(1),
@@ -127,10 +138,15 @@ router.post(
         orderId: req.params.id,
         driverId: body.driver_id,
         assignedByUserId: req.userData?.id,
+        warehouseAssignmentId: body.warehouse_assignment_id || null,
+        assignAllWarehouseLegs: Boolean(body.assign_all_warehouse_legs),
       })
+      const payload = Array.isArray(assignment)
+        ? { assignments: assignment, assignment: assignment[0] }
+        : { assignment }
       res.status(201).json({
         ok: true,
-        data: { assignment },
+        data: payload,
         error: null,
         requestId: req.requestId,
       })
@@ -436,6 +452,33 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error instanceof ValidationError || error.name === 'ZodError') {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: error.issues?.[0]?.message || error.message || 'Invalid request',
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
       logger.error('Submit POD error:', error)
       res.status(500).json({
         ok: false,
@@ -482,6 +525,19 @@ router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (r
       }
       proof = await getProofOfDelivery(req.params.id, supplierId)
     } else if (tenant?.tenantType === 'RESTAURANT') {
+      const perms = req.tenantContext?.permissions ?? []
+      if (
+        !hasPermission(perms, P.ORDERS_VIEW) &&
+        !hasPermission(perms, P.RECEIVING_VIEW) &&
+        !rolesIncludeOwner(req.tenantContext?.roles)
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Permission denied' },
+          requestId: req.requestId,
+        })
+      }
       proof = await getProofOfDelivery(req.params.id, null, tenant.tenantId)
     } else {
       return res.status(403).json({
@@ -628,6 +684,19 @@ router.get('/:id/tracking', requireAuth, resolveTenantContext, async (req, res) 
     let tracking = null
 
     if (tenant?.tenantType === 'RESTAURANT') {
+      const perms = req.tenantContext?.permissions ?? []
+      if (
+        !hasPermission(perms, P.ORDERS_VIEW) &&
+        !hasPermission(perms, P.RECEIVING_VIEW) &&
+        !rolesIncludeOwner(req.tenantContext?.roles)
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Missing permission to view tracking' },
+          requestId: req.requestId,
+        })
+      }
       tracking = await getOrderTracking({
         orderId,
         restaurantId: tenant.tenantId,
@@ -714,6 +783,20 @@ router.post(
           requestId: req.requestId,
         })
       }
+      const perms = req.tenantContext?.permissions ?? []
+      if (
+        !hasPermission(perms, P.ORDERS_EDIT) &&
+        !hasPermission(perms, P.ORDERS_MANAGE) &&
+        !hasPermission(perms, P.RECEIVING_MANAGE) &&
+        !rolesIncludeOwner(req.tenantContext?.roles)
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Missing permission to confirm receipt' },
+          requestId: req.requestId,
+        })
+      }
       const proof = await confirmProofOfDelivery(req.params.id, tenant.tenantId, req.userData?.id)
       res.json({
         ok: true,
@@ -722,6 +805,15 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      // No POD yet (or not this restaurant's order) is a 404, not a server fault.
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
       logger.error('Confirm POD error:', error)
       res.status(500).json({
         ok: false,

@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from 'react'
+import { Suspense, lazy, type ReactNode } from 'react'
 import { lazyNamedPage } from './i18n/lazyPage'
 import {
   createBrowserRouter,
@@ -9,21 +9,33 @@ import {
 } from 'react-router-dom'
 import { ROUTER_FUTURE } from './lib/routerFuture'
 import { ConsumerAuthProvider } from './contexts/ConsumerAuthContext'
-import { ConsumerShell } from './components/consumer/ConsumerShell'
 import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
-import { RegisterCompletePage } from './pages/RegisterCompletePage'
-import { LegalReacceptPage } from './pages/LegalReacceptPage'
-import { InviteAcceptPage } from './pages/InviteAcceptPage'
-import { BranchInviteAcceptPage } from './pages/BranchInviteAcceptPage'
 import { OAuthRedirect } from './components/OAuthRedirect'
 import { PageLoading } from './components/ui/page-loading'
 import { CustomDomainCatalogHost } from './components/public/CustomDomainCatalogHost'
 import { RequirePermission } from './components/RequirePermission'
+import { NotFoundPage, RouteErrorPage } from './pages/ErrorPages'
 
+const ConsumerShell = lazy(() =>
+  import('./components/consumer/ConsumerShell').then((m) => ({ default: m.ConsumerShell }))
+)
+const RegisterCompletePage = lazyNamedPage(
+  () => import('./pages/RegisterCompletePage'),
+  'RegisterCompletePage'
+)
+const LegalReacceptPage = lazyNamedPage(
+  () => import('./pages/LegalReacceptPage'),
+  'LegalReacceptPage'
+)
+const InviteAcceptPage = lazyNamedPage(() => import('./pages/InviteAcceptPage'), 'InviteAcceptPage')
+const BranchInviteAcceptPage = lazyNamedPage(
+  () => import('./pages/BranchInviteAcceptPage'),
+  'BranchInviteAcceptPage'
+)
 const DashboardPage = lazyNamedPage(() => import('./pages/DashboardPage'), 'DashboardPage')
 const SupplierHome = lazyNamedPage(() => import('./pages/SupplierHome'), 'SupplierHome')
 const ProductsPage = lazyNamedPage(() => import('./pages/ProductsPage'), 'ProductsPage')
@@ -161,10 +173,7 @@ const ConsumerLoyaltyPage = lazyNamedPage(
   'ConsumerLoyaltyPage'
 )
 const OrgOverviewPage = lazyNamedPage(() => import('./pages/OrgOverviewPage'), 'OrgOverviewPage')
-const CentralPurchasingPage = lazyNamedPage(
-  () => import('./pages/CentralPurchasingPage'),
-  'CentralPurchasingPage'
-)
+
 const BranchDetailPage = lazyNamedPage(() => import('./pages/BranchDetailPage'), 'BranchDetailPage')
 const LegalHubPage = lazyNamedPage(() => import('./pages/LegalDocumentPage'), 'LegalHubPage')
 const LegalDocumentPage = lazyNamedPage(
@@ -236,9 +245,11 @@ function ConsumerRouteLayout() {
     location.pathname.includes('/menu') || location.pathname.includes('/checkout')
   return (
     <ConsumerAuthProvider restaurantSlug={restaurantSlug ?? ''}>
-      <ConsumerShell slug={restaurantSlug ?? ''} showBranchPicker={showBranchPicker}>
-        <Outlet />
-      </ConsumerShell>
+      <Suspense fallback={<PageLoader />}>
+        <ConsumerShell slug={restaurantSlug ?? ''} showBranchPicker={showBranchPicker}>
+          <Outlet />
+        </ConsumerShell>
+      </Suspense>
     </ConsumerAuthProvider>
   )
 }
@@ -251,688 +262,777 @@ function LazyPage({ children }: { children: ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>
 }
 
+// One pathless root route so every branch shares the branded 404/500 error pages.
 const router = createBrowserRouter([
   {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/auth/login',
-    element: <OAuthRedirect flow="login" />,
-  },
-  {
-    path: '/auth/register',
-    element: <OAuthRedirect flow="register" />,
-  },
-  {
-    path: '/register',
-    element: <RegisterPage />,
-  },
-  {
-    path: '/reserve/confirmation',
-    element: (
-      <LazyPage>
-        <PublicReservationConfirmation />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/reserve/waitlist/:token/accept',
-    element: (
-      <LazyPage>
-        <PublicReservationWaitlistOffer action="accept" />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/reserve/waitlist/:token/decline',
-    element: (
-      <LazyPage>
-        <PublicReservationWaitlistOffer action="decline" />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/reserve/manage/:token',
-    element: (
-      <LazyPage>
-        <PublicReservationManage />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/reserve/:restaurantIdOrSlug',
-    element: (
-      <LazyPage>
-        <PublicReservationPortal />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/reserve',
-    element: (
-      <LazyPage>
-        <PublicReservationPortal />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/supplier/:idOrSlug',
-    element: (
-      <LazyPage>
-        <PublicSupplierCatalogPage />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/order/:restaurantSlug',
-    element: <ConsumerRouteLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
-        index: true,
-        element: (
-          <LazyPage>
-            <ConsumerStorefrontPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'menu',
-        element: (
-          <LazyPage>
-            <ConsumerMenuPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'checkout',
-        element: (
-          <LazyPage>
-            <ConsumerCheckoutPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'receipt/:receiptToken',
-        element: (
-          <LazyPage>
-            <ConsumerReceiptPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'track',
-        element: (
-          <LazyPage>
-            <ConsumerTrackOrderPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'account',
-        element: (
-          <LazyPage>
-            <ConsumerAccountPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'rewards',
-        element: (
-          <LazyPage>
-            <ConsumerRewardsPage />
-          </LazyPage>
-        ),
-      },
-    ],
-  },
-  {
-    path: '/staff',
-    element: (
-      <LazyPage>
-        <StaffSelfServiceLogin />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/staff/login',
-    element: (
-      <LazyPage>
-        <StaffSelfServiceLogin />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/register/complete',
-    element: <RegisterCompletePage />,
-  },
-  {
-    path: '/legal/reaccept',
-    element: <LegalReacceptPage />,
-  },
-  {
-    path: '/invite/branch',
-    element: <BranchInviteAcceptPage />,
-  },
-  {
-    path: '/invite',
-    element: <InviteAcceptPage />,
-  },
-  {
-    path: '/legal',
-    element: (
-      <LazyPage>
-        <LegalHubPage />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/legal/:slug',
-    element: (
-      <LazyPage>
-        <LegalDocumentPage />
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/staff/dashboard',
-    element: (
-      <LazyPage>
-        <StaffPortalGuard>
-          <StaffSelfServiceDashboard />
-        </StaffPortalGuard>
-      </LazyPage>
-    ),
-  },
-  {
-    path: '/',
-    element: (
-      <AuthGuard>
-        <Layout />
-      </AuthGuard>
-    ),
-    children: [
-      {
-        index: true,
-        element: (
-          <LazyPage>
-            <SupplierHome />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app',
-        element: (
-          <LazyPage>
-            <SupplierHome />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/dashboard',
-        element: (
-          <LazyPage>
-            <DashboardPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/command-center',
-        element: (
-          <LazyPage>
-            <SupplierCommandCenterPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/run-sheet',
-        element: (
-          <LazyPage>
-            <SupplierRunSheetPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/driver-deliveries',
-        element: (
-          <LazyPage>
-            <DriverDeliveriesPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/activate',
-        element: (
-          <LazyPage>
-            <AccountActivationPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/products',
-        element: (
-          <LazyPage>
-            <ProductsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/products/:id',
-        element: (
-          <LazyPage>
-            <ProductDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/orders',
-        element: (
-          <LazyPage>
-            <OrdersPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/orders/:id',
-        element: (
-          <LazyPage>
-            <OrderDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/customer-growth',
-        element: (
-          <LazyPage>
-            <RequirePermission anyOf={['GROWTH_VIEW']} allowOwner title="customer growth">
-              <SupplierCustomerGrowthPage />
-            </RequirePermission>
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/reports',
-        element: (
-          <LazyPage>
-            <ReportsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/disputes',
-        element: (
-          <LazyPage>
-            <DisputesPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/disputes/:id',
-        element: (
-          <LazyPage>
-            <DisputeDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/promotions',
-        element: (
-          <LazyPage>
-            <PromotionsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/loyalty',
-        element: (
-          <LazyPage>
-            <LoyaltyProgramPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/consumer-loyalty',
-        element: (
-          <LazyPage>
-            <ConsumerLoyaltyPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/contract-pricing',
-        element: (
-          <LazyPage>
-            <ContractPricingPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/my-prices',
-        element: (
-          <LazyPage>
-            <MyContractPricesPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/deals',
-        element: (
-          <LazyPage>
-            <DealsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/cart',
-        element: (
-          <LazyPage>
-            <CartPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/quick-lists',
-        element: (
-          <LazyPage>
-            <QuickListsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/restaurant-inventory',
-        element: (
-          <LazyPage>
-            <RestaurantInventoryPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/onboarding',
-        element: (
-          <LazyPage>
-            <RestaurantOnboardingPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/receiving',
-        element: (
-          <LazyPage>
-            <ReceivingPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipes',
-        element: (
-          <LazyPage>
-            <RecipesListPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipes/new',
-        element: (
-          <LazyPage>
-            <RecipeBuilderPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipes/:id/edit',
-        element: (
-          <LazyPage>
-            <RecipeBuilderPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipes/:id',
-        element: (
-          <LazyPage>
-            <RecipeDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipe-costing',
-        element: (
-          <LazyPage>
-            <RecipeCostingDashboardPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/recipe-costing/price-impact',
-        element: (
-          <LazyPage>
-            <RecipePriceImpactPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/reservations',
-        element: (
-          <LazyPage>
-            <ReservationsPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/consumer-menu',
-        element: (
-          <LazyPage>
-            <MenuAdminPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/consumer-orders',
-        element: (
-          <LazyPage>
-            <ConsumerOrdersPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/staff',
-        element: (
-          <LazyPage>
-            <StaffPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/suppliers',
-        element: (
-          <LazyPage>
-            <SuppliersPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/suppliers/:id',
-        element: (
-          <LazyPage>
-            <SupplierDetailPage />
-          </LazyPage>
-        ),
-      },
-      {
-        path: 'app/quote-requests',
-        element: (
-          <LazyPage>
-            <QuoteRequestsPage />
-          </LazyPage>
-        ),
+        path: '/login',
+        element: <LoginPage />,
       },
       {
-        path: 'app/quote-requests/new',
-        element: (
-          <LazyPage>
-            <CreateQuoteRequestPage />
-          </LazyPage>
-        ),
+        path: '/auth/login',
+        element: <OAuthRedirect flow="login" />,
       },
       {
-        path: 'app/quote-requests/supplier',
-        element: (
-          <LazyPage>
-            <SupplierQuoteInboxPage />
-          </LazyPage>
-        ),
+        path: '/auth/register',
+        element: <OAuthRedirect flow="register" />,
       },
       {
-        path: 'app/quote-requests/supplier/:quoteRequestSupplierId',
-        element: (
-          <LazyPage>
-            <SupplierQuoteResponsePage />
-          </LazyPage>
-        ),
+        path: '/register',
+        element: <RegisterPage />,
       },
       {
-        path: 'app/quote-requests/:id',
+        path: '/reserve/confirmation',
         element: (
           <LazyPage>
-            <QuoteRequestDetailPage />
+            <PublicReservationConfirmation />
           </LazyPage>
         ),
       },
       {
-        path: 'app/restaurants',
+        path: '/reserve/waitlist/:token/accept',
         element: (
           <LazyPage>
-            <RestaurantsPage />
+            <PublicReservationWaitlistOffer action="accept" />
           </LazyPage>
         ),
       },
       {
-        path: 'app/restaurants/:id',
+        path: '/reserve/waitlist/:token/decline',
         element: (
           <LazyPage>
-            <RestaurantDetailPage />
+            <PublicReservationWaitlistOffer action="decline" />
           </LazyPage>
         ),
       },
       {
-        path: 'app/settings',
+        path: '/reserve/manage/:token',
         element: (
           <LazyPage>
-            <SettingsPage />
+            <PublicReservationManage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/org',
+        path: '/reserve/:restaurantIdOrSlug',
         element: (
           <LazyPage>
-            <OrgOverviewPage />
+            <PublicReservationPortal />
           </LazyPage>
         ),
       },
       {
-        path: 'app/org/central-purchasing',
+        path: '/reserve',
         element: (
           <LazyPage>
-            <CentralPurchasingPage />
+            <PublicReservationPortal />
           </LazyPage>
         ),
       },
       {
-        path: 'app/org/branches/:supplierId',
+        path: '/supplier/:idOrSlug',
         element: (
           <LazyPage>
-            <BranchDetailPage />
+            <PublicSupplierCatalogPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/chat',
-        element: (
-          <LazyPage>
-            <ChatPage />
-          </LazyPage>
-        ),
+        path: '/order/:restaurantSlug',
+        element: <ConsumerRouteLayout />,
+        children: [
+          {
+            index: true,
+            element: (
+              <LazyPage>
+                <ConsumerStorefrontPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'menu',
+            element: (
+              <LazyPage>
+                <ConsumerMenuPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'checkout',
+            element: (
+              <LazyPage>
+                <ConsumerCheckoutPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'receipt/:receiptToken',
+            element: (
+              <LazyPage>
+                <ConsumerReceiptPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'track',
+            element: (
+              <LazyPage>
+                <ConsumerTrackOrderPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'account',
+            element: (
+              <LazyPage>
+                <ConsumerAccountPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'rewards',
+            element: (
+              <LazyPage>
+                <ConsumerRewardsPage />
+              </LazyPage>
+            ),
+          },
+        ],
       },
       {
-        path: 'app/fulfillment',
+        path: '/staff',
         element: (
           <LazyPage>
-            <FulfillmentPage />
+            <StaffSelfServiceLogin />
           </LazyPage>
         ),
       },
       {
-        path: 'app/inventory',
+        path: '/staff/login',
         element: (
           <LazyPage>
-            <InventoryPage />
+            <StaffSelfServiceLogin />
           </LazyPage>
         ),
       },
       {
-        path: 'app/invoices',
+        path: '/register/complete',
         element: (
           <LazyPage>
-            <InvoicesPage />
+            <RegisterCompletePage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/supplier-settings',
+        path: '/legal/reaccept',
         element: (
           <LazyPage>
-            <SupplierSettingsPage />
+            <LegalReacceptPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin/restaurants/:tab',
+        path: '/invite/branch',
         element: (
           <LazyPage>
-            <AdminDashboardPage initialTab="restaurants" />
+            <BranchInviteAcceptPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin/restaurants',
+        path: '/invite',
         element: (
           <LazyPage>
-            <AdminDashboardPage initialTab="restaurants" />
+            <InviteAcceptPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin/suppliers/:tab',
+        path: '/legal',
         element: (
           <LazyPage>
-            <AdminDashboardPage initialTab="suppliers" />
+            <LegalHubPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin/suppliers',
+        path: '/legal/:slug',
         element: (
           <LazyPage>
-            <AdminDashboardPage initialTab="suppliers" />
+            <LegalDocumentPage />
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin/:tab',
+        path: '/staff/dashboard',
         element: (
           <LazyPage>
-            <AdminDashboardPage />
+            <StaffPortalGuard>
+              <StaffSelfServiceDashboard />
+            </StaffPortalGuard>
           </LazyPage>
         ),
       },
       {
-        path: 'app/admin',
+        path: '/',
         element: (
-          <LazyPage>
-            <AdminDashboardPage />
-          </LazyPage>
+          <AuthGuard>
+            <Layout />
+          </AuthGuard>
         ),
+        children: [
+          {
+            index: true,
+            element: (
+              <LazyPage>
+                <SupplierHome />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app',
+            element: (
+              <LazyPage>
+                <SupplierHome />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/dashboard',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['ORDERS_VIEW', 'INVOICES_VIEW']}
+                  allowOwner
+                  title="dashboard"
+                >
+                  <DashboardPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/command-center',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['ORDERS_MANAGE', 'FULFILLMENT_VIEW', 'INVOICES_VIEW']}
+                  allowOwner
+                  title="command center"
+                >
+                  <SupplierCommandCenterPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/run-sheet',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['FULFILLMENT_VIEW', 'DRIVER_DELIVERIES_VIEW']}
+                  allowOwner
+                  title="run sheet"
+                >
+                  <SupplierRunSheetPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/driver-deliveries',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE', 'FULFILLMENT_VIEW']}
+                  allowOwner
+                  title="driver deliveries"
+                >
+                  <DriverDeliveriesPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/activate',
+            element: (
+              <LazyPage>
+                <AccountActivationPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/products',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']}
+                  allowOwner
+                  title="products"
+                >
+                  <ProductsPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/products/:id',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW']}
+                  allowOwner
+                  title="product"
+                >
+                  <ProductDetailPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/orders',
+            element: (
+              <LazyPage>
+                <OrdersPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/orders/:id',
+            element: (
+              <LazyPage>
+                <OrderDetailPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/customer-growth',
+            element: (
+              <LazyPage>
+                <RequirePermission anyOf={['GROWTH_VIEW']} allowOwner title="customer growth">
+                  <SupplierCustomerGrowthPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/reports',
+            element: (
+              <LazyPage>
+                <ReportsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/disputes',
+            element: (
+              <LazyPage>
+                <DisputesPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/disputes/:id',
+            element: (
+              <LazyPage>
+                <DisputeDetailPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/promotions',
+            element: (
+              <LazyPage>
+                <PromotionsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/loyalty',
+            element: (
+              <LazyPage>
+                <LoyaltyProgramPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/consumer-loyalty',
+            element: (
+              <LazyPage>
+                <ConsumerLoyaltyPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/contract-pricing',
+            element: (
+              <LazyPage>
+                <ContractPricingPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/my-prices',
+            element: (
+              <LazyPage>
+                <MyContractPricesPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/deals',
+            element: (
+              <LazyPage>
+                <DealsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/cart',
+            element: (
+              <LazyPage>
+                <CartPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quick-lists',
+            element: (
+              <LazyPage>
+                <QuickListsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/restaurant-inventory',
+            element: (
+              <LazyPage>
+                <RestaurantInventoryPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/onboarding',
+            element: (
+              <LazyPage>
+                <RestaurantOnboardingPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/receiving',
+            element: (
+              <LazyPage>
+                <ReceivingPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipes',
+            element: (
+              <LazyPage>
+                <RecipesListPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipes/new',
+            element: (
+              <LazyPage>
+                <RecipeBuilderPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipes/:id/edit',
+            element: (
+              <LazyPage>
+                <RecipeBuilderPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipes/:id',
+            element: (
+              <LazyPage>
+                <RecipeDetailPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipe-costing',
+            element: (
+              <LazyPage>
+                <RecipeCostingDashboardPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/recipe-costing/price-impact',
+            element: (
+              <LazyPage>
+                <RecipePriceImpactPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/reservations',
+            element: (
+              <LazyPage>
+                <ReservationsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/consumer-menu',
+            element: (
+              <LazyPage>
+                <MenuAdminPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/consumer-orders',
+            element: (
+              <LazyPage>
+                <ConsumerOrdersPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/staff',
+            element: (
+              <LazyPage>
+                <StaffPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/suppliers',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']}
+                  allowOwner
+                  title="suppliers"
+                >
+                  <SuppliersPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/suppliers/:id',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']}
+                  allowOwner
+                  title="supplier"
+                >
+                  <SupplierDetailPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quote-requests',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="ORDERS_VIEW" title="quote requests">
+                  <QuoteRequestsPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quote-requests/new',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="ORDERS_CREATE" title="create quote request">
+                  <CreateQuoteRequestPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quote-requests/supplier',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="ORDERS_VIEW" title="quote inbox">
+                  <SupplierQuoteInboxPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quote-requests/supplier/:quoteRequestSupplierId',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="ORDERS_MANAGE" title="quote response">
+                  <SupplierQuoteResponsePage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/quote-requests/:id',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="ORDERS_VIEW" title="quote request">
+                  <QuoteRequestDetailPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/restaurants',
+            element: (
+              <LazyPage>
+                <RestaurantsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/restaurants/:id',
+            element: (
+              <LazyPage>
+                <RestaurantDetailPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/settings',
+            element: (
+              <LazyPage>
+                <SettingsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/org',
+            element: (
+              <LazyPage>
+                <OrgOverviewPage />
+              </LazyPage>
+            ),
+          },
+
+          {
+            path: 'app/org/branches/:supplierId',
+            element: (
+              <LazyPage>
+                <BranchDetailPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/chat',
+            element: (
+              <LazyPage>
+                <ChatPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/fulfillment',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['FULFILLMENT_VIEW', 'FULFILLMENT_MANAGE']}
+                  allowOwner
+                  title="fulfillment"
+                >
+                  <FulfillmentPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/inventory',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['INVENTORY_VIEW', 'INVENTORY_MANAGE']}
+                  allowOwner
+                  title="inventory"
+                >
+                  <InventoryPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/invoices',
+            element: (
+              <LazyPage>
+                <InvoicesPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/supplier-settings',
+            element: (
+              <LazyPage>
+                <SupplierSettingsPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin/restaurants/:tab',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage initialTab="restaurants" />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin/restaurants',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage initialTab="restaurants" />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin/suppliers/:tab',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage initialTab="suppliers" />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin/suppliers',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage initialTab="suppliers" />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin/:tab',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/admin',
+            element: (
+              <LazyPage>
+                <AdminDashboardPage />
+              </LazyPage>
+            ),
+          },
+        ],
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
       },
     ],
   },

@@ -33,6 +33,7 @@ import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
+import { getProductMoq } from '../lib/orderQuantityRules'
 import {
   EMPTY_PRODUCT_FORM,
   ProductsPageLoading,
@@ -67,7 +68,7 @@ export function ProductsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState(() => searchParams.get('supplier') ?? '')
   const [offset, setOffset] = useState(0)
   const [cursor, setCursor] = useState<string | undefined>()
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
@@ -244,7 +245,7 @@ export function ProductsPage() {
   }
 
   const handleAddToCart = (product: any) => {
-    addItem({ productId: product.id, product, quantity: 1 })
+    addItem({ productId: product.id, product, quantity: getProductMoq(product) })
     toast.success(t('toast.addedToCart'))
   }
 

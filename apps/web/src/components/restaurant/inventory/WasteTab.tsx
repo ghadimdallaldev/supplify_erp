@@ -8,7 +8,7 @@ export interface WasteTabProps {
 }
 
 export function WasteTab({ preselectedProductId, onPreselectConsumed }: WasteTabProps) {
-  const { data, isLoading } = useGetRestaurantInventoryQuery({ limit: 500 })
+  const { data, isLoading } = useGetRestaurantInventoryQuery({ limit: 100 })
   const inventory = data?.inventory || []
 
   if (isLoading) {

@@ -10,6 +10,7 @@ import './endpoints/warehouses'
 import './endpoints/dashboard'
 import './endpoints/files'
 import './endpoints/chat'
+import './endpoints/assistant'
 import './endpoints/restaurantInventory'
 import './endpoints/receiving'
 import './endpoints/quickLists'
@@ -163,6 +164,8 @@ export const {
   useGetWarehouseRoutingRulesQuery,
   useSimulateWarehouseRoutingMutation,
   useGetOrderWarehouseAssignmentsQuery,
+  useReassignOrderWarehouseMutation,
+  useDispatchOrderWarehouseMutation,
   useGetDashboardStatsQuery,
   useGetDashboardSummaryQuery,
   useGetAuditLogsQuery,
@@ -175,10 +178,16 @@ export const {
   useGetFeaturedPlacementPackagesQuery,
   useGetMyFeaturedPlacementsQuery,
   usePurchaseFeaturedPlacementMutation,
+  usePayFeaturedPlacementMutation,
   useGetAdminFeaturedPlacementsQuery,
+  useRefundFeaturedPlacementMutation,
   useGetMessagesQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
+  useGetAssistantCapabilitiesQuery,
+  useGetAssistantConversationsQuery,
+  useGetAssistantMessagesQuery,
+  useSendAssistantMessageMutation,
   useMarkConversationReadMutation,
   useMarkMessageReadMutation,
   usePinConversationMutation,
@@ -342,11 +351,13 @@ export const {
   useGetSupplierQuoteInboxQuery,
   useGetSupplierQuoteRequestDetailQuery,
   useSubmitSupplierQuoteResponseMutation,
+  useDeclineSupplierQuoteRequestMutation,
   useGetPublicReservationAvailabilityQuery,
   useLazyGetPublicReservationAvailabilityQuery,
   useCreatePublicReservationMutation,
   useJoinPublicWaitlistMutation,
   useGetPublicReservationDetailsQuery,
+  useSubmitPublicReservationReviewMutation,
   useCancelPublicReservationMutation,
   useReschedulePublicReservationMutation,
   useRequestStaffPortalLinkMutation,
@@ -410,6 +421,7 @@ export const {
   useCreatePromotionMutation,
   useUpdatePromotionMutation,
   useActivatePromotionMutation,
+  usePayActivationMutation,
   usePausePromotionMutation,
   useDeletePromotionMutation,
   useGetPromotionAnalyticsQuery,
@@ -430,6 +442,8 @@ export const {
   useApproveAdminDealMutation,
   useRejectAdminDealMutation,
   usePauseAdminDealMutation,
+  useMarkAdminBoostPaidMutation,
+  useRefundAdminBoostMutation,
   useSubmitPromotionMutation,
   usePreviewCartDealMutation,
   useGetAdminLimitKeysQuery,

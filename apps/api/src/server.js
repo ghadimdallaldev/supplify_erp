@@ -33,6 +33,7 @@ import { ordersRoutes } from './routes/orders.routes.js'
 import { filesRoutes } from './routes/files.routes.js'
 import { adminRoutes } from './routes/admin.routes.js'
 import { chatRoutes } from './routes/chat.routes.js'
+import { assistantRoutes } from './routes/assistant.routes.js'
 import { invoicesRoutes } from './routes/invoices.routes.js'
 import { paymentsRoutes } from './routes/payments.routes.js'
 import { quickListsRoutes } from './routes/quick-lists.routes.js'
@@ -96,6 +97,8 @@ import {
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
 import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
+import { stripeWebhookRoutes } from './routes/stripe-webhook.routes.js'
+import { internalAuthRoutes } from './routes/internal-auth.routes.js'
 
 validateProductionConfig()
 logEmailBootMode()
@@ -286,6 +289,13 @@ app.use(
   whatsappWebhookRoutes
 )
 
+// Stripe billing webhooks — raw body required for Stripe-Signature verification.
+app.use(
+  '/webhooks/stripe',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  stripeWebhookRoutes
+)
+
 app.use('/auth', authLimiter)
 app.use('/auth/refresh', refreshLimiter)
 app.use('/auth/mobile/refresh', refreshLimiter)
@@ -349,7 +359,7 @@ const mountLocalUploadsStatic =
   (config.NODE_ENV !== 'production' || config.STORAGE_PUBLIC_READ)
 if (mountLocalUploadsStatic) {
   const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
-  app.use('/uploads', express.static(uploadsDir))
+  app.use('/uploads', express.static(uploadsDir, { maxAge: '1y', immutable: true }))
 }
 
 app.get('/health', async (req, res) => {
@@ -424,6 +434,13 @@ app.use('/api/files', filesRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/chat', chatSendLimiter)
 app.use('/api/chat', chatRoutes)
+const assistantSendLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(120, 'Too many assistant requests, please try again later.', {
+      storePrefix: 'rl:assistant',
+    })
+  : noopLimiter
+app.use('/api/assistant', assistantSendLimiter)
+app.use('/api/assistant', assistantRoutes)
 app.use('/api/invoices', invoicesRoutes)
 app.use('/api/payments', paymentsRoutes)
 app.use('/api/quick-lists', quickListsRoutes)
@@ -443,6 +460,7 @@ app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
 app.use('/api/public', publicRoutes)
+app.use('/api/internal', internalAuthRoutes)
 app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
 app.use('/api/consumer', consumerRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)

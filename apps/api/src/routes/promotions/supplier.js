@@ -11,8 +11,14 @@ import {
   getRestaurantIdForRequest,
 } from '../../lib/rbac.js'
 import { query, withTransaction } from '../../lib/db.js'
+import {
+  createDealBoostInvoice,
+  chargePromotionAdInvoice,
+  DEAL_BOOST_INVOICE_TYPE,
+  isPromotionAdPaymentWaived,
+} from '../../lib/billing/promotion-ad-billing.js'
 import { logger } from '../../lib/logger.js'
-import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError, PromotionAdError } from '../../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../../services/promotions.service.js'
 import {
   discoverDealsForRestaurant,
@@ -89,6 +95,11 @@ const listQuerySchema = z.object({
   status: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+})
+
+const payActivationBodySchema = z.object({
+  paymentMethodId: z.string().uuid().optional(),
+  idempotencyKey: z.string().min(8).max(120).optional(),
 })
 
 router.get('/analytics/summary', async (req, res, next) => {
@@ -373,6 +384,7 @@ router.post('/:id/submit', async (req, res, next) => {
 router.post('/:id/pay-activation', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
+    const body = payActivationBodySchema.parse(req.body || {})
     const deal = await loadPromotionForSupplier(req.params.id, supplierId)
     if (deal.status !== DEAL_STATUSES.APPROVED_PENDING_PAYMENT) {
       throw new ValidationError('Deal is not awaiting boost payment')
@@ -381,7 +393,7 @@ router.post('/:id/pay-activation', async (req, res, next) => {
       throw new ValidationError('Deal boost is already paid')
     }
     const amount = Number(deal.boost_price_snapshot || 0)
-    if (amount <= 0 || isBoostPaymentWaived()) {
+    if (amount <= 0 || isBoostPaymentWaived() || isPromotionAdPaymentWaived()) {
       const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.NOT_REQUIRED })
       const { rows } = await query(
         `UPDATE promotions SET status = $2, payment_status = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
@@ -399,19 +411,88 @@ router.post('/:id/pay-activation', async (req, res, next) => {
         requestId: req.requestId,
       })
     }
-    return res.status(402).json({
-      ok: false,
-      data: {
-        paymentRequired: true,
-        amount,
-        pricingKey: deal.boost_pricing_key,
-        message:
-          'Payment provider is not connected yet. Boost payment must be confirmed on the server before the deal can go live.',
-      },
-      error: {
-        name: 'PAYMENT_REQUIRED',
-        message: 'Boost payment required before deal can become active',
-      },
+
+    let invoiceId = deal.billing_invoice_id
+    if (!invoiceId) {
+      const created = await createDealBoostInvoice({ deal })
+      invoiceId = created.invoice.id
+    }
+
+    const idempotencyKey = body.idempotencyKey || `deal-boost:${deal.id}:${amount}`
+    let charge
+    try {
+      charge = await chargePromotionAdInvoice({
+        invoiceId,
+        supplierId,
+        paymentMethodId: body.paymentMethodId || null,
+        idempotencyKey,
+        expectedType: DEAL_BOOST_INVOICE_TYPE,
+      })
+    } catch (err) {
+      if (err instanceof PromotionAdError && err.code === 'PROMOTION_AD_PAYMENT_REQUIRED') {
+        return res.status(402).json({
+          ok: false,
+          data: {
+            paymentRequired: true,
+            amount,
+            pricingKey: deal.boost_pricing_key,
+            invoiceId,
+            message: 'Add an active supplier payment method before paying for this boost.',
+          },
+          error: {
+            name: err.code,
+            message: err.message,
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (err instanceof PromotionAdError && err.code === 'PROMOTION_AD_PAYMENT_FAILED') {
+        return res.status(402).json({
+          ok: false,
+          data: {
+            paymentRequired: true,
+            amount,
+            pricingKey: deal.boost_pricing_key,
+            invoiceId,
+            message: err.message || 'Boost payment was declined.',
+          },
+          error: {
+            name: 'PAYMENT_FAILED',
+            message: err.message || 'Boost payment failed',
+            code: err.details?.failureCode,
+          },
+          requestId: req.requestId,
+        })
+      }
+      throw err
+    }
+
+    const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
+    const { rows } = await query(
+      `UPDATE promotions
+       SET status = $2, payment_status = $3, billing_invoice_id = $5, updated_at = NOW()
+       WHERE id = $1 AND supplier_id = $4 AND status = 'approved_pending_payment'
+       RETURNING *`,
+      [deal.id, next.status, next.payment_status, supplierId, charge.invoice?.id || invoiceId]
+    )
+    if (!rows.length) {
+      throw new ValidationError('Deal is no longer awaiting boost payment')
+    }
+
+    const published = await publishDealAfterApproval(rows[0], {
+      waivePayment: false,
+      paymentConfirmed: true,
+    })
+    if (published.campaign?.id && (charge.invoice?.id || invoiceId)) {
+      await query(`UPDATE deal_promotions SET billing_invoice_id = $2 WHERE id = $1`, [
+        published.campaign.id,
+        charge.invoice?.id || invoiceId,
+      ]).catch(() => {})
+    }
+    return res.json({
+      ok: true,
+      data: { promotion: published.deal, invoice: charge.invoice || null },
+      error: null,
       requestId: req.requestId,
     })
   } catch (err) {

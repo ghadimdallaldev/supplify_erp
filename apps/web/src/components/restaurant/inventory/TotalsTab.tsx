@@ -7,7 +7,7 @@ import {
 import { getMovementSource } from './inventoryShared'
 
 export function TotalsTab() {
-  const { data, isLoading: isLoadingInventory } = useGetRestaurantInventoryQuery({ limit: 500 })
+  const { data, isLoading: isLoadingInventory } = useGetRestaurantInventoryQuery({ limit: 100 })
   const { data: historyData, isLoading: isLoadingHistory } = useGetRestaurantInventoryHistoryQuery({
     limit: 50,
   })

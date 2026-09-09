@@ -2,6 +2,7 @@ import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { t, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
+import { getUpgradePathForTenant } from '../../lib/subscription/plans.js'
 import { notifyTenantUsers, sendNotification } from './in-app.js'
 
 /**
@@ -1145,6 +1146,7 @@ async function notifyBillingEvent(
   locale = DEFAULT_LOCALE
 ) {
   try {
+    const billingPath = getUpgradePathForTenant(tenantType)
     const sent = await notifyTenantUsers({
       tenantId,
       tenantType,
@@ -1153,7 +1155,7 @@ async function notifyBillingEvent(
       contentForLocale,
       referenceType: 'SUBSCRIPTION',
       referenceId: metadata.subscriptionId || null,
-      metadata: { ctaUrl: '/app/billing', ...metadata },
+      metadata: { ...metadata, ctaUrl: billingPath, link: billingPath },
     })
     return sent
   } catch (err) {
@@ -1643,6 +1645,51 @@ export async function notifyQuoteResponseReceived(
     })
   } catch (err) {
     logger.error('notifyQuoteResponseReceived failed', { err: err.message })
+    return null
+  }
+}
+
+export async function notifyQuoteRequestDeclined(
+  { restaurantId, quoteRequestId, quoteRequestSupplierId, supplierId, reason = null },
+  locale = DEFAULT_LOCALE
+) {
+  try {
+    const alreadySent = await hasRecentQuoteNotification({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationCategory: 'quote_request_declined',
+      referenceId: quoteRequestSupplierId,
+    })
+    if (alreadySent) return null
+
+    const { rows } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
+
+    const reasonSuffix = (userLocale) =>
+      reason ? nt('quote.reasonPrefix', userLocale, { reason }) : ''
+
+    return notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'QUOTE_RESPONSE',
+      notificationCategory: 'quote_request_declined',
+      contentForLocale: (userLocale) => ({
+        title: nt('quote.declinedTitle', userLocale),
+        message: nt('quote.declinedMessage', userLocale, {
+          supplierName: rows[0]?.name || nt('common.aSupplier', userLocale),
+          reasonSuffix: reasonSuffix(userLocale),
+        }),
+      }),
+      referenceId: quoteRequestId,
+      referenceType: 'QUOTE_REQUEST',
+      metadata: {
+        quoteRequestSupplierId,
+        supplierId,
+        declineReason: reason,
+        ctaUrl: `/app/quote-requests/${quoteRequestId}`,
+      },
+    })
+  } catch (err) {
+    logger.error('notifyQuoteRequestDeclined failed', { err: err.message })
     return null
   }
 }

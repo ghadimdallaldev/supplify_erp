@@ -20,7 +20,8 @@
       "reference": "Billing & deals"
     },
     "footerInquiries": "For legal inquiries contact",
-    "footerPrivacy": "Privacy:"
+    "footerPrivacy": "Privacy:",
+    "footerAgreement": "By using Supplify, you agree to our <terms>Terms</terms>, <privacy>Privacy Policy</privacy>, and <legal>other legal agreements</legal>."
   },
   "reaccept": {
     "title": "Updated legal agreements",

@@ -93,10 +93,13 @@ export function InventoryTab({
   }, [])
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [supplierFilter, setSupplierFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [sortBy, setSortBy] = useState<SortOption>('updated_desc')
+  const [pageOffset, setPageOffset] = useState(0)
+  const pageSize = 50
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
   const [adjustingItem, setAdjustingItem] = useState<any>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
@@ -110,7 +113,30 @@ export function InventoryTab({
   const [showTrend, setShowTrend] = useState(false)
   const itemsSectionRef = useRef<HTMLDivElement>(null)
 
-  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery({ limit: 500 })
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    setPageOffset(0)
+  }, [debouncedSearch, statusFilter, supplierFilter, categoryFilter])
+
+  const inventoryQueryArgs = useMemo(
+    () => ({
+      limit: pageSize,
+      offset: pageOffset,
+      ...(debouncedSearch ? { q: debouncedSearch } : {}),
+      ...(statusFilter !== 'ALL'
+        ? { status: statusFilter as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' }
+        : {}),
+      ...(supplierFilter !== 'ALL' ? { supplierId: supplierFilter } : {}),
+      ...(categoryFilter !== 'ALL' ? { category: categoryFilter } : {}),
+    }),
+    [pageOffset, debouncedSearch, statusFilter, supplierFilter, categoryFilter]
+  )
+
+  const { data, isLoading, error, refetch } = useGetRestaurantInventoryQuery(inventoryQueryArgs)
   const { data: historyData } = useGetRestaurantInventoryHistoryQuery(
     { limit: 50 },
     { skip: !showTrend }
@@ -121,6 +147,90 @@ export function InventoryTab({
   const [adjustInventory] = useAdjustRestaurantInventoryMutation()
 
   const inventory = useMemo(() => data?.inventory ?? [], [data?.inventory])
+  const inventoryTotal = data?.total ?? inventory.length
+  const apiSummary = data?.summary
+
+  const uniqueSuppliers = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const item of inventory as Array<{ supplier_id?: string; supplier_name?: string }>) {
+      if (item.supplier_id && item.supplier_name) map.set(item.supplier_id, item.supplier_name)
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [inventory])
+
+  const uniqueCategories = useMemo(
+    () =>
+      Array.from(
+        new Set<string>(
+          inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
+        )
+      ).sort(),
+    [inventory]
+  )
+
+  const hasActiveFilters =
+    search !== '' || statusFilter !== 'ALL' || supplierFilter !== 'ALL' || categoryFilter !== 'ALL'
+
+  const clearFilters = () => {
+    setSearch('')
+    setStatusFilter('ALL')
+    setSupplierFilter('ALL')
+    setCategoryFilter('ALL')
+  }
+
+  const summary = useMemo(() => {
+    if (apiSummary) {
+      return {
+        total: inventoryTotal,
+        inStock: apiSummary.inStock,
+        lowStock: apiSummary.lowStock,
+        outOfStock: apiSummary.outOfStock,
+      }
+    }
+    let inStock = 0
+    let lowStock = 0
+    let outOfStock = 0
+    for (const item of inventory) {
+      const status = getStockStatus(item.quantity, item.low_stock_threshold)
+      if (status === 'IN_STOCK') inStock++
+      else if (status === 'LOW_STOCK') lowStock++
+      else outOfStock++
+    }
+    return { total: inventoryTotal, inStock, lowStock, outOfStock }
+  }, [apiSummary, inventory, inventoryTotal])
+
+  const filteredInventory = useMemo(
+    () =>
+      [...inventory].sort((a: any, b: any) => {
+        const aPinned = pinnedItems.has(a.product_id)
+        const bPinned = pinnedItems.has(b.product_id)
+        if (aPinned && !bPinned) return -1
+        if (!aPinned && bPinned) return 1
+
+        switch (sortBy) {
+          case 'name_asc':
+            return a.product_name.localeCompare(b.product_name)
+          case 'name_desc':
+            return b.product_name.localeCompare(a.product_name)
+          case 'quantity_asc':
+            return a.quantity - b.quantity
+          case 'quantity_desc':
+            return b.quantity - a.quantity
+          case 'status': {
+            const aRank = getStatusSortRank(getStockStatus(a.quantity, a.low_stock_threshold))
+            const bRank = getStatusSortRank(getStockStatus(b.quantity, b.low_stock_threshold))
+            return aRank - bRank || a.product_name.localeCompare(b.product_name)
+          }
+          case 'updated_desc':
+          default:
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        }
+      }),
+    [inventory, sortBy, pinnedItems]
+  )
+
   const history = useMemo(() => historyData?.history ?? [], [historyData?.history])
   const trackedProductIds = useMemo(
     () => new Set(inventory.map((item: { product_id: string }) => item.product_id)),
@@ -317,51 +427,6 @@ export function InventoryTab({
     toast.success(t('toasts.exportedCsv'))
   }
 
-  const uniqueSuppliers = useMemo(
-    () =>
-      Array.from(
-        new Set<string>(
-          inventory
-            .map((item: { supplier_name?: string }) => item.supplier_name)
-            .filter((s): s is string => Boolean(s))
-        )
-      ).sort(),
-    [inventory]
-  )
-
-  const uniqueCategories = useMemo(
-    () =>
-      Array.from(
-        new Set<string>(
-          inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
-        )
-      ).sort(),
-    [inventory]
-  )
-
-  const hasActiveFilters =
-    search !== '' || statusFilter !== 'ALL' || supplierFilter !== 'ALL' || categoryFilter !== 'ALL'
-
-  const clearFilters = () => {
-    setSearch('')
-    setStatusFilter('ALL')
-    setSupplierFilter('ALL')
-    setCategoryFilter('ALL')
-  }
-
-  const summary = useMemo(() => {
-    let inStock = 0
-    let lowStock = 0
-    let outOfStock = 0
-    for (const item of inventory) {
-      const status = getStockStatus(item.quantity, item.low_stock_threshold)
-      if (status === 'IN_STOCK') inStock++
-      else if (status === 'LOW_STOCK') lowStock++
-      else outOfStock++
-    }
-    return { total: inventory.length, inStock, lowStock, outOfStock }
-  }, [inventory])
-
   const trendStats = useMemo(() => {
     if (!showTrend || history.length === 0) {
       return { total: 0, recentAdditions: 0, recentSubtractions: 0 }
@@ -378,50 +443,7 @@ export function InventoryTab({
     return { total: history.length, recentAdditions, recentSubtractions }
   }, [history, showTrend])
 
-  const filteredInventory = useMemo(
-    () =>
-      inventory
-        .filter((item: any) => {
-          const itemCategory = getItemCategory(item)
-          const matchesSearch =
-            !search ||
-            item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-            item.product_sku.toLowerCase().includes(search.toLowerCase()) ||
-            itemCategory.toLowerCase().includes(search.toLowerCase())
-          const matchesStatus =
-            statusFilter === 'ALL' ||
-            getStockStatus(item.quantity, item.low_stock_threshold) === statusFilter
-          const matchesSupplier = supplierFilter === 'ALL' || item.supplier_name === supplierFilter
-          const matchesCategory = categoryFilter === 'ALL' || itemCategory === categoryFilter
-          return matchesSearch && matchesStatus && matchesSupplier && matchesCategory
-        })
-        .sort((a: any, b: any) => {
-          const aPinned = pinnedItems.has(a.product_id)
-          const bPinned = pinnedItems.has(b.product_id)
-          if (aPinned && !bPinned) return -1
-          if (!aPinned && bPinned) return 1
-
-          switch (sortBy) {
-            case 'name_asc':
-              return a.product_name.localeCompare(b.product_name)
-            case 'name_desc':
-              return b.product_name.localeCompare(a.product_name)
-            case 'quantity_asc':
-              return a.quantity - b.quantity
-            case 'quantity_desc':
-              return b.quantity - a.quantity
-            case 'status': {
-              const aRank = getStatusSortRank(getStockStatus(a.quantity, a.low_stock_threshold))
-              const bRank = getStatusSortRank(getStockStatus(b.quantity, b.low_stock_threshold))
-              return aRank - bRank || a.product_name.localeCompare(b.product_name)
-            }
-            case 'updated_desc':
-            default:
-              return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-          }
-        }),
-    [inventory, search, statusFilter, supplierFilter, categoryFilter, sortBy, pinnedItems]
-  )
+  // filteredInventory / uniqueSuppliers / summary are defined above from server-filtered data.
 
   const handleSummaryCardClick = (status: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK') => {
     setStatusFilter(status)
@@ -728,8 +750,8 @@ export function InventoryTab({
                 <SelectContent>
                   <SelectItem value="ALL">{t('filters.allSuppliers')}</SelectItem>
                   {uniqueSuppliers.map((supplier) => (
-                    <SelectItem key={supplier} value={supplier}>
-                      {supplier}
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -795,6 +817,29 @@ export function InventoryTab({
             <span className="text-[var(--text-muted)]">
               {t('filters.showingPrefix')}{' '}
               <span className="font-semibold text-[var(--text)]">{filteredInventory.length}</span>{' '}
+              {t('items.ofTotal', { total: inventoryTotal, defaultValue: `of ${inventoryTotal}` })}
+              {inventoryTotal > pageSize ? (
+                <span className="ml-3 inline-flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pageOffset <= 0}
+                    onClick={() => setPageOffset((prev) => Math.max(0, prev - pageSize))}
+                  >
+                    {tCommon('previous', { defaultValue: 'Previous' })}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pageOffset + pageSize >= inventoryTotal}
+                    onClick={() => setPageOffset((prev) => prev + pageSize)}
+                  >
+                    {tCommon('next', { defaultValue: 'Next' })}
+                  </Button>
+                </span>
+              ) : null}
               {t('filters.showingSuffix', { total: inventory.length })}
             </span>
             {statusFilter !== 'ALL' ? (

@@ -183,6 +183,28 @@ export const contractPricingApi = api.injectEndpoints({
       query: (id) => ({ url: `/api/promotions/admin/${id}/pause`, method: 'POST' }),
       invalidatesTags: ['Promotions'],
     }),
+    markAdminBoostPaid: builder.mutation<
+      { deal: Record<string, unknown>; invoiceId?: string },
+      { id: string; reason?: string }
+    >({
+      query: ({ id, reason }) => ({
+        url: `/api/promotions/admin/${id}/mark-boost-paid`,
+        method: 'POST',
+        body: reason ? { reason } : {},
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
+    refundAdminBoost: builder.mutation<
+      { deal: Record<string, unknown> },
+      { id: string; reason?: string; amount?: number }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/promotions/admin/${id}/refund-boost`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Promotions'],
+    }),
     submitPromotion: builder.mutation<
       { promotion: Record<string, unknown> },
       { id: string; pricingKey: string }

@@ -14,6 +14,7 @@ import { useAppSelector } from '../../hooks/redux'
 import { ensureNamespace } from '../../i18n'
 import type { Product } from '../../types'
 import { Loader2, Search, X } from 'lucide-react'
+import { RESTAURANT_BUSINESS_TYPES } from '../../lib/restaurantBusinessTypes'
 
 export type AppliesTo = 'all' | 'specific_products' | 'specific_categories'
 
@@ -21,6 +22,8 @@ export type DealTargetingValue = {
   appliesTo: AppliesTo
   productIds: string[]
   categoryIds: string[]
+  restaurantTypes: string[]
+  areas: string[]
 }
 
 type Props = {
@@ -31,6 +34,7 @@ type Props = {
 export function DealTargetingPickers({ value, onChange }: Props) {
   const { t } = useTranslation('deals')
   const [productSearch, setProductSearch] = useState('')
+  const [areaDraft, setAreaDraft] = useState('')
   const { user } = useAppSelector((state) => state.auth)
   const isSupplier = user?.role === 'SUPPLIER'
   const { data: supplierMe } = useGetSupplierMeQuery(undefined, { skip: !isSupplier })
@@ -80,6 +84,29 @@ export function DealTargetingPickers({ value, onChange }: Props) {
     onChange({ ...value, categoryIds: [...set] })
   }
 
+  const toggleRestaurantType = (type: string) => {
+    const set = new Set(value.restaurantTypes || [])
+    if (set.has(type)) set.delete(type)
+    else set.add(type)
+    onChange({ ...value, restaurantTypes: [...set] })
+  }
+
+  const addArea = () => {
+    const area = areaDraft.trim()
+    if (!area) return
+    const set = new Set(value.areas || [])
+    set.add(area)
+    onChange({ ...value, areas: [...set] })
+    setAreaDraft('')
+  }
+
+  const removeArea = (area: string) => {
+    onChange({
+      ...value,
+      areas: (value.areas || []).filter((a) => a !== area),
+    })
+  }
+
   return (
     <div className="space-y-3 border rounded-lg p-3 bg-[var(--app-muted)]/30">
       <p className="text-xs text-[var(--text-muted)]">{t('targeting.helperText')}</p>
@@ -90,6 +117,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
           onValueChange={(v) => {
             const appliesTo = v as AppliesTo
             onChange({
+              ...value,
               appliesTo,
               productIds: appliesTo === 'specific_products' ? value.productIds : [],
               categoryIds: appliesTo === 'specific_categories' ? value.categoryIds : [],
@@ -207,6 +235,66 @@ export function DealTargetingPickers({ value, onChange }: Props) {
           ) : null}
         </div>
       ) : null}
+
+      <div className="space-y-2 border-t pt-3">
+        <Label>{t('targeting.audienceTitle')}</Label>
+        <p className="text-xs text-[var(--text-muted)]">{t('targeting.audienceHelper')}</p>
+        <div className="flex flex-wrap gap-2">
+          {RESTAURANT_BUSINESS_TYPES.map((type) => {
+            const selected = (value.restaurantTypes || []).includes(type)
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => toggleRestaurantType(type)}
+                className={`rounded-md border px-2 py-1 text-xs ${
+                  selected
+                    ? 'border-[var(--brand)] bg-[var(--brand)]/10 font-medium'
+                    : 'hover:bg-[var(--app-muted)]'
+                }`}
+              >
+                {t(`targeting.restaurantTypes.${type}`, { defaultValue: type.replace(/_/g, ' ') })}
+              </button>
+            )
+          })}
+        </div>
+        <div className="space-y-2">
+          <Label>{t('targeting.areas')}</Label>
+          {(value.areas || []).length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {(value.areas || []).map((area) => (
+                <Badge key={area} variant="secondary" className="gap-1">
+                  {area}
+                  <button
+                    type="button"
+                    className="hover:opacity-70"
+                    onClick={() => removeArea(area)}
+                    aria-label={t('targeting.removeArea', { area })}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <Input
+              placeholder={t('targeting.areaPlaceholder')}
+              value={areaDraft}
+              onChange={(e) => setAreaDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addArea()
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={addArea}>
+              {t('targeting.addArea')}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

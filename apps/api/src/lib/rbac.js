@@ -39,7 +39,10 @@ import {
   ensureTenantSystemRoles,
   assignOwnerRoleForUser,
   userHasOwnerRole,
+  rolesIncludeOwner,
 } from './tenant-roles.js'
+
+export { rolesIncludeOwner }
 import { assertStaffPortalRouteAccess, STAFF_PORTAL_APP_ROLE } from './staff-portal-auth.js'
 import {
   extractAccessToken,
@@ -94,12 +97,16 @@ function authCookieOptions(maxAge) {
   return opts
 }
 
-// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts)
-export function setAuthCookies(res, accessToken, refreshToken) {
+// Set auth cookies (use COOKIE_SAME_SITE=none on Railway when web and API are different hosts).
+// id_token is optional but required for silent Keycloak logout (id_token_hint).
+export function setAuthCookies(res, accessToken, refreshToken, idToken = null) {
   const accessMaxAge = config.AUTH_ACCESS_COOKIE_MAX_AGE_MS
   const refreshMaxAge = config.AUTH_REFRESH_COOKIE_MAX_AGE_MS
   res.cookie('access_token', accessToken, authCookieOptions(accessMaxAge))
   res.cookie('refresh_token', refreshToken, authCookieOptions(refreshMaxAge))
+  if (idToken && typeof idToken === 'string') {
+    res.cookie('id_token', idToken, authCookieOptions(refreshMaxAge))
+  }
 }
 
 export function getSessionMetaFromAccessToken(accessToken) {
@@ -120,6 +127,7 @@ export function clearAuthCookies(res) {
   }
   res.clearCookie('access_token', opts)
   res.clearCookie('refresh_token', opts)
+  res.clearCookie('id_token', opts)
 }
 
 // Get user from database by Keycloak sub (short TTL cache — hot path on every authenticated request)
@@ -209,12 +217,14 @@ export async function upsertUser(userInfo, roles = []) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
       const emailLower = normalizedEmail
-      if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
-        explicitRole = 'ADMIN'
-      } else if (emailLower === 'supplier@supplify.com') {
-        explicitRole = 'SUPPLIER'
-      } else if (emailLower === 'restaurant@supplify.com') {
-        explicitRole = 'RESTAURANT'
+      if (config.APP_ENV === 'dev') {
+        if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
+          explicitRole = 'ADMIN'
+        } else if (emailLower === 'supplier@supplify.com') {
+          explicitRole = 'SUPPLIER'
+        } else if (emailLower === 'restaurant@supplify.com') {
+          explicitRole = 'RESTAURANT'
+        }
       }
     }
     const insertRole = explicitRole || 'PENDING'
@@ -414,7 +424,7 @@ export async function requireAuth(req, res, next) {
       emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'requireAuth' })
 
       // Set new cookies
-      setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+      setAuthCookies(res, newTokens.access_token, newTokens.refresh_token, newTokens.id_token)
 
       // Verify the new token
       const payload = await verifyToken(newTokens.access_token)
@@ -502,7 +512,7 @@ export async function optionalAuth(req, res, next) {
 
           if (refreshResult.ok) {
             const newTokens = refreshResult.tokens
-            setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+            setAuthCookies(res, newTokens.access_token, newTokens.refresh_token, newTokens.id_token)
             emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', { source: 'optionalAuth' })
 
             const payload = await verifyToken(newTokens.access_token)
@@ -1008,7 +1018,7 @@ export function requirePermission(permissionKey) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
-    if (tenant?.roles?.includes('Owner')) {
+    if (rolesIncludeOwner(tenant?.roles)) {
       return next()
     }
     const perms = tenant?.permissions ?? admin?.permissions ?? []
@@ -1032,7 +1042,7 @@ export function requireAnyPermission(...permissionKeys) {
   return (req, res, next) => {
     const tenant = req.tenantContext
     const admin = req.adminContext
-    if (tenant?.roles?.includes('Owner')) {
+    if (rolesIncludeOwner(tenant?.roles)) {
       return next()
     }
     const perms = tenant?.permissions ?? admin?.permissions ?? []

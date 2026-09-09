@@ -92,6 +92,7 @@ export type SupplierGrowthMetrics = {
   eligibleSponsorPlans?: string[]
   sponsorship?: {
     offersCreated: number
+    offersOpen: number
     offersAccepted: number
     offersDeclined: number
     offersExpired: number

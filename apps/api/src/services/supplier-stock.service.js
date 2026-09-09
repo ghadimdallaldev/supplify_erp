@@ -10,8 +10,12 @@ import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
 export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
-  const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse')
-  if (multiWh) return true
+  // Single-warehouse (Silver+) and multi-warehouse (Gold+) both use warehouse_inventory
+  // when the supplier has at least one active warehouse.
+  const [warehousesFeature, multiWh] = await Promise.all([
+    isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses'),
+    isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse'),
+  ])
 
   const db = client ? (sql, params) => client.query(sql, params) : query
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
@@ -19,7 +23,7 @@ export async function supplierUsesWarehouseInventory(supplierId, { client = null
     `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
     [supplierId]
   )
-  return Number(rows[0]?.c || 0) > 0
+  return Boolean(warehousesFeature || multiWh) && Number(rows[0]?.c || 0) >= 1
 }
 
 /**
@@ -49,8 +53,12 @@ export async function getSupplierProductAvailableQty(supplierId, productId) {
 /**
  * Supplier-wide stock display: aggregate warehouse rows when enabled, else legacy inventory.
  */
-export async function listSupplierStockDisplay(supplierId, { productIds = null } = {}) {
+export async function listSupplierStockDisplay(
+  supplierId,
+  { productIds = null, dbQuery = query } = {}
+) {
   const useWh = await supplierUsesWarehouseInventory(supplierId)
+  const db = dbQuery
 
   if (useWh) {
     const supplierCol = await getWarehouseSupplierColumn()
@@ -60,7 +68,7 @@ export async function listSupplierStockDisplay(supplierId, { productIds = null }
       params.push(productIds)
       productClause = ` AND wi.product_id = ANY($${params.length}::uuid[])`
     }
-    const { rows } = await query(
+    const { rows } = await db(
       `
       SELECT
         wi.product_id,
@@ -86,7 +94,7 @@ export async function listSupplierStockDisplay(supplierId, { productIds = null }
     params.push(productIds)
     productClause = ` WHERE product_id = ANY($1::uuid[])`
   }
-  const { rows } = await query(
+  const { rows } = await db(
     `
     SELECT product_id, available_qty, reserved_qty,
            (available_qty + reserved_qty) AS on_hand_qty,
@@ -98,6 +106,49 @@ export async function listSupplierStockDisplay(supplierId, { productIds = null }
     params
   )
   return rows
+}
+
+/**
+ * Overlay product list/detail rows with checkout-authoritative stock.
+ * When a supplier uses warehouse inventory, missing WH rows mean 0 (fail-closed),
+ * never fall back to legacy `inventory` qty.
+ *
+ * @param {Array<{ id: string, supplier_id?: string, available_qty?: number }>} productRows
+ * @returns {Promise<typeof productRows>}
+ */
+export async function overlayProductRowsWithAuthoritativeStock(productRows) {
+  if (!Array.isArray(productRows) || productRows.length === 0) return productRows
+
+  const bySupplier = new Map()
+  for (const row of productRows) {
+    const supplierId = row.supplier_id
+    if (!supplierId || !row.id) continue
+    if (!bySupplier.has(supplierId)) bySupplier.set(supplierId, [])
+    bySupplier.get(supplierId).push(row)
+  }
+
+  const authoritativeQty = new Map()
+  await Promise.all(
+    [...bySupplier.entries()].map(async ([supplierId, products]) => {
+      if (!(await supplierUsesWarehouseInventory(supplierId))) return
+      const productIds = products.map((p) => p.id)
+      const stockRows = await listSupplierStockDisplay(supplierId, { productIds })
+      const seen = new Set()
+      for (const stock of stockRows) {
+        authoritativeQty.set(stock.product_id, Number(stock.available_qty ?? 0))
+        seen.add(stock.product_id)
+      }
+      for (const product of products) {
+        if (!seen.has(product.id)) authoritativeQty.set(product.id, 0)
+      }
+    })
+  )
+
+  if (authoritativeQty.size === 0) return productRows
+
+  return productRows.map((row) =>
+    authoritativeQty.has(row.id) ? { ...row, available_qty: authoritativeQty.get(row.id) } : row
+  )
 }
 
 /**

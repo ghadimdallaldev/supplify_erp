@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, ClipboardList, MapPin, Navigation, Truck, Warehouse } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -26,11 +27,19 @@ import {
 } from '../components/fulfillment/lazyFulfillmentTabs'
 import { ensureNamespace } from '../i18n'
 
+const FULFILLMENT_TABS = ['dispatch', 'picklists', 'routes', 'tracking', 'exceptions'] as const
+
 export function FulfillmentPage() {
   const { t } = useTranslation('fulfillment')
   const { can } = usePermissions()
   const canViewWarehouses = can('WAREHOUSES_VIEW')
-  const [activeTab, setActiveTab] = useState('dispatch')
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab')
+    return tabParam && (FULFILLMENT_TABS as readonly string[]).includes(tabParam)
+      ? tabParam
+      : 'dispatch'
+  })
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('')
 
   useEffect(() => {

@@ -231,6 +231,31 @@
       "inviteFailed": "Invite failed",
       "sponsorStarted": "Sponsorship started",
       "sponsorFailed": "Sponsor failed"
+    },
+    "funnel": {
+      "title": "Sponsorship funnel",
+      "description": "What happened to the subscription months you gifted.",
+      "ofOffers": "{{percent}}% of offers",
+      "totalSpend": "Total spend",
+      "averageValue": "Average offer value",
+      "stages": {
+        "created": "Offers made",
+        "accepted": "Accepted",
+        "activated": "Months activated",
+        "completed": "Months completed"
+      },
+      "attention": {
+        "open_one": "{{count}} awaiting reply",
+        "open_other": "{{count}} awaiting reply",
+        "declined_one": "{{count}} declined",
+        "declined_other": "{{count}} declined",
+        "expired_one": "{{count}} expired",
+        "expired_other": "{{count}} expired",
+        "paymentsPending_one": "{{count}} payment pending",
+        "paymentsPending_other": "{{count}} payments pending",
+        "paymentsFailed_one": "{{count}} payment failed",
+        "paymentsFailed_other": "{{count}} payments failed"
+      }
     }
   }
 }

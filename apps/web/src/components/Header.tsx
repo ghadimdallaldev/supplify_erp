@@ -23,6 +23,7 @@ import { cn } from '../lib/utils'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Plus } from 'lucide-react'
+import { resolveNotificationUrl } from '../lib/notificationAlerts'
 
 const PAGE_NAMES: Record<string, string> = {
   '/app/dashboard': 'dashboard',
@@ -42,9 +43,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/app/restaurant-inventory': 'inventory',
   '/app/invoices': 'invoices',
   '/app/chat': 'chat',
-  '/app/notifications': 'notifications',
   '/app/settings': 'settings',
-  '/app/branches': 'branches',
   '/app/admin': 'platform',
   '/app/admin/suppliers': 'supplierAdmin',
   '/app/admin/restaurants': 'restaurantAdmin',
@@ -417,30 +416,13 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                         background: !notification.is_read ? 'var(--brand-ultra)' : 'transparent',
                       }}
                       onClick={() => {
-                        const meta =
-                          typeof notification.metadata === 'string'
-                            ? (() => {
-                                try {
-                                  return JSON.parse(notification.metadata || '{}')
-                                } catch {
-                                  return {}
-                                }
-                              })()
-                            : notification.metadata || {}
-                        const link = typeof meta.link === 'string' ? meta.link : null
-                        if (link) {
-                          navigate(link)
-                          closeNotifications()
-                          return
-                        }
-                        if (notification.reference_type === 'ORDER' && notification.reference_id) {
-                          navigate(`/app/orders/${notification.reference_id}`)
-                          closeNotifications()
-                        }
                         if (notification.reference_type === 'DEAL' && notification.reference_id) {
                           navigate(`/app/deals?highlight=${notification.reference_id}`)
                           closeNotifications()
+                          return
                         }
+                        navigate(resolveNotificationUrl(notification))
+                        closeNotifications()
                       }}
                     >
                       <div

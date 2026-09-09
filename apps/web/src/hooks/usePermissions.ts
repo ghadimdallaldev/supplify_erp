@@ -1,21 +1,11 @@
 /**
  * RBAC: check if the current user has a permission (for nav gating and UI).
  * Uses tenantPermissions when in tenant context, adminPermissions when on admin.
- * When admin is impersonating, allows all tenant permissions so the UI matches backend access.
+ * When admin is impersonating, uses the effective tenant permissions returned by the API.
  */
 import { useAppSelector } from './redux'
 import { useImpersonation } from './useImpersonation'
 import { isTenantOwner } from '../lib/tenantRoles'
-
-/** Used when an ADMIN user has no RBAC roles yet (e.g. after a partial seed). */
-const ADMIN_FALLBACK_PERMISSIONS = [
-  'ADMIN_ACCESS',
-  'ADMIN_TENANTS',
-  'ADMIN_PLANS',
-  'ADMIN_FINANCE',
-  'ADMIN_GROWTH',
-  'ADMIN_SUPPORT',
-] as const
 
 function hasPermission(permissions: string[] | undefined, required: string): boolean {
   if (!Array.isArray(permissions)) return false
@@ -23,15 +13,6 @@ function hasPermission(permissions: string[] | undefined, required: string): boo
   const manageKey = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_MANAGE$/, '_MANAGE')
   if (manageKey !== required && permissions.includes(manageKey)) return true
   return false
-}
-
-function adminPermissionsForUser(
-  adminPermissions: string[] | undefined,
-  isImpersonating: boolean
-): string[] {
-  if (isImpersonating) return adminPermissions ?? []
-  if (Array.isArray(adminPermissions) && adminPermissions.length > 0) return adminPermissions
-  return [...ADMIN_FALLBACK_PERMISSIONS]
 }
 
 export function usePermissions() {
@@ -45,17 +26,9 @@ export function usePermissions() {
     }
     if (user.role === 'ADMIN') {
       if (isImpersonating) {
-        // Owner-level view-as: use /auth/me tenantPermissions when present; otherwise
-        // allow nav until session hydrates (matches backend impersonation access).
-        if (Array.isArray(user.tenantPermissions) && user.tenantPermissions.length > 0) {
-          return hasPermission(user.tenantPermissions, permissionKey)
-        }
-        return true
+        return hasPermission(user.tenantPermissions, permissionKey)
       }
-      return hasPermission(
-        adminPermissionsForUser(user.adminPermissions, isImpersonating),
-        permissionKey
-      )
+      return hasPermission(user.adminPermissions, permissionKey)
     }
     return hasPermission(user.tenantPermissions, permissionKey)
   }

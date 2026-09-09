@@ -1,5 +1,5 @@
 import { query } from '../../lib/db.js'
-import { getCache, setCache, deleteCache } from '../../lib/cache.js'
+import { getCache, setCache, deleteCache, deleteCacheByPrefix } from '../../lib/cache.js'
 import { singleflight } from '../../lib/singleflight.js'
 import { mapWithConcurrency } from '../../lib/concurrency.js'
 import { logger } from '../../lib/logger.js'
@@ -505,16 +505,13 @@ export function notificationUnreadCacheKey(userId, userType) {
 export async function invalidateUserNotificationsListCache(userId, userType = null) {
   if (!userId) return
   const userTypes = userType ? [userType] : ['RESTAURANT', 'SUPPLIER', 'ADMIN', 'PENDING']
-  const limits = [25, 50]
-  const keys = []
-  for (const type of userTypes) {
-    keys.push(notificationUnreadCacheKey(userId, type))
-    for (const limit of limits) {
-      keys.push(notificationListCacheKey(userId, type, limit, 0, false))
-      keys.push(notificationListCacheKey(userId, type, limit, 0, true))
-    }
-  }
-  await Promise.all(keys.map((key) => deleteCache(key).catch(() => {})))
+  await Promise.all(
+    userTypes.flatMap((type) => [
+      deleteCache(notificationUnreadCacheKey(userId, type)).catch(() => {}),
+      // Prefix clears all limit/offset/unreadOnly list pages for this user
+      deleteCacheByPrefix(`notif:list:${userId}:${type}:`).catch(() => {}),
+    ])
+  )
 }
 
 const NOTIFICATION_UNREAD_CACHE_TTL_SECONDS = 30
@@ -589,20 +586,15 @@ export async function getUserNotifications(
       [...params, limit, offset]
     )
 
-    const countQuery = query(
-      `
-    SELECT COUNT(*)::int AS count
-    FROM notification_log
-    WHERE user_id = $1 AND user_type = $2 AND is_read = false
-  `,
-      [userId, userType]
-    )
-
-    const [{ rows }, { rows: countRows }] = await Promise.all([listQuery, countQuery])
+    // Share unread cache/singleflight with GET /notifications/unread-count
+    const [{ rows }, unread] = await Promise.all([
+      listQuery,
+      getUnreadNotificationCount(userId, userType),
+    ])
 
     const result = {
       notifications: rows,
-      unreadCount: countRows[0]?.count ?? 0,
+      unreadCount: unread.unreadCount ?? 0,
     }
 
     await setCache(cacheKey, result, NOTIFICATION_LIST_CACHE_TTL_SECONDS).catch(() => {})

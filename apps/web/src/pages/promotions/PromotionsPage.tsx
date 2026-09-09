@@ -20,6 +20,7 @@ import { LIMIT_UPGRADE_COPY } from '../../lib/upgradeCopy'
 import {
   useGetPromotionsQuery,
   useCreatePromotionMutation,
+  usePayActivationMutation,
   usePausePromotionMutation,
   useResumePromotionMutation,
   useDeletePromotionMutation,
@@ -27,6 +28,7 @@ import {
 import { DealAnalyticsDialog } from '../../components/deals/DealAnalyticsDialog'
 import { SubmitDealDialog } from '../../components/deals/SubmitDealDialog'
 import { DealBoostPackagePicker } from '../../components/deals/DealBoostPackagePicker'
+import { DealCreatePreview } from '../../components/deals/DealCreatePreview'
 import { DealsStatusFilter, SupplierDealRow } from '../../components/deals/SupplierDealRow'
 import {
   DealTargetingPickers,
@@ -43,6 +45,7 @@ import { SUPPLIER_CTA_TYPES, SUPPLIER_DEAL_TYPES } from '../../lib/dealDisplayLa
 
 export function PromotionsPage() {
   const { t } = useTranslation('cart')
+  const { t: dealT } = useTranslation('deals')
   const { persona } = useWorkspaceRole()
   const copy = {
     title: persona.promotionsCopy?.title ?? t('promotions.title'),
@@ -121,12 +124,15 @@ export function PromotionsPage() {
     appliesTo: 'all',
     productIds: [],
     categoryIds: [],
+    restaurantTypes: [],
+    areas: [],
   })
 
   const { data, isLoading, error, refetch } = useGetPromotionsQuery(
     statusFilter ? { status: statusFilter } : undefined
   )
   const [createPromotion, { isLoading: creating }] = useCreatePromotionMutation()
+  const [payActivation] = usePayActivationMutation()
   const [pausePromotion] = usePausePromotionMutation()
   const [resumePromotion] = useResumePromotionMutation()
   const [deletePromotion] = useDeletePromotionMutation()
@@ -158,6 +164,10 @@ export function PromotionsPage() {
     appliesTo: targeting.appliesTo,
     productIds: targeting.appliesTo === 'specific_products' ? targeting.productIds : undefined,
     categoryIds: targeting.appliesTo === 'specific_categories' ? targeting.categoryIds : undefined,
+    targetRestaurantTypes: targeting.restaurantTypes?.length
+      ? targeting.restaurantTypes
+      : undefined,
+    targetAreas: targeting.areas?.length ? targeting.areas : undefined,
     submitForReview,
     pricingKey: submitForReview ? createPricingKey : undefined,
   })
@@ -185,7 +195,13 @@ export function PromotionsPage() {
       type: preset.type,
       discountValue: preset.discountValue,
     }))
-    setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+    setTargeting({
+      appliesTo: 'all',
+      productIds: [],
+      categoryIds: [],
+      restaurantTypes: [],
+      areas: [],
+    })
   }
 
   const handleSaveDraft = async () => {
@@ -195,7 +211,13 @@ export function PromotionsPage() {
       toast.success(t('promotions.toastDraftSaved'))
       setShowCreate(false)
       setCreatePricingKey('')
-      setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+      setTargeting({
+        appliesTo: 'all',
+        productIds: [],
+        categoryIds: [],
+        restaurantTypes: [],
+        areas: [],
+      })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
@@ -214,7 +236,13 @@ export function PromotionsPage() {
       toast.success(t('promotions.toastSubmitted'))
       setShowCreate(false)
       setCreatePricingKey('')
-      setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+      setTargeting({
+        appliesTo: 'all',
+        productIds: [],
+        categoryIds: [],
+        restaurantTypes: [],
+        areas: [],
+      })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
@@ -319,6 +347,20 @@ export function PromotionsPage() {
                     await deletePromotion(id).unwrap()
                     toast.success(t('promotions.toastDeleted'))
                     refetch()
+                  }}
+                  onPayActivation={async (id) => {
+                    try {
+                      const idempotencyKey =
+                        typeof crypto !== 'undefined' && crypto.randomUUID
+                          ? `deal-boost:${id}:${crypto.randomUUID()}`
+                          : `deal-boost:${id}:${Date.now()}`
+                      await payActivation({ id, idempotencyKey }).unwrap()
+                      toast.success(dealT('supplierRow.paymentSuccess'))
+                      refetch()
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || dealT('supplierRow.paymentFailed'))
+                    }
                   }}
                   onPause={async (id) => {
                     await pausePromotion(id).unwrap()
@@ -487,6 +529,16 @@ export function PromotionsPage() {
                   </div>
                 </div>
               </div>
+              <DealCreatePreview
+                name={form.name}
+                type={form.type}
+                discountValue={form.discountValue}
+                ctaType={form.ctaType}
+                couponCode={form.couponCode}
+                restaurantTypes={targeting.restaurantTypes}
+                areas={targeting.areas}
+                boostSelected={Boolean(createPricingKey)}
+              />
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={handleSaveDraft} disabled={creating}>

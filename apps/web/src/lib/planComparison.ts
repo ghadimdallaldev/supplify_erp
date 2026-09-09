@@ -84,7 +84,7 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   order_calendar: 'Order calendar',
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
-  ai_platform: 'AI reorder assistant',
+  ai_platform: 'AI assistant + reorder LLM',
   multi_branch: 'Multi-branch',
   disputes_returns: 'Disputes & returns',
   advanced_roles: 'Advanced roles',

@@ -7,6 +7,7 @@ export interface AdminOverview {
     arr?: number
     activeSubscriptions?: number
     paidActiveSubscriptions?: number
+    paidActiveOrTrialing?: number
     paidActiveOnly?: number
   }
   orders?: {
@@ -88,8 +89,9 @@ export function deriveSystemHealth(
   const emailFailed = overview?.operational?.emailFailed24h ?? 0
   const fulfillment = overview?.operational?.openFulfillmentIssues ?? 0
 
-  if (recentErrorCount > 0 || pastDue > 0) return 'critical'
-  if (emailFailed >= 5 || fulfillment >= 10) return 'degraded'
+  if (recentErrorCount > 0) return 'critical'
+  // Billing-only issues (past-due subscriptions) are a warning, not a system outage.
+  if (pastDue > 0 || emailFailed >= 5 || fulfillment >= 10) return 'degraded'
   return 'healthy'
 }
 

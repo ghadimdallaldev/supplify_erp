@@ -43,6 +43,13 @@ export function LoginPage() {
       setInviteRegistered(true)
     } else if (expiredParam === 'true') {
       setError(t('sessionExpired'))
+    } else if (errorParam === 'email_not_verified') {
+      setError(t('emailNotVerified'))
+      // Continue into Keycloak so the user sees the OTP page (not a dead-end SPA screen).
+      if (!isEmbeddedFrame()) {
+        setIsLoading(true)
+        redirectToAuth('login')
+      }
     } else if (errorParam) {
       setError(t('authFailed'))
     }

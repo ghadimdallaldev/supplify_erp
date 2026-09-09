@@ -29,6 +29,7 @@ const STATUS_COLUMN_META: Array<{ id: ReservationStatus; tone: string }> = [
   { id: 'CONFIRMED', tone: 'border-[var(--mint)]/35 bg-[var(--mint-pale)]' },
   { id: 'SEATED', tone: 'border-[var(--app-border)] bg-[var(--brand-ultra)]' },
   { id: 'WAITLIST', tone: 'border-amber-200 bg-amber-50' },
+  { id: 'NO_SHOW', tone: 'border-rose-200 bg-rose-50' },
 ]
 
 interface ReservationBoardProps {
@@ -75,9 +76,20 @@ function SortableReservationCard({
       ],
       CONFIRMED: [
         { status: 'SEATED', labelKey: 'board.actions.seat' },
+        { status: 'NO_SHOW', labelKey: 'board.actions.noShow' },
         { status: 'CANCELLED', labelKey: 'board.actions.cancel' },
       ],
-      SEATED: [{ status: 'COMPLETED', labelKey: 'board.actions.complete' }],
+      SEATED: [
+        { status: 'COMPLETED', labelKey: 'board.actions.complete' },
+        { status: 'NO_SHOW', labelKey: 'board.actions.noShow' },
+      ],
+      NO_SHOW: [],
+      COMPLETED: [],
+      CANCELLED: [],
+      WAITLIST: [
+        { status: 'CONFIRMED', labelKey: 'board.actions.confirm' },
+        { status: 'CANCELLED', labelKey: 'board.actions.cancel' },
+      ],
     }
     return actions[reservation.status]?.map((action) => ({
       ...action,
@@ -306,6 +318,8 @@ export function ReservationBoard({
         toast.success(t('board.toasts.seated'))
       } else if (status === 'CANCELLED') {
         toast.success(t('board.toasts.cancelled'))
+      } else if (status === 'NO_SHOW') {
+        toast.success(t('board.toasts.noShow'))
       } else {
         toast.success(t('board.toasts.updated'))
       }

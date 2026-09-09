@@ -1,11 +1,20 @@
 import { t, resolveLocale } from '../../../i18n/index.js'
 import { buildAppUrl } from '../../../lib/app-url.js'
-import { renderEmailLayout, textToBodyHtml } from './layout.js'
+import { renderEmailLayout, textToBodyHtml, renderOtpCode, renderDetailStrip } from './layout.js'
 
 function emailKey(templateId, field) {
   const [group, ...rest] = templateId.split('.')
   if (rest.length === 0) return `emails.${group}.${field}`
   return `emails.${group}.${rest.join('.')}.${field}`
+}
+
+function buildDetailRows(lng, specs) {
+  return (specs || [])
+    .map((spec) => ({
+      label: t(spec.labelKey, lng),
+      value: spec.value == null ? '' : String(spec.value),
+    }))
+    .filter((row) => row.label && row.value.trim())
 }
 
 function standardTemplate({
@@ -17,18 +26,38 @@ function standardTemplate({
   tenantName,
   data = {},
   locale = 'en',
+  code,
+  details,
+  previewText,
 }) {
   const lng = resolveLocale(locale)
-  const body = data.bodyHtml || textToBodyHtml(message)
+  const otpCode = code || data.code
+  const bodyMessage =
+    otpCode && message ? message.replace(/\{\{\s*code\s*\}\}/gi, '').trim() || message : message
+  const body = data.bodyHtml || textToBodyHtml(bodyMessage)
   const resolvedCtaUrl = buildAppUrl(data.ctaUrl || data.inviteUrl || data.loginUrl || ctaUrl)
+  const detailRows = details || data.details || []
+  const detailStripHtml = renderDetailStrip(detailRows)
+  const codeBlockHtml = otpCode
+    ? renderOtpCode(otpCode, {
+        expiryText: t('emails.otp.expiry', lng),
+        reassuranceText: t('emails.otp.reassurance', lng),
+      })
+    : ''
+  // OTP emails: code is the action — never show CTA
+  const showCta = !(otpCode && codeBlockHtml)
   const { html, text } = renderEmailLayout({
     locale: lng,
     title: title || subject,
     bodyHtml: body,
-    bodyText: message,
-    ctaUrl: resolvedCtaUrl,
-    ctaLabel: data.ctaLabel || ctaLabel,
+    bodyText: otpCode ? [bodyMessage, String(otpCode)].filter(Boolean).join('\n\n') : message,
+    ctaUrl: showCta ? resolvedCtaUrl : undefined,
+    ctaLabel: showCta ? data.ctaLabel || ctaLabel : undefined,
     tenantName: data.tenantName || tenantName,
+    previewText: previewText || data.previewText,
+    code: otpCode,
+    codeBlockHtml,
+    detailStripHtml,
   })
   return { subject, html, text }
 }
@@ -40,6 +69,31 @@ function register(map, id, fn) {
 /** @type {Record<string, (data: object, locale?: string) => { subject: string, html: string, text: string }>} */
 export const TEMPLATE_REGISTRY = {}
 
+register(TEMPLATE_REGISTRY, 'auth.email_otp_login', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.email_otp_login.subject', lng),
+    title: t('emails.auth.email_otp_login.title', lng),
+    message: t('emails.auth.email_otp_login.message', lng),
+    code: d.code,
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
+
+register(TEMPLATE_REGISTRY, 'auth.email_otp_verify', (d, locale = 'en') => {
+  const lng = resolveLocale(locale)
+  return standardTemplate({
+    subject: t('emails.auth.email_otp_verify.subject', lng),
+    title: t('emails.auth.email_otp_verify.title', lng),
+    message: t('emails.auth.email_otp_verify.message', lng),
+    code: d.code,
+    tenantName: d.tenantName,
+    data: d,
+    locale: lng,
+  })
+})
 register(TEMPLATE_REGISTRY, 'auth.welcome', (d, locale = 'en') => {
   const lng = resolveLocale(locale)
   const messageKey =
@@ -65,6 +119,7 @@ register(TEMPLATE_REGISTRY, 'auth.team_invite', (d, locale = 'en') => {
     ? t('emails.auth.team_invite.greetingNamed', lng, { name: d.invitedName })
     : t('emails.auth.team_invite.greeting', lng)
   const defaultMessage = `${greeting}\n\n${t('emails.auth.team_invite.message', lng, { tenantName })}`
+  const roleValue = d.roleName || d.role || d.intendedRole || ''
   return standardTemplate({
     subject:
       d.subject ||
@@ -76,6 +131,10 @@ register(TEMPLATE_REGISTRY, 'auth.team_invite', (d, locale = 'en') => {
     ctaUrl: d.inviteUrl || d.ctaUrl,
     ctaLabel: t('emails.cta.acceptInvitation', lng),
     tenantName: d.tenantName,
+    details: buildDetailRows(lng, [
+      { labelKey: 'emails.details.team', value: tenantName },
+      { labelKey: 'emails.details.role', value: roleValue },
+    ]),
     data: d,
     locale: lng,
   })
@@ -145,6 +204,9 @@ for (const status of orderStatuses) {
   const id = `order.${status}`
   register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {
     const lng = resolveLocale(locale)
+    const orderValue = d.orderNumber || d.orderId || d.referenceId || ''
+    const statusValue = d.statusLabel || d.status || ''
+    const amountValue = d.amount || d.total || d.totalAmount || ''
     return standardTemplate({
       subject: d.subject || t(emailKey(id, 'subject'), lng),
       title: d.title || t(emailKey(id, 'title'), lng),
@@ -152,6 +214,11 @@ for (const status of orderStatuses) {
       ctaUrl: d.ctaUrl,
       ctaLabel: t('emails.cta.viewOrder', lng),
       tenantName: d.tenantName,
+      details: buildDetailRows(lng, [
+        { labelKey: 'emails.details.order', value: orderValue },
+        { labelKey: 'emails.details.status', value: statusValue },
+        { labelKey: 'emails.details.total', value: amountValue },
+      ]),
       data: d,
       locale: lng,
     })
@@ -185,6 +252,11 @@ register(TEMPLATE_REGISTRY, 'invoice.issued', (d, locale = 'en') => {
     ctaUrl: d.ctaUrl || '/app/invoices',
     ctaLabel: t('emails.cta.viewInvoice', lng),
     tenantName: d.tenantName,
+    details: buildDetailRows(lng, [
+      { labelKey: 'emails.details.invoice', value: d.invoiceNumber || '' },
+      { labelKey: 'emails.details.amount', value: d.amount || d.total || '' },
+      { labelKey: 'emails.details.due', value: d.dueDate || d.due_date || '' },
+    ]),
     data: d,
     locale: lng,
   })
@@ -199,6 +271,11 @@ register(TEMPLATE_REGISTRY, 'invoice.overdue', (d, locale = 'en') => {
     ctaUrl: d.ctaUrl || '/app/invoices',
     ctaLabel: t('emails.cta.viewInvoice', lng),
     tenantName: d.tenantName,
+    details: buildDetailRows(lng, [
+      { labelKey: 'emails.details.invoice', value: d.invoiceNumber || '' },
+      { labelKey: 'emails.details.amount', value: d.amount || d.total || '' },
+      { labelKey: 'emails.details.due', value: d.dueDate || d.due_date || '' },
+    ]),
     data: d,
     locale: lng,
   })
@@ -282,9 +359,16 @@ for (const status of billingTemplates) {
       subject: d.subject || t(emailKey(id, 'subject'), lng),
       title: t(emailKey(id, 'title'), lng),
       message: d.message,
-      ctaUrl: d.ctaUrl || '/app/billing',
+      ctaUrl: d.ctaUrl || '/app/settings?tab=subscription',
       ctaLabel: t('emails.cta.manageBilling', lng),
       tenantName: d.tenantName,
+      details: buildDetailRows(lng, [
+        { labelKey: 'emails.details.plan', value: d.planName || d.plan || '' },
+        {
+          labelKey: 'emails.details.status',
+          value: d.statusLabel || d.status || '',
+        },
+      ]),
       data: d,
       locale: lng,
     })
@@ -330,6 +414,8 @@ const reservationTemplates = [
   'new',
   'waitlist',
   'waitlist_offer',
+  'reminder',
+  'review_invite',
 ]
 for (const status of reservationTemplates) {
   const id = `reservation.${status}`
@@ -444,8 +530,14 @@ const growthTemplates = {
   'growth.connection_declined': { cta: '/app/restaurants', ctaLabel: 'viewRestaurants' },
   'growth.referral_registered': { cta: '/app', ctaLabel: 'openSupplify' },
   'growth.referral_reward': { cta: '/app/promotions', ctaLabel: 'viewDeals' },
-  'growth.sponsorship_gift': { cta: '/app/billing', ctaLabel: 'manageBilling' },
-  'growth.sponsorship_expired': { cta: '/app/billing', ctaLabel: 'manageBilling' },
+  'growth.sponsorship_gift': {
+    cta: '/app/settings?tab=subscription',
+    ctaLabel: 'manageBilling',
+  },
+  'growth.sponsorship_expired': {
+    cta: '/app/settings?tab=subscription',
+    ctaLabel: 'manageBilling',
+  },
 }
 for (const [id, { cta, ctaLabel }] of Object.entries(growthTemplates)) {
   register(TEMPLATE_REGISTRY, id, (d, locale = 'en') => {

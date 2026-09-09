@@ -8,13 +8,17 @@ import { getBillingStatus } from './billing/billing-service.js'
 import { getEffectiveFeaturesForTenant } from './feature-flags.js'
 import { resolveActiveBillingSubscription } from './org-billing-tenant.js'
 import { isAiEnvEnabled } from './ai-platform.js'
+import { getCache, setCache } from './cache.js'
+import { singleflight } from './singleflight.js'
 
 const OPEN_ISSUE_STATUSES = `('shortage_reported', 'substitution_suggested', 'waiting_restaurant_approval')`
 const FAILED_EMAIL_THRESHOLD = 5
 const STALE_GPS_THRESHOLD = 10
 const EXPIRED_LOTS_THRESHOLD = 20
 const OPEN_ISSUES_THRESHOLD = 10
-
+const EMAIL_HEALTH_CACHE_TTL_SECONDS = 60
+const EMAIL_STATS_CACHE_KEY = 'admin:email:stats24h'
+const EMAIL_FAILURES_CACHE_KEY = 'admin:email:failures24h'
 const SNAPSHOT_FEATURE_KEYS = [
   'smart_reorder',
   'quick_lists',
@@ -227,6 +231,44 @@ function buildWarnings(ctx) {
 }
 
 /**
+ * Shared 24h email_delivery_log aggregates (overview + operational summary).
+ * Cached so admin dashboard tabs do not re-scan the same table on every load.
+ */
+export async function getAdminEmailStats24h() {
+  const cached = await getCache(EMAIL_STATS_CACHE_KEY)
+  if (cached && typeof cached === 'object' && typeof cached.failed === 'number') {
+    return cached
+  }
+
+  return singleflight(EMAIL_STATS_CACHE_KEY, async () => {
+    const again = await getCache(EMAIL_STATS_CACHE_KEY)
+    if (again && typeof again === 'object' && typeof again.failed === 'number') {
+      return again
+    }
+
+    const rows = await safeOperationalQuery(
+      'emailStats24h',
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours')::int AS failed,
+         COUNT(*) FILTER (WHERE status = 'skipped' AND created_at >= NOW() - INTERVAL '24 hours')::int AS skipped,
+         COUNT(*) FILTER (WHERE status = 'sent' AND created_at >= NOW() - INTERVAL '24 hours')::int AS sent,
+         COUNT(*) FILTER (WHERE status = 'log_only' AND created_at >= NOW() - INTERVAL '24 hours')::int AS log_only
+       FROM email_delivery_log`,
+      [{ failed: 0, skipped: 0, sent: 0, log_only: 0 }]
+    )
+    const row = rows[0] || {}
+    const result = {
+      failed: parseInt(row.failed, 10) || 0,
+      skipped: parseInt(row.skipped, 10) || 0,
+      sent: parseInt(row.sent, 10) || 0,
+      logOnly: parseInt(row.log_only, 10) || 0,
+    }
+    await setCache(EMAIL_STATS_CACHE_KEY, result, EMAIL_HEALTH_CACHE_TTL_SECONDS).catch(() => {})
+    return result
+  })
+}
+
+/**
  * Lightweight counters for admin overview (subset of operational summary).
  */
 export async function buildAdminOperationalOverviewCounters({
@@ -236,14 +278,7 @@ export async function buildAdminOperationalOverviewCounters({
     ? Promise.resolve(aiReorderMetricsIn)
     : getAiReorderMetrics()
   const [emailStats, fulfillmentStats, gpsRows, expiryStats, aiReorderMetrics] = await Promise.all([
-    safeOperationalQuery(
-      'emailFailed24h',
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours')::int AS failed,
-         COUNT(*) FILTER (WHERE status = 'skipped' AND created_at >= NOW() - INTERVAL '24 hours')::int AS skipped
-       FROM email_delivery_log`,
-      [{ failed: 0, skipped: 0 }]
-    ),
+    getAdminEmailStats24h(),
     safeOperationalQuery(
       'openFulfillmentIssues',
       `SELECT COUNT(*)::int AS count FROM order_fulfillment_issue
@@ -280,11 +315,10 @@ export async function buildAdminOperationalOverviewCounters({
     aiReorderPromise,
   ])
 
-  const emailRow = emailStats[0] || {}
   const gpsSummary = summarizeGpsDeliveryRows(gpsRows)
   return {
-    emailFailed24h: parseInt(emailRow.failed, 10) || 0,
-    emailSkipped24h: parseInt(emailRow.skipped, 10) || 0,
+    emailFailed24h: emailStats.failed,
+    emailSkipped24h: emailStats.skipped,
     openFulfillmentIssues: parseInt(fulfillmentStats[0]?.count, 10) || 0,
     staleGpsDeliveries: gpsSummary.stale,
     expiredInventoryLots: parseInt(expiryStats[0]?.count, 10) || 0,
@@ -311,16 +345,7 @@ export async function buildAdminOperationalSummary() {
     pendingDealsRow,
     aiReorderMetrics,
   ] = await Promise.all([
-    safeOperationalQuery(
-      'emailStats24h',
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'failed' AND created_at >= NOW() - INTERVAL '24 hours')::int AS failed,
-         COUNT(*) FILTER (WHERE status = 'skipped' AND created_at >= NOW() - INTERVAL '24 hours')::int AS skipped,
-         COUNT(*) FILTER (WHERE status = 'sent' AND created_at >= NOW() - INTERVAL '24 hours')::int AS sent,
-         COUNT(*) FILTER (WHERE status = 'log_only' AND created_at >= NOW() - INTERVAL '24 hours')::int AS log_only
-       FROM email_delivery_log`,
-      [{ failed: 0, skipped: 0, sent: 0, log_only: 0 }]
-    ),
+    getAdminEmailStats24h(),
     safeOperationalQuery(
       'expiryStats',
       `SELECT
@@ -427,7 +452,7 @@ export async function buildAdminOperationalSummary() {
     getAiReorderMetrics(),
   ])
 
-  const emailRow = emailStats[0] || {}
+  const emailRow = emailStats || {}
   const expiryRow = expiryStats[0] || {}
   const reorderRow = reorderStats[0] || {}
   const fulfillmentRow = fulfillmentStats[0] || {}
@@ -445,11 +470,11 @@ export async function buildAdminOperationalSummary() {
 
   const email = {
     ...emailConfig,
-    failed24h: parseInt(emailRow.failed, 10) || 0,
-    skipped24h: parseInt(emailRow.skipped, 10) || 0,
-    sent24h: parseInt(emailRow.sent, 10) || 0,
-    deduped24h: parseInt(emailRow.skipped, 10) || 0,
-    logOnly24h: parseInt(emailRow.log_only, 10) || 0,
+    failed24h: emailRow.failed || 0,
+    skipped24h: emailRow.skipped || 0,
+    sent24h: emailRow.sent || 0,
+    deduped24h: emailRow.skipped || 0,
+    logOnly24h: emailRow.logOnly || 0,
   }
 
   const expiry = {
@@ -742,9 +767,21 @@ export async function listAdminActiveDeliveries({ limit = 30 } = {}) {
 
 export async function getAdminEmailHealthFailures({ limit = 20 } = {}) {
   const cap = Math.min(Math.max(parseInt(String(limit), 10) || 20, 1), 50)
-  const rows = await safeOperationalQuery(
-    'emailHealthFailures',
-    `
+  const cacheKey = `${EMAIL_FAILURES_CACHE_KEY}:${cap}`
+  const cached = await getCache(cacheKey)
+  if (Array.isArray(cached)) {
+    return cached
+  }
+
+  return singleflight(cacheKey, async () => {
+    const again = await getCache(cacheKey)
+    if (Array.isArray(again)) {
+      return again
+    }
+
+    const rows = await safeOperationalQuery(
+      'emailHealthFailures',
+      `
     SELECT id, tenant_id, event_type, status, subject, recipient,
            LEFT(error_message, 200) AS error_message, created_at
     FROM email_delivery_log
@@ -752,20 +789,23 @@ export async function getAdminEmailHealthFailures({ limit = 20 } = {}) {
     ORDER BY created_at DESC
     LIMIT $1
     `,
-    [],
-    [cap]
-  )
+      [],
+      [cap]
+    )
 
-  return rows.map((row) => ({
-    id: row.id,
-    tenantId: row.tenant_id,
-    eventType: row.event_type,
-    status: row.status,
-    subject: row.subject,
-    recipientRedacted: redactEmail(row.recipient),
-    errorMessage: row.error_message,
-    createdAt: row.created_at,
-  }))
+    const result = rows.map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      eventType: row.event_type,
+      status: row.status,
+      subject: row.subject,
+      recipientRedacted: redactEmail(row.recipient),
+      errorMessage: row.error_message,
+      createdAt: row.created_at,
+    }))
+    await setCache(cacheKey, result, EMAIL_HEALTH_CACHE_TTL_SECONDS).catch(() => {})
+    return result
+  })
 }
 
 /**

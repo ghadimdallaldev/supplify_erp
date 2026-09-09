@@ -175,7 +175,9 @@ router.get('/health', async (req, res) => {
 
     try {
       const { rows } = await query(
-        `SELECT id, type, severity, source, payload, created_at FROM system_event WHERE severity = 'error' ORDER BY created_at DESC LIMIT 50`
+        `SELECT id, type, severity, source, payload, created_at FROM system_event
+         WHERE severity = 'error' AND created_at >= NOW() - INTERVAL '24 hours'
+         ORDER BY created_at DESC LIMIT 50`
       )
       recentErrors = rows.map((r) => {
         const payload = r.payload || {}

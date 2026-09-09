@@ -311,6 +311,7 @@ router.get(
   '/orders/:orderId/invoices',
   requireAuth,
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
   async (req, res) => {
     try {
       const { orderId } = req.params
@@ -621,6 +622,7 @@ router.get(
   '/invoices/:id/credits',
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
   async (req, res) => {
     try {
       const { id } = req.params
@@ -684,6 +686,7 @@ router.get(
   '/suppliers/:supplierId/statement',
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
   async (req, res) => {
     try {
       const { supplierId } = req.params
@@ -763,15 +766,21 @@ router.get(
 )
 
 // Get monthly expense breakdown
-router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
-  try {
-    const { period = '30' } = req.query
+router.get(
+  '/expenses',
+  requireAuth,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('INVOICES_VIEW'),
+  async (req, res) => {
+    try {
+      const rawPeriod = Number.parseInt(String(req.query.period ?? '30'), 10)
+      const periodDays = Number.isFinite(rawPeriod) ? Math.min(365, Math.max(1, rawPeriod)) : 30
 
-    const restaurantId = await requireRestaurantId(req)
+      const restaurantId = await requireRestaurantId(req)
 
-    // Get expense breakdown by supplier
-    const { rows: bySupplier } = await query(
-      `
+      // Get expense breakdown by supplier
+      const { rows: bySupplier } = await query(
+        `
       SELECT 
         s.id as supplier_id,
         s.name as supplier_name,
@@ -783,16 +792,16 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN payment p ON p.invoice_id = i.id AND p.status = 'COMPLETED'
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '${period} days'
+        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
       GROUP BY s.id, s.name
       ORDER BY total_spent DESC
     `,
-      [restaurantId]
-    )
+        [restaurantId, periodDays]
+      )
 
-    // Get expense breakdown by category (from products)
-    const { rows: byCategory } = await query(
-      `
+      // Get expense breakdown by category (from products)
+      const { rows: byCategory } = await query(
+        `
       SELECT 
         COALESCE(p.category, 'Uncategorized') as category,
         SUM(ili.quantity * ili.unit_price) as total_spent
@@ -800,16 +809,16 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       JOIN invoice_line_item ili ON ili.invoice_id = i.id
       LEFT JOIN product p ON p.id = ili.product_id
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '${period} days'
+        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
       GROUP BY p.category
       ORDER BY total_spent DESC
     `,
-      [restaurantId]
-    )
+        [restaurantId, periodDays]
+      )
 
-    // Get monthly trend
-    const { rows: monthlyTrend } = await query(
-      `
+      // Get monthly trend
+      const { rows: monthlyTrend } = await query(
+        `
       SELECT 
         DATE_TRUNC('month', i.invoice_date) as month,
         COUNT(i.id) as invoice_count,
@@ -820,44 +829,50 @@ router.get('/expenses', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
       GROUP BY DATE_TRUNC('month', i.invoice_date)
       ORDER BY month ASC
     `,
-      [restaurantId]
-    )
+        [restaurantId]
+      )
 
-    res.json({
-      ok: true,
-      data: {
-        bySupplier,
-        byCategory,
-        monthlyTrend,
-        period: parseInt(period),
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error({
-      message: 'Get expenses error',
-      error: error.message,
-      stack: error.stack,
-    })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get expenses',
-        details: error.message,
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: {
+          bySupplier,
+          byCategory,
+          monthlyTrend,
+          period: periodDays,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error({
+        message: 'Get expenses error',
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get expenses',
+          details: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Get overdue payments and alerts
 router.get(
   '/overdue',
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN', 'SUPPLIER']),
+  (req, res, next) => {
+    // Supplier clients poll this endpoint and receive an empty payload; skip invoice RBAC for them.
+    if (req.userData?.role === 'SUPPLIER') return next()
+    return requirePermission('INVOICES_VIEW')(req, res, next)
+  },
   async (req, res) => {
     try {
       // If the caller is not a restaurant/admin, return empty (avoid UI 403s)

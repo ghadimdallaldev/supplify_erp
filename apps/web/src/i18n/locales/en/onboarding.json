@@ -13,14 +13,18 @@
     "phoneLabel": "Phone (optional)",
     "phonePlaceholder": "+961 3 000 000",
     "submit": "Continue to Supplify",
-    "creatingWorkspace": "Creating your workspaceâ€¦",
-    "almostDone": "Almost doneâ€¦",
+    "creatingWorkspace": "Creating your workspace…",
+    "almostDone": "Almost done…",
+    "verifyEmailTitle": "Check your email",
+    "verifyEmailDescription": "We sent a verification code to {{email}}. Sign in again — you will enter the code on the next screen, then finish setting up your organization.",
+    "verifyEmailCta": "Sign in to verify",
     "errors": {
       "chooseAccountType": "Please choose whether you are a restaurant or a supplier.",
       "legalRequired": "Please accept all required legal agreements before continuing.",
-      "serverRestart": "The server restarted while saving your profile. Your account may already be set up â€” refresh this page, or try submitting once more.",
+      "serverRestart": "The server restarted while saving your profile. Your account may already be set up — refresh this page, or try submitting once more.",
       "generic": "Could not complete registration. Please try again.",
-      "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment."
+      "statusVerify": "Could not verify registration status. Refresh the page or try again in a moment.",
+      "emailNotVerified": "Sign in again to enter the verification code on the next screen, then continue."
     }
   },
   "activation": {
@@ -80,7 +84,8 @@
       "city": "City",
       "region": "Region/State",
       "country": "Country",
-      "deliveryInstructions": "Delivery Instructions"
+      "deliveryInstructions": "Delivery Instructions",
+      "area": "Area / neighborhood"
     },
     "placeholders": {
       "businessName": "Enter business name",
@@ -92,19 +97,28 @@
       "city": "City Name",
       "region": "State or Region",
       "country": "Country",
-      "deliveryInstructions": "e.g., Gate A, Floor 2, Landmark: next to gas station"
+      "deliveryInstructions": "e.g., Gate A, Floor 2, Landmark: next to gas station",
+      "area": "e.g. Hamra, Downtown"
     },
     "businessTypes": {
-      "restaurant": "Restaurant",
-      "cafe": "Cafe",
+      "fine_dining": "Fine dining",
+      "casual_dining": "Casual dining",
+      "fast_food": "Fast food",
+      "cafe": "Café",
+      "bakery": "Bakery",
       "hotel": "Hotel",
-      "catering": "Catering"
+      "catering": "Catering",
+      "cloud_kitchen": "Cloud kitchen",
+      "restaurant": "Restaurant (legacy)"
     },
     "toasts": {
       "notLoaded": "Restaurant information not loaded",
       "logoFailed": "Failed to upload logo",
       "updated": "Profile updated successfully!",
       "updateFailed": "Failed to update profile"
+    },
+    "hints": {
+      "area": "Used for deal targeting. Match the names suppliers enter (city, neighborhood, or region)."
     }
   },
   "restaurantTeam": {

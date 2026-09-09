@@ -21,6 +21,7 @@ import {
   normalizeInvitationEmail,
 } from './invitation-accept.js'
 import { syncDriverLinkForRoleAssignment } from './driver-user-link.js'
+import { syncDriverLoginPolicyForUser } from './driver-login-policy.js'
 import { assignOrgUserRole, invalidateOrgPermissionCaches } from './supplier-org.js'
 import { sendTeamInvitationEmail } from '../services/invitation-mail.service.js'
 import { logger } from './logger.js'
@@ -285,6 +286,7 @@ export async function acceptBranchInvitation({
       password,
       realmRoleName: keycloakRealmRoleForWorkspace('SUPPLIER'),
       resetPasswordOnExisting: true,
+      emailVerified: true,
     })
     keycloakUserMs = Math.round(performance.now() - keycloakStart)
     keycloakSub = kcUserId
@@ -430,6 +432,7 @@ export async function acceptBranchInvitation({
   if (scope.organizationId) {
     await invalidateOrgPermissionCaches(txResult.userId, scope.organizationId)
   }
+  await syncDriverLoginPolicyForUser(txResult.userId)
   const { invalidateUserPermissionCache } = await import('./permissions.js')
   await invalidateUserPermissionCache(txResult.userId, txResult.supplierId, 'SUPPLIER')
 

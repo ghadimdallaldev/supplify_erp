@@ -24,7 +24,8 @@ function toValidationError(error) {
   if (
     message.includes('Insufficient stock') ||
     message.includes('No default warehouse') ||
-    message.includes('no warehouse inventory row')
+    message.includes('no warehouse inventory row') ||
+    message.includes('Warehouse stock could not be assigned')
   ) {
     return new ValidationError(message)
   }
@@ -100,11 +101,7 @@ export async function reserveStockForPlacedOrder(
     })
 
     if (!fulfillment?.assignments?.length || fulfillment.mode === 'none') {
-      await assertAndDeductSupplierStockBatch(
-        client,
-        lines.map((line) => ({ ...line, reserve: reserveLegacy || Boolean(line.reserve) }))
-      )
-      return { mode: 'legacy', fulfillment }
+      throw new ValidationError('Warehouse stock could not be assigned; order was not placed')
     }
 
     return { mode: 'warehouse', fulfillment }
@@ -134,17 +131,22 @@ export async function releaseStockForOrder(client, orderId) {
     [orderId]
   )
 
-  for (const item of items) {
-    const qty = Number(item.quantity)
-    if (!qty || qty <= 0) continue
+  const releaseRows = items
+    .map((item) => ({
+      productId: item.product_id,
+      quantity: Number(item.quantity),
+    }))
+    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
 
+  if (releaseRows.length > 0) {
     await client.query(
-      `UPDATE inventory
-       SET available_qty = available_qty + $1,
-           reserved_qty = GREATEST(0, reserved_qty - $1),
+      `UPDATE inventory AS inv
+       SET available_qty = inv.available_qty + src.qty,
+           reserved_qty = GREATEST(0, inv.reserved_qty - src.qty),
            updated_at = now()
-       WHERE product_id = $2`,
-      [qty, item.product_id]
+       FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
+       WHERE inv.product_id = src.product_id`,
+      [releaseRows.map((row) => row.productId), releaseRows.map((row) => row.quantity)]
     )
   }
 
@@ -198,4 +200,57 @@ export async function syncWarehouseMirrorFromLegacy(
   )
 
   return { warehouseId: targetWarehouseId, available, reserved }
+}
+
+/**
+ * When warehouse inventory is edited directly, mirror aggregate qty into legacy `inventory`
+ * so remaining legacy readers stay aligned for warehouse-mode suppliers.
+ */
+export async function syncLegacyMirrorFromWarehouse(dbOrClient, { supplierId, productId }) {
+  if (!supplierId || !productId) return null
+
+  const { query } = await import('../lib/db.js')
+  const run =
+    typeof dbOrClient?.query === 'function'
+      ? (sql, params) => dbOrClient.query(sql, params)
+      : typeof dbOrClient === 'function'
+        ? dbOrClient
+        : query
+  const clientForMode = typeof dbOrClient?.query === 'function' ? dbOrClient : null
+
+  const mode = await resolveOrderStockMode(supplierId, { client: clientForMode })
+  if (mode !== 'warehouse') return null
+
+  const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => run(sql, params))
+  const { rows } = await run(
+    `
+    SELECT
+      COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty,
+      COALESCE(SUM(wi.quantity_reserved), 0)::numeric AS reserved_qty
+    FROM warehouse_inventory wi
+    JOIN warehouse w ON w.id = wi.warehouse_id
+    WHERE wi.product_id = $1
+      AND w.${supplierCol} = $2
+      AND w.is_active = TRUE
+    `,
+    [productId, supplierId]
+  )
+
+  const available = Number(rows[0]?.available_qty || 0)
+  const reserved = Number(rows[0]?.reserved_qty || 0)
+
+  await run(
+    `
+    INSERT INTO inventory (product_id, available_qty, reserved_qty, updated_at)
+    VALUES ($1, $2, $3, now())
+    ON CONFLICT (product_id) DO UPDATE SET
+      available_qty = EXCLUDED.available_qty,
+      reserved_qty = EXCLUDED.reserved_qty,
+      updated_at = now()
+    `,
+    [productId, available, reserved]
+  )
+
+  return { available, reserved }
 }

@@ -48,6 +48,20 @@ export const promotionsApi = api.injectEndpoints({
       query: (id) => ({ url: `/api/promotions/${id}/activate`, method: 'POST' }),
       invalidatesTags: ['Promotions'],
     }),
+    payActivation: builder.mutation<
+      { promotion: Record<string, unknown> },
+      { id: string; paymentMethodId?: string; idempotencyKey?: string }
+    >({
+      query: ({ id, paymentMethodId, idempotencyKey }) => ({
+        url: `/api/promotions/${id}/pay-activation`,
+        method: 'POST',
+        body: {
+          ...(paymentMethodId ? { paymentMethodId } : {}),
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+        },
+      }),
+      invalidatesTags: ['Promotions', 'Billing'],
+    }),
     pausePromotion: builder.mutation<{ promotion: Record<string, unknown> }, string>({
       query: (id) => ({ url: `/api/promotions/${id}/pause`, method: 'POST' }),
       invalidatesTags: ['Promotions'],

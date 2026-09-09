@@ -34,7 +34,11 @@ import { writeAuditLog } from '../../lib/audit.js'
 import { orderAmendmentsRouter } from '../order-amendments.routes.js'
 import { ordersDriverRoutes } from '../orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
-import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
+import {
+  syncWarehouseFulfillmentOnOrderStatus,
+  commitDispatchInventoryForAssignment,
+  reassignOrderWarehouseAssignment,
+} from '../../services/warehouseInventory.js'
 import { hasPermission } from '../../lib/permissions.js'
 import {
   updateDriverDeliveryStatus,
@@ -100,47 +104,95 @@ router.patch(
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
     try {
-      const { warehouse_id: warehouseId, notes } = req.body
-      const { rows: existing } = await query(
-        `SELECT * FROM order_warehouse_assignment WHERE id = $1 AND order_id = $2`,
-        [req.params.assignmentId, req.params.id]
+      const orderId = req.params.id
+      const assignmentId = req.params.assignmentId
+      const newWarehouseId = req.body?.warehouse_id ?? req.body?.warehouseId
+      if (!newWarehouseId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'warehouse_id is required' },
+          requestId: req.requestId,
+        })
+      }
+
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows: orderRows } = await query(
+        `SELECT 1 FROM customer_order o
+         JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+         WHERE o.id = $2
+         LIMIT 1`,
+        [supplierId, orderId]
       )
-      if (!existing.length) {
+      if (!orderRows.length) {
         return res.status(404).json({
           ok: false,
           data: null,
-          error: { name: 'NOT_FOUND', message: 'Assignment not found' },
+          error: { name: 'NOT_FOUND', message: 'Order not found' },
           requestId: req.requestId,
         })
       }
-      if (!['pending', 'picking'].includes(existing[0].status)) {
-        return res.status(409).json({
+
+      const assignment = await withTransaction(async (client) => {
+        return reassignOrderWarehouseAssignment(client, {
+          orderId,
+          assignmentId,
+          newWarehouseId,
+          supplierId,
+          assignedBy: req.userData?.id || 'manual',
+        })
+      })
+
+      if (!assignment) {
+        return res.status(404).json({
           ok: false,
           data: null,
-          error: {
-            name: 'INVALID_STATUS',
-            message: 'Can only reassign while pending or picking',
-          },
+          error: { name: 'NOT_FOUND', message: 'Warehouse assignment not found' },
           requestId: req.requestId,
         })
       }
-      const { rows } = await query(
-        `UPDATE order_warehouse_assignment
-         SET warehouse_id = COALESCE($1, warehouse_id),
-             assigned_by = 'manual',
-             notes = COALESCE($2, notes),
-             assigned_at = now()
-         WHERE id = $3 RETURNING *`,
-        [warehouseId, notes, req.params.assignmentId]
-      )
+
       res.json({
         ok: true,
-        data: { assignment: rows[0] },
+        data: { assignment },
         error: null,
         requestId: req.requestId,
       })
     } catch (error) {
-      logger.error('Reassign warehouse error:', error)
+      if (error?.code === 'INVALID_STATUS') {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: 'INVALID_STATUS', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error?.code === 'WAREHOUSE_NOT_FOUND') {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'WAREHOUSE_NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (String(error?.message || '').includes('Insufficient stock')) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: 'INSUFFICIENT_STOCK', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('Reassign warehouse assignment error:', error)
       res.status(500).json({
         ok: false,
         data: null,
@@ -150,21 +202,42 @@ router.patch(
     }
   }
 )
-
 router.post(
   '/:id/warehouses/:assignmentId/dispatch',
   requireRole(['SUPPLIER']),
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
     try {
-      const { rows } = await query(
-        `UPDATE order_warehouse_assignment
-         SET status = 'dispatched', dispatched_at = now()
-         WHERE id = $1 AND order_id = $2 AND status IN ('pending', 'picking', 'packed')
-         RETURNING *`,
-        [req.params.assignmentId, req.params.id]
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      const { rows: orderRows } = await query(
+        `SELECT 1 FROM customer_order o
+         JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
+         WHERE o.id = $2
+         LIMIT 1`,
+        [supplierId, req.params.id]
       )
-      if (!rows.length) {
+      if (!orderRows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Order not found' },
+          requestId: req.requestId,
+        })
+      }
+
+      const assignment = await withTransaction(async (client) => {
+        return commitDispatchInventoryForAssignment(client, req.params.id, req.params.assignmentId)
+      })
+      if (!assignment) {
         return res.status(409).json({
           ok: false,
           data: null,
@@ -174,7 +247,7 @@ router.post(
       }
       res.json({
         ok: true,
-        data: { assignment: rows[0] },
+        data: { assignment },
         error: null,
         requestId: req.requestId,
       })

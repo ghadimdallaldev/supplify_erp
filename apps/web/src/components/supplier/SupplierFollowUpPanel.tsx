@@ -141,7 +141,7 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                     </div>
                     <div className="flex flex-wrap gap-1 shrink-0">
                       <Button variant="outline" size="sm" asChild>
-                        <Link to={`/app/orders?restaurantId=${item.restaurantId}`}>
+                        <Link to={`/app/orders?restaurant=${item.restaurantId}`}>
                           <History className="h-3.5 w-3.5 mr-1" />
                           {t('followUp.history')}
                         </Link>

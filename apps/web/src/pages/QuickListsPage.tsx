@@ -1,4 +1,4 @@
-import { Suspense, useState, useMemo } from 'react'
+import { Suspense, useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -104,7 +104,18 @@ export function QuickListsPage() {
   const quickListItemGate = getPlanLimitGate(entitlementsData?.entitlements, 'quick_list_items')
 
   const { data, isLoading, refetch } = useGetQuickListsQuery()
-  const { data: productsData } = useGetProductsQuery({ limit: 1000 })
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedProductSearch(productSearch.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [productSearch])
+  const { data: productsData } = useGetProductsQuery(
+    {
+      limit: 50,
+      ...(debouncedProductSearch ? { q: debouncedProductSearch } : {}),
+    },
+    { skip: !showProductDialog }
+  )
   const { data: selectedListDetailsData } = useGetQuickListQuery(selectedListForDetails?.id || '', {
     skip: !selectedListForDetails,
   })
@@ -182,15 +193,8 @@ export function QuickListsPage() {
     })
   }, [productsData?.products])
 
-  const filteredProducts = useMemo(
-    () =>
-      catalogProducts.filter(
-        (product: any) =>
-          product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-          product.sku?.toLowerCase().includes(productSearch.toLowerCase())
-      ),
-    [catalogProducts, productSearch]
-  )
+  // Server already filters by `q` when dialog search is set.
+  const filteredProducts = catalogProducts
 
   const handleDeleteList = async (listId: string, listName: string) => {
     if (!confirm(t('quickLists.confirmDelete', { name: listName }))) return

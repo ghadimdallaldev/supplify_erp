@@ -4,17 +4,17 @@ Applies to **all** Railway Keycloak services. See also [`docs/operations/keycloa
 
 ## Per-environment settings (current)
 
-| Setting                            | **dev**                     | **preprod**      | **staging**      | **prod**                           |
-| ---------------------------------- | --------------------------- | ---------------- | ---------------- | ---------------------------------- |
-| `KEYCLOAK_USE_OPTIMIZED`           | `false`                     | `false`          | `false`          | `true`                             |
-| Start mode                         | Runtime `--db=postgres`     | Runtime postgres | Runtime postgres | Optimized (after Dockerfile build) |
-| `JAVA_OPTS_APPEND`                 | `-Xmx512m` fixed            | `-Xmx512m` fixed | `-Xmx512m` fixed | `MaxRAMPercentage=60`              |
-| `KC_METRICS_ENABLED` (build + env) | `false`                     | `false`          | `false`          | `true`                             |
-| Dockerfile build                   | `kc.sh build --db=postgres` | same             | same             | same                               |
+| Setting                            | **dev**                     | **preprod**      | **staging**      | **prod**                            |
+| ---------------------------------- | --------------------------- | ---------------- | ---------------- | ----------------------------------- |
+| `KEYCLOAK_USE_OPTIMIZED`           | `false`                     | `false`          | `false`          | `false`                             |
+| Start mode                         | Runtime `--db=postgres`     | Runtime postgres | Runtime postgres | Runtime postgres                    |
+| `JAVA_OPTS_APPEND`                 | `-Xmx512m` fixed            | `-Xmx512m` fixed | `-Xmx512m` fixed | `-Xmx512m` fixed (same as non-prod) |
+| `KC_METRICS_ENABLED` (build + env) | `false`                     | `false`          | `false`          | `true`                              |
+| Dockerfile build                   | `kc.sh build --db=postgres` | same             | same             | same                                |
 
 **Non-prod (dev / preprod / staging):** `KEYCLOAK_USE_OPTIMIZED=false` — entrypoint runs `kc.sh start --db=postgres` with JDBC from Postgres refs. Reliable on Railway; avoids H2/optimized cache mismatches.
 
-**Production:** `KEYCLOAK_USE_OPTIMIZED=true` — uses pre-built postgres image + `--optimized` for faster boot and metrics.
+**Production:** same fixed heap as non-prod (`-Xmx512m`). Do **not** use `MaxRAMPercentage` — on Railway soft/large memory limits the JVM expands into multi‑GB and dominates the bill. `KEYCLOAK_USE_OPTIMIZED=false` (runtime postgres) matches non-prod reliability.
 
 ## Why Keycloak uses memory when Supplify is not open
 
@@ -46,8 +46,9 @@ KC_PROXY_HEADERS=xforwarded
 ### Production
 
 ```env
-JAVA_OPTS_APPEND=-XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25 -XX:MaxMetaspaceSize=256m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
-KEYCLOAK_USE_OPTIMIZED=true
+# Same fixed heap as non-prod — MaxRAMPercentage on Railway bills multi-GB RAM.
+JAVA_OPTS_APPEND=-Xms128m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseContainerSupport -XX:+ExitOnOutOfMemoryError
+KEYCLOAK_USE_OPTIMIZED=false
 KC_METRICS_ENABLED=true
 KC_PROXY_HEADERS=xforwarded
 ```
@@ -73,17 +74,17 @@ KC_PROXY_HEADERS=xforwarded
 
 ```text
 Keycloak railway-entrypoint.sh v3
-Keycloak start mode: runtime postgres (no --optimized)   # non-prod
-Keycloak start mode: optimized + postgres                # prod
+Keycloak start mode: runtime postgres (no --optimized)
 Listening on: http://0.0.0.0:8080
 ```
 
-## Expected memory (non-prod, 512 MiB–1 GiB plan)
+## Expected memory (all envs, 512 MiB heap)
 
 | Mode                          | Typical steady RSS                |
 | ----------------------------- | --------------------------------- |
 | `start-dev`, no cap           | 700 MiB–10 GiB → OOM (old config) |
 | Runtime postgres + `-Xmx512m` | **350–700 MB**                    |
+| `MaxRAMPercentage=60` (bad)   | multi‑GB → huge Railway RAM bill  |
 
 Monitor: Railway → Keycloak service → Metrics.
 

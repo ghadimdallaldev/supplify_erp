@@ -447,7 +447,8 @@
       "notes": "Notes",
       "includeGps": "Include GPS location when available",
       "skip": "Skip",
-      "saveProof": "Save proof"
+      "saveProof": "Save proof",
+      "proofRequired": "Add a photo, a signature, or the recipient's name to save proof."
     },
     "confirmButton": "Confirm proof of delivery",
     "toast": {

@@ -33,6 +33,7 @@ import {
   verifyTenantCustomDomain,
 } from '../../services/custom-domain.service.js'
 import { hasBrandingCapability } from '../../lib/branding-tier.js'
+import { deliveredOrderStatusInSql } from '../../lib/order-statuses.js'
 import {
   mapSupplierBusinessSettingsRow,
   serializeOperatingHoursForDb,
@@ -41,6 +42,8 @@ import {
 import {
   listFeaturedPackages,
   purchaseAndActivateFeaturedPlacement,
+  payFeaturedPlacement,
+  refundFeaturedPlacement,
   listPlacementsForSupplier,
   listAllActivePlacementsForAdmin,
 } from '../../services/featured-supplier-placement.service.js'
@@ -388,7 +391,9 @@ router.get(
       if (!supplierId) throw new NotFoundError('Supplier not found')
 
       const { rows } = await query(
-        `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions
+        `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
+                last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
+                last_order_rollover_days, last_order_timezone
          FROM supplier WHERE id = $1`,
         [supplierId]
       )
@@ -442,13 +447,39 @@ router.patch(
         fields.push(`terms_and_conditions = $${paramIndex++}`)
         values.push(body.termsAndConditions)
       }
+      if (body.lastOrderMode !== undefined) {
+        fields.push(`last_order_mode = $${paramIndex++}`)
+        values.push(body.lastOrderMode)
+      }
+      if (body.lastOrderCutoffType !== undefined) {
+        fields.push(`last_order_cutoff_type = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffType)
+      }
+      if (body.lastOrderCutoffTime !== undefined) {
+        fields.push(`last_order_cutoff_time = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffTime)
+      }
+      if (body.lastOrderCutoffMinutes !== undefined) {
+        fields.push(`last_order_cutoff_minutes = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffMinutes)
+      }
+      if (body.lastOrderRolloverDays !== undefined) {
+        fields.push(`last_order_rollover_days = $${paramIndex++}`)
+        values.push(body.lastOrderRolloverDays)
+      }
+      if (body.lastOrderTimezone !== undefined) {
+        fields.push(`last_order_timezone = $${paramIndex++}`)
+        values.push(body.lastOrderTimezone)
+      }
 
       values.push(supplierId)
       const { rows } = await query(
         `UPDATE supplier
          SET ${fields.join(', ')}, updated_at = now()
          WHERE id = $${paramIndex}
-         RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions`,
+         RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
+                   last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
+                   last_order_rollover_days, last_order_timezone`,
         values
       )
       if (!rows.length) throw new NotFoundError('Supplier not found')
@@ -516,9 +547,54 @@ router.post(
         supplierId,
         pricingKey,
         createdBy: req.userData.id,
-        waivePayment: process.env.NODE_ENV !== 'production',
+        paymentMethodId: req.body?.paymentMethodId || null,
+        idempotencyKey: req.body?.idempotencyKey || null,
       })
-      res.status(201).json({ ok: true, data: { placement }, error: null, requestId: req.requestId })
+      const status = placement.paymentRequired ? 202 : 201
+      res
+        .status(status)
+        .json({ ok: true, data: { placement }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/pay',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const result = await payFeaturedPlacement({
+        placementId: req.params.id,
+        supplierId,
+        paymentMethodId: req.body?.paymentMethodId || null,
+        idempotencyKey: req.body?.idempotencyKey || null,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/refund',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const result = await refundFeaturedPlacement({
+        placementId: req.params.id,
+        amount: req.body?.amount != null ? Number(req.body.amount) : null,
+        reason: req.body?.reason || 'admin_refund',
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }
@@ -564,13 +640,19 @@ router.get(
         })
       }
 
-      // Calculate statistics from orders
-      // Count distinct orders that have items from this supplier
+      // Calculate statistics from orders (exclude drafts/cancels; spend = delivered only)
       const { rows: orderStats } = await query(
         `
       SELECT 
-        COUNT(DISTINCT o.id) as total_orders,
-        COALESCE(SUM(oi.line_total), 0) as total_spent
+        COUNT(DISTINCT o.id) FILTER (
+          WHERE o.status NOT IN ('DRAFT', 'CANCELLED')
+        )::int as total_orders,
+        COUNT(DISTINCT o.id) FILTER (
+          WHERE ${deliveredOrderStatusInSql('o.status')}
+        )::int as delivered_orders,
+        COALESCE(SUM(oi.line_total) FILTER (
+          WHERE ${deliveredOrderStatusInSql('o.status')}
+        ), 0)::numeric as total_spent
       FROM customer_order o
       INNER JOIN order_item oi ON oi.order_id = o.id
       WHERE o.restaurant_id = $1 
@@ -580,8 +662,9 @@ router.get(
       )
 
       const totalOrders = parseInt(orderStats[0]?.total_orders || 0)
+      const deliveredOrders = parseInt(orderStats[0]?.delivered_orders || 0)
       const totalSpent = parseFloat(orderStats[0]?.total_spent || 0)
-      const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
+      const averageOrderValue = deliveredOrders > 0 ? totalSpent / deliveredOrders : 0
 
       res.json({
         ok: true,
@@ -632,21 +715,12 @@ async function handleGetSupplierById(req, res) {
       restaurantId = await getRestaurantIdForRequest(req)
     }
 
-    // Build query with product_count and avg_price
+    // Build query with product_count and avg_price via LATERAL (match catalog list)
     let sql = `
       SELECT 
         s.*,
-        COALESCE(
-          (SELECT COUNT(DISTINCT p.id) FROM product p WHERE p.supplier_id = s.id), 
-          0
-        ) as product_count,
-        COALESCE(
-          (SELECT AVG(pr.amount) FROM product p 
-           JOIN price pr ON pr.product_id = p.id 
-           WHERE p.supplier_id = s.id 
-             AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)), 
-          0
-        ) as avg_price
+        COALESCE(stats.product_count, 0) as product_count,
+        COALESCE(stats.avg_price, 0) as avg_price
     `
 
     // Add follow status if restaurant
@@ -664,11 +738,39 @@ async function handleGetSupplierById(req, res) {
             AND sb.restaurant_id = $2
         ) as is_blocked
       `
-      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id, restaurantId])
+      const result = await query(
+        `${sql}
+      FROM supplier s
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT p.id)::int AS product_count,
+          COALESCE(AVG(pr.amount), 0) AS avg_price
+        FROM product p
+        LEFT JOIN price pr ON pr.product_id = p.id
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE p.supplier_id = s.id
+      ) stats ON true
+      WHERE s.id = $1`,
+        [id, restaurantId]
+      )
       rows = result.rows
     } else {
       sql += `, false as is_followed, false as is_blocked`
-      const result = await query(sql + ' FROM supplier s WHERE s.id = $1', [id])
+      const result = await query(
+        `${sql}
+      FROM supplier s
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT p.id)::int AS product_count,
+          COALESCE(AVG(pr.amount), 0) AS avg_price
+        FROM product p
+        LEFT JOIN price pr ON pr.product_id = p.id
+          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+        WHERE p.supplier_id = s.id
+      ) stats ON true
+      WHERE s.id = $1`,
+        [id]
+      )
       rows = result.rows
     }
 

@@ -104,7 +104,7 @@ const DISPLAY_NAMES = {
   waitlist_auto_promo: 'Waitlist Auto-Promotion',
   supplier_deals: 'Supplier deals',
   supplier_deals_redeem: 'Supplier deal redemptions',
-  ai_platform: 'AI platform (LLM reorder assistant)',
+  ai_platform: 'AI platform (assistant + reorder LLM)',
 }
 
 export function featureDisplayName(featureKey) {

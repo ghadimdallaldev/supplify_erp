@@ -85,16 +85,11 @@ const router = Router()
 // ========================================
 router.get('/audit-logs', async (req, res) => {
   try {
-    const {
-      limit = 50,
-      offset = 0,
-      tenantId,
-      actionType,
-      adminId,
-      dateFrom,
-      dateTo,
-      search,
-    } = req.query
+    const { tenantId, actionType, adminId, dateFrom, dateTo, search } = req.query
+    const parsedLimit = parseInt(String(req.query.limit ?? 50), 10)
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 50 : parsedLimit, 1), 200)
+    const parsedOffset = parseInt(String(req.query.offset ?? 0), 10)
+    const offset = Math.max(Number.isNaN(parsedOffset) ? 0 : parsedOffset, 0)
 
     const conditions = []
     const params = []
@@ -112,13 +107,16 @@ router.get('/audit-logs', async (req, res) => {
       conditions.push(`admin_user_id = $${paramIndex++}`)
       params.push(adminId)
     }
-    if (dateFrom) {
+    // Date bounds are interpreted as UTC start/end of day for consistency
+    const fromDate = dateFrom ? new Date(`${dateFrom}T00:00:00Z`) : null
+    if (fromDate && !Number.isNaN(fromDate.getTime())) {
       conditions.push(`created_at >= $${paramIndex++}`)
-      params.push(new Date(dateFrom).toISOString())
+      params.push(fromDate.toISOString())
     }
-    if (dateTo) {
+    const toDateParsed = dateTo ? new Date(`${dateTo}T23:59:59.999Z`) : null
+    if (toDateParsed && !Number.isNaN(toDateParsed.getTime())) {
       conditions.push(`created_at <= $${paramIndex++}`)
-      params.push(new Date(dateTo + 'T23:59:59').toISOString())
+      params.push(toDateParsed.toISOString())
     }
     if (search) {
       conditions.push(
@@ -137,7 +135,7 @@ router.get('/audit-logs', async (req, res) => {
     )
     const total = parseInt(countRows[0].count)
 
-    params.push(parseInt(limit), parseInt(offset))
+    params.push(limit, offset)
     const { rows: logs } = await query(
       `SELECT * FROM admin_audit_log ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
       params
@@ -153,8 +151,8 @@ router.get('/audit-logs', async (req, res) => {
       data: {
         logs,
         total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        limit,
+        offset,
         actionTypes: actionTypes.map((r) => r.action_type),
       },
       error: null,

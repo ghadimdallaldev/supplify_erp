@@ -15,6 +15,8 @@ export type LegalAcceptanceStatus = {
 export interface User {
   id: string
   email: string
+  /** From Keycloak access token; false until email OTP verification completes */
+  emailVerified?: boolean
   displayName: string
   role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING' | 'STAFF_PORTAL'
   /** platform = main app; staff_portal = operational staff only */

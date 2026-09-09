@@ -15,6 +15,13 @@ export function resolveHttpError(err) {
     statusCode = err.statusCode || 400
     errorName = err.code || 'SPONSORSHIP_INVALID_STATE'
     message = err.message
+  } else if (
+    err.name === 'PromotionAdError' ||
+    (err.code && String(err.code).startsWith('PROMOTION_AD_'))
+  ) {
+    statusCode = err.statusCode || 400
+    errorName = err.code || 'PROMOTION_AD_INVALID_STATE'
+    message = err.message
   } else if (err.name === 'ValidationError') {
     statusCode = 400
     errorName = 'VALIDATION_ERROR'
@@ -156,6 +163,17 @@ export class SponsorshipError extends Error {
   constructor(code, message, { statusCode = 400, details = null } = {}) {
     super(message)
     this.name = 'SponsorshipError'
+    this.code = code
+    this.statusCode = statusCode
+    this.details = details
+  }
+}
+
+/** Domain errors for deal boost / featured placement ad billing. */
+export class PromotionAdError extends Error {
+  constructor(code, message, { statusCode = 400, details = null } = {}) {
+    super(message)
+    this.name = 'PromotionAdError'
     this.code = code
     this.statusCode = statusCode
     this.details = details

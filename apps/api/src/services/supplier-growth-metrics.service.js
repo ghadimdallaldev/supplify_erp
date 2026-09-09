@@ -61,7 +61,11 @@ export async function getSupplierGrowthMetrics(supplierId) {
     ),
     query(
       `SELECT
-         COUNT(*) FILTER (WHERE status = 'offered')::int AS offers_created,
+         -- Every sponsorship row started life as an offer. Counting only rows still
+         -- sitting in 'offered' made the funnel shrink as offers were accepted, so
+         -- offersAccepted could exceed offersCreated.
+         COUNT(*)::int AS offers_created,
+         COUNT(*) FILTER (WHERE status = 'offered')::int AS offers_open,
          COUNT(*) FILTER (WHERE status IN ('accepted', 'payment_pending', 'payment_failed', 'scheduled', 'active', 'completed'))::int AS offers_accepted,
          COUNT(*) FILTER (WHERE status = 'cancelled' AND cancellation_reason = 'declined_by_restaurant')::int AS offers_declined,
          COUNT(*) FILTER (WHERE status = 'expired')::int AS offers_expired,
@@ -93,6 +97,7 @@ export async function getSupplierGrowthMetrics(supplierId) {
     },
     sponsorship: {
       offersCreated: funnel.offers_created ?? 0,
+      offersOpen: funnel.offers_open ?? 0,
       offersAccepted: funnel.offers_accepted ?? 0,
       offersDeclined: funnel.offers_declined ?? 0,
       offersExpired: funnel.offers_expired ?? 0,

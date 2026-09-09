@@ -1,0 +1,28 @@
+{
+  "title": "Assistant",
+  "subtitle": "Ask about stock, orders, deliveries, and more",
+  "placeholder": "Ask anything… e.g. how many tomato kilos do we still have?",
+  "send": "Send",
+  "newChat": "New chat",
+  "fromLiveData": "From live data",
+  "quotaHint": "{{remaining}} AI requests left today",
+  "quotaExhausted": "AI quota exhausted. Upgrade or wait for reset.",
+  "unavailable": "Assistant is not available on your plan.",
+  "upgrade": "View plans",
+  "empty": "Ask a question to get started.",
+  "thinking": "Looking up live data…",
+  "error": "Something went wrong. Please try again.",
+  "openAria": "Open Supplify Assistant",
+  "closeAria": "Close assistant",
+  "suggestions": {
+    "stock": "How many tomato kilos do we still have?",
+    "need": "What do we still need to order this week?",
+    "orders": "Show my recent orders",
+    "deliveries": "Any deliveries on the way?",
+    "invoices": "What invoices are open?",
+    "fulfillment": "How is fulfillment looking today?",
+    "warehouse": "What warehouse stock is low?",
+    "stops": "What are my stops today?",
+    "admin": "Give me a platform overview"
+  }
+}

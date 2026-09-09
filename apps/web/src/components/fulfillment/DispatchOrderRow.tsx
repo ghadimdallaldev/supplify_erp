@@ -105,6 +105,17 @@ export function DispatchOrderRow({
             >
               {gpsLabel}
             </Badge>
+            {order.warehouse_name || order.warehouse_code ? (
+              <Badge
+                variant="outline"
+                data-testid="dispatch-warehouse-badge"
+                className="text-[10px]"
+              >
+                {order.multi_warehouse
+                  ? `${order.warehouse_name || order.warehouse_code} (+${Math.max(0, (order.warehouse_count || 1) - 1)})`
+                  : order.warehouse_name || order.warehouse_code}
+              </Badge>
+            ) : null}
             {order.route_planning_label ? (
               <Badge variant="outline" data-testid="dispatch-planned-route-badge">
                 {order.route_planning_label}

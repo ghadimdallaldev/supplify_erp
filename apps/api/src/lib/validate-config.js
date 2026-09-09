@@ -60,6 +60,14 @@ function validateSharedProductionRules(issues) {
       'REDIS_URL is not set — API caches and Socket.IO use in-process memory only (no cross-replica sharing)'
     )
   }
+  if (config.AUTH_EMAIL_OTP_ENABLED && isWeakSecret(config.AUTH_EMAIL_OTP_INTERNAL_SECRET)) {
+    issues.push(
+      'AUTH_EMAIL_OTP_INTERNAL_SECRET must be at least 32 characters when email OTP is enabled'
+    )
+  }
+  if (config.AUTH_EMAIL_OTP_ENABLED && config.EMAIL_LOG_ONLY && config.APP_ENV !== 'dev') {
+    issues.push('EMAIL_LOG_ONLY is not allowed for enabled email OTP outside dev')
+  }
   const emailConfigured =
     !config.EMAIL_ENABLED || config.EMAIL_LOG_ONLY || Boolean(config.SMTP_HOST && config.SMTP_PASS)
   if (config.EMAIL_ENABLED && !emailConfigured && !config.EMAIL_LOG_ONLY) {
@@ -100,6 +108,9 @@ function validatePreprodRules(issues) {
 
 function validateProdRules(issues) {
   validateHostedSafetyRules(issues, 'production')
+  if (config.ALLOW_AUTO_SUPER_ADMIN) {
+    issues.push('ALLOW_AUTO_SUPER_ADMIN must be false in production')
+  }
   if (!config.REDIS_URL) {
     issues.push('REDIS_URL must be set in production')
   }

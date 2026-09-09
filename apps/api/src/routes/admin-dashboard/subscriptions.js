@@ -94,6 +94,10 @@ const router = Router()
 router.get('/subscriptions', async (req, res) => {
   try {
     const { status, tenantType } = req.query
+    const parsedLimit = parseInt(String(req.query.limit ?? 200), 10)
+    const limit = Math.min(Math.max(Number.isNaN(parsedLimit) ? 200 : parsedLimit, 1), 500)
+    const parsedOffset = parseInt(String(req.query.offset ?? 0), 10)
+    const offset = Math.max(Number.isNaN(parsedOffset) ? 0 : parsedOffset, 0)
 
     let whereClause = ''
     const params = []
@@ -110,6 +114,15 @@ router.get('/subscriptions', async (req, res) => {
       whereClause += ` s.tenant_type = $${paramIndex++}`
       params.push(tenantType)
     }
+
+    const { rows: countRows } = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM (
+         SELECT DISTINCT s.tenant_id, s.tenant_type FROM subscription s ${whereClause}
+       ) tenants`,
+      params
+    )
+    const total = countRows[0]?.total ?? 0
 
     // One subscription per tenant: prefer ACTIVE, then TRIALING, then most recent
     const { rows: subscriptions } = await query(
@@ -134,13 +147,14 @@ router.get('/subscriptions', async (req, res) => {
       LEFT JOIN supplier su ON (sub.tenant_id = su.id AND sub.tenant_type = 'SUPPLIER')
       LEFT JOIN restaurant r ON (sub.tenant_id = r.id AND sub.tenant_type = 'RESTAURANT')
       ORDER BY sub.created_at DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `,
-      params
+      [...params, limit, offset]
     )
 
     res.json({
       ok: true,
-      data: { subscriptions },
+      data: { subscriptions, total, limit, offset },
       error: null,
       requestId: req.requestId,
     })

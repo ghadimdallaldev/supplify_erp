@@ -1,6 +1,10 @@
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
-import { notifyQuoteRequestReceived, notifyQuoteResponseReceived } from './notification.service.js'
+import {
+  notifyQuoteRequestReceived,
+  notifyQuoteResponseReceived,
+  notifyQuoteRequestDeclined,
+} from './notification.service.js'
 
 const DEFAULT_PAGE_SIZE = 20
 
@@ -160,13 +164,22 @@ export async function listRestaurantQuoteRequests(
     `
     SELECT
       qr.*,
-      (SELECT COUNT(*)::int FROM quote_request_items qri WHERE qri.quote_request_id = qr.id) AS item_count,
-      (SELECT COUNT(*)::int FROM quote_request_suppliers qrs WHERE qrs.quote_request_id = qr.id) AS supplier_count,
-      (
-        SELECT COUNT(*)::int FROM quote_request_suppliers qrs
-        WHERE qrs.quote_request_id = qr.id AND qrs.status = 'responded'
-      ) AS response_count
+      COALESCE(item_stats.item_count, 0) AS item_count,
+      COALESCE(supplier_stats.supplier_count, 0) AS supplier_count,
+      COALESCE(supplier_stats.response_count, 0) AS response_count
     FROM quote_requests qr
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS item_count
+      FROM quote_request_items qri
+      WHERE qri.quote_request_id = qr.id
+    ) item_stats ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        COUNT(*)::int AS supplier_count,
+        COUNT(*) FILTER (WHERE qrs.status = 'responded')::int AS response_count
+      FROM quote_request_suppliers qrs
+      WHERE qrs.quote_request_id = qr.id
+    ) supplier_stats ON true
     WHERE qr.restaurant_id = $1${statusFilter}
     ORDER BY qr.created_at DESC
     LIMIT ${safeLimit} OFFSET ${offset}
@@ -304,19 +317,36 @@ export async function getQuoteRequestCompare(quoteRequestId, restaurantId, dbQue
   return getQuoteRequestDetail(quoteRequestId, restaurantId, dbQuery)
 }
 
+export const SUPPLIER_INBOX_STATUSES = ['pending', 'responded', 'declined']
+const SUPPLIER_INBOX_SORTS = {
+  newest: 'qr.created_at DESC',
+  oldest: 'qr.created_at ASC',
+  // Undated requests sort last so the genuinely urgent ones lead.
+  needed_by: 'qr.needed_by ASC NULLS LAST, qr.created_at ASC',
+}
+
 export async function listSupplierQuoteRequests(
   supplierId,
-  { page = 1, limit = DEFAULT_PAGE_SIZE, status } = {},
+  { page = 1, limit = DEFAULT_PAGE_SIZE, status, search, sort = 'newest' } = {},
   dbQuery = query
 ) {
   const safeLimit = Math.min(Math.max(1, limit), 50)
-  const offset = (Math.max(1, page) - 1) * safeLimit
+  const safePage = Math.max(1, page)
+  const offset = (safePage - 1) * safeLimit
+  const orderBy = SUPPLIER_INBOX_SORTS[sort] ?? SUPPLIER_INBOX_SORTS.newest
+
+  const filters = []
   const params = [supplierId]
-  let statusFilter = ''
-  if (status) {
+  if (status && SUPPLIER_INBOX_STATUSES.includes(status)) {
     params.push(status)
-    statusFilter = ` AND qrs.status = $${params.length}`
+    filters.push(` AND qrs.status = $${params.length}`)
   }
+  const trimmedSearch = typeof search === 'string' ? search.trim() : ''
+  if (trimmedSearch) {
+    params.push(`%${trimmedSearch}%`)
+    filters.push(` AND r.name ILIKE $${params.length}`)
+  }
+  const filterSql = filters.join('')
 
   const { rows } = await dbQuery(
     `
@@ -328,23 +358,55 @@ export async function listSupplierQuoteRequests(
       qr.needed_by,
       qr.created_at AS quote_request_created_at,
       r.name AS restaurant_name,
-      (SELECT COUNT(*)::int FROM quote_request_items qri WHERE qri.quote_request_id = qr.id) AS item_count
+      COALESCE(item_stats.item_count, 0) AS item_count
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
-    WHERE qrs.supplier_id = $1${statusFilter}
-    ORDER BY qrs.created_at DESC
+    LEFT JOIN LATERAL (
+      SELECT COUNT(*)::int AS item_count
+      FROM quote_request_items qri
+      WHERE qri.quote_request_id = qr.id
+    ) item_stats ON true
+    WHERE qrs.supplier_id = $1${filterSql}
+    ORDER BY ${orderBy}
     LIMIT ${safeLimit} OFFSET ${offset}
     `,
     params
   )
 
-  const countParams = status ? [supplierId, status] : [supplierId]
-  const countFilter = status ? ' AND status = $2' : ''
   const { rows: countRows } = await dbQuery(
-    `SELECT COUNT(*)::int AS total FROM quote_request_suppliers WHERE supplier_id = $1${countFilter}`,
-    countParams
+    `
+    SELECT COUNT(*)::int AS total
+    FROM quote_request_suppliers qrs
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    JOIN restaurant r ON r.id = qr.restaurant_id
+    WHERE qrs.supplier_id = $1${filterSql}
+    `,
+    params
   )
+
+  // Tab counts and the unread badge must reflect the whole inbox, not the page.
+  const { rows: summaryRows } = await dbQuery(
+    `
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE qrs.status = 'pending')::int AS pending,
+      COUNT(*) FILTER (WHERE qrs.status = 'responded')::int AS responded,
+      COUNT(*) FILTER (WHERE qrs.status = 'declined')::int AS declined,
+      COUNT(*) FILTER (WHERE qrs.status = 'pending' AND qrs.viewed_at IS NULL)::int AS unread,
+      COUNT(*) FILTER (
+        WHERE qrs.status = 'pending'
+          AND qr.status = 'open'
+          AND qr.needed_by IS NOT NULL
+          AND qr.needed_by <= CURRENT_DATE + 2
+      )::int AS urgent
+    FROM quote_request_suppliers qrs
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    WHERE qrs.supplier_id = $1
+    `,
+    [supplierId]
+  )
+  const summary = summaryRows[0] ?? {}
 
   return {
     inbox: rows.map((row) => ({
@@ -357,9 +419,20 @@ export async function listSupplierQuoteRequests(
       createdAt: row.quote_request_created_at,
       restaurantName: row.restaurant_name,
       itemCount: Number(row.item_count),
+      declineReason: row.decline_reason ?? null,
+      viewedAt: row.viewed_at ?? null,
+      respondedAt: row.status === 'responded' ? row.updated_at : null,
     })),
+    counts: {
+      total: summary.total ?? 0,
+      pending: summary.pending ?? 0,
+      responded: summary.responded ?? 0,
+      declined: summary.declined ?? 0,
+      unread: summary.unread ?? 0,
+      urgent: summary.urgent ?? 0,
+    },
     pagination: {
-      page: Math.max(1, page),
+      page: safePage,
       limit: safeLimit,
       total: countRows[0]?.total ?? 0,
     },
@@ -369,12 +442,23 @@ export async function listSupplierQuoteRequests(
 export async function getSupplierQuoteRequestDetail(
   supplierId,
   quoteRequestSupplierId,
+  { markViewed = false } = {},
   dbQuery = query
 ) {
+  if (markViewed) {
+    await dbQuery(
+      `UPDATE quote_request_suppliers
+       SET viewed_at = now()
+       WHERE id = $1 AND supplier_id = $2 AND viewed_at IS NULL`,
+      [quoteRequestSupplierId, supplierId]
+    )
+  }
+
   const { rows } = await dbQuery(
     `
     SELECT qrs.*, qr.restaurant_id, qr.note AS quote_request_note, qr.needed_by,
-           qr.status AS quote_request_status, r.name AS restaurant_name
+           qr.status AS quote_request_status, qr.created_at AS quote_request_created_at,
+           r.name AS restaurant_name
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
@@ -417,7 +501,13 @@ export async function getSupplierQuoteRequestDetail(
     restaurantId: row.restaurant_id,
     restaurantName: row.restaurant_name,
     quoteRequestNote: row.quote_request_note,
+    quoteRequestStatus: row.quote_request_status,
+    // The response form must lock once the restaurant closes or cancels the RFQ.
+    canRespond: row.quote_request_status === 'open' && row.status !== 'declined',
     neededBy: row.needed_by,
+    createdAt: row.quote_request_created_at,
+    declineReason: row.decline_reason ?? null,
+    viewedAt: row.viewed_at ?? null,
     items: items.map((item) => ({
       id: item.id,
       productId: item.product_id,
@@ -454,13 +544,21 @@ export async function submitQuoteResponse(
   dbQuery = query
 ) {
   const { rows: qrsRows } = await dbQuery(
-    `SELECT qrs.*, qr.restaurant_id FROM quote_request_suppliers qrs
+    `SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
+     FROM quote_request_suppliers qrs
      JOIN quote_requests qr ON qr.id = qrs.quote_request_id
      WHERE qrs.id = $1 AND qrs.supplier_id = $2`,
     [quoteRequestSupplierId, supplierId]
   )
   if (!qrsRows.length) throw new NotFoundError('Quote request not found')
   const qrs = qrsRows[0]
+
+  // A quote the restaurant already closed or cancelled must not accept new pricing.
+  if (qrs.quote_request_status !== 'open') {
+    throw new ValidationError(
+      `This quote request is ${qrs.quote_request_status} and no longer accepts responses`
+    )
+  }
 
   const { rows: requestItems } = await dbQuery(
     `SELECT id FROM quote_request_items WHERE quote_request_id = $1`,
@@ -542,7 +640,54 @@ export async function submitQuoteResponse(
     supplierId,
   }).catch(() => {})
 
-  return getSupplierQuoteRequestDetail(supplierId, quoteRequestSupplierId, dbQuery)
+  return getSupplierQuoteRequestDetail(supplierId, quoteRequestSupplierId, {}, dbQuery)
+}
+
+/**
+ * Supplier declines to quote. `declined` was always a valid row status but no
+ * endpoint could reach it, so an inbox entry the supplier could not serve had to
+ * sit as `pending` forever with the restaurant waiting on it.
+ */
+export async function declineQuoteRequest(
+  { supplierId, quoteRequestSupplierId, reason },
+  dbQuery = query
+) {
+  const { rows } = await dbQuery(
+    `SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
+     FROM quote_request_suppliers qrs
+     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+     WHERE qrs.id = $1 AND qrs.supplier_id = $2`,
+    [quoteRequestSupplierId, supplierId]
+  )
+  if (!rows.length) throw new NotFoundError('Quote request not found')
+  const qrs = rows[0]
+
+  if (qrs.status === 'declined') {
+    return getSupplierQuoteRequestDetail(supplierId, quoteRequestSupplierId, {}, dbQuery)
+  }
+  if (qrs.status === 'responded') {
+    throw new ValidationError('You have already submitted a quote for this request')
+  }
+  if (qrs.quote_request_status !== 'open') {
+    throw new ValidationError(`This quote request is ${qrs.quote_request_status}`)
+  }
+
+  await dbQuery(
+    `UPDATE quote_request_suppliers
+     SET status = 'declined', decline_reason = $2, updated_at = now()
+     WHERE id = $1`,
+    [quoteRequestSupplierId, reason?.trim() || null]
+  )
+
+  await notifyQuoteRequestDeclined({
+    restaurantId: qrs.restaurant_id,
+    quoteRequestId: qrs.quote_request_id,
+    quoteRequestSupplierId,
+    supplierId,
+    reason: reason?.trim() || null,
+  }).catch(() => {})
+
+  return getSupplierQuoteRequestDetail(supplierId, quoteRequestSupplierId, {}, dbQuery)
 }
 
 export async function buildCartPayloadFromResponse(

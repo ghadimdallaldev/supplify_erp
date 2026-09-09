@@ -403,6 +403,7 @@ function userInfoFromClaims(payload) {
     given_name: payload.given_name,
     family_name: payload.family_name,
     preferred_username: payload.preferred_username,
+    email_verified: payload.email_verified === true,
   }
 }
 
@@ -421,7 +422,11 @@ export async function getUserInfo(accessToken, idToken = null) {
       timeout: KEYCLOAK_HTTP_TIMEOUT_MS,
     })
 
-    return response.data
+    const data = response.data || {}
+    return {
+      ...data,
+      email_verified: data.email_verified === true || data.email_verified === 'true',
+    }
   } catch (error) {
     const status = error.response?.status
     const body = error.response?.data
@@ -508,13 +513,19 @@ export async function getRegistrationUrl(redirectUri, state) {
 /**
  * Build Keycloak end_session (logout) URL so the user's browser is redirected there
  * to clear Keycloak's SSO session. After logout, Keycloak redirects to postLogoutRedirectUri.
+ *
+ * Pass idTokenHint whenever available — without it Keycloak shows a "Do you want to
+ * log out?" confirmation whenever an SSO cookie is present.
  */
-export async function getKeycloakLogoutUrl(postLogoutRedirectUri) {
+export async function getKeycloakLogoutUrl(postLogoutRedirectUri, idTokenHint = null) {
   const { KEYCLOAK_PUBLIC_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID } = getKeycloakValues()
   const endSession = `${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/logout`
   const params = new URLSearchParams({
     post_logout_redirect_uri: postLogoutRedirectUri,
     client_id: KEYCLOAK_CLIENT_ID,
   })
+  if (idTokenHint && typeof idTokenHint === 'string') {
+    params.set('id_token_hint', idTokenHint)
+  }
   return `${endSession}?${params.toString()}`
 }

@@ -9,55 +9,29 @@ import {
   getRestaurantIneligibilityMessage,
   getDealTypeLabel,
 } from './deal-lifecycle.service.js'
+import {
+  businessTypeMatches,
+  locationMatchesAreas,
+  parseJsonStringArray,
+  restaurantRowForTargeting,
+} from '../lib/restaurant-targeting.js'
 
 const INTERACTION_TYPES = EXTENDED_INTERACTION_TYPES
 
 export function matchesRestaurantTargeting(deal, restaurant) {
-  let types = deal.target_restaurant_types || []
-  if (typeof types === 'string') {
-    try {
-      types = JSON.parse(types)
-    } catch {
-      types = []
-    }
-  }
-  if (Array.isArray(types) && types.length > 0) {
-    const biz = (restaurant?.business_type || '').toLowerCase()
-    if (!types.some((t) => String(t).toLowerCase() === biz)) return false
-  }
-  let areas = deal.target_areas || []
-  if (typeof areas === 'string') {
-    try {
-      areas = JSON.parse(areas)
-    } catch {
-      areas = []
-    }
-  }
-  if (Array.isArray(areas) && areas.length > 0) {
-    const loc = [restaurant?.city, restaurant?.state, restaurant?.country, restaurant?.address]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    if (!areas.some((a) => loc.includes(String(a).toLowerCase()))) return false
-  }
+  const types = parseJsonStringArray(deal.target_restaurant_types)
+  if (!businessTypeMatches(types, restaurant?.business_type)) return false
+  const areas = parseJsonStringArray(deal.target_areas)
+  if (!locationMatchesAreas(areas, restaurant)) return false
   return true
 }
 
 export function matchesPromotionAudience(audience, restaurant) {
   if (!audience || audience.all === true) return true
   const types = audience.restaurantTypes || audience.restaurant_types || []
-  if (types.length > 0) {
-    const biz = (restaurant?.business_type || '').toLowerCase()
-    if (!types.some((t) => String(t).toLowerCase() === biz)) return false
-  }
+  if (!businessTypeMatches(types, restaurant?.business_type)) return false
   const areas = audience.areas || []
-  if (areas.length > 0) {
-    const loc = [restaurant?.city, restaurant?.state, restaurant?.country, restaurant?.address]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    if (!areas.some((a) => loc.includes(String(a).toLowerCase()))) return false
-  }
+  if (!locationMatchesAreas(areas, restaurant)) return false
   return true
 }
 
@@ -66,19 +40,11 @@ export function matchesPromotionAudience(audience, restaurant) {
  */
 export async function loadRestaurantForTargeting(restaurantId) {
   const { rows } = await query(
-    `SELECT id, name, business_type, address_json FROM restaurant WHERE id = $1`,
+    `SELECT id, name, business_type, address_json, delivery_location_label
+     FROM restaurant WHERE id = $1`,
     [restaurantId]
   )
-  const r = rows[0]
-  if (!r) return null
-  const addr = r.address_json || {}
-  return {
-    ...r,
-    city: addr.city,
-    state: addr.state,
-    country: addr.country,
-    address: addr.line1 || addr.street,
-  }
+  return restaurantRowForTargeting(rows[0] || null)
 }
 
 /**
@@ -308,9 +274,68 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
 }
 
 export async function loadDealDetailForRestaurant(dealId, restaurantId) {
-  const deals = await discoverDealsForRestaurant(restaurantId, {})
-  const deal = deals.find((d) => String(d.id) === String(dealId))
+  const restaurant = await loadRestaurantForTargeting(restaurantId)
+  if (!restaurant) return null
+
+  const { rows } = await query(
+    `
+    SELECT
+      p.*,
+      s.name AS supplier_name,
+      s.slug AS supplier_slug,
+      EXISTS (
+        SELECT 1 FROM supplier_follow sf
+        WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
+      ) AS is_followed,
+      dp.id AS deal_promotion_id,
+      dp.budget AS promotion_budget,
+      dp.starts_at AS promotion_starts_at,
+      dp.ends_at AS promotion_ends_at,
+      dp.target_audience AS promotion_target_audience,
+      (dp.id IS NOT NULL) AS is_sponsored
+    FROM promotions p
+    JOIN supplier s ON s.id = p.supplier_id
+    LEFT JOIN LATERAL (
+      SELECT dp2.*
+      FROM deal_promotions dp2
+      WHERE dp2.deal_id = p.id
+        AND dp2.status = 'active'
+        AND dp2.starts_at <= NOW()
+        AND (dp2.ends_at IS NULL OR dp2.ends_at > NOW())
+      ORDER BY dp2.created_at DESC
+      LIMIT 1
+    ) dp ON TRUE
+    WHERE p.id = $2
+      AND p.status = 'active'
+      AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
+      AND p.boost_start_at IS NOT NULL
+      AND p.boost_start_at <= NOW()
+      AND p.boost_end_at IS NOT NULL
+      AND p.boost_end_at > NOW()
+      AND p.starts_at <= NOW()
+      AND (p.ends_at IS NULL OR p.ends_at > NOW())
+      AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
+      AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
+      AND (
+        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
+        OR EXISTS (
+          SELECT 1 FROM promotion_restaurant_targets prt
+          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
+        )
+      )
+      AND dp.id IS NOT NULL
+    `,
+    [restaurantId, dealId]
+  )
+
+  const deal = rows[0]
   if (!deal) return null
+  if (!matchesRestaurantTargeting(deal, restaurant)) return null
+  if (deal.is_sponsored && deal.deal_promotion_id) {
+    const raw = deal.promotion_target_audience || deal.target_audience
+    const audience = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!matchesPromotionAudience(audience, restaurant)) return null
+  }
 
   const { rows: targets } = await query(
     `
@@ -415,8 +440,10 @@ export async function getDealAnalytics(dealId, supplierId) {
     SELECT
       COUNT(*)::int AS usage_count,
       COALESCE(SUM(pu.discount_applied), 0)::numeric AS total_discount,
-      COUNT(DISTINCT pu.order_id)::int AS orders_influenced
+      COUNT(DISTINCT pu.order_id)::int AS orders_influenced,
+      COALESCE(SUM(co.total_amount), 0)::numeric AS attributed_gmv
     FROM promotion_usages pu
+    LEFT JOIN customer_order co ON co.id = pu.order_id
     WHERE pu.promotion_id = $1
     `,
     [dealId]
@@ -442,6 +469,23 @@ export async function getDealAnalytics(dealId, supplierId) {
     [dealId]
   )
 
+  const { rows: spendRows } = await query(
+    `
+    SELECT COALESCE(SUM(bi.amount), 0)::numeric AS ad_spend
+    FROM billing_invoice bi
+    WHERE bi.tenant_type = 'SUPPLIER'
+      AND bi.tenant_id = $2
+      AND bi.status = 'PAID'
+      AND COALESCE(bi.metadata->>'refunded', 'false') <> 'true'
+      AND (
+        bi.id = (SELECT billing_invoice_id FROM promotions WHERE id = $1)
+        OR (bi.metadata->>'type') = 'deal_boost'
+           AND (bi.metadata->>'promotionId') = $1::text
+      )
+    `,
+    [dealId, supplierId]
+  )
+
   const interactionMap = Object.fromEntries(interactions.map((r) => [r.interaction_type, r.count]))
   const promo = promotionRows[0]
   const views = interactionMap.view || 0
@@ -449,6 +493,10 @@ export async function getDealAnalytics(dealId, supplierId) {
   const clicks = interactionMap.click || 0
   const orders = usage[0]?.orders_influenced || 0
   const conversionRate = views > 0 ? Math.round((orders / views) * 10000) / 100 : 0
+  const adSpend = Number(spendRows[0]?.ad_spend || promo?.price_paid || promo?.budget || 0)
+  const attributedGmv = Number(usage[0]?.attributed_gmv || 0)
+  const roas = adSpend > 0 ? Math.round((attributedGmv / adSpend) * 100) / 100 : null
+  const costPerOrder = orders > 0 && adSpend > 0 ? Math.round((adSpend / orders) * 100) / 100 : null
 
   return {
     ...usage[0],
@@ -460,10 +508,15 @@ export async function getDealAnalytics(dealId, supplierId) {
     messages: interactionMap.message || 0,
     couponUses: interactionMap.coupon_used || 0,
     conversionRate,
+    adSpend,
+    attributedGmv,
+    roas,
+    costPerOrder,
     promotion: promo
       ? {
           id: promo.id,
           budget: promo.budget,
+          pricePaid: promo.price_paid,
           impressions: promo.impressions,
           clicks: promo.clicks,
           orders: promo.orders_count,
@@ -509,11 +562,27 @@ export async function getSupplierDealsAnalyticsSummary(supplierId, { days = 30 }
     SELECT
       COUNT(DISTINCT pu.order_id)::int AS orders_influenced,
       COALESCE(SUM(pu.discount_applied), 0)::numeric AS total_discount,
+      COALESCE(SUM(co.total_amount), 0)::numeric AS attributed_gmv,
       COUNT(*)::int AS usage_count
     FROM promotion_usages pu
     JOIN promotions p ON p.id = pu.promotion_id
+    LEFT JOIN customer_order co ON co.id = pu.order_id
     WHERE p.supplier_id = $1
       AND pu.applied_at >= NOW() - ($2::int * INTERVAL '1 day')
+    `,
+    [supplierId, daysInt]
+  )
+
+  const { rows: adSpendRows } = await query(
+    `
+    SELECT COALESCE(SUM(amount), 0)::numeric AS ad_spend
+    FROM billing_invoice
+    WHERE tenant_id = $1
+      AND tenant_type = 'SUPPLIER'
+      AND status = 'PAID'
+      AND COALESCE(metadata->>'refunded', 'false') <> 'true'
+      AND (metadata->>'type') IN ('deal_boost', 'featured_placement')
+      AND COALESCE(paid_at, created_at) >= NOW() - ($2::int * INTERVAL '1 day')
     `,
     [supplierId, daysInt]
   )
@@ -544,6 +613,9 @@ export async function getSupplierDealsAnalyticsSummary(supplierId, { days = 30 }
   const clicks = interactionMap.click || 0
   const orders = usageRows[0]?.orders_influenced || 0
   const conversionRate = views > 0 ? Math.round((orders / views) * 10000) / 100 : 0
+  const adSpend = Number(adSpendRows[0]?.ad_spend || 0)
+  const attributedGmv = Number(usageRows[0]?.attributed_gmv || 0)
+  const roas = adSpend > 0 ? Math.round((attributedGmv / adSpend) * 100) / 100 : null
 
   return {
     periodDays: daysInt,
@@ -556,6 +628,9 @@ export async function getSupplierDealsAnalyticsSummary(supplierId, { days = 30 }
     couponUses: interactionMap.coupon_used || 0,
     messages: interactionMap.message || 0,
     totalDiscount: Number(usageRows[0]?.total_discount || 0),
+    attributedGmv,
+    adSpend,
+    roas,
     conversionRate,
     topDeals,
   }

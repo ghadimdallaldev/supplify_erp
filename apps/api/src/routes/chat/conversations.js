@@ -793,6 +793,18 @@ router.post(
 router.patch('/conversations/:conversationId/read', requireAuth, async (req, res) => {
   try {
     const { conversationId } = req.params
+    const { rows: conversations } = await query(
+      'SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1',
+      [conversationId]
+    )
+    if (!conversations.length || !(await userCanAccessConversation(req, conversations[0]))) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Conversation not found' },
+        requestId: req.requestId,
+      })
+    }
 
     // Reset unread count
     const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -884,6 +896,18 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
     }
 
     const message = messages[0]
+    const { rows: conversations } = await query(
+      'SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1',
+      [message.conversation_id]
+    )
+    if (!conversations.length || !(await userCanAccessConversation(req, conversations[0]))) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Message not found' },
+        requestId: req.requestId,
+      })
+    }
 
     // Only mark as read if the current user is the receiver (not the sender)
     const participantType = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
@@ -897,17 +921,31 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
       })
     }
 
-    // Mark message as read
-    await query(
+    // Mark message as read and keep participant unread_count in sync
+    const { rows: marked } = await query(
       `
       UPDATE message
       SET is_read = true,
           read_at = now(),
           updated_at = now()
       WHERE id = $1 AND is_read = false
+      RETURNING id
     `,
       [messageId]
     )
+
+    if (marked.length > 0) {
+      await query(
+        `
+        UPDATE conversation_participant
+        SET unread_count = GREATEST(unread_count - 1, 0),
+            last_read_at = now(),
+            updated_at = now()
+        WHERE conversation_id = $1 AND participant_type = $2
+      `,
+        [message.conversation_id, participantType]
+      )
+    }
 
     // Emit socket event for real-time read receipt update
     try {

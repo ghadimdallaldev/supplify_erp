@@ -26,6 +26,9 @@ export function resolvePushUrl(referenceType, referenceId) {
   if (referenceType === 'CONVERSATION' || referenceType === 'CHAT') return '/app/chat'
   if (referenceType === 'QUICK_LIST') return '/app/quick-lists'
   if (referenceType === 'QUOTE_REQUEST') return `/app/quote-requests/${referenceId}`
+  if (referenceType === 'SUBSCRIPTION' || referenceType === 'BILLING') {
+    return '/app/settings?tab=subscription'
+  }
   return '/app/notifications'
 }
 

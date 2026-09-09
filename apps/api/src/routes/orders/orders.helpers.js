@@ -217,21 +217,12 @@ const orderCreateSchema = z.object({
       })
     )
     .optional(),
-  status: z
-    .enum([
-      'DRAFT',
-      'PLACED',
-      'ACKNOWLEDGED',
-      'PROCESSING',
-      'SHIPPED',
-      'DELIVERED',
-      'RECEIVED_PARTIAL',
-      'RECEIVED_FULL',
-      'INVOICED',
-      'COMPLETED',
-      'CANCELLED',
-    ])
-    .default('PLACED'),
+  status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
+  deliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  notes: z.string().max(2000).optional(),
 })
 
 const supplierOrderCreateSchema = z.object({
@@ -283,6 +274,7 @@ const orderUpdateSchema = z.object({
 const orderListSchema = z.object({
   status: z.string().optional(),
   supplier: z.string().uuid().optional(),
+  restaurant: z.string().uuid().optional(),
   q: z.string().max(200).optional(),
   from: z.string().optional(),
   to: z.string().optional(),

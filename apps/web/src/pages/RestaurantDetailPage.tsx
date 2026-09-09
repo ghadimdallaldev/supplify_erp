@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useGetOrdersQuery, useGetRestaurantsQuery } from '../services/api'
+import { useGetOrdersQuery, useGetRestaurantQuery } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -34,35 +34,58 @@ export function RestaurantDetailPage() {
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const [isPinned, setIsPinned] = useState(false)
+  const supplierId =
+    user?.workspace?.tenantType === 'SUPPLIER' ? user.workspace.tenantId : undefined
 
-  const { data: restaurantsData } = useGetRestaurantsQuery({ limit: 1000, offset: 0 })
-  const { data: ordersData } = useGetOrdersQuery({ limit: 1000, offset: 0, includeItems: true })
+  const { data: restaurantPayload, isLoading: restaurantLoading } = useGetRestaurantQuery(id!, {
+    skip: !id,
+  })
+  const restaurant =
+    restaurantPayload && typeof restaurantPayload === 'object' && 'restaurant' in restaurantPayload
+      ? (restaurantPayload as { restaurant: any }).restaurant
+      : restaurantPayload
 
-  const restaurant = restaurantsData?.restaurants.find((r) => r.id === id)
+  const { data: ordersData } = useGetOrdersQuery(
+    {
+      restaurant: id,
+      limit: 100,
+      offset: 0,
+      includeItems: true,
+    },
+    { skip: !id }
+  )
 
   useEffect(() => {
     void ensureNamespace('restaurants')
   }, [])
 
-  // Get all orders for this restaurant
-  const restaurantOrders = useMemo(() => {
-    if (!ordersData?.orders) return []
-    return ordersData.orders.filter((order) => order.restaurant_id === id)
-  }, [ordersData, id])
+  const restaurantOrders = useMemo(() => ordersData?.orders ?? [], [ordersData?.orders])
 
-  // Calculate statistics
+  // Calculate statistics — for suppliers, use line totals for this supplier only
   const stats = useMemo(() => {
     const totalOrders = restaurantOrders.length
     const totalSpent = restaurantOrders.reduce((sum, order) => {
+      if (supplierId) {
+        const lineSum =
+          order.items
+            ?.filter((item: any) => item.supplier_id === supplierId)
+            .reduce((itemSum: number, item: any) => {
+              const lineTotal =
+                typeof item.line_total === 'number'
+                  ? item.line_total
+                  : parseFloat(item.line_total || 0)
+              return itemSum + (isNaN(lineTotal) ? 0 : lineTotal)
+            }, 0) || 0
+        return sum + lineSum
+      }
       const amount =
         typeof order.total_amount === 'number'
           ? order.total_amount
-          : parseFloat(order.total_amount || 0)
+          : parseFloat(String(order.total_amount || 0))
       return sum + (isNaN(amount) ? 0 : amount)
     }, 0)
     const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0
 
-    // Get most purchased products
     const productCount = new Map<
       string,
       { name: string; sku: string; totalQuantity: number; totalRevenue: number }
@@ -70,6 +93,7 @@ export function RestaurantDetailPage() {
 
     restaurantOrders.forEach((order) => {
       order.items?.forEach((item: any) => {
+        if (supplierId && item.supplier_id !== supplierId) return
         if (!productCount.has(item.product_id)) {
           productCount.set(item.product_id, {
             name: item.product_name || t('detail.unknownProduct'),
@@ -92,7 +116,6 @@ export function RestaurantDetailPage() {
       .sort((a, b) => b.totalQuantity - a.totalQuantity)
       .slice(0, 5)
 
-    // Get order trend (last 6 months)
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
 
@@ -108,11 +131,21 @@ export function RestaurantDetailPage() {
       mostPurchasedProducts,
       recentOrders,
     }
-  }, [restaurantOrders, t])
+  }, [restaurantOrders, supplierId, t])
 
   const handlePinToggle = () => {
     setIsPinned(!isPinned)
     toast.success(!isPinned ? t('detail.pinnedToast') : t('detail.unpinnedToast'))
+  }
+
+  if (restaurantLoading) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[var(--text-muted)]">
+          {t('detail.loading', { defaultValue: 'Loading…' })}
+        </p>
+      </div>
+    )
   }
 
   if (!restaurant) {

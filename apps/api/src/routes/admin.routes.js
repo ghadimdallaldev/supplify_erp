@@ -15,7 +15,10 @@ import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { logger } from '../lib/logger.js'
 import { z } from 'zod'
 import { getCache, setCache } from '../lib/cache.js'
-import { buildDashboardSummary } from '../services/dashboard-summary.service.js'
+import {
+  buildDashboardSummary,
+  dashboardSummaryCacheKey,
+} from '../services/dashboard-summary.service.js'
 
 const router = express.Router()
 
@@ -335,10 +338,6 @@ router.get(
 )
 
 const DASHBOARD_SUMMARY_CACHE_TTL_SECONDS = 60
-
-function dashboardSummaryCacheKey(tenantType, tenantId) {
-  return `dashboard:summary:v1:${tenantType}:${tenantId}`
-}
 
 // Lightweight dashboard bundle: stats + recent orders + spend trend / low-stock preview
 router.get(

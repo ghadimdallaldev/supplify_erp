@@ -195,7 +195,23 @@
     "noProductsFound": "لم يتم العثور على منتجات",
     "categories": "الفئات",
     "noCategoriesAvailable": "لا تتوفر فئات",
-    "clearSelection": "مسح التحديد"
+    "clearSelection": "مسح التحديد",
+    "audienceTitle": "من يرى هذا التعزيز",
+    "audienceHelper": "اختياري. استهدف أنواع المطاعم والمناطق — فارغ يعني كل المطاعم المؤهلة. تطابق المناطق المدينة أو الحي أو المنطقة على ملف المطعم.",
+    "areas": "المناطق",
+    "areaPlaceholder": "مثلاً بيروت، حمرا، وسط المدينة",
+    "addArea": "إضافة",
+    "removeArea": "إزالة {{area}}",
+    "restaurantTypes": {
+      "fine_dining": "فاخر",
+      "casual_dining": "عائلي",
+      "fast_food": "وجبات سريعة",
+      "cafe": "مقهى",
+      "bakery": "مخبز",
+      "hotel": "فندق",
+      "catering": "تموين",
+      "cloud_kitchen": "مطبخ سحابي"
+    }
   },
   "banner": {
     "andMore": " و{{count}} أخرى",
@@ -214,6 +230,9 @@
     "boostPrice_one": "تعزيز ${{price}} · {{count}} يوم",
     "boostPrice_other": "تعزيز ${{price}} · {{count}} أيام",
     "awaitingPayment": "بانتظار دفع التعزيز للنشر",
+    "payActivation": "Pay boost ${{price}}",
+    "paymentSuccess": "Boost paid and activated",
+    "paymentFailed": "Boost payment failed",
     "submitWithBoost": "إرسال مع التعزيز",
     "delete": "حذف",
     "pause": "إيقاف مؤقت",
@@ -242,6 +261,10 @@
     "couponUses": "استخدامات القسيمة",
     "conversion": "التحويل",
     "discountAmount": "مبلغ الخصم",
+    "adSpend": "إنفاق الإعلان",
+    "attributedGmv": "إيراد منسوب",
+    "roas": "عائد الإنفاق",
+    "costPerOrder": "تكلفة الطلب",
     "boostSummary": "التعزيز: {{status}} · الميزانية ${{budget}} · {{impressions}} مشاهدة · ظهور ممول"
   },
   "boostStatusCard": {
@@ -259,5 +282,15 @@
   "card": {
     "toastCouponError": "تعذّر استرداد القسيمة",
     "toastMessageError": "تعذّر بدء المحادثة"
+  },
+  "createPreview": {
+    "title": "معاينة المطعم",
+    "untitled": "عرض بدون عنوان",
+    "cta": "الإجراء الأساسي: {{cta}}",
+    "coupon": "الرمز {{code}}",
+    "audience": "الجمهور: {{types}} · المناطق: {{areas}}",
+    "allTypes": "كل الأنواع",
+    "allAreas": "كل المناطق",
+    "helper": "هكذا سيرى المطعم عرضك في خلاصة العروض بعد التفعيل."
   }
 }

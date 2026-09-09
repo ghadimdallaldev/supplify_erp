@@ -19,8 +19,10 @@ import {
   listSupplierQuoteRequests,
   getSupplierQuoteRequestDetail,
   submitQuoteResponse,
+  declineQuoteRequest,
   buildCartPayloadFromResponse,
   assertRestaurantOwnsQuoteRequest,
+  SUPPLIER_INBOX_STATUSES,
 } from '../services/quote-requests.service.js'
 
 const router = express.Router()
@@ -36,15 +38,33 @@ const createQuoteRequestSchema = z.object({
       })
     )
     .min(1),
-  supplierIds: z.array(z.string().uuid()).min(1),
-  note: z.string().optional(),
-  neededBy: z.string().optional(),
+  supplierIds: z.array(z.string().uuid()).min(1).max(25),
+  note: z.string().max(2000).optional(),
+  // needed_by is a DATE column — an arbitrary string reached Postgres as a 500.
+  neededBy: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'neededBy must be an ISO date (YYYY-MM-DD)')
+    .optional(),
 })
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().optional(),
   status: z.enum(['open', 'closed', 'cancelled', 'pending', 'responded', 'declined']).optional(),
+})
+
+// The supplier inbox filters on quote_request_suppliers.status; the restaurant-side
+// values (open/closed/cancelled) never match there and silently returned nothing.
+const supplierInboxQuerySchema = z.object({
+  page: z.coerce.number().int().positive().max(10000).optional(),
+  limit: z.coerce.number().int().positive().max(50).optional(),
+  status: z.enum(['pending', 'responded', 'declined']).optional(),
+  search: z.string().trim().max(120).optional(),
+  sort: z.enum(['newest', 'oldest', 'needed_by']).optional(),
+})
+
+const declineSchema = z.object({
+  reason: z.string().trim().max(500).optional().nullable(),
 })
 
 const responseItemSchema = z.object({
@@ -81,8 +101,19 @@ router.get(
           requestId: req.requestId,
         })
       }
-      const params = listQuerySchema.parse(req.query)
-      const data = await listSupplierQuoteRequests(supplierId, params)
+      const parsed = supplierInboxQuerySchema.safeParse(req.query)
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: `Invalid inbox filter (status must be one of ${SUPPLIER_INBOX_STATUSES.join(', ')})`,
+          },
+          requestId: req.requestId,
+        })
+      }
+      const data = await listSupplierQuoteRequests(supplierId, parsed.data)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (error) {
       next(error)
@@ -107,8 +138,37 @@ router.get(
       }
       const data = await getSupplierQuoteRequestDetail(
         supplierId,
-        req.params.quoteRequestSupplierId
+        req.params.quoteRequestSupplierId,
+        { markViewed: true }
       )
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
+router.post(
+  '/supplier/inbox/:quoteRequestSupplierId/decline',
+  requireRole(['SUPPLIER']),
+  requirePermission(P.ORDERS_MANAGE),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Supplier not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = declineSchema.parse(req.body ?? {})
+      const data = await declineQuoteRequest({
+        supplierId,
+        quoteRequestSupplierId: req.params.quoteRequestSupplierId,
+        reason: body.reason,
+      })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (error) {
       next(error)

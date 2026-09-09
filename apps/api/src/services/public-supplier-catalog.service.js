@@ -7,6 +7,7 @@ import {
   getDefaultCatalogPricesBatch,
 } from './resolve-product-price.service.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
+import { listSupplierStockDisplay } from './supplier-stock.service.js'
 
 const DEFAULT_PAGE_SIZE = 24
 
@@ -17,16 +18,23 @@ export function isUuid(str) {
 
 async function buildPublicSupplierSelectFields() {
   const fields = ['s.id', 's.name']
-  if (await columnExists('supplier', 'slug')) {
+  const [hasSlug, hasMinimumOrderAmount, hasPaymentTerms, hasPublicCatalogEnabled] =
+    await Promise.all([
+      columnExists('supplier', 'slug'),
+      columnExists('supplier', 'minimum_order_amount'),
+      columnExists('supplier', 'payment_terms'),
+      columnExists('supplier', 'public_catalog_enabled'),
+    ])
+  if (hasSlug) {
     fields.push('s.slug')
   }
-  if (await columnExists('supplier', 'minimum_order_amount')) {
+  if (hasMinimumOrderAmount) {
     fields.push('s.minimum_order_amount')
   }
-  if (await columnExists('supplier', 'payment_terms')) {
+  if (hasPaymentTerms) {
     fields.push('s.payment_terms')
   }
-  if (await columnExists('supplier', 'public_catalog_enabled')) {
+  if (hasPublicCatalogEnabled) {
     fields.push('s.public_catalog_enabled')
   }
   return fields.join(',\n  ')
@@ -73,9 +81,9 @@ export async function resolvePublicSupplierByIdOrSlug(idOrSlug, dbQuery = query)
   return rows[0]
 }
 
-async function canExposeBranding(supplierId, dbQuery = query) {
+async function canExposeBranding(supplierId) {
   try {
-    const enabled = await isFeatureEnabled('custom_branding', supplierId, 'SUPPLIER')
+    const enabled = await isFeatureEnabled(supplierId, 'SUPPLIER', 'custom_branding')
     return enabled
   } catch {
     return false
@@ -142,54 +150,59 @@ export async function listPublicSupplierProducts(
 
   const whereClause = where.join(' AND ')
 
-  const { rows } = await dbQuery(
-    `
-    SELECT
-      p.id,
-      p.name,
-      p.sku,
-      p.category,
-      p.unit,
-      p.image_url,
-      p.description,
-      COALESCE(inv.total_available, 0) > 0 AS in_stock
-    FROM product p
-    JOIN supplier s ON s.id = p.supplier_id
-    LEFT JOIN (
-      SELECT product_id, SUM(available_qty) AS total_available
-      FROM inventory
-      GROUP BY product_id
-    ) inv ON inv.product_id = p.id
-    WHERE ${whereClause}
-    ORDER BY p.name ASC
-    LIMIT ${safeLimit} OFFSET ${offset}
-    `,
-    params
-  )
+  // Products page, total count, and category list are independent — run in parallel.
+  const [{ rows }, { rows: countRows }, { rows: categories }] = await Promise.all([
+    dbQuery(
+      `
+      SELECT
+        p.id,
+        p.name,
+        p.sku,
+        p.category,
+        p.unit,
+        p.image_url,
+        p.description
+      FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE ${whereClause}
+      ORDER BY p.name ASC
+      LIMIT ${safeLimit} OFFSET ${offset}
+      `,
+      params
+    ),
+    dbQuery(
+      `
+      SELECT COUNT(*)::int AS total
+      FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE ${whereClause}
+      `,
+      params
+    ),
+    dbQuery(
+      `
+      SELECT DISTINCT p.category
+      FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
+      WHERE p.supplier_id = $1
+        AND p.category IS NOT NULL
+        AND p.category <> ''
+        AND ${catalogEnabledPredicate}
+      ORDER BY p.category ASC
+      LIMIT 50
+      `,
+      [supplierId]
+    ),
+  ])
 
-  const { rows: countRows } = await dbQuery(
-    `
-    SELECT COUNT(*)::int AS total
-    FROM product p
-    JOIN supplier s ON s.id = p.supplier_id
-    WHERE ${whereClause}
-    `,
-    params
-  )
-
-  const { rows: categories } = await dbQuery(
-    `
-    SELECT DISTINCT p.category
-    FROM product p
-    JOIN supplier s ON s.id = p.supplier_id
-    WHERE p.supplier_id = $1
-      AND p.category IS NOT NULL
-      AND p.category <> ''
-      AND ${catalogEnabledPredicate}
-    ORDER BY p.category ASC
-    LIMIT 50
-    `,
-    [supplierId]
+  const stockRows = rows.length
+    ? await listSupplierStockDisplay(supplierId, {
+        productIds: rows.map((row) => row.id),
+        dbQuery,
+      })
+    : []
+  const stockByProductId = new Map(
+    stockRows.map((row) => [row.product_id, Number(row.available_qty) > 0])
   )
 
   return {
@@ -201,7 +214,7 @@ export async function listPublicSupplierProducts(
       unit: row.unit,
       imageUrl: row.image_url,
       description: row.description,
-      inStock: row.in_stock,
+      inStock: stockByProductId.get(row.id) === true,
     })),
     categories: categories.map((c) => c.category).filter(Boolean),
     pagination: {
@@ -270,6 +283,7 @@ export async function listAuthenticatedRestaurantProducts(
 
 export async function getPublicSupplierCatalogSummary(idOrSlug, dbQuery = query) {
   const profile = await getPublicSupplierProfile(idOrSlug, dbQuery)
+
   const { rows: countRows } = await dbQuery(
     `SELECT COUNT(*)::int AS total FROM product WHERE supplier_id = $1`,
     [profile.id]

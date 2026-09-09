@@ -21,7 +21,7 @@ export async function completeInviteAcceptSession(res, { result, fullName, req }
 
   try {
     const tokens = await exchangePasswordForTokens(result.email, result.password)
-    setAuthCookies(res, tokens.access_token, tokens.refresh_token)
+    setAuthCookies(res, tokens.access_token, tokens.refresh_token, tokens.id_token)
     const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
     return {
       user: {

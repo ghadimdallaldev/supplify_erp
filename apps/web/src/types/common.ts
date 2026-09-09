@@ -2,6 +2,7 @@
 export interface Address {
   street?: string
   city?: string
+  area?: string
   region?: string
   country?: string
 }

@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
-import { config } from '../config/env.js'
+import { isPromotionAdPaymentWaived } from '../lib/billing/promotion-ad-billing.js'
+import { buildBoostTargetAudienceFromDeal } from '../lib/restaurant-targeting.js'
 import {
   DEAL_STATUSES,
   PAYMENT_STATUSES,
@@ -117,17 +118,18 @@ export async function applyBoostSelectionToDeal(dealId, supplierId, pricingKey, 
  */
 export async function publishDealAfterApproval(
   deal,
-  { targetAudience = { all: true }, waivePayment = true } = {}
+  { targetAudience = null, waivePayment = true, paymentConfirmed = false } = {}
 ) {
   if (!deal.boost_pricing_key && !deal.boost_package_id) {
     throw new Error('Deal has no boost package selected')
   }
 
+  const audience = targetAudience || buildBoostTargetAudienceFromDeal(deal)
   const now = new Date()
   const window = computeBoostWindow(deal, { now })
   const budget = Number(deal.boost_price_snapshot) || 0
-  const billingStatus = waivePayment ? 'waived' : 'pending'
-  const campaignStatus = waivePayment ? 'active' : 'draft'
+  const billingStatus = waivePayment ? 'waived' : paymentConfirmed ? 'paid' : 'pending'
+  const campaignStatus = waivePayment || paymentConfirmed ? 'active' : 'draft'
 
   return withTransaction(async (client) => {
     const { rows: pkgRows } = await client.query(
@@ -151,7 +153,7 @@ export async function publishDealAfterApproval(
         budget,
         window.boost_start_at,
         window.boost_end_at,
-        JSON.stringify(targetAudience),
+        JSON.stringify(audience),
         pkg?.billing_type || 'flat_fee',
         billingStatus,
         campaignStatus,
@@ -184,7 +186,5 @@ export async function publishDealAfterApproval(
 }
 
 export function isBoostPaymentWaived() {
-  return (
-    config.NODE_ENV !== 'production' || process.env.ALLOW_WAIVE_DEAL_PROMOTION_PAYMENT === 'true'
-  )
+  return isPromotionAdPaymentWaived()
 }

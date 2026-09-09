@@ -23,6 +23,7 @@ import { ReservationBoard } from '../components/reservations/ReservationBoard'
 import { ReservationTableBuilder } from '../components/reservations/ReservationTableBuilder'
 import { PublicBookingSettingsCard } from '../components/reservations/PublicBookingSettingsCard'
 import { ReservationAnalyticsPanel } from '../components/reservations/ReservationAnalyticsPanel'
+import { ReservationReviewsPanel } from '../components/reservations/ReservationReviewsPanel'
 import { ReservationCreateDrawer } from '../components/reservations/ReservationCreateDrawer'
 import { ReservationAssignmentsSummary } from '../components/reservations/ReservationAssignmentsSummary'
 import { CalendarDays, Loader2, Link2, Copy, Star, Users, Sparkles } from 'lucide-react'
@@ -385,6 +386,8 @@ export function ReservationsPage() {
             activeRange={range}
             onRangeChange={handleRangeChange}
           />
+
+          <ReservationReviewsPanel />
 
           <Card>
             <CardHeader>

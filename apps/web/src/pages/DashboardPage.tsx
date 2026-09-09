@@ -125,22 +125,26 @@ export function DashboardPage() {
     smartReorderFeatureValue === 'full_90day_trends' ||
     smartReorderFeatureValue === 'ai_forecast_seasonality'
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
-    skip: !isRestaurant || !smartReorderEnabled,
+    skip: !isRestaurant || !smartReorderEnabled || !showRestaurantSection('showReorderAlerts'),
   })
   const inventoryMgmtEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.inventory_management
   )
   const { data: expirySummaryData } = useGetExpirySummaryQuery(undefined, {
-    skip: !isRestaurant || !inventoryMgmtEnabled,
+    skip: !isRestaurant || !inventoryMgmtEnabled || !showRestaurantSection('showExpiry'),
   })
   const { data: reorderRemindersData } = useGetReorderRemindersQuery(undefined, {
-    skip: !isRestaurant || !smartReorderEnabled,
+    skip: !isRestaurant || !smartReorderEnabled || !showRestaurantSection('showReorderReminders'),
   })
   const { data: atRiskData } = useGetSupplierAtRiskOrdersQuery(undefined, {
     skip: !isSupplier || !smartReorderEnabled,
   })
   const { data: quickListsData } = useGetQuickListsQuery(undefined, {
-    skip: !isRestaurant,
+    skip:
+      !isRestaurant ||
+      !smartReorderEnabled ||
+      !showRestaurantSection('showReorderAlerts') ||
+      !restaurantLayout?.allowReorderActions,
   })
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [addingSuggestionId, setAddingSuggestionId] = useState<string | null>(null)
@@ -148,7 +152,9 @@ export function DashboardPage() {
   const [periodDays, setPeriodDays] = useState<SpendTrendPeriodDays>(SPEND_TREND_DAYS)
   const { data: invoiceAnalytics } = useGetInvoiceAnalyticsQuery(
     { period: periodDays },
-    { skip: !isRestaurant || !financeInvoicesEnabled }
+    {
+      skip: !isRestaurant || !financeInvoicesEnabled || !showRestaurantSection('showSpendTrend'),
+    }
   )
   const planName = formatPlanDisplayName(
     entitlementsData?.entitlements?.plan?.code,

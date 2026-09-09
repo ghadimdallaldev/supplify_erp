@@ -41,6 +41,7 @@ import {
 } from '../lib/admin-user-preferences.js'
 import { emitAuthSessionEvent } from '../lib/auth-session-events.js'
 import { extractAccessToken } from '../lib/mobile-auth.js'
+import { mustBlockUnverifiedEmail } from '../lib/email-verification-gate.js'
 
 const legalAcceptanceSchema = {
   packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
@@ -82,6 +83,36 @@ function clearLocalAuthSession(req, res) {
     }
     req.session.destroy(() => resolve())
   })
+}
+
+function saveSession(req) {
+  return new Promise((resolve, reject) => {
+    if (!req.session) {
+      resolve()
+      return
+    }
+    req.session.save((err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
+/**
+ * Unverified OTP gate: clear app session and Keycloak SSO, then re-enter login
+ * so the user hits password + OTP / signup required action (not a dead-end SPA page).
+ * Pass idTokenHint whenever available to skip Keycloak's logout confirmation page.
+ */
+async function redirectUnverifiedEmailToLogin(req, res, idTokenHint = null) {
+  const hint = idTokenHint || req.cookies?.id_token || null
+  await clearLocalAuthSession(req, res)
+  const loginContinue = `${callbackOrigin(req)}/auth/login`
+  const logoutUrl = await getKeycloakLogoutUrl(loginContinue, hint)
+  logger.warn('Blocking auth until email OTP verification completes', {
+    next: loginContinue,
+    silentLogout: Boolean(hint),
+  })
+  return res.redirect(logoutUrl)
 }
 
 /**
@@ -127,13 +158,9 @@ router.get('/login', async (req, res) => {
     // Generate CSRF token for this session
     const state = randomBytes(32).toString('hex')
 
-    // Store state in session and force save
+    // Store state in session and force save before redirect (avoids lost oauthState).
     req.session.oauthState = state
-    req.session.save((err) => {
-      if (err) {
-        logger.error('Error saving session', { error: err.message })
-      }
-    })
+    await saveSession(req)
 
     logger.info('Login initiated')
 
@@ -155,19 +182,28 @@ router.get('/register', async (req, res) => {
   const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
   try {
     // Keycloak blocks registration when another SSO session is active — end it first.
+    // Skip the logout hop when there is no app session (avoids a pointless redirect).
+    // When ending SSO, pass id_token_hint so Keycloak does not show "Do you want to log out?".
     if (req.query.continue !== '1') {
-      await clearLocalAuthSession(req, res)
-      const continueUrl = `${callbackOrigin(req)}/auth/register?continue=1`
-      const logoutUrl = await getKeycloakLogoutUrl(continueUrl)
-      logger.info('Registration: clearing Keycloak SSO session before signup')
-      return res.redirect(logoutUrl)
+      const idTokenHint = req.cookies?.id_token || null
+      const hasAppSession = Boolean(
+        req.cookies?.access_token || req.cookies?.refresh_token || idTokenHint
+      )
+      if (hasAppSession) {
+        await clearLocalAuthSession(req, res)
+        const continueUrl = `${callbackOrigin(req)}/auth/register?continue=1`
+        const logoutUrl = await getKeycloakLogoutUrl(continueUrl, idTokenHint)
+        logger.info('Registration: clearing Keycloak SSO session before signup', {
+          silentLogout: Boolean(idTokenHint),
+        })
+        return res.redirect(logoutUrl)
+      }
     }
 
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
-    req.session.save((err) => {
-      if (err) logger.error('Error saving session', { error: err.message })
-    })
+    req.session.registrationFlow = true
+    await saveSession(req)
 
     const redirectUri = `${callbackOrigin(req)}/auth/callback`
     const registrationUrl = await getRegistrationUrl(redirectUri, state)
@@ -184,6 +220,7 @@ router.get('/register', async (req, res) => {
 router.get('/logout', async (req, res) => {
   try {
     const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+    const idTokenHint = req.cookies?.id_token || null
     await clearLocalAuthSession(req, res)
 
     let redirectAfter = `${webOrigin}/login`
@@ -193,7 +230,7 @@ router.get('/logout', async (req, res) => {
       redirectAfter = req.query.redirect
     }
 
-    const logoutUrl = await getKeycloakLogoutUrl(redirectAfter)
+    const logoutUrl = await getKeycloakLogoutUrl(redirectAfter, idTokenHint)
     res.redirect(logoutUrl)
   } catch (error) {
     logger.error('Public logout error', { error: error.message })
@@ -228,7 +265,7 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
-    // Clear the state from session after successful verification
+    delete req.session.registrationFlow
     delete req.session.oauthState
 
     const redirectUri = `${callbackOrigin(req)}/auth/callback`
@@ -238,6 +275,20 @@ router.get('/callback', async (req, res) => {
 
     // Get user info from Keycloak
     const userInfo = await getUserInfo(tokens.access_token, tokens.id_token)
+
+    // Block any OAuth completion while email OTP verification is incomplete —
+    // not only registrationFlow (login SSO could otherwise skip the OTP page).
+    if (
+      mustBlockUnverifiedEmail({
+        otpEnabled: config.AUTH_EMAIL_OTP_ENABLED,
+        emailVerified: userInfo.email_verified,
+      })
+    ) {
+      logger.warn('Blocking auth until email OTP verification completes', {
+        email: userInfo.email,
+      })
+      return redirectUnverifiedEmailToLogin(req, res, tokens.id_token)
+    }
 
     // Decode the access token to get roles from realm_access and resource_access
     const tokenParts = tokens.access_token.split('.')
@@ -251,8 +302,15 @@ router.get('/callback', async (req, res) => {
     // Upsert user in database
     const user = await upsertUser(userInfo, roles)
 
+    // Existing driver accounts are backfilled on their next successful login. The provider
+    // still requires OTP for that first synchronization; subsequent driver logins are quiet.
+    if (config.AUTH_EMAIL_OTP_ENABLED) {
+      const { syncDriverLoginPolicyForUser } = await import('../lib/driver-login-policy.js')
+      await syncDriverLoginPolicyForUser(user.id)
+    }
+
     // Set auth cookies
-    setAuthCookies(res, tokens.access_token, tokens.refresh_token)
+    setAuthCookies(res, tokens.access_token, tokens.refresh_token, tokens.id_token)
     clearImpersonationCookie(res)
     clearActiveTenantCookie(res)
 
@@ -455,6 +513,7 @@ router.get('/me', requireAuth, async (req, res) => {
       data: {
         id: user.id,
         email: user.email,
+        emailVerified: req.user?.email_verified === true,
         displayName: user.display_name,
         role: user.role,
         accessType,
@@ -594,7 +653,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     const newTokens = refreshResult.tokens
-    setAuthCookies(res, newTokens.access_token, newTokens.refresh_token)
+    setAuthCookies(res, newTokens.access_token, newTokens.refresh_token, newTokens.id_token)
     emitAuthSessionEvent('AUTH_TOKEN_REFRESH_SUCCEEDED', {
       source: proactive ? 'proactive' : 'explicit',
     })
@@ -720,6 +779,7 @@ router.post('/logout', requireAuth, async (req, res) => {
   try {
     const accessToken = req.cookies?.access_token
     const refreshToken = req.cookies?.refresh_token
+    const idTokenHint = req.cookies?.id_token || null
 
     // Revoke tokens in Keycloak
     if (accessToken) {
@@ -745,7 +805,7 @@ router.post('/logout', requireAuth, async (req, res) => {
     // Keycloak logout URL: redirect user there to clear Keycloak SSO session
     let keycloakLogoutUrl = null
     try {
-      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri)
+      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri, idTokenHint)
     } catch (e) {
       logger.warn('Could not build Keycloak logout URL', { error: e.message })
     }
@@ -766,6 +826,7 @@ router.post('/logout', requireAuth, async (req, res) => {
   } catch (error) {
     logger.error('Logout error', { error: error.message })
 
+    const idTokenHint = req.cookies?.id_token || null
     // Clear cookies and session even if revocation or destroy fails
     clearAuthCookies(res)
     clearImpersonationCookie(res)
@@ -774,7 +835,7 @@ router.post('/logout', requireAuth, async (req, res) => {
 
     let keycloakLogoutUrl = null
     try {
-      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri)
+      keycloakLogoutUrl = await getKeycloakLogoutUrl(postLogoutRedirectUri, idTokenHint)
     } catch {
       /* optional: logout URL not required for success response */
     }

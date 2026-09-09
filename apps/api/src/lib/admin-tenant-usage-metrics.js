@@ -68,6 +68,12 @@ export const RESTAURANT_USAGE_FIELDS_SQL = `
   ) AS storage_mb_used
 `
 
+/**
+ * Only meters for the current period count: daily meters use CURRENT_DATE,
+ * cumulative meters (storage) use the fixed sentinel period (see subscription.js).
+ */
+const CURRENT_PERIOD_METER_SQL = `period_start_date IN (CURRENT_DATE, '${CUMULATIVE_STORAGE_PERIOD_DATE}')`
+
 const TENANTS_OVER_LIMIT_SQL = `
   SELECT COUNT(*)::int AS count
   FROM (
@@ -76,6 +82,7 @@ const TENANTS_OVER_LIMIT_SQL = `
     WHERE is_over_limit = true
       AND limit_value IS NOT NULL
       AND limit_value > 0
+      AND ${CURRENT_PERIOD_METER_SQL}
   ) over_tenants
 `
 
@@ -89,6 +96,7 @@ const TENANTS_NEAR_LIMIT_SQL = `
       AND limit_value > 0
       AND current_value >= (limit_value * 0.8)
       AND current_value < limit_value
+      AND ${CURRENT_PERIOD_METER_SQL}
   ) near_tenants
 `
 

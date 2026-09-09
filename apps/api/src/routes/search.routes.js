@@ -84,6 +84,18 @@ const SEARCH_PRODUCT_COLUMNS = `
 `
 
 async function searchProducts(q, limit, restaurantId) {
+  const params = [q, limit]
+  let blocklistClause = ''
+  if (restaurantId) {
+    blocklistClause = `
+      AND NOT EXISTS (
+        SELECT 1 FROM supplier_blocklist sb
+        WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $3
+      )
+    `
+    params.push(restaurantId)
+  }
+
   const { rows } = await query(
     `
     SELECT
@@ -94,10 +106,11 @@ async function searchProducts(q, limit, restaurantId) {
     FROM product p
     JOIN supplier s ON s.id = p.supplier_id
     WHERE p.search_vector @@ plainto_tsquery('simple', $1)
+    ${blocklistClause}
     ORDER BY search_rank DESC, p.created_at DESC
     LIMIT $2
     `,
-    [q, limit]
+    params
   )
 
   if (restaurantId && rows.length > 0) {
@@ -123,13 +136,13 @@ async function searchSuppliers(q, limit, restaurantId) {
     `
     SELECT
       s.*,
-      COALESCE(pc.product_count, 0) AS product_count
+      COALESCE(stats.product_count, 0) AS product_count
     FROM supplier s
-    LEFT JOIN (
-      SELECT supplier_id, COUNT(DISTINCT id)::int AS product_count
-      FROM product
-      GROUP BY supplier_id
-    ) pc ON pc.supplier_id = s.id
+    LEFT JOIN LATERAL (
+      SELECT COUNT(DISTINCT p.id)::int AS product_count
+      FROM product p
+      WHERE p.supplier_id = s.id
+    ) stats ON true
     WHERE (
       LOWER(s.name) LIKE $1
       OR LOWER(COALESCE(s.contact_email, '')) LIKE $1
