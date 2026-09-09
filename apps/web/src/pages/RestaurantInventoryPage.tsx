@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
@@ -20,13 +21,21 @@ import {
 } from '../components/restaurant/inventory/lazyRestaurantInventoryTabs'
 import { ensureNamespace } from '../i18n'
 
+const RESTAURANT_INVENTORY_TABS = ['inventory', 'waste', 'history', 'expiry', 'totals'] as const
+
 export function RestaurantInventoryPage() {
   const { t } = useTranslation('inventory')
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     void ensureNamespace('inventory')
   }, [])
-  const [activeTab, setActiveTab] = useState('inventory')
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get('tab')
+    return tabParam && (RESTAURANT_INVENTORY_TABS as readonly string[]).includes(tabParam)
+      ? tabParam
+      : 'inventory'
+  })
   const [showAddProductDialog, setShowAddProductDialog] = useState(false)
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false)
   const [wastePreselectProductId, setWastePreselectProductId] = useState<string | null>(null)

@@ -37,7 +37,14 @@ window.addEventListener('vite:preloadError', (event) => {
 const appLoadT0 = performance.now()
 perfLog('app.bootstrap.start')
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

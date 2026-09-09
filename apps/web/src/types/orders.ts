@@ -39,6 +39,8 @@ export interface CreateOrderRequest {
   status?: 'DRAFT' | 'PLACED'
   promotionId?: string
   couponCode?: string
+  deliveryDate?: string
+  notes?: string
   quoteLocks?: Array<{
     productId: string
     quoteRequestSupplierId: string
@@ -225,6 +227,11 @@ export interface DispatchOrderCard {
   active_route_status?: string | null
   planned_route_only?: boolean
   route_planning_label?: string | null
+  warehouse_id?: string | null
+  warehouse_name?: string | null
+  warehouse_code?: string | null
+  warehouse_count?: number
+  multi_warehouse?: boolean
   assignment?: {
     id: string
     status: string

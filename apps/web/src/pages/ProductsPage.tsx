@@ -68,7 +68,7 @@ export function ProductsPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState(() => searchParams.get('supplier') ?? '')
   const [offset, setOffset] = useState(0)
   const [cursor, setCursor] = useState<string | undefined>()
   const [cursorHistory, setCursorHistory] = useState<string[]>([])

@@ -35,6 +35,36 @@ import { TooltipProvider } from './ui/tooltip'
 import { AdminShell } from './admin/shell'
 import { AssistantFab } from './assistant/AssistantFab'
 
+/** Scroll to `#anchor` targets on hash navigation (retries briefly for lazy-mounted content). */
+function ScrollToHash() {
+  const { hash } = useLocation()
+
+  useEffect(() => {
+    if (!hash) return
+    const id = decodeURIComponent(hash.slice(1))
+    if (!id) return
+
+    let cancelled = false
+    let attempts = 0
+    const tryScroll = () => {
+      if (cancelled) return
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+        return
+      }
+      attempts += 1
+      if (attempts < 10) window.setTimeout(tryScroll, 100)
+    }
+    requestAnimationFrame(tryScroll)
+    return () => {
+      cancelled = true
+    }
+  }, [hash])
+
+  return null
+}
+
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -251,6 +281,7 @@ export function Layout() {
       <TooltipProvider delayDuration={400} skipDelayDuration={0}>
         <BranchProvider>
           <div className="min-h-screen min-h-[100dvh]" style={{ background: 'var(--bg)' }}>
+            <ScrollToHash />
             <ImpersonationBanner />
             <UpgradeModal />
             <PaymentModal />

@@ -15,9 +15,21 @@ export const DEFAULT_SLOT_INTERVAL_MINUTES = 30
 export function readBookingMeta(operatingHours) {
   const parsed = parseOperatingHours(operatingHours)
   const meta = parsed?._booking ?? parsed?.bookingMeta ?? {}
+  const depositMode = ['none', 'fixed', 'percent'].includes(meta.depositMode)
+    ? meta.depositMode
+    : 'none'
   return {
     durationMinutes: Number(meta.durationMinutes) || DEFAULT_DURATION_MINUTES,
     slotIntervalMinutes: Number(meta.slotIntervalMinutes) || DEFAULT_SLOT_INTERVAL_MINUTES,
+    minPartySize: Number(meta.minPartySize) || 1,
+    maxPartySize: Number(meta.maxPartySize) || 20,
+    maxCoversPerSlot: Number(meta.maxCoversPerSlot) || null,
+    cancelWindowHours:
+      meta.cancelWindowHours === 0 || meta.cancelWindowHours ? Number(meta.cancelWindowHours) : 2,
+    depositMode,
+    depositAmount: Number(meta.depositAmount) || 0,
+    depositPercent: Number(meta.depositPercent) || 0,
+    depositPolicyText: typeof meta.depositPolicyText === 'string' ? meta.depositPolicyText : '',
   }
 }
 
@@ -183,10 +195,15 @@ export function calculateSlotsFromData({
   openingHour,
   closingHour,
   slotIntervalMinutes = DEFAULT_SLOT_INTERVAL_MINUTES,
+  maxCoversPerSlot = null,
   now = new Date(),
 }) {
   const activeTables = tables.filter((t) => t.is_active !== false)
-  const totalCapacity = activeTables.reduce((sum, t) => sum + Number(t.capacity || 0), 0)
+  const tableCapacity = activeTables.reduce((sum, t) => sum + Number(t.capacity || 0), 0)
+  const totalCapacity =
+    maxCoversPerSlot && Number(maxCoversPerSlot) > 0
+      ? Math.min(tableCapacity, Number(maxCoversPerSlot))
+      : tableCapacity
   const tableCount = activeTables.length
 
   if (!tableCount || totalCapacity < 1) {
@@ -301,9 +318,41 @@ export async function getRestaurantSlotAvailability(
   }
 
   const parsedHours = parseOperatingHours(operatingHours)
-  const { durationMinutes, slotIntervalMinutes } = readBookingMeta(parsedHours)
+  const bookingMeta = readBookingMeta(parsedHours)
+  const { durationMinutes, slotIntervalMinutes, minPartySize, maxPartySize, maxCoversPerSlot } =
+    bookingMeta
   const probeDate = dateAtHour(calendarDate, 12)
   const bookingWindow = resolveBookingWindow(parsedHours, probeDate)
+
+  const { rows: blackoutRows } = await queryFn(
+    `
+      SELECT id, reason
+      FROM reservation_blackout
+      WHERE restaurant_id = $1
+        AND blackout_date = $2::date
+        AND branch_id IS NULL
+      LIMIT 1
+    `,
+    [restaurantId, calendarDate]
+  )
+  if (blackoutRows.length) {
+    return {
+      slots: [],
+      totalCapacity,
+      tableCount: tables.length,
+      bookingWindow: { ...bookingWindow, closed: true, source: 'blackout' },
+      calendarDate,
+      durationMinutes,
+      slotIntervalMinutes,
+      minPartySize,
+      maxPartySize,
+      blackout: true,
+      blackoutReason: blackoutRows[0].reason || null,
+      depositMode: bookingMeta.depositMode,
+      depositPolicyText: bookingMeta.depositPolicyText,
+      cancelWindowHours: bookingMeta.cancelWindowHours,
+    }
+  }
 
   if (bookingWindow.closed) {
     return {
@@ -314,6 +363,29 @@ export async function getRestaurantSlotAvailability(
       calendarDate,
       durationMinutes,
       slotIntervalMinutes,
+      minPartySize,
+      maxPartySize,
+      depositMode: bookingMeta.depositMode,
+      depositPolicyText: bookingMeta.depositPolicyText,
+      cancelWindowHours: bookingMeta.cancelWindowHours,
+    }
+  }
+
+  if (partySize < minPartySize || partySize > maxPartySize) {
+    return {
+      slots: [],
+      totalCapacity,
+      tableCount: tables.length,
+      bookingWindow,
+      calendarDate,
+      durationMinutes,
+      slotIntervalMinutes,
+      minPartySize,
+      maxPartySize,
+      partySizeRejected: true,
+      depositMode: bookingMeta.depositMode,
+      depositPolicyText: bookingMeta.depositPolicyText,
+      cancelWindowHours: bookingMeta.cancelWindowHours,
     }
   }
 
@@ -332,6 +404,7 @@ export async function getRestaurantSlotAvailability(
     openingHour: bookingWindow.openingHour,
     closingHour: bookingWindow.closingHour,
     slotIntervalMinutes,
+    maxCoversPerSlot,
   })
 
   return {
@@ -342,6 +415,11 @@ export async function getRestaurantSlotAvailability(
     calendarDate,
     durationMinutes,
     slotIntervalMinutes,
+    minPartySize,
+    maxPartySize,
+    depositMode: bookingMeta.depositMode,
+    depositPolicyText: bookingMeta.depositPolicyText,
+    cancelWindowHours: bookingMeta.cancelWindowHours,
   }
 }
 

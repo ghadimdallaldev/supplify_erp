@@ -450,6 +450,8 @@ export function RestaurantsPage() {
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
@@ -600,6 +602,8 @@ export function RestaurantsPage() {
                       <img
                         src={restaurant.logo_url}
                         alt={restaurant.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement

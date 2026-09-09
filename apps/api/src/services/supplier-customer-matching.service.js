@@ -97,27 +97,38 @@ export async function matchProspectsForSupplier(supplierId, { batchId = null } =
 
 export async function listProspects(
   supplierId,
-  { limit = 50, offset = 0, lifecycleStatus = null } = {}
+  { limit = 50, offset = 0, lifecycleStatus = null, search = null } = {}
 ) {
-  const params = [supplierId]
-  let statusClause = ''
+  // Both queries read from supplier_customer_prospect aliased as `p`, so one set of
+  // qualified clauses serves the page query and the count query alike.
+  const filterParams = [supplierId]
+  let filterClause = ''
   if (lifecycleStatus) {
-    params.push(lifecycleStatus)
-    statusClause = ` AND lifecycle_status = $${params.length}`
+    filterParams.push(lifecycleStatus)
+    filterClause += ` AND p.lifecycle_status = $${filterParams.length}`
   }
-  params.push(limit, offset)
+  const trimmedSearch = typeof search === 'string' ? search.trim() : ''
+  if (trimmedSearch) {
+    filterParams.push(`%${trimmedSearch}%`)
+    const i = filterParams.length
+    filterClause += ` AND (p.restaurant_name ILIKE $${i} OR p.email ILIKE $${i} OR p.phone ILIKE $${i} OR p.contact_person ILIKE $${i})`
+  }
+
+  const params = [...filterParams, limit, offset]
   const { rows } = await query(
     `SELECT p.*, r.name AS matched_restaurant_name
      FROM supplier_customer_prospect p
      LEFT JOIN restaurant r ON r.id = p.matched_restaurant_id
-     WHERE p.supplier_id = $1${statusClause}
+     WHERE p.supplier_id = $1${filterClause}
      ORDER BY p.created_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   )
   const { rows: countRows } = await query(
-    `SELECT COUNT(*)::int AS total FROM supplier_customer_prospect WHERE supplier_id = $1${statusClause}`,
-    lifecycleStatus ? [supplierId, lifecycleStatus] : [supplierId]
+    `SELECT COUNT(*)::int AS total
+     FROM supplier_customer_prospect p
+     WHERE p.supplier_id = $1${filterClause}`,
+    filterParams
   )
   return { prospects: rows, total: countRows[0]?.total ?? 0 }
 }

@@ -478,15 +478,22 @@
       "totalViews": "إجمالي المشاهدات",
       "dealRedemptions": "استردادات العروض",
       "boostRevenue": "إيرادات التعزيز",
+      "boostAdSpend": "إنفاق الإعلانات (تعزيز+مميز)",
+      "orderGmv": "إيراد الطلبات من العروض",
+      "openAdInvoices": "فواتير إعلانات مفتوحة",
       "discountAmount": "مبلغ الخصم"
     },
     "toasts": {
       "approved": "تمت الموافقة على العرض",
       "rejected": "تم رفض العرض",
       "paused": "تم إيقاف العرض مؤقتًا",
+      "markedPaid": "تم تسجيل دفع التعزيز ونشر العرض",
+      "refunded": "تم استرداد التعزيز وإيقاف العرض",
       "approveFailed": "فشلت الموافقة على العرض",
       "rejectFailed": "فشل رفض العرض",
-      "pauseFailed": "فشل إيقاف العرض مؤقتًا"
+      "pauseFailed": "فشل إيقاف العرض مؤقتًا",
+      "markPaidFailed": "فشل تسجيل دفع التعزيز",
+      "refundFailed": "فشل استرداد التعزيز"
     },
     "collapseDetails": "طي التفاصيل",
     "expandDetails": "توسيع التفاصيل"

@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { publicFrontendUrl } from '../../lib/env'
 import { useResolvePublicHostQuery } from '../../services/api'
 import { PageLoading } from '../ui/page-loading'
-import { PublicSupplierCatalogPage } from '../../pages/PublicSupplierCatalogPage'
+
+const PublicSupplierCatalogPage = lazy(() =>
+  import('../../pages/PublicSupplierCatalogPage').then((m) => ({
+    default: m.PublicSupplierCatalogPage,
+  }))
+)
 
 function platformHostname() {
   try {
@@ -50,5 +55,9 @@ export function CustomDomainCatalogHost({ children }: { children: ReactNode }) {
     )
   }
 
-  return <PublicSupplierCatalogPage forcedSlug={data.slug} whiteLabel />
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <PublicSupplierCatalogPage forcedSlug={data.slug} whiteLabel />
+    </Suspense>
+  )
 }

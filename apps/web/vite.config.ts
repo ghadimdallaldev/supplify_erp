@@ -24,10 +24,15 @@ async function loadVisualizer() {
 const visualizerPlugin = await loadVisualizer()
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   publicDir: path.resolve(rootDir, 'static'),
   plugins: [react(), visualizerPlugin].filter(Boolean),
+  // Strip console/debugger from production bundles only — dev keeps console output.
+  esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : undefined,
   build: {
+    target: 'es2022',
+    // Skip gzip-size reporting on build — it adds time and we analyze via `pnpm analyze`.
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
         // Group vendor libs into shared chunks to reduce per-route request count.
@@ -141,4 +146,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

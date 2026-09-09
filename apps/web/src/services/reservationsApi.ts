@@ -147,6 +147,14 @@ export const reservationsApi = api.injectEndpoints({
         totalCapacity: number
         durationMinutes?: number
         slotIntervalMinutes?: number
+        minPartySize?: number
+        maxPartySize?: number
+        maxCoversPerSlot?: number | null
+        cancelWindowHours?: number
+        depositMode?: 'none' | 'fixed' | 'percent'
+        depositAmount?: number
+        depositPercent?: number
+        depositPolicyText?: string
       },
       void
     >({
@@ -163,12 +171,28 @@ export const reservationsApi = api.injectEndpoints({
         totalCapacity: number
         durationMinutes?: number
         slotIntervalMinutes?: number
+        minPartySize?: number
+        maxPartySize?: number
+        maxCoversPerSlot?: number | null
+        cancelWindowHours?: number
+        depositMode?: 'none' | 'fixed' | 'percent'
+        depositAmount?: number
+        depositPercent?: number
+        depositPolicyText?: string
       },
       {
         openTime: string
         closeTime: string
         durationMinutes?: number
         slotIntervalMinutes?: number
+        minPartySize?: number
+        maxPartySize?: number
+        maxCoversPerSlot?: number
+        cancelWindowHours?: number
+        depositMode?: 'none' | 'fixed' | 'percent'
+        depositAmount?: number
+        depositPercent?: number
+        depositPolicyText?: string
       }
     >({
       query: (body) => ({
@@ -177,6 +201,38 @@ export const reservationsApi = api.injectEndpoints({
         body,
       }),
       invalidatesTags: [{ type: 'Reservation' as const, id: 'BOOKING_SETTINGS' }],
+    }),
+    getReservationBlackouts: build.query<
+      {
+        blackouts: Array<{
+          id: string
+          blackout_date: string
+          reason?: string | null
+          branch_id?: string | null
+        }>
+      },
+      void
+    >({
+      query: () => '/api/reservations/blackouts',
+      providesTags: [{ type: 'Reservation' as const, id: 'BLACKOUTS' }],
+    }),
+    createReservationBlackout: build.mutation<
+      { blackout: Record<string, unknown> },
+      { blackoutDate: string; reason?: string; branchId?: string | null }
+    >({
+      query: (body) => ({
+        url: '/api/reservations/blackouts',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: [{ type: 'Reservation' as const, id: 'BLACKOUTS' }],
+    }),
+    deleteReservationBlackout: build.mutation<{ id: string }, string>({
+      query: (id) => ({
+        url: `/api/reservations/blackouts/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: [{ type: 'Reservation' as const, id: 'BLACKOUTS' }],
     }),
     getGuestIntelligence: build.query<
       {
@@ -192,6 +248,21 @@ export const reservationsApi = api.injectEndpoints({
         params: { branchId },
       }),
       providesTags: [{ type: 'Reservation' as const, id: 'GUESTS' }],
+    }),
+    getReservationReviews: build.query<{ reviews: import('../types').ReservationReview[] }, void>({
+      query: () => ({ url: '/api/reservations/reviews' }),
+      providesTags: [{ type: 'Reservation' as const, id: 'REVIEWS' }],
+    }),
+    replyToReservationReview: build.mutation<
+      { review: import('../types').ReservationReview },
+      { id: string; reply: string }
+    >({
+      query: ({ id, reply }) => ({
+        url: `/api/reservations/reviews/${id}/reply`,
+        method: 'POST',
+        body: { reply },
+      }),
+      invalidatesTags: [{ type: 'Reservation' as const, id: 'REVIEWS' }],
     }),
   }),
   overrideExisting: false,
@@ -209,4 +280,9 @@ export const {
   useManuallyPromoteWaitlistMutation,
   useGetPublicBookingSettingsQuery,
   useUpdatePublicBookingSettingsMutation,
+  useGetReservationBlackoutsQuery,
+  useCreateReservationBlackoutMutation,
+  useDeleteReservationBlackoutMutation,
+  useGetReservationReviewsQuery,
+  useReplyToReservationReviewMutation,
 } = reservationsApi

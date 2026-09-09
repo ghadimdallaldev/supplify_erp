@@ -195,7 +195,23 @@
     "noProductsFound": "No products found",
     "categories": "Categories",
     "noCategoriesAvailable": "No categories available",
-    "clearSelection": "Clear selection"
+    "clearSelection": "Clear selection",
+    "audienceTitle": "Who sees this boost",
+    "audienceHelper": "Optional. Target restaurant types and delivery areas — empty means all eligible restaurants. Area tokens match city, neighborhood/area, or region on the restaurant profile.",
+    "areas": "Areas",
+    "areaPlaceholder": "e.g. Beirut, Hamra, Downtown",
+    "addArea": "Add",
+    "removeArea": "Remove {{area}}",
+    "restaurantTypes": {
+      "fine_dining": "Fine dining",
+      "casual_dining": "Casual dining",
+      "fast_food": "Fast food",
+      "cafe": "Café",
+      "bakery": "Bakery",
+      "hotel": "Hotel",
+      "catering": "Catering",
+      "cloud_kitchen": "Cloud kitchen"
+    }
   },
   "banner": {
     "andMore": " and {{count}} more",
@@ -245,6 +261,10 @@
     "couponUses": "Coupon uses",
     "conversion": "Conversion",
     "discountAmount": "Discount amount",
+    "adSpend": "Ad spend",
+    "attributedGmv": "Attributed GMV",
+    "roas": "ROAS",
+    "costPerOrder": "Cost per order",
     "boostSummary": "Boost: {{status}} · budget ${{budget}} · {{impressions}} impressions · sponsored placement"
   },
   "boostStatusCard": {
@@ -262,5 +282,15 @@
   "card": {
     "toastCouponError": "Could not retrieve coupon",
     "toastMessageError": "Could not start conversation"
+  },
+  "createPreview": {
+    "title": "Restaurant preview",
+    "untitled": "Untitled deal",
+    "cta": "Primary action: {{cta}}",
+    "coupon": "Code {{code}}",
+    "audience": "Audience: {{types}} · Areas: {{areas}}",
+    "allTypes": "all types",
+    "allAreas": "all areas",
+    "helper": "This is how restaurants will see your offer in the deals feed once live."
   }
 }

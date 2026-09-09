@@ -178,7 +178,9 @@
     "rescheduled": { "subject": "تم إعادة جدولة الحجز", "title": "تم تحديث الحجز" },
     "new": { "subject": "حجز جديد", "title": "حجز جديد" },
     "waitlist": { "subject": "تحديث قائمة الانتظار", "title": "تحديث قائمة الانتظار" },
-    "waitlist_offer": { "subject": "طاولة متاحة", "title": "عرض من قائمة الانتظار" }
+    "waitlist_offer": { "subject": "طاولة متاحة", "title": "عرض من قائمة الانتظار" },
+    "reminder": { "subject": "تذكير بالحجز", "title": "تذكير بالحجز" },
+    "review_invite": { "subject": "كيف كانت زيارتك؟", "title": "شاركنا تقييمك" }
   },
   "staff": {
     "magic_link": {

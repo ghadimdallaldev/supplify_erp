@@ -22,6 +22,7 @@ import { runLogRetentionJob } from '../jobs/log-retention.job.js'
 import { runReorderForecastJob } from '../jobs/reorder-forecast.job.js'
 import { runGrowthProgramMaintenanceJob } from '../jobs/sponsorship-expiry.job.js'
 import { runRecipeRecalcJob } from '../jobs/recipe-recalc.job.js'
+import { runReservationGuestCommsJob } from '../jobs/reservation-guest-comms.job.js'
 
 /** @returns {boolean} Whether cron timers should be registered on API boot */
 export function shouldRegisterCrons(nodeEnv = config.NODE_ENV) {
@@ -94,6 +95,16 @@ export function registerCronJobs({ trackInterval }) {
         'Waitlist expired-offers job failed:'
       ),
       label: 'Waitlist expired-offers job started',
+    },
+    {
+      name: CRON_JOBS.RESERVATION_GUEST_COMMS,
+      intervalMs: 15 * 60 * 1000,
+      run: wrap(
+        CRON_JOBS.RESERVATION_GUEST_COMMS,
+        () => runReservationGuestCommsJob(),
+        'Reservation guest comms job failed:'
+      ),
+      label: 'Reservation guest comms job started',
     },
     {
       name: CRON_JOBS.PROMOTIONS_EXPIRY,

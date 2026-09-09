@@ -1,5 +1,6 @@
 import { query } from '../../lib/db.js'
 import { hasPermission } from '../../lib/permissions.js'
+import { rolesIncludeOwner } from '../../lib/tenant-roles.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { isFeatureEnabledForTenant } from '../../lib/feature-flags.js'
 import { getReorderAssistance } from '../restaurant-reorder-assistance.service.js'
@@ -32,7 +33,7 @@ const ROW_CAP = 15
 
 function can(ctx, permissionKey) {
   if (ctx.isAdmin && !ctx.isImpersonating) return true
-  if (ctx.roles?.includes('Owner')) return true
+  if (rolesIncludeOwner(ctx.roles)) return true
   return hasPermission(ctx.permissions || [], permissionKey)
 }
 
@@ -154,7 +155,10 @@ const TOOLS = {
         type: 'object',
         properties: {
           status: { type: 'string', description: 'Optional order status filter' },
-          search: { type: 'string', description: 'Optional order id fragment or counterparty name' },
+          search: {
+            type: 'string',
+            description: 'Optional order id fragment or counterparty name',
+          },
         },
       },
     },
@@ -238,9 +242,7 @@ const TOOLS = {
     run: async (ctx, args) => {
       const raw = String(args.orderId || '').trim()
       if (!raw) return { error: 'orderId required' }
-      const uuidMatch = raw.match(
-        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
-      )
+      const uuidMatch = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
       const short = raw.replace(/^ORD-/i, '').toLowerCase()
       const tenantFilter =
         ctx.tenantType === 'RESTAURANT'
@@ -585,9 +587,7 @@ const TOOLS = {
       parameters: { type: 'object', properties: {} },
     },
     available: async (ctx) =>
-      Boolean(ctx.driverId) &&
-      ctx.tenantType === 'SUPPLIER' &&
-      can(ctx, P.DRIVER_DELIVERIES_VIEW),
+      Boolean(ctx.driverId) && ctx.tenantType === 'SUPPLIER' && can(ctx, P.DRIVER_DELIVERIES_VIEW),
     run: async (ctx) => {
       const route = await getDriverActiveRoute(ctx.tenantId, ctx.driverId)
       if (!route) return { route: null, stops: [] }

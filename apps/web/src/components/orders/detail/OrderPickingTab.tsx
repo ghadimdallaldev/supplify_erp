@@ -19,6 +19,12 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
   }
 
   const order = data.order
+  const assignments = ((order as any).warehouseAssignments || []) as Array<{
+    order_item_id?: string | null
+    warehouse_name?: string
+    warehouse_code?: string
+  }>
+  const orderLevelAssignment = assignments.find((a) => !a.order_item_id)
 
   return (
     <Card>
@@ -39,47 +45,56 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {order.items?.map((item: any, idx: number) => (
-            <div key={item.id || idx} className="border rounded-lg p-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">
-                    {t('pickingTab.product')}
-                  </p>
-                  <p className="font-semibold">{item.product_name}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">
-                    {t('pickingTab.sku', { sku: item.product_sku })}
-                  </p>
+          {order.items?.map((item: any, idx: number) => {
+            const itemAssignment =
+              assignments.find((a) => a.order_item_id === item.id) || orderLevelAssignment
+            const warehouseLabel =
+              itemAssignment?.warehouse_name ||
+              itemAssignment?.warehouse_code ||
+              item.location_code ||
+              t('pickingTab.notAssigned')
+            return (
+              <div key={item.id || idx} className="border rounded-lg p-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-muted)]">
+                      {t('pickingTab.product')}
+                    </p>
+                    <p className="font-semibold">{item.product_name}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
+                      {t('pickingTab.sku', { sku: item.product_sku })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-muted)]">
+                      {t('pickingTab.quantity')}
+                    </p>
+                    <p className="text-lg font-bold">{item.quantity}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-muted)]">
+                      {t('pickingTab.warehouseLocation')}
+                    </p>
+                    <p className="font-medium">{warehouseLabel}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--text-muted)]">
+                      {t('pickingTab.lotExpiry')}
+                    </p>
+                    <p className="text-sm">—</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">
-                    {t('pickingTab.quantity')}
-                  </p>
-                  <p className="text-lg font-bold">{item.quantity}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">
-                    {t('pickingTab.warehouseLocation')}
-                  </p>
-                  <p className="font-medium">{item.location_code || t('pickingTab.notAssigned')}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-[var(--text-muted)]">
-                    {t('pickingTab.lotExpiry')}
-                  </p>
-                  <p className="text-sm">—</p>
-                </div>
+                {item.picking_notes && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-sm font-medium text-[var(--text-muted)]">
+                      {t('pickingTab.pickingNotes')}
+                    </p>
+                    <p className="text-sm">{item.picking_notes}</p>
+                  </div>
+                )}
               </div>
-              {item.picking_notes && (
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm font-medium text-[var(--text-muted)]">
-                    {t('pickingTab.pickingNotes')}
-                  </p>
-                  <p className="text-sm">{item.picking_notes}</p>
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </Card>

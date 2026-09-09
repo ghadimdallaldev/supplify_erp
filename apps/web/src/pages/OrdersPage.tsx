@@ -38,7 +38,7 @@ import { Search, Filter, Plus, AlertCircle } from 'lucide-react'
 
 /** @deprecated use filterControlClass from components/ui/filter-control */
 const ordersFilterControlClass = filterControlClass
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
@@ -65,6 +65,11 @@ const ORDER_STATUS_FILTER_VALUES = [
 
 export function OrdersPage() {
   const { t } = useTranslation('orders')
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const [restaurantFilter, setRestaurantFilter] = useState(
+    () => searchParams.get('restaurant') ?? ''
+  )
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -110,11 +115,12 @@ export function OrdersPage() {
 
   useEffect(() => {
     setOffset(0)
-  }, [status, debouncedSearch, dateFrom, dateTo])
+  }, [status, debouncedSearch, dateFrom, dateTo, restaurantFilter])
 
   const { data, isLoading, isFetching, error, refetch } = useGetOrdersQuery(
     {
       status: status || undefined,
+      restaurant: restaurantFilter || undefined,
       q: debouncedSearch || undefined,
       from: dateFrom || undefined,
       to: dateTo || undefined,
@@ -233,7 +239,7 @@ export function OrdersPage() {
                 <button
                   onClick={() => {
                     toast.dismiss(id)
-                    window.location.href = '/app/settings'
+                    navigate('/app/settings')
                   }}
                   className="px-3 py-1 text-sm font-medium text-white bg-[var(--brand)] rounded-md hover:bg-[var(--brand)]/90 erp-pressable"
                 >
@@ -328,12 +334,19 @@ export function OrdersPage() {
   const hasNextPage = total != null ? offset + pageSize < total : filteredOrders.length === pageSize
   const hasPrevPage = offset > 0
 
-  const hasActiveFilters = Boolean(debouncedSearch || status || hasAdvancedFilters)
+  const hasActiveFilters = Boolean(
+    debouncedSearch || status || hasAdvancedFilters || restaurantFilter
+  )
+
+  const restaurantFilterName =
+    restaurantsData?.restaurants?.find((r: any) => r.id === restaurantFilter)?.name ??
+    restaurantFilter
 
   const clearAllFilters = () => {
     setSearch('')
     setDebouncedSearch('')
     setStatus('')
+    setRestaurantFilter('')
     setDateFrom('')
     setDateTo('')
     setActiveTab('all')
@@ -471,7 +484,7 @@ export function OrdersPage() {
             }
           >
             <div className="p-4 sm:p-5">
-              {(debouncedSearch || status || hasAdvancedFilters) && (
+              {hasActiveFilters && (
                 <div className="mb-4 border-b border-[var(--app-border)] pb-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="mr-1 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
@@ -480,6 +493,11 @@ export function OrdersPage() {
                     {debouncedSearch ? (
                       <Badge variant="outline" className="px-2.5 py-1 font-normal">
                         {t('page.filterSearch', { value: debouncedSearch })}
+                      </Badge>
+                    ) : null}
+                    {restaurantFilter ? (
+                      <Badge variant="outline" className="px-2.5 py-1 font-normal">
+                        {restaurantFilterName}
                       </Badge>
                     ) : null}
                     {status ? (

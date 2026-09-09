@@ -410,7 +410,7 @@ export function DashboardWidgetGrid(props: any) {
                 </Link>
               ) : isRestaurant && smartReorderEnabled ? (
                 <Link
-                  to="/app/inventory#reorder-assistance"
+                  to="/app/restaurant-inventory#reorder-assistance"
                   style={{
                     fontSize: 11,
                     color: 'var(--brand)',
@@ -673,7 +673,7 @@ export function DashboardWidgetGrid(props: any) {
               title={t('widgets.expiry.title')}
               action={
                 <Link
-                  to="/app/inventory?tab=expiry"
+                  to="/app/restaurant-inventory?tab=expiry"
                   style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
                 >
                   {t('widgets.recentOrders.viewAll')}

@@ -11,11 +11,20 @@ const BRANDING_COLUMNS_DDL = `
 /** @type {{ supplier?: object, restaurant?: object } | null} */
 let brandingColumnCache = null
 
+/** Caches information_schema lookups per process, keyed by `table.column`. */
+/** @type {Map<string, boolean>} */
+const columnExistsCache = new Map()
+
 export function resetBrandingColumnCache() {
   brandingColumnCache = null
+  columnExistsCache.clear()
 }
 
 export async function columnExists(table, columnName) {
+  const cacheKey = `${table}.${columnName}`
+  if (columnExistsCache.has(cacheKey)) {
+    return columnExistsCache.get(cacheKey)
+  }
   const { rows } = await query(
     `SELECT 1
      FROM information_schema.columns
@@ -25,7 +34,9 @@ export async function columnExists(table, columnName) {
      LIMIT 1`,
     [table, columnName]
   )
-  return rows.length > 0
+  const exists = rows.length > 0
+  columnExistsCache.set(cacheKey, exists)
+  return exists
 }
 
 /** True when brand color columns are present (used before PATCH). */
@@ -61,6 +72,8 @@ export async function ensureTenantBrandingSchema() {
   await migrationQuery(`ALTER TABLE restaurant ${BRANDING_COLUMNS_DDL}`)
   await migrationQuery(`ALTER TABLE supplier ${BRANDING_COLUMNS_DDL}`)
 
+  // Columns may have just been created — drop any stale cached lookups.
+  columnExistsCache.clear()
   const supplierCols = await fetchBrandingColumnMap('supplier')
   const restaurantCols = await fetchBrandingColumnMap('restaurant')
   brandingColumnCache = { supplier: supplierCols, restaurant: restaurantCols }

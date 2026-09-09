@@ -109,27 +109,55 @@ router.get('/financial-overview', async (req, res) => {
            CASE
              WHEN s.billing_cycle = 'YEARLY' AND COALESCE(sp.price_per_year, 0) > 0
                THEN sp.price_per_year / 12.0
+             WHEN COALESCE(sp.price_per_month, 0) = 0 AND COALESCE(sp.price_per_year, 0) > 0
+               THEN sp.price_per_year / 12.0
              ELSE sp.price_per_month
            END
          ), 0)::numeric as mrr
          FROM subscription s
          JOIN subscription_plan sp ON sp.id = s.plan_id
-         WHERE s.status IN ('ACTIVE', 'TRIALING')
+         WHERE s.status = 'ACTIVE'
            AND LOWER(sp.code) NOT IN ('free', 'enterprise')
-           AND COALESCE(sp.price_per_month, 0) > 0
+           AND (COALESCE(sp.price_per_month, 0) > 0 OR COALESCE(sp.price_per_year, 0) > 0)
          GROUP BY sp.id, sp.name, sp.code, sp.tenant_type, sp.type, sp.price_per_month, sp.price_per_year`
       ),
       query(
-        `SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
-         COALESCE(SUM(total_amount), 0)::numeric as revenue
-         FROM invoice WHERE status IN ('PAID', 'PARTIALLY_PAID') AND restaurant_id IS NOT NULL
-         GROUP BY restaurant_id ORDER BY revenue DESC LIMIT 10`
+        `SELECT t.tenant_id, t.tenant_type,
+           COALESCE(r.name, su.name) as tenant_name,
+           t.revenue
+         FROM (
+           SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
+             COALESCE(SUM(total_amount), 0)::numeric as revenue
+           FROM invoice WHERE status IN ('PAID', 'PARTIALLY_PAID') AND restaurant_id IS NOT NULL
+           GROUP BY restaurant_id
+           UNION ALL
+           SELECT supplier_id as tenant_id, 'SUPPLIER' as tenant_type,
+             COALESCE(SUM(total_amount), 0)::numeric as revenue
+           FROM invoice WHERE status IN ('PAID', 'PARTIALLY_PAID') AND supplier_id IS NOT NULL
+           GROUP BY supplier_id
+         ) t
+         LEFT JOIN restaurant r ON (t.tenant_type = 'RESTAURANT' AND r.id = t.tenant_id)
+         LEFT JOIN supplier su ON (t.tenant_type = 'SUPPLIER' AND su.id = t.tenant_id)
+         ORDER BY t.revenue DESC LIMIT 10`
       ),
       query(
-        `SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
-         COALESCE(SUM(balance_due), 0)::numeric as overdue_amount
-         FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0 AND restaurant_id IS NOT NULL
-         GROUP BY restaurant_id ORDER BY overdue_amount DESC LIMIT 10`
+        `SELECT t.tenant_id, t.tenant_type,
+           COALESCE(r.name, su.name) as tenant_name,
+           t.overdue_amount
+         FROM (
+           SELECT restaurant_id as tenant_id, 'RESTAURANT' as tenant_type,
+             COALESCE(SUM(balance_due), 0)::numeric as overdue_amount
+           FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0 AND restaurant_id IS NOT NULL
+           GROUP BY restaurant_id
+           UNION ALL
+           SELECT supplier_id as tenant_id, 'SUPPLIER' as tenant_type,
+             COALESCE(SUM(balance_due), 0)::numeric as overdue_amount
+           FROM invoice WHERE status = 'OVERDUE' AND balance_due > 0 AND supplier_id IS NOT NULL
+           GROUP BY supplier_id
+         ) t
+         LEFT JOIN restaurant r ON (t.tenant_type = 'RESTAURANT' AND r.id = t.tenant_id)
+         LEFT JOIN supplier su ON (t.tenant_type = 'SUPPLIER' AND su.id = t.tenant_id)
+         ORDER BY t.overdue_amount DESC LIMIT 10`
       ),
     ])
 
@@ -157,8 +185,18 @@ router.get('/financial-overview', async (req, res) => {
         mrr,
         arr,
         mrrExcludesFreeTrial: true,
-        topTenantsByRevenue: topTenantsRevenueResult.rows || [],
-        topTenantsByOverdue: topTenantsOverdueResult.rows || [],
+        topTenantsByRevenue: (topTenantsRevenueResult.rows || []).map((r) => ({
+          tenantId: r.tenant_id,
+          tenantType: r.tenant_type,
+          tenantName: r.tenant_name,
+          revenue: parseFloat(r.revenue || 0),
+        })),
+        topTenantsByOverdue: (topTenantsOverdueResult.rows || []).map((r) => ({
+          tenantId: r.tenant_id,
+          tenantType: r.tenant_type,
+          tenantName: r.tenant_name,
+          overdueAmount: parseFloat(r.overdue_amount || 0),
+        })),
       },
       error: null,
       requestId: req.requestId,

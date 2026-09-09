@@ -109,13 +109,33 @@ router.get(
       const { rows: warehouses } = await query(
         `SELECT w.*,
           (SELECT COUNT(DISTINCT wi.product_id)::int FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS product_count,
+          (SELECT COALESCE(SUM(wi.quantity_available), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS total_available_qty,
+          (SELECT COALESCE(SUM(wi.quantity_reserved), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS total_reserved_qty,
           (SELECT COALESCE(SUM(wi.quantity_on_hand * COALESCE(pr.amount, 0)), 0)
            FROM warehouse_inventory wi
            LEFT JOIN LATERAL (
              SELECT amount FROM price WHERE product_id = wi.product_id
              ORDER BY valid_from DESC LIMIT 1
            ) pr ON true
-           WHERE wi.warehouse_id = w.id) AS stock_value
+           WHERE wi.warehouse_id = w.id) AS stock_value,
+          COALESCE((
+            SELECT json_agg(row_to_json(inv) ORDER BY inv.product_name)
+            FROM (
+              SELECT
+                wi.id,
+                wi.product_id,
+                p.name AS product_name,
+                p.sku AS product_sku,
+                wi.quantity_on_hand,
+                wi.quantity_reserved,
+                wi.quantity_available
+              FROM warehouse_inventory wi
+              JOIN product p ON p.id = wi.product_id
+              WHERE wi.warehouse_id = w.id
+              ORDER BY p.name
+              LIMIT 50
+            ) inv
+          ), '[]'::json) AS inventory
          FROM warehouse w
          WHERE w.${supplierCol} = $1
          ORDER BY w.is_default DESC NULLS LAST, w.created_at DESC`,
@@ -332,7 +352,7 @@ router.post(
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
-      const { items = [], restaurant_id: restaurantId } = req.body
+      const { items = [], restaurant_id: restaurantId, postal_code: bodyPostal } = req.body
 
       const supplierCol = await getWarehouseSupplierColumn()
       const { rows: warehouses } = await query(
@@ -344,13 +364,36 @@ router.post(
         [supplierId]
       )
 
-      let restaurantPostalCode = null
+      let restaurantPostalCode = bodyPostal || null
       if (restaurantId) {
         const { rows: rRows } = await query(`SELECT address_json FROM restaurant WHERE id = $1`, [
           restaurantId,
         ])
         const addr = rRows[0]?.address_json
-        restaurantPostalCode = addr?.postalCode ?? addr?.zip ?? null
+        restaurantPostalCode = addr?.postalCode ?? addr?.zip ?? restaurantPostalCode
+      }
+
+      if (!items.length) {
+        const defaultWh = warehouses.find((w) => w.is_default || w.is_main) || warehouses[0] || null
+        return res.json({
+          ok: true,
+          data: {
+            preview: defaultWh
+              ? [
+                  {
+                    productId: null,
+                    quantity: 0,
+                    warehouseId: defaultWh.id,
+                    warehouseName: defaultWh.name,
+                    reason: 'default',
+                  },
+                ]
+              : [],
+            warehouseName: defaultWh?.name ?? null,
+          },
+          error: null,
+          requestId: req.requestId,
+        })
       }
 
       const productIds = items.map((i) => i.product_id ?? i.productId).filter(Boolean)
@@ -571,6 +614,109 @@ router.patch(
         code,
       } = req.body
 
+      const deactivating = is_active === false && wh?.is_active !== false
+      if (deactivating) {
+        const supplierCol = await getWarehouseSupplierColumn()
+        if (isDefaultWarehouse(wh)) {
+          const { rows: others } = await query(
+            `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE`,
+            [supplierId, warehouseId]
+          )
+          if (others.length > 0) {
+            return res.status(409).json({
+              ok: false,
+              data: null,
+              error: {
+                name: 'DEFAULT_WAREHOUSE',
+                message: 'Set another warehouse as default before deactivating this one',
+              },
+              requestId: req.requestId,
+            })
+          }
+        }
+
+        const { rows: pending } = await query(
+          `SELECT id FROM order_warehouse_assignment
+           WHERE warehouse_id = $1 AND status IN ('pending', 'picking', 'packed') LIMIT 1`,
+          [warehouseId]
+        )
+        if (pending.length) {
+          return res.status(409).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'PENDING_ASSIGNMENTS',
+              message: 'Cannot deactivate warehouse with pending order assignments',
+            },
+            requestId: req.requestId,
+          })
+        }
+
+        const warehouse = await withTransaction(async (client) => {
+          const { rows: others } = await client.query(
+            `SELECT id FROM warehouse
+             WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE
+             ORDER BY is_default DESC NULLS LAST, is_main DESC NULLS LAST, created_at ASC`,
+            [supplierId, warehouseId]
+          )
+          const targetId = others[0]?.id
+          if (targetId) {
+            await transferWarehouseInventory(client, warehouseId, targetId)
+            await client.query(
+              `UPDATE supplier SET default_warehouse_id = COALESCE(default_warehouse_id, $1)
+               WHERE id = $2 AND (default_warehouse_id IS NULL OR default_warehouse_id = $3)`,
+              [targetId, supplierId, warehouseId]
+            )
+          } else {
+            await client.query(
+              `UPDATE supplier SET default_warehouse_id = NULL
+               WHERE id = $1 AND default_warehouse_id = $2`,
+              [supplierId, warehouseId]
+            )
+          }
+
+          const { rows } = await client.query(
+            `UPDATE warehouse SET
+              name = COALESCE($1, name),
+              address = COALESCE($2, address),
+              capacity = COALESCE($3, capacity),
+              contact_name = COALESCE($4, contact_name),
+              contact_email = COALESCE($5, contact_email),
+              contact_phone = COALESCE($6, contact_phone),
+              is_active = FALSE,
+              type = COALESCE($7, type),
+              capacity_sqm = COALESCE($8, capacity_sqm),
+              operating_hours = COALESCE($9, operating_hours),
+              notes = COALESCE($10, notes),
+              code = COALESCE($11, code),
+              updated_at = now()
+             WHERE id = $12 RETURNING *`,
+            [
+              name,
+              address,
+              capacity,
+              contact_name,
+              contact_email,
+              contact_phone,
+              type,
+              capacity_sqm,
+              operating_hours,
+              notes,
+              code,
+              warehouseId,
+            ]
+          )
+          return rows[0]
+        })
+
+        return res.json({
+          ok: true,
+          data: { warehouse },
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
       const { rows } = await query(
         `UPDATE warehouse SET
           name = COALESCE($1, name),
@@ -635,10 +781,10 @@ router.post(
         )
         const { rows } = await client.query(
           `UPDATE warehouse SET is_default = TRUE, is_main = TRUE, updated_at = now()
-           WHERE id = $1 AND ${supplierCol} = $2 RETURNING *`,
+           WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE RETURNING *`,
           [warehouseId, supplierId]
         )
-        if (!rows.length) throw new NotFoundError('Warehouse not found')
+        if (!rows.length) throw new NotFoundError('Warehouse not found or inactive')
         await client.query(`UPDATE supplier SET default_warehouse_id = $1 WHERE id = $2`, [
           warehouseId,
           supplierId,

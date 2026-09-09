@@ -63,7 +63,10 @@ export function AdminUsageTab({
   const showOverview = !showSuppliersOnly && !showRestaurantsOnly
 
   const { data: plansData } = useGetAdminPlansQuery({}, { skip: !active })
-  const { data: subscriptionsData } = useGetAdminSubscriptionsQuery({}, { skip: !active })
+  const { data: subscriptionsData } = useGetAdminSubscriptionsQuery(
+    { limit: 500 },
+    { skip: !active }
+  )
 
   const {
     data: suppliersData,

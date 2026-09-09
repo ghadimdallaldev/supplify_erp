@@ -49,15 +49,20 @@ export const warehousesApi = api.injectEndpoints({
       query: () => '/api/warehouses/routing/rules',
     }),
     simulateWarehouseRouting: builder.mutation<
-      { preview: any[] },
-      { items: Array<{ productId: string; quantity: number }>; restaurant_id?: string }
+      { preview: any[]; warehouseName?: string | null },
+      {
+        items?: Array<{ productId: string; quantity: number }>
+        restaurant_id?: string
+        postal_code?: string
+      }
     >({
       query: (body) => ({
         url: '/api/warehouses/routing/simulate',
         method: 'POST',
         body: {
-          items: body.items.map((i) => ({ product_id: i.productId, quantity: i.quantity })),
+          items: (body.items || []).map((i) => ({ product_id: i.productId, quantity: i.quantity })),
           restaurant_id: body.restaurant_id,
+          postal_code: body.postal_code,
         },
       }),
     }),
@@ -66,6 +71,27 @@ export const warehousesApi = api.injectEndpoints({
       string
     >({
       query: (orderId) => `/api/orders/${orderId}/warehouses`,
+    }),
+    reassignOrderWarehouse: builder.mutation<
+      { assignment: any },
+      { orderId: string; assignmentId: string; warehouseId: string }
+    >({
+      query: ({ orderId, assignmentId, warehouseId }) => ({
+        url: `/api/orders/${orderId}/warehouses/${assignmentId}`,
+        method: 'PATCH',
+        body: { warehouse_id: warehouseId },
+      }),
+      invalidatesTags: ['Inventory', 'Order'],
+    }),
+    dispatchOrderWarehouse: builder.mutation<
+      { assignment: any },
+      { orderId: string; assignmentId: string }
+    >({
+      query: ({ orderId, assignmentId }) => ({
+        url: `/api/orders/${orderId}/warehouses/${assignmentId}/dispatch`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Inventory', 'Order'],
     }),
     listZones: builder.query<{ zones: WarehouseDeliveryZone[] }, string>({
       query: (warehouseId) => `/api/warehouses/${warehouseId}/zones`,

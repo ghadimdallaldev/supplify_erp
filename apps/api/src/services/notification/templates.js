@@ -1649,6 +1649,51 @@ export async function notifyQuoteResponseReceived(
   }
 }
 
+export async function notifyQuoteRequestDeclined(
+  { restaurantId, quoteRequestId, quoteRequestSupplierId, supplierId, reason = null },
+  locale = DEFAULT_LOCALE
+) {
+  try {
+    const alreadySent = await hasRecentQuoteNotification({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationCategory: 'quote_request_declined',
+      referenceId: quoteRequestSupplierId,
+    })
+    if (alreadySent) return null
+
+    const { rows } = await query(`SELECT name FROM supplier WHERE id = $1`, [supplierId])
+
+    const reasonSuffix = (userLocale) =>
+      reason ? nt('quote.reasonPrefix', userLocale, { reason }) : ''
+
+    return notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'QUOTE_RESPONSE',
+      notificationCategory: 'quote_request_declined',
+      contentForLocale: (userLocale) => ({
+        title: nt('quote.declinedTitle', userLocale),
+        message: nt('quote.declinedMessage', userLocale, {
+          supplierName: rows[0]?.name || nt('common.aSupplier', userLocale),
+          reasonSuffix: reasonSuffix(userLocale),
+        }),
+      }),
+      referenceId: quoteRequestId,
+      referenceType: 'QUOTE_REQUEST',
+      metadata: {
+        quoteRequestSupplierId,
+        supplierId,
+        declineReason: reason,
+        ctaUrl: `/app/quote-requests/${quoteRequestId}`,
+      },
+    })
+  } catch (err) {
+    logger.error('notifyQuoteRequestDeclined failed', { err: err.message })
+    return null
+  }
+}
+
 export async function notifyAdminNewTenant(
   { tenantId, tenantType, tenantName, contactEmail },
   locale = DEFAULT_LOCALE

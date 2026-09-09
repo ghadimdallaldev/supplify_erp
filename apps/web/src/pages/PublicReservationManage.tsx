@@ -14,6 +14,7 @@ import {
   useGetPublicReservationAvailabilityQuery,
   useReschedulePublicReservationMutation,
   useCancelPublicReservationMutation,
+  useSubmitPublicReservationReviewMutation,
 } from '../services/api'
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
 import { ReservationTimeSlotGrid } from '../components/public/ReservationTimeSlotGrid'
@@ -42,6 +43,16 @@ export function PublicReservationManage() {
 
   const { data, isLoading, refetch } = useGetPublicReservationDetailsQuery(token, { skip: !token })
   const reservation = data?.reservation
+  const canReview = Boolean(data?.canReview)
+  const existingReview = data?.review
+  const showReview = searchParams.get('review') === '1' || canReview || Boolean(existingReview)
+
+  const [overallRating, setOverallRating] = useState(5)
+  const [foodRating, setFoodRating] = useState(5)
+  const [serviceRating, setServiceRating] = useState(5)
+  const [ambianceRating, setAmbianceRating] = useState(5)
+  const [reviewComment, setReviewComment] = useState('')
+  const [submitReview, { isLoading: submittingReview }] = useSubmitPublicReservationReviewMutation()
 
   const [rescheduleDate, setRescheduleDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [rescheduleSlot, setRescheduleSlot] = useState('')
@@ -131,6 +142,24 @@ export function PublicReservationManage() {
       refetch()
     } catch (error: unknown) {
       toast.error(extractApiError(error, t('manage.cancelFailed')))
+    }
+  }
+
+  const handleReview = async (event: React.FormEvent) => {
+    event.preventDefault()
+    try {
+      await submitReview({
+        token,
+        overallRating,
+        foodRating,
+        serviceRating,
+        ambianceRating,
+        comment: reviewComment || undefined,
+      }).unwrap()
+      toast.success(t('manageReview.thanks'))
+      refetch()
+    } catch (error: unknown) {
+      toast.error(extractApiError(error, t('manageReview.failed')))
     }
   }
 
@@ -247,6 +276,64 @@ export function PublicReservationManage() {
           </form>
         </PublicPanel>
       </div>
+
+      {showReview ? (
+        <div className="mx-auto mt-5 w-full max-w-3xl">
+          <PublicPanel title={t('manageReview.title')} description={t('manageReview.subtitle')}>
+            {existingReview ? (
+              <div className="space-y-2 text-sm">
+                <p>{t('manageReview.already')}</p>
+                <p className="font-semibold">
+                  {t('manageReview.overall')}: {existingReview.overallRating}/5
+                </p>
+                {existingReview.comment ? <p>{existingReview.comment}</p> : null}
+                {existingReview.staffReply ? (
+                  <p className="rounded-lg bg-[var(--mint-pale)] px-3 py-2 text-[var(--mint)]">
+                    <span className="font-semibold">{t('manageReview.staffReply')}: </span>
+                    {existingReview.staffReply}
+                  </p>
+                ) : null}
+              </div>
+            ) : canReview ? (
+              <form className="space-y-3" onSubmit={handleReview}>
+                {(
+                  [
+                    ['overall', overallRating, setOverallRating, t('manageReview.overall')],
+                    ['food', foodRating, setFoodRating, t('manageReview.food')],
+                    ['service', serviceRating, setServiceRating, t('manageReview.service')],
+                    ['ambiance', ambianceRating, setAmbianceRating, t('manageReview.ambiance')],
+                  ] as const
+                ).map(([key, value, setter, label]) => (
+                  <div key={key}>
+                    <Label htmlFor={`rating-${key}`}>{label}</Label>
+                    <Input
+                      id={`rating-${key}`}
+                      type="number"
+                      min={1}
+                      max={5}
+                      className="mt-1.5"
+                      value={value}
+                      onChange={(e) => setter(Number(e.target.value))}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <Label htmlFor="reviewComment">{t('manageReview.comment')}</Label>
+                  <Textarea
+                    id="reviewComment"
+                    className="mt-1.5"
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={submittingReview}>
+                  {submittingReview ? t('manageReview.submitting') : t('manageReview.submit')}
+                </Button>
+              </form>
+            ) : null}
+          </PublicPanel>
+        </div>
+      ) : null}
     </PublicPageLayout>
   )
 }

@@ -213,11 +213,11 @@ export function DealCard({
     }
 
     if (cta === 'view_products') {
-      navigate(`/app/products?supplierId=${supplierId}&dealId=${dealId}`)
+      navigate(`/app/products?supplier=${supplierId}&dealId=${dealId}`)
       return
     }
 
-    navigate(`/app/products?supplierId=${supplierId}&dealId=${dealId}&orderDeal=1`)
+    navigate(`/app/products?supplier=${supplierId}&dealId=${dealId}&orderDeal=1`)
   }
 
   return (

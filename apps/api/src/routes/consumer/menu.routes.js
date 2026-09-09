@@ -26,6 +26,12 @@ import {
   executeMenuImport,
   MENU_IMPORT_TEMPLATE,
 } from '../../services/consumer-menu-import.service.js'
+import {
+  MENU_ALLERGENS,
+  MENU_DIETARY_TAGS,
+  sanitizeMenuTagList,
+  validateMenuTags,
+} from '../../lib/consumer-menu-tags.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -41,6 +47,9 @@ const categorySchema = z.object({
   isActive: z.boolean().optional(),
 })
 
+const menuTagSchema = z.array(z.enum(MENU_ALLERGENS)).optional()
+const dietaryTagSchema = z.array(z.enum(MENU_DIETARY_TAGS)).optional()
+
 const itemSchema = z.object({
   categoryId: z.string().uuid(),
   name: z.string().min(1),
@@ -50,6 +59,8 @@ const itemSchema = z.object({
   imageUrl: z.string().optional().nullable(),
   sortOrder: z.number().int().optional(),
   isAvailable: z.boolean().optional(),
+  allergens: menuTagSchema,
+  dietaryTags: dietaryTagSchema,
 })
 
 const modifierGroupSchema = z.object({
@@ -102,6 +113,8 @@ router.get('/', async (req, res) => {
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
     const menu = await getPublicMenu(restaurant.id, branchId || null)
+    // Anonymous public content — safe for CDN/browser caching.
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
     jsonOk(res, { restaurant, menu })
   } catch (error) {
     logger.error('Public consumer menu fetch failed', { error: error.message })
@@ -235,12 +248,16 @@ consumerMenuAdminRoutes.post('/items', requirePermission('CATALOG_EDIT'), async 
     if (!cats.length) {
       return jsonError(res, 404, 'CATEGORY_NOT_FOUND', 'Category not found')
     }
+    const allergens = sanitizeMenuTagList(body.allergens, MENU_ALLERGENS)
+    const dietaryTags = sanitizeMenuTagList(body.dietaryTags, MENU_DIETARY_TAGS)
+    validateMenuTags(allergens, dietaryTags)
+
     const { rows } = await query(
       `
       INSERT INTO menu_item (
-        restaurant_id, branch_id, category_id, name, description, base_price, image_url, sort_order, is_available
+        restaurant_id, branch_id, category_id, name, description, base_price, image_url, sort_order, is_available, allergens, dietary_tags
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
       `,
       [
@@ -253,6 +270,8 @@ consumerMenuAdminRoutes.post('/items', requirePermission('CATALOG_EDIT'), async 
         body.imageUrl ?? null,
         body.sortOrder ?? 0,
         body.isAvailable ?? true,
+        allergens,
+        dietaryTags,
       ]
     )
     await invalidateMenuCache(restaurantId, body.branchId ?? null)
@@ -267,6 +286,17 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
   try {
     const body = itemSchema.partial().parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+
+    const allergens =
+      body.allergens !== undefined ? sanitizeMenuTagList(body.allergens, MENU_ALLERGENS) : undefined
+    const dietaryTags =
+      body.dietaryTags !== undefined
+        ? sanitizeMenuTagList(body.dietaryTags, MENU_DIETARY_TAGS)
+        : undefined
+    if (allergens !== undefined || dietaryTags !== undefined) {
+      validateMenuTags(allergens ?? [], dietaryTags ?? [])
+    }
+
     const { rows } = await query(
       `
       UPDATE menu_item
@@ -279,8 +309,10 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
         image_url = COALESCE($6, image_url),
         sort_order = COALESCE($7, sort_order),
         is_available = COALESCE($8, is_available),
+        allergens = COALESCE($9, allergens),
+        dietary_tags = COALESCE($10, dietary_tags),
         updated_at = now()
-      WHERE id = $9 AND restaurant_id = $10
+      WHERE id = $11 AND restaurant_id = $12
       RETURNING *
       `,
       [
@@ -292,6 +324,8 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
         body.imageUrl !== undefined ? body.imageUrl : null,
         body.sortOrder ?? null,
         body.isAvailable ?? null,
+        allergens ?? null,
+        dietaryTags ?? null,
         req.params.id,
         restaurantId,
       ]

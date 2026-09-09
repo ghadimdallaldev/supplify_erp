@@ -50,6 +50,7 @@ import { useAppSelector } from '../hooks/redux'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatCurrency, formatPrice } from '../utils/format'
+import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { CardAddressBlock } from '../components/ui/card-layout'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
@@ -670,13 +671,18 @@ export function SupplierDetailPage() {
                         {product.category && <Badge variant="secondary">{product.category}</Badge>}
                       </div>
                       <p className="text-sm text-[var(--text-muted)] mb-2">{product.sku}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold">
-                          {product.current_price
-                            ? formatPrice(product.current_price)
-                            : t('detail.productsTab.notAvailable')}
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)]">
+                      <div className="flex items-center justify-between gap-2">
+                        {product.current_price != null ? (
+                          <ContractPriceDisplay
+                            currentPrice={product.current_price}
+                            catalogPrice={product.catalog_price}
+                            pricingSource={product.pricing_source}
+                            compact
+                          />
+                        ) : (
+                          <p className="font-semibold">{t('detail.productsTab.notAvailable')}</p>
+                        )}
+                        <p className="text-sm text-[var(--text-muted)] shrink-0">
                           {t('detail.productsTab.stock', {
                             count: product.available_qty || 0,
                           })}

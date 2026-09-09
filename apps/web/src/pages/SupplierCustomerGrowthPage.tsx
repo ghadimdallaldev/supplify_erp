@@ -22,6 +22,7 @@ import {
   useConnectProspectMutation,
   useCreateSponsorshipOfferMutation,
   useGetSupplierSponsorshipsQuery,
+  type SupplierGrowthMetrics,
   usePaySponsorshipMutation,
   useRetrySponsorshipPaymentMutation,
   useCancelSponsorshipMutation,
@@ -39,6 +40,7 @@ import {
   type SponsorshipGiftPlanKey,
 } from '../lib/growthSponsorshipPlans'
 import { toast } from 'sonner'
+import { formatCurrency } from '../utils/format'
 
 type ImportPreviewRow = {
   rowNumber: number
@@ -53,6 +55,92 @@ function MetricTile({ label, value }: { label: string; value: number | string })
       <p className="text-xs text-[var(--text-muted)]">{label}</p>
       <p className="text-xl font-semibold mt-1">{value}</p>
     </div>
+  )
+}
+
+/**
+ * Sponsorship funnel. The API has always returned these numbers but nothing
+ * rendered them, so suppliers could not see what happened to the offers they paid for.
+ */
+function SponsorshipFunnel({
+  funnel,
+}: {
+  funnel: NonNullable<SupplierGrowthMetrics['sponsorship']>
+}) {
+  const { t } = useTranslation('supplierOps')
+  if (funnel.offersCreated === 0) return null
+
+  const stages = [
+    { key: 'created', value: funnel.offersCreated },
+    { key: 'accepted', value: funnel.offersAccepted },
+    { key: 'activated', value: funnel.monthsActivated },
+    { key: 'completed', value: funnel.monthsCompleted },
+  ]
+  const attention = [
+    { key: 'open', value: funnel.offersOpen },
+    { key: 'declined', value: funnel.offersDeclined },
+    { key: 'expired', value: funnel.offersExpired },
+    { key: 'paymentsPending', value: funnel.paymentsPending },
+    { key: 'paymentsFailed', value: funnel.paymentsFailed },
+  ].filter((s) => s.value > 0)
+
+  return (
+    <Card data-testid="sponsorship-funnel">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Gift className="h-5 w-5" />
+          {t('customerGrowth.funnel.title')}
+        </CardTitle>
+        <CardDescription>{t('customerGrowth.funnel.description')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {stages.map((stage) => (
+            <div
+              key={stage.key}
+              className="rounded-lg border border-[var(--app-border)] p-3"
+              data-testid={`funnel-stage-${stage.key}`}
+            >
+              <p className="text-xs text-[var(--text-muted)]">
+                {t(`customerGrowth.funnel.stages.${stage.key}`)}
+              </p>
+              <p className="mt-1 text-xl font-semibold">{stage.value}</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {t('customerGrowth.funnel.ofOffers', {
+                  percent: Math.round((stage.value / funnel.offersCreated) * 100),
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+        {attention.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {attention.map((item) => (
+              <Badge
+                key={item.key}
+                variant={
+                  item.key === 'paymentsFailed' || item.key === 'expired'
+                    ? 'destructive'
+                    : 'secondary'
+                }
+              >
+                {t(`customerGrowth.funnel.attention.${item.key}`, { count: item.value })}
+              </Badge>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <MetricTile
+            label={t('customerGrowth.funnel.totalSpend')}
+            value={formatCurrency(funnel.totalSpend)}
+          />
+          <MetricTile
+            label={t('customerGrowth.funnel.averageValue')}
+            value={formatCurrency(funnel.averageValue)}
+          />
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -253,7 +341,7 @@ export function SupplierCustomerGrowthPage() {
           />
           <MetricTile
             label={t('customerGrowth.metrics.revenueGenerated')}
-            value={`$${metrics.revenueGenerated}`}
+            value={formatCurrency(metrics.revenueGenerated)}
           />
           <MetricTile
             label={t('customerGrowth.metrics.rewardsEarned')}
@@ -263,6 +351,8 @@ export function SupplierCustomerGrowthPage() {
           />
         </div>
       ) : null}
+
+      {metrics?.sponsorship ? <SponsorshipFunnel funnel={metrics.sponsorship} /> : null}
 
       <Card>
         <CardHeader>

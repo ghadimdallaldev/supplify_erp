@@ -97,6 +97,7 @@ import {
   startMemoryMonitor,
 } from './lib/memory-monitor.js'
 import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
+import { stripeWebhookRoutes } from './routes/stripe-webhook.routes.js'
 import { internalAuthRoutes } from './routes/internal-auth.routes.js'
 
 validateProductionConfig()
@@ -288,6 +289,13 @@ app.use(
   whatsappWebhookRoutes
 )
 
+// Stripe billing webhooks — raw body required for Stripe-Signature verification.
+app.use(
+  '/webhooks/stripe',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  stripeWebhookRoutes
+)
+
 app.use('/auth', authLimiter)
 app.use('/auth/refresh', refreshLimiter)
 app.use('/auth/mobile/refresh', refreshLimiter)
@@ -351,7 +359,7 @@ const mountLocalUploadsStatic =
   (config.NODE_ENV !== 'production' || config.STORAGE_PUBLIC_READ)
 if (mountLocalUploadsStatic) {
   const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
-  app.use('/uploads', express.static(uploadsDir))
+  app.use('/uploads', express.static(uploadsDir, { maxAge: '1y', immutable: true }))
 }
 
 app.get('/health', async (req, res) => {

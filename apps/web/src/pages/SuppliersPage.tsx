@@ -523,6 +523,8 @@ export function SuppliersPage() {
                       <img
                         src={supplier.logo_url}
                         alt={supplier.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-12 w-12 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           // Fallback to gradient if image fails to load
@@ -719,6 +721,8 @@ export function SuppliersPage() {
                       <img
                         src={supplier.logo_url}
                         alt={supplier.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-16 w-16 rounded-lg object-cover border-2 border-[var(--app-border)] shadow-md"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement

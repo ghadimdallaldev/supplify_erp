@@ -354,7 +354,8 @@ export function AdminOverviewTab({
               )}
             </div>
             {(() => {
-              const s30 = conversionStats.funnelDropOff?.['30d']
+              const windowKey = `${conversionStats.days ?? 30}d`
+              const s30 = conversionStats.funnelDropOff?.[windowKey]
               const funnelSteps = [
                 {
                   label: 'Feature / limit blocks',
@@ -427,7 +428,9 @@ export function AdminOverviewTab({
                     <tr className="border-b border-[var(--app-border)]">
                       <th className="py-2 text-left font-medium text-[var(--text-muted)]">Step</th>
                       <th className="py-2 text-right font-medium text-[var(--text-muted)]">7d</th>
-                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">30d</th>
+                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">
+                        {`${conversionStats.days ?? 30}d`}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--app-border)]">
@@ -444,8 +447,11 @@ export function AdminOverviewTab({
                             0}
                         </td>
                         <td className="py-2 text-right font-semibold text-[var(--text)]">
-                          {(conversionStats.funnelDropOff!['30d'] as Record<string, number>)[key] ??
-                            0}
+                          {(
+                            conversionStats.funnelDropOff![
+                              `${conversionStats.days ?? 30}d`
+                            ] as Record<string, number>
+                          )?.[key] ?? 0}
                         </td>
                       </tr>
                     ))}

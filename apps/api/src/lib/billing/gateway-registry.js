@@ -1,16 +1,22 @@
-import { config } from '../../config/env.js'
-import { logger } from '../logger.js'
 import { stubGateway } from './providers/stub.js'
 import { manualGateway } from './providers/manual.js'
+import { stripeGateway, isStripeConfigured } from './providers/stripe.js'
+import { config } from '../../config/env.js'
+import { logger } from '../logger.js'
 
 const registry = new Map([
   ['stub', stubGateway],
   ['manual', manualGateway],
 ])
 
+if (isStripeConfigured()) {
+  registry.set('stripe', stripeGateway)
+  logger.info('Stripe billing gateway registered')
+}
+
 /**
  * Resolve a payment gateway implementation by provider id.
- * Additional providers (stripe, wish_money, bank_transfer) register here when integrated.
+ * Stripe registers when STRIPE_SECRET_KEY / PAYMENTS_SECRET_KEY is configured.
  */
 export function getBillingGateway(providerId) {
   const id = (providerId || config.BILLING_GATEWAY || 'stub').toLowerCase()
@@ -21,6 +27,15 @@ export function getBillingGateway(providerId) {
     throw new Error(
       'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live (use BILLING_GATEWAY=manual for pilot, or a registered PSP)'
     )
+  }
+  if (id === 'stripe' && !registry.has('stripe')) {
+    if (config.PAYMENTS_MODE === 'live') {
+      throw new Error(
+        'Stripe gateway requested but STRIPE_SECRET_KEY / PAYMENTS_SECRET_KEY is not configured'
+      )
+    }
+    logger.warn('Stripe requested but not configured; falling back to stub')
+    return stubGateway
   }
   const gateway = registry.get(id)
   if (!gateway) {

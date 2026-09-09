@@ -23,6 +23,7 @@ import {
   updateTenantLogo,
 } from '../services/branding.service.js'
 import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
+import { normalizeBusinessType } from '../lib/restaurant-targeting.js'
 
 const router = express.Router()
 
@@ -37,10 +38,12 @@ const restaurantCreateSchema = z.object({
   tradeLicenseNo: z.string().max(50).optional(),
   contactEmail: z.string().email(),
   phone: z.string().max(20).optional(),
+  businessType: z.string().max(64).optional(),
   address: z
     .object({
       street: z.string().optional(),
       city: z.string().optional(),
+      area: z.string().optional(),
       region: z.string().optional(),
       country: z.string().optional(),
     })
@@ -623,10 +626,14 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   try {
     const restaurantData = restaurantCreateSchema.parse(req.body)
 
+    const businessType = restaurantData.businessType
+      ? normalizeBusinessType(restaurantData.businessType) || restaurantData.businessType
+      : null
+
     const { rows } = await query(
       `
-      INSERT INTO restaurant (name, slug, trade_license_no, contact_email, phone, address_json)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO restaurant (name, slug, trade_license_no, contact_email, phone, business_type, address_json)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
       [
@@ -635,6 +642,7 @@ router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
         restaurantData.tradeLicenseNo,
         restaurantData.contactEmail,
         restaurantData.phone,
+        businessType,
         restaurantData.address ? JSON.stringify(restaurantData.address) : null,
       ]
     )
@@ -782,11 +790,17 @@ router.patch(
           tradeLicenseNo: 'trade_license_no',
           contactEmail: 'contact_email',
           phone: 'phone',
+          businessType: 'business_type',
           address: 'address_json',
         },
         {
-          valueTransform: (dbField, value) =>
-            dbField === 'address_json' ? JSON.stringify(value) : value,
+          valueTransform: (dbField, value) => {
+            if (dbField === 'address_json') return JSON.stringify(value)
+            if (dbField === 'business_type') {
+              return normalizeBusinessType(value) || value
+            }
+            return value
+          },
         }
       )
 

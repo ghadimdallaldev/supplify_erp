@@ -30,16 +30,21 @@ import { PageShell } from '../../components/ui/page-shell'
 import { EmptyState } from '../../components/ui/empty-state'
 import { LogoUpload } from '../../components/LogoUpload'
 import { MenuBulkImportPanel } from '../../components/consumer/MenuBulkImportPanel'
+import { MenuTagPicker } from '../../components/consumer/MenuTagPicker'
+import { downloadQrCode, qrCodeImageUrl } from '../../lib/consumerMenuTags'
 import { formatPrice } from '../../utils/format'
 import { toast } from 'sonner'
 import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   LayoutList,
   Link2,
   List,
   Pencil,
+  QrCode,
+  Share2,
   Trash2,
 } from 'lucide-react'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -80,6 +85,8 @@ export function MenuAdminPage() {
     basePrice: '',
     description: '',
     imageUrl: null as string | null,
+    allergens: [] as string[],
+    dietaryTags: [] as string[],
   })
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({
@@ -88,6 +95,8 @@ export function MenuAdminPage() {
     description: '',
     isAvailable: true,
     imageUrl: null as string | null,
+    allergens: [] as string[],
+    dietaryTags: [] as string[],
   })
   const [modifierGroupForm, setModifierGroupForm] = useState({
     menuItemId: '',
@@ -262,6 +271,8 @@ export function MenuAdminPage() {
         basePrice: Number(itemForm.basePrice),
         description: itemForm.description.trim() || undefined,
         imageUrl: itemForm.imageUrl,
+        allergens: itemForm.allergens,
+        dietaryTags: itemForm.dietaryTags,
       }).unwrap()
       setItemForm({
         categoryId: itemForm.categoryId,
@@ -269,6 +280,8 @@ export function MenuAdminPage() {
         basePrice: '',
         description: '',
         imageUrl: null,
+        allergens: [],
+        dietaryTags: [],
       })
       toast.success(t('menuAdmin.itemCreated'))
       refetch()
@@ -286,6 +299,8 @@ export function MenuAdminPage() {
       description: item.description ?? '',
       isAvailable: item.is_available,
       imageUrl: item.image_url ?? null,
+      allergens: item.allergens ?? [],
+      dietaryTags: item.dietary_tags ?? [],
     })
   }
 
@@ -300,6 +315,8 @@ export function MenuAdminPage() {
         description: editForm.description.trim() || undefined,
         isAvailable: editForm.isAvailable,
         imageUrl: editForm.imageUrl,
+        allergens: editForm.allergens,
+        dietaryTags: editForm.dietaryTags,
       }).unwrap()
       setEditingItemId(null)
       toast.success(t('menuAdmin.itemUpdated'))
@@ -436,19 +453,77 @@ export function MenuAdminPage() {
               </CardTitle>
               <CardDescription>{t('menuAdmin.shareLink')}</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2 sm:flex-row">
-              <Input readOnly value={publicUrl} />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={async () => {
-                  const ok = await copyToClipboard(publicUrl)
-                  if (ok) toast.success(t('menuAdmin.linkCopied'))
-                }}
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                {t('common.copy')}
-              </Button>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input readOnly value={publicUrl} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    const ok = await copyToClipboard(publicUrl)
+                    if (ok) toast.success(t('menuAdmin.linkCopied'))
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  {t('common.copy')}
+                </Button>
+              </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="flex flex-col items-center gap-2 rounded-lg border bg-white p-3 dark:bg-background">
+                  <img
+                    src={qrCodeImageUrl(publicUrl, 180)}
+                    alt={t('menuAdmin.qrAlt')}
+                    width={180}
+                    height={180}
+                    className="rounded-md"
+                  />
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <QrCode className="h-3.5 w-3.5" aria-hidden />
+                    {t('menuAdmin.qrHint')}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 sm:pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await downloadQrCode(publicUrl, `${slug}-menu-qr.png`)
+                        toast.success(t('menuAdmin.qrDownloaded'))
+                      } catch {
+                        toast.error(t('menuAdmin.qrDownloadFailed'))
+                      }
+                    }}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {t('menuAdmin.downloadQr')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (navigator.share) {
+                        try {
+                          await navigator.share({
+                            title: t('menuAdmin.shareTitle'),
+                            url: publicUrl,
+                          })
+                        } catch {
+                          /* user cancelled */
+                        }
+                      } else {
+                        const ok = await copyToClipboard(publicUrl)
+                        if (ok) toast.success(t('menuAdmin.linkCopied'))
+                      }
+                    }}
+                  >
+                    <Share2 className="mr-2 h-4 w-4" />
+                    {t('menuAdmin.shareLinkAction')}
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -849,6 +924,14 @@ export function MenuAdminPage() {
                           helperText={t('menuAdmin.photoHelper')}
                         />
                       </div>
+                      <MenuTagPicker
+                        allergens={itemForm.allergens}
+                        dietaryTags={itemForm.dietaryTags}
+                        onAllergensChange={(allergens) => setItemForm((f) => ({ ...f, allergens }))}
+                        onDietaryTagsChange={(dietaryTags) =>
+                          setItemForm((f) => ({ ...f, dietaryTags }))
+                        }
+                      />
                       <Button
                         type="submit"
                         disabled={creatingItem || !(data?.categories ?? []).length}
@@ -1189,6 +1272,16 @@ export function MenuAdminPage() {
                                                 helperText={t('menuAdmin.photoHelper')}
                                               />
                                             </div>
+                                            <MenuTagPicker
+                                              allergens={editForm.allergens}
+                                              dietaryTags={editForm.dietaryTags}
+                                              onAllergensChange={(allergens) =>
+                                                setEditForm((f) => ({ ...f, allergens }))
+                                              }
+                                              onDietaryTagsChange={(dietaryTags) =>
+                                                setEditForm((f) => ({ ...f, dietaryTags }))
+                                              }
+                                            />
                                             <label className="flex items-center gap-2 text-sm">
                                               <Switch
                                                 checked={editForm.isAvailable}
