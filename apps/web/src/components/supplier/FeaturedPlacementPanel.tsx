@@ -4,6 +4,7 @@ import {
   useGetFeaturedPlacementPackagesQuery,
   useGetMyFeaturedPlacementsQuery,
   usePurchaseFeaturedPlacementMutation,
+  usePayFeaturedPlacementMutation,
 } from '../../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -17,14 +18,18 @@ import { ensureNamespace } from '../../i18n'
 export function FeaturedPlacementPanel() {
   const { t } = useTranslation('suppliers')
   const { data: packagesData, isLoading: packagesLoading } = useGetFeaturedPlacementPackagesQuery()
-  const { data: mineData, isLoading: mineLoading } = useGetMyFeaturedPlacementsQuery()
+  const { data: mineData, isLoading: mineLoading, refetch } = useGetMyFeaturedPlacementsQuery()
   const [purchase, { isLoading: purchasing }] = usePurchaseFeaturedPlacementMutation()
+  const [payPlacement, { isLoading: paying }] = usePayFeaturedPlacementMutation()
   const [busyKey, setBusyKey] = useState<string | null>(null)
 
   const packages = packagesData?.packages ?? []
   const placements = mineData?.placements ?? []
   const active = placements.find(
     (p: any) => p.status === 'active' && new Date(p.ends_at) > new Date()
+  )
+  const pendingPay = placements.find(
+    (p: any) => p.status === 'pending_payment' || p.payment_status === 'pending'
   )
 
   useEffect(() => {
@@ -34,8 +39,40 @@ export function FeaturedPlacementPanel() {
   const handlePurchase = async (pricingKey: string) => {
     setBusyKey(pricingKey)
     try {
-      await purchase({ pricingKey }).unwrap()
+      const idempotencyKey =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? `featured:${pricingKey}:${crypto.randomUUID()}`
+          : `featured:${pricingKey}:${Date.now()}`
+      const result = await purchase({ pricingKey, idempotencyKey }).unwrap()
+      const placement = result?.placement as { paymentRequired?: boolean; id?: string } | undefined
+      if (placement?.paymentRequired) {
+        toast.message(
+          t('featuredPlacement.toast.paymentRequired', {
+            defaultValue: 'Placement created — complete payment to activate.',
+          })
+        )
+        refetch()
+        return
+      }
       toast.success(t('featuredPlacement.toast.activated'))
+      refetch()
+    } catch (e: any) {
+      toast.error(e?.data?.error?.message || t('featuredPlacement.toast.activateFailed'))
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const handlePayPending = async () => {
+    if (!pendingPay?.id) return
+    setBusyKey(String(pendingPay.id))
+    try {
+      await payPlacement({
+        id: pendingPay.id,
+        idempotencyKey: `featured-pay:${pendingPay.id}:${Date.now()}`,
+      }).unwrap()
+      toast.success(t('featuredPlacement.toast.activated'))
+      refetch()
     } catch (e: any) {
       toast.error(e?.data?.error?.message || t('featuredPlacement.toast.activateFailed'))
     } finally {
@@ -75,6 +112,24 @@ export function FeaturedPlacementPanel() {
             <p className="text-amber-800 mt-1">
               Ends {new Date(active.ends_at).toLocaleDateString()}
             </p>
+          </div>
+        ) : null}
+
+        {!active && pendingPay ? (
+          <div className="rounded-lg border border-[var(--app-border)] p-3 text-sm flex items-center justify-between gap-2">
+            <div>
+              <p className="font-medium">Payment required</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Complete card payment to activate featured placement.
+              </p>
+            </div>
+            <Button size="sm" disabled={paying || Boolean(busyKey)} onClick={handlePayPending}>
+              {busyKey === String(pendingPay.id) ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Pay now'
+              )}
+            </Button>
           </div>
         ) : null}
 

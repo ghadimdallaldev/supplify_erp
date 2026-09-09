@@ -41,25 +41,21 @@ export const adminApi = api.injectEndpoints({
         mostBlockedLimit: string | null
         blocksByFeature: Array<{ key: string; count: number }>
         blocksByLimit: Array<{ key: string; count: number }>
-        countsPerEventType?: { '7d': Record<string, number>; '30d': Record<string, number> }
-        funnelDropOff?: {
-          '7d': {
+        /** Keyed by window: '7d' plus `${days}d` for the requested window (default '30d'). */
+        countsPerEventType?: Record<string, Record<string, number>>
+        funnelDropOff?: Record<
+          string,
+          {
             blocked: number
             openUpgrade: number
             clickUpgrade: number
             upgradeSuccess: number
           }
-          '30d': {
-            blocked: number
-            openUpgrade: number
-            clickUpgrade: number
-            upgradeSuccess: number
-          }
-        }
-        recommendationFunnel?: {
-          '7d': { shown: number; clicked: number; upgradeSuccess: number }
-          '30d': { shown: number; clicked: number; upgradeSuccess: number }
-        }
+        >
+        recommendationFunnel?: Record<
+          string,
+          { shown: number; clicked: number; upgradeSuccess: number }
+        >
       },
       { days?: number }
     >({
@@ -104,7 +100,10 @@ export const adminApi = api.injectEndpoints({
         ),
       invalidatesTags: ['Admin'],
     }),
-    getAdminSubscriptions: builder.query<{ subscriptions: Subscription[] }, any>({
+    getAdminSubscriptions: builder.query<
+      { subscriptions: Subscription[]; total?: number; limit?: number; offset?: number },
+      any
+    >({
       query: (params) => ({
         url: '/api/admin-dashboard/subscriptions',
         params,

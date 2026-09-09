@@ -31,6 +31,13 @@ import {
   handleReservationCancelled,
 } from '../services/waitlistPromotion.js'
 import {
+  upsertReservationGuest,
+  createReservationReviewByToken,
+  getReservationReviewByToken,
+} from '../services/reservation-guest-reviews.service.js'
+import { getRestaurantRatingSummary } from '../services/consumer-reviews.service.js'
+import { evaluateCancelWindow, assertDepositAcknowledged } from '../lib/reservation-policy.js'
+import {
   getRestaurantSlotAvailability,
   assertSlotBookable,
   toCalendarDateString,
@@ -66,6 +73,19 @@ const createPublicReservationSchema = z.object({
   customerEmail: z.string().email(),
   customerPhone: z.string().min(1),
   notes: z.string().optional(),
+  occasion: z.string().max(120).optional(),
+  allergies: z.string().max(500).optional(),
+  depositAcknowledged: z.boolean().optional(),
+})
+
+const publicReservationReviewSchema = z.object({
+  token: z.string().uuid(),
+  overallRating: z.number().int().min(1).max(5),
+  foodRating: z.number().int().min(1).max(5).optional(),
+  serviceRating: z.number().int().min(1).max(5).optional(),
+  ambianceRating: z.number().int().min(1).max(5).optional(),
+  comment: z.string().max(2000).optional(),
+  reviewerName: z.string().max(120).optional(),
 })
 
 const staffLinkRequestSchema = z.object({
@@ -191,6 +211,10 @@ function isUuid(str) {
   return typeof str === 'string' && uuidRegex.test(str)
 }
 
+/** CDN/browser caching for anonymous public content — only set on 200 responses. */
+const PUBLIC_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
+const RESOLVE_HOST_CACHE_CONTROL = 'public, max-age=300, s-maxage=300, stale-while-revalidate=600'
+
 router.get('/restaurants/:idOrSlug', async (req, res) => {
   try {
     const { idOrSlug } = req.params
@@ -212,6 +236,7 @@ router.get('/restaurants/:idOrSlug', async (req, res) => {
       })
     }
 
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({
       ok: true,
       data: rows[0],
@@ -256,6 +281,7 @@ router.get('/resolve-host', async (req, res) => {
         requestId: req.requestId,
       })
     }
+    res.set('Cache-Control', RESOLVE_HOST_CACHE_CONTROL)
     res.json({ ok: true, data: resolved, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('resolve-host failed', { error: error.message })
@@ -271,6 +297,7 @@ router.get('/resolve-host', async (req, res) => {
 router.get('/suppliers/:idOrSlug', async (req, res) => {
   try {
     const data = await getPublicSupplierProfile(req.params.idOrSlug)
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'NotFoundError') {
@@ -296,6 +323,7 @@ router.get('/suppliers/:idOrSlug/products', async (req, res) => {
     const params = publicSupplierProductsSchema.parse(req.query)
     const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
     const data = await listPublicSupplierProducts(supplier.id, params)
+    res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
     if (error.name === 'NotFoundError') {
@@ -456,6 +484,8 @@ router.post('/reservations', async (req, res) => {
         throw err
       }
 
+      assertDepositAcknowledged(restaurantRows[0].operating_hours, payload.depositAcknowledged)
+
       await assertNoDuplicateGuestBooking(
         client,
         payload.restaurantId,
@@ -487,6 +517,15 @@ router.post('/reservations', async (req, res) => {
 
       assertSlotBookable(availability, scheduledAt, payload.partySize)
 
+      const guest = await upsertReservationGuest(client, {
+        restaurantId: payload.restaurantId,
+        displayName: payload.customerName,
+        phone: payload.customerPhone,
+        email: payload.customerEmail,
+        allergies: payload.allergies,
+        notes: payload.notes,
+      })
+
       const { rows } = await client.query(
         `
         INSERT INTO reservation (
@@ -500,12 +539,16 @@ router.post('/reservations', async (req, res) => {
           scheduled_at,
           duration_minutes,
           notes,
+          occasion,
+          allergies,
+          booking_source,
+          guest_id,
           waitlist,
           auto_confirmed,
           public_token,
           public_token_expires_at
         )
-        VALUES ($1, $2, 'CONFIRMED', $3, $4, $5, $6, $7, $8, $9, false, true, gen_random_uuid(), now() + interval '180 days')
+        VALUES ($1, $2, 'CONFIRMED', $3, $4, $5, $6, $7, $8, $9, $10, $11, 'public', $12, false, true, gen_random_uuid(), now() + interval '180 days')
         RETURNING *
       `,
         [
@@ -518,6 +561,9 @@ router.post('/reservations', async (req, res) => {
           scheduledAt.toISOString(),
           durationMinutes,
           payload.notes ?? null,
+          payload.occasion ?? null,
+          payload.allergies ?? null,
+          guest?.id || null,
         ]
       )
 
@@ -1165,6 +1211,25 @@ router.get('/reservations/manage', async (req, res) => {
       [reservation.restaurant_id]
     )
     const restaurant = restaurantRows[0]
+    let review = null
+    try {
+      const joined = await getReservationReviewByToken(token)
+      if (joined.review_id) {
+        review = {
+          id: joined.review_id,
+          overallRating: joined.overall_rating,
+          foodRating: joined.food_rating,
+          serviceRating: joined.service_rating,
+          ambianceRating: joined.ambiance_rating,
+          comment: joined.review_comment,
+          staffReply: joined.staff_reply,
+          createdAt: joined.review_created_at,
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    const ratingSummary = await getRestaurantRatingSummary(reservation.restaurant_id)
     res.json({
       ok: true,
       data: {
@@ -1174,6 +1239,9 @@ router.get('/reservations/manage', async (req, res) => {
           restaurantSlug: restaurant?.slug,
           manageToken: reservation.public_token,
         },
+        review,
+        ratingSummary,
+        canReview: reservation.status === 'COMPLETED' && !review,
       },
       error: null,
       requestId: req.requestId,
@@ -1184,6 +1252,27 @@ router.get('/reservations/manage', async (req, res) => {
       ok: false,
       data: null,
       error: { name: 'RESERVATION_MANAGE_ERROR', message: error.message },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.post('/reservations/manage/review', async (req, res) => {
+  try {
+    const payload = publicReservationReviewSchema.parse(req.body)
+    const review = await createReservationReviewByToken(payload)
+    res.status(201).json({
+      ok: true,
+      data: { review },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    const status = error.statusCode || 400
+    res.status(status).json({
+      ok: false,
+      data: null,
+      error: { name: error.name || 'RESERVATION_REVIEW_ERROR', message: error.message },
       requestId: req.requestId,
     })
   }
@@ -1214,6 +1303,26 @@ router.post('/reservations/manage/cancel', async (req, res) => {
         ok: false,
         data: null,
         error: { name: 'RESERVATION_ALREADY_CANCELLED', message: 'Reservation already cancelled' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: restaurantPolicyRows } = await query(
+      `SELECT operating_hours FROM restaurant WHERE id = $1`,
+      [reservation.restaurant_id]
+    )
+    const cancelEval = evaluateCancelWindow(
+      restaurantPolicyRows[0]?.operating_hours,
+      reservation.scheduled_at
+    )
+    if (!cancelEval.allowed) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'CANCEL_WINDOW_CLOSED',
+          message: `Online cancellation must be at least ${cancelEval.cancelWindowHours} hours before your reservation. Please contact the restaurant.`,
+        },
         requestId: req.requestId,
       })
     }

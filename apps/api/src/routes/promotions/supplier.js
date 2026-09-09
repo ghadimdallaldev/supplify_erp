@@ -11,9 +11,14 @@ import {
   getRestaurantIdForRequest,
 } from '../../lib/rbac.js'
 import { query, withTransaction } from '../../lib/db.js'
-import { getBillingGateway } from '../../lib/billing/gateway-registry.js'
+import {
+  createDealBoostInvoice,
+  chargePromotionAdInvoice,
+  DEAL_BOOST_INVOICE_TYPE,
+  isPromotionAdPaymentWaived,
+} from '../../lib/billing/promotion-ad-billing.js'
 import { logger } from '../../lib/logger.js'
-import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
+import { ValidationError, NotFoundError, PromotionAdError } from '../../middlewares/errorHandler.js'
 import { loadActivePromotionsForSupplier } from '../../services/promotions.service.js'
 import {
   discoverDealsForRestaurant,
@@ -388,7 +393,7 @@ router.post('/:id/pay-activation', async (req, res, next) => {
       throw new ValidationError('Deal boost is already paid')
     }
     const amount = Number(deal.boost_price_snapshot || 0)
-    if (amount <= 0 || isBoostPaymentWaived()) {
+    if (amount <= 0 || isBoostPaymentWaived() || isPromotionAdPaymentWaived()) {
       const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.NOT_REQUIRED })
       const { rows } = await query(
         `UPDATE promotions SET status = $2, payment_status = $3, updated_at = NOW() WHERE id = $1 RETURNING *`,
@@ -407,157 +412,86 @@ router.post('/:id/pay-activation', async (req, res, next) => {
       })
     }
 
-    const { rows: subscriptionRows } = await query(
-      `SELECT id FROM subscription
-       WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER'
-         AND status NOT IN ('CANCELLED')
-       ORDER BY created_at DESC LIMIT 1`,
-      [supplierId]
-    )
-    if (!subscriptionRows.length) {
-      throw new ValidationError('Supplier billing subscription not found')
+    let invoiceId = deal.billing_invoice_id
+    if (!invoiceId) {
+      const created = await createDealBoostInvoice({ deal })
+      invoiceId = created.invoice.id
     }
 
-    const methodParams = body.paymentMethodId ? [supplierId, body.paymentMethodId] : [supplierId]
-    const methodFilter = body.paymentMethodId ? `AND id = $2` : ''
-    const { rows: paymentMethods } = await query(
-      `SELECT id, provider, provider_payment_method_id
-       FROM billing_payment_method
-       WHERE tenant_id = $1 AND tenant_type = 'SUPPLIER'
-         AND status = 'ACTIVE' ${methodFilter}
-       ORDER BY is_default DESC, created_at DESC
-       LIMIT 1`,
-      methodParams
-    )
-    if (!paymentMethods.length) {
-      return res.status(402).json({
-        ok: false,
-        data: {
-          paymentRequired: true,
-          amount,
-          pricingKey: deal.boost_pricing_key,
-          message: 'Add an active supplier payment method before paying for this boost.',
-        },
-        error: {
-          name: 'PAYMENT_REQUIRED',
-          message: 'No active payment method is available for boost activation',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    const method = paymentMethods[0]
-    const gateway = getBillingGateway(method.provider)
     const idempotencyKey = body.idempotencyKey || `deal-boost:${deal.id}:${amount}`
-    const paymentResult = await withTransaction(async (client) => {
-      const { rows: existing } = await client.query(
-        `SELECT id, status FROM billing_payment WHERE idempotency_key = $1`,
-        [idempotencyKey]
-      )
-      if (existing[0]?.status === 'SUCCEEDED') {
-        const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
-        const { rows } = await client.query(
-          `UPDATE promotions
-           SET status = $2, payment_status = $3, updated_at = NOW()
-           WHERE id = $1 AND supplier_id = $4 AND status = 'approved_pending_payment'
-           RETURNING *`,
-          [deal.id, next.status, next.payment_status, supplierId]
-        )
-        return { success: true, payment: existing[0], promotion: rows[0] }
-      }
-
-      const { rows: paymentRows } = await client.query(
-        `INSERT INTO billing_payment (
-          invoice_id, subscription_id, tenant_id, tenant_type, payment_method_id,
-          provider, amount, currency, status, idempotency_key, metadata
-        ) VALUES (NULL, $1, $2, 'SUPPLIER', $3, $4, $5, 'USD', 'PROCESSING', $6, $7)
-        ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = now()
-        RETURNING *`,
-        [
-          subscriptionRows[0].id,
-          supplierId,
-          method.id,
-          gateway.id,
-          amount,
-          idempotencyKey,
-          JSON.stringify({ type: 'DEAL_BOOST', promotionId: deal.id }),
-        ]
-      )
-      const payment = paymentRows[0]
-      const chargeResult = await gateway.charge({
-        amount,
-        currency: 'USD',
-        providerPaymentMethodId: method.provider_payment_method_id,
+    let charge
+    try {
+      charge = await chargePromotionAdInvoice({
+        invoiceId,
+        supplierId,
+        paymentMethodId: body.paymentMethodId || null,
         idempotencyKey,
-        metadata: { type: 'DEAL_BOOST', promotionId: deal.id },
+        expectedType: DEAL_BOOST_INVOICE_TYPE,
       })
-
-      if (chargeResult.status !== 'succeeded') {
-        await client.query(
-          `UPDATE billing_payment
-           SET status = 'FAILED', provider_payment_id = $1, failure_code = $2,
-               failure_message = $3, updated_at = now()
-           WHERE id = $4`,
-          [
-            chargeResult.providerPaymentId,
-            chargeResult.failureCode,
-            chargeResult.failureMessage,
-            payment.id,
-          ]
-        )
-        return {
-          success: false,
-          amount,
-          failureCode: chargeResult.failureCode,
-          failureMessage: chargeResult.failureMessage,
-        }
+    } catch (err) {
+      if (err instanceof PromotionAdError && err.code === 'PROMOTION_AD_PAYMENT_REQUIRED') {
+        return res.status(402).json({
+          ok: false,
+          data: {
+            paymentRequired: true,
+            amount,
+            pricingKey: deal.boost_pricing_key,
+            invoiceId,
+            message: 'Add an active supplier payment method before paying for this boost.',
+          },
+          error: {
+            name: err.code,
+            message: err.message,
+          },
+          requestId: req.requestId,
+        })
       }
-
-      await client.query(
-        `UPDATE billing_payment
-         SET status = 'SUCCEEDED', provider_payment_id = $1, updated_at = now()
-         WHERE id = $2`,
-        [chargeResult.providerPaymentId, payment.id]
-      )
-      const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
-      const { rows } = await client.query(
-        `UPDATE promotions
-         SET status = $2, payment_status = $3, updated_at = NOW()
-         WHERE id = $1 AND supplier_id = $4 AND status = 'approved_pending_payment'
-         RETURNING *`,
-        [deal.id, next.status, next.payment_status, supplierId]
-      )
-      if (!rows.length) {
-        throw new ValidationError('Deal is no longer awaiting boost payment')
+      if (err instanceof PromotionAdError && err.code === 'PROMOTION_AD_PAYMENT_FAILED') {
+        return res.status(402).json({
+          ok: false,
+          data: {
+            paymentRequired: true,
+            amount,
+            pricingKey: deal.boost_pricing_key,
+            invoiceId,
+            message: err.message || 'Boost payment was declined.',
+          },
+          error: {
+            name: 'PAYMENT_FAILED',
+            message: err.message || 'Boost payment failed',
+            code: err.details?.failureCode,
+          },
+          requestId: req.requestId,
+        })
       }
-      return { success: true, payment, promotion: rows[0] }
-    })
-
-    if (!paymentResult.success) {
-      return res.status(402).json({
-        ok: false,
-        data: {
-          paymentRequired: true,
-          amount,
-          pricingKey: deal.boost_pricing_key,
-          message: paymentResult.failureMessage || 'Boost payment was declined.',
-        },
-        error: {
-          name: 'PAYMENT_FAILED',
-          message: paymentResult.failureMessage || 'Boost payment failed',
-          code: paymentResult.failureCode,
-        },
-        requestId: req.requestId,
-      })
+      throw err
     }
 
-    const published = await publishDealAfterApproval(paymentResult.promotion, {
+    const next = resolveScheduledOrActive(deal, { payment_status: PAYMENT_STATUSES.PAID })
+    const { rows } = await query(
+      `UPDATE promotions
+       SET status = $2, payment_status = $3, billing_invoice_id = $5, updated_at = NOW()
+       WHERE id = $1 AND supplier_id = $4 AND status = 'approved_pending_payment'
+       RETURNING *`,
+      [deal.id, next.status, next.payment_status, supplierId, charge.invoice?.id || invoiceId]
+    )
+    if (!rows.length) {
+      throw new ValidationError('Deal is no longer awaiting boost payment')
+    }
+
+    const published = await publishDealAfterApproval(rows[0], {
       waivePayment: false,
       paymentConfirmed: true,
     })
+    if (published.campaign?.id && (charge.invoice?.id || invoiceId)) {
+      await query(`UPDATE deal_promotions SET billing_invoice_id = $2 WHERE id = $1`, [
+        published.campaign.id,
+        charge.invoice?.id || invoiceId,
+      ]).catch(() => {})
+    }
     return res.json({
       ok: true,
-      data: { promotion: published.deal },
+      data: { promotion: published.deal, invoice: charge.invoice || null },
       error: null,
       requestId: req.requestId,
     })

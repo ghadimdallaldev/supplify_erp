@@ -270,6 +270,11 @@ function mapDispatchOrder(row) {
       : row.active_route_status === 'PLANNED'
         ? 'Planned route'
         : null,
+    warehouse_id: row.warehouse_id ?? null,
+    warehouse_name: row.warehouse_name ?? null,
+    warehouse_code: row.warehouse_code ?? null,
+    warehouse_count: row.warehouse_count ?? 0,
+    multi_warehouse: Number(row.warehouse_count || 0) > 1,
     assignment: row.assignment_id
       ? {
           id: row.assignment_id,
@@ -323,7 +328,11 @@ function buildDispatchBaseSelect() {
         (pod.order_id IS NOT NULL) AS has_pod,
         ar.route_id AS active_route_id,
         ar.route_number AS active_route_number,
-        ar.route_status AS active_route_status
+        ar.route_status AS active_route_status,
+        owa_sum.warehouse_id,
+        owa_sum.warehouse_name,
+        owa_sum.warehouse_code,
+        owa_sum.warehouse_count
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
       JOIN restaurant r ON r.id = o.restaurant_id
@@ -350,6 +359,17 @@ function buildDispatchBaseSelect() {
           AND dr.status IN ('PLANNED', 'IN_PROGRESS')
         LIMIT 1
       ) ar ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          (ARRAY_AGG(w.id ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_id,
+          (ARRAY_AGG(w.name ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_name,
+          (ARRAY_AGG(w.code ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_code,
+          COUNT(*)::int AS warehouse_count
+        FROM order_warehouse_assignment owa
+        JOIN warehouse w ON w.id = owa.warehouse_id
+        WHERE owa.order_id = o.id
+          AND owa.status NOT IN ('failed')
+      ) owa_sum ON true
       WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
   `
 }
@@ -560,6 +580,8 @@ router.post(
       }
 
       await invalidateUserAuthCaches({ tenantId: supplierId, tenantType: 'SUPPLIER' })
+      // The rolled-over assignment changes bucket/date on the dispatch board.
+      await invalidateDispatchCacheForSupplier(supplierId)
 
       res.json({
         ok: true,

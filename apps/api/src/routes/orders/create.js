@@ -300,7 +300,8 @@ router.post(
         if (supplierIds.length) {
           const { rows: supplierRows } = await query(
             `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name,
-                    minimum_order_amount
+                    minimum_order_amount, last_order_mode, last_order_cutoff_type, last_order_cutoff_time,
+                    last_order_cutoff_minutes, last_order_rollover_days, last_order_timezone
              FROM supplier WHERE id = ANY($1::uuid[])`,
             [supplierIds]
           )

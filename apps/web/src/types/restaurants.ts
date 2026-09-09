@@ -6,6 +6,7 @@ export interface Restaurant {
   name: string
   slug: string
   trade_license_no?: string
+  business_type?: string
   contact_email: string
   phone?: string
   address_json?: Address
@@ -13,6 +14,12 @@ export interface Restaurant {
   brand_primary?: string
   brand_accent?: string
   brand_display_name?: string
+  delivery_location_label?: string
+  delivery_instructions?: string
+  description?: string
+  website?: string
+  tax_id?: string
+  vat_number?: string
   created_at: string
   updated_at: string
 }
@@ -23,6 +30,7 @@ export interface CreateRestaurantRequest {
   tradeLicenseNo?: string
   contactEmail: string
   phone?: string
+  businessType?: string
   address?: Address
 }
 
@@ -32,6 +40,7 @@ export interface UpdateRestaurantRequest {
   tradeLicenseNo?: string
   contactEmail?: string
   phone?: string
+  businessType?: string
   address?: Address
 }
 

@@ -42,6 +42,8 @@ import {
 import {
   listFeaturedPackages,
   purchaseAndActivateFeaturedPlacement,
+  payFeaturedPlacement,
+  refundFeaturedPlacement,
   listPlacementsForSupplier,
   listAllActivePlacementsForAdmin,
 } from '../../services/featured-supplier-placement.service.js'
@@ -389,7 +391,9 @@ router.get(
       if (!supplierId) throw new NotFoundError('Supplier not found')
 
       const { rows } = await query(
-        `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions
+        `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
+                last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
+                last_order_rollover_days, last_order_timezone
          FROM supplier WHERE id = $1`,
         [supplierId]
       )
@@ -443,13 +447,39 @@ router.patch(
         fields.push(`terms_and_conditions = $${paramIndex++}`)
         values.push(body.termsAndConditions)
       }
+      if (body.lastOrderMode !== undefined) {
+        fields.push(`last_order_mode = $${paramIndex++}`)
+        values.push(body.lastOrderMode)
+      }
+      if (body.lastOrderCutoffType !== undefined) {
+        fields.push(`last_order_cutoff_type = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffType)
+      }
+      if (body.lastOrderCutoffTime !== undefined) {
+        fields.push(`last_order_cutoff_time = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffTime)
+      }
+      if (body.lastOrderCutoffMinutes !== undefined) {
+        fields.push(`last_order_cutoff_minutes = $${paramIndex++}`)
+        values.push(body.lastOrderCutoffMinutes)
+      }
+      if (body.lastOrderRolloverDays !== undefined) {
+        fields.push(`last_order_rollover_days = $${paramIndex++}`)
+        values.push(body.lastOrderRolloverDays)
+      }
+      if (body.lastOrderTimezone !== undefined) {
+        fields.push(`last_order_timezone = $${paramIndex++}`)
+        values.push(body.lastOrderTimezone)
+      }
 
       values.push(supplierId)
       const { rows } = await query(
         `UPDATE supplier
          SET ${fields.join(', ')}, updated_at = now()
          WHERE id = $${paramIndex}
-         RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions`,
+         RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
+                   last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
+                   last_order_rollover_days, last_order_timezone`,
         values
       )
       if (!rows.length) throw new NotFoundError('Supplier not found')
@@ -517,9 +547,54 @@ router.post(
         supplierId,
         pricingKey,
         createdBy: req.userData.id,
-        waivePayment: process.env.NODE_ENV !== 'production',
+        paymentMethodId: req.body?.paymentMethodId || null,
+        idempotencyKey: req.body?.idempotencyKey || null,
       })
-      res.status(201).json({ ok: true, data: { placement }, error: null, requestId: req.requestId })
+      const status = placement.paymentRequired ? 202 : 201
+      res
+        .status(status)
+        .json({ ok: true, data: { placement }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/pay',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER']),
+  requirePermission('SETTINGS_EDIT'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) throw new NotFoundError('Supplier not found')
+      const result = await payFeaturedPlacement({
+        placementId: req.params.id,
+        supplierId,
+        paymentMethodId: req.body?.paymentMethodId || null,
+        idempotencyKey: req.body?.idempotencyKey || null,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/refund',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const result = await refundFeaturedPlacement({
+        placementId: req.params.id,
+        amount: req.body?.amount != null ? Number(req.body.amount) : null,
+        reason: req.body?.reason || 'admin_refund',
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }

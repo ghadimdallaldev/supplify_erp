@@ -59,6 +59,16 @@ async function resolveSupplierId(req) {
 
 const importSchema = z.object({ csv: z.string().min(1) })
 
+/** Guard LIMIT/OFFSET: a negative offset made Postgres throw and surfaced as a 500. */
+function parsePaging(reqQuery, { defaultLimit = 50, maxLimit = 200 } = {}) {
+  const rawLimit = Number(reqQuery.limit)
+  const rawOffset = Number(reqQuery.offset)
+  return {
+    limit: Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, maxLimit) : defaultLimit,
+    offset: Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0,
+  }
+}
+
 router.post(
   '/customers/import/preview',
   requirePermission('CUSTOMERS_IMPORT'),
@@ -111,12 +121,13 @@ router.post('/customers/import/error-report', requirePermission('CUSTOMERS_IMPOR
 router.get('/customers/prospects', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
-    const limit = Math.min(Number(req.query.limit) || 50, 200)
-    const offset = Number(req.query.offset) || 0
+    const { limit, offset } = parsePaging(req.query)
     const data = await listProspects(supplierId, {
       limit,
       offset,
-      lifecycleStatus: req.query.lifecycleStatus || null,
+      lifecycleStatus:
+        typeof req.query.lifecycleStatus === 'string' ? req.query.lifecycleStatus : null,
+      search: typeof req.query.search === 'string' ? req.query.search : null,
     })
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
@@ -223,10 +234,11 @@ const createSponsorshipSchema = z.object({
 router.get('/sponsorships', requirePermission('GROWTH_VIEW'), async (req, res, next) => {
   try {
     const supplierId = await resolveSupplierId(req)
+    const { limit, offset } = parsePaging(req.query)
     const data = await listSupplierSponsorships(supplierId, {
-      limit: Number(req.query.limit) || 50,
-      offset: Number(req.query.offset) || 0,
-      status: req.query.status || null,
+      limit,
+      offset,
+      status: typeof req.query.status === 'string' ? req.query.status : null,
     })
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {

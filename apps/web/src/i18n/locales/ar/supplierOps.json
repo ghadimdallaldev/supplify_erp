@@ -231,6 +231,31 @@
       "inviteFailed": "فشلت الدعوة",
       "sponsorStarted": "بدأت الرعاية",
       "sponsorFailed": "فشلت الرعاية"
+    },
+    "funnel": {
+      "title": "مسار الرعاية",
+      "description": "ما حدث لأشهر الاشتراك التي أهديتها.",
+      "ofOffers": "{{percent}}٪ من العروض",
+      "totalSpend": "إجمالي الإنفاق",
+      "averageValue": "متوسط قيمة العرض",
+      "stages": {
+        "created": "العروض المقدمة",
+        "accepted": "المقبولة",
+        "activated": "الأشهر المفعّلة",
+        "completed": "الأشهر المكتملة"
+      },
+      "attention": {
+        "open_one": "عرض بانتظار الرد",
+        "open_other": "{{count}} عروض بانتظار الرد",
+        "declined_one": "عرض مرفوض",
+        "declined_other": "{{count}} عروض مرفوضة",
+        "expired_one": "عرض منتهي",
+        "expired_other": "{{count}} عروض منتهية",
+        "paymentsPending_one": "دفعة معلّقة",
+        "paymentsPending_other": "{{count}} دفعات معلّقة",
+        "paymentsFailed_one": "دفعة فاشلة",
+        "paymentsFailed_other": "{{count}} دفعات فاشلة"
+      }
     }
   }
 }

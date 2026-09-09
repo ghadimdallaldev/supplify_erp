@@ -218,6 +218,11 @@ const orderCreateSchema = z.object({
     )
     .optional(),
   status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
+  deliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  notes: z.string().max(2000).optional(),
 })
 
 const supplierOrderCreateSchema = z.object({

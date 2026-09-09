@@ -32,6 +32,7 @@ import {
   useGetEntitlementsQuery,
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
+  useSetDefaultWarehouseMutation,
   useGetSupplierFulfillmentQuery,
 } from '../../../../services/api'
 import { ensureNamespace } from '../../../../i18n'
@@ -54,6 +55,7 @@ export function SupplierWarehousesTab() {
   })
   useGetSupplierFulfillmentQuery(undefined, { skip: !multiWarehousePlan })
   const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
+  const [setDefaultWarehouse, { isLoading: isSettingDefault }] = useSetDefaultWarehouseMutation()
 
   const warehouseCount = warehousesData?.warehouses?.length ?? 0
   const warehouseGate = getWarehouseAddGate(entitlements, warehouseCount)
@@ -91,15 +93,32 @@ export function SupplierWarehousesTab() {
       const address = [warehouseForm.address, warehouseForm.city, warehouseForm.country]
         .filter(Boolean)
         .join(', ')
-      await createWarehouse({
+      const created = await createWarehouse({
         name: warehouseForm.name,
         code: warehouseForm.code || undefined,
         address: address || undefined,
       }).unwrap()
+      if (warehouseForm.isMain && created?.warehouse?.id && !created.warehouse.is_default) {
+        await setDefaultWarehouse(created.warehouse.id).unwrap()
+      }
       toast.success(t('warehouses.toast.added'))
       await refetchWarehouses()
       setShowAddWarehouse(false)
       setWarehouseForm({ name: '', code: '', address: '', city: '', country: '', isMain: false })
+    } catch (err: any) {
+      toast.error(err?.data?.error?.message || t('warehouses.toast.addFailed'))
+    }
+  }
+
+  const handleSetDefault = async (warehouseId: string) => {
+    if (!canWriteWarehouses) {
+      toast.error(t('warehouses.toast.noPermission'))
+      return
+    }
+    try {
+      await setDefaultWarehouse(warehouseId).unwrap()
+      toast.success(t('warehouses.toast.added'))
+      await refetchWarehouses()
     } catch (err: any) {
       toast.error(err?.data?.error?.message || t('warehouses.toast.addFailed'))
     }
@@ -200,14 +219,26 @@ export function SupplierWarehousesTab() {
                         </div>
                       )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setZonesWarehouse({ id: wh.id, name: wh.name })}
-                    >
-                      <MapPinned className="h-4 w-4 mr-2" />
-                      {t('warehouses.manageZones')}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {!(wh.is_default || wh.is_main) && canWriteWarehouses && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isSettingDefault}
+                          onClick={() => handleSetDefault(wh.id)}
+                        >
+                          {t('warehouses.default')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setZonesWarehouse({ id: wh.id, name: wh.name })}
+                      >
+                        <MapPinned className="h-4 w-4 mr-2" />
+                        {t('warehouses.manageZones')}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))

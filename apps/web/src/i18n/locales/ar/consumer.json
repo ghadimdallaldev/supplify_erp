@@ -29,7 +29,38 @@
     },
     "cartEmpty": "سلتك فارغة",
     "addedToCart": "تمت إضافة {{name}}",
-    "preorderedToCart": "تم الطلب المسبق لـ {{name}}"
+    "preorderedToCart": "تم الطلب المسبق لـ {{name}}",
+    "filtersTitle": "فلاتر غذائية",
+    "clearFilters": "مسح الفلاتر",
+    "noTag": "بدون {{tag}}",
+    "excludeAllergenAria": "إخفاء العناصر التي تحتوي {{allergen}}"
+  },
+  "menuTags": {
+    "allergensLabel": "يحتوي على مسببات حساسية",
+    "allergensHint": "اختر مسببات الحساسية الموجودة في هذا الطبق.",
+    "dietaryLabel": "وسوم غذائية",
+    "dietaryHint": "اختر الوسوم الغذائية المناسبة.",
+    "allergen": {
+      "gluten": "غلوتين",
+      "dairy": "ألبان",
+      "eggs": "بيض",
+      "fish": "سمك",
+      "shellfish": "محار",
+      "tree_nuts": "مكسرات شجرية",
+      "peanuts": "فول سوداني",
+      "soy": "صويا",
+      "sesame": "سمسم",
+      "sesame": "سمسم"
+    },
+    "dietary": {
+      "vegetarian": "نباتي",
+      "vegan": "نباتي صرف",
+      "halal": "حلال",
+      "gluten_free": "خالٍ من الغلوتين",
+      "dairy_free": "خالٍ من الألبان",
+      "nut_free": "خالٍ من المكسرات",
+      "spicy": "حار"
+    }
   },
   "menuItem": {
     "soldOut": "نفدت الكمية",

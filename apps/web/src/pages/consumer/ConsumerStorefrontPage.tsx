@@ -296,6 +296,7 @@ export function ConsumerStorefrontPage() {
                       alt=""
                       className="mb-2.5 h-[72px] w-full rounded-lg object-cover"
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div

@@ -47,6 +47,22 @@ export function DealAnalyticsDialog({
               value={a?.conversionRate != null ? `${a.conversionRate}%` : '—'}
             />
             <Stat
+              label={t('analytics.adSpend')}
+              value={a?.adSpend != null ? formatPrice(Number(a.adSpend)) : '—'}
+            />
+            <Stat
+              label={t('analytics.attributedGmv')}
+              value={a?.attributedGmv != null ? formatPrice(Number(a.attributedGmv)) : '—'}
+            />
+            <Stat
+              label={t('analytics.roas')}
+              value={a?.roas != null ? `${Number(a.roas).toFixed(2)}x` : '—'}
+            />
+            <Stat
+              label={t('analytics.costPerOrder')}
+              value={a?.costPerOrder != null ? formatPrice(Number(a.costPerOrder)) : '—'}
+            />
+            <Stat
               label={t('analytics.discountAmount')}
               value={a?.total_discount != null ? formatPrice(Number(a.total_discount)) : '—'}
             />
@@ -54,7 +70,7 @@ export function DealAnalyticsDialog({
               <div className="col-span-2 text-xs text-[var(--text-muted)] border-t pt-2">
                 {t('analytics.boostSummary', {
                   status: formatBoostStatusLabel(promo.status),
-                  budget: Number(promo.budget || 0).toFixed(2),
+                  budget: Number(promo.budget || promo.pricePaid || 0).toFixed(2),
                   impressions: String(promo.impressions || 0),
                 })}
               </div>

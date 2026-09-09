@@ -4,7 +4,10 @@ import {
   requireAuth,
   resolveTenantContext,
   resolveAdminContext,
+  requireAnyPermission,
+  rolesIncludeOwner,
 } from '../lib/rbac.js'
+import { requireFeature } from '../lib/subscription.js'
 import {
   getAssistantCapabilities,
   buildAssistantContext,
@@ -21,6 +24,28 @@ const messageSchema = z.object({
   message: z.string().min(1).max(4000),
 })
 
+/** Baseline: any workspace view permission (or Owner) can open the assistant. */
+function assistantAccessGuard(req, res, next) {
+  if (req.userData?.role === 'ADMIN' || req.adminContext) return next()
+  if (rolesIncludeOwner(req.tenantContext?.roles)) return next()
+  return requireAnyPermission(
+    'ORDERS_VIEW',
+    'INVENTORY_VIEW',
+    'INVOICES_VIEW',
+    'FULFILLMENT_VIEW',
+    'CATALOG_VIEW',
+    'SETTINGS_VIEW',
+    'RESERVATIONS_VIEW',
+    'CHAT_VIEW'
+  )(req, res, next)
+}
+
+const assistantFeatureGate = requireFeature(
+  'ai_platform',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 router.use(requireAuth)
 router.use(resolveTenantContext)
 router.use((req, res, next) => {
@@ -29,6 +54,11 @@ router.use((req, res, next) => {
   }
   return next()
 })
+router.use((req, res, next) => {
+  if (req.userData?.role === 'ADMIN' || req.adminContext) return next()
+  return assistantFeatureGate(req, res, next)
+})
+router.use(assistantAccessGuard)
 
 router.get('/capabilities', async (req, res, next) => {
   try {

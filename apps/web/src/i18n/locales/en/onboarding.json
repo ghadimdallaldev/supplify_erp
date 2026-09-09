@@ -84,7 +84,8 @@
       "city": "City",
       "region": "Region/State",
       "country": "Country",
-      "deliveryInstructions": "Delivery Instructions"
+      "deliveryInstructions": "Delivery Instructions",
+      "area": "Area / neighborhood"
     },
     "placeholders": {
       "businessName": "Enter business name",
@@ -96,19 +97,28 @@
       "city": "City Name",
       "region": "State or Region",
       "country": "Country",
-      "deliveryInstructions": "e.g., Gate A, Floor 2, Landmark: next to gas station"
+      "deliveryInstructions": "e.g., Gate A, Floor 2, Landmark: next to gas station",
+      "area": "e.g. Hamra, Downtown"
     },
     "businessTypes": {
-      "restaurant": "Restaurant",
-      "cafe": "Cafe",
+      "fine_dining": "Fine dining",
+      "casual_dining": "Casual dining",
+      "fast_food": "Fast food",
+      "cafe": "Café",
+      "bakery": "Bakery",
       "hotel": "Hotel",
-      "catering": "Catering"
+      "catering": "Catering",
+      "cloud_kitchen": "Cloud kitchen",
+      "restaurant": "Restaurant (legacy)"
     },
     "toasts": {
       "notLoaded": "Restaurant information not loaded",
       "logoFailed": "Failed to upload logo",
       "updated": "Profile updated successfully!",
       "updateFailed": "Failed to update profile"
+    },
+    "hints": {
+      "area": "Used for deal targeting. Match the names suppliers enter (city, neighborhood, or region)."
     }
   },
   "restaurantTeam": {

@@ -28,6 +28,7 @@ import {
 import { DealAnalyticsDialog } from '../../components/deals/DealAnalyticsDialog'
 import { SubmitDealDialog } from '../../components/deals/SubmitDealDialog'
 import { DealBoostPackagePicker } from '../../components/deals/DealBoostPackagePicker'
+import { DealCreatePreview } from '../../components/deals/DealCreatePreview'
 import { DealsStatusFilter, SupplierDealRow } from '../../components/deals/SupplierDealRow'
 import {
   DealTargetingPickers,
@@ -123,6 +124,8 @@ export function PromotionsPage() {
     appliesTo: 'all',
     productIds: [],
     categoryIds: [],
+    restaurantTypes: [],
+    areas: [],
   })
 
   const { data, isLoading, error, refetch } = useGetPromotionsQuery(
@@ -161,6 +164,10 @@ export function PromotionsPage() {
     appliesTo: targeting.appliesTo,
     productIds: targeting.appliesTo === 'specific_products' ? targeting.productIds : undefined,
     categoryIds: targeting.appliesTo === 'specific_categories' ? targeting.categoryIds : undefined,
+    targetRestaurantTypes: targeting.restaurantTypes?.length
+      ? targeting.restaurantTypes
+      : undefined,
+    targetAreas: targeting.areas?.length ? targeting.areas : undefined,
     submitForReview,
     pricingKey: submitForReview ? createPricingKey : undefined,
   })
@@ -188,7 +195,13 @@ export function PromotionsPage() {
       type: preset.type,
       discountValue: preset.discountValue,
     }))
-    setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+    setTargeting({
+      appliesTo: 'all',
+      productIds: [],
+      categoryIds: [],
+      restaurantTypes: [],
+      areas: [],
+    })
   }
 
   const handleSaveDraft = async () => {
@@ -198,7 +211,13 @@ export function PromotionsPage() {
       toast.success(t('promotions.toastDraftSaved'))
       setShowCreate(false)
       setCreatePricingKey('')
-      setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+      setTargeting({
+        appliesTo: 'all',
+        productIds: [],
+        categoryIds: [],
+        restaurantTypes: [],
+        areas: [],
+      })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
@@ -217,7 +236,13 @@ export function PromotionsPage() {
       toast.success(t('promotions.toastSubmitted'))
       setShowCreate(false)
       setCreatePricingKey('')
-      setTargeting({ appliesTo: 'all', productIds: [], categoryIds: [] })
+      setTargeting({
+        appliesTo: 'all',
+        productIds: [],
+        categoryIds: [],
+        restaurantTypes: [],
+        areas: [],
+      })
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
@@ -325,7 +350,11 @@ export function PromotionsPage() {
                   }}
                   onPayActivation={async (id) => {
                     try {
-                      await payActivation({ id }).unwrap()
+                      const idempotencyKey =
+                        typeof crypto !== 'undefined' && crypto.randomUUID
+                          ? `deal-boost:${id}:${crypto.randomUUID()}`
+                          : `deal-boost:${id}:${Date.now()}`
+                      await payActivation({ id, idempotencyKey }).unwrap()
                       toast.success(dealT('supplierRow.paymentSuccess'))
                       refetch()
                     } catch (e: unknown) {
@@ -500,6 +529,16 @@ export function PromotionsPage() {
                   </div>
                 </div>
               </div>
+              <DealCreatePreview
+                name={form.name}
+                type={form.type}
+                discountValue={form.discountValue}
+                ctaType={form.ctaType}
+                couponCode={form.couponCode}
+                restaurantTypes={targeting.restaurantTypes}
+                areas={targeting.areas}
+                boostSelected={Boolean(createPricingKey)}
+              />
             </div>
             <DialogFooter className="flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={handleSaveDraft} disabled={creating}>

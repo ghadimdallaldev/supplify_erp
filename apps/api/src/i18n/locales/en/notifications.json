@@ -222,7 +222,10 @@
     "requestTitle": "New quote request",
     "requestMessage": "{{restaurantName}} requested your best price on selected items.",
     "responseTitle": "Supplier response received",
-    "responseMessage": "{{supplierName}} responded to your quote request."
+    "responseMessage": "{{supplierName}} responded to your quote request.",
+    "declinedTitle": "Supplier declined to quote",
+    "declinedMessage": "{{supplierName}} declined your quote request{{reasonSuffix}}.",
+    "reasonPrefix": ": {{reason}}"
   },
   "admin": {
     "newTenantTitle": "New {{tenantType}} registered",

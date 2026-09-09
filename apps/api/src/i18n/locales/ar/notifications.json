@@ -216,7 +216,10 @@
     "requestTitle": "طلب عرض سعر جديد",
     "requestMessage": "طلب {{restaurantName}} أفضل سعر للمنتجات المحددة.",
     "responseTitle": "رد من المورد",
-    "responseMessage": "رد {{supplierName}} على طلب عرض السعر."
+    "responseMessage": "رد {{supplierName}} على طلب عرض السعر.",
+    "declinedTitle": "اعتذر المورد عن التسعير",
+    "declinedMessage": "اعتذر {{supplierName}} عن الرد على طلب عرض السعر{{reasonSuffix}}.",
+    "reasonPrefix": ": {{reason}}"
   },
   "admin": {
     "newTenantTitle": "تسجيل {{tenantType}} جديد",

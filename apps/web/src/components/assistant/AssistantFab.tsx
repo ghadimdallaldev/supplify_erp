@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bot, Loader2, Send, Sparkles } from 'lucide-react'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '../ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { ensureNamespace } from '../../i18n'
@@ -48,9 +43,10 @@ export function AssistantFab() {
   const { data: entitlements } = useGetEntitlementsQuery(undefined, {
     skip: !user || (user.role === 'ADMIN' && !isImpersonating),
   })
-  const planHasAi = user?.role === 'ADMIN' && !isImpersonating
-    ? true
-    : featureEnabled(entitlements?.features?.ai_platform)
+  const planHasAi =
+    user?.role === 'ADMIN' && !isImpersonating
+      ? true
+      : featureEnabled(entitlements?.features?.ai_platform)
 
   useEffect(() => {
     void ensureNamespace('assistant')
@@ -124,6 +120,7 @@ function AssistantChatBody({
   role?: string
 }) {
   const { t } = useTranslation('assistant')
+  const { isEffectiveSupplier } = useImpersonation()
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [localMessages, setLocalMessages] = useState<LocalMsg[]>([])
@@ -204,7 +201,11 @@ function AssistantChatBody({
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-sm text-[var(--text-muted)]">{t('unavailable')}</p>
         <Button asChild variant="outline" size="sm">
-          <a href="/app/settings?tab=subscription">{t('upgrade')}</a>
+          <Link
+            to={isEffectiveSupplier ? '/app/settings?tab=plan' : '/app/settings?tab=subscription'}
+          >
+            {t('upgrade')}
+          </Link>
         </Button>
       </div>
     )
@@ -213,11 +214,7 @@ function AssistantChatBody({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--app-border)] px-4 py-2 text-xs text-[var(--text-muted)]">
-        <span>
-          {quotaRemaining != null
-            ? t('quotaHint', { remaining: quotaRemaining })
-            : null}
-        </span>
+        <span>{quotaRemaining != null ? t('quotaHint', { remaining: quotaRemaining }) : null}</span>
         <button
           type="button"
           className="font-medium text-[var(--brand-mid)] hover:underline"

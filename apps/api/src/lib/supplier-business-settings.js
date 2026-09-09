@@ -45,6 +45,12 @@ export const supplierBusinessSettingsUpdateSchema = z
     paymentTerms: z.string().max(200).nullable().optional(),
     returnPolicy: z.string().max(5000).nullable().optional(),
     termsAndConditions: z.string().max(10000).nullable().optional(),
+    lastOrderMode: z.enum(['none', 'cutoff']).optional(),
+    lastOrderCutoffType: z.enum(['absolute_time', 'minutes_before_window']).nullable().optional(),
+    lastOrderCutoffTime: z.string().regex(timePattern).nullable().optional(),
+    lastOrderCutoffMinutes: z.number().int().min(1).max(1440).nullable().optional(),
+    lastOrderRolloverDays: z.number().int().min(1).max(14).optional(),
+    lastOrderTimezone: z.string().max(64).optional(),
   })
   .refine(
     (body) =>
@@ -52,7 +58,13 @@ export const supplierBusinessSettingsUpdateSchema = z
       body.minimumOrderAmount !== undefined ||
       body.paymentTerms !== undefined ||
       body.returnPolicy !== undefined ||
-      body.termsAndConditions !== undefined,
+      body.termsAndConditions !== undefined ||
+      body.lastOrderMode !== undefined ||
+      body.lastOrderCutoffType !== undefined ||
+      body.lastOrderCutoffTime !== undefined ||
+      body.lastOrderCutoffMinutes !== undefined ||
+      body.lastOrderRolloverDays !== undefined ||
+      body.lastOrderTimezone !== undefined,
     { message: 'At least one field is required' }
   )
 
@@ -115,5 +127,12 @@ export function mapSupplierBusinessSettingsRow(row) {
     paymentTerms: row.payment_terms ?? null,
     returnPolicy: row.return_policy ?? null,
     termsAndConditions: row.terms_and_conditions ?? null,
+    lastOrderMode: row.last_order_mode || 'none',
+    lastOrderCutoffType: row.last_order_cutoff_type ?? null,
+    lastOrderCutoffTime: row.last_order_cutoff_time ?? null,
+    lastOrderCutoffMinutes:
+      row.last_order_cutoff_minutes != null ? Number(row.last_order_cutoff_minutes) : null,
+    lastOrderRolloverDays: Number(row.last_order_rollover_days ?? 1) || 1,
+    lastOrderTimezone: row.last_order_timezone || 'UTC',
   }
 }

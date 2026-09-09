@@ -29,7 +29,37 @@
     },
     "cartEmpty": "Your cart is empty",
     "addedToCart": "Added {{name}}",
-    "preorderedToCart": "Preordered {{name}}"
+    "preorderedToCart": "Preordered {{name}}",
+    "filtersTitle": "Dietary filters",
+    "clearFilters": "Clear filters",
+    "noTag": "No {{tag}}",
+    "excludeAllergenAria": "Hide items containing {{allergen}}"
+  },
+  "menuTags": {
+    "allergensLabel": "Contains allergens",
+    "allergensHint": "Select allergens present in this dish.",
+    "dietaryLabel": "Dietary tags",
+    "dietaryHint": "Select dietary labels that apply.",
+    "allergen": {
+      "gluten": "Gluten",
+      "dairy": "Dairy",
+      "eggs": "Eggs",
+      "fish": "Fish",
+      "shellfish": "Shellfish",
+      "tree_nuts": "Tree nuts",
+      "peanuts": "Peanuts",
+      "soy": "Soy",
+      "sesame": "Sesame"
+    },
+    "dietary": {
+      "vegetarian": "Vegetarian",
+      "vegan": "Vegan",
+      "halal": "Halal",
+      "gluten_free": "Gluten-free",
+      "dairy_free": "Dairy-free",
+      "nut_free": "Nut-free",
+      "spicy": "Spicy"
+    }
   },
   "menuItem": {
     "soldOut": "Sold out",
@@ -271,6 +301,13 @@
     "publicStorefront": "Public storefront",
     "shareLink": "Share this link with guests.",
     "linkCopied": "Link copied",
+    "qrAlt": "QR code for guest menu",
+    "qrHint": "Print or display for table ordering.",
+    "downloadQr": "Download QR",
+    "qrDownloaded": "QR code downloaded",
+    "qrDownloadFailed": "Unable to download QR code",
+    "shareTitle": "Order online",
+    "shareLinkAction": "Share link",
     "tabMenu": "Menu",
     "tabFulfillment": "Fulfillment",
     "fulfillmentSettings": "Fulfillment settings",

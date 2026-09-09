@@ -12,7 +12,7 @@ import { query } from '../lib/db.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { logger } from '../lib/logger.js'
-import { requireFeature, requireWithinLimit, isFeatureEnabled } from '../lib/subscription.js'
+import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
   linkDriverToUser,
@@ -65,6 +65,20 @@ async function resolveSupplierId(req) {
   }
 
   return getSupplierIdForRequest(req)
+}
+
+/**
+ * A driver may only be parked at one of this supplier's own warehouses.
+ * Previously only existence was checked, which let a supplier point a driver at
+ * another tenant's warehouse and leak that warehouse through the driver list.
+ */
+async function assertWarehouseBelongsToSupplier(warehouseId, supplierId) {
+  if (!warehouseId) return
+  const { rows } = await query(`SELECT id FROM warehouse WHERE id = $1 AND supplier_id = $2`, [
+    warehouseId,
+    supplierId,
+  ])
+  if (!rows.length) throw new ValidationError('Warehouse not found')
 }
 
 const createDriverSchema = z.object({
@@ -196,15 +210,7 @@ router.post(
       if (body.user_id) {
         await assertUserNotLinkedToOtherDriver(body.user_id, supplierId)
       }
-      if (body.warehouse_id) {
-        const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
-        if (multiActive) {
-          const { rows: wh } = await query(`SELECT id FROM warehouse WHERE id = $1`, [
-            body.warehouse_id,
-          ])
-          if (!wh.length) throw new ValidationError('Warehouse not found')
-        }
-      }
+      await assertWarehouseBelongsToSupplier(body.warehouse_id, supplierId)
 
       const { rows } = await query(
         `INSERT INTO drivers (
@@ -276,13 +282,19 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
     )
     if (!existing.length) throw new NotFoundError('Driver not found')
 
+    if (body.warehouse_id) {
+      await assertWarehouseBelongsToSupplier(body.warehouse_id, supplierId)
+    }
+
     if (body.is_active === false) {
       const { rows: active } = await query(
         `SELECT da.id, o.id AS order_id
          FROM driver_assignments da
          JOIN customer_order o ON o.id = da.order_id
-         WHERE da.driver_id = $1 AND da.status IN ('assigned', 'picked_up', 'out_for_delivery')`,
-        [req.params.id]
+         WHERE da.driver_id = $1
+           AND da.supplier_id = $2
+           AND da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'rescheduled')`,
+        [req.params.id, supplierId]
       )
       if (active.length) {
         return res.status(409).json({
@@ -378,6 +390,14 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
         requestId: req.requestId,
       })
     }
+    if (error instanceof z.ZodError || error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
     logger.error('Update driver error:', error)
     res.status(500).json({
       ok: false,
@@ -389,59 +409,78 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
 })
 
 router.delete('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) => {
-  req.body = { is_active: false }
-  const supplierId = await resolveSupplierId(req)
-  if (!supplierId) {
-    return res.status(403).json({
+  try {
+    const supplierId = await resolveSupplierId(req)
+    if (!supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: existing } = await query(
+      `SELECT * FROM drivers WHERE id = $1 AND supplier_id = $2`,
+      [req.params.id, supplierId]
+    )
+    if (!existing.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Driver not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: active } = await query(
+      `SELECT da.id FROM driver_assignments da
+       WHERE da.driver_id = $1
+         AND da.supplier_id = $2
+         AND da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'rescheduled')`,
+      [req.params.id, supplierId]
+    )
+    if (active.length) {
+      return res.status(409).json({
+        ok: false,
+        data: { activeDeliveries: active },
+        error: {
+          name: 'ACTIVE_DELIVERIES',
+          message: `Driver has ${active.length} active deliveries. Reassign before deactivating.`,
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    // Planned routes for a deactivated driver would otherwise sit on the board
+    // permanently — nobody can start them once the driver is gone.
+    await query(
+      `UPDATE delivery_route SET status = 'CANCELLED', updated_at = now()
+       WHERE supplier_id = $1 AND driver_id = $2 AND status = 'PLANNED'`,
+      [supplierId, req.params.id]
+    )
+
+    const { rows } = await query(
+      `UPDATE drivers SET is_active = false, updated_at = now()
+       WHERE id = $1 AND supplier_id = $2 RETURNING *`,
+      [req.params.id, supplierId]
+    )
+
+    res.json({
+      ok: true,
+      data: { driver: mapDriver(rows[0]) },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    logger.error('Deactivate driver error:', error)
+    res.status(500).json({
       ok: false,
       data: null,
-      error: { name: 'FORBIDDEN', message: 'Supplier not found' },
+      error: { name: 'INTERNAL_ERROR', message: 'Failed to deactivate driver' },
       requestId: req.requestId,
     })
   }
-
-  const { rows: existing } = await query(
-    `SELECT * FROM drivers WHERE id = $1 AND supplier_id = $2`,
-    [req.params.id, supplierId]
-  )
-  if (!existing.length) {
-    return res.status(404).json({
-      ok: false,
-      data: null,
-      error: { name: 'NOT_FOUND', message: 'Driver not found' },
-      requestId: req.requestId,
-    })
-  }
-
-  const { rows: active } = await query(
-    `SELECT da.id FROM driver_assignments da
-     WHERE da.driver_id = $1 AND da.status IN ('assigned', 'picked_up', 'out_for_delivery')`,
-    [req.params.id]
-  )
-  if (active.length) {
-    return res.status(409).json({
-      ok: false,
-      data: { activeDeliveries: active },
-      error: {
-        name: 'ACTIVE_DELIVERIES',
-        message: `Driver has ${active.length} active deliveries. Reassign before deactivating.`,
-      },
-      requestId: req.requestId,
-    })
-  }
-
-  const { rows } = await query(
-    `UPDATE drivers SET is_active = false, updated_at = now()
-     WHERE id = $1 AND supplier_id = $2 RETURNING *`,
-    [req.params.id, supplierId]
-  )
-
-  res.json({
-    ok: true,
-    data: { driver: mapDriver(rows[0]) },
-    error: null,
-    requestId: req.requestId,
-  })
 })
 
 router.get('/:id/assignments', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {

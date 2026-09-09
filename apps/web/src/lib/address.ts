@@ -1,6 +1,7 @@
 export type AddressFields = {
   street: string
   city: string
+  area: string
   region: string
   country: string
 }
@@ -8,6 +9,7 @@ export type AddressFields = {
 const EMPTY_ADDRESS: AddressFields = {
   street: '',
   city: '',
+  area: '',
   region: '',
   country: '',
 }
@@ -37,6 +39,7 @@ export function normalizeAddress(value: unknown): AddressFields {
   return {
     street: pickAddressField(obj, 'street', 'line1', 'line_1', 'address'),
     city: pickAddressField(obj, 'city'),
+    area: pickAddressField(obj, 'area', 'neighborhood', 'district'),
     region: pickAddressField(obj, 'region', 'state', 'province'),
     country: pickAddressField(obj, 'country'),
   }
@@ -49,5 +52,7 @@ export function formatAddressLine(value: unknown): string {
   if (typeof value !== 'object') return String(value)
 
   const parts = normalizeAddress(value)
-  return [parts.street, parts.city, parts.region, parts.country].filter(Boolean).join(', ')
+  return [parts.street, parts.area, parts.city, parts.region, parts.country]
+    .filter(Boolean)
+    .join(', ')
 }

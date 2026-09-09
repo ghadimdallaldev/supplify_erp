@@ -175,7 +175,9 @@
     "rescheduled": { "subject": "Reservation rescheduled", "title": "Reservation updated" },
     "new": { "subject": "New reservation", "title": "New reservation" },
     "waitlist": { "subject": "Waitlist update", "title": "Waitlist update" },
-    "waitlist_offer": { "subject": "Table available", "title": "Waitlist offer" }
+    "waitlist_offer": { "subject": "Table available", "title": "Waitlist offer" },
+    "reminder": { "subject": "Reservation reminder", "title": "Reservation reminder" },
+    "review_invite": { "subject": "How was your visit?", "title": "Share your review" }
   },
   "staff": {
     "magic_link": {

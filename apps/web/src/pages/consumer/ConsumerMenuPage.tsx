@@ -10,6 +10,7 @@ import { CartDrawer } from '../../components/consumer/CartDrawer'
 import { OrderSheet } from '../../components/consumer/OrderSheet'
 import { CategoryNav } from '../../components/consumer/CategoryNav'
 import { MenuItemCard } from '../../components/consumer/MenuItemCard'
+import { MenuDietaryFilters } from '../../components/consumer/MenuDietaryFilters'
 import { FloatingCartBar } from '../../components/consumer/FloatingCartBar'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
@@ -76,6 +77,8 @@ export function ConsumerMenuPage() {
   const [cartOpen, setCartOpen] = useState(false)
   const [orderItem, setOrderItem] = useState<ConsumerMenuItem | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [excludeAllergens, setExcludeAllergens] = useState<string[]>([])
+  const [requireDietary, setRequireDietary] = useState<string[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string>()
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({})
   const scrollSpyPaused = useRef(false)
@@ -143,23 +146,42 @@ export function ConsumerMenuPage() {
   const filteredCategories = useMemo(() => {
     const categories = data?.menu.categories ?? []
     const q = searchQuery.trim().toLowerCase()
-    if (!q) return categories
     return categories
       .map((cat) => ({
         ...cat,
-        items: cat.items.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            (item.description ?? '').toLowerCase().includes(q)
-        ),
+        items: cat.items.filter((item) => {
+          if (q) {
+            const matchesSearch =
+              item.name.toLowerCase().includes(q) ||
+              (item.description ?? '').toLowerCase().includes(q)
+            if (!matchesSearch) return false
+          }
+          const allergens = item.allergens ?? []
+          const dietary = item.dietary_tags ?? []
+          if (excludeAllergens.some((tag) => allergens.includes(tag))) return false
+          if (requireDietary.some((tag) => !dietary.includes(tag))) return false
+          return true
+        }),
       }))
       .filter((cat) => cat.items.length > 0)
-  }, [data?.menu.categories, searchQuery])
+  }, [data?.menu.categories, excludeAllergens, requireDietary, searchQuery])
 
   const totalItems = useMemo(
     () => filteredCategories.reduce((sum, cat) => sum + cat.items.length, 0),
     [filteredCategories]
   )
+
+  const chefPicks = useMemo(() => {
+    const picks: ConsumerMenuItem[] = []
+    for (const cat of filteredCategories) {
+      for (const item of cat.items) {
+        if (item.is_available === false) continue
+        picks.push(item)
+        if (picks.length >= 6) return picks
+      }
+    }
+    return picks
+  }, [filteredCategories])
 
   useEffect(() => {
     if (filteredCategories.length && !activeCategoryId) {
@@ -280,6 +302,14 @@ export function ConsumerMenuPage() {
             </button>
           )}
         </div>
+        {!isLoading && (data?.menu.categories?.length ?? 0) > 0 ? (
+          <MenuDietaryFilters
+            excludeAllergens={excludeAllergens}
+            requireDietary={requireDietary}
+            onExcludeAllergensChange={setExcludeAllergens}
+            onRequireDietaryChange={setRequireDietary}
+          />
+        ) : null}
       </div>
 
       {usingFallbackMenu && (
@@ -294,6 +324,28 @@ export function ConsumerMenuPage() {
           activeCategoryId={activeCategoryId}
           onSelect={scrollToCategory}
         />
+      )}
+
+      {!isLoading && !searchQuery && chefPicks.length > 0 && (
+        <section
+          className="space-y-2"
+          aria-label={t('menu.chefPicks', { defaultValue: 'Chef picks' })}
+        >
+          <h2 className="text-sm font-semibold tracking-wide text-[var(--text)]">
+            {t('menu.chefPicks', { defaultValue: 'Chef picks' })}
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {chefPicks.map((item) => (
+              <div key={`pick-${item.id}`} className="w-[220px] shrink-0">
+                <MenuItemCard
+                  item={item}
+                  onSelect={() => handleItemSelect(item)}
+                  disabled={orderingClosed || item.is_available === false}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {isLoading && (

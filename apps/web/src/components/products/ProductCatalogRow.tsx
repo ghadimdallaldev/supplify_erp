@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Package, Plus, TrendingUp, Heart, Eye } from 'lucide-react'
@@ -288,7 +289,7 @@ function ProductActions({
   )
 }
 
-export function ProductCatalogRow({
+function ProductCatalogRowInner({
   product,
   isSupplier,
   showFavorite,
@@ -386,3 +387,5 @@ export function ProductCatalogRow({
     </tr>
   )
 }
+
+export const ProductCatalogRow = memo(ProductCatalogRowInner)

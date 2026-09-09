@@ -94,7 +94,38 @@
     "items_other": "{{count}} منتجات",
     "neededBy": "مطلوب بحلول {{date}}",
     "viewResponse": "عرض الرد",
-    "respond": "الرد"
+    "respond": "الرد",
+    "unread": "غير مقروء",
+    "decline": "اعتذار",
+    "declinePrompt": "هل تريد الاعتذار عن طلب عرض السعر من {{restaurant}}؟ يمكنك إضافة سبب اختياري يظهر للمطعم.",
+    "declineSuccess": "تم الاعتذار عن طلب عرض السعر",
+    "declineFailed": "تعذر الاعتذار عن طلب عرض السعر",
+    "declinedReason": "تم الاعتذار: {{reason}}",
+    "overdue": "متأخر",
+    "dueToday": "مطلوب اليوم",
+    "dueInDays_one": "مطلوب خلال يوم",
+    "dueInDays_other": "مطلوب خلال {{count}} أيام",
+    "searchPlaceholder": "ابحث باسم المطعم…",
+    "noMatchesTitle": "لا توجد طلبات مطابقة",
+    "noMatchesDescription": "جرّب بحثًا أو تصفية مختلفة.",
+    "urgentSummary_one": "طلب واحد يحتاج تسعيرًا خلال يومين.",
+    "urgentSummary_other": "{{count}} طلبات تحتاج تسعيرًا خلال يومين.",
+    "pendingSummary_one": "طلب واحد بانتظار تسعيرك.",
+    "pendingSummary_other": "{{count}} طلبات بانتظار تسعيرك.",
+    "pageOf": "صفحة {{page}} من {{pageCount}} · {{total}} إجمالاً",
+    "previous": "السابق",
+    "next": "التالي",
+    "tabs": {
+      "all": "الكل",
+      "pending": "قيد الانتظار",
+      "responded": "تم الرد",
+      "declined": "معتذر عنها"
+    },
+    "sort": {
+      "newest": "الأحدث",
+      "oldest": "الأقدم",
+      "needed_by": "تاريخ الحاجة"
+    }
   },
   "response": {
     "notFoundTitle": "طلب عرض السعر غير موجود",
@@ -112,6 +143,14 @@
     "overallNotePlaceholder": "رسالة اختيارية للمطعم",
     "sendResponse": "إرسال الرد",
     "sentSuccess": "تم إرسال الرد",
-    "sendFailed": "فشل إرسال الرد"
+    "sendFailed": "فشل إرسال الرد",
+    "decline": "اعتذار عن التسعير",
+    "declinePrompt": "هل تريد الاعتذار عن طلب عرض السعر؟ يمكنك إضافة سبب اختياري يظهر للمطعم.",
+    "declineSuccess": "تم الاعتذار عن طلب عرض السعر",
+    "declineFailed": "تعذر الاعتذار عن طلب عرض السعر",
+    "missingPrice_one": "أدخل سعر الوحدة لعنصر متاح واحد، أو ضع علامة غير متاح.",
+    "missingPrice_other": "أدخل سعر الوحدة لـ {{count}} عناصر متاحة، أو ضع علامة غير متاح.",
+    "lockedDeclined": "لقد اعتذرت عن طلب عرض السعر هذا ولم يعد بالإمكان تسعيره.",
+    "lockedClosed": "طلب عرض السعر هذا {{status}} ولم يعد يقبل الردود."
   }
 }

@@ -23,6 +23,8 @@ export function SupplifyLogo({
       width={size}
       height={size}
       style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }}
+      // React 18 warns on the camelCase fetchPriority prop; spread the lowercase attribute.
+      {...{ fetchpriority: 'high' }}
     />
   )
 

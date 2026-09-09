@@ -49,7 +49,10 @@ export function PublicReservationPortal() {
     customerEmail: '',
     customerPhone: '',
     notes: '',
+    occasion: '',
+    allergies: '',
   })
+  const [depositAcknowledged, setDepositAcknowledged] = useState(false)
   const [availabilityChecked, setAvailabilityChecked] = useState(false)
 
   const slots = useMemo(() => availabilityData?.slots ?? [], [availabilityData?.slots])
@@ -95,7 +98,11 @@ export function PublicReservationPortal() {
     form.customerName.trim().length > 0 &&
     form.customerEmail.trim().length > 0 &&
     form.customerPhone.trim().length > 0
-  const canConfirm = Boolean(form.selectedSlot && guestContactComplete)
+  const depositRequired =
+    availabilityData?.depositMode === 'fixed' || availabilityData?.depositMode === 'percent'
+  const canConfirm = Boolean(
+    form.selectedSlot && guestContactComplete && (!depositRequired || depositAcknowledged)
+  )
 
   const handleCreateReservation = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -121,6 +128,9 @@ export function PublicReservationPortal() {
         customerEmail: form.customerEmail.trim(),
         customerPhone: form.customerPhone.trim(),
         notes: form.notes || undefined,
+        occasion: form.occasion || undefined,
+        allergies: form.allergies || undefined,
+        depositAcknowledged: depositAcknowledged || undefined,
       }).unwrap()
 
       toast.success(t('portal.reservationConfirmed'))
@@ -437,6 +447,67 @@ export function PublicReservationPortal() {
                 className="mt-1.5 min-h-[100px]"
               />
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="occasion">
+                  {t('portal.occasion', { defaultValue: 'Occasion' })}
+                </Label>
+                <Input
+                  id="occasion"
+                  className="mt-1.5"
+                  value={form.occasion}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, occasion: event.target.value }))
+                  }
+                  placeholder={t('portal.occasionPlaceholder', {
+                    defaultValue: 'Birthday, anniversary…',
+                  })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="allergies">
+                  {t('portal.allergies', { defaultValue: 'Allergies' })}
+                </Label>
+                <Input
+                  id="allergies"
+                  className="mt-1.5"
+                  value={form.allergies}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, allergies: event.target.value }))
+                  }
+                  placeholder={t('portal.allergiesPlaceholder', {
+                    defaultValue: 'Nuts, shellfish…',
+                  })}
+                />
+              </div>
+            </div>
+
+            {availabilityData?.depositPolicyText ||
+            availabilityData?.depositMode === 'fixed' ||
+            availabilityData?.depositMode === 'percent' ? (
+              <div className="space-y-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2 text-xs text-[var(--text-muted)]">
+                <p>
+                  {availabilityData.depositPolicyText ||
+                    t('portal.depositNotice', {
+                      defaultValue: 'This restaurant may require a deposit for your reservation.',
+                    })}
+                </p>
+                <label className="flex items-start gap-2 text-[var(--text)]">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={depositAcknowledged}
+                    onChange={(e) => setDepositAcknowledged(e.target.checked)}
+                  />
+                  <span>
+                    {t('portal.depositAck', {
+                      defaultValue: 'I understand and accept the deposit policy',
+                    })}
+                  </span>
+                </label>
+              </div>
+            ) : null}
 
             <Button
               type="submit"

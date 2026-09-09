@@ -32,9 +32,23 @@ export const chatApi = api.injectEndpoints({
       query: () => '/api/suppliers/featured-placement/mine',
       providesTags: ['Supplier'],
     }),
-    purchaseFeaturedPlacement: builder.mutation<{ placement: unknown }, { pricingKey: string }>({
+    purchaseFeaturedPlacement: builder.mutation<
+      { placement: unknown },
+      { pricingKey: string; paymentMethodId?: string; idempotencyKey?: string }
+    >({
       query: (body) => ({
         url: '/api/suppliers/featured-placement/purchase',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Supplier'],
+    }),
+    payFeaturedPlacement: builder.mutation<
+      { placement: unknown },
+      { id: string; paymentMethodId?: string; idempotencyKey?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/suppliers/featured-placement/${id}/pay`,
         method: 'POST',
         body,
       }),
@@ -43,6 +57,17 @@ export const chatApi = api.injectEndpoints({
     getAdminFeaturedPlacements: builder.query<{ placements: unknown[] }, void>({
       query: () => '/api/suppliers/featured-placement/admin/active',
       providesTags: ['Admin'],
+    }),
+    refundFeaturedPlacement: builder.mutation<
+      { placement: unknown },
+      { id: string; reason?: string; amount?: number }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/suppliers/featured-placement/${id}/refund`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Supplier', 'Admin'],
     }),
     getMessages: builder.query<any, { conversationId: string }>({
       query: ({ conversationId }) => `/api/chat/conversations/${conversationId}/messages`,

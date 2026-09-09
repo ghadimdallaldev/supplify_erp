@@ -10,7 +10,12 @@ import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
 export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
-  const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse')
+  // Single-warehouse (Silver+) and multi-warehouse (Gold+) both use warehouse_inventory
+  // when the supplier has at least one active warehouse.
+  const [warehousesFeature, multiWh] = await Promise.all([
+    isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses'),
+    isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse'),
+  ])
 
   const db = client ? (sql, params) => client.query(sql, params) : query
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
@@ -18,7 +23,7 @@ export async function supplierUsesWarehouseInventory(supplierId, { client = null
     `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
     [supplierId]
   )
-  return Boolean(multiWh) && Number(rows[0]?.c || 0) >= 1
+  return Boolean(warehousesFeature || multiWh) && Number(rows[0]?.c || 0) >= 1
 }
 
 /**
