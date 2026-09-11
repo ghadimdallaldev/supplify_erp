@@ -2,6 +2,23 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — Preprod incident hardening applied to prod
+
+Issues found on preprod and verified/fixed on **production** so they do not recur:
+
+| Issue                                                  | Prod status                                                                       |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Missing `supplify-mobile` client / redirect variants   | Present; redirects include `supplify://`, triple-slash, package-id; login form OK |
+| Broken `supplify-browser-email-otp` flow               | Re-applied; Cookie + forms + email-otp REQUIRED                                   |
+| `KC_HOSTNAME` / issuer mismatch                        | `keycloak.supplifyerp.com` / issuer OK                                            |
+| Web blank page (`VITE_KEYCLOAK_URL` empty)             | Railway web vars synced; baked bundle has Keycloak URL + `supplify-prod`          |
+| OTP from-domain unverified (`preprod.supplifyerp.com`) | Prod already `noreply@supplifyerp.com` (verified)                                 |
+| API `KEYCLOAK_CLIENT_SECRET` ≠ Keycloak `supplify-api` | **Fixed** — regenerated + Railway API updated + redeployed                        |
+| OTP mail URL/secret wiring                             | `SUPPLIFY_OTP_MAIL_URL` + secrets match API                                       |
+
+- **Mobile code**: release builds hardcode `supplify://auth/callback` (both Android/iOS) so Keycloak never sees wrong redirect variants.
+- **Note**: prod `registrationAllowed=false` (invite/admin create only) — unlike preprod self-signup. PENDING users still must finish `/register/complete` on web before mobile.
+
 ## 2026-09-12 — Keycloak mobile client + EAS preprod alignment
 
 - **Keycloak**: Added public client `supplify-mobile` (PKCE, `supplify://auth/callback`, post-logout `supplify://auth/logout`) to `deploy/keycloak/realm-export.preprod.json` and `realm-export.prod.json`. Partial-imported into live `keycloak-preprod.supplifyerp.com` / `keycloak.supplifyerp.com` so mobile login no longer returns "Client not found". Verified: auth without PKCE returns `code_challenge_method` error to the app scheme (client present).

@@ -34,7 +34,17 @@ Required for Expo Android/iOS PKCE login. Present in `deploy/keycloak/realm-expo
 
 ## Credentials
 
-`KEYCLOAK_CLIENT_SECRET` in Railway API must match Keycloak (dashboard only; never commit).
+`KEYCLOAK_CLIENT_SECRET` in Railway API **must** match the live Keycloak `supplify-api` client secret.
+
+After any realm partial-import or client overwrite, verify (admin token required):
+
+```bash
+# Live secret must equal Railway API KEYCLOAK_CLIENT_SECRET
+# Mismatch symptoms: web /auth/callback → "Token exchange failed: 401"
+# and LoginPage shows "Authentication failed. If you were signed in as a demo user..."
+```
+
+If mismatched: regenerate the secret in Keycloak Admin → Clients → `supplify-api` → Credentials, then set the same value on Railway `supplify-api-prod` `KEYCLOAK_CLIENT_SECRET` and redeploy the API.
 
 ## Sync from git
 

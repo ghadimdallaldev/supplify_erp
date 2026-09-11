@@ -7,10 +7,16 @@
   "directAccessGrantsEnabled": false,
   "redirectUris": [
     "supplify://auth/callback",
+    "supplify://*",
+    "supplify:///auth/callback",
+    "com.supplify.mobile://auth/callback",
+    "com.supplify.mobile://*",
     "exp://127.0.0.1:8081/--/auth/callback",
     "exp://127.0.0.1:8081/*",
     "exp://localhost:8081/--/auth/callback",
-    "exp://localhost:8081/*"
+    "exp://localhost:8081/*",
+    "http://localhost:8081/*",
+    "http://127.0.0.1:8081/*"
   ],
   "webOrigins": ["+"],
   "protocol": "openid-connect",

@@ -40,6 +40,8 @@ Redirect URIs: `supplify://auth/callback`, Expo Go `exp://…` (dev), post-logou
 
 `KEYCLOAK_CLIENT_SECRET` in Railway API must match the Keycloak client secret (set via dashboard; not stored in git).
 
+After realm import / client sync, confirm secrets still match. Mismatch → `/auth/callback` token exchange 401 and the web login "Authentication failed…" banner.
+
 ## Sync from git
 
 ```bash

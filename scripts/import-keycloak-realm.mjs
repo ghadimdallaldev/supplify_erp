@@ -126,6 +126,52 @@ async function partialImport(url, token, realmName, realmExport) {
   return res.json()
 }
 
+async function ensureApiClientSecret(url, token, realmName) {
+  const desired = process.env.KEYCLOAK_CLIENT_SECRET
+  if (!desired || desired === 'changeme') return
+
+  const listRes = await adminFetch(
+    `${url}/admin/realms/${encodeURIComponent(realmName)}/clients?clientId=supplify-api`,
+    token
+  )
+  if (!listRes.ok) {
+    throw new Error(`List supplify-api client failed (${listRes.status}): ${await listRes.text()}`)
+  }
+  const clients = await listRes.json()
+  const client = clients[0]
+  if (!client?.id) {
+    console.warn('supplify-api client not found — skip KEYCLOAK_CLIENT_SECRET sync')
+    return
+  }
+
+  const secretRes = await adminFetch(
+    `${url}/admin/realms/${encodeURIComponent(realmName)}/clients/${client.id}/client-secret`,
+    token
+  )
+  if (secretRes.ok) {
+    const current = await secretRes.json()
+    if (current.value === desired) {
+      console.log('supplify-api client secret already matches KEYCLOAK_CLIENT_SECRET')
+      return
+    }
+  }
+
+  const putRes = await adminFetch(
+    `${url}/admin/realms/${encodeURIComponent(realmName)}/clients/${client.id}`,
+    token,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ ...client, secret: desired }),
+    }
+  )
+  if (!putRes.ok) {
+    throw new Error(
+      `Update supplify-api client secret failed (${putRes.status}): ${await putRes.text()}`
+    )
+  }
+  console.log('Aligned Keycloak supplify-api secret with KEYCLOAK_CLIENT_SECRET env')
+}
+
 async function ensureDriverLoginUserAttribute(url, token, realmName) {
   const endpoint = `${url}/admin/realms/${encodeURIComponent(realmName)}/users/profile`
   const currentResponse = await adminFetch(endpoint, token)
@@ -219,6 +265,7 @@ async function main() {
     console.error('Partial import reported errors:', result.error)
     process.exit(1)
   }
+  await ensureApiClientSecret(url, token, realmName)
   await ensureDriverLoginUserAttribute(url, token, realmName)
 }
 
