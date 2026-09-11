@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — Keycloak mobile client + EAS preprod alignment
+
+- **Keycloak**: Added public client `supplify-mobile` (PKCE, `supplify://auth/callback`, post-logout `supplify://auth/logout`) to `deploy/keycloak/realm-export.preprod.json` and `realm-export.prod.json`. Partial-imported into live `keycloak-preprod.supplifyerp.com` / `keycloak.supplifyerp.com` so mobile login no longer returns "Client not found".
+- **iOS EAS**: Aligned `supplify-mobile-ios/eas.json` with Android — `preprod` / `preview` / `ios-simulator` / `production` bake `EXPO_PUBLIC_*` API + Keycloak URLs and `supplify-mobile` client id.
+- **Builds**: Fresh EAS `preprod` builds kicked from latest mobile tips (Android APK + iOS device/simulator as credentials allow).
+- **Docs**: `deploy/railway/*/KEYCLOAK_CLIENT.md` now list `supplify-mobile`; this parity entry records the live sync.
+
 ## 2026-09-12 — Android/iOS release audit
 
 - **iOS parity fix**: Restored the empty src/features/supplier/screens/SupplierPromotionsScreen.tsx from the synchronized Android implementation; SupplierNavigator now typechecks on iOS.

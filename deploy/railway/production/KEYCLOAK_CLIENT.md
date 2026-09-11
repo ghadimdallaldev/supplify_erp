@@ -1,6 +1,6 @@
 # Keycloak client setup — Railway production
 
-Realm: **supplify-prod** · Clients: **supplify-api**, **supplify-web**
+Realm: **supplify-prod** · Clients: **supplify-api**, **supplify-web**, **supplify-mobile**
 
 Custom domains: `app.supplifyerp.com` (web), `api.supplifyerp.com` (API), `keycloak.supplifyerp.com` (IdP).
 
@@ -27,6 +27,10 @@ https://api.supplifyerp.com
 - `registrationAllowed: false` — admins create users in Keycloak only
 - `directAccessGrantsEnabled: false` — no password grant
 - `sslRequired: all`
+
+## Mobile public client (`supplify-mobile`)
+
+Required for Expo Android/iOS PKCE login. Present in `deploy/keycloak/realm-export.prod.json`. Sync with the command below. Redirect URIs: `supplify://auth/callback`, Expo Go `exp://…` (dev), post-logout `supplify://auth/logout`. See `docs/mobile/KEYCLOAK_MOBILE_CLIENT.md`.
 
 ## Credentials
 

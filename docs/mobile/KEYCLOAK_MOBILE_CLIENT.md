@@ -83,7 +83,25 @@ Point `EXPO_PUBLIC_API_URL` at your Railway development API URL. Ensure Keycloak
 
 ## Verification
 
-After Keycloak client creation, confirm:
+Confirm the public client exists (should redirect to the realm login form, not "Client not found"):
+
+```bash
+curl -sSL "https://keycloak-preprod.supplifyerp.com/realms/supplify-preprod/protocol/openid-connect/auth?client_id=supplify-mobile&response_type=code&redirect_uri=supplify%3A%2F%2Fauth%2Fcallback&scope=openid" | head
+```
+
+Apply from git when missing:
+
+```bash
+KEYCLOAK_ADMIN_PASSWORD=<from Railway> node scripts/import-keycloak-realm.mjs \
+  --file deploy/keycloak/realm-export.preprod.json \
+  --url https://keycloak-preprod.supplifyerp.com
+
+KEYCLOAK_ADMIN_PASSWORD=<from Railway> node scripts/import-keycloak-realm.mjs \
+  --file deploy/keycloak/realm-export.prod.json \
+  --url https://keycloak.supplifyerp.com
+```
+
+After Keycloak client creation, confirm API mobile auth tests:
 
 ```bash
 # From supplify_erp API tests
