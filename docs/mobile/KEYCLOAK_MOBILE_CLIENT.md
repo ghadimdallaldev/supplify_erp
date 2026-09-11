@@ -18,7 +18,35 @@ Configure this **once** in Keycloak before running the Supplify mobile app again
 
 ## Realm
 
-Use the same realm as the web app (default: `Supplify`).
+| Environment             | Realm              |
+| ----------------------- | ------------------ |
+| Local / Railway **dev** | `Supplify`         |
+| Railway **preprod**     | `supplify-preprod` |
+| Railway **prod**        | `supplify-prod`    |
+
+Mobile EAS profiles bake the matching realm into `EXPO_PUBLIC_KEYCLOAK_REALM` (see `supplify-mobile/eas.json`).
+
+## Mobile environment variables
+
+Set these in `C:/myProjects/supplify-mobile/.env` and `C:/myProjects/supplify-mobile-ios/.env` for **local** Expo:
+
+```env
+EXPO_PUBLIC_API_URL=http://localhost
+EXPO_PUBLIC_KEYCLOAK_URL=http://localhost:8180
+EXPO_PUBLIC_KEYCLOAK_REALM=Supplify
+EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=supplify-mobile
+```
+
+Hosted backends (EAS builds):
+
+| Build profile         | `EXPO_PUBLIC_API_URL`                 | `EXPO_PUBLIC_KEYCLOAK_URL`                 | Realm              |
+| --------------------- | ------------------------------------- | ------------------------------------------ | ------------------ |
+| `preprod` / `preview` | `https://api-preprod.supplifyerp.com` | `https://keycloak-preprod.supplifyerp.com` | `supplify-preprod` |
+| `production`          | `https://api.supplifyerp.com`         | `https://keycloak.supplifyerp.com`         | `supplify-prod`    |
+
+Both standalone mobile repositories default local Keycloak to `http://localhost:8180`, matching the ERP development stack. Their committed `.env.example` files carry the same value. Use a reachable LAN address or hosted URL for a physical device.
+
+These are Expo public configuration values, not secrets. Never place Keycloak client secrets or Apple/Expo signing credentials in a mobile `.env` file.
 
 ## Driver OTP bypass
 
@@ -27,21 +55,6 @@ The `EMAIL_OTP` authenticator skips MFA for users whose Keycloak attribute `supp
 ## Mobile branch switch
 
 Mobile obtains `activeTenantToken` from the `POST /api/branches/switch` JSON response body (field `data.activeTenantToken`). This field is only present for bearer-authenticated requests; web clients receive the token via an `HttpOnly` cookie instead. Store the token and attach it as `X-Active-Tenant-Token` on subsequent requests.
-
-## Mobile environment variables
-
-Set these in `C:/myProjects/supplify-mobile/.env` and `C:/myProjects/supplify-mobile-ios/.env` (Expo):
-
-```env
-EXPO_PUBLIC_API_URL=https://your-api.railway.app
-EXPO_PUBLIC_KEYCLOAK_URL=https://your-keycloak.railway.app
-EXPO_PUBLIC_KEYCLOAK_REALM=Supplify
-EXPO_PUBLIC_KEYCLOAK_CLIENT_ID=supplify-mobile
-```
-
-Both standalone mobile repositories default local Keycloak to `http://localhost:8180`, matching the ERP development stack. Their committed `.env.example` files carry the same value. Use a reachable LAN address or hosted URL for a physical device.
-
-These are Expo public configuration values, not secrets. Never place Keycloak client secrets or Apple/Expo signing credentials in a mobile `.env` file.
 
 ## Auth flow (PKCE)
 
