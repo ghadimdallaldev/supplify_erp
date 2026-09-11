@@ -84,15 +84,15 @@ Entry points: Products page, Supplier detail, Supplier settings catalog card.
 
 ## Web routes
 
-| Route                             | Page                   |
-| --------------------------------- | ---------------------- |
-| `/app/quote-requests`             | Restaurant quote list  |
-| `/app/quote-requests/new`         | Create quote request   |
-| `/app/quote-requests/:id`         | Request detail         |
-| `/app/quote-requests/:id/compare` | Compare responses      |
-| `/app/supplier/quotes`            | Supplier inbox         |
-| `/app/supplier/quotes/:id`        | Supplier response form |
-| `/supplier/:idOrSlug`             | Public mini-store      |
+| Route                              | Page                   |
+| ---------------------------------- | ---------------------- |
+| `/app/quote-requests`              | Restaurant quote list  |
+| `/app/quote-requests/new`          | Create quote request   |
+| `/app/quote-requests/:id`          | Request detail         |
+| `/app/quote-requests/:id/compare`  | Compare responses      |
+| `/app/quote-requests/supplier`     | Supplier inbox         |
+| `/app/quote-requests/supplier/:id` | Supplier response form |
+| `/supplier/:idOrSlug`              | Public mini-store      |
 
 ## Database
 

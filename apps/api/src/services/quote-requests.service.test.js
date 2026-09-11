@@ -21,6 +21,7 @@ vi.mock('./notification.service.js', () => ({
 import {
   createQuoteRequest,
   listRestaurantQuoteRequests,
+  listSupplierQuoteRequests,
   getSupplierQuoteRequestDetail,
   submitQuoteResponse,
   declineQuoteRequest,
@@ -207,6 +208,140 @@ describe('quote-requests.service', () => {
     await expect(getSupplierQuoteRequestDetail('supplier-2', 'qrs-1')).rejects.toBeInstanceOf(
       NotFoundError
     )
+  })
+
+  it('getSupplierQuoteRequestDetail exposes canRespond when RFQ is open and not declined', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'pending',
+            quote_request_status: 'open',
+            quote_request_note: null,
+            needed_by: null,
+            quote_request_created_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
+    expect(detail.canRespond).toBe(true)
+  })
+
+  it('getSupplierQuoteRequestDetail sets canRespond false when quote request is closed', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'pending',
+            quote_request_status: 'closed',
+            quote_request_note: null,
+            needed_by: null,
+            quote_request_created_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
+    expect(detail.canRespond).toBe(false)
+  })
+
+  it('getSupplierQuoteRequestDetail sets canRespond false when supplier declined', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'declined',
+            quote_request_status: 'open',
+            quote_request_note: null,
+            needed_by: null,
+            quote_request_created_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
+    expect(detail.canRespond).toBe(false)
+  })
+
+  it('listSupplierQuoteRequests applies status filter, search, needed_by sort and counts envelope', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            status: 'pending',
+            quote_request_status: 'open',
+            quote_request_note: 'Urgent',
+            needed_by: '2026-09-15',
+            quote_request_created_at: new Date().toISOString(),
+            restaurant_name: 'Golden Fork',
+            item_count: 3,
+            decline_reason: null,
+            viewed_at: null,
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            total: 5,
+            pending: 2,
+            responded: 2,
+            declined: 1,
+            unread: 1,
+            urgent: 1,
+          },
+        ],
+      })
+
+    const result = await listSupplierQuoteRequests('supplier-1', {
+      status: 'pending',
+      search: 'Golden',
+      sort: 'needed_by',
+      page: 1,
+      limit: 20,
+    })
+
+    const listSql = queryMock.mock.calls[0][0]
+    expect(listSql).toContain('qrs.status = $2')
+    expect(listSql).toContain('r.name ILIKE $3')
+    expect(listSql).toContain('qr.needed_by ASC NULLS LAST')
+    expect(result.inbox).toHaveLength(1)
+    expect(result.inbox[0].restaurantName).toBe('Golden Fork')
+    expect(result.counts).toEqual({
+      total: 5,
+      pending: 2,
+      responded: 2,
+      declined: 1,
+      unread: 1,
+      urgent: 1,
+    })
+    expect(result.pagination.total).toBe(1)
   })
 
   it('submits quote response and notifies restaurant', async () => {

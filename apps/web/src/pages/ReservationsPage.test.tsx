@@ -23,13 +23,13 @@ vi.mock('../services/reservationsApi', () => ({
     isLoading: false,
   }),
   useGetReservationWaitlistQuery: () => ({
-    useGetReservationReviewsQuery: () => ({
-      data: { reviews: [] },
-      isLoading: false,
-    }),
     data: { waitlist: [] },
     isLoading: false,
     refetch: vi.fn(),
+  }),
+  useGetReservationReviewsQuery: () => ({
+    data: { reviews: [] },
+    isLoading: false,
   }),
   useManuallyPromoteWaitlistMutation: () => [vi.fn(), { isLoading: false }],
   useGetPublicBookingSettingsQuery: () => ({ data: undefined }),

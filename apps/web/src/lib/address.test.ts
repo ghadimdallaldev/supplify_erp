@@ -6,6 +6,7 @@ describe('normalizeAddress', () => {
     expect(normalizeAddress({ city: 'Dubai', country: 'UAE' })).toEqual({
       street: '',
       city: 'Dubai',
+      area: '',
       region: '',
       country: 'UAE',
     })
@@ -15,6 +16,7 @@ describe('normalizeAddress', () => {
     expect(normalizeAddress('123 Main St')).toEqual({
       street: '123 Main St',
       city: '',
+      area: '',
       region: '',
       country: '',
     })

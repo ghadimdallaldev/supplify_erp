@@ -55,6 +55,7 @@ vi.mock('../services/quote-requests.service.js', () => ({
   }),
   getSupplierQuoteRequestDetail: vi.fn().mockResolvedValue({ id: 'qrs-1', items: [] }),
   submitQuoteResponse: vi.fn().mockResolvedValue({ id: 'qrs-1', status: 'responded' }),
+  declineQuoteRequest: vi.fn().mockResolvedValue({ id: 'qrs-1', status: 'declined' }),
   buildCartPayloadFromResponse: vi.fn().mockResolvedValue({
     supplierId: 'supplier-1',
     quoteRequestSupplierId: 'qrs-1',
@@ -113,6 +114,28 @@ describe('quote-requests.routes', () => {
     expect(res.body.data.quoteRequests).toHaveLength(1)
   })
 
+  it('GET supplier inbox forwards status, search, sort and returns counts envelope', async () => {
+    quoteService.listSupplierQuoteRequests.mockResolvedValueOnce({
+      inbox: [{ id: 'qrs-1', status: 'pending', restaurantName: 'Golden Fork' }],
+      counts: { total: 3, pending: 1, responded: 1, declined: 1, unread: 1, urgent: 0 },
+      pagination: { page: 1, limit: 20, total: 1 },
+    })
+
+    const res = await request(app)
+      .get('/api/quote-requests/supplier/inbox')
+      .query({ status: 'pending', search: 'Golden', sort: 'needed_by' })
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_VIEW')
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.counts.pending).toBe(1)
+    expect(res.body.data.inbox).toHaveLength(1)
+    expect(quoteService.listSupplierQuoteRequests).toHaveBeenCalledWith(
+      'supplier-1',
+      expect.objectContaining({ status: 'pending', search: 'Golden', sort: 'needed_by' })
+    )
+  })
+
   it('denies supplier quote responses without order management permission', async () => {
     const res = await request(app)
       .post('/api/quote-requests/supplier/inbox/qrs-1/respond')
@@ -129,5 +152,21 @@ describe('quote-requests.routes', () => {
     expect(res.status).toBe(200)
     expect(res.body.data.items).toHaveLength(1)
     expect(quoteService.buildCartPayloadFromResponse).toHaveBeenCalled()
+  })
+
+  it('POST supplier inbox decline delegates to declineQuoteRequest', async () => {
+    const res = await request(app)
+      .post('/api/quote-requests/supplier/inbox/qrs-1/decline')
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_MANAGE')
+      .send({ reason: 'Out of stock this week' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.ok).toBe(true)
+    expect(quoteService.declineQuoteRequest).toHaveBeenCalledWith({
+      supplierId: 'supplier-1',
+      quoteRequestSupplierId: 'qrs-1',
+      reason: 'Out of stock this week',
+    })
   })
 })

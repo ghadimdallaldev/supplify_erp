@@ -204,13 +204,17 @@
       "PENDING": "قيد الانتظار",
       "CONFIRMED": "مؤكدة",
       "SEATED": "جالسون",
-      "WAITLIST": "قائمة الانتظار"
+      "WAITLIST": "قائمة الانتظار",
+      "NO_SHOW": "?? ????",
+      "CANCELLED": "?????",
+      "COMPLETED": "??????"
     },
     "actions": {
       "confirm": "تأكيد",
       "cancel": "إلغاء",
       "seat": "جلوس",
-      "complete": "إكمال"
+      "complete": "إكمال",
+      "noShow": "??? ????"
     },
     "statusLower": {
       "PENDING": "قيد الانتظار",
@@ -218,7 +222,8 @@
       "SEATED": "جالسون",
       "WAITLIST": "قائمة الانتظار",
       "CANCELLED": "ملغاة",
-      "COMPLETED": "مكتملة"
+      "COMPLETED": "مكتملة",
+      "NO_SHOW": "?? ????"
     },
     "toasts": {
       "movedTo": "نُقل إلى {{status}}",
@@ -228,8 +233,21 @@
       "cancelled": "أُلغي الحجز",
       "updated": "تم تحديث الحجز",
       "tableAssigned": "تم تعيين الطاولة",
-      "assignFailed": "تعذّر تعيين الطاولة"
+      "assignFailed": "تعذّر تعيين الطاولة",
+      "noShow": "?? ????? ??? ???? ?????"
     }
+  },
+  "reviews": {
+    "title": "تقييمات الضيوف",
+    "description": "تقييمات ما بعد الزيارة للحجوزات المكتملة.",
+    "empty": "لا توجد تقييمات للحجوزات بعد.",
+    "replyPlaceholder": "اكتب رداً عاماً…",
+    "reply": "رد",
+    "replying": "جارٍ الإرسال…",
+    "replySaved": "تم نشر الرد",
+    "replyFailed": "تعذر نشر الرد",
+    "overall": "التقييم العام {{rating}}/5",
+    "party": "{{count}} ضيوف"
   },
   "assignments": {
     "empty": "لا حجوزات في <strong>{{date}}</strong>. غيّر التاريخ أعلاه أو شارك رابط الحجز مع الضيوف.",
@@ -422,5 +440,20 @@
       "WAITLIST": "قائمة الانتظار",
       "available": "متاحة"
     }
+  },
+  "manageReview": {
+    "title": "???? ??????",
+    "subtitle": "???????? ????? ?????? ??? ???????.",
+    "overall": "??????? ?????",
+    "food": "??????",
+    "service": "??????",
+    "ambiance": "???????",
+    "comment": "?????????",
+    "submit": "????? ???????",
+    "submitting": "???? ????????",
+    "thanks": "????? ???????!",
+    "failed": "???? ????? ???????",
+    "already": "??? ????? ??? ??????? ??????.",
+    "staffReply": "?? ??????"
   }
 }

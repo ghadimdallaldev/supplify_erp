@@ -202,6 +202,6 @@ New staff or multi-tenant users must be assigned roles via `user_role` (e.g. whe
 
 - [RBAC permission matrix](./RBAC_PERMISSION_MATRIX.md) — default restaurant/supplier roles and codes
 - [RBAC audit report](./RBAC_AUDIT_REPORT.md) — route/page enforcement inventory and verification commands
-- [RBAC hardening QA report](../qa/RBAC_HARDENING_QA_REPORT.md) — automated + manual test checklist
+- Manual spot checks: [regression-checklist.md](../qa/regression-checklist.md) **RBAC-X01–X08** (2026-09-10) and §6.16 / §7.10
 
 After deploy, system roles are synced automatically by the `migrate` container (`sync-system-roles.mjs`). On dev machines: `pnpm db:sync-roles`.

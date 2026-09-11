@@ -4,17 +4,17 @@ How to run automated checks in the Supplify monorepo: API unit tests (Vitest), w
 
 ## Quick commands (monorepo root)
 
-| Command               | Mode                   | What it runs                                              |
-| --------------------- | ---------------------- | --------------------------------------------------------- |
-| `pnpm test:api`       | **Run once** (CI-safe) | Full API Vitest suite (`apps/api`, 131 files, ~770 tests) |
-| `pnpm test:api:watch` | Watch                  | API tests while developing                                |
-| `pnpm test:web`       | Run once               | Full web Vitest suite                                     |
-| `pnpm test:web:watch` | Watch                  | Web tests while developing                                |
-| `pnpm test:all`       | Run once               | API + web (`pnpm test:ci`)                                |
-| `pnpm test:billing`   | Run once               | Billing/subscription/plan subset (API)                    |
-| `pnpm test:rbac`      | Run once               | API + web RBAC-focused files                              |
-| `pnpm test:ci`        | Run once               | Same as `test:all` (used by `pnpm qa`)                    |
-| `pnpm qa`             | Run once               | lint + typecheck + `test:ci` + build                      |
+| Command               | Mode                   | What it runs                                   |
+| --------------------- | ---------------------- | ---------------------------------------------- |
+| `pnpm test:api`       | **Run once** (CI-safe) | Full API Vitest suite (`apps/api`, ~293 files) |
+| `pnpm test:api:watch` | Watch                  | API tests while developing                     |
+| `pnpm test:web`       | Run once               | Full web Vitest suite (`apps/web`, ~126 files) |
+| `pnpm test:web:watch` | Watch                  | Web tests while developing                     |
+| `pnpm test:all`       | Run once               | API + web (`pnpm test:ci`)                     |
+| `pnpm test:billing`   | Run once               | Billing/subscription/plan subset (API)         |
+| `pnpm test:rbac`      | Run once               | API + web RBAC-focused files                   |
+| `pnpm test:ci`        | Run once               | Same as `test:all` (used by `pnpm qa`)         |
+| `pnpm qa`             | Run once               | lint + typecheck + `test:ci` + build           |
 
 ### Final verification (PR / Cursor / CI)
 
@@ -139,9 +139,35 @@ pnpm --filter @supplify/web test:run -- ProductImageImport
 
 Manual regression: [regression-checklist.md](./regression-checklist.md) §7.3 **SUP-15a–f**. Feature spec: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Requires migration `0168_catalog_image_import.sql`.
 
+## 2026-09-10 release areas (targeted runs)
+
+```bash
+# Promotion ad billing + disputes
+pnpm --filter @supplify/api test:api src/lib/billing/promotion-ad-billing.test.js src/routes/promotions.boost-money-flow.test.js
+
+# Quote inbox decline / list
+pnpm --filter @supplify/api test:api src/services/quote-requests.service.test.js src/routes/quote-requests.routes.test.js
+pnpm --filter @supplify/web test:run -- SupplierQuoteInboxPage
+
+# Reservations excellence + last-order
+pnpm --filter @supplify/api test:api src/lib/reservation-policy.test.js src/lib/supplier-last-order.test.js src/routes/reservations.routes.test.js
+
+# Audience targeting
+pnpm --filter @supplify/api test:api src/lib/restaurant-targeting.test.js
+
+# Contract price on scheduled orders
+pnpm --filter @supplify/api test:api src/services/scheduled-orders.service.test.js
+
+# Driver POD / fulfillment
+pnpm --filter @supplify/api test:api src/services/driver-fulfillment.service.test.js
+```
+
+Manual regression: [regression-checklist.md](./regression-checklist.md) **2026-09-10 release smoke pack**. Migrations `0196`–`0203`.
+
 ## Related docs
 
 - [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md) — baseline failures, fixes, risks
 - [Manual test checklist](./regression-checklist.md)
+- [Test coverage report](./test-coverage-report.md)
 - [Billing activation manual checklist](./../archive/old/manual-test-checklist-billing-activation.md)
 - [tests/README.md](../../tests/README.md) — Playwright E2E

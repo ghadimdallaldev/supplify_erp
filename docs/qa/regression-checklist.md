@@ -13,6 +13,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 3. **Deep links:** Many routes work when typed in the address bar even if not in the sidebar — test those once per persona.
 4. **Delivery GPS:** Restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver **§7.4.2** (`DRV-GPS1–3`). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
 5. **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
+6. **2026-09-10 delta:** After Parts 0–3, run the **[2026-09-10 release smoke pack](#2026-09-10-release-smoke-pack-run-today)** (hospitality, promotions billing, quote inbox v2, fulfillment/POD). Design specs: [hospitality](../superpowers/specs/2026-09-10-hospitality-excellence-design.md), [promotions](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md).
 
 ---
 
@@ -60,7 +61,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                          | pass  |
 | SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                           | pass  |
-| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All migrations apply (incl. `0104_user_workspace_membership`, **`0144`**, **`0145`**); no errors                                                                                                          | pass  |
+| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All **~204** migrations apply through **`0203_promotion_ad_disputed`** (incl. `0196`–`0203` for 2026-09-10); no errors                                                                                    | pass  |
 | SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;`          | pass  |
 | SETUP-05 | Verify plan catalog (post `0117` + `0145`): `pnpm run log:tier-limits` or query `subscription_plan` for `code = 'silver'`                                      | Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no `promotions` limit key; Silver supplier: 1 warehouse, `promotions` 3; Free **`chats_per_day: 3`**; `advanced_roles` false on Silver | pass  |
 | SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                                     | pass  |
@@ -494,6 +495,11 @@ Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [I
 | PUB-14 | Gold+ restaurant: cancel seated reservation → waitlist guest with matching party size gets offer | Guest receives accept/decline link; board shows offer pending             |       |
 | PUB-15 | Open `/reserve/waitlist/:token/accept` from offer email/UI                                       | Confirmation UI; reservation `CONFIRMED`; waitlist entry accepted         |       |
 | PUB-16 | Open `/reserve/waitlist/:token/decline`                                                          | Offer declined; next guest can be offered on expiry/manual promote        |       |
+| PUB-17 | Public book: fill **occasion** + **allergies**                                                   | Confirmation + manage page show the notes; restaurant board shows them    |       |
+| PUB-18 | Booking policy deposit required                                                                  | Guest must acknowledge deposit before confirm                             |       |
+| PUB-19 | Blackout date on restaurant                                                                      | Public slot picker shows closed / no slots for that day                   |       |
+| PUB-20 | After completed visit: open review link from invite                                              | Guest can submit rating/review via manage token                           |       |
+| PUB-21 | Ratings summary on public reserve page (if enabled)                                              | Aggregate rating visible without login                                    |       |
 
 ## 5.2 Staff self-service portal
 
@@ -557,6 +563,17 @@ Hidden without RBAC permission or feature gate.
 | RST-16 | Update quantities / remove lines | Totals recalculate                        |       |
 | RST-17 | Submit order                     | Success; redirects to orders; cart clears |       |
 | RST-18 | Empty cart checkout              | Validation prevents submit                |       |
+
+### 6.4.1 Supplier last-order cutoff & contract pricing — 2026-09-09/10
+
+| ID      | Steps                                                                       | Expected                                                                   | Pass? |
+| ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----- |
+| RST-18a | Supplier sets `last_order_mode=cutoff` (absolute time) in Business settings | Setting saves; restaurant cart shows cutoff / rolled delivery date         |       |
+| RST-18b | Place order after cutoff                                                    | `requested_delivery_date` rolls to next allowed day (or blocks per mode)   |       |
+| RST-18c | Supplier sets minutes-before-window + rollover days                         | Cart countdown / next window matches rule                                  |       |
+| RST-18d | Restaurant with active contract: open cart after rehydrate (reload)         | Lines show **Your price** (contract), not stale catalog list price         |       |
+| RST-18e | Scheduled quick-list auto-order with active contract                        | Order lines snapshot `pricing_source=CONTRACT_PRICE` + `contract_price_id` |       |
+| RST-18f | Supplier detail / catalog card with contract                                | Contract badge only when `pricing_source === 'CONTRACT_PRICE'`             |       |
 
 ## 6.5 Quick lists (`/app/quick-lists`) — requires `quick_lists` feature
 
@@ -627,6 +644,24 @@ Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_L
 | RST-42a | Multi-branch restaurant: switch branch on reservations board | Board data scoped to selected branch; waitlist matches branch    |       |
 | RST-42b | Guest cancel via manage link (public API parity)             | Same outcome as staff cancel; capacity freed; notifications sent |       |
 | RST-42c | Over-capacity slot attempt (public book or staff create)     | Friendly validation; no double-book beyond capacity guard        |       |
+
+### 6.8.1 Reservation excellence (migration `0198`) — 2026-09-10
+
+Spec: [hospitality-excellence design](../superpowers/specs/2026-09-10-hospitality-excellence-design.md) · Feature: [reservations-foh.md](../features/reservations-foh.md)
+
+| ID      | Steps                                                                  | Expected                                                               | Pass? |
+| ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----- |
+| RST-42d | Mark seated guest **No-show** from board                               | Status `NO_SHOW`; guest CRM no-show count increments                   |       |
+| RST-42e | Open guest CRM / intelligence for returning guest                      | Visit count, tags/VIP, prior occasions visible                         |       |
+| RST-42f | Settings / booking: set party min/max + cancel window                  | Public book enforces limits; late cancel blocked or warned             |       |
+| RST-42g | Add blackout date (full day or window)                                 | Public slots closed for that date; board shows blackout                |       |
+| RST-42h | Delete blackout                                                        | Slots reopen                                                           |       |
+| RST-42i | Public book with **occasion** + **allergies**                          | Fields saved; visible on board / detail                                |       |
+| RST-42j | Deposit policy on: guest books                                         | Deposit acknowledgment required before confirm                         |       |
+| RST-42k | Completed reservation → guest receives review invite (or cron dry-run) | Review invite email/SMS path fires; manage-token review link works     |       |
+| RST-42l | Guest submits review via manage token                                  | Review linked to `reservation_id`; appears in restaurant reviews inbox |       |
+| RST-42m | Staff reply to reservation-linked review                               | Reply saved; guest-facing surface updated if applicable                |       |
+| RST-42n | Analytics: no-show rate / source mix                                   | Metrics include no-shows and booking sources after sample data         |       |
 
 ## 6.9 Staff HR (`/app/staff`)
 
@@ -782,6 +817,25 @@ Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_L
 | SUP-22  | Tab: Exceptions                                    | Log/resolve exception                                                 |       |
 | SUP-23  | Proof of delivery capture                          | Notes/signature fields save                                           |       |
 
+### 7.4.3 Dispatch cache, POD, multi-WH — 2026-09-10
+
+Migrations: `0200` (POD one-per-order). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md)
+
+| ID     | Steps                                                                | Expected                                                                                         | Pass? |
+| ------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----- |
+| FUL-01 | Assign driver on dispatch board                                      | Order leaves **unassigned** within **&lt;45s** (cache invalidated; not stuck until TTL)          |       |
+| FUL-02 | Create/activate/cancel route; remove stop                            | Dispatch board refreshes assignment buckets without waiting full cache TTL                       |       |
+| FUL-03 | Plan route for **tomorrow**; assign stops                            | `scheduled_delivery_date` = route date (not forced to today); not treated overdue by tonight job |       |
+| FUL-04 | Driver submits POD with photo **or** signature **or** recipient name | POD saved; dispatch shows `has_pod`                                                              |       |
+| FUL-05 | Driver submits empty POD (no photo/signature/name)                   | **400**; UI save disabled                                                                        |       |
+| FUL-06 | Driver retries POD submit twice (flaky network)                      | Still **one** POD row per order (upsert); no duplicate proofs                                    |       |
+| FUL-07 | Multi-warehouse order: assign all warehouse legs                     | One driver leg per open WH assignment; order stays open until **all** legs terminal              |       |
+| FUL-08 | Deliver only one WH leg of multi-WH order                            | Order not fully `DELIVERED` until remaining legs delivered/failed                                |       |
+| FUL-09 | Dispatch board warehouse badge                                       | Assigned warehouse visible on card                                                               |       |
+| FUL-10 | Silver single-WH supplier → warehouse inventory mode                 | Inventory uses warehouse SoT (not blocked awaiting Gold multi-WH)                                |       |
+| FUL-11 | Cancel route / remove stop that had assigned driver                  | Driver leg released; order returns to assignable pool (not orphaned under empty route)           |       |
+| FUL-12 | Reassign driver                                                      | `scheduled_delivery_date` preserved; old route stop removed                                      |       |
+
 ### 7.4.1 Delivery GPS tracking (Gold+, `driver_management` + `GPS_TRACKING_ENABLED`)
 
 Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENABLED=true`; optional `VITE_GOOGLE_MAPS_API_KEY` for map embed.
@@ -890,6 +944,29 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | SUP-59 | Sidebar nav label                            | **Deals** (not “Promotions”)                       |       |
 | SUP-60 | Settings → Subscription usage                | Limit labeled **Active deals**                     |       |
 
+### 7.11.1 Promotion ad billing, targeting & ROAS — 2026-09-10
+
+Migrations: `0197`, `0203`. Spec: [supplier-promotions-excellence](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md) · [deals-and-promotions.md](../features/deals-and-promotions.md)
+
+| ID     | Steps                                                               | Expected                                                                   | Pass? |
+| ------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----- |
+| SUP-61 | Create deal with **restaurant types** + **areas** targeting         | Saved; publish copies audience to boost `target_audience`                  |       |
+| SUP-62 | Create-deal dialog **restaurant-facing preview**                    | Preview matches what restaurants see                                       |       |
+| SUP-63 | Pay-activate boost (stub/mock) with idempotency key                 | `billing_invoice` (`deal_boost`) + payment; campaign activates             |       |
+| SUP-64 | Retry same pay-activation with same idempotency key                 | No double charge; same outcome                                             |       |
+| SUP-65 | Purchase / pay featured placement                                   | `featured_placement` invoice; placement pending→active after pay           |       |
+| SUP-66 | Deal analytics dialog                                               | Shows `adSpend`, `attributedGmv`, `roas`, `costPerOrder` when spend exists |       |
+| SUP-67 | `PAYMENTS_MODE=live` without payment method (dev toggle carefully)  | Silent waive refused; explicit pay required                                |       |
+| SUP-68 | Restaurant profile: set **business type** + **area**; matching deal | Deal appears in restaurant feed for matching audience                      |       |
+
+## 7.12 Guest menu / kitchen 86 (restaurant consumer board)
+
+| ID      | Steps                                                        | Expected                                       | Pass? |
+| ------- | ------------------------------------------------------------ | ---------------------------------------------- | ----- |
+| MENU-01 | Menu admin: set allergen + dietary tags on item              | Tags persist (`0201`); guest menu filters work |       |
+| MENU-02 | Download / share menu QR                                     | QR opens public guest menu                     |       |
+| MENU-03 | Kitchen board: **86** (mark unavailable) with `CATALOG_EDIT` | Item unavailable on guest menu until restored  |       |
+
 ---
 
 # Part 8 — Platform admin
@@ -976,12 +1053,18 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 ### Deals & Boosts tab — approvals & boost pricing
 
-| ID     | Steps                                       | Expected                                     | Pass? |
-| ------ | ------------------------------------------- | -------------------------------------------- | ----- |
-| ADM-35 | Open **Deals & Boosts** tab on `/app/admin` | Pending deals list + pricing tiers load      |       |
-| ADM-36 | Approve pending deal                        | Deal status → active; visible to restaurants |       |
-| ADM-37 | Reject pending deal                         | Deal returns to draft                        |       |
-| ADM-38 | Edit boost pricing tier amount              | Saves via PATCH; suppliers see updated price |       |
+| ID        | Steps                                        | Expected                                                       | Pass? |
+| --------- | -------------------------------------------- | -------------------------------------------------------------- | ----- |
+| ADM-35    | Open **Deals & Boosts** tab on `/app/admin`  | Pending deals list + pricing tiers load                        |       |
+| ADM-36    | Approve pending deal                         | Deal status → active; visible to restaurants                   |       |
+| ADM-37    | Reject pending deal                          | Deal returns to draft                                          |       |
+| ADM-38    | Edit boost pricing tier amount               | Saves via PATCH; suppliers see updated price                   |       |
+| ADM-AD-01 | Deals insights: **ad spend** / order GMV     | Real spend from boost/featured invoices                        |       |
+| ADM-AD-02 | Admin **Mark paid** on unpaid boost invoice  | Boost activates; invoice paid                                  |       |
+| ADM-AD-03 | Admin **Refund** boost                       | Refund recorded; boost paused/cancelled per rules              |       |
+| ADM-AD-04 | Admin **Refund** featured placement          | Placement cancelled/refunded                                   |       |
+| ADM-AD-05 | Simulate Stripe chargeback webhook (staging) | Boost paused / featured cancelled; payment `disputed` (`0203`) |       |
+| ADM-AD-06 | Subscriptions list pagination                | Default page ≤200; cap 500                                     |       |
 
 ### Health tab
 
@@ -1093,51 +1176,97 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 # Part 11 — Automated tests (CI parity)
 
-| ID    | Command                                                                                                       | Expected                                                 | Pass? |
-| ----- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----- |
-| CI-01 | `pnpm test:api`                                                                                               | 131 files / ~770 API tests pass                          |       |
-| CI-02 | `pnpm test:web`                                                                                               | 59 files / ~202 web tests pass                           |       |
-| CI-03 | `pnpm test:ci` (root)                                                                                         | Both packages green                                      |       |
-| CI-04 | `pnpm run e2e:playwright` (if configured)                                                                     | E2E suite pass                                           |       |
-| CI-05 | Deals/promotions unit + API gates (see `docs/features/deals-and-promotions.md` § Tests)                       | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass |       |
-| CI-06 | Realtime/socket subset: `socket.test.js`, `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`         | Pass                                                     |       |
-| CI-07 | Legal re-acceptance: `legal-acceptance.test.js`, `legalReacceptanceGate.test.ts`, `dealDisplayLabels.test.ts` | Pass                                                     |       |
-| CI-08 | Plan audit (post `0145`): `planLimits.test.ts`, `planComparison.test.ts`, `npm run test:billing`              | Pass; Free `chats_per_day` = 3                           |       |
+| ID    | Command                                                                                                       | Expected                                                       | Pass? |
+| ----- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ----- |
+| CI-01 | `pnpm test:api`                                                                                               | ~293 API test files / suite green (counts drift; trust exit 0) |       |
+| CI-02 | `pnpm test:web`                                                                                               | ~126 web test files / suite green                              |       |
+| CI-03 | `pnpm test:ci` (root)                                                                                         | Both packages green                                            |       |
+| CI-04 | `pnpm run e2e:playwright` (if configured)                                                                     | E2E suite pass                                                 |       |
+| CI-05 | Deals/promotions unit + API gates (see `docs/features/deals-and-promotions.md` § Tests)                       | Vitest + `tests/api/promotions-deals-gates.spec.ts` pass       |       |
+| CI-06 | Realtime/socket subset: `socket.test.js`, `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`         | Pass                                                           |       |
+| CI-07 | Legal re-acceptance: `legal-acceptance.test.js`, `legalReacceptanceGate.test.ts`, `dealDisplayLabels.test.ts` | Pass                                                           |       |
+| CI-08 | Plan audit (post `0145`): `planLimits.test.ts`, `planComparison.test.ts`, `npm run test:billing`              | Pass; Free `chats_per_day` = 3                                 |       |
 
 ---
 
 # Part 12 — Non-functional & browser matrix
 
-| ID     | Area           | Steps                                      | Expected                               | Pass? |
-| ------ | -------------- | ------------------------------------------ | -------------------------------------- | ----- |
-| NFR-01 | Browser        | Chrome latest                              | Full pass on critical paths            |       |
-| NFR-02 | Browser        | Firefox / Safari                           | Layout acceptable                      |       |
-| NFR-03 | Responsive     | Tablet width                               | Sidebar usable                         |       |
-| NFR-04 | Performance    | Dashboard with prod-like data              | Loads < 5s                             |       |
-| NFR-05 | Error handling | Stop API mid-request                       | Toast/error boundary; no white screen  |       |
-| NFR-06 | Security       | Access other tenant ID in URL              | 403/404                                |       |
-| NFR-07 | Cache          | Subscription entitlements: call 3× rapidly | Same data; no N+1 to DB                |       |
-| NFR-08 | WebSocket      | 10-minute idle, then send chat message     | Socket reconnects; message delivers    |       |
-| NFR-09 | Migration      | Run `db:migrate` on empty DB               | All 90+ migrations apply without error |       |
-| NFR-10 | Concurrency    | Two users submit orders simultaneously     | Both orders created; no duplicates     |       |
+| ID     | Area           | Steps                                      | Expected                                               | Pass? |
+| ------ | -------------- | ------------------------------------------ | ------------------------------------------------------ | ----- |
+| NFR-01 | Browser        | Chrome latest                              | Full pass on critical paths                            |       |
+| NFR-02 | Browser        | Firefox / Safari                           | Layout acceptable                                      |       |
+| NFR-03 | Responsive     | Tablet width                               | Sidebar usable                                         |       |
+| NFR-04 | Performance    | Dashboard with prod-like data              | Loads < 5s                                             |       |
+| NFR-05 | Error handling | Stop API mid-request                       | Toast/error boundary; no white screen                  |       |
+| NFR-06 | Security       | Access other tenant ID in URL              | 403/404                                                |       |
+| NFR-07 | Cache          | Subscription entitlements: call 3× rapidly | Same data; no N+1 to DB                                |       |
+| NFR-08 | WebSocket      | 10-minute idle, then send chat message     | Socket reconnects; message delivers                    |       |
+| NFR-09 | Migration      | Run `db:migrate` on empty DB               | All ~204 migrations apply through `0203` without error |       |
+| NFR-10 | Concurrency    | Two users submit orders simultaneously     | Both orders created; no duplicates                     |       |
 
 ---
 
-## Quote requests & supplier mini-store (2026-06-11)
+## Quote requests & supplier mini-store (2026-06-11; inbox v2 2026-09-10)
 
-Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)
+Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md) · Feature: [quote-requests.md](../features/quote-requests.md) · Migration `0202`
 
-| ID     | Step                                             | Expected                                              | Pass? |
-| ------ | ------------------------------------------------ | ----------------------------------------------------- | ----- |
-| QRF-01 | Restaurant → Products → **Request best price**   | Create page opens                                     |       |
-| QRF-02 | Select products + suppliers → submit             | Quote request created; suppliers notified             |       |
-| QRF-03 | Supplier → **Quote inbox** → respond per line    | Response saved; restaurant notified                   |       |
-| QRF-04 | Restaurant → Quote requests → **Compare offers** | Side-by-side table                                    |       |
-| QRF-05 | **Add to cart** from winning response            | Cart populated; checkout still resolves server prices |       |
-| QRF-06 | Supplier settings → copy/preview catalog link    | URL `/supplier/:slug` works                           |       |
-| QRF-07 | Guest opens mini-store                           | Products visible; **no prices**                       |       |
-| QRF-08 | Logged-in restaurant on mini-store               | Prices + add to cart                                  |       |
-| QRF-09 | Disable public catalog in settings               | `/supplier/:slug` returns not found                   |       |
+| ID     | Step                                             | Expected                                                   | Pass? |
+| ------ | ------------------------------------------------ | ---------------------------------------------------------- | ----- |
+| QRF-01 | Restaurant → Products → **Request best price**   | Create page opens                                          |       |
+| QRF-02 | Select products + suppliers → submit             | Quote request created; suppliers notified                  |       |
+| QRF-03 | Supplier → **Quote inbox** → respond per line    | Response saved; restaurant notified                        |       |
+| QRF-04 | Restaurant → Quote requests → **Compare offers** | Side-by-side table                                         |       |
+| QRF-05 | **Add to cart** from winning response            | Cart populated; checkout still resolves server prices      |       |
+| QRF-06 | Supplier settings → copy/preview catalog link    | URL `/supplier/:slug` works                                |       |
+| QRF-07 | Guest opens mini-store                           | Products visible; **no prices**                            |       |
+| QRF-08 | Logged-in restaurant on mini-store               | Prices + add to cart                                       |       |
+| QRF-09 | Disable public catalog in settings               | `/supplier/:slug` returns not found                        |       |
+| QRF-10 | Supplier inbox: status tabs show live **counts** | pending / responded / declined / unread / urgent match API |       |
+| QRF-11 | Search inbox by restaurant name                  | Debounced filter; list narrows                             |       |
+| QRF-12 | Sort by **needed by**                            | Ascending needed-by date                                   |       |
+| QRF-13 | Overdue / due-today urgency badges               | Visible on cards                                           |       |
+| QRF-14 | Unread marker clears after open                  | `viewed_at` set; unread count drops                        |       |
+| QRF-15 | **Decline** pending RFQ with reason              | Status declined; restaurant notified; reason stored        |       |
+| QRF-16 | Open closed/cancelled RFQ response page          | Locked; `canRespond=false`; decline/respond blocked        |       |
+| QRF-17 | Respond with available line but empty unit price | Client + API reject                                        |       |
+| QRF-18 | Inbox pagination                                 | Next page loads without duplicating rows                   |       |
+
+---
+
+## 2026-09-10 release smoke pack (run today)
+
+Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an existing QA env. Design specs: [hospitality](../superpowers/specs/2026-09-10-hospitality-excellence-design.md), [promotions](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md).
+
+| Priority | IDs                     | Area                                    |
+| -------- | ----------------------- | --------------------------------------- |
+| P0       | RST-42d–42n, PUB-17–21  | Reservation excellence                  |
+| P0       | RST-18a–18f             | Last-order cutoff + contract prices     |
+| P0       | SUP-61–68, ADM-AD-01–05 | Promotions ad billing / ROAS / disputes |
+| P0       | QRF-10–18               | Quote inbox v2                          |
+| P0       | FUL-01–12               | Dispatch / POD / multi-WH               |
+| P1       | MENU-01–03, NFR-11–13   | Guest menu 86 + branded 404/500         |
+| P1       | RBAC-X01–X08            | Sep-10 permission gates                 |
+
+### RBAC hardening spot checks (2026-09-10)
+
+| ID       | Steps                                                           | Expected              | Pass? |
+| -------- | --------------------------------------------------------------- | --------------------- | ----- |
+| RBAC-X01 | Restaurant staff without `INVOICES_VIEW` → `/app/invoices`      | Nav hidden / 403      |       |
+| RBAC-X02 | Restaurant without `ORDERS_VIEW`/`CATALOG_VIEW` → deals feed    | Blocked               |       |
+| RBAC-X03 | Supplier without fulfillment perms → `/app/fulfillment`         | Blocked               |       |
+| RBAC-X04 | Quote inbox without `ORDERS_VIEW`                               | Blocked               |       |
+| RBAC-X05 | Assistant fab without `ai_platform`                             | Hidden / tools refuse |       |
+| RBAC-X06 | Price mutation without `CATALOG_EDIT`                           | 403                   |       |
+| RBAC-X07 | Restaurant tracking/POD without `ORDERS_VIEW` / receiving perms | 403                   |       |
+| RBAC-X08 | Owner role: recipes permissions present on `/auth/me`           | `RECIPES_*` in list   |       |
+
+### Branded error pages
+
+| ID     | Steps                                        | Expected                             | Pass? |
+| ------ | -------------------------------------------- | ------------------------------------ | ----- |
+| NFR-11 | Navigate to `/app/this-route-does-not-exist` | Branded **404** (EN); no blank shell |       |
+| NFR-12 | Switch locale to AR on 404                   | Arabic copy renders                  |       |
+| NFR-13 | Force router error (dev) or broken chunk     | Branded **500** / error boundary     |       |
 
 ---
 

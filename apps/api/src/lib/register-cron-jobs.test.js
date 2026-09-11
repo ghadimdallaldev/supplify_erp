@@ -40,6 +40,10 @@ vi.mock('./cron-runner.js', () => ({
     EMAIL_DIGEST: 'email_digest',
     STALE_GPS_ALERTS: 'stale_gps_alerts',
     LOG_RETENTION: 'log_retention',
+    RESERVATION_GUEST_COMMS: 'reservation_guest_comms',
+    REORDER_FORECAST: 'reorder_forecast',
+    RECIPE_RECALC: 'recipe_recalc',
+    GROWTH_PROGRAM_MAINTENANCE: 'growth_program_maintenance',
   },
   runCronJob: vi.fn(async (_name, fn) => {
     await fn()
@@ -95,6 +99,9 @@ vi.mock('../jobs/stale-gps-alerts.job.js', () => ({
 vi.mock('../jobs/log-retention.job.js', () => ({
   runLogRetentionJob: vi.fn().mockResolvedValue({}),
 }))
+vi.mock('../jobs/reservation-guest-comms.job.js', () => ({
+  runReservationGuestCommsJob: vi.fn().mockResolvedValue({}),
+}))
 vi.mock('../jobs/reorder-forecast.job.js', () => ({
   runReorderForecastJob: vi.fn().mockResolvedValue({}),
 }))
@@ -116,11 +123,11 @@ describe('registerCronJobs', () => {
     vi.clearAllMocks()
   })
 
-  it('registers 20 cron jobs in non-test environments', async () => {
+  it('registers 21 cron jobs in non-test environments', async () => {
     const { registerCronJobs } = await import('./register-cron-jobs.js')
     const result = registerCronJobs({ trackInterval })
-    expect(result).toEqual({ registered: 20, skipped: false })
-    expect(trackInterval).toHaveBeenCalledTimes(20)
+    expect(result).toEqual({ registered: 21, skipped: false })
+    expect(trackInterval).toHaveBeenCalledTimes(21)
   })
 })
 

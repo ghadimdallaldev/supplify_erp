@@ -18,6 +18,12 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   resolveAdminContext: (_req, _res, next) => next(),
+  requireAnyPermission: () => (_req, _res, next) => next(),
+  rolesIncludeOwner: () => false,
+}))
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (_req, _res, next) => next(),
 }))
 
 vi.mock('../services/assistant-chat.service.js', () => ({

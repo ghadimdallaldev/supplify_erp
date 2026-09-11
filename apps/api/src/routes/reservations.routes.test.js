@@ -125,6 +125,75 @@ describe('reservations.routes', () => {
     expect(response.body.data.reservation.tables).toEqual(['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'])
   })
 
+  it('marks reservation NO_SHOW and sets no_show_marked_at', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'res-no-show',
+          status: 'NO_SHOW',
+          guest_id: null,
+          tables: [],
+          party_size: 4,
+        },
+      ],
+    })
+
+    const response = await request(app)
+      .patch('/api/reservations/res-no-show')
+      .send({ status: 'NO_SHOW', notes: 'Guest did not arrive' })
+      .expect(200)
+
+    expect(response.body.data.reservation.status).toBe('NO_SHOW')
+    const updateCall = queryMock.mock.calls.find((call) =>
+      String(call[0]).includes('no_show_marked_at')
+    )
+    expect(updateCall?.[1]?.[0]).toBe('NO_SHOW')
+  })
+
+  it('lists reservation blackouts for the restaurant', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'bo-1',
+          restaurant_id: 'restaurant-1',
+          branch_id: null,
+          blackout_date: '2026-09-15',
+          reason: 'Private event',
+        },
+      ],
+    })
+
+    const response = await request(app).get('/api/reservations/blackouts').expect(200)
+
+    expect(response.body.ok).toBe(true)
+    expect(response.body.data.blackouts).toHaveLength(1)
+    expect(response.body.data.blackouts[0].reason).toBe('Private event')
+  })
+
+  it('creates a reservation blackout date', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'bo-new',
+          restaurant_id: 'restaurant-1',
+          blackout_date: '2026-09-20',
+          reason: 'Renovation',
+        },
+      ],
+    })
+
+    const response = await request(app)
+      .post('/api/reservations/blackouts')
+      .send({ blackoutDate: '2026-09-20', reason: 'Renovation' })
+      .expect(201)
+
+    expect(response.body.data.blackout.blackout_date).toBe('2026-09-20')
+    const insertCall = queryMock.mock.calls.find((call) =>
+      String(call[0]).includes('INSERT INTO reservation_blackout')
+    )
+    expect(insertCall?.[1]).toEqual(['restaurant-1', null, '2026-09-20', 'Renovation'])
+  })
+
   it('rejects invalid branchId on guest intelligence', async () => {
     const response = await request(app)
       .get('/api/reservations/guest-intelligence')

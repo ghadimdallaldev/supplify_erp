@@ -118,10 +118,14 @@ vi.mock('../lib/permissions.js', async (importOriginal) => {
   }
 })
 
-vi.mock('../lib/tenant-roles.js', () => ({
-  ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
-  assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
-}))
+vi.mock('../lib/tenant-roles.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
+    assignOwnerRoleForUser: vi.fn().mockResolvedValue(undefined),
+  }
+})
 
 const { authConfigState } = vi.hoisted(() => ({
   authConfigState: {

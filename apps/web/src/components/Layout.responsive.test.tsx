@@ -2,7 +2,6 @@ import { describe, expect, it, vi, afterEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './Layout'
-import { ROUTER_FUTURE } from '../lib/routerFuture'
 
 vi.mock('./Sidebar', () => ({
   Sidebar: () => <aside data-testid="sidebar-mock" />,
@@ -75,7 +74,7 @@ describe('Layout shell responsive', () => {
 
   it('keeps overflow-x-hidden on main content to prevent page-level horizontal scroll', () => {
     render(
-      <MemoryRouter initialEntries={['/app/dashboard']} future={ROUTER_FUTURE}>
+      <MemoryRouter initialEntries={['/app/dashboard']}>
         <Routes>
           <Route path="/app" element={<Layout />}>
             <Route path="dashboard" element={<div data-testid="page-content">Dashboard</div>} />

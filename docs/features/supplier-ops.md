@@ -191,7 +191,14 @@ Service: `supplier-reorder-intelligence.service.js` (`createReorderReminderDraft
 ## See also
 
 - [bulk-product-image-import.md](./bulk-product-image-import.md) — ZIP import methods, job flow, env vars
-
 - [warehouse-fulfillment.md](./warehouse-fulfillment.md) — multi-warehouse routing
 - [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md) — delivery GPS in command center preview
 - [inventory-expiry-and-reorder.md](./inventory-expiry-and-reorder.md) — restaurant-side reorder suggestions
+
+## Last-order cutoff (migration `0199`)
+
+Supplier Business settings can set `last_order_mode`: `none` | `cutoff` (absolute time or minutes-before-window + rollover days). Cart checkout persists resolved `deliveryDate` as `customer_order.requested_delivery_date`.
+
+- Lib: `apps/api/src/lib/supplier-last-order.js` (+ `supplier-last-order.test.js`)
+- Manual QA: [regression-checklist.md](../qa/regression-checklist.md) **RST-18a–18c**
+- Design: [hospitality-excellence](../superpowers/specs/2026-09-10-hospitality-excellence-design.md)

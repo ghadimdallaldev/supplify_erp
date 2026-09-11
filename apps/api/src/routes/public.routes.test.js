@@ -307,6 +307,7 @@ describe('POST /api/public/reservations/manage/cancel', () => {
       cancelled_at: new Date().toISOString(),
       cancellation_reason: 'Guest cancelled',
     }
+    const scheduledFarAhead = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
     queryMock
       .mockResolvedValueOnce({
         rows: [
@@ -316,8 +317,12 @@ describe('POST /api/public/reservations/manage/cancel', () => {
             public_token: RESERVATION_PUBLIC_TOKEN,
             restaurant_id: RESTAURANT_ID,
             party_size: 4,
+            scheduled_at: scheduledFarAhead,
           },
         ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ operating_hours: { booking: { cancelWindowHours: 2 } } }],
       })
       .mockResolvedValueOnce({ rows: [cancelled] })
 
@@ -332,7 +337,7 @@ describe('POST /api/public/reservations/manage/cancel', () => {
       expect.objectContaining({ id: 'res-cancel-1' }),
       { cancellationReason: 'Guest cancelled' }
     )
-    const updateSql = String(queryMock.mock.calls[1][0])
+    const updateSql = String(queryMock.mock.calls[2][0])
     expect(updateSql).toContain('cancelled_at')
     expect(updateSql).toContain('cancellation_reason')
   })

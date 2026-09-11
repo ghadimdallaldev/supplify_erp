@@ -21,7 +21,17 @@ vi.mock('../lib/rbac.js', () => ({
     req.userData = req.userData || { ...mockUser }
     next()
   }),
+  resolveTenantContext: vi.fn(async (req, res, next) => {
+    req.tenantContext = req.tenantContext || {
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      roles: ['Owner'],
+      permissions: ['CATALOG_EDIT', 'CATALOG_VIEW'],
+    }
+    next()
+  }),
   requireRole: () => (req, res, next) => next(),
+  requirePermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
   requireOwnership: () => (req, res, next) => next(),

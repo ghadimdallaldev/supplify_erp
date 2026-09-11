@@ -232,7 +232,12 @@ Automated coverage maps to `docs/qa/regression-checklist.md` IDs below.
 - RST-74–RST-80: Full deals feed CTAs and sponsored UI (E2E not implemented)
 - RST-82–RST-83: Free Trial **1/day** deal redemption cap (manual + `limit-resolution.test.js`)
 - SUP-52–SUP-58: Supplier create/boost/analytics UI (E2E not implemented)
+- **SUP-61–SUP-68 / ADM-AD-01–05** (2026-09-10): ad billing pay flow, create preview, audience targeting, ROAS UI, admin mark-paid/refund, Stripe dispute — see [regression-checklist.md](../qa/regression-checklist.md) smoke pack
 - API-24: `POST /api/orders` with `promotionId` + `couponCode` (integration)
+
+### Analytics fields (supplier deal analytics)
+
+`getDealAnalytics` / UI dialog include `adSpend`, `attributedGmv`, `roas`, `costPerOrder` when ad invoices exist.
 
 ---
 

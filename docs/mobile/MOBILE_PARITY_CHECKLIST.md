@@ -12,6 +12,16 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [ ] Was `MOBILE_FEATURE_PARITY.md` updated if something is deferred?
 - [ ] Supplier bulk image import changed? → Web-only; document in parity file (see 2026-06-15 entry).
 
+## 2026-09-12 — Native release audit
+
+- [x] Android and iOS typechecks pass without emulator/Xcode execution.
+- [x] Android and iOS Jest suites pass: 19 suites / 65 tests each.
+- [x] Expo Doctor passes 18/18 checks on both repos.
+- [x] Static Android and iOS Expo exports pass.
+- [x] Catalog render path optimized identically in Android and iOS with memoized cart quantity lookup.
+- [x] iOS supplier promotions screen restored to Android parity; shared API client test import fixed in both repos.
+- [x] Remaining upstream audit findings documented in MOBILE_FEATURE_PARITY.md; no forced breaking upgrades applied.
+
 Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS). No Expo workspace belongs inside the ERP.
 
 ## 2026-08-14 — Supplify Assistant

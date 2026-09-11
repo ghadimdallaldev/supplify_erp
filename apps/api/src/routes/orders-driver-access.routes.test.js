@@ -117,4 +117,14 @@ describe('driver order delivery routes without ORDERS_VIEW', () => {
 
     expect(res.body.error?.message).toMatch(/ORDERS_VIEW/)
   })
+
+  it('rejects empty proof-of-delivery body with 400', async () => {
+    const res = await request(app)
+      .post('/api/orders/order-1/proof-of-delivery')
+      .send({ notes: 'No photo or recipient' })
+      .expect(400)
+
+    expect(res.body.ok).toBe(false)
+    expect(res.body.error?.message).toMatch(/photo|signature|recipient/i)
+  })
 })
