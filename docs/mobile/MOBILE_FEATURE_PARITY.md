@@ -4,9 +4,9 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 ## 2026-09-12 — Keycloak mobile client + EAS preprod alignment
 
-- **Keycloak**: Added public client `supplify-mobile` (PKCE, `supplify://auth/callback`, post-logout `supplify://auth/logout`) to `deploy/keycloak/realm-export.preprod.json` and `realm-export.prod.json`. Partial-imported into live `keycloak-preprod.supplifyerp.com` / `keycloak.supplifyerp.com` so mobile login no longer returns "Client not found".
-- **iOS EAS**: Aligned `supplify-mobile-ios/eas.json` with Android — `preprod` / `preview` / `ios-simulator` / `production` bake `EXPO_PUBLIC_*` API + Keycloak URLs and `supplify-mobile` client id.
-- **Builds**: Fresh EAS `preprod` builds kicked from latest mobile tips (Android APK + iOS device/simulator as credentials allow).
+- **Keycloak**: Added public client `supplify-mobile` (PKCE, `supplify://auth/callback`, post-logout `supplify://auth/logout`) to `deploy/keycloak/realm-export.preprod.json` and `realm-export.prod.json`. Partial-imported into live `keycloak-preprod.supplifyerp.com` / `keycloak.supplifyerp.com` so mobile login no longer returns "Client not found". Verified: auth without PKCE returns `code_challenge_method` error to the app scheme (client present).
+- **iOS EAS**: Aligned `supplify-mobile-ios/eas.json` with Android — `preprod` / `preview` / `ios-simulator` / `production` bake `EXPO_PUBLIC_*` API + Keycloak URLs and `supplify-mobile` client id (`220ff61`).
+- **Builds**: Android `preprod` APK queued from tip `227435b`: https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/01c5457b-7631-4638-9407-21532c2a1302 . iOS `ios-simulator` queued from tip `220ff61`: https://expo.dev/accounts/supplify-team/projects/supplify-mobile-ios/builds/90b35052-5866-40f8-b7f3-b98fcae78497 . iOS **device** `preprod` blocked in non-interactive mode (no Ad Hoc / internal-distribution credentials); run `eas credentials -p ios` then `eas build -p ios --profile preprod` locally once.
 - **Docs**: `deploy/railway/*/KEYCLOAK_CLIENT.md` now list `supplify-mobile`; this parity entry records the live sync.
 
 ## 2026-09-12 — Android/iOS release audit
