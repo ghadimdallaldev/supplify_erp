@@ -3,13 +3,18 @@ import { logger } from '../lib/logger.js'
 
 /**
  * Persist a chat message received via socket (e.g. from legacy client that only emits send_message).
- * Resolves app_user id to sender_type + entity sender_id, verifies conversation access, then INSERTs.
+ * Uses the socket-authenticated active tenant to resolve the sender, then inserts the message.
  * @param {string} conversationId - UUID
  * @param {string} appUserId - app_user.id (UUID)
  * @param {string} content - message content
  * @returns {Promise<{ id: string, created_at: string } | null>} created message or null if cannot resolve
  */
-export async function persistMessageFromSocket(conversationId, appUserId, content) {
+export async function persistMessageFromSocket(
+  conversationId,
+  appUserId,
+  content,
+  { tenantId = null, role = null } = {}
+) {
   if (
     !conversationId ||
     !appUserId ||
@@ -27,43 +32,31 @@ export async function persistMessageFromSocket(conversationId, appUserId, conten
     if (convRows.length === 0) return null
     const conversation = convRows[0]
 
-    const { rows: userRows } = await query('SELECT id, email, role FROM app_user WHERE id = $1', [
-      appUserId,
-    ])
-    if (userRows.length === 0) return null
-    const appUser = userRows[0]
-
     let senderType = null
     let senderId = null
-    if (appUser.role === 'SUPPLIER') {
-      const { rows: sup } = await query(
-        'SELECT id FROM supplier WHERE id = $1 AND contact_email = $2',
-        [conversation.supplier_id, appUser.email]
-      )
-      if (sup.length > 0) {
-        senderType = 'SUPPLIER'
-        senderId = sup[0].id
-      }
-    } else if (appUser.role === 'RESTAURANT') {
-      const { rows: rest } = await query(
-        'SELECT id FROM restaurant WHERE id = $1 AND contact_email = $2',
-        [conversation.restaurant_id, appUser.email]
-      )
-      if (rest.length > 0) {
-        senderType = 'RESTAURANT'
-        senderId = rest[0].id
-      }
-    } else if (appUser.role === 'ADMIN') {
+    if (role === 'SUPPLIER' && tenantId === conversation.supplier_id) {
+      senderType = 'SUPPLIER'
+      senderId = tenantId
+    } else if (role === 'RESTAURANT' && tenantId === conversation.restaurant_id) {
+      senderType = 'RESTAURANT'
+      senderId = tenantId
+    } else if (role === 'ADMIN') {
       const { rows: adminConv } = await query(
         `SELECT 1 FROM conversation WHERE id = $1 AND COALESCE(is_admin_conversation, false) = true`,
         [conversationId]
       )
       if (adminConv.length > 0) {
         senderType = 'ADMIN'
-        senderId = appUser.id
+        senderId = appUserId
       }
     }
     if (!senderType || !senderId) return null
+
+    if (senderType !== 'ADMIN') {
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      const usage = await checkAndIncrementUsage(tenantId, role, 'chats_per_day', 1)
+      if (!usage.allowed) return null
+    }
 
     const { rows: msgRows } = await query(
       `INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type, is_admin_message)
