@@ -1,7 +1,7 @@
 # Supplify Terms and Conditions
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]  
+**Effective Date:** September 12, 2026  
+**Last Updated:** September 12, 2026  
 **Platform:** Supplify  
 **Operator:** [Company Legal Name]  
 **Address:** [Company Address]  
@@ -126,7 +126,7 @@ Accepted substitutions may update orders, create amendments, or be logged in the
 
 ## 15. Delivery, Drivers, Routes, and Proof of Delivery
 
-Suppliers may use Supplify for delivery assignments, driver dispatch, route planning, delivery statuses, route stops, proof of delivery, failed deliveries, rescheduling, and fulfillment exceptions.
+Suppliers may use Supplify for delivery assignments, driver dispatch, route planning, delivery statuses, route stops, proof of delivery, failed deliveries, rescheduling, and fulfillment exceptions. Suppliers may assign drivers to fulfill deliveries. Drivers' GPS location is tracked during active delivery sessions to enable route optimization and real-time ETA display.
 
 Suppliers are responsible for driver conduct, delivery compliance, vehicle/transport obligations, product handling, delivery timing, and proof-of-delivery accuracy.
 
@@ -151,6 +151,14 @@ Unless stated otherwise, subscription fees for periods already used are non-refu
 ## 18. Mobile App Terms
 
 These Terms apply to the mobile app. App store terms may also apply. Supplify may request mobile permissions for notifications, camera, files, photos, location, and related features. Offline availability is not guaranteed. You are responsible for securing mobile devices used to access Supplify.
+
+## 18a. Real-Time Messaging
+
+Users may use the in-app chat feature to communicate in real time. Message content is stored on our servers and retained per our data retention policy.
+
+## 18b. Push Notifications
+
+By installing the mobile app and accepting push notification permissions, you consent to receiving push notifications. You may manage or disable notifications in the app settings at any time.
 
 ## 19. Notifications
 

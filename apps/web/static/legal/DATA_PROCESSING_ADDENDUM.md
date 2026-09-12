@@ -1,7 +1,7 @@
 # Supplify Data Processing Addendum
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]
+**Effective Date:** September 12, 2026  
+**Last Updated:** September 12, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 
@@ -32,6 +32,11 @@ Supplify will use reasonable technical and organizational measures including acc
 ## 6. Subprocessors
 
 Supplify may engage subprocessors for hosting, storage, authentication, messaging, email, WhatsApp/SMS, push notifications, payments, analytics, support, monitoring, AI, and other services. Supplify remains responsible for subprocessors used to provide the platform.
+
+Current subprocessors include, but are not limited to:
+
+- **Expo Push Notification Service (Expo, Inc.)** — Delivers push notifications to mobile devices running the Supplify app. Expo processes device push tokens on our behalf.
+- **GPS/Location Processing** — Driver location data is processed in real time by our own infrastructure during active delivery sessions.
 
 ## 7. Confidentiality
 
