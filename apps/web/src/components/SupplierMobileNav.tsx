@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Package, ShoppingCart, UserPlus } from 'lucide-react'
+import { Package, ShoppingCart, UserPlus, MessageSquare } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
@@ -69,6 +69,13 @@ export function SupplierMobileNav() {
       permission: 'ORDERS_VIEW',
       testId: 'mobile-nav-orders',
       badge: { count: pendingOrders, tone: 'warning' as const },
+    },
+    {
+      name: 'Chat',
+      href: '/app/chat',
+      icon: MessageSquare,
+      permission: 'CHAT_VIEW',
+      testId: 'mobile-nav-chat',
     },
     ...(supplierGrowthEnabled
       ? [

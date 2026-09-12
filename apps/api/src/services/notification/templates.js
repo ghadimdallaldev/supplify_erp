@@ -1,9 +1,11 @@
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
-import { t, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
+import { t, resolveLocale, DEFAULT_LOCALE, fetchUserLocales } from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
 import { getUpgradePathForTenant } from '../../lib/subscription/plans.js'
-import { notifyTenantUsers, sendNotification } from './in-app.js'
+import { notifyTenantUsers, sendNotification, listTenantUserIds } from './in-app.js'
+import { getIO } from '../../lib/socket.js'
+import { getRedisClient } from '../../lib/cache.js'
 
 /**
  * Domain notification templates and typed notify* helpers.
@@ -928,40 +930,88 @@ export async function notifyMessageReceived(
 
   let tenantId
   let tenantType
-  let senderLabel
   if (senderType === 'RESTAURANT') {
     tenantId = conv.supplier_id
     tenantType = 'SUPPLIER'
-    senderLabel = nt('common.aRestaurant', locale)
   } else {
     tenantId = conv.restaurant_id
     tenantType = 'RESTAURANT'
-    senderLabel = nt('common.aSupplier', locale)
   }
   if (!tenantId) return null
 
   const preview = messagePreview ? `: "${messagePreview.slice(0, 80)}"` : ''
   try {
-    const sent = await notifyTenantUsers({
-      tenantId,
-      tenantType,
-      notificationType: 'MESSAGE',
-      notificationCategory: 'message_received',
-      contentForLocale: (userLocale) => ({
-        title: nt('message.title', userLocale),
-        message: nt('message.body', userLocale, {
-          senderLabel:
-            senderType === 'RESTAURANT'
-              ? nt('common.aRestaurant', userLocale)
-              : nt('common.aSupplier', userLocale),
-          preview,
-        }),
-      }),
-      referenceId: conversationId,
-      referenceType: 'CONVERSATION',
-      metadata: { conversationId },
-    })
-    return sent[0] || null
+    const userIds = await listTenantUserIds(tenantId, tenantType)
+    if (!userIds.length) return null
+
+    const localesByUser = await fetchUserLocales(userIds)
+
+    // Get socket IO instance for online check (may not be initialized in all environments)
+    let io = null
+    try {
+      io = getIO()
+    } catch {
+      // socket not initialized — treat all users as offline
+    }
+
+    const redis = getRedisClient()
+
+    const results = await Promise.allSettled(
+      userIds.map(async (recipientUserId) => {
+        // Check if recipient has an active socket connection
+        const socketRoom = io?.sockets?.adapter?.rooms?.get(`user_${recipientUserId}`)
+        const isOnline = socketRoom != null && socketRoom.size > 0
+
+        // Rate-limit chat emails: max 1 per 2 hours per user.
+        // Only attempt email when the user is offline; use atomic SET NX to avoid
+        // double-sending under concurrent notifications.
+        let canSendEmail = !isOnline
+        if (canSendEmail && redis) {
+          const throttleKey = `chat_email_throttle:${recipientUserId}`
+          // SET NX returns 'OK' when the key was freshly created (first email in window),
+          // null when the key already existed (throttled).
+          const setResult = await redis.set(throttleKey, '1', 'EX', 7200, 'NX')
+          canSendEmail = setResult === 'OK'
+        }
+
+        const userLocale = localesByUser.get(recipientUserId) || DEFAULT_LOCALE
+        const localized = {
+          title: nt('message.title', userLocale),
+          message: nt('message.body', userLocale, {
+            senderLabel:
+              senderType === 'RESTAURANT'
+                ? nt('common.aRestaurant', userLocale)
+                : nt('common.aSupplier', userLocale),
+            preview,
+          }),
+        }
+
+        return sendNotification({
+          userId: recipientUserId,
+          userType: tenantType,
+          notificationType: 'MESSAGE',
+          notificationCategory: 'message_received',
+          title: localized.title,
+          message: localized.message,
+          locale: userLocale,
+          referenceId: conversationId,
+          referenceType: 'CONVERSATION',
+          metadata: {
+            conversationId,
+            ...(canSendEmail ? {} : { skipEmail: true, skipWhatsapp: true }),
+          },
+        })
+      })
+    )
+
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        logger.error('notifyMessageReceived: recipient failed', { err: result.reason?.message })
+      }
+    }
+
+    const first = results.find((r) => r.status === 'fulfilled' && r.value)
+    return first?.value || null
   } catch (err) {
     logger.error('notifyMessageReceived failed', { err: err.message })
     return null

@@ -1,5 +1,5 @@
 import { query } from '../../lib/db.js'
-import { sendWebPushToUser, isPushConfigured } from '../push.service.js'
+import { sendWebPushToUser, sendExpoPushToUser, isPushConfigured } from '../push.service.js'
 import { logger } from '../../lib/logger.js'
 import { ensureNotificationPreferences, invalidateNotificationPreferencesCache } from './in-app.js'
 
@@ -41,13 +41,15 @@ export function dispatchPushNotification({
   referenceType,
   notificationId,
 }) {
+  const url = resolvePushUrl(referenceType, referenceId)
+
   sendWebPushToUser({
     userId,
     title,
     message,
     referenceId,
     referenceType,
-    url: resolvePushUrl(referenceType, referenceId),
+    url,
   })
     .then((pushResult) => {
       if (pushResult?.sent > 0 && notificationId) {
@@ -57,8 +59,17 @@ export function dispatchPushNotification({
       }
     })
     .catch((error) => {
-      logger.error('Push send failed', { error: error.message })
+      logger.error('Web push send failed', { error: error.message })
     })
+
+  sendExpoPushToUser(userId, {
+    title,
+    body: message,
+    data: { referenceId, referenceType, notificationId },
+    url,
+  }).catch((error) => {
+    logger.error('Expo push send failed', { error: error.message })
+  })
 }
 
 export { isPushConfigured }

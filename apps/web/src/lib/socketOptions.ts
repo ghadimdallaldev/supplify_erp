@@ -1,10 +1,10 @@
 import type { ManagerOptions } from 'socket.io-client'
 import type { SocketOptions } from 'socket.io-client'
 
-/** Shared Socket.IO client options (polling first reduces WebSocket console noise during API restarts). */
+/** Shared Socket.IO client options (WebSocket first for low-latency chat; falls back to polling). */
 export const SOCKET_IO_OPTIONS: Partial<ManagerOptions & SocketOptions> = {
   path: '/socket.io',
-  transports: ['polling', 'websocket'],
+  transports: ['websocket', 'polling'],
   withCredentials: true,
   reconnection: true,
   reconnectionDelay: 1000,
