@@ -32,7 +32,7 @@ export function resolvePushUrl(referenceType, referenceId) {
   return '/app/notifications'
 }
 
-/** Fire-and-forget web push for a notification row. */
+/** Dispatch browser and native push independently. */
 export function dispatchPushNotification({
   userId,
   title,
@@ -40,17 +40,20 @@ export function dispatchPushNotification({
   referenceId,
   referenceType,
   notificationId,
+  notificationType,
+  notificationCategory,
+  metadata = null,
 }) {
   const url = resolvePushUrl(referenceType, referenceId)
 
-  const markPushSent = () => {
+  const markWebPushSent = () => {
     if (!notificationId) return
     query(`UPDATE notification_log SET push_sent = true WHERE id = $1`, [notificationId]).catch(
       () => {}
     )
   }
 
-  sendWebPushToUser({
+  const webPush = sendWebPushToUser({
     userId,
     title,
     message,
@@ -59,24 +62,39 @@ export function dispatchPushNotification({
     url,
   })
     .then((pushResult) => {
-      if (pushResult?.sent > 0) markPushSent()
+      if (pushResult?.sent > 0) markWebPushSent()
+      return pushResult
     })
     .catch((error) => {
       logger.error('Web push send failed', { error: error.message })
+      return { sent: 0, error: error.message }
     })
 
-  sendExpoPushToUser(userId, {
+  const clientData = {
+    notificationId,
+    notification_id: notificationId,
+    notificationType,
+    notification_type: notificationType,
+    notificationCategory,
+    notification_category: notificationCategory,
+    referenceId,
+    reference_id: referenceId,
+    referenceType,
+    reference_type: referenceType,
+    ...(metadata && typeof metadata === 'object' ? metadata : {}),
+  }
+  const expoPush = sendExpoPushToUser(userId, {
     title,
     body: message,
-    data: { referenceId, referenceType, notificationId },
+    data: clientData,
     url,
+    notificationId,
+  }).catch((error) => {
+    logger.error('Expo push send failed', { error: error.message })
+    return { sent: 0, error: error.message }
   })
-    .then((expoResult) => {
-      if (expoResult?.sent > 0) markPushSent()
-    })
-    .catch((error) => {
-      logger.error('Expo push send failed', { error: error.message })
-    })
+
+  return Promise.all([webPush, expoPush]).then(([web, expo]) => ({ web, expo }))
 }
 
 export { isPushConfigured }
