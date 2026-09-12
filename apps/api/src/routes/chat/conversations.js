@@ -18,17 +18,10 @@ import {
   getTenantSubscription,
   getRecommendedPlanNames,
   buildLimitExceededPayload,
-  requireFeature,
-  checkLimit,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
 import { notifyMessageReceived } from '../../services/notification.service.js'
 import { assertChatAttachmentUrl } from '../../lib/sanitize-upload.js'
-import {
-  getOrCreateSupportConversation,
-  listSupportConversationsForTenant,
-  listAdminSupportConversations,
-} from '../../services/support-chat.service.js'
 import {
   getOrCreateConversation,
   userCanAccessConversation,
