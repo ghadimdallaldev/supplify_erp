@@ -210,6 +210,7 @@ export async function assignDriverToOrder({
         supplierId,
         milestone: 'driver_assigned',
         driverName: driverRows[0]?.full_name,
+        driverId,
       })
     }
   } catch {
@@ -368,6 +369,7 @@ export async function updateDeliveryStatus({
             supplierId,
             milestone: 'delivered',
             driverName: updatedAssignment[0]?.driver_name,
+            driverId: assignment.driver_id,
           })
         } else if (status === 'out_for_delivery') {
           await notifyDriverDeliveryMilestone({
@@ -375,6 +377,7 @@ export async function updateDeliveryStatus({
             supplierId,
             milestone: 'out_for_delivery',
             driverName: updatedAssignment[0]?.driver_name,
+            driverId: assignment.driver_id,
           })
         } else if (status === 'failed') {
           await notifyDriverDeliveryMilestone({
@@ -382,6 +385,7 @@ export async function updateDeliveryStatus({
             supplierId,
             milestone: 'failed_delivery',
             driverName: updatedAssignment[0]?.driver_name,
+            driverId: assignment.driver_id,
           })
         }
       }

@@ -43,6 +43,13 @@ export function dispatchPushNotification({
 }) {
   const url = resolvePushUrl(referenceType, referenceId)
 
+  const markPushSent = () => {
+    if (!notificationId) return
+    query(`UPDATE notification_log SET push_sent = true WHERE id = $1`, [notificationId]).catch(
+      () => {}
+    )
+  }
+
   sendWebPushToUser({
     userId,
     title,
@@ -52,11 +59,7 @@ export function dispatchPushNotification({
     url,
   })
     .then((pushResult) => {
-      if (pushResult?.sent > 0 && notificationId) {
-        query(`UPDATE notification_log SET push_sent = true WHERE id = $1`, [notificationId]).catch(
-          () => {}
-        )
-      }
+      if (pushResult?.sent > 0) markPushSent()
     })
     .catch((error) => {
       logger.error('Web push send failed', { error: error.message })
@@ -67,9 +70,13 @@ export function dispatchPushNotification({
     body: message,
     data: { referenceId, referenceType, notificationId },
     url,
-  }).catch((error) => {
-    logger.error('Expo push send failed', { error: error.message })
   })
+    .then((expoResult) => {
+      if (expoResult?.sent > 0) markPushSent()
+    })
+    .catch((error) => {
+      logger.error('Expo push send failed', { error: error.message })
+    })
 }
 
 export { isPushConfigured }

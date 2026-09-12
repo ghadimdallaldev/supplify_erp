@@ -1,6 +1,12 @@
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
-import { t, resolveLocale, DEFAULT_LOCALE, fetchUserLocales } from '../../i18n/index.js'
+import {
+  t,
+  resolveLocale,
+  resolveUserLocale,
+  DEFAULT_LOCALE,
+  fetchUserLocales,
+} from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
 import { getUpgradePathForTenant } from '../../lib/subscription/plans.js'
 import { notifyTenantUsers, sendNotification, listTenantUserIds } from './in-app.js'
@@ -372,9 +378,30 @@ function buildDriverMilestoneNotification(order, milestone, audience, locale = D
   const lng = resolveLocale(locale)
   const key = DRIVER_MILESTONE_MESSAGES[milestone]
   if (!key) return null
+  const title = nt(`driver.${key}.title`, lng)
+  const orderId = orderShortId(order)
+
+  if (audience === 'driver') {
+    const driverMessageKey = `driver.${key}.driver`
+    const driverMessage = nt(driverMessageKey, lng, { orderId })
+    if (driverMessage !== `notifications.${driverMessageKey}`) {
+      return { title, message: driverMessage }
+    }
+    if (milestone === 'driver_assigned') {
+      return {
+        title: 'New delivery assigned',
+        message: `Order #${orderId} was assigned to you`,
+      }
+    }
+    return {
+      title,
+      message: nt(`driver.${key}.supplier`, lng, { orderId }),
+    }
+  }
+
   return {
-    title: nt(`driver.${key}.title`, lng),
-    message: nt(`driver.${key}.${audience}`, lng, { orderId: orderShortId(order) }),
+    title,
+    message: nt(`driver.${key}.${audience}`, lng, { orderId }),
   }
 }
 
@@ -428,7 +455,13 @@ export async function notifyDeliveryRolloverBatch({
 }
 
 /** In-app notifications for driver delivery milestones (no email per ping). */
-export async function notifyDriverDeliveryMilestone({ order, supplierId, milestone, driverName }) {
+export async function notifyDriverDeliveryMilestone({
+  order,
+  supplierId,
+  milestone,
+  driverName,
+  driverId,
+}) {
   if (!DRIVER_MILESTONE_MESSAGES[milestone] || !order?.id) return null
 
   const base = {
@@ -461,6 +494,36 @@ export async function notifyDriverDeliveryMilestone({ order, supplierId, milesto
         buildDriverMilestoneNotification(order, milestone, 'supplier', locale),
       ...base,
     })
+  }
+
+  if (driverId) {
+    const { rows: driverRows } = await query(
+      `SELECT user_id, full_name FROM drivers WHERE id = $1`,
+      [driverId]
+    )
+    const linkedUserId = driverRows[0]?.user_id
+    if (linkedUserId) {
+      const userLocale = await resolveUserLocale(linkedUserId)
+      const content = buildDriverMilestoneNotification(order, milestone, 'driver', userLocale)
+      if (content) {
+        await sendNotification({
+          userId: linkedUserId,
+          userType: 'SUPPLIER',
+          notificationType: 'ORDER',
+          notificationCategory: milestone,
+          title: content.title,
+          message: content.message,
+          locale: userLocale,
+          referenceId: order.id,
+          referenceType: 'ORDER',
+          metadata: {
+            ...base.metadata,
+            driver_id: driverId,
+            ctaUrl: '/app/driver-deliveries',
+          },
+        })
+      }
+    }
   }
 
   return true
