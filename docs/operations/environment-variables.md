@@ -218,6 +218,14 @@ Legacy aliases still supported: `S3_*` → `STORAGE_*`, `API_PUBLIC_URL` = `PUBL
 
 Access in code: `apps/web/src/lib/env.ts`.
 
+## Mobile build-time push
+
+| Variable               | Used by                 | Required in                                                | Notes                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GOOGLE_SERVICES_JSON` | Android Expo/EAS config | Android development, preview, and production native builds | EAS **file** variable containing Firebase `google-services.json`. Both mobile `app.config.js` files map it to `android.googleServicesFile` and fail an Android EAS build when absent. Do not prefix with `EXPO_PUBLIC_`. The matching FCM V1 service-account key must also be configured in EAS credentials. |
+
+This is a build-time file path supplied by EAS, not an API or client-runtime variable. iOS device builds separately require a valid APNs key in EAS credentials.
+
 ## Health endpoints
 
 | Route         | Response (preprod/prod)                                  |

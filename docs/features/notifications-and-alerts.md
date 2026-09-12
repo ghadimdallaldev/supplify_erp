@@ -12,6 +12,15 @@ How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture,
 - Opening a thread calls `PATCH /api/chat/conversations/:conversationId/read`; the cached badge is cleared immediately and reconciled on the next server refresh.
 - The socket connection carries the same active-tenant token as REST requests, preventing branch/workspace mismatch after tenant switching.
 
+## Native Expo push delivery (2026-09-13)
+
+- `POST /api/push/devices` and `DELETE /api/push/devices` are authenticated user-level registration endpoints. They intentionally do not require tenant resolution or mutate `push_enabled`.
+- A push endpoint belongs to exactly one user. Re-registering transfers it to the authenticated account; logout removes the stored device while the access token is still valid.
+- Native registration requires an installed development/preview/production build. It retries transient failures and exposes its state in mobile Notification settings instead of failing silently.
+- Native payloads include `notificationId`, `notificationType`, `notificationCategory`, `referenceId`, `referenceType`, their snake_case equivalents, metadata, and the resolved web URL. Chat uses `referenceType: CONVERSATION` with `conversationId` metadata.
+- Expo ticket acceptance is not treated as delivery. The API reconciles Expo receipts, marks `notification_log.push_sent` only after FCM/APNs returns success, and removes stale `DeviceNotRegistered` subscriptions.
+- Android release builds require Firebase `google-services.json` plus a matching EAS FCM V1 service-account credential. Both mobile repos accept the client file through the EAS file variable `GOOGLE_SERVICES_JSON`; `app.config.js` fails Android EAS builds when it is absent. iOS device builds require a valid APNs key in EAS. Validate both with physical-device background and terminated-app tests before release.
+
 ## Recipients
 
 `notifyTenantUsers` in `notification.service.js` loads every `app_user` linked to the tenant via:
@@ -23,14 +32,15 @@ Team members receive the same in-app (and email/push when enabled) alerts as the
 
 ## Channels
 
-| Channel  | When                                                                                                     |
-| -------- | -------------------------------------------------------------------------------------------------------- |
-| In-app   | `notification_log` + header bell; foreground toast + optional browser banner via `useNotificationAlerts` |
-| Realtime | Socket.IO `notification_new` and `entitlements_refresh` on the app socket                                |
-| Email    | Plan tier + `email_enabled` + per-category `notify_*` toggles; HTML templates (see below)                |
-| WhatsApp | Tier + toggle; server send via `whatsapp.service.js` (Meta Cloud API)                                    |
-| Web Push | Opt-in `push_enabled` + VAPID keys (see below)                                                           |
-| Webhook  | Platinum tier — outbound signed HTTP to tenant-configured URL (`notification/webhook.js`)                |
+| Channel     | When                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------- |
+| In-app      | `notification_log` + header bell; foreground toast + optional browser banner via `useNotificationAlerts` |
+| Realtime    | Socket.IO `notification_new` and `entitlements_refresh` on the app socket                                |
+| Email       | Plan tier + `email_enabled` + per-category `notify_*` toggles; HTML templates (see below)                |
+| WhatsApp    | Tier + toggle; server send via `whatsapp.service.js` (Meta Cloud API)                                    |
+| Native Push | Opt-in `push_enabled` + tenant feature + registered Expo device + FCM/APNs credentials                   |
+| Web Push    | Opt-in `push_enabled` + VAPID keys (see below)                                                           |
+| Webhook     | Platinum tier — outbound signed HTTP to tenant-configured URL (`notification/webhook.js`)                |
 
 Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, `failed_delivery`, `delivery_rescheduled`) are **in-app only** — email and WhatsApp are suppressed per ping (`skipEmail` + `skipWhatsapp` on metadata). `delivery_rescheduled` also triggers a `delivery_rollover` batch notification to the supplier team via the delivery-rollover cron job.
 

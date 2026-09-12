@@ -12,6 +12,10 @@ import {
 } from './notification.service.js'
 
 const queryMock = vi.fn()
+const dispatchPushNotificationMock = vi.fn().mockResolvedValue({
+  web: { sent: 0 },
+  expo: { sent: 1 },
+})
 
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
@@ -32,6 +36,12 @@ vi.mock('../lib/subscription.js', () => ({
   isFeatureEnabled: vi.fn().mockResolvedValue(false),
 }))
 
+vi.mock('./notification/push.js', () => ({
+  dispatchPushNotification: (...args) => dispatchPushNotificationMock(...args),
+  isPushConfigured: vi.fn(() => false),
+  setPushEnabledPreference: vi.fn(),
+  resolvePushUrl: vi.fn(() => '/app/chat'),
+}))
 vi.mock('./whatsapp.service.js', () => ({
   sendWhatsAppMessage: vi.fn().mockResolvedValue({ sent: false, reason: 'NOT_CONFIGURED' }),
 }))
@@ -44,6 +54,7 @@ describe('Notification Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryMock.mockReset()
+    dispatchPushNotificationMock.mockClear()
   })
 
   const basePrefs = {
@@ -89,6 +100,100 @@ describe('Notification Service', () => {
         })
       )
       expect(emitNotificationNew).toHaveBeenCalled()
+    })
+
+    it('uses the supplied tenant for entitlement resolution', async () => {
+      const { getEntitlements, isFeatureEnabled } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+      isFeatureEnabled.mockResolvedValue(false)
+
+      queryMock
+        .mockResolvedValueOnce({ rows: [{ ...basePrefs }] })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'supplier-target', email: 'supplier@test.com', phone: null }],
+        })
+        .mockResolvedValueOnce({ rows: [{ email: 'supplier@test.com', phone: null }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'notif-tenant', title: 'New message' }] })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await sendNotification({
+        userId: 'supplier-user',
+        userType: 'SUPPLIER',
+        notificationType: 'MESSAGE',
+        notificationCategory: 'message_received',
+        title: 'New message',
+        message: 'A restaurant sent you a message',
+        tenantId: 'supplier-target',
+      })
+
+      expect(getEntitlements).toHaveBeenCalledWith('supplier-target', 'SUPPLIER')
+      expect(isFeatureEnabled).toHaveBeenCalledWith(
+        'supplier-target',
+        'SUPPLIER',
+        'push_notifications'
+      )
+      expect(
+        queryMock.mock.calls.some(([sql]) => String(sql).includes('SELECT tur.tenant_id'))
+      ).toBe(false)
+    })
+
+    it('dispatches a native chat push with mobile deep-link fields', async () => {
+      const { getEntitlements, isFeatureEnabled } = await import('../lib/subscription.js')
+      getEntitlements.mockResolvedValue({ features: { notifications: 'in_app_only' } })
+      isFeatureEnabled.mockResolvedValue(true)
+
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              ...basePrefs,
+              push_enabled: true,
+              notify_message_received: true,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ tenant_id: 'supplier-target', email: 'supplier@test.com', phone: null }],
+        })
+        .mockResolvedValueOnce({ rows: [{ email: 'supplier@test.com', phone: null }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'notif-chat-1', title: 'New message', message: 'Hello' }],
+        })
+        .mockResolvedValueOnce({ rowCount: 1 })
+
+      await sendNotification({
+        userId: 'supplier-user',
+        userType: 'SUPPLIER',
+        notificationType: 'MESSAGE',
+        notificationCategory: 'message_received',
+        title: 'New message',
+        message: 'A restaurant sent you a message: "Hello"',
+        referenceId: 'conv-1',
+        referenceType: 'CONVERSATION',
+        metadata: { conversationId: 'conv-1' },
+        tenantId: 'supplier-target',
+      })
+
+      expect(dispatchPushNotificationMock).toHaveBeenCalledWith({
+        userId: 'supplier-user',
+        title: 'New message',
+        message: 'A restaurant sent you a message: "Hello"',
+        referenceId: 'conv-1',
+        referenceType: 'CONVERSATION',
+        notificationId: 'notif-chat-1',
+        notificationType: 'MESSAGE',
+        notificationCategory: 'message_received',
+        metadata: { conversationId: 'conv-1' },
+      })
+
+      const insertCall = queryMock.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO notification_log')
+      )
+      expect(insertCall?.[1]?.[11]).toBe(false)
+      const channelUpdate = queryMock.mock.calls.find(([sql]) =>
+        String(sql).includes('SET email_sent = $1')
+      )
+      expect(String(channelUpdate?.[0])).not.toContain('push_sent')
     })
 
     it('skips notification when preference is disabled', async () => {

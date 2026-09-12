@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-13 - Native chat push reliability hardening
+
+- Updated the API plus both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`; Android and iOS implementations remain identical.
+- Mobile device registration now runs for every authenticated native session, retries transient failures (15 seconds, 60 seconds, 5 minutes), retries when the app returns to the foreground, and exposes registration health plus a manual retry in Notification settings.
+- Expo tokens are persisted securely, unregistered before authenticated logout, and transferred safely when the same device signs into another account. Registration no longer re-enables a user's explicit push opt-out.
+- iOS registration accepts authorized, provisional, and ephemeral notification permission states as required by Expo SDK 56. Android creates the `supplify-alerts` channel before requesting a token.
+- Chat push payloads carry both camelCase and snake_case notification/reference fields. Tapping a chat alert opens its conversation; foreground alerts invalidate chat and notification queries immediately.
+- The API now sends only supported Expo payload fields, validates tokens, checks downstream FCM/APNs receipts, removes `DeviceNotRegistered` tokens, and marks `notification_log.push_sent` only after confirmed delivery. Migration `0204_push_subscription_endpoint_ownership.sql` prevents one endpoint from remaining attached to multiple users.
+- Added build-only EAS file variable `GOOGLE_SERVICES_JSON` to both mobile `.env.example` files. Shared `app.config.js` injects it into `android.googleServicesFile` and fails Android EAS builds when it is missing. No feature key, permission key, or API response contract changed.
+- Release prerequisite: populate `GOOGLE_SERVICES_JSON` in EAS and attach the matching FCM V1 service-account credential; iOS device builds require a valid APNs key. These private EAS credentials cannot be verified from the repository and must be checked before the device demo.
+- Verification: focused API push/notification tests and focused Android/iOS registration/deep-link tests pass; full regression results are recorded in the final audit report.
+
 ## 2026-09-12 — Client-demo critical mobile hardening
 
 - Applied the same chat, notification, deal, contract-pricing, supplier-directory, and delivery-map fixes to both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`.

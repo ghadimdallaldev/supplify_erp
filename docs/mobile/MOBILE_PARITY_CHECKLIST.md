@@ -12,6 +12,16 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [ ] Was `MOBILE_FEATURE_PARITY.md` updated if something is deferred?
 - [ ] Supplier bulk image import changed? → Web-only; document in parity file (see 2026-06-15 entry).
 
+## 2026-09-13 - Native chat push audit
+
+- [x] API notification, Expo payload, device registration, and deep-link contracts synchronized across ERP, Android, and iOS.
+- [x] Android and iOS registration retry/status/logout behavior kept identical.
+- [x] Chat alerts invalidate the chat list and open the target conversation on both platforms.
+- [x] Push endpoint ownership is globally unique; explicit push opt-out is preserved.
+- [x] Focused API and both mobile push/deep-link tests pass.
+- [x] Android EAS build fails closed unless the `GOOGLE_SERVICES_JSON` file variable is available; the default `supplify-alerts` channel resolves in both app configs.
+- [ ] Physical-device delivery after a new credentialed build: populate Android `GOOGLE_SERVICES_JSON`, verify matching FCM V1 credentials, and verify iOS APNs in EAS before the client demo.
+
 ## 2026-09-12 — Native release audit
 
 - [x] Android and iOS typechecks pass without emulator/Xcode execution.

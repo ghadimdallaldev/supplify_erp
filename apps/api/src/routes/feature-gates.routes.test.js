@@ -87,6 +87,9 @@ vi.mock('../services/push.service.js', () => ({
   getVapidPublicKey: vi.fn(() => 'vapid-key'),
   savePushSubscription: vi.fn().mockResolvedValue({ id: 'sub-1' }),
   removePushSubscription: vi.fn().mockResolvedValue(true),
+  saveExpoPushDevice: vi.fn().mockResolvedValue({ id: 'device-1' }),
+  removeExpoPushDevice: vi.fn().mockResolvedValue(true),
+  isValidExpoPushToken: vi.fn(() => true),
 }))
 
 vi.mock('../services/order-amendments.service.js', () => ({

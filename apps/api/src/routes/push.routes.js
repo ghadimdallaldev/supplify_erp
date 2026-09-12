@@ -8,6 +8,7 @@ import {
   removePushSubscription,
   saveExpoPushDevice,
   removeExpoPushDevice,
+  isValidExpoPushToken,
 } from '../services/push.service.js'
 import { setPushEnabledPreference } from '../services/notification.service.js'
 
@@ -26,7 +27,7 @@ const unsubscribeSchema = z.object({
 })
 
 const deviceSchema = z.object({
-  token: z.string().min(1),
+  token: z.string().min(1).refine(isValidExpoPushToken, 'Invalid Expo push token'),
   platform: z.enum(['ios', 'android']),
 })
 
@@ -96,40 +97,27 @@ router.delete(
   }
 )
 
-router.post(
-  '/devices',
-  requireAuth,
-  resolveTenantContext,
-  pushFeatureGate,
-  async (req, res, next) => {
-    try {
-      const body = deviceSchema.parse(req.body)
-      const device = await saveExpoPushDevice(req.userData.id, {
-        token: body.token,
-        platform: body.platform,
-      })
-      await setPushEnabledPreference(req.userData.id, req.userData.role, true)
-      res.status(201).json({ ok: true, data: { device }, error: null, requestId: req.requestId })
-    } catch (err) {
-      next(err)
-    }
+router.post('/devices', requireAuth, async (req, res, next) => {
+  try {
+    const body = deviceSchema.parse(req.body)
+    const device = await saveExpoPushDevice(req.userData.id, {
+      token: body.token,
+      platform: body.platform,
+    })
+    res.status(201).json({ ok: true, data: { device }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
   }
-)
+})
 
-router.delete(
-  '/devices',
-  requireAuth,
-  resolveTenantContext,
-  pushFeatureGate,
-  async (req, res, next) => {
-    try {
-      const body = deviceSchema.parse(req.body)
-      const removed = await removeExpoPushDevice(req.userData.id, body.token)
-      res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
-    } catch (err) {
-      next(err)
-    }
+router.delete('/devices', requireAuth, async (req, res, next) => {
+  try {
+    const body = deviceSchema.parse(req.body)
+    const removed = await removeExpoPushDevice(req.userData.id, body.token)
+    res.json({ ok: true, data: { removed }, error: null, requestId: req.requestId })
+  } catch (err) {
+    next(err)
   }
-)
+})
 
 export { router as pushRoutes }

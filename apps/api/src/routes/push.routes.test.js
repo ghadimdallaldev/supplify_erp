@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const saveExpoPushDevice = vi.fn()
 const removeExpoPushDevice = vi.fn()
+const setPushEnabledPreference = vi.fn()
 
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -41,10 +42,11 @@ vi.mock('../services/push.service.js', () => ({
   removePushSubscription: vi.fn(),
   saveExpoPushDevice: (...args) => saveExpoPushDevice(...args),
   removeExpoPushDevice: (...args) => removeExpoPushDevice(...args),
+  isValidExpoPushToken: vi.fn(() => true),
 }))
 
 vi.mock('../services/notification.service.js', () => ({
-  setPushEnabledPreference: vi.fn(),
+  setPushEnabledPreference: (...args) => setPushEnabledPreference(...args),
 }))
 
 import { pushRoutes } from './push.routes.js'
@@ -66,6 +68,7 @@ describe('push.routes', () => {
     vi.clearAllMocks()
     saveExpoPushDevice.mockReset()
     removeExpoPushDevice.mockReset()
+    setPushEnabledPreference.mockReset()
   })
 
   it('POST /devices registers expo push token', async () => {
@@ -82,6 +85,7 @@ describe('push.routes', () => {
       token: 'ExponentPushToken[abc]',
       platform: 'ios',
     })
+    expect(setPushEnabledPreference).not.toHaveBeenCalled()
   })
 
   it('DELETE /devices unregisters expo push token', async () => {

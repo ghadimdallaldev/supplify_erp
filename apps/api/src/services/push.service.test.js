@@ -10,6 +10,37 @@ vi.mock('web-push', () => ({
   },
 }))
 
+const expoSendPushNotificationsMock = vi.fn()
+const expoGetPushReceiptsMock = vi.fn()
+const expoChunkMessagesMock = vi.fn((messages) => [messages])
+const expoChunkReceiptIdsMock = vi.fn((ids) => [ids])
+
+vi.mock('expo-server-sdk', () => {
+  class Expo {
+    static isExpoPushToken(token) {
+      return typeof token === 'string' && /^(Expo|Exponent)PushToken\[[^\]]+\]$/.test(token)
+    }
+
+    chunkPushNotifications(messages) {
+      return expoChunkMessagesMock(messages)
+    }
+
+    chunkPushNotificationReceiptIds(ids) {
+      return expoChunkReceiptIdsMock(ids)
+    }
+
+    sendPushNotificationsAsync(messages) {
+      return expoSendPushNotificationsMock(messages)
+    }
+
+    getPushNotificationReceiptsAsync(ids) {
+      return expoGetPushReceiptsMock(ids)
+    }
+  }
+
+  return { Expo }
+})
+
 const queryMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
@@ -33,6 +64,10 @@ describe('Push Service', () => {
     vi.clearAllMocks()
     queryMock.mockReset()
     sendNotificationMock.mockReset()
+    expoSendPushNotificationsMock.mockReset()
+    expoGetPushReceiptsMock.mockReset()
+    expoChunkMessagesMock.mockImplementation((messages) => [messages])
+    expoChunkReceiptIdsMock.mockImplementation((ids) => [ids])
     vi.resetModules()
   })
 
@@ -87,6 +122,9 @@ describe('Push Service', () => {
       expect.stringContaining('INSERT INTO push_subscriptions'),
       expect.arrayContaining(['user-1', 'https://push.example/1'])
     )
+    const [sql] = queryMock.mock.calls[0]
+    expect(sql).toContain('ON CONFLICT (endpoint)')
+    expect(sql).toContain('user_id = EXCLUDED.user_id')
   })
 
   it('removePushSubscription deletes by user and endpoint', async () => {
@@ -108,6 +146,9 @@ describe('Push Service', () => {
       expect.stringContaining('INSERT INTO push_subscriptions'),
       ['user-1', 'expo:ExponentPushToken[abc]', 'expo', 'ios', null]
     )
+    const [sql] = queryMock.mock.calls[0]
+    expect(sql).toContain('ON CONFLICT (endpoint)')
+    expect(sql).toContain('user_id = EXCLUDED.user_id')
   })
 
   it('removeExpoPushDevice deletes by expo endpoint', async () => {
@@ -139,6 +180,106 @@ describe('Push Service', () => {
     expect(sendNotificationMock).toHaveBeenCalledTimes(1)
   })
 
+  it('buildExpoPushMessage only emits Expo-supported fields', async () => {
+    const { buildExpoPushMessage } = await import('./push.service.js')
+    const message = buildExpoPushMessage({
+      token: 'ExponentPushToken[abc]',
+      title: 'New message',
+      body: 'A restaurant sent you a message',
+      data: { notification_type: 'MESSAGE' },
+      url: '/app/chat',
+    })
+
+    expect(message).toEqual(
+      expect.objectContaining({
+        to: 'ExponentPushToken[abc]',
+        title: 'New message',
+        sound: 'default',
+        priority: 'high',
+        channelId: 'supplify-alerts',
+        badge: 1,
+      })
+    )
+    expect(message.data).toEqual({
+      notification_type: 'MESSAGE',
+      url: '/app/chat',
+    })
+    expect(message).not.toHaveProperty('_subscriptionId')
+  })
+
+  it('sends valid Expo messages and maps accepted tickets to receipts', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'expo-sub-1',
+          endpoint: 'expo:ExponentPushToken[abc]',
+          platform: 'android',
+        },
+      ],
+    })
+    expoSendPushNotificationsMock.mockResolvedValueOnce([{ status: 'ok', id: 'ticket-1' }])
+
+    const { sendExpoPushToUser } = await import('./push.service.js')
+    const result = await sendExpoPushToUser('user-1', {
+      title: 'New message',
+      body: 'Hello',
+      data: { reference_type: 'CONVERSATION', reference_id: 'conv-1' },
+      url: '/app/chat',
+      notificationId: 'notif-1',
+    })
+
+    expect(result).toEqual({ sent: 1, failed: 0, total: 1 })
+    expect(expoSendPushNotificationsMock).toHaveBeenCalledWith([
+      expect.objectContaining({
+        to: 'ExponentPushToken[abc]',
+        data: expect.objectContaining({ reference_id: 'conv-1' }),
+      }),
+    ])
+  })
+
+  it('marks successful Expo receipts and removes stale devices', async () => {
+    expoGetPushReceiptsMock.mockResolvedValueOnce({
+      'ticket-ok': { status: 'ok' },
+      'ticket-stale': {
+        status: 'error',
+        message: 'No longer registered',
+        details: { error: 'DeviceNotRegistered' },
+      },
+    })
+    queryMock.mockResolvedValue({ rowCount: 1 })
+
+    const { reconcileExpoPushReceipts } = await import('./push.service.js')
+    const result = await reconcileExpoPushReceipts([
+      {
+        ticketId: 'ticket-ok',
+        subscriptionId: 'sub-ok',
+        notificationId: 'notif-1',
+      },
+      {
+        ticketId: 'ticket-stale',
+        subscriptionId: 'sub-stale',
+        notificationId: 'notif-2',
+      },
+    ])
+
+    expect(result).toEqual({ delivered: 1, failed: 1, pending: [] })
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM push_subscriptions'),
+      [['sub-stale']]
+    )
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE notification_log SET push_sent = true'),
+      [['notif-1']]
+    )
+  })
+
+  it('rejects malformed Expo push tokens before writing', async () => {
+    const { saveExpoPushDevice } = await import('./push.service.js')
+    await expect(
+      saveExpoPushDevice('user-1', { token: 'not-a-token', platform: 'android' })
+    ).rejects.toThrow('Invalid expo push device payload')
+    expect(queryMock).not.toHaveBeenCalled()
+  })
   it('treats CHANGE_ME placeholders as not configured', async () => {
     vi.doMock('../config/env.js', () => ({
       config: {
