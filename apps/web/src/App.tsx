@@ -7,7 +7,6 @@ import {
   useParams,
   useLocation,
 } from 'react-router-dom'
-import { ROUTER_FUTURE } from './lib/routerFuture'
 import { ConsumerAuthProvider } from './contexts/ConsumerAuthContext'
 import { AuthGuard } from './components/AuthGuard'
 import { StaffPortalGuard } from './components/StaffPortalGuard'
@@ -1041,7 +1040,7 @@ const router = createBrowserRouter([
 export function App() {
   return (
     <CustomDomainCatalogHost>
-      <RouterProvider router={router} future={ROUTER_FUTURE} />
+      <RouterProvider router={router} />
     </CustomDomainCatalogHost>
   )
 }
