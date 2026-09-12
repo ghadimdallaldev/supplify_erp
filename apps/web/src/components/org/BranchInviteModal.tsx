@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Select, SelectTrigger } from '../ui/select'
@@ -16,8 +16,7 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
   const [managerName, setManagerName] = useState('')
   const [managerEmail, setManagerEmail] = useState('')
   const [roleId, setRoleId] = useState('')
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const [createInvitation, { isLoading }] = useCreateBranchInvitationMutation()
   const { data: rolesData } = useGetBranchInviteRolesQuery(
@@ -30,8 +29,7 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
       setManagerName('')
       setManagerEmail('')
       setRoleId('')
-      setInviteUrl(null)
-      setCopied(false)
+      setSubmitted(false)
     }
   }, [open])
 
@@ -47,20 +45,19 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
 
   const handleGenerate = async () => {
     if (!roleId || !managerEmail.trim()) return
-    const result = await createInvitation({
+    await createInvitation({
       supplier_id: supplierId,
       invited_name: managerName.trim() || undefined,
       invited_email: managerEmail.trim() || undefined,
       role_id: roleId,
     }).unwrap()
-    setInviteUrl(result.invite_url)
+    setSubmitted(true)
   }
 
-  const handleCopy = async () => {
-    if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
+  const resetForAnother = () => {
+    setManagerName('')
+    setManagerEmail('')
+    setSubmitted(false)
   }
 
   return (
@@ -69,7 +66,7 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
         <DialogHeader>
           <DialogTitle>Invite someone to {branchName ?? 'this branch'}</DialogTitle>
         </DialogHeader>
-        {!inviteUrl ? (
+        {!submitted ? (
           <div className="space-y-3">
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">Name</span>
@@ -120,29 +117,22 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="rounded-md border border-[var(--app-border)] p-3 space-y-2">
-              <p className="text-xs text-[var(--text-muted)]">Invite link (expires in 7 days)</p>
-              <p className="text-sm break-all font-mono">{inviteUrl}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleCopy().catch(() => {})}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-1" /> Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-1" /> Copy Link
-                  </>
-                )}
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+              <span className="font-medium">Invitation Sent</span>
+            </div>
+            <p className="text-sm text-[var(--text-muted)]">
+              An invitation has been sent to <strong>{managerEmail}</strong>. They&apos;ll receive
+              an email with a link to join.
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" className="flex-1" onClick={onClose}>
+                Done
+              </Button>
+              <Button type="button" variant="outline" className="flex-1" onClick={resetForAnother}>
+                Invite another person
               </Button>
             </div>
-            <Button type="button" className="w-full" onClick={onClose}>
-              Done
-            </Button>
           </div>
         )}
       </DialogContent>

@@ -35,7 +35,7 @@ import {
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
 import { toast } from 'sonner'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { formatPrice } from '../utils/format'
@@ -136,28 +136,29 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
-  const applyResolvedPrices = async (
-    lineItems: Array<{ productId: string; supplierId: string; quantity: number }>
-  ) => {
-    if (!lineItems.length) return
-    try {
-      const result = await resolveContractPrices({ items: lineItems }).unwrap()
-      for (const resolved of result.items) {
-        if (resolved?.unitPrice == null) continue
-        dispatch(
-          updateItemResolvedPrice({
-            productId: resolved.productId,
-            currentPrice: resolved.unitPrice,
-            pricingSource: resolved.source,
-            catalogPrice: resolved.defaultPrice ?? undefined,
-            ownerEmail,
-          })
-        )
+  const applyResolvedPrices = useCallback(
+    async (lineItems: Array<{ productId: string; supplierId: string; quantity: number }>) => {
+      if (!lineItems.length) return
+      try {
+        const result = await resolveContractPrices({ items: lineItems }).unwrap()
+        for (const resolved of result.items) {
+          if (resolved?.unitPrice == null) continue
+          dispatch(
+            updateItemResolvedPrice({
+              productId: resolved.productId,
+              currentPrice: resolved.unitPrice,
+              pricingSource: resolved.source,
+              catalogPrice: resolved.defaultPrice ?? undefined,
+              ownerEmail,
+            })
+          )
+        }
+      } catch {
+        // Order creation re-resolves server-side; cart preview is best-effort
       }
-    } catch {
-      // Order creation re-resolves server-side; cart preview is best-effort
-    }
-  }
+    },
+    [dispatch, ownerEmail, resolveContractPrices]
+  )
 
   // Re-resolve after rehydrate so stale localStorage catalog prices never win over contracts
   const didResolveCartPrices = useRef(false)
@@ -174,7 +175,7 @@ export function CartPage() {
     if (!resolveTargets.length) return
     didResolveCartPrices.current = true
     void applyResolvedPrices(resolveTargets)
-  }, [groups])
+  }, [applyResolvedPrices, groups])
 
   const handleUpdateQuantity = async (productId: string, quantity: number) => {
     updateQuantity(productId, quantity)

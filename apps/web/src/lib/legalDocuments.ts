@@ -1,12 +1,12 @@
-export const LEGAL_PACK_VERSION = '2026-06-09'
+export const LEGAL_PACK_VERSION = '2026-09-12'
 
 export const LEGAL_OPERATOR = {
   companyLegalName: 'Supplify',
   supportEmail: 'legal@supplify.com',
   privacyEmail: 'privacy@supplify.com',
   website: 'https://supplify.com',
-  effectiveDate: 'May 28, 2026',
-  lastUpdated: 'June 9, 2026',
+  effectiveDate: 'September 12, 2026',
+  lastUpdated: 'September 12, 2026',
 }
 
 export type LegalDocumentSlug =

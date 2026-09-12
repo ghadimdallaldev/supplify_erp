@@ -1,7 +1,10 @@
 import webpush from 'web-push'
+import { Expo } from 'expo-server-sdk'
 import { config } from '../config/env.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+
+const _expo = new Expo()
 
 let vapidConfigured = false
 
@@ -151,6 +154,67 @@ export async function sendPushToSubscription(subscriptionRow, payloadString) {
       message: error.message,
     })
     return { sent: false, reason: 'ERROR', statusCode }
+  }
+}
+
+/**
+ * Send Expo push notifications to all registered devices for a user.
+ * Automatically removes stale (DeviceNotRegistered) tokens.
+ */
+export async function sendExpoPushToUser(userId, { title, body, data = {}, url }) {
+  const { rows } = await query(
+    `SELECT id, endpoint, auth AS platform
+     FROM push_subscriptions
+     WHERE user_id = $1 AND endpoint LIKE 'expo:%'`,
+    [userId]
+  )
+  if (rows.length === 0) return
+
+  const messages = rows
+    .map((row) => {
+      const token = row.endpoint.replace('expo:', '')
+      if (!Expo.isExpoPushToken(token)) {
+        logger.warn({ token }, 'Invalid Expo push token, skipping')
+        return null
+      }
+      return {
+        to: token,
+        title,
+        body,
+        data: { ...data, url },
+        sound: 'default',
+        _subscriptionId: row.id,
+      }
+    })
+    .filter(Boolean)
+
+  if (messages.length === 0) return
+
+  const chunks = _expo.chunkPushNotifications(messages)
+  const tickets = []
+  for (const chunk of chunks) {
+    try {
+      const chunkTickets = await _expo.sendPushNotificationsAsync(chunk)
+      tickets.push(...chunkTickets)
+    } catch (err) {
+      logger.error({ err }, 'Expo push chunk send error')
+    }
+  }
+
+  // Handle DeviceNotRegistered errors immediately from tickets
+  const toDelete = []
+  tickets.forEach((ticket, i) => {
+    if (ticket.status === 'error') {
+      logger.warn({ ticket }, 'Expo push ticket error')
+      if (ticket.details?.error === 'DeviceNotRegistered') {
+        const sub = rows[i]
+        if (sub) toDelete.push(sub.id)
+      }
+    }
+  })
+
+  if (toDelete.length > 0) {
+    await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [toDelete])
   }
 }
 

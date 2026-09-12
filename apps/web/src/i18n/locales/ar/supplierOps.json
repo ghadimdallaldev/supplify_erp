@@ -245,15 +245,15 @@
         "completed": "الأشهر المكتملة"
       },
       "attention": {
-        "open_one": "عرض بانتظار الرد",
+        "open_one": "{{count}} عرض بانتظار الرد",
         "open_other": "{{count}} عروض بانتظار الرد",
-        "declined_one": "عرض مرفوض",
+        "declined_one": "{{count}} عرض مرفوض",
         "declined_other": "{{count}} عروض مرفوضة",
-        "expired_one": "عرض منتهي",
+        "expired_one": "{{count}} عرض منتهي",
         "expired_other": "{{count}} عروض منتهية",
-        "paymentsPending_one": "دفعة معلّقة",
+        "paymentsPending_one": "{{count}} دفعة معلّقة",
         "paymentsPending_other": "{{count}} دفعات معلّقة",
-        "paymentsFailed_one": "دفعة فاشلة",
+        "paymentsFailed_one": "{{count}} دفعة فاشلة",
         "paymentsFailed_other": "{{count}} دفعات فاشلة"
       }
     }

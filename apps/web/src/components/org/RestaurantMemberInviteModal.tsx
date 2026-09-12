@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Select, SelectTrigger } from '../ui/select'
@@ -28,8 +28,6 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [roleId, setRoleId] = useState('')
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [selectedRoleName, setSelectedRoleName] = useState('')
 
   const {
@@ -48,8 +46,6 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
       setFullName('')
       setEmail('')
       setRoleId('')
-      setInviteUrl(null)
-      setCopied(false)
       setSelectedRoleName('')
     }
   }, [open])
@@ -64,29 +60,18 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
 
   const handleGenerate = async () => {
     if (!roleId || !email.trim()) return
-    const result = await createInvitation({
+    await createInvitation({
       invited_name: fullName.trim() || undefined,
       invited_email: email.trim() || undefined,
       role_id: roleId,
     }).unwrap()
-    setInviteUrl(result.invite_url)
     setStep(2)
-    setCopied(false)
-  }
-
-  const handleCopy = async () => {
-    if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
   }
 
   const resetForAnother = () => {
     setFullName('')
     setEmail('')
-    setInviteUrl(null)
     setStep(1)
-    setCopied(false)
   }
 
   return (
@@ -175,32 +160,15 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Share invite link</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                Invitation Sent
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
-              <div className="rounded-md border border-[var(--app-border)] p-3 space-y-2">
-                <p className="text-xs text-[var(--text-muted)]">Invite link (expires in 7 days)</p>
-                <p className="text-sm break-all font-mono">{inviteUrl}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCopy().catch(() => {})}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 mr-1" /> Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4 mr-1" /> Copy Link
-                    </>
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Anyone with this link can join as {selectedRoleName || 'your selected role'}.
-                Expires in 7 days.
+              <p className="text-sm text-[var(--text-muted)]">
+                An invitation has been sent to <strong>{email}</strong>. They&apos;ll receive an
+                email with a link to join.
               </p>
               <div className="flex gap-2">
                 <Button type="button" className="flex-1" onClick={onClose}>
@@ -212,7 +180,7 @@ export function RestaurantMemberInviteModal({ open, onClose }: Props) {
                   className="flex-1"
                   onClick={resetForAnother}
                 >
-                  Invite Another Person
+                  Invite another person
                 </Button>
               </div>
             </div>

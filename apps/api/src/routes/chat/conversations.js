@@ -725,7 +725,7 @@ router.post(
 
         // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
         try {
-          const { getIO } = await import('../lib/socket.js')
+          const { getIO } = await import('../../lib/socket.js')
           const io = getIO()
           if (io) {
             io.to(`conversation_${conversationId}`).emit('new_message', {
@@ -837,7 +837,7 @@ router.patch('/conversations/:conversationId/read', requireAuth, async (req, res
 
     // Emit socket event for real-time read receipt updates
     try {
-      const { getIO } = await import('../lib/socket.js')
+      const { getIO } = await import('../../lib/socket.js')
       const io = getIO()
       if (io && updatedMessages.length > 0) {
         io.to(`conversation_${conversationId}`).emit('messages_read_update', {
@@ -949,7 +949,7 @@ router.patch('/messages/:messageId/read', requireAuth, async (req, res) => {
 
     // Emit socket event for real-time read receipt update
     try {
-      const { getIO } = await import('../lib/socket.js')
+      const { getIO } = await import('../../lib/socket.js')
       const io = getIO()
       if (io) {
         io.to(`conversation_${message.conversation_id}`).emit('message_read_update', {
