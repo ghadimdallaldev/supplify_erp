@@ -2,6 +2,244 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — Full operational mobile↔web parity pass (goal)
+
+### Verified against web sidebar + RBAC
+
+- **Driver notification settings**: More → Notification settings (root stack); prefs `PATCH` is self-service (no `SETTINGS_*`).
+- **System push bar**: Expo push not gated on VAPID; `priority: high` + Android channel `supplify-alerts`; `configurePushPresentation()` at app start; drivers get milestone pushes via linked `drivers.user_id`.
+- **Reservations / Host desk**: Host tab + board/create/waitlist under `RESERVATIONS_*`; FOH-only users land on Host.
+- **Sidebar coverage**: All restaurant/supplier/driver operational web nav items are **Native** or **Hybrid** (native hub + open-on-web for dense editors). Platform `/app/admin/*` remains web-deferred by design.
+- **Speed**: default React Query `staleTime` 60s; entitlements/prefs 5m; FlashList + 30s host-desk polling where live.
+- **Both apps**: `supplify-mobile` and `supplify-mobile-ios` typecheck clean (`npx tsc --noEmit`).
+
+### Still hybrid (deep edit on web)
+
+Recipe authoring, full loyalty rule builders, warehouse zones, team invites/payroll, bulk import, org billing profile — listed in-app with open-on-web footers.
+
+## 2026-09-12 — Supplier loyalty, customer growth, inventory (mobile)
+
+### SupplierLoyaltyScreen + CustomerGrowthScreen + SupplierInventoryScreen
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added types: `src/types/loyalty.ts`, `src/types/growth.ts`, `src/types/supplierInventory.ts`.
+- Added queries: `loyalty.ts` → `GET /api/loyalty/supplier/program`, `GET /api/loyalty/supplier/balances`; `growth.ts` → `GET /api/supplier/growth/metrics`, `GET /api/supplier/growth/customers/prospects`; `supplierInventory.ts` → `GET /api/inventory`, `PATCH /api/inventory/product/:productId` (`availableQty`).
+- Added `src/utils/supplierStockStatus.ts` (ported from web supplier stock helpers).
+- Added `canViewSupplierGrowth()` to `src/hooks/usePermissions.ts` (owners always; else `GROWTH_VIEW` | `CUSTOMERS_MANAGE`).
+- **SupplierLoyaltyScreen**: program status + earn/redeem rules summary; restaurant balances FlashList when `ORDERS_VIEW`; open-on-web footer for program edit (`/app/loyalty`).
+- **CustomerGrowthScreen**: metrics stat cards + sponsorship funnel summary; prospects FlashList; open-on-web footer for import/invite/sponsor actions.
+- **SupplierInventoryScreen**: stat cards (SKUs, low stock, out of stock); FlashList stock rows with status pills; tap-to-set quantity sheet when `INVENTORY_EDIT` | `INVENTORY_MANAGE` (simple PATCH).
+- **Gates**: `SupplierLoyalty` when `CATALOG_VIEW` (matches web `/app/loyalty` sidebar); balances query additionally requires `ORDERS_VIEW` (matches API). `CustomerGrowth` when plan feature `supplier_growth` + `canViewSupplierGrowth`. `SupplierInventory` when plan feature `inventory_management` + `INVENTORY_VIEW`.
+- **Discoverability**: More → Operations native rows **Loyalty program**, **Inventory**, **Customer growth**; removed open-on-web rows for inventory and customer growth.
+- Program edit, CSV import, prospect invite/connect/sponsor, and inventory adjustments/settings remain web-first (open-on-web footers).
+- No API contract changes.
+
+## 2026-09-12 — Recipes list, recipe costing dashboard, guest rewards (mobile)
+
+### Restaurant `RecipesScreen` + `RecipeCostingScreen`
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/types/recipes.ts` and `src/services/api/queries/recipes.ts`:
+  - `GET /api/recipes` (active list, optional search)
+  - `GET /api/recipe-costing/dashboard`
+  - `GET /api/recipe-costing/alerts`
+- **RecipesScreen**: FlashList of active recipes (name, category, calc status, cost per portion and food cost % when `RECIPES_VIEW_COSTS`); debounced search; pull-to-refresh; open-on-web footer for create/edit.
+- **RecipeCostingScreen**: stat cards (active, above target, missing cost, recently impacted); portfolio food cost when costs visible; active alerts list; top highest-cost recipes when `RECIPES_VIEW_COSTS`; link to native recipes list; open-on-web footer for price impact.
+- **Gates**: stack routes `Recipes` and `RecipeCosting` when plan feature `recipe_costing` + permission `RECIPES_VIEW` (matches web sidebar + API feature gate).
+- **Discoverability**: More → **Recipes & costing** native rows **Recipes** and **Recipe costing**; removed open-on-web **Recipes** row from Also on web.
+
+### Restaurant `ConsumerLoyaltyScreen` (guest rewards)
+
+- **Mobile implemented** in both mobile repos.
+- Extended `src/types/consumer.ts` and `src/services/api/queries/consumer.ts`:
+  - `GET /api/loyalty/consumer/program`
+  - `PUT /api/loyalty/consumer/program` (enable/disable toggle)
+- **ConsumerLoyaltyScreen**: program status stat cards; earn/redeem rules summary; fulfillment multiplier summary; enable/disable toggle when `CATALOG_EDIT` | `CATALOG_MANAGE`; read-only hint otherwise; open-on-web footer for full rule editing.
+- **Gates**: stack route `ConsumerLoyalty` when `CATALOG_VIEW` (matches web `consumer-loyalty` nav).
+- **Discoverability**: More → Guest ordering native **Guest rewards**; removed open-on-web **Guest rewards** row.
+- No API contract changes.
+
+## 2026-09-12 — Supplier warehouses + drivers lists (mobile)
+
+### SupplierWarehousesScreen + SupplierDriversScreen
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/types/supplierSettings.ts` with `SupplierWarehouse`, `SupplierDriver`, address formatting, and status/linked-user helpers.
+- Added `src/services/api/queries/warehouses.ts` → `GET /api/warehouses`.
+- Added `src/services/api/queries/drivers.ts` → `GET /api/drivers?active=false` (includes inactive drivers).
+- **SupplierWarehousesScreen**: FlashList of warehouses (name, address, default badge, active/inactive pill); pull-to-refresh; footer open-on-web rows for add/edit and zones.
+- **SupplierDriversScreen**: FlashList of drivers (name, phone, active pill, linked-user hint, warehouse name); pull-to-refresh; footer open-on-web for add/edit.
+- **Gates**: `SupplierWarehouses` when plan feature `warehouses` + `WAREHOUSES_VIEW` (matches web supplier-settings warehouses tab); `SupplierDrivers` when plan feature `driver_management` + `FULFILLMENT_VIEW` (matches drivers API/list intent).
+- **Discoverability**: More → **Supplier settings** native rows **Warehouses** and **Drivers**; removed open-on-web **Supplier settings**; **Zones & rules on web** retained (`/app/supplier-settings?tab=delivery`); team invites open-on-web now deep-links `?tab=team`.
+- Create/edit deferred to web (list + open-on-web footers) — driver user linking and warehouse zones remain web-only.
+- No API contract changes.
+
+## 2026-09-12 — Supplier contract pricing + restaurant guest ordering (mobile)
+
+### Supplier `ContractPricingScreen`
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/services/api/queries/contractPricing.ts` → `GET/POST/PATCH/DELETE /api/restaurant-pricing` (list with `status`/`q` filters, create upsert, update price, deactivate).
+- Extended `src/types/contractPricing.ts` with supplier `ContractPriceRow` types.
+- **ContractPricingScreen**: FlashList of restaurant × product contract rows; debounced search; active/all/inactive filters; tap-to-edit price modal; long-press deactivate; create modal (restaurant + product pickers + price) when `CATALOG_EDIT` or `CATALOG_MANAGE`.
+- **Gates**: stack route `ContractPricing` when `CATALOG_VIEW` (matches web sidebar); write actions inside screen require `CATALOG_EDIT` | `CATALOG_MANAGE`.
+- **Discoverability**: More → Operations **Contract pricing**; removed open-on-web **Contract pricing** row.
+
+### Restaurant guest hospitality admin
+
+- **Mobile implemented** in both mobile repos.
+- Added `src/services/api/queries/consumer.ts` and `src/types/consumer.ts`.
+- **ConsumerMenuScreen** (`GET /api/consumer/menu`, `POST/PATCH /api/consumer/menu/items`): category sections + item FlashList; stat cards; pull-to-refresh; tap edit name/price; 86 toggle via `isAvailable`; quick add item when categories exist; open-on-web footer for modifiers/QR/import.
+- **ConsumerOrdersScreen** (`GET /api/consumer/orders`, `PATCH /api/consumer/orders/:id/status`): status filter chips; order cards with lines and totals; advance status when `ORDERS_MANAGE`.
+- Added `src/utils/consumerOrder.ts` for status labels and next-status helpers.
+- **Gates**: `ConsumerMenu` when `CATALOG_VIEW`; `ConsumerOrders` when `ORDERS_VIEW` (matches web `sidebarNavConfig` hospitality add-ons).
+- **Discoverability**: More → **Guest ordering** section with native **Guest menu**, **Guest orders**, and **Guest rewards**; recipe costing under **Recipes & costing**.
+- No API contract changes — uses existing ERP consumer and restaurant-pricing routes.
+
+## 2026-09-12 — Dispute detail screens (mobile)
+
+### DisputeDetailScreen (restaurant + supplier)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Extended `src/services/api/queries/disputes.ts` with `useDispute(id)` plus mutations: `useReviewDispute`, `useResolveDispute`, `useRejectDispute`, `useCancelDispute` — wired to existing ERP routes (`GET /api/disputes/:id`, `POST .../review|resolve|reject|cancel`).
+- Expanded `src/types/disputes.ts` with detail response types and camelCase/snake_case field helpers.
+- Added shared `src/features/disputes/DisputeDetailScreen.tsx`: summary, description, line items, credit notes, replacement-order link; supplier actions when `FULFILLMENT_MANAGE`; restaurant cancel when `ORDERS_CREATE` and status `open`.
+- **Navigation**: stack route `DisputeDetail` gated on `disputes_returns` + `ORDERS_VIEW` (restaurant) or `FULFILLMENT_VIEW` (supplier); list rows in `DisputesScreen` / `IncomingDisputesScreen` navigate to detail.
+- **Notifications**: `notificationNavigation.ts` deep-links dispute alerts to `DisputeDetail` when `referenceId` or `/app/disputes/:id` URL is present.
+- No API contract changes.
+
+## 2026-09-12 — Cart preferred delivery date (mobile)
+
+### deliveryDate on checkout (parity with web CartPage)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Updated `useCreateOrder` in `src/services/api/queries/orders.ts` to accept optional `deliveryDate` (ISO `YYYY-MM-DD`) and `notes`.
+- Updated `CartScreen.tsx`: Today / Tomorrow / +2 days chips (default Tomorrow); cutoff hint matching web copy; sends `deliveryDate` on `POST /api/orders`.
+- Added `src/utils/deliveryDate.ts` helpers.
+- No API contract changes — uses existing order create schema.
+
+## 2026-09-12 — Native My Prices + Reports hub (mobile)
+
+### Restaurant contract pricing list (`MyPricesScreen`)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `useMyContractPricing` in `src/services/api/queries/restaurant.ts` → `GET /api/restaurant-pricing/my-pricing` (optional `q`, `supplierId`, `productId` filters).
+- Added `src/types/contractPricing.ts` with `MyContractPrice`, summary, and response types.
+- **MyPricesScreen**: FlashList of contract lines (supplier, product, your price vs catalog); debounced search; pull-to-refresh; stat cards for line/supplier counts.
+- **Gates**: stack route `MyPrices` when `CATALOG_VIEW` **or** `ORDERS_VIEW` (matches web sidebar intent).
+- **Discoverability**: More → Orders & sourcing **My prices**; restaurant dashboard quick action; removed open-on-web **My prices** row.
+
+### Reports hub (`ReportsScreen` — restaurant + supplier)
+
+- **Mobile implemented** in both mobile repos.
+- Added `src/services/api/queries/reports.ts` and `src/types/reports.ts`.
+- **Restaurant** (when `reports` plan feature + `ORDERS_VIEW` | `INVOICES_VIEW`): order volume, spend by supplier, top products via `/api/reports/restaurant/*`.
+- **Supplier** (when `reports` plan feature + `FULFILLMENT_VIEW` | `INVOICES_VIEW` | `CATALOG_EDIT`): revenue trend, top restaurants, order volume via `/api/reports/supplier/*`.
+- **ReportsScreen**: role-aware tabs; date chips (Last 7 / 30 days); summary StatCards; FlashList rows with text progress bars (no chart library).
+- **Navigation**: stack route `Reports` with `withFeatureGate(..., 'reports', ...)` in `RestaurantNavigator` and `SupplierNavigator`.
+- **Discoverability**: More → Finance & stock (restaurant) / Operations (supplier); dashboard quick actions; removed open-on-web **Reports** rows.
+- No API contract changes — read-only parity with existing ERP report endpoints.
+
+## 2026-09-12 — Restaurant staff members list (mobile)
+
+### StaffScreen (parity with web Staff → Team tab roster)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/types/staff.ts` with `StaffMember` and helpers (`staffDisplayName`, `staffStatusLabel`).
+- Added `useStaffMembers` in `src/services/api/queries/staff.ts` — `GET /api/staff/members`; query key `staffMembers`.
+- **StaffScreen**: FlashList of members (display name, role, status pill); pull-to-refresh; empty state; footer **Manage on web** rows for schedule and (when `STAFF_EDIT` | `STAFF_MANAGE` | `STAFF_INVITE`) invites/payroll.
+- **Navigation**: stack route `Staff` gated on `STAFF_VIEW` in `RestaurantNavigator`.
+- **Discoverability**: More → **People → Staff** native row; **Also on web → Schedule on web** retained for scheduling/payroll (`/app/staff`).
+- **Supplier**: `STAFF_*` permissions exist in supplier org roles but team management uses tenant roles / branch invitations (`/app/supplier-settings`), not `/api/staff/*` (restaurant-only API). No `Staff` stack route in `SupplierNavigator`; supplier More → **Team & invites** open-on-web row when `STAFF_VIEW`.
+- No API contract changes.
+
+## 2026-09-12 — Supplier product catalog list (mobile)
+
+### SupplierProductsScreen (parity with web `/app/products` list for suppliers)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `useSupplierProducts` in `src/services/api/queries/supplier.ts` — reuses existing `GET /api/products` with `includeStock=true`; API auto-scopes to the signed-in supplier tenant (no `supplier` query param needed).
+- Added `SupplierProductsScreen.tsx`: FlashList of products (name, SKU, price, stock badge, category); debounced search; pull-to-refresh; up to 100 rows per fetch.
+- **Capability level**: **Read-only native list** for all users with `CATALOG_VIEW` | `CATALOG_EDIT`. No in-app PATCH (API product update does not expose price/active toggles on PATCH). Users with `CATALOG_EDIT` | `CATALOG_MANAGE` get tap-to-open-web and a header **Web** shortcut for create/pricing/bulk tools; **Bulk import** remains an open-on-web row in More → Also on web.
+- **Navigation**: stack route `SupplierProducts` gated on `CATALOG_VIEW` | `CATALOG_EDIT` in `SupplierNavigator`.
+- **Discoverability**: supplier dashboard quick action and More → Operations row **Product catalog**; replaced generic open-on-web **Products** row with native navigate when permitted.
+- No API contract changes.
+
+## 2026-09-12 — Restaurant inventory adjust operations (mobile)
+
+### Inventory stock adjustments beyond read-only list
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Extended `src/services/api/queries/inventory.ts` with mutations wired to existing ERP endpoints:
+  - `POST /api/restaurant-inventory/add` — add stock (`useAddRestaurantInventory`)
+  - `POST /api/restaurant-inventory/adjust` — subtract / waste / count correction (`useAdjustRestaurantInventory`)
+  - `PATCH /api/restaurant-inventory/:productId` — set quantity or par (`usePatchRestaurantInventory`; exposed for future use)
+- Updated `src/types/inventory.ts` with adjustment/waste types and helpers (`inventoryQuantity`, `inventoryParLevel`); list query normalizes API `quantity` / `low_stock_threshold` fields.
+- **InventoryScreen**: tap item (when `INVENTORY_EDIT` or `INVENTORY_MANAGE`) opens `InventoryAdjustSheet` modal — Add stock, Remove stock (count correction), or Log waste (WASTAGE + optional `wasteCategory` and reason). Success/error toasts via `ToastProvider`; React Query invalidates inventory + expiry summary on success.
+- No API contract changes — client parity with web `InventoryTab` adjust/add flows.
+
+### ReceivingHub screen (parity with web `/app/receiving` pending tab)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `ReceivingHubScreen.tsx`: FlashList of pending receiving orders via existing `usePendingReceiving`; pull-to-refresh; tap opens `Receive` with `orderId`; empty state when queue is clear.
+- **Navigation**: stack route `ReceivingHub` gated on `RECEIVING_VIEW` | `RECEIVING_MANAGE` and `receiving_quality` feature gate; `Receive` stack screen retained for single-order confirmation.
+- **Discoverability**: restaurant dashboard quick action and More → Orders & sourcing row now open `ReceivingHub` (labeled “Receiving queue”) instead of bare `Receive`.
+- No API contract changes — uses existing `/api/receiving/pending-orders`.
+
+## 2026-09-12 — Driver milestone push to linked app user + mobile “Also on web” rows
+
+### Driver-targeted in-app / push on delivery milestones
+
+- **Change (API)**: `notifyDriverDeliveryMilestone` accepts optional `driverId`. When the driver row has `user_id`, the API sends a direct `sendNotification` to that user (`userType: SUPPLIER`) with driver-facing copy (assignment uses “Order #… was assigned to you”; other milestones reuse supplier i18n strings). `driver-fulfillment.service.js` passes `driverId` on assign and status updates.
+- **Mobile impact**: No handler changes required — existing ORDER / driver-deliveries deep links apply. Linked drivers with Expo push tokens now receive milestone alerts on assign, out-for-delivery, delivered, and failed.
+
+### Open-on-web portal rows (More tab)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/utils/webAppUrl.ts` (maps `EXPO_PUBLIC_API_URL` host → web origin: dev/preprod/prod Supplify domains; localhost → Vite `:5173`; fallback `https://app.supplifyerp.com`).
+- Added `src/features/shared/OpenOnWebRow.tsx` — opens ERP routes in the device browser.
+- **SettingsScreen**: new **Also on web** section (RBAC + plan gates) for restaurant and supplier web-only features not yet native.
+- Architecture docs updated: reservations/host desk is native; remaining dense ERP modules listed as open-on-web.
+
+## 2026-09-12 — Mobile More/settings discoverability (RBAC + plan gates)
+
+### Restaurant + supplier More menus and dashboard quick actions
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- **SettingsScreen (More tab)**: Reorganized restaurant links into Workspace / Orders & sourcing / Finance & stock / Host desk sections; supplier links into Operations + Workspace (notifications, prefs, assistant, subscription). Every stack destination is linked when the user has the matching RBAC permission **and** plan feature (mirrors `withFeatureGate` keys in navigators).
+- **Dashboards**: Restaurant and supplier home quick actions now include Assistant, Plan & features, Chat (nested tab nav), and Reservations (restaurant); feature-gated rows hide when the workspace plan lacks the feature.
+- **Performance**: Default React Query `staleTime` is 60s in `AppProviders`; notification preferences and entitlements queries use 5m `staleTime`.
+- No API contract changes — navigation wiring only.
+
+## 2026-09-12 — Restaurant reservations host desk (mobile)
+
+### Host desk for FOH / reservations staff
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `src/types/reservations.ts` with `ReservationStatus`, `Reservation`, `ReservationTable`, `ReservationWaitlist`, and `ReservationBoardResponse` (ported from ERP web types).
+- Added `src/services/api/queries/reservations.ts`: `useReservationBoard`, `useCreateReservation`, `useUpdateReservationStatus`, `useAssignReservationTables`, `useReservationWaitlist`, `usePromoteWaitlist`; query keys in `keys.ts`.
+- **Screens**: `ReservationsScreen` (Today/Tomorrow board, status actions via Alert, waitlist promote, 30s refetch) and `CreateReservationScreen` (guest + booking form).
+- **Navigation**: `Host` bottom tab (calendar icon) when `RESERVATIONS_VIEW`; FOH-only users land on Host; stack routes `Reservations` / `CreateReservation`; Settings and dashboard quick actions link to reservations.
+- **Notifications**: `RESERVATION` deep link already maps to `{ screen: 'Reservations' }` in `notificationNavigation.ts`.
+- No API contract changes — uses existing `/api/reservations/*` endpoints.
+
+## 2026-09-12 — Mobile push reliability + notification prefs self-service
+
+### Expo push no longer gated on VAPID
+
+- **Change (API)**: `sendNotification` in `in-app.js` no longer requires `isPushConfigured()` (VAPID keys) before dispatching push. Expo mobile push works when the user has `push_enabled` and the tenant has the `push_notifications` feature; web push still no-ops without VAPID.
+- **Change (API)**: `sendExpoPushToUser` now sets `priority: 'high'`, `channelId: 'supplify-alerts'`, and returns `{ sent }` so successful Expo deliveries mark `push_sent` on the notification log (same as web).
+- **Mobile impact**: No mobile code change required — improves delivery for already-registered Expo tokens on servers without VAPID configured.
+
+### Notification prefs PATCH is self-service (drivers can save)
+
+- **Change (API)**: `notificationsMutationGuard` allows any authenticated user to `PATCH /preferences` without `SETTINGS_EDIT` / `SETTINGS_MANAGE`. `POST /test` still requires `SETTINGS_MANAGE`.
+- **Mobile impact**: Drivers and other low-privilege roles can persist notification toggles from the app.
+
+### Driver notification settings nav fix (mobile)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`: Driver **More** tab exposes **Notification settings** (see entry below for Driver bottom tab navigator).
+
 ## 2026-09-12 — WebSocket real-time chat + Driver bottom tab navigator
 
 ### Task 1: WebSocket real-time chat (replaces 15-second polling)

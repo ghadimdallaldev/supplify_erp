@@ -353,15 +353,23 @@ describe('notificationsMutationGuard', () => {
     expect(next).toHaveBeenCalled()
   })
 
-  it('requires settings permission for tenant users', () => {
+  it('allows tenant users to PATCH preferences with only SETTINGS_VIEW', () => {
     const req = {
       ...mockReq('PATCH', '/preferences'),
       userData: { role: 'RESTAURANT' },
       tenantContext: { permissions: ['SETTINGS_VIEW'] },
     }
-    const r = mockResWithPerms(['SETTINGS_VIEW'])
-    notificationsMutationGuard(req, r, next)
-    expect(next).not.toHaveBeenCalled()
-    expect(r.status).toHaveBeenCalledWith(403)
+    notificationsMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows driver-like permissions to PATCH preferences', () => {
+    const req = {
+      ...mockReq('PATCH', '/preferences'),
+      userData: { role: 'RESTAURANT' },
+      tenantContext: { permissions: [P.DRIVER_DELIVERIES_VIEW] },
+    }
+    notificationsMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
   })
 })

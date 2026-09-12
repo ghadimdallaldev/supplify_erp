@@ -7,7 +7,7 @@ import { getEntitlements, isFeatureEnabled } from '../../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from '../whatsapp.service.js'
 import { emitNotificationNew } from '../../lib/socket.js'
 import { emailService } from './email.js'
-import { dispatchPushNotification, isPushConfigured } from './push.js'
+import { dispatchPushNotification } from './push.js'
 import { dispatchNotificationWebhook } from './webhook.js'
 import { fetchUserLocales, resolveLocale, DEFAULT_LOCALE } from '../../i18n/index.js'
 import {
@@ -328,7 +328,7 @@ export async function sendNotification({
         isPrefEnabled(prefs, 'whatsapp_enabled') &&
         !!contact?.phone,
       sms: false,
-      push: isPushConfigured() && isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
+      push: isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
       inApp: isPrefEnabled(prefs, 'in_app_enabled'),
       webhook: allowedChannels.has('webhook'),
     }
