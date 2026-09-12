@@ -1063,6 +1063,7 @@ export async function notifyMessageReceived(
             conversationId,
             ...(canSendEmail ? {} : { skipEmail: true, skipWhatsapp: true }),
           },
+          tenantId,
         })
       })
     )

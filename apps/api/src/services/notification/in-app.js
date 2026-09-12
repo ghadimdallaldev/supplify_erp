@@ -234,6 +234,7 @@ export async function notifyTenantUsers({
         referenceId,
         referenceType,
         metadata,
+        tenantId,
       })
       return { ok: true, row }
     } catch (error) {
@@ -292,6 +293,7 @@ export async function sendNotification({
   referenceId = null,
   referenceType = null,
   metadata = null,
+  tenantId: notificationTenantId = null,
 }) {
   try {
     const resolvedLocale = resolveLocale(locale || DEFAULT_LOCALE)
@@ -301,10 +303,10 @@ export async function sendNotification({
 
     // Tier enforcement: derive allowed channels from subscription plan
     let allowedChannels = new Set(['in_app']) // safe default
-    let tenantId = null
+    let tenantId = notificationTenantId
     let pushFeatureEnabled = false
     try {
-      tenantId = await getTenantIdForUser(userId, userType)
+      if (!tenantId) tenantId = await getTenantIdForUser(userId, userType)
       if (tenantId) {
         const entitlements = await getEntitlements(tenantId, userType)
         allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
@@ -364,7 +366,7 @@ export async function sendNotification({
         metadata ? JSON.stringify(metadata) : null,
         !!channels.email, // Convert to boolean
         !!channels.sms, // Convert to boolean
-        !!channels.push, // Convert to boolean
+        false, // Mark true only after web delivery or an Expo FCM/APNs receipt succeeds.
         !!channels.inApp, // Convert to boolean
         !!channels.whatsapp, // Convert to boolean
       ]
@@ -423,13 +425,16 @@ export async function sendNotification({
     }
 
     if (channels.push) {
-      dispatchPushNotification({
+      void dispatchPushNotification({
         userId,
         title,
         message,
         referenceId,
         referenceType,
         notificationId: notification.id,
+        notificationType,
+        notificationCategory,
+        metadata: metadataPayload,
       })
     }
 
@@ -446,10 +451,10 @@ export async function sendNotification({
     await query(
       `
       UPDATE notification_log
-      SET email_sent = $1, sms_sent = $2, push_sent = $3, whatsapp_sent = $4
-      WHERE id = $5
+      SET email_sent = $1, sms_sent = $2, whatsapp_sent = $3
+      WHERE id = $4
     `,
-      [results.email, results.sms, results.push, results.whatsapp, notification.id]
+      [results.email, results.sms, results.whatsapp, notification.id]
     )
 
     logger.info('Notification sent', {

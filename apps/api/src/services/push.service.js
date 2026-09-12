@@ -67,8 +67,11 @@ export async function savePushSubscription(userId, { endpoint, keys, userAgent }
     `
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
     VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (user_id, endpoint)
-    DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, user_agent = EXCLUDED.user_agent
+    ON CONFLICT (endpoint)
+    DO UPDATE SET user_id = EXCLUDED.user_id,
+                  p256dh = EXCLUDED.p256dh,
+                  auth = EXCLUDED.auth,
+                  user_agent = EXCLUDED.user_agent
     RETURNING *
     `,
     [userId, endpoint, keys.p256dh, keys.auth, userAgent || null]
@@ -94,16 +97,23 @@ export function isExpoPushSubscription(subscriptionRow) {
   return subscriptionRow?.endpoint?.startsWith(EXPO_ENDPOINT_PREFIX)
 }
 
+export function isValidExpoPushToken(token) {
+  return Expo.isExpoPushToken(token)
+}
+
 export async function saveExpoPushDevice(userId, { token, platform }) {
-  if (!token || !['ios', 'android'].includes(platform)) {
+  if (!isValidExpoPushToken(token) || !['ios', 'android'].includes(platform)) {
     throw new Error('Invalid expo push device payload')
   }
   const { rows } = await query(
     `
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
     VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (user_id, endpoint)
-    DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, user_agent = EXCLUDED.user_agent
+    ON CONFLICT (endpoint)
+    DO UPDATE SET user_id = EXCLUDED.user_id,
+                  p256dh = EXCLUDED.p256dh,
+                  auth = EXCLUDED.auth,
+                  user_agent = EXCLUDED.user_agent
     RETURNING *
     `,
     [userId, expoPushEndpoint(token), 'expo', platform, null]
@@ -157,70 +167,181 @@ export async function sendPushToSubscription(subscriptionRow, payloadString) {
   }
 }
 
+export function buildExpoPushMessage({ token, title, body, data = {}, url }) {
+  return {
+    to: token,
+    title,
+    body,
+    data: { ...data, url },
+    sound: 'default',
+    priority: 'high',
+    channelId: 'supplify-alerts',
+    badge: 1,
+  }
+}
+
+const EXPO_RECEIPT_RETRY_DELAYS_MS = [15_000, 60_000, 5 * 60_000]
+
+export async function reconcileExpoPushReceipts(ticketMappings) {
+  if (!ticketMappings.length) return { delivered: 0, failed: 0, pending: [] }
+
+  const receipts = {}
+  const receiptIds = ticketMappings.map((item) => item.ticketId)
+  for (const chunk of _expo.chunkPushNotificationReceiptIds(receiptIds)) {
+    try {
+      Object.assign(receipts, await _expo.getPushNotificationReceiptsAsync(chunk))
+    } catch (error) {
+      logger.error({ error }, 'Expo push receipt request failed')
+    }
+  }
+
+  const pending = []
+  const staleSubscriptionIds = new Set()
+  const deliveredNotificationIds = new Set()
+  let delivered = 0
+  let failed = 0
+
+  for (const mapping of ticketMappings) {
+    const receipt = receipts[mapping.ticketId]
+    if (!receipt) {
+      pending.push(mapping)
+      continue
+    }
+    if (receipt.status === 'ok') {
+      delivered += 1
+      if (mapping.notificationId) deliveredNotificationIds.add(mapping.notificationId)
+      continue
+    }
+
+    failed += 1
+    logger.warn(
+      {
+        receipt,
+        ticketId: mapping.ticketId,
+        subscriptionId: mapping.subscriptionId,
+      },
+      'Expo push delivery receipt error'
+    )
+    if (receipt.details?.error === 'DeviceNotRegistered') {
+      staleSubscriptionIds.add(mapping.subscriptionId)
+    }
+  }
+
+  if (staleSubscriptionIds.size > 0) {
+    await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [[...staleSubscriptionIds]])
+  }
+  if (deliveredNotificationIds.size > 0) {
+    await query('UPDATE notification_log SET push_sent = true WHERE id = ANY($1)', [
+      [...deliveredNotificationIds],
+    ])
+  }
+
+  return { delivered, failed, pending }
+}
+
+function scheduleExpoPushReceiptCheck(ticketMappings, attempt = 0) {
+  if (!ticketMappings.length) return
+  const delay = EXPO_RECEIPT_RETRY_DELAYS_MS[attempt]
+  if (delay == null) {
+    logger.warn(
+      { receiptCount: ticketMappings.length },
+      'Expo push receipts were not available after all retries'
+    )
+    return
+  }
+
+  const timer = setTimeout(() => {
+    reconcileExpoPushReceipts(ticketMappings)
+      .then((result) => {
+        if (result.pending.length) scheduleExpoPushReceiptCheck(result.pending, attempt + 1)
+      })
+      .catch((error) => logger.error({ error }, 'Expo push receipt reconciliation failed'))
+  }, delay)
+  timer.unref?.()
+}
+
 /**
  * Send Expo push notifications to all registered devices for a user.
- * Automatically removes stale (DeviceNotRegistered) tokens.
+ * Invalid and stale tokens are removed. Accepted tickets are reconciled with
+ * FCM/APNs receipts before notification_log.push_sent is marked true.
  */
-export async function sendExpoPushToUser(userId, { title, body, data = {}, url }) {
+export async function sendExpoPushToUser(
+  userId,
+  { title, body, data = {}, url, notificationId = null }
+) {
   const { rows } = await query(
     `SELECT id, endpoint, auth AS platform
      FROM push_subscriptions
      WHERE user_id = $1 AND endpoint LIKE 'expo:%'`,
     [userId]
   )
-  if (rows.length === 0) return { sent: 0 }
+  if (rows.length === 0) return { sent: 0, failed: 0, total: 0 }
 
-  const messages = rows
-    .map((row) => {
-      const token = row.endpoint.replace('expo:', '')
-      if (!Expo.isExpoPushToken(token)) {
-        logger.warn({ token }, 'Invalid Expo push token, skipping')
-        return null
-      }
-      return {
-        to: token,
-        title,
-        body,
-        data: { ...data, url },
-        sound: 'default',
-        priority: 'high',
-        channelId: 'supplify-alerts',
-        _subscriptionId: row.id,
-      }
-    })
-    .filter(Boolean)
+  const invalidSubscriptionIds = []
+  const deliveries = rows.flatMap((row) => {
+    const token = row.endpoint.replace('expo:', '')
+    if (!isValidExpoPushToken(token)) {
+      invalidSubscriptionIds.push(row.id)
+      logger.warn({ subscriptionId: row.id }, 'Invalid Expo push token removed')
+      return []
+    }
+    return [
+      {
+        subscriptionId: row.id,
+        notificationId,
+        message: buildExpoPushMessage({ token, title, body, data, url }),
+      },
+    ]
+  })
 
-  if (messages.length === 0) return { sent: 0 }
+  if (invalidSubscriptionIds.length > 0) {
+    await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [invalidSubscriptionIds])
+  }
+  if (deliveries.length === 0) {
+    return { sent: 0, failed: invalidSubscriptionIds.length, total: rows.length }
+  }
 
-  const chunks = _expo.chunkPushNotifications(messages)
-  const tickets = []
+  const chunks = _expo.chunkPushNotifications(deliveries.map((item) => item.message))
+  const ticketMappings = []
+  const immediateStaleIds = new Set()
+  let deliveryOffset = 0
+  let failed = invalidSubscriptionIds.length
+
   for (const chunk of chunks) {
     try {
       const chunkTickets = await _expo.sendPushNotificationsAsync(chunk)
-      tickets.push(...chunkTickets)
-    } catch (err) {
-      logger.error({ err }, 'Expo push chunk send error')
+      chunkTickets.forEach((ticket, index) => {
+        const delivery = deliveries[deliveryOffset + index]
+        if (!delivery) return
+
+        if (ticket.status === 'ok') {
+          ticketMappings.push({
+            ticketId: ticket.id,
+            subscriptionId: delivery.subscriptionId,
+            notificationId: delivery.notificationId,
+          })
+          return
+        }
+
+        failed += 1
+        logger.warn({ ticket, subscriptionId: delivery.subscriptionId }, 'Expo push ticket error')
+        if (ticket.details?.error === 'DeviceNotRegistered') {
+          immediateStaleIds.add(delivery.subscriptionId)
+        }
+      })
+    } catch (error) {
+      failed += chunk.length
+      logger.error({ error }, 'Expo push chunk send error')
     }
+    deliveryOffset += chunk.length
   }
 
-  // Handle DeviceNotRegistered errors immediately from tickets
-  const toDelete = []
-  tickets.forEach((ticket, i) => {
-    if (ticket.status === 'error') {
-      logger.warn({ ticket }, 'Expo push ticket error')
-      if (ticket.details?.error === 'DeviceNotRegistered') {
-        const sub = rows[i]
-        if (sub) toDelete.push(sub.id)
-      }
-    }
-  })
-
-  if (toDelete.length > 0) {
-    await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [toDelete])
+  if (immediateStaleIds.size > 0) {
+    await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [[...immediateStaleIds]])
   }
 
-  const sent = tickets.filter((ticket) => ticket.status === 'ok').length
-  return { sent }
+  scheduleExpoPushReceiptCheck(ticketMappings)
+  return { sent: ticketMappings.length, failed, total: rows.length }
 }
 
 /**
