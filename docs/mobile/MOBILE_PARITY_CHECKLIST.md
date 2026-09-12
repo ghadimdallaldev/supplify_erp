@@ -24,6 +24,13 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 
 Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS). No Expo workspace belongs inside the ERP.
 
+## 2026-09-12 - ERP/mobile end-to-end audit
+
+- [x] Platform-admin users have a mobile hub linking every admin-console destination.
+- [x] Android and iOS chat contracts are synchronized, including Socket.IO join/leave payloads.
+- [x] Driver Assistant is reachable from More and remains feature-gated.
+- [x] Product CSV parsing and CSV-only startup performance were hardened without changing the API contract.
+
 ## 2026-08-14 — Supplify Assistant
 
 - [x] API `/api/assistant` + types added; mobile client/types updated in both repos.

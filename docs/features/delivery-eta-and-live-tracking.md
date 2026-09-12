@@ -1,5 +1,9 @@
 # Delivery ETA and live tracking
 
+## Mobile map provider safety (2026-09-12)
+
+The Android and iOS active-delivery and order-tracking screens mount `react-native-maps` only when `EXPO_PUBLIC_MAP_PROVIDER` is `native` or `google`. The default `osm` configuration now renders a stable delivery summary with an **Open map** action that hands coordinates to the device maps app. This avoids native provider crashes while preserving delivery location access; ETA/API calculations are unchanged.
+
 Companion to [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md). Covers destination coordinates, ETA calculation, and tracking payload fields.
 
 ## Prerequisites for ETA

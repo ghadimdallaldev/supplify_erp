@@ -8,6 +8,7 @@ vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   return {
     query: queryMock,
+    withTransaction: vi.fn((handler) => handler({ query: queryMock })),
     pool: { query: queryMock },
     __queryMock: queryMock,
   }
@@ -214,7 +215,6 @@ describe('Chat Routes', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }],
         })
-        .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({
           rows: [
             {
@@ -230,7 +230,6 @@ describe('Chat Routes', () => {
             },
           ], // Message insert RETURNING *
         })
-        .mockResolvedValueOnce({ rows: [] }) // COMMIT
         .mockResolvedValueOnce({
           rows: [
             {

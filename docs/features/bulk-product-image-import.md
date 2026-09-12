@@ -66,6 +66,8 @@ The image-import dialog’s **URL via CSV** tab documents this path. During impo
 - Same optimization and storage metering as ZIP imports.
 - Runs inline with product row processing (not a background ZIP job).
 
+CSV previews use a lightweight parser and load the XLSX dependency only for spreadsheet uploads, keeping the common CSV path responsive while preserving quoted-field support.
+
 ## Processing flow (ZIP methods)
 
 ```mermaid

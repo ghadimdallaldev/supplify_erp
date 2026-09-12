@@ -4,6 +4,14 @@
 
 How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture, recipients, and configuration.
 
+## Mobile chat notification behavior (2026-09-12)
+
+- Authenticated mobile sessions keep one global Socket.IO notification listener active for the selected tenant. A `MESSAGE` notification invalidates both notifications and chat conversations.
+- Foreground Expo notifications also invalidate those caches; notification lists poll every 30 seconds as a fallback.
+- Restaurant and supplier Chat tabs derive an aggregate unread badge from conversation `unread_count` values. Chat lists refresh on focus and every 15 seconds, so a conversation is visible without first opening Home notifications.
+- Opening a thread calls `PATCH /api/chat/conversations/:conversationId/read`; the cached badge is cleared immediately and reconciled on the next server refresh.
+- The socket connection carries the same active-tenant token as REST requests, preventing branch/workspace mismatch after tenant switching.
+
 ## Recipients
 
 `notifyTenantUsers` in `notification.service.js` loads every `app_user` linked to the tenant via:

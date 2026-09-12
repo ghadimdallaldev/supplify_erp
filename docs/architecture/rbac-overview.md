@@ -190,6 +190,10 @@ Plan entitlements (`requireFeature`) and role permissions (`requirePermission`) 
 
 See **[ACCESS_CONTROL.md](./ACCESS_CONTROL.md)** for the full matrix (module analytics vs global `reports`, tenant resolution, and checklists for new routes).
 
+## Socket chat authorization (2026-09-12)
+
+Socket.IO chat events do not pass through Express middleware, so `join_conversation`, `send_message`, `message_read`, and `typing` repeat the critical boundary checks: the conversation must exist, its supplier/restaurant ID must match the socket's active tenant, the tenant must have the `chat` feature, and the user must have `CHAT_VIEW` or `CHAT_SEND` (with `CHAT_MANAGE` implication). Permission resolution uses tenant-role membership, so invited staff work without relying on the tenant contact email. Socket message persistence derives `sender_id` from the authenticated active tenant and applies the daily chat usage limit.
+
 ## Default assignments (migration 0043)
 
 - Users with `app_user.role = 'RESTAURANT'` and `restaurant.contact_email = app_user.email` get **RESTAURANT_OWNER** for that restaurant.

@@ -2,6 +2,25 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — Client-demo critical mobile hardening
+
+- Applied the same chat, notification, deal, contract-pricing, supplier-directory, and delivery-map fixes to both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`.
+- Chat lists now refresh on focus and every 15 seconds, join visible conversation rooms, and invalidate immediately for socket/push message notifications. Restaurant and supplier tabs show aggregate unread badges.
+- Chat sockets now send the active-tenant token, retain room subscriptions across reconnects, and use reference-counted listeners so leaving one screen cannot detach another screen's live updates.
+- Chat threads mark conversations read, preserve unsent drafts on API failure, hide order attachment actions without `ORDERS_VIEW`, and keep the composer above the keyboard (`adjustResize` on Android and keyboard avoidance on iOS).
+- Restaurants can follow/unfollow and message suppliers from the native supplier directory; suppliers can start/open chats from the native customer list. All actions retain API permission and feature gates.
+- Supplier deal creation now requires a description of what the deal is about and supports percentage, fixed-value, and free-delivery deal types with matching validation.
+- Contract-pricing create/edit sheets are safe-area aware, scrollable, and keyboard-safe. Active-delivery and order-tracking maps now avoid mounting an unsupported native provider and provide a reliable device-maps fallback.
+- No new endpoint, environment variable, feature key, or permission key was introduced.
+- Verification: both mobile TypeScript checks, both 65-test Jest suites, Android Expo production export, and iOS Expo production export passed.
+
+## 2026-09-12 - End-to-end audit hardening
+
+- API product CSV import now lazy-loads XLSX only for spreadsheet files and correctly handles quoted commas, escaped quotes, UTF-8 BOMs, multiline fields, and unterminated-quote validation.
+- Android and iOS chat clients are synchronized with the API contract for order references and Socket.IO conversation join/leave payloads; shared supplier query exports are restored on both platforms.
+- Driver More exposes the existing feature-gated Assistant route.
+- Platform-admin mobile users now have a functional hub linking all admin monitor, account, billing, growth, and tenant-portal destinations into the authenticated web console. Dense admin editors remain web-hosted.
+
 ## 2026-09-12 — Full operational mobile↔web parity pass (goal)
 
 ### Verified against web sidebar + RBAC
@@ -9,7 +28,7 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Driver notification settings**: More → Notification settings (root stack); prefs `PATCH` is self-service (no `SETTINGS_*`).
 - **System push bar**: Expo push not gated on VAPID; `priority: high` + Android channel `supplify-alerts`; `configurePushPresentation()` at app start; drivers get milestone pushes via linked `drivers.user_id`.
 - **Reservations / Host desk**: Host tab + board/create/waitlist under `RESERVATIONS_*`; FOH-only users land on Host.
-- **Sidebar coverage**: All restaurant/supplier/driver operational web nav items are **Native** or **Hybrid** (native hub + open-on-web for dense editors). Platform `/app/admin/*` remains web-deferred by design.
+- **Sidebar coverage**: All restaurant/supplier/driver operational web nav items are **Native** or **Hybrid** (native hub + open-on-web for dense editors). Platform `/app/admin/*` is reachable through the mobile admin hub and remains web-hosted for dense editors.
 - **Speed**: default React Query `staleTime` 60s; entitlements/prefs 5m; FlashList + 30s host-desk polling where live.
 - **Both apps**: `supplify-mobile` and `supplify-mobile-ios` typecheck clean (`npx tsc --noEmit`).
 

@@ -10,6 +10,10 @@ Suppliers create **deals** (stored in `promotions`) — percentage/fixed discoun
 
 > **UI labels (June 2026):** User-facing copy uses **Deals** and **Boosts**; internal API/DB names remain `promotions`, `deal_promotions`, etc. See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
 
+## Mobile creation parity (2026-09-12)
+
+Both Android and iOS supplier apps collect a required deal description ("What is this deal about?"), deal type, conditional discount value, dates, audience, areas, and boost settings. Percentage values must be greater than zero and at most 100; fixed discounts must be positive; free-delivery deals do not send a discount value. The payload uses the existing promotion API contract and permission gates.
+
 ## Terminology
 
 | Term                | Meaning                                                     |

@@ -50,6 +50,17 @@ Valid Product,SKU2,abc`
       expect(result.errorCount).toBeGreaterThan(0)
       expect(result.preview.some((p) => p.status === 'error')).toBe(true)
     })
+
+    it('parses quoted commas, escaped quotes, BOMs, and multiline fields', async () => {
+      const { parseImportFile } = await import('./product-import.service.js')
+      const csv =
+        '\uFEFFname,sku,description\n"Tomato, Roma",SKU1,"Fresh ""Roma"" tomatoes"\n"Second item",SKU2,"Line one\nLine two"'
+      const result = parseImportFile(Buffer.from(csv), 'products.csv')
+
+      expect(result.rows[0].raw.name).toBe('Tomato, Roma')
+      expect(result.rows[0].raw.description).toBe('Fresh "Roma" tomatoes')
+      expect(result.rows[1].raw.description).toBe('Line one\nLine two')
+    })
   })
 
   describe('executeProductImport', () => {

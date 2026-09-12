@@ -193,7 +193,11 @@ export async function initializeSocket(server) {
     socket.on('join_conversation', async (conversationId) => {
       try {
         if (!conversationId || typeof conversationId !== 'string') return
-        const allowed = await userCanAccessConversation(socket.data.userId, conversationId)
+        const allowed = await userCanAccessConversation(socket.data.userId, conversationId, {
+          tenantId: socket.data.tenantId,
+          role: socket.data.role,
+          requiredPermission: 'CHAT_VIEW',
+        })
         if (!allowed) {
           logger.warn('Socket join denied', { socketId: socket.id, conversationId })
           return
@@ -221,6 +225,15 @@ export async function initializeSocket(server) {
         const senderId = socket.data.userId
         if (typeof content !== 'string' || content.length > 5000) return
 
+        const allowed = await userCanAccessConversation(senderId, conversationId, {
+          tenantId: socket.data.tenantId,
+          role: socket.data.role,
+          requiredPermission: 'CHAT_SEND',
+        })
+        if (!allowed) {
+          socket.emit('chat_error', { code: 'FORBIDDEN', message: 'Chat send access denied' })
+          return
+        }
         logger.info('New message received via socket', {
           socketId: socket.id,
           conversationId,
@@ -231,13 +244,25 @@ export async function initializeSocket(server) {
         let messageId = null
         let timestamp = new Date().toISOString()
         if (conversationId && senderId && content) {
-          const persisted = await persistMessageFromSocket(conversationId, senderId, content)
-          if (persisted) {
-            messageId = persisted.id
-            timestamp = persisted.created_at
+          const persisted = await persistMessageFromSocket(conversationId, senderId, content, {
+            tenantId: socket.data.tenantId,
+            role: socket.data.role,
+          })
+          if (!persisted) {
+            socket.emit('chat_error', { code: 'SEND_FAILED', message: 'Message was not sent' })
+            return
           }
+          messageId = persisted.id
+          timestamp = persisted.created_at
+          const { notifyMessageReceived } = await import('../services/notification.service.js')
+          notifyMessageReceived({
+            conversationId,
+            senderType: socket.data.role,
+            messagePreview: content.slice(0, 100),
+          }).catch((err) =>
+            logger.warn('Socket message notification failed', { error: err.message })
+          )
         }
-
         io.to(`conversation_${conversationId}`).emit('new_message', {
           conversationId,
           content,
@@ -251,10 +276,16 @@ export async function initializeSocket(server) {
       }
     })
 
-    socket.on('message_read', (data) => {
+    socket.on('message_read', async (data) => {
       try {
         if (!data || typeof data !== 'object') return
         const { conversationId, messageId } = data
+        const allowed = await userCanAccessConversation(socket.data.userId, conversationId, {
+          tenantId: socket.data.tenantId,
+          role: socket.data.role,
+          requiredPermission: 'CHAT_VIEW',
+        })
+        if (!allowed) return
 
         io.to(`conversation_${conversationId}`).emit('message_read_update', {
           conversationId,
@@ -266,10 +297,16 @@ export async function initializeSocket(server) {
       }
     })
 
-    socket.on('typing', (data) => {
+    socket.on('typing', async (data) => {
       try {
         if (!data || typeof data !== 'object') return
         const { conversationId, isTyping } = data
+        const allowed = await userCanAccessConversation(socket.data.userId, conversationId, {
+          tenantId: socket.data.tenantId,
+          role: socket.data.role,
+          requiredPermission: 'CHAT_VIEW',
+        })
+        if (!allowed) return
 
         socket.to(`conversation_${conversationId}`).emit('user_typing', {
           conversationId,

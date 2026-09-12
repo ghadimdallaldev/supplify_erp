@@ -1,5 +1,9 @@
 # Contract Pricing Feature
 
+## Mobile sheet behavior (2026-09-12)
+
+Supplier create/edit contract-pricing sheets in both mobile apps are safe-area aware, vertically scrollable, and keyboard avoiding. Product search and selection remain usable while the keyboard is open, and save/cancel controls are reachable on small screens. API behavior and catalog permissions are unchanged.
+
 > Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
 
 End-to-end customer-specific (restaurant) contract pricing for Supplify.
