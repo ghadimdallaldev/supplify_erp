@@ -168,7 +168,7 @@ export async function sendExpoPushToUser(userId, { title, body, data = {}, url }
      WHERE user_id = $1 AND endpoint LIKE 'expo:%'`,
     [userId]
   )
-  if (rows.length === 0) return
+  if (rows.length === 0) return { sent: 0 }
 
   const messages = rows
     .map((row) => {
@@ -183,12 +183,14 @@ export async function sendExpoPushToUser(userId, { title, body, data = {}, url }
         body,
         data: { ...data, url },
         sound: 'default',
+        priority: 'high',
+        channelId: 'supplify-alerts',
         _subscriptionId: row.id,
       }
     })
     .filter(Boolean)
 
-  if (messages.length === 0) return
+  if (messages.length === 0) return { sent: 0 }
 
   const chunks = _expo.chunkPushNotifications(messages)
   const tickets = []
@@ -216,6 +218,9 @@ export async function sendExpoPushToUser(userId, { title, body, data = {}, url }
   if (toDelete.length > 0) {
     await query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [toDelete])
   }
+
+  const sent = tickets.filter((ticket) => ticket.status === 'ok').length
+  return { sent }
 }
 
 /**
