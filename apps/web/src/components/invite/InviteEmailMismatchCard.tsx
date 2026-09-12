@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../ui/button'
 import { redirectToLogoutForInvite } from '../../lib/invite-session'
 
@@ -8,29 +9,33 @@ type Props = {
 }
 
 export function InviteEmailMismatchCard({ invitedEmail, sessionEmail, invitePath }: Props) {
+  const navigate = useNavigate()
+
   return (
     <div className="space-y-4">
+      <div className="space-y-1 text-sm text-[var(--text-muted)]">
+        <p>
+          You&apos;re signed in as: <strong>{sessionEmail}</strong>
+        </p>
+        <p>
+          This invitation is for: <strong>{invitedEmail}</strong>
+        </p>
+      </div>
       <p className="text-sm text-[var(--text-muted)]">
-        This invitation is tied to <strong>{invitedEmail}</strong>. You&apos;re signed in as{' '}
-        <strong>{sessionEmail}</strong>, so you can&apos;t accept it from this account.
+        To accept this invitation, you need to sign out of your current account first.
       </p>
-      <p className="text-sm text-[var(--text-muted)]">
-        You don&apos;t need an existing account for <strong>{invitedEmail}</strong>. Sign out of{' '}
-        {sessionEmail} first — you&apos;ll return to this invite link and choose a password there
-        (full name, email, password). That creates your user and accepts the invite in one step.
-      </p>
-      <p className="text-xs text-[var(--text-muted)]">
-        Only use the normal Sign in page if you already registered {invitedEmail} before. If this
-        invite should go to {sessionEmail} instead, ask your admin to send a new invitation to that
-        address.
-      </p>
-      <Button
-        type="button"
-        className="w-full"
-        onClick={() => redirectToLogoutForInvite(invitePath)}
-      >
-        Sign out — then create account as {invitedEmail}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={() => redirectToLogoutForInvite(invitePath)}
+        >
+          Sign out and continue
+        </Button>
+        <Button type="button" variant="outline" className="flex-1" onClick={() => navigate('/app')}>
+          Cancel
+        </Button>
+      </div>
     </div>
   )
 }

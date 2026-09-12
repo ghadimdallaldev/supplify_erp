@@ -2,6 +2,70 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — WebSocket real-time chat + Driver bottom tab navigator
+
+### Task 1: WebSocket real-time chat (replaces 15-second polling)
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Added `socket.io-client@^4.8.3` to `dependencies` in both mobile `package.json` files.
+- Created `src/services/chatSocket.ts` in both repos: singleton Socket.IO client that authenticates via `Cookie: access_token=<token>; refresh_token=<token>` in the handshake `extraHeaders`, matching the server's `resolveSocketUserFromCookieHeader` middleware.
+- `ChatThreadScreen.tsx`: added socket `useEffect` that joins the conversation room (`join_conversation` event), listens for `new_message` and invalidates the `['chat', 'messages', conversationId]` query. Polling interval reduced from 15 s to 60 s (socket handles real-time; polling is fallback).
+- `ChatListScreen.tsx`: added socket listener on `new_message` to invalidate `['chat', 'conversations']` so the list stays fresh when any conversation receives a message.
+
+### Task 2: Driver App bottom tab navigator with logout
+
+- **Mobile implemented** in both `supplify-mobile` and `supplify-mobile-ios`.
+- Created `src/features/driver/screens/DriverMoreScreen.tsx`: displays driver name/tenant/role, "Notification settings" row (navigates to `NotificationPreferences`), and "Sign out" button. Mirrors `SettingsScreen` styling exactly.
+- Rewrote `src/navigation/DriverNavigator.tsx`: top-level `createBottomTabNavigator` with three tabs — **Deliveries** (nested `NativeStackNavigator` containing DriverHome, DriverStop, DeliveryProof, ProblemReport, DriverRunSheet, Assistant, NotificationPreferences), **Run Sheet** (DriverRunSheetScreen), and **More** (DriverMoreScreen). Icons: `car-outline`, `document-text-outline`, `person-circle-outline`. Added `DriverTabParamList`. `DriverStackParamList` retains `DriverRunSheet` for backward compatibility with existing `DriverHomeScreen` navigate calls.
+
+## 2026-09-12 — Web-only UX and legal changes (no mobile impact)
+
+### Task 1: Chat in SupplierMobileNav
+
+- Added Chat (`/app/chat`, `CHAT_VIEW`) to `SupplierMobileNav.tsx`, positioned between Orders and Growth.
+- **Mobile skipped**: This is the web responsive mobile-nav bar, not the native Expo app navigation. Native apps manage their own tab bars independently.
+
+### Task 2: Socket.IO WebSocket-first transport
+
+- Changed `transports` order in `apps/web/src/lib/socketOptions.ts` from `['polling', 'websocket']` to `['websocket', 'polling']`.
+- **Mobile skipped**: Web-only client configuration. Mobile uses Expo push notifications and its own socket client, unaffected.
+
+### Task 3: Remove full cache invalidation on new_message
+
+- Removed `api.util.invalidateTags(['Chat'])` from the `new_message` handler in `useChatRealtime.ts`. The direct cache upsert is kept.
+- **Mobile skipped**: Web-only RTK Query optimization. Mobile has its own state management.
+
+### Task 4: Invite modals — email-sent confirmation
+
+- `RestaurantMemberInviteModal.tsx` and `BranchInviteModal.tsx` step 2 now shows an email-sent confirmation ("Invitation Sent" with CheckCircle2, email address, Done / Invite another person buttons) instead of displaying the invite link with a copy button.
+- **Mobile skipped**: Web-only modal UI change. No API contract change; the invitation creation endpoint is unchanged.
+
+### Task 5: InviteEmailMismatchCard — user-initiated logout
+
+- `InviteEmailMismatchCard.tsx` now shows a structured mismatch screen ("You're signed in as / This invitation is for") with explicit "Sign out and continue" and "Cancel" buttons instead of a single auto-described button.
+- No auto-redirect on mount was present; this is purely a copy/UX improvement.
+- **Mobile skipped**: Web-only invite accept flow. Mobile has its own auth handling.
+
+### Task 6: Legal document updates
+
+- Effective date updated to September 12, 2026 in all four legal docs and `LEGAL_PACK_VERSION` bumped to `2026-09-12`.
+- Added real-time messaging, GPS/driver tracking, push notification, Expo platform, and data-rights clauses to TERMS, PRIVACY_POLICY, MOBILE_APP_TERMS, and DATA_PROCESSING_ADDENDUM.
+- **Mobile skipped**: Legal markdown files are served from the web app. The `LEGAL_PACK_VERSION` string is used in web legal acceptance payloads only; mobile legal acceptance version is managed separately in each mobile repo.
+
+## 2026-09-12 — Expo push delivery implemented; chat email throttling added
+
+### Expo push notification sending (Task 1)
+
+- **Change**: `apps/api/src/services/push.service.js` now actually sends Expo push notifications. `sendExpoPushToUser` iterates over all `expo:*` rows in `push_subscriptions` for a user and fires them via `expo-server-sdk`. Stale `DeviceNotRegistered` tokens are deleted immediately on receipt of a failing ticket.
+- `apps/api/src/services/notification/push.js` `dispatchPushNotification` now calls both `sendWebPushToUser` (browser) and `sendExpoPushToUser` (mobile) fire-and-forget in parallel.
+- **Mobile impact**: The mobile apps already register tokens and already handle push payloads — no mobile code change needed. This change makes the server start acting on registrations that were previously silently ignored.
+- **`expo-server-sdk@^3.7.0`** added to `apps/api/package.json` dependencies.
+
+### Chat email throttling (Task 2)
+
+- **Change**: `notifyMessageReceived` in `apps/api/src/services/notification/templates.js` now fans out per-user instead of calling `notifyTenantUsers`. For each recipient: (a) if the user has an active Socket.IO connection (`user_<id>` room has size > 0), email and WhatsApp are suppressed; (b) if offline, a Redis `SET NX EX 7200` atomic check enforces a 2-hour email rate-limit per user (`chat_email_throttle:<userId>`). Push and in-app notifications are always delivered.
+- **Mobile impact**: None — this is a server-side email delivery optimization. Mobile already receives push notifications through the push dispatch path; no payload or contract change.
+
 ## 2026-09-12 — Mobile EAS profiles: distinct development / preprod / production
 
 - **Change**: Both `supplify-mobile` and `supplify-mobile-ios` `eas.json` now bake three hosted backends — `development` → `api-dev` / `keycloak-dev` / realm `Supplify`; `preprod` → preprod hosts; `production` → prod hosts. Previously `development` incorrectly pointed at preprod.

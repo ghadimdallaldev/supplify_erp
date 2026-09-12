@@ -1,7 +1,7 @@
 # Supplify Mobile App Terms
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]
+**Effective Date:** September 12, 2026  
+**Last Updated:** September 12, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 
@@ -36,6 +36,8 @@ You may manage permissions through your device settings. Some features may not w
 
 Push notifications may relate to orders, deliveries, routes, reservations, waitlists, invoices, disputes, messages, billing, security, and account activity. Delivery is not guaranteed.
 
+The app requests permission to send push notifications for order updates, messages, and delivery status changes. You may disable push notifications in your device settings at any time.
+
 ## 6. Driver and Staff Use
 
 Drivers and staff may have restricted mobile views. Drivers may see assigned deliveries, routes, restaurant information needed for delivery, status buttons, proof-of-delivery tools, and notes.
@@ -45,6 +47,8 @@ Drivers must not share devices or accounts and must update statuses truthfully.
 ## 7. Location Features
 
 If location tracking is introduced, Supplify will provide additional disclosures. Location may be used for delivery tracking, proof of delivery, ETA, route planning, and operational safety. Users may be required to consent where applicable.
+
+The Supplify driver app requests background location permission to track delivery progress when the driver is marked active. If you are not a driver, the app does not use background location.
 
 ## 8. Camera and Uploads
 
@@ -62,6 +66,10 @@ Supplify may require app updates for security, compatibility, or feature access.
 
 Users are responsible for securing devices used to access Supplify. Businesses should remove access from lost devices or former employees.
 
-## 12. Limitations
+## 12. Expo Platform
+
+Our mobile apps are built on Expo (by Expo, Inc.) and use Expo's push notification gateway to deliver notifications to your device.
+
+## 13. Limitations
 
 Supplify is not responsible for device failures, app store outages, operating system issues, push notification failures, network outages, or user device misconfiguration.

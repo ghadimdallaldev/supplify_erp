@@ -1,7 +1,7 @@
 # Supplify Privacy Policy
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]  
+**Effective Date:** September 12, 2026  
+**Last Updated:** September 12, 2026  
 **Operator:** [Company Legal Name]  
 **Contact:** [Privacy Email]
 
@@ -62,7 +62,15 @@ We may collect the following categories of data:
 - Delivery statuses
 - Notes and proof of delivery
 - Timestamps
-- Location data if enabled in the future
+- GPS location data during active delivery sessions
+
+### Location data
+
+We collect GPS location data from drivers during active delivery sessions (when the driver is marked as on duty). This data is used for delivery tracking and route optimization and is not used for any other purpose. Location tracking stops when the delivery session ends.
+
+### Push notification tokens
+
+When you enable push notifications on the mobile app or web browser, we store a device-specific push token to deliver notifications to your device. You may revoke this permission at any time in your device or app settings.
 
 ### Communication data
 
@@ -71,6 +79,10 @@ We may collect the following categories of data:
 - Email/WhatsApp/SMS/push notification metadata
 - Support messages
 - Reminder drafts
+
+### Chat messages
+
+In-app chat messages between restaurants and suppliers are stored on our servers. Messages are retained for 12 months from the date sent.
 
 ### Technical and usage data
 
@@ -173,6 +185,8 @@ No system is completely secure. Tenants are responsible for managing users, pass
 ## 14. User and Tenant Rights
 
 Subject to applicable law, users or tenants may request access, correction, deletion, export, or restriction of certain data. Some requests may need to be made through the tenant owner or may be limited due to legal, security, billing, audit, or technical reasons.
+
+Users may request deletion of their chat history, location history, or push tokens at any time by contacting privacy@supplify.com.
 
 ## 15. International Transfers
 

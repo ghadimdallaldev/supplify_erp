@@ -73,8 +73,6 @@ export function useChatRealtime({
     const handleNewMessage = (data: NewMessagePayload) => {
       if (!data?.conversationId) return
 
-      dispatch(api.util.invalidateTags(['Chat']))
-
       const active = selectedRef.current
       if (active !== data.conversationId) return
 
