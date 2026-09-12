@@ -53,40 +53,37 @@ export async function listRestaurantDeliveryLocations(restaurantId) {
   }
 }
 
-function parseDeliveryLocationInput(body) {
-  const hasLat = Object.prototype.hasOwnProperty.call(body, 'deliveryLatitude')
-  const hasLng = Object.prototype.hasOwnProperty.call(body, 'deliveryLongitude')
-  const hasLegacyLat = Object.prototype.hasOwnProperty.call(body, 'delivery_latitude')
-  const hasLegacyLng = Object.prototype.hasOwnProperty.call(body, 'delivery_longitude')
+/**
+ * First defined alias wins. Accepts camelCase (web), snake_case (legacy web),
+ * and the bare `latitude`/`label`/`addressNotes` shape shipped by mobile clients.
+ */
+function pickAlias(body, aliases) {
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(body, alias) && body[alias] !== undefined) {
+      return body[alias]
+    }
+  }
+  return undefined
+}
 
-  const latitude = hasLat
-    ? body.deliveryLatitude
-    : hasLegacyLat
-      ? body.delivery_latitude
-      : undefined
-  const longitude = hasLng
-    ? body.deliveryLongitude
-    : hasLegacyLng
-      ? body.delivery_longitude
-      : undefined
+function parseDeliveryLocationInput(body) {
+  const source = body && typeof body === 'object' ? body : {}
+
+  const latitude = pickAlias(source, ['deliveryLatitude', 'delivery_latitude', 'latitude'])
+  const longitude = pickAlias(source, ['deliveryLongitude', 'delivery_longitude', 'longitude'])
 
   const coords =
     latitude !== undefined || longitude !== undefined
       ? validateDeliveryCoordinates(latitude ?? null, longitude ?? null)
       : null
 
-  const label =
-    body.deliveryLocationLabel !== undefined
-      ? body.deliveryLocationLabel
-      : body.delivery_location_label !== undefined
-        ? body.delivery_location_label
-        : undefined
-  const notes =
-    body.deliveryAddressNotes !== undefined
-      ? body.deliveryAddressNotes
-      : body.delivery_address_notes !== undefined
-        ? body.delivery_address_notes
-        : undefined
+  const label = pickAlias(source, ['deliveryLocationLabel', 'delivery_location_label', 'label'])
+  const notes = pickAlias(source, [
+    'deliveryAddressNotes',
+    'delivery_address_notes',
+    'addressNotes',
+    'address_notes',
+  ])
 
   if (coords == null && label === undefined && notes === undefined) {
     throw new ValidationError('No delivery location fields to update')

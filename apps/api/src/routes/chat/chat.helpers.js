@@ -12,22 +12,33 @@ export const createConversationSupplierSchema = z.object({
   restaurantId: z.string().uuid(),
 })
 
-export const sendMessageSchema = z.object({
-  content: z.string().min(1),
-  messageType: z.enum(['TEXT', 'SYSTEM', 'ORDER_REFERENCE']).default('TEXT'),
-  orderId: z.string().uuid().optional(),
-  replyTo: z.string().uuid().optional(),
-  attachments: z
-    .array(
-      z.object({
-        fileUrl: z.string().url(),
-        fileType: z.string(),
-        fileName: z.string(),
-        fileSize: z.number().optional(),
-      })
-    )
-    .optional(),
-})
+export const sendMessageSchema = z.preprocess(
+  (value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const input = value
+      if (!input.content && typeof input.body === 'string') {
+        return { ...input, content: input.body }
+      }
+    }
+    return value
+  },
+  z.object({
+    content: z.string().min(1),
+    messageType: z.enum(['TEXT', 'SYSTEM', 'ORDER_REFERENCE']).default('TEXT'),
+    orderId: z.string().uuid().optional(),
+    replyTo: z.string().uuid().optional(),
+    attachments: z
+      .array(
+        z.object({
+          fileUrl: z.string().url(),
+          fileType: z.string(),
+          fileName: z.string(),
+          fileSize: z.number().optional(),
+        })
+      )
+      .optional(),
+  })
+)
 
 export const quickReplySchema = z.object({
   title: z.string().min(1),

@@ -2,6 +2,28 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-12 — Mobile EAS profiles: distinct development / preprod / production
+
+- **Change**: Both `supplify-mobile` and `supplify-mobile-ios` `eas.json` now bake three hosted backends — `development` → `api-dev` / `keycloak-dev` / realm `Supplify`; `preprod` → preprod hosts; `production` → prod hosts. Previously `development` incorrectly pointed at preprod.
+- **Git**: iOS repo gains `preprod` and `prod` branches (same promote path as Android + ERP).
+- **Docs**: `KEYCLOAK_MOBILE_CLIENT.md` table updated.
+
+## 2026-09-12 — Restaurant delivery location unsavable on mobile (both apps)
+
+- **Symptom**: Saving the restaurant delivery pin from the mobile app always failed with `No delivery location fields to update`, and the form rendered blank even when a pin was already stored.
+- **Root cause (mobile)**: `DeliveryLocationScreen` / `useUpdateDeliveryLocation` sent `{ latitude, longitude, label, addressNotes }`, but `PATCH /api/restaurants/me/delivery-location` reads `deliveryLatitude` / `deliveryLongitude` / `deliveryLocationLabel` / `deliveryAddressNotes`. No key matched, so `parseDeliveryLocationInput` rejected every request. Separately, `useDeliveryLocations` typed the response as `{ locations: [...] }` with an `isPrimary` flag, but the API returns `{ restaurant, branches }` with `delivery*` field names — so hydration silently read `undefined` and the form never populated. Web was unaffected because it already used the camelCase contract.
+- **Fix (mobile, both repos)**: `DeliveryLocation` retyped to mirror `mapDeliveryLocationRow()`; added `DeliveryLocationsResponse` and `DeliveryLocationUpdate`; the screen now hydrates from `data.restaurant` and sends the `delivery*` keys. Added `useUpdateBranchDeliveryLocation` for the existing branch endpoint (not yet surfaced in the UI).
+- **Fix (API, backward compatibility)**: `parseDeliveryLocationInput` now resolves each field through an alias list — camelCase, snake_case, and the bare `latitude` / `longitude` / `label` / `addressNotes` shape — so **already-installed EAS builds start saving without a rebuild**. First defined alias wins; explicit `null` still clears coordinates. Covered by `apps/api/src/services/restaurant-delivery-location.service.test.js` (12 tests).
+- **Live tracking audit**: Driver GPS ingest (`POST /api/orders/:id/location`), tracking read (`GET /api/orders/:id/tracking`), `buildTrackingPayload` → `DeliveryTrackingInfo`, and the restaurant/supplier tracking responses were checked field-by-field against both mobile type definitions — these already match; no change needed.
+- **Deploy**: API to dev / preprod / prod. Mobile picks up the corrected contract on the next EAS build or Expo update; the API aliases cover builds already in the field.
+
+## 2026-09-12 — Chat messages invisible on mobile (web→app)
+
+- **Root cause (API)**: `apps/api/src/routes/chat/conversations.js` imported socket from `../lib/socket.js` (missing). Realtime `new_message` / read-receipt emits failed on every send (`Cannot find module .../routes/lib/socket.js`). Fixed to `../../lib/socket.js`.
+- **Root cause (mobile)**: API returns message `content` and conversation `last_message_preview`; mobile UI read `body` / `last_message`, so threads looked empty even after refresh while in-app notifications still worked. Both Android and iOS now normalize API shapes; send uses `{ content }` (API also accepts `body` alias).
+- **Deploy**: Ship API to **dev / preprod / prod**. Mobile needs a new EAS build (or Expo update if JS-only) to pick up the field mapping.
+- **Note**: Push channel for chat was `push:false` in preprod logs (in-app only) — separate from this display bug.
+
 ## 2026-09-12 — Preprod incident hardening applied to prod
 
 Issues found on preprod and verified/fixed on **production** so they do not recur:

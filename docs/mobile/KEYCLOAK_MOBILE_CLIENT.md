@@ -41,8 +41,11 @@ Hosted backends (EAS builds):
 
 | Build profile         | `EXPO_PUBLIC_API_URL`                 | `EXPO_PUBLIC_KEYCLOAK_URL`                 | Realm              |
 | --------------------- | ------------------------------------- | ------------------------------------------ | ------------------ |
+| `development`         | `https://api-dev.supplifyerp.com`     | `https://keycloak-dev.supplifyerp.com`     | `Supplify`         |
 | `preprod` / `preview` | `https://api-preprod.supplifyerp.com` | `https://keycloak-preprod.supplifyerp.com` | `supplify-preprod` |
 | `production`          | `https://api.supplifyerp.com`         | `https://keycloak.supplifyerp.com`         | `supplify-prod`    |
+
+Both Android (`supplify-mobile`) and iOS (`supplify-mobile-ios`) bake these three profiles in `eas.json`. Git branches mirror the same environments (`dev` → `preprod` → `prod`).
 
 Both standalone mobile repositories default local Keycloak to `http://localhost:8180`, matching the ERP development stack. Their committed `.env.example` files carry the same value. Use a reachable LAN address or hosted URL for a physical device.
 

@@ -190,6 +190,11 @@ All nullable — orders and tracking continue to work when unset.
 
 When a tenant has multiple operational branches, each branch can be edited separately.
 
+**Mobile** (`DeliveryLocationScreen`, both Android and iOS, gated on `SETTINGS_VIEW` /
+`SETTINGS_EDIT` / `SETTINGS_MANAGE`) edits the **restaurant-level** pin only, with a
+"Use my current location" action backed by `expo-location`. Branch pins remain web-only;
+the mobile `useUpdateBranchDeliveryLocation` hook exists but is not yet surfaced in the UI.
+
 ### APIs
 
 | Method | Path                                                    | Access                                                               |
@@ -199,11 +204,26 @@ When a tenant has multiple operational branches, each branch can be edited separ
 | PATCH  | `/api/restaurants/branches/:branchId/delivery-location` | Restaurant admin — operational branch                                |
 | PATCH  | `/api/restaurant-org/branches/:restaurantId`            | Org owner / regional manager — also accepts delivery location fields |
 
+Request body — each field is resolved through an alias list, first defined alias wins:
+
+| Field     | Accepted keys (in priority order)                                                 |
+| --------- | --------------------------------------------------------------------------------- |
+| Latitude  | `deliveryLatitude`, `delivery_latitude`, `latitude`                               |
+| Longitude | `deliveryLongitude`, `delivery_longitude`, `longitude`                            |
+| Label     | `deliveryLocationLabel`, `delivery_location_label`, `label`                       |
+| Notes     | `deliveryAddressNotes`, `delivery_address_notes`, `addressNotes`, `address_notes` |
+
+`deliveryLatitude` / `deliveryLongitude` is the canonical contract used by web and the
+mobile apps. The bare `latitude` / `label` aliases exist so mobile builds already installed
+in the field keep working; new clients should send the canonical keys.
+
 Validation:
 
 - Latitude ∈ [-90, 90], longitude ∈ [-180, 180]
 - Both null clears the location
 - Partial lat/lng rejected
+- A body with no recognised field is rejected with `No delivery location fields to update`
+- An empty-string label or notes value is stored as `NULL`
 
 Suppliers read destination coordinates only through **`GET /api/orders/:id/tracking`** for orders they fulfill (not full restaurant profile).
 
