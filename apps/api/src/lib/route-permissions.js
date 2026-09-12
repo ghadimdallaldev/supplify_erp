@@ -214,10 +214,7 @@ export function notificationsMutationGuard(req, res, next) {
   const method = req.method.toUpperCase()
   const path = req.path || ''
   if (method === 'PATCH' && path === '/preferences') {
-    if (req.userData?.role === 'ADMIN' && !req.tenantContext?.tenantId) {
-      return next()
-    }
-    return requireAnyPermission(P.SETTINGS_EDIT, P.SETTINGS_MANAGE)(req, res, next)
+    return next()
   }
   if (method === 'POST' && path === '/test') {
     return requirePermission(P.SETTINGS_MANAGE)(req, res, next)
