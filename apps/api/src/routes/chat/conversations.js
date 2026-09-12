@@ -9,7 +9,7 @@ import {
   getSupplierIdForRequest,
 } from '../../lib/rbac.js'
 import { chatSendGuard } from '../../lib/route-permissions.js'
-import { query } from '../../lib/db.js'
+import { query, withTransaction } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import {
@@ -631,12 +631,9 @@ router.post(
         }
       }
 
-      // Start transaction
-      await query('BEGIN')
-
-      try {
+      const message = await withTransaction(async (client) => {
         // Create message
-        const { rows: messages } = await query(
+        const { rows: messages } = await client.query(
           `
         INSERT INTO message (
           conversation_id, sender_type, sender_id, content, message_type, order_id, reply_to
@@ -675,23 +672,24 @@ router.post(
             )
             ap += 5
           }
-          await query(
+          await client.query(
             `INSERT INTO message_attachment (message_id, file_url, file_type, file_name, file_size) VALUES ${attVals.join(', ')}`,
             attParams
           )
         }
 
-        await query('COMMIT')
+        return message
+      })
 
-        notifyMessageReceived({
-          conversationId,
-          senderType: req.userData.role,
-          messagePreview: messageData.content?.slice(0, 100) || '',
-        }).catch((err) => logger.warn('Message received notification failed', { err: err.message }))
+      notifyMessageReceived({
+        conversationId,
+        senderType: req.userData.role,
+        messagePreview: messageData.content?.slice(0, 100) || '',
+      }).catch((err) => logger.warn('Message received notification failed', { err: err.message }))
 
-        // Fetch message with attachments
-        const { rows: fullMessages } = await query(
-          `
+      // Fetch message with attachments
+      const { rows: fullMessages } = await query(
+        `
         SELECT 
           m.*,
           rm.content as reply_to_content,
@@ -714,52 +712,48 @@ router.post(
         WHERE m.id = $1
         GROUP BY m.id, rm.content, rm.sender_type
       `,
-          [message.id]
-        )
+        [message.id]
+      )
 
-        logger.info('Message sent', {
-          messageId: message.id,
-          conversationId,
-          actor: req.userData.id,
-        })
+      logger.info('Message sent', {
+        messageId: message.id,
+        conversationId,
+        actor: req.userData.id,
+      })
 
-        // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
-        try {
-          const { getIO } = await import('../../lib/socket.js')
-          const io = getIO()
-          if (io) {
-            io.to(`conversation_${conversationId}`).emit('new_message', {
-              conversationId,
-              messageId: message.id,
-              senderId: senderId,
-              senderType,
-              content: messageData.content,
-              timestamp: new Date().toISOString(),
-            })
-          }
-        } catch (socketError) {
-          logger.warn('Failed to emit new_message after send:', socketError)
+      // Notify all clients in the conversation so they refetch messages (ensures persistence is visible)
+      try {
+        const { getIO } = await import('../../lib/socket.js')
+        const io = getIO()
+        if (io) {
+          io.to(`conversation_${conversationId}`).emit('new_message', {
+            conversationId,
+            messageId: message.id,
+            senderId: senderId,
+            senderType,
+            content: messageData.content,
+            timestamp: new Date().toISOString(),
+          })
         }
-
-        // Include warning in response if applicable
-        const responseData = { message: fullMessages[0] }
-        if (req.chatWarning) {
-          responseData.warning = {
-            message: `You've used ${req.chatWarningPercent.toFixed(0)}% of your daily chat limit. Consider upgrading your plan.`,
-            usagePercent: req.chatWarningPercent,
-          }
-        }
-
-        res.status(201).json({
-          ok: true,
-          data: responseData,
-          error: null,
-          requestId: req.requestId,
-        })
-      } catch (error) {
-        await query('ROLLBACK')
-        throw error
+      } catch (socketError) {
+        logger.warn('Failed to emit new_message after send:', socketError)
       }
+
+      // Include warning in response if applicable
+      const responseData = { message: fullMessages[0] }
+      if (req.chatWarning) {
+        responseData.warning = {
+          message: `You've used ${req.chatWarningPercent.toFixed(0)}% of your daily chat limit. Consider upgrading your plan.`,
+          usagePercent: req.chatWarningPercent,
+        }
+      }
+
+      res.status(201).json({
+        ok: true,
+        data: responseData,
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -781,7 +775,6 @@ router.post(
         error: {
           name: 'INTERNAL_ERROR',
           message: 'Failed to send message',
-          details: error.message,
         },
         requestId: req.requestId,
       })

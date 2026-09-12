@@ -1,5 +1,5 @@
 import path from 'node:path'
-import * as XLSX from 'xlsx'
+import { createRequire } from 'node:module'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { checkLimit } from '../lib/subscription.js'
@@ -8,6 +8,13 @@ import { logger } from '../lib/logger.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { importImageFromUrl, assertSafeImageUrl } from './product-image-import.service.js'
+
+const require = createRequire(import.meta.url)
+let xlsxModule
+
+function getXlsx() {
+  return (xlsxModule ??= require('xlsx'))
+}
 
 export const XLSX_MAX_BUFFER_BYTES = MAX_UPLOAD_BYTES
 export const XLSX_MAX_SHEETS = 1
@@ -60,15 +67,55 @@ function cellToString(value) {
 }
 
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim())
-  if (lines.length < 2) {
+  const source = String(text || '').replace(/^\uFEFF/, '')
+  const records = []
+  let record = []
+  let field = ''
+  let inQuotes = false
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (source[i + 1] === '"') {
+          field += '"'
+          i += 1
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += char
+      }
+      continue
+    }
+
+    if (char === '"' && field === '') {
+      inQuotes = true
+    } else if (char === ',') {
+      record.push(field.trim())
+      field = ''
+    } else if (char === '\n') {
+      record.push(field.trim())
+      if (record.some((value) => value !== '')) records.push(record)
+      record = []
+      field = ''
+    } else if (char !== '\r') {
+      field += char
+    }
+  }
+
+  if (inQuotes) throw new ValidationError('CSV contains an unterminated quoted field')
+  record.push(field.trim())
+  if (record.some((value) => value !== '')) records.push(record)
+
+  if (records.length < 2) {
     throw new ValidationError('CSV must include a header row and at least one data row')
   }
-  const headers = lines[0].split(',').map((h) => h.trim())
-  const rows = lines.slice(1).map((line, index) => {
-    const values = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''))
-    return { rowNumber: index + 2, raw: mapRow(headers, values) }
-  })
+  const headers = records[0]
+  const rows = records.slice(1).map((values, index) => ({
+    rowNumber: index + 2,
+    raw: mapRow(headers, values),
+  }))
   return { headers, rows }
 }
 
@@ -94,6 +141,7 @@ function assertNoFormulasInWorkbook(workbook) {
 }
 
 function parseXlsxBuffer(buffer) {
+  const XLSX = getXlsx()
   if (buffer.length > XLSX_MAX_BUFFER_BYTES) {
     throw new ValidationError(`Spreadsheet exceeds maximum size of ${XLSX_MAX_BUFFER_BYTES} bytes`)
   }
