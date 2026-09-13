@@ -12,6 +12,18 @@ This guide covers everything admins need to manage Supplify effectively, includi
 
 Navigate to `/app/admin` (visible only to users with ADMIN role).
 
+### Navigating the console
+
+The admin console has its own shell (see `docs/ui/ADMIN_SHELL_REVAMP.md`):
+
+- **Sidebar** — workspace switcher (Platform / Suppliers / Restaurants / Settings) on top, grouped
+  sections below (Monitor, Accounts, Billing, Growth). On desktop the footer button collapses it to
+  an icon rail; the choice is remembered per browser. On phones it is a drawer (Escape closes).
+- **Top bar** — breadcrumb and section title, `⌘K` search, a light/dark theme toggle (saved to your
+  admin preferences), and your account menu with `Account settings` and `Sign out`.
+- Sections are URL-addressable: `/app/admin/<tab>`, `/app/admin/suppliers/<tab>`,
+  `/app/admin/restaurants/<tab>`.
+
 ### Available Tabs
 
 1. **Overview** - Platform metrics, MRR, ARR, tenant counts

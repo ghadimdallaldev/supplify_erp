@@ -132,7 +132,7 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
   return (
     <AdminShellPage data-testid="admin-dashboard-page">
-      <div className="admin-tab-panel">
+      <div key={selectedTab} className="admin-tab-panel admin-tab-panel-enter">
         <AdminTabMount tab="overview" selectedTab={selectedTab}>
           <LazyAdminOverviewTab
             active={selectedTab === 'overview'}

@@ -137,11 +137,11 @@ export function AdminErrorState({
   const resolvedTitle = title ?? t('common.errorDefault')
   return (
     <div
-      className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm"
+      className="rounded-lg border border-[var(--red)]/30 bg-[var(--red-pale)] p-4 text-sm"
       data-testid="admin-error-state"
     >
-      <p className="font-semibold text-red-900">{resolvedTitle}</p>
-      {message && <p className="mt-1 text-red-800">{message}</p>}
+      <p className="font-semibold text-[var(--red)]">{resolvedTitle}</p>
+      {message && <p className="mt-1 text-[var(--text)]">{message}</p>}
       {onRetry && (
         <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
           {t('common.retry')}
