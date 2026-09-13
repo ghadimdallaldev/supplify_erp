@@ -41,13 +41,23 @@ export async function assignDriverToOrder({ orderId, supplierId, driverId, assig
   })
 }
 
-export async function reassignDriverToOrder({ orderId, supplierId, driverId, assignedBy, reason }) {
+export async function reassignDriverToOrder({
+  orderId,
+  supplierId,
+  driverId,
+  assignedBy,
+  reason,
+  driverAssignmentId = null,
+  warehouseAssignmentId = null,
+}) {
   return reassignDriver({
     supplierId,
     orderId,
     driverId,
     reason,
     assignedByUserId: assignedBy,
+    driverAssignmentId,
+    warehouseAssignmentId,
   })
 }
 

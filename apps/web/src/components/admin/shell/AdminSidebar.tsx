@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../../lib/utils'
 import { SupplifyLogo } from '../../SupplifyLogo'
@@ -34,29 +35,49 @@ function NavGroups({
       {groups.map((group) => {
         const visibleItems = group.items.filter((item) => canAdminTab[item.tab] !== false)
         if (visibleItems.length === 0) return null
+        const hasActiveItem = visibleItems.some((item) => item.tab === selectedTab)
+        const links = (
+          <ul className="admin-sidebar-list">
+            {visibleItems.map(({ tab, label, icon: Icon }) => {
+              const active = selectedTab === tab
+              return (
+                <li key={tab}>
+                  <Link
+                    to={adminTabPath(portal, tab)}
+                    data-testid={`admin-nav-${tab}`}
+                    className={cn('admin-sidebar-link', active && 'admin-sidebar-link-active')}
+                    aria-current={active ? 'page' : undefined}
+                    onClick={() => onMobileClose?.()}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>{label}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )
+
+        if (group.collapsible) {
+          return (
+            <details
+              key={group.label}
+              className="admin-sidebar-group admin-sidebar-details"
+              open={hasActiveItem || undefined}
+            >
+              <summary className="admin-sidebar-group-summary">
+                <span>{group.label}</span>
+                <ChevronDown className="admin-sidebar-group-chevron h-3.5 w-3.5" aria-hidden />
+              </summary>
+              {links}
+            </details>
+          )
+        }
 
         return (
           <div key={group.label} className="admin-sidebar-group">
             <p className="admin-sidebar-group-label">{group.label}</p>
-            <ul className="admin-sidebar-list">
-              {visibleItems.map(({ tab, label, icon: Icon }) => {
-                const active = selectedTab === tab
-                return (
-                  <li key={tab}>
-                    <Link
-                      to={adminTabPath(portal, tab)}
-                      data-testid={`admin-nav-${tab}`}
-                      className={cn('admin-sidebar-link', active && 'admin-sidebar-link-active')}
-                      aria-current={active ? 'page' : undefined}
-                      onClick={() => onMobileClose?.()}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span>{label}</span>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+            {links}
           </div>
         )
       })}

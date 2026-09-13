@@ -22,6 +22,7 @@ import {
   declineQuoteRequest,
   buildCartPayloadFromResponse,
   assertRestaurantOwnsQuoteRequest,
+  updateQuoteRequestStatus,
   SUPPLIER_INBOX_STATUSES,
 } from '../services/quote-requests.service.js'
 
@@ -81,6 +82,10 @@ const responseItemSchema = z.object({
 const submitResponseSchema = z.object({
   note: z.string().optional(),
   items: z.array(responseItemSchema).min(1),
+})
+
+const updateQuoteRequestStatusSchema = z.object({
+  status: z.enum(['closed', 'cancelled']),
 })
 
 router.use(requireAuth, resolveTenantContext)
@@ -304,6 +309,30 @@ router.get(
   }
 )
 
+router.patch(
+  '/:id',
+  requireRole(['RESTAURANT']),
+  requirePermission(P.ORDERS_CREATE),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Restaurant not found' },
+          requestId: req.requestId,
+        })
+      }
+      const body = updateQuoteRequestStatusSchema.parse(req.body)
+      const data = await updateQuoteRequestStatus(req.params.id, restaurantId, body.status)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
 router.get(
   '/:id/compare',
   requireRole(['RESTAURANT']),
@@ -345,6 +374,7 @@ router.post(
       await assertRestaurantOwnsQuoteRequest(req.params.id, restaurantId)
       const data = await buildCartPayloadFromResponse({
         restaurantId,
+        quoteRequestId: req.params.id,
         quoteRequestSupplierId: req.params.supplierRowId,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })

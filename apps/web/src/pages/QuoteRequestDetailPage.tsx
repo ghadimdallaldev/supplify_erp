@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   useGetQuoteRequestCompareQuery,
   useConvertQuoteResponseToCartMutation,
+  useUpdateQuoteRequestStatusMutation,
 } from '../services/api'
 import { useCartActions } from '../hooks/useCartActions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -44,6 +45,17 @@ export function QuoteRequestDetailPage() {
   const { addItem } = useCartActions()
   const { data, isLoading, isError, refetch } = useGetQuoteRequestCompareQuery(id!, { skip: !id })
   const [convertToCart, { isLoading: converting }] = useConvertQuoteResponseToCartMutation()
+  const [updateStatus, { isLoading: updatingStatus }] = useUpdateQuoteRequestStatusMutation()
+
+  const handleStatusUpdate = async (status: 'closed' | 'cancelled') => {
+    if (!id) return
+    try {
+      await updateStatus({ quoteRequestId: id, status }).unwrap()
+      toast.success(status === 'cancelled' ? t('detail.cancelSuccess') : t('detail.closeSuccess'))
+    } catch (err: any) {
+      toast.error(err?.data?.error?.message || t('detail.statusUpdateFailed'))
+    }
+  }
 
   const handleAddToCart = async (supplier: QuoteRequestSupplierEntry) => {
     if (!id || supplier.status !== 'responded') return
@@ -125,7 +137,29 @@ export function QuoteRequestDetailPage() {
           </Button>
         }
         actions={
-          <Badge>{quoteRequest.status === 'open' ? t('status.open') : quoteRequest.status}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>{quoteRequest.status === 'open' ? t('status.open') : quoteRequest.status}</Badge>
+            {quoteRequest.status === 'open' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={updatingStatus}
+                  onClick={() => handleStatusUpdate('closed')}
+                >
+                  {t('detail.closeRequest')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={updatingStatus}
+                  onClick={() => handleStatusUpdate('cancelled')}
+                >
+                  {t('detail.cancelRequest')}
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
 

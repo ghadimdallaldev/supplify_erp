@@ -243,11 +243,12 @@ export function ChatComposer({
                 : t('composer.writeMessagePlaceholder')
             }
             className="max-h-[120px] min-h-[36px] flex-1 resize-none border-0 bg-transparent py-2 text-sm leading-relaxed text-[var(--text)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-0"
-            disabled={isSending || isUploading}
+            readOnly={isSending || isUploading}
           />
 
           <Button
             type="button"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={onSend}
             disabled={!canSendNow}
             size="sm"

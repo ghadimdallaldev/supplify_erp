@@ -30,10 +30,12 @@ export type AdminNavItem = {
 export type AdminNavGroup = {
   labelKey: string
   items: AdminNavItem[]
+  collapsible?: boolean
 }
 
 export type AdminNavGroupResolved = {
   label: string
+  collapsible?: boolean
   items: Array<{ tab: AdminTabKey; label: string; icon: LucideIcon }>
 }
 
@@ -143,6 +145,7 @@ export const ADMIN_PLATFORM_NAV: AdminNavGroup[] = [
   },
   {
     labelKey: 'billing',
+    collapsible: true,
     items: [
       { tab: 'plans', labelKey: 'plans', icon: CreditCard },
       { tab: 'subscriptions', labelKey: 'subscriptions', icon: Repeat },
@@ -153,6 +156,7 @@ export const ADMIN_PLATFORM_NAV: AdminNavGroup[] = [
   },
   {
     labelKey: 'growth',
+    collapsible: true,
     items: [
       { tab: 'features', labelKey: 'features', icon: Flag },
       { tab: 'deals', labelKey: 'deals', icon: Sparkles },

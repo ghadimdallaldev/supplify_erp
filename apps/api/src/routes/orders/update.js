@@ -36,11 +36,8 @@ import { ordersDriverRoutes } from '../orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
 import { hasPermission } from '../../lib/permissions.js'
-import {
-  updateDriverDeliveryStatus,
-  getSupplierIdForOrder,
-  orderHasProofOfDelivery,
-} from '../../lib/driver-delivery.js'
+import { updateDriverDeliveryStatus, getSupplierIdForOrder } from '../../lib/driver-delivery.js'
+import { resolveDeliveryPodFlags } from '../../lib/pod-requirement.js'
 import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
@@ -65,6 +62,7 @@ import {
 } from './orders.helpers.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
+import { assertValidOrderStatusTransition } from '../../lib/order-status-transitions.js'
 
 const router = express.Router()
 
@@ -131,13 +129,17 @@ router.patch('/:id', async (req, res) => {
         actorUserId: req.userData.id,
       })
       const { rows: refreshed } = await query(`SELECT * FROM customer_order WHERE id = $1`, [id])
-      const hasPod = await orderHasProofOfDelivery(id)
+      const { podRequired, hasPod } = await resolveDeliveryPodFlags({
+        supplierId,
+        orderId: id,
+        deliveryStatus: updateData.delivery_status,
+      })
       return res.json({
         ok: true,
         data: {
           order: refreshed[0],
           assignment,
-          podRequired: updateData.delivery_status === 'delivered',
+          podRequired,
           hasPod,
         },
         error: null,
@@ -254,7 +256,51 @@ router.patch('/:id', async (req, res) => {
 
       // Legacy COMPLETED → DELIVERED only (inventory applies on receiving)
       if (updateData.status === 'COMPLETED') {
-        return await handleOrderDelivery(id, req.userData, res, req)
+        try {
+          assertValidOrderStatusTransition({
+            role: req.userData.role,
+            from: order.status,
+            to: 'DELIVERED',
+            legacyCompleted: true,
+          })
+        } catch (transitionError) {
+          if (transitionError instanceof ValidationError) {
+            return res.status(400).json({
+              ok: false,
+              data: null,
+              error: {
+                name: 'VALIDATION_ERROR',
+                message: transitionError.message,
+              },
+              requestId: req.requestId,
+            })
+          }
+          throw transitionError
+        }
+        return await handleOrderDelivery(id, req.userData, res, req, order.status)
+      }
+    }
+
+    if (updateData.status && updateData.status !== order.status) {
+      try {
+        assertValidOrderStatusTransition({
+          role: req.userData.role,
+          from: order.status,
+          to: updateData.status,
+        })
+      } catch (transitionError) {
+        if (transitionError instanceof ValidationError) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: transitionError.message,
+            },
+            requestId: req.requestId,
+          })
+        }
+        throw transitionError
       }
     }
 

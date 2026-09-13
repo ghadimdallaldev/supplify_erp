@@ -133,6 +133,7 @@ export function DriverDispatchBoard({
       await updateDeliveryStatus({
         orderId: order.id,
         status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled' | 'assigned',
+        driver_assignment_id: order.assignment?.id,
       }).unwrap()
       if (next === 'delivered') {
         setPodOrder(order)
@@ -151,6 +152,7 @@ export function DriverDispatchBoard({
         orderId: failOrder.id,
         status: 'failed',
         failure_reason: failureReason,
+        driver_assignment_id: failOrder.assignment?.id,
       }).unwrap()
       toast.success(t('dispatch.toast.markedFailed'))
       setFailOrder(null)
@@ -323,7 +325,7 @@ export function DriverDispatchBoard({
                 const sel = canSelectOrderForRoute(order)
                 return (
                   <DispatchOrderRow
-                    key={order.id}
+                    key={`${order.id}-${order.assignment?.id ?? 'unassigned'}`}
                     order={order}
                     onViewTracking={openTracking}
                     selectable={canPlanRoutes}
@@ -347,7 +349,7 @@ export function DriverDispatchBoard({
                 const sel = canSelectOrderForRoute(order)
                 return (
                   <DispatchOrderRow
-                    key={order.id}
+                    key={`${order.id}-${order.assignment?.id ?? 'unassigned'}`}
                     order={order}
                     showDriver
                     onViewTracking={openTracking}
@@ -397,7 +399,7 @@ export function DriverDispatchBoard({
             >
               {data.out_for_delivery.map((order) => (
                 <DispatchOrderRow
-                  key={order.id}
+                  key={`${order.id}-${order.assignment?.id ?? 'unassigned'}`}
                   order={order}
                   showDriver
                   onViewTracking={openTracking}
@@ -470,7 +472,7 @@ export function DriverDispatchBoard({
             >
               {data.delivered_today.map((order) => (
                 <DispatchOrderRow
-                  key={order.id}
+                  key={`${order.id}-${order.assignment?.id ?? 'unassigned'}`}
                   order={order}
                   showDriver
                   onViewTracking={openTracking}

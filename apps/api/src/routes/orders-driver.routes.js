@@ -32,6 +32,7 @@ import {
   isGpsTrackingEnabled,
 } from '../services/driver-location.service.js'
 import { ValidationError, ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
+import { resolveDeliveryPodFlags } from '../lib/pod-requirement.js'
 import { hasPermission } from '../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
@@ -79,10 +80,14 @@ const deliveryStatusSchema = z.object({
   ]),
   notes: z.string().optional().nullable(),
   failure_reason: z.string().optional().nullable(),
+  driver_assignment_id: z.string().uuid().optional().nullable(),
+  warehouse_assignment_id: z.string().uuid().optional().nullable(),
 })
 const reassignSchema = z.object({
   driver_id: z.string().uuid(),
   reason: z.string().optional().nullable(),
+  driver_assignment_id: z.string().uuid().optional().nullable(),
+  warehouse_assignment_id: z.string().uuid().optional().nullable(),
 })
 const podSchema = z
   .object({
@@ -196,6 +201,7 @@ router.patch(
           userId: req.userData.id,
           supplierId,
           orderId: req.params.id,
+          assignmentId: body.driver_assignment_id ?? null,
           permissions: perms,
         })
       }
@@ -217,10 +223,20 @@ router.patch(
         notes: body.notes,
         failureReason: body.failure_reason,
         userId: req.userData?.id,
+        driverAssignmentId: body.driver_assignment_id ?? null,
+        warehouseAssignmentId: body.warehouse_assignment_id ?? null,
       })
+      const podFlags =
+        body.status === 'delivered'
+          ? await resolveDeliveryPodFlags({
+              supplierId,
+              orderId: req.params.id,
+              deliveryStatus: body.status,
+            })
+          : null
       res.json({
         ok: true,
-        data: { assignment },
+        data: podFlags ? { assignment, ...podFlags } : { assignment },
         error: null,
         requestId: req.requestId,
       })
@@ -269,6 +285,8 @@ router.post(
         driverId: body.driver_id,
         reason: body.reason,
         assignedByUserId: req.userData?.id,
+        driverAssignmentId: body.driver_assignment_id ?? null,
+        warehouseAssignmentId: body.warehouse_assignment_id ?? null,
       })
       res.json({
         ok: true,

@@ -108,30 +108,39 @@ export function createOpenAiProvider() {
           tool_calls: toolCalls,
         })
 
-        for (const call of toolCalls) {
-          const name = call.function?.name || 'unknown'
-          let args = {}
-          try {
-            args = JSON.parse(call.function?.arguments || '{}')
-          } catch {
-            args = {}
-          }
+        // Tool calls in the same model response are independent read-only
+        // lookups. Run them concurrently, but append results in model order so
+        // the conversation and source list remain deterministic.
+        const toolResults = await Promise.all(
+          toolCalls.map(async (call) => {
+            const name = call.function?.name || 'unknown'
+            let args = {}
+            try {
+              args = JSON.parse(call.function?.arguments || '{}')
+            } catch {
+              args = {}
+            }
 
-          let result
-          let ok = true
-          try {
-            result = await executeTool(name, args)
-          } catch (err) {
-            ok = false
-            result = { error: err?.message || 'Tool failed' }
-          }
-          sources.push({ tool: name, args, ok })
-          thread.push({
-            role: 'tool',
-            tool_call_id: call.id,
-            content: JSON.stringify(result ?? null),
+            let result
+            let ok = true
+            try {
+              result = await executeTool(name, args)
+            } catch (err) {
+              ok = false
+              result = { error: err?.message || 'Tool failed' }
+            }
+            return {
+              source: { tool: name, args, ok },
+              message: {
+                role: 'tool',
+                tool_call_id: call.id,
+                content: JSON.stringify(result ?? null),
+              },
+            }
           })
-        }
+        )
+        sources.push(...toolResults.map((item) => item.source))
+        thread.push(...toolResults.map((item) => item.message))
       }
 
       // Force a final answer without further tools after max rounds.
@@ -151,7 +160,8 @@ export function createOpenAiProvider() {
       tokensOut += final.usage?.completion_tokens ?? 0
 
       return {
-        reply: String(final.choices[0]?.message?.content || '').trim() || 'I could not find an answer.',
+        reply:
+          String(final.choices[0]?.message?.content || '').trim() || 'I could not find an answer.',
         sources,
         tokensIn,
         tokensOut,

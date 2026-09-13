@@ -105,6 +105,8 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     orders,
     byArea,
     routeSummary,
+    // Counts are per delivery leg (driver assignment), not unique orders — multi-WH
+    // orders with several active legs appear once per leg; unassigned orders appear once.
     stats: {
       total: orders.length,
       pending: orders.filter((o) => o.deliveryStatus === 'pending').length,
@@ -117,15 +119,23 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   }
 }
 
+/** Stable dedupe key for board rows: assignment when present, otherwise order. */
+export function boardRowDedupeKey(row) {
+  const assignmentId = row.assignmentId ?? row.assignment_id ?? null
+  const orderId = row.orderId ?? row.order_id
+  return assignmentId ?? orderId
+}
+
 async function queryDeliveryBoardRows(sql, conditions, params) {
   const { rows } = await query(
     `
-    SELECT DISTINCT ON (o.id)
+    SELECT DISTINCT ON (COALESCE(da.id, o.id))
       o.id AS order_id,
       o.status AS order_status,
       r.name AS restaurant_name,
       ${sql.deliveryAreaExpr} AS delivery_area,
       da.id AS assignment_id,
+      da.warehouse_assignment_id AS warehouse_assignment_id,
       COALESCE(da.status, 'pending') AS delivery_status,
       da.driver_id AS driver_id,
       ${sql.driverNameExpr} AS driver_name,
@@ -138,10 +148,10 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
     JOIN order_item oi ON oi.order_id = o.id
     JOIN restaurant r ON r.id = o.restaurant_id
     ${sql.branchJoinSql}
-    ${sql.driverLateralSql}
+    ${sql.driverAssignmentJoinSql}
     ${sql.zoneJoinSql}
     WHERE ${conditions.join(' AND ')}
-    ORDER BY o.id, scheduled_at DESC
+    ORDER BY COALESCE(da.id, o.id), scheduled_at DESC
     LIMIT 500
   `,
     params
@@ -160,6 +170,7 @@ async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr
       r.name AS restaurant_name,
       'Unassigned area' AS delivery_area,
       NULL::uuid AS assignment_id,
+      NULL::uuid AS warehouse_assignment_id,
       'pending' AS delivery_status,
       NULL::uuid AS driver_id,
       NULL::text AS driver_name,
@@ -180,7 +191,7 @@ async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr
   return rows
 }
 
-function mapBoardRow(r, locationMap) {
+export function mapBoardRow(r, locationMap) {
   const locRow = r.driver_id ? locationMap.get(r.driver_id) : null
   const tracking = buildTrackingPayload({
     orderId: r.order_id,
@@ -213,6 +224,8 @@ function mapBoardRow(r, locationMap) {
     restaurantName: r.restaurant_name,
     deliveryArea: r.delivery_area,
     deliveryStatus,
+    assignmentId: r.assignment_id ?? null,
+    warehouseAssignmentId: r.warehouse_assignment_id ?? null,
     driverId: r.driver_id,
     driverName: r.driver_name,
     hasPod: r.has_pod,

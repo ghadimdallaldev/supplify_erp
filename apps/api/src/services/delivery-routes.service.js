@@ -17,6 +17,8 @@ const DRIVER_TODAY_ROUTE_STATUSES = ['IN_PROGRESS', 'PLANNED']
 const FIXED_STOP_UI_STATUSES = new Set(['DELIVERED', 'FAILED'])
 
 const ROUTABLE_ASSIGNMENT_STATUSES = ['assigned', 'rescheduled', 'failed']
+/** Live driver legs cleared when a route is cancelled or an order is removed — never `delivered`. */
+const RELEASEABLE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery', 'rescheduled']
 
 export async function assertDriverBelongsToSupplier(driverId, supplierId) {
   const { rows } = await query(
@@ -319,8 +321,8 @@ async function releaseDriverAssignments(dbLike, { supplierId, orderIds }) {
      SET status = 'reassigned', updated_at = now()
      WHERE supplier_id = $1
        AND order_id = ANY($2::uuid[])
-       AND status = 'assigned'`,
-    [supplierId, orderIds]
+       AND status = ANY($3::text[])`,
+    [supplierId, orderIds, RELEASEABLE_ASSIGNMENT_STATUSES]
   )
 }
 
@@ -328,45 +330,58 @@ async function syncDriverAssignment(
   client,
   { supplierId, orderId, driverId, userId, scheduledDate = null }
 ) {
-  const { rows: existing } = await client.query(
-    `
-    SELECT da.id, da.driver_id, da.status
-    FROM driver_assignments da
-    WHERE da.order_id = $1 AND da.supplier_id = $2
-      AND da.status NOT IN ('reassigned', 'delivered')
-    ORDER BY da.created_at DESC
-    LIMIT 1
-    `,
-    [orderId, supplierId]
-  )
-
-  if (existing.length) {
-    const row = existing[0]
-    if (row.driver_id === driverId && ROUTABLE_ASSIGNMENT_STATUSES.includes(row.status)) {
-      return row
-    }
-    await client.query(
-      `UPDATE driver_assignments SET status = 'reassigned', updated_at = now() WHERE id = $1`,
-      [row.id]
-    )
-  }
-
-  const { rows: whRows } = await client.query(
-    `SELECT id FROM order_warehouse_assignment WHERE order_id = $1 ORDER BY assigned_at DESC NULLS LAST LIMIT 1`,
+  const { rows: pendingWh } = await client.query(
+    `SELECT id FROM order_warehouse_assignment
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')
+     ORDER BY assigned_at DESC NULLS LAST`,
     [orderId]
   )
+  const warehouseLegIds = pendingWh.length ? pendingWh.map((row) => row.id) : [null]
+  const synced = []
 
-  // Operational delivery day follows the route it was planned on, not "today" —
-  // a route scheduled for tomorrow must not be treated as overdue by the rollover job.
-  const { rows: inserted } = await client.query(
-    `INSERT INTO driver_assignments (
-       order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
-       scheduled_delivery_date
-     ) VALUES ($1, $2, $3, $4, $5, 'assigned', COALESCE($6::date, CURRENT_DATE))
-     RETURNING *`,
-    [orderId, whRows[0]?.id ?? null, driverId, supplierId, userId ?? null, scheduledDate ?? null]
-  )
-  return inserted[0]
+  for (const warehouseAssignmentId of warehouseLegIds) {
+    const { rows: existing } = await client.query(
+      `
+      SELECT da.id, da.driver_id, da.status
+      FROM driver_assignments da
+      WHERE da.order_id = $1 AND da.supplier_id = $2
+        AND da.status NOT IN ('reassigned', 'delivered')
+        AND (
+          ($3::uuid IS NULL AND da.warehouse_assignment_id IS NULL)
+          OR da.warehouse_assignment_id = $3
+        )
+      ORDER BY da.created_at DESC
+      LIMIT 1
+      `,
+      [orderId, supplierId, warehouseAssignmentId]
+    )
+
+    if (existing.length) {
+      const row = existing[0]
+      if (row.driver_id === driverId && ROUTABLE_ASSIGNMENT_STATUSES.includes(row.status)) {
+        synced.push(row)
+        continue
+      }
+      await client.query(
+        `UPDATE driver_assignments SET status = 'reassigned', updated_at = now() WHERE id = $1`,
+        [row.id]
+      )
+    }
+
+    // Operational delivery day follows the route it was planned on, not "today" —
+    // a route scheduled for tomorrow must not be treated as overdue by the rollover job.
+    const { rows: inserted } = await client.query(
+      `INSERT INTO driver_assignments (
+         order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
+         scheduled_delivery_date
+       ) VALUES ($1, $2, $3, $4, $5, 'assigned', COALESCE($6::date, CURRENT_DATE))
+       RETURNING *`,
+      [orderId, warehouseAssignmentId, driverId, supplierId, userId ?? null, scheduledDate ?? null]
+    )
+    synced.push(inserted[0])
+  }
+
+  return synced[0] ?? null
 }
 
 export async function createDeliveryRoute({
@@ -823,27 +838,32 @@ export async function updateRouteStop(
   if (dbStatus) {
     const assignmentStatus = STOP_TO_ASSIGNMENT[status]
     if (assignmentStatus) {
-      if (assignmentStatus === 'out_for_delivery') {
-        const { getActiveDriverAssignment } = await import('./driver-fulfillment.service.js')
-        const current = await getActiveDriverAssignment(stop.orderId)
-        if (current?.status === 'assigned') {
+      const { listActiveDriverAssignments } = await import('./driver-fulfillment.service.js')
+      const activeAssignments = await listActiveDriverAssignments(stop.orderId)
+      // Multi-WH: one route stop may map to several driver legs — update each explicitly.
+      const targets = activeAssignments.length ? activeAssignments : [{ id: null, status: null }]
+
+      for (const assignment of targets) {
+        if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
           await updateDeliveryStatus({
             supplierId,
             orderId: stop.orderId,
             status: 'picked_up',
             notes,
             userId,
+            driverAssignmentId: assignment.id,
           })
         }
+        await updateDeliveryStatus({
+          supplierId,
+          orderId: stop.orderId,
+          status: assignmentStatus,
+          notes,
+          failureReason,
+          userId,
+          driverAssignmentId: assignment.id,
+        })
       }
-      await updateDeliveryStatus({
-        supplierId,
-        orderId: stop.orderId,
-        status: assignmentStatus,
-        notes,
-        failureReason,
-        userId,
-      })
     }
   }
 

@@ -82,7 +82,12 @@
     "note": "ملاحظة",
     "substitute": "بديل: {{name}}",
     "addedToCart": "تمت الإضافة إلى السلة",
-    "addToCartFailed": "تعذّرت الإضافة إلى السلة"
+    "addToCartFailed": "تعذّرت الإضافة إلى السلة",
+    "closeRequest": "إغلاق الطلب",
+    "cancelRequest": "إلغاء الطلب",
+    "closeSuccess": "تم إغلاق طلب عرض السعر",
+    "cancelSuccess": "تم إلغاء طلب عرض السعر",
+    "statusUpdateFailed": "تعذر تحديث طلب عرض السعر"
   },
   "inbox": {
     "title": "صندوق طلبات عروض الأسعار",
