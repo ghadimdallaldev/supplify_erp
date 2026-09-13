@@ -125,6 +125,21 @@
     "brand": "الإدارة",
     "searchPlaceholder": "بحث في الإدارة…",
     "logoutTitle": "{{name}} — انقر لتسجيل الخروج",
+    "workspaces": "مساحات العمل",
+    "collapseSidebar": "طي الشريط الجانبي",
+    "expandSidebar": "توسيع الشريط الجانبي",
+    "skipToContent": "الانتقال إلى المحتوى",
+    "theme": {
+      "switchToDark": "التبديل إلى المظهر الداكن",
+      "switchToLight": "التبديل إلى المظهر الفاتح",
+      "saveFailed": "تم تغيير المظهر هنا، لكن تعذر حفظ التفضيل"
+    },
+    "userMenu": {
+      "open": "فتح قائمة الحساب",
+      "platformAdmin": "مسؤول المنصة",
+      "settings": "إعدادات الحساب",
+      "signOut": "تسجيل الخروج"
+    },
     "groups": {
       "monitor": "المراقبة",
       "accounts": "الحسابات",
@@ -160,7 +175,8 @@
       "sections": "أقسام الإدارة",
       "openMenu": "فتح قائمة الإدارة",
       "closeMenu": "إغلاق قائمة الإدارة",
-      "openSearch": "فتح البحث"
+      "openSearch": "فتح البحث",
+      "breadcrumb": "مسار التنقل"
     }
   },
   "users": {

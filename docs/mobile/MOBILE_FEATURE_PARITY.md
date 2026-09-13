@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Admin console shell revamp (web)
+
+- Reworked the platform-admin shell in `apps/web`: collapsible icon-rail sidebar (persisted per browser), vertical workspace switcher, sticky translucent top bar with breadcrumb, light/dark theme toggle wired to `PATCH /auth/admin-preferences`, account menu (settings + sign out) replacing the avatar-as-logout button, skip-to-content link, Escape/scroll-lock on the mobile drawer, and tab-panel enter animation. `.dark` now overrides the Supplify hex tokens so the admin dark theme actually darkens.
+- No new endpoint, env var, feature key, or permission key. The preferences endpoint and `AdminUserPreferences` type are unchanged.
+- **Mobile skipped**: admin-only. The native apps have no admin surface (the mobile admin hub deep-links into this web console).
+- Docs: `docs/ui/ADMIN_SHELL_REVAMP.md`, `docs/ui/README.md`, `docs/admin/admin-guide.md`.
+
 ## 2026-09-14 — Contract pricing, fulfillment, and quotation correctness audit
 
 - Audited and fixed critical/high business-logic defects across contract pricing, fulfillment, and quotations in the API/web monorepo; both mobile apps updated for client-contract changes.
