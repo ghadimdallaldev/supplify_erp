@@ -3,6 +3,7 @@ import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { notifyTenantUsers } from './notification.service.js'
 import { releaseStockForOrder, reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
+import { resolveProductPrice } from './resolve-product-price.service.js'
 
 export const MUTABLE_ORDER_STATUSES = new Set([
   'PLACED',
@@ -71,6 +72,20 @@ export async function recalculateOrderTotal(orderId, client) {
 /**
  * Apply line-item changes from an accepted amendment.
  */
+async function resolveAmendmentUnitPrice(
+  client,
+  { restaurantId, supplierId, productId, quantity }
+) {
+  const resolved = await resolveProductPrice(
+    { restaurantId, supplierId, productId, quantity },
+    client.query.bind(client)
+  )
+  if (resolved?.unitPrice != null) {
+    return Number(resolved.unitPrice)
+  }
+  return null
+}
+
 export async function applyAmendmentItems(client, orderId, amendmentId) {
   const { rows: items } = await client.query(
     `SELECT * FROM order_amendment_items WHERE amendment_id = $1`,
@@ -83,15 +98,40 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
   )
   const changeType = amendments[0]?.change_type
 
+  const { rows: orderRows } = await client.query(
+    `SELECT restaurant_id FROM customer_order WHERE id = $1`,
+    [orderId]
+  )
+  const restaurantId = orderRows[0]?.restaurant_id
+
   for (const item of items) {
     if (changeType === 'quantity_change' && item.order_item_id && item.requested_quantity != null) {
       const qty = Number(item.requested_quantity)
-      const unitPrice = Number(item.unit_price || 0)
+      let unitPrice = Number(item.unit_price || 0)
+
+      if (restaurantId) {
+        const { rows: orderItems } = await client.query(
+          `SELECT product_id, supplier_id FROM order_item WHERE id = $1 AND order_id = $2`,
+          [item.order_item_id, orderId]
+        )
+        if (orderItems.length) {
+          const resolvedPrice = await resolveAmendmentUnitPrice(client, {
+            restaurantId,
+            supplierId: orderItems[0].supplier_id,
+            productId: orderItems[0].product_id,
+            quantity: qty,
+          })
+          if (resolvedPrice != null) {
+            unitPrice = resolvedPrice
+          }
+        }
+      }
+
       const lineTotal = qty * unitPrice
       await client.query(
         `
         UPDATE order_item
-        SET quantity = $1, line_total = $2, unit_price = COALESCE(unit_price, $3)
+        SET quantity = $1, line_total = $2, unit_price = $3
         WHERE id = $4 AND order_id = $5
         `,
         [qty, lineTotal, unitPrice, item.order_item_id, orderId]
@@ -107,13 +147,26 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
       item.substitute_product_id
     ) {
       const qty = Number(item.requested_quantity ?? item.original_quantity ?? 1)
-      const unitPrice = Number(item.unit_price || 0)
-      const lineTotal = qty * unitPrice
       const { rows: products } = await client.query(
         `SELECT supplier_id FROM product WHERE id = $1`,
         [item.substitute_product_id]
       )
       if (!products.length) throw new ValidationError('Substitute product not found')
+
+      let unitPrice = Number(item.unit_price || 0)
+      if (restaurantId) {
+        const resolvedPrice = await resolveAmendmentUnitPrice(client, {
+          restaurantId,
+          supplierId: products[0].supplier_id,
+          productId: item.substitute_product_id,
+          quantity: qty,
+        })
+        if (resolvedPrice != null) {
+          unitPrice = resolvedPrice
+        }
+      }
+
+      const lineTotal = qty * unitPrice
       await client.query(
         `
         UPDATE order_item

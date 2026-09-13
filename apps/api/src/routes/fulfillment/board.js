@@ -71,7 +71,7 @@ router.get('/board', async (req, res) => {
     const [{ rows: routes }, { rows: unassignedRows }, { rows: statsRows }] = await Promise.all([
       query(
         `
-        SELECT id, route_number, driver_name, vehicle_info, scheduled_date, status
+        SELECT id, route_number, driver_id, driver_name, vehicle_info, scheduled_date, status
         FROM delivery_route
         WHERE supplier_id = $1
           AND status IN ('PLANNED', 'IN_PROGRESS')
@@ -143,7 +143,7 @@ router.get('/board', async (req, res) => {
     const routePayload = routes.map((route) => ({
       id: route.id,
       route_number: route.route_number,
-      driver_id: route.driver_name ? route.id : null,
+      driver_id: route.driver_id ?? null,
       status: route.status,
       scheduled_date: route.scheduled_date,
       driver_name: route.driver_name,
@@ -152,11 +152,11 @@ router.get('/board', async (req, res) => {
     }))
 
     const drivers = routes
-      .filter((route) => route.driver_name)
+      .filter((route) => route.driver_id)
       .map((route) => {
         const fullRoute = routePayload.find((r) => r.id === route.id)
         return {
-          id: route.id,
+          id: route.driver_id,
           name: route.driver_name,
           phone: null,
           vehicle: route.vehicle_info,
@@ -279,6 +279,7 @@ function mapDispatchOrder(row) {
       ? {
           id: row.assignment_id,
           status: row.assignment_status,
+          warehouse_assignment_id: row.warehouse_assignment_id ?? null,
           driver: {
             id: row.driver_id,
             full_name: row.driver_name,
@@ -306,8 +307,10 @@ function dispatchCacheKey(supplierId, days, warehouseId) {
 export { invalidateDispatchCacheForSupplier }
 
 function buildDispatchBaseSelect() {
+  // One row per driver assignment (multi-WH legs). Unassigned orders appear once
+  // via DISTINCT ON (COALESCE(da.id, o.id)).
   return `
-      SELECT DISTINCT ON (o.id)
+      SELECT DISTINCT ON (COALESCE(da.id, o.id))
         o.id,
         o.status AS order_status,
         o.total_amount,
@@ -316,6 +319,7 @@ function buildDispatchBaseSelect() {
         COALESCE(oic.item_count, 0) AS item_count,
         da.id AS assignment_id,
         da.status AS assignment_status,
+        da.warehouse_assignment_id AS warehouse_assignment_id,
         da.assigned_at,
         da.delivered_at,
         da.scheduled_delivery_date,
@@ -329,9 +333,9 @@ function buildDispatchBaseSelect() {
         ar.route_id AS active_route_id,
         ar.route_number AS active_route_number,
         ar.route_status AS active_route_status,
-        owa_sum.warehouse_id,
-        owa_sum.warehouse_name,
-        owa_sum.warehouse_code,
+        owa_leg.warehouse_id,
+        owa_leg.warehouse_name,
+        owa_leg.warehouse_code,
         owa_sum.warehouse_count
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
@@ -343,12 +347,10 @@ function buildDispatchBaseSelect() {
         GROUP BY order_id
       ) oic ON oic.order_id = o.id
       LEFT JOIN (SELECT DISTINCT order_id FROM proof_of_delivery) pod ON pod.order_id = o.id
-      LEFT JOIN LATERAL (
-        SELECT * FROM driver_assignments da2
-        WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
-        ORDER BY da2.created_at DESC
-        LIMIT 1
-      ) da ON true
+      LEFT JOIN driver_assignments da
+        ON da.order_id = o.id
+       AND da.supplier_id = $1
+       AND da.status <> 'reassigned'
       LEFT JOIN drivers d ON d.id = da.driver_id
       LEFT JOIN LATERAL (
         SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
@@ -360,13 +362,14 @@ function buildDispatchBaseSelect() {
         LIMIT 1
       ) ar ON true
       LEFT JOIN LATERAL (
-        SELECT
-          (ARRAY_AGG(w.id ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_id,
-          (ARRAY_AGG(w.name ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_name,
-          (ARRAY_AGG(w.code ORDER BY owa.assigned_at DESC NULLS LAST))[1] AS warehouse_code,
-          COUNT(*)::int AS warehouse_count
+        SELECT w.id AS warehouse_id, w.name AS warehouse_name, w.code AS warehouse_code
         FROM order_warehouse_assignment owa
         JOIN warehouse w ON w.id = owa.warehouse_id
+        WHERE owa.id = da.warehouse_assignment_id
+      ) owa_leg ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS warehouse_count
+        FROM order_warehouse_assignment owa
         WHERE owa.order_id = o.id
           AND owa.status NOT IN ('failed')
       ) owa_sum ON true
@@ -429,21 +432,21 @@ router.get('/dispatch', async (req, res) => {
         `${baseSelect}
            AND (da.id IS NULL OR da.status IN ('failed'))
            AND o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
-           ORDER BY o.id, o.created_at DESC
+           ORDER BY COALESCE(da.id, o.id), o.created_at DESC
            LIMIT $${limitParamIndex}`,
         limitParams
       ),
       query(
         `${baseSelect}
            AND da.status IN ('assigned', 'rescheduled')
-           ORDER BY o.id, da.assigned_at DESC
+           ORDER BY COALESCE(da.id, o.id), da.assigned_at DESC
            LIMIT $${limitParamIndex}`,
         limitParams
       ),
       query(
         `${baseSelect}
            AND da.status IN ('picked_up', 'out_for_delivery')
-           ORDER BY o.id, da.updated_at DESC
+           ORDER BY COALESCE(da.id, o.id), da.updated_at DESC
            LIMIT $${limitParamIndex}`,
         limitParams
       ),
@@ -451,7 +454,7 @@ router.get('/dispatch', async (req, res) => {
         `${baseSelect}
            AND da.status = 'delivered'
            AND da.delivered_at >= date_trunc('day', now())
-           ORDER BY o.id, da.delivered_at DESC
+           ORDER BY COALESCE(da.id, o.id), da.delivered_at DESC
            LIMIT $${limitParamIndex}`,
         limitParams
       ),

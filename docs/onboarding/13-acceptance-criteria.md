@@ -586,25 +586,25 @@
 
 ## 25. Quote requests (RFQ)
 
-| Field             | Criteria                                               |
-| ----------------- | ------------------------------------------------------ |
-| **Feature**       | Multi-supplier RFQ, compare responses, add to cart     |
-| **Preconditions** | Connected suppliers                                    |
-| **Role**          | Restaurant creates; Supplier responds                  |
-| **Plan**          | Core ordering                                          |
-| **Success path**  | RFQ sent → supplier quotes lines → restaurant compares |
-| **Alternatives**  | Add winning lines to cart (manual checkout)            |
-| **Validation**    | Notifications `quote_request_received`                 |
-| **Permissions**   | `ORDERS_CREATE`                                        |
-| **API**           | `quote-requests.service.js`                            |
-| **UI**            | `/app/quote-requests/*`                                |
-| **DB**            | `0153` schema                                          |
-| **Notifications** | Email/in-app on quote events                           |
-| **Error cases**   | Quoted price informational only at order create        |
-| **Security**      | Suppliers see only their RFQ lines                     |
-| **Mobile**        | Limited                                                |
-| **Test coverage** | Service tests                                          |
-| **Status**        | Shipped (quote price not auto-applied at checkout)     |
+| Field             | Criteria                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| **Feature**       | Multi-supplier RFQ, compare responses, add to cart                                    |
+| **Preconditions** | Connected suppliers                                                                   |
+| **Role**          | Restaurant creates; Supplier responds                                                 |
+| **Plan**          | Core ordering                                                                         |
+| **Success path**  | RFQ sent → supplier quotes lines → restaurant compares                                |
+| **Alternatives**  | Add winning lines to cart (manual checkout)                                           |
+| **Validation**    | Notifications `quote_request_received`                                                |
+| **Permissions**   | `ORDERS_CREATE`                                                                       |
+| **API**           | `quote-requests.service.js`                                                           |
+| **UI**            | `/app/quote-requests/*`                                                               |
+| **DB**            | `0153` schema                                                                         |
+| **Notifications** | Email/in-app on quote events                                                          |
+| **Error cases**   | Closed/cancelled RFQ blocks cart + checkout; quote qty exceeded rejected              |
+| **Security**      | Suppliers see only their RFQ lines                                                    |
+| **Mobile**        | Limited                                                                               |
+| **Test coverage** | Service tests                                                                         |
+| **Status**        | Shipped — quote locks applied at checkout (`QUOTE_PRICE`); RFQ close/cancel supported |
 
 ---
 

@@ -165,6 +165,15 @@ driver assign / status / reassign, POD submit, and both manual and cron rollover
 Skipping it leaves the board showing an order as unassigned for up to 45 seconds after
 a driver has been routed.
 
+### Supplier delivery board (multi-warehouse legs)
+
+`GET /api/supplier-ops/deliveries/board` returns **one row per non-reassigned driver
+assignment** (`assignmentId`, `warehouseAssignmentId`), not one row per order.
+Unassigned orders still appear once as `deliveryStatus: pending`. Board `stats` count
+delivery legs, so multi-WH orders can contribute multiple rows. Clients must pass
+`driver_assignment_id` (or `warehouse_assignment_id`) when updating status on
+multi-leg orders.
+
 ### Proof of delivery
 
 One POD row per order, enforced by a unique index on `proof_of_delivery(order_id)`
@@ -173,6 +182,12 @@ One POD row per order, enforced by a unique index on `proof_of_delivery(order_id
 instead of stacking duplicates. A POD must carry at least one of a photo
 (`file_key`), a signature (`signature_file_key`) or a `recipient_name` — the web
 dialog disables save until one is present and the API rejects the rest with a 400.
+
+POD capture is **optional** for delivery confirmation today — there is no supplier
+setting that blocks `delivered` without a POD record. API responses expose
+`podRequired` (policy) and `hasPod` (record exists) separately; `podRequired` stays
+`false` until a tenant setting is added (`apps/api/src/lib/pod-requirement.js`).
+When that setting exists, `updateDeliveryStatus` will reject `delivered` without POD.
 
 ### Rollback notes
 

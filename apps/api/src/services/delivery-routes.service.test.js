@@ -16,6 +16,14 @@ vi.mock('./driver-fulfillment.service.js', () => ({
   getActiveDriverAssignment: vi.fn().mockResolvedValue(null),
 }))
 
+vi.mock('../lib/dispatch-cache.js', () => ({
+  invalidateDispatchCacheForSupplier: vi.fn(),
+}))
+
+vi.mock('../lib/delivery-zone-join.js', () => ({
+  getDeliveryZoneJoinSql: vi.fn().mockResolvedValue(''),
+}))
+
 describe('delivery-routes.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -410,6 +418,10 @@ describe('delivery-routes.service', () => {
     expect(releaseCall).toBeDefined()
     expect(releaseCall[1][0]).toBe('s1')
     expect(releaseCall[1][1]).toEqual(['o1', 'o2'])
+    expect(releaseCall[1][2]).toEqual(
+      expect.arrayContaining(['assigned', 'picked_up', 'out_for_delivery', 'rescheduled'])
+    )
+    expect(releaseCall[0]).not.toMatch(/status = 'delivered'/)
   })
 
   it('buildDriverRouteFromAssignments requires at least 2 eligible deliveries', async () => {
@@ -432,6 +444,88 @@ describe('delivery-routes.service', () => {
       .mockResolvedValueOnce({ rows: [] })
 
     await expect(buildDriverRouteFromAssignments('s1', 'd1')).rejects.toThrow(/at least 2/i)
+  })
+
+  it('createDeliveryRoute assigns driver to every pending warehouse leg', async () => {
+    const orderId = '11111111-1111-4111-8111-111111111111'
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockImplementation(async (sql, params) => {
+      const text = String(sql)
+      if (text.includes('COUNT(*)::int AS n')) return { rows: [{ n: 0 }] }
+      if (text.includes('INSERT INTO delivery_route')) {
+        return {
+          rows: [
+            {
+              id: 'r1',
+              route_number: 'R-20260528-001',
+              route_label: null,
+              area: null,
+              driver_id: 'd1',
+              driver_name: 'Alex',
+              vehicle_info: null,
+              status: 'PLANNED',
+              scheduled_date: '2026-05-28',
+            },
+          ],
+        }
+      }
+      if (text.includes('SELECT r.address_json')) return { rows: [{ address_json: {} }] }
+      if (text.includes('INSERT INTO route_stop')) return { rows: [{ id: 'stop-1' }] }
+      if (text.includes('order_warehouse_assignment') && text.includes('status NOT IN')) {
+        return { rows: [{ id: 'wh-a' }, { id: 'wh-b' }] }
+      }
+      if (text.includes('FROM driver_assignments da') && text.includes('warehouse_assignment_id')) {
+        return { rows: [] }
+      }
+      if (text.includes('INSERT INTO driver_assignments')) {
+        return { rows: [{ id: `da-${params[1]}`, warehouse_assignment_id: params[1] }] }
+      }
+      if (text.includes('FROM route_stop rs')) {
+        return {
+          rows: [
+            {
+              id: 'stop-1',
+              route_id: 'r1',
+              order_id: orderId,
+              sequence_number: 1,
+              status: 'PLANNED',
+              restaurant_name: 'Cafe',
+              address_json: {},
+              total_amount: 100,
+              item_count: 2,
+              notes: null,
+              completed_at: null,
+              assignment_status: 'assigned',
+              destination_latitude: null,
+              destination_longitude: null,
+              delivery_area: 'North',
+            },
+          ],
+        }
+      }
+      return { rows: [] }
+    })
+
+    const { createDeliveryRoute } = await import('./delivery-routes.service.js')
+    await createDeliveryRoute({
+      supplierId: 's1',
+      orderIds: [orderId],
+      driverId: 'd1',
+      scheduledDate: '2026-05-28',
+    })
+
+    const inserts = clientQueryMock.mock.calls.filter(([sql]) =>
+      String(sql).includes('INSERT INTO driver_assignments')
+    )
+    expect(inserts).toHaveLength(2)
+    expect(inserts[0][1][1]).toBe('wh-a')
+    expect(inserts[1][1][1]).toBe('wh-b')
   })
 
   it('buildDriverRouteFromAssignments returns existing route when already sufficient', async () => {

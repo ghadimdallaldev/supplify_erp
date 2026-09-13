@@ -62,6 +62,11 @@ vi.mock('../services/quote-requests.service.js', () => ({
     items: [{ productId: 'p-1', quantity: 2, quotedUnitPrice: 5, quoteResponseItemId: 'qri-1' }],
   }),
   assertRestaurantOwnsQuoteRequest: vi.fn().mockResolvedValue({ id: 'qr-1' }),
+  updateQuoteRequestStatus: vi.fn().mockResolvedValue({
+    quoteRequest: { id: 'qr-1', status: 'closed' },
+    items: [],
+    suppliers: [],
+  }),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -147,11 +152,23 @@ describe('quote-requests.routes', () => {
     expect(quoteService.submitQuoteResponse).not.toHaveBeenCalled()
   })
 
+  it('PATCH /:id closes or cancels an open quote request', async () => {
+    const res = await request(app).patch('/api/quote-requests/qr-1').send({ status: 'closed' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.data.quoteRequest.status).toBe('closed')
+    expect(quoteService.updateQuoteRequestStatus).toHaveBeenCalledWith('qr-1', 'rest-1', 'closed')
+  })
+
   it('POST to-cart returns cart payload without order', async () => {
     const res = await request(app).post('/api/quote-requests/qr-1/suppliers/qrs-1/to-cart')
     expect(res.status).toBe(200)
     expect(res.body.data.items).toHaveLength(1)
-    expect(quoteService.buildCartPayloadFromResponse).toHaveBeenCalled()
+    expect(quoteService.buildCartPayloadFromResponse).toHaveBeenCalledWith({
+      restaurantId: 'rest-1',
+      quoteRequestId: 'qr-1',
+      quoteRequestSupplierId: 'qrs-1',
+    })
   })
 
   it('POST supplier inbox decline delegates to declineQuoteRequest', async () => {

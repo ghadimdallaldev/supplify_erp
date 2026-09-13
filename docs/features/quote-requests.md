@@ -11,17 +11,19 @@ Restaurants send **multi-supplier quote requests** (RFQ) for catalog products. S
 3. Each invited supplier receives an in-app notification (`quote_request_received`).
 4. Supplier submits structured response per line item (price, availability, delivery date, substitute).
 5. Restaurant compares responses (`GET .../compare`) and optionally loads cart payload from a chosen response.
-6. Restaurant completes checkout via normal `POST /api/orders` — **quoted prices are informational in cart only**; order create still uses server price resolution.
+6. Restaurant completes checkout via normal `POST /api/orders` with `quoteLocks` — **quoted unit prices are locked at checkout** (`pricing_source = QUOTE_PRICE` on `order_item`). Clients must send `quoteLocks` for every quoted cart line (web CartPage and mobile CartScreen do this). **Server enforcement:** if an open RFQ has a responded, available quote line for a product in the order, checkout returns `400` unless that product is included in `quoteLocks` — raw API clients cannot silently use catalog/contract pricing instead. Checkout does **not** auto-close the RFQ — other invited suppliers may still respond until the restaurant closes it.
+7. Restaurant may **close or cancel** an open RFQ (`PATCH /api/quote-requests/:id/status`); suppliers can no longer respond or load cart payloads once status leaves `open`.
 
 ## API — Restaurant (`/api/quote-requests`)
 
-| Method | Path                                    | Permission                  | Description                                                              |
-| ------ | --------------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
-| POST   | `/`                                     | `ORDERS_CREATE`             | Create request (`items[]`, `supplierIds[]`, optional `note`, `neededBy`) |
-| GET    | `/`                                     | `CATALOG_VIEW` / `ORDERS_*` | Paginated list (`page`, `limit`, `status`: open/closed/cancelled)        |
-| GET    | `/:id`                                  | `CATALOG_VIEW` / `ORDERS_*` | Request detail with supplier statuses                                    |
-| GET    | `/:id/compare`                          | `CATALOG_VIEW` / `ORDERS_*` | Side-by-side comparison payload                                          |
-| POST   | `/:id/suppliers/:supplierRowId/to-cart` | `ORDERS_CREATE`             | Cart line payload from accepted response                                 |
+| Method | Path                                    | Permission                  | Description                                                                 |
+| ------ | --------------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| POST   | `/`                                     | `ORDERS_CREATE`             | Create request (`items[]`, `supplierIds[]`, optional `note`, `neededBy`)    |
+| GET    | `/`                                     | `CATALOG_VIEW` / `ORDERS_*` | Paginated list (`page`, `limit`, `status`: open/closed/cancelled)           |
+| GET    | `/:id`                                  | `CATALOG_VIEW` / `ORDERS_*` | Request detail with supplier statuses                                       |
+| GET    | `/:id/compare`                          | `CATALOG_VIEW` / `ORDERS_*` | Side-by-side comparison payload                                             |
+| POST   | `/:id/suppliers/:supplierRowId/to-cart` | `ORDERS_CREATE`             | Cart line payload from accepted response (uses substitute SKU when offered) |
+| PATCH  | `/:id/status`                           | `ORDERS_CREATE`             | Close or cancel an open request                                             |
 
 ## API — Supplier (`/api/quote-requests`)
 
@@ -63,7 +65,7 @@ Response items support: `isAvailable`, `unitPrice`, `quantity`, `deliveryDate`, 
 ## Notifications
 
 - **Supplier:** `quote_request_received` on create (deduped per supplier/request).
-- **Restaurant:** `quote_response_received` when a supplier submits a response.
+- **Restaurant:** `quote_response_received` when a supplier submits a response (deduped per supplier row, not per RFQ).
 - **Restaurant:** `quote_request_declined` when a supplier declines to quote; the
   optional reason is appended to the message and carried in `metadata.declineReason`.
 
@@ -107,10 +109,12 @@ Tables: `quote_requests`, `quote_request_items`, `quote_request_suppliers`, `quo
 
 ## Tests
 
-| File                                                   | Covers                        |
-| ------------------------------------------------------ | ----------------------------- |
-| `apps/api/src/services/quote-requests.service.test.js` | Create, notify, list, compare |
-| `apps/api/src/routes/quote-requests.routes.test.js`    | Route auth and validation     |
+| File                                                          | Covers                                        |
+| ------------------------------------------------------------- | --------------------------------------------- |
+| `apps/api/src/services/quote-requests.service.test.js`        | Create, notify, list, compare                 |
+| `apps/api/src/routes/quote-requests.routes.test.js`           | Route auth and validation                     |
+| `apps/api/src/services/resolve-product-price.service.test.js` | Open-quote product detection for checkout     |
+| `apps/api/src/routes/orders.routes.test.js`                   | Mandatory `quoteLocks` when open quotes exist |
 
 ## See also
 

@@ -252,6 +252,7 @@ export async function createSponsorshipOffer(
   supplierId,
   {
     prospectId,
+    planCode: requestedPlanCode = null,
     restaurantId = null,
     invitationId = null,
     suggestedPlanId = null,
@@ -288,7 +289,6 @@ export async function createSponsorshipOffer(
   }
 
   const config = await getReferralProgramConfig()
-  const prospect = eligibility.prospect
   const resolvedRestaurantId = eligibility.restaurantId
   const offerExpiresAt = addDays(new Date(), config.offerExpiryDays ?? 14)
 
@@ -296,11 +296,45 @@ export async function createSponsorshipOffer(
   if (suggestedPlanId) {
     const snap = await buildPricingSnapshot(suggestedPlanId)
     planCode = snap.planCode
+  } else if (requestedPlanCode) {
+    const eligible = (config.eligibleSponsorPlans || []).map((code) => String(code).toLowerCase())
+    planCode = String(requestedPlanCode).toLowerCase()
+    if (!eligible.includes(planCode)) {
+      throw new SponsorshipError(
+        'SPONSORSHIP_PLAN_NOT_ELIGIBLE',
+        `Plan ${requestedPlanCode} is not eligible for sponsorship`,
+        { statusCode: 400 }
+      )
+    }
   } else if ((config.eligibleSponsorPlans || []).length) {
     planCode = config.eligibleSponsorPlans[0]
   }
-
   const result = await withTransaction(async (client) => {
+    // Serialize sponsorship creation per supplier so yearly limits and
+    // idempotency remain correct under concurrent clicks/retries.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [
+      `supplier_sponsorship:${supplierId}`,
+    ])
+
+    if (idempotencyKey) {
+      const { rows: existing } = await client.query(
+        `SELECT * FROM supplier_sponsorship WHERE supplier_id = $1 AND idempotency_key = $2 FOR UPDATE`,
+        [supplierId, idempotencyKey]
+      )
+      if (existing[0]) return { sponsorship: existing[0], duplicate: true }
+    }
+
+    if (!eligibility.usage.unlimited && Number.isFinite(Number(eligibility.usage.limit))) {
+      const used = await countSponsorshipsThisYear(supplierId, client)
+      if (used >= Number(eligibility.usage.limit)) {
+        throw new SponsorshipError(
+          'SPONSORSHIP_LIMIT_REACHED',
+          'Cannot create sponsorship: limit_reached',
+          { statusCode: 403 }
+        )
+      }
+    }
+
     const { rows: attrRows } = await client.query(
       `INSERT INTO supplier_referral_attribution (
          supplier_id, prospect_id, restaurant_id, invitation_id, attribution_type,
@@ -350,6 +384,8 @@ export async function createSponsorshipOffer(
 
     return { sponsorship: sponsorRows[0], attributionId: attrRows[0].id }
   })
+
+  if (result.duplicate) return result
 
   if (resolvedRestaurantId) {
     await notifyTenantUsers({

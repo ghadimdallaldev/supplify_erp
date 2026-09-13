@@ -3,6 +3,7 @@ import { incrementDailyUsageMeterInTransaction } from '../lib/subscription.js'
 import { insertOrderItemsBatch } from './order-create.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 import { resolveSupplierDeliveryDate } from '../lib/supplier-last-order.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
 
 function elapsedMsSince(start) {
   return Math.round(performance.now() - start)
@@ -59,6 +60,13 @@ export async function createRestaurantOrdersInTransaction({
   for (const [supplierId, items] of supplierGroups.entries()) {
     lineCount += items.length
     const supplier = supplierProfiles.get(supplierId) ?? { id: supplierId }
+    const currencies = [...new Set(items.map((item) => item.currency || 'USD'))]
+    if (currencies.length > 1) {
+      throw new ValidationError(
+        `Mixed currencies in one supplier order are not supported (${currencies.join(', ')})`
+      )
+    }
+    const orderCurrency = currencies[0] || 'USD'
 
     let phaseStart = performance.now()
     const deliveryResolution = resolveSupplierDeliveryDate(
@@ -70,10 +78,16 @@ export async function createRestaurantOrdersInTransaction({
     } = await q(
       `
           INSERT INTO customer_order (restaurant_id, currency, status, notes, requested_delivery_date)
-          VALUES ($1, 'USD', $2, $3, $4::date)
+          VALUES ($1, $2, $3, $4, $5::date)
           RETURNING *
         `,
-      [restaurantId, orderStatus, orderData?.notes || null, deliveryResolution.deliveryDate]
+      [
+        restaurantId,
+        orderCurrency,
+        orderStatus,
+        orderData?.notes || null,
+        deliveryResolution.deliveryDate,
+      ]
     )
     order.deliveryResolution = deliveryResolution
     timings.orderHeaderInsertMs += elapsedMsSince(phaseStart)
@@ -146,6 +160,7 @@ export async function createRestaurantOrdersInTransaction({
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.unitPrice * item.quantity,
+        pricingSource: item.pricingSource ?? null,
       }))
 
       phaseStart = performance.now()

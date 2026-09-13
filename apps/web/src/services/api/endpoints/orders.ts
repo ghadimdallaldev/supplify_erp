@@ -511,12 +511,21 @@ export const ordersApi = api.injectEndpoints({
         status: 'picked_up' | 'out_for_delivery' | 'delivered' | 'failed' | 'rescheduled'
         notes?: string
         failure_reason?: string
+        driver_assignment_id?: string
+        warehouse_assignment_id?: string
       }
     >({
-      query: ({ orderId, status, notes, failure_reason }) => ({
+      query: ({
+        orderId,
+        status,
+        notes,
+        failure_reason,
+        driver_assignment_id,
+        warehouse_assignment_id,
+      }) => ({
         url: `/api/orders/${orderId}/delivery-status`,
         method: 'PATCH',
-        body: { status, notes, failure_reason },
+        body: { status, notes, failure_reason, driver_assignment_id, warehouse_assignment_id },
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),

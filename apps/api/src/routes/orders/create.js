@@ -44,6 +44,7 @@ import {
 import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
+  findOpenQuotedProductsForOrder,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
 import {
@@ -54,7 +55,6 @@ import { reserveStockForPlacedOrder } from '../../services/supplier-order-stock.
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
 import { redeemLoyaltyAtCheckout } from '../../services/loyalty.service.js'
-
 import {
   orderCreateSchema,
   supplierOrderCreateSchema,
@@ -127,6 +127,21 @@ router.post(
 
       const productMap = new Map(products.map((p) => [p.id, p]))
 
+      const lockByProductId = new Map(
+        (orderData.quoteLocks ?? []).map((lock) => [lock.productId, lock])
+      )
+      const openQuotedProducts = await findOpenQuotedProductsForOrder({
+        restaurantId,
+        productIds,
+      })
+      for (const { productId, sku } of openQuotedProducts.values()) {
+        if (!lockByProductId.has(productId)) {
+          throw new ValidationError(
+            `An open quote exists for ${sku || productId}. Remove the item and re-add it from your quote request, or include quoteLocks in the order payload.`
+          )
+        }
+      }
+
       const resolveItems = orderData.items.map((item) => {
         const product = productMap.get(item.productId)
         return {
@@ -140,19 +155,50 @@ router.post(
         items: resolveItems.filter((item) => item.supplierId),
         catalogByProductId,
         quoteLocks: orderData.quoteLocks,
+        date: orderData.deliveryDate ?? undefined,
       })
       const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
       orderCreateTimings.productPriceLookupMs = elapsedMsSince(phaseStart)
 
+      // Quote-locked checkout requires quoteLocks for every quoted cart line. The API cannot
+      // infer quote metadata from items alone — clients (web CartPage) must send locks.
       if (orderData.quoteLocks?.length) {
-        const lockByProductId = new Map(orderData.quoteLocks.map((lock) => [lock.productId, lock]))
+        const qriIds = orderData.quoteLocks.map((lock) => lock.quoteResponseItemId)
+        const { rows: quotedQtyRows } = await query(
+          `
+          SELECT qri.id, qri.quantity, qreq.product_id, p.sku
+          FROM quote_response_items qri
+          JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+          JOIN product p ON p.id = qreq.product_id
+          WHERE qri.id = ANY($1::uuid[])
+          `,
+          [qriIds]
+        )
+        const quotedQtyByResponseItemId = new Map(
+          quotedQtyRows.map((row) => [
+            row.id,
+            {
+              quantity: row.quantity != null ? Number(row.quantity) : null,
+              sku: row.sku,
+              productId: row.product_id,
+            },
+          ])
+        )
+
         for (const item of orderData.items) {
           if (!lockByProductId.has(item.productId)) continue
+          const lock = lockByProductId.get(item.productId)
           const resolved = resolvedMap.get(item.productId)
           if (resolved?.source !== 'QUOTE_PRICE') {
             const product = productMap.get(item.productId)
             throw new ValidationError(
               `Quoted price is no longer available for ${product?.sku || item.productId}. Remove the item and re-add it from your quote request.`
+            )
+          }
+          const quoted = quotedQtyByResponseItemId.get(lock.quoteResponseItemId)
+          if (quoted?.quantity != null && item.quantity > quoted.quantity) {
+            throw new ValidationError(
+              `Ordered quantity (${item.quantity}) exceeds quoted quantity (${quoted.quantity}) for ${quoted.sku || item.productId}`
             )
           }
         }
@@ -184,6 +230,7 @@ router.post(
           ...item,
           product,
           unitPrice: Number(resolved.unitPrice),
+          currency: resolved.currency || 'USD',
           pricingSource: resolved.source,
           contractPriceId: resolved.contractPriceId,
           defaultCatalogPrice: resolved.defaultPrice,
@@ -408,23 +455,33 @@ router.post(
                 promoLines,
               }) => {
                 let appliedPromotion = null
-                if (payload.promotionId) {
+                // Honor supplier quote locks: exclude QUOTE_PRICE lines from all promo paths
+                // (explicit promotionId, coupons, and auto-deals) so quoted unit prices stand.
+                const promoEligibleLines = promoLines.filter(
+                  (line) => line.pricingSource !== 'QUOTE_PRICE'
+                )
+                const promoEligibleSubtotal = promoEligibleLines.reduce(
+                  (sum, line) => sum + Number(line.lineTotal ?? 0),
+                  0
+                )
+
+                if (payload.promotionId && promoEligibleLines.length) {
                   appliedPromotion = await applyPromotionByIdToOrder({
                     client: txClient,
                     promotionId: payload.promotionId,
                     orderId: order.id,
                     supplierId,
                     restaurantId: restId,
-                    subtotal: totalAmount,
-                    lineItems: promoLines,
+                    subtotal: promoEligibleSubtotal,
+                    lineItems: promoEligibleLines,
                   })
-                } else if (payload.couponCode) {
+                } else if (payload.couponCode && promoEligibleLines.length) {
                   const couponMatch = await validateCouponForOrder({
                     couponCode: payload.couponCode,
                     supplierId,
                     restaurantId: restId,
-                    subtotal: totalAmount,
-                    lineItems: promoLines,
+                    subtotal: promoEligibleSubtotal,
+                    lineItems: promoEligibleLines,
                   })
                   if (couponMatch) {
                     appliedPromotion = await applyPromotionByIdToOrder({
@@ -433,20 +490,20 @@ router.post(
                       orderId: order.id,
                       supplierId,
                       restaurantId: restId,
-                      subtotal: totalAmount,
-                      lineItems: promoLines,
+                      subtotal: promoEligibleSubtotal,
+                      lineItems: promoEligibleLines,
                     })
                   }
                 }
 
-                if (!appliedPromotion) {
+                if (!appliedPromotion && promoEligibleLines.length) {
                   appliedPromotion = await applyBestPromotionToOrder({
                     client: txClient,
                     orderId: order.id,
                     supplierId,
                     restaurantId: restId,
-                    subtotal: totalAmount,
-                    lineItems: promoLines,
+                    subtotal: promoEligibleSubtotal,
+                    lineItems: promoEligibleLines,
                     skipDealPreflight: true,
                   })
                 }
@@ -720,21 +777,6 @@ router.post(
 
       // Create order with transaction
       const result = await withTransaction(async (client) => {
-        // Create order with status PLACED
-        const {
-          rows: [order],
-        } = await client.query(
-          `
-        INSERT INTO customer_order (restaurant_id, currency, status, notes)
-        VALUES ($1, 'USD', 'PLACED', $2)
-        RETURNING *
-      `,
-          [orderData.restaurant_id, orderData.notes || null]
-        )
-
-        let totalAmount = 0
-        const orderItems = []
-
         const manualResolveItems = orderData.items.map((item) => ({
           productId: item.productId,
           supplierId,
@@ -743,8 +785,33 @@ router.post(
         const manualResolved = await resolveProductPricesBatch({
           restaurantId: orderData.restaurant_id,
           items: manualResolveItems,
+          date: orderData.deliveryDate ?? undefined,
         })
         const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
+        const currencies = [
+          ...new Set([...manualResolvedMap.values()].map((resolved) => resolved.currency || 'USD')),
+        ]
+        if (currencies.length > 1) {
+          throw new ValidationError(
+            `Mixed currencies in one supplier order are not supported (${currencies.join(', ')})`
+          )
+        }
+        const orderCurrency = currencies[0] || 'USD'
+
+        // Create order with status PLACED
+        const {
+          rows: [order],
+        } = await client.query(
+          `
+        INSERT INTO customer_order (restaurant_id, currency, status, notes)
+        VALUES ($1, $2, 'PLACED', $3)
+        RETURNING *
+      `,
+          [orderData.restaurant_id, orderCurrency, orderData.notes || null]
+        )
+
+        let totalAmount = 0
+        const orderItems = []
 
         // Process each item
         for (const item of orderData.items) {

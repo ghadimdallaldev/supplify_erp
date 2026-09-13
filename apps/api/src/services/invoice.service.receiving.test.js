@@ -3,6 +3,7 @@ import {
   buildLineItemsFromReceiving,
   calculateInvoiceTotals,
   assertNoDuplicateInvoice,
+  prorateOrderDiscount,
 } from './invoice.service.js'
 import { ConflictError } from '../middlewares/errorHandler.js'
 
@@ -44,5 +45,19 @@ describe('invoice receiving helpers', () => {
   it('calculateInvoiceTotals with zero lines returns zero total', () => {
     const result = calculateInvoiceTotals([], { taxRate: 5 })
     expect(result.totalAmount).toBe(0)
+  })
+
+  it('prorateOrderDiscount scales promotion discount for partial receive', () => {
+    expect(prorateOrderDiscount(20, 50, 100)).toBe(10)
+    expect(prorateOrderDiscount(20, 100, 100)).toBe(20)
+    expect(prorateOrderDiscount(20, 0, 100)).toBe(0)
+  })
+
+  it('calculateInvoiceTotals applies prorated discount on partial subtotal', () => {
+    const lines = [{ line_total: 50 }]
+    const prorated = prorateOrderDiscount(20, 50, 100)
+    const result = calculateInvoiceTotals(lines, { taxRate: 0, orderDiscount: prorated })
+    expect(result.totalAmount).toBe(40)
+    expect(result.extraLines[0].line_total).toBe(-10)
   })
 })

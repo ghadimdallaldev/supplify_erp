@@ -89,10 +89,14 @@ vi.mock('../services/warehouseInventory.js', () => ({
   releaseInventoryForOrder: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../services/resolve-product-price.service.js', () => ({
-  resolveProductPricesBatch: vi.fn(),
-  getDefaultCatalogPricesBatch: vi.fn().mockResolvedValue(new Map()),
-}))
+vi.mock('../services/resolve-product-price.service.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    resolveProductPricesBatch: vi.fn(),
+    getDefaultCatalogPricesBatch: vi.fn().mockResolvedValue(new Map()),
+  }
+})
 
 vi.mock('../services/restaurant-order-create.service.js', () => ({
   createRestaurantOrdersInTransaction: vi.fn(),
@@ -120,7 +124,10 @@ vi.mock('../services/dashboard-summary.service.js', () => ({
 }))
 
 /** Shared checkout preflight mocks: product → blocklist → follow/link → supplier profile */
-function mockRestaurantCheckoutPreflight(db, { productId, supplierId }) {
+function mockRestaurantCheckoutPreflight(
+  db,
+  { productId, supplierId, openQuotedProducts = [], quoteLockQtyRows = null }
+) {
   db.query
     .mockResolvedValueOnce({
       rows: [
@@ -135,6 +142,13 @@ function mockRestaurantCheckoutPreflight(db, { productId, supplierId }) {
         },
       ],
     })
+    .mockResolvedValueOnce({ rows: openQuotedProducts }) // open quote lock requirement lookup
+
+  if (quoteLockQtyRows != null) {
+    db.query.mockResolvedValueOnce({ rows: quoteLockQtyRows })
+  }
+
+  db.query
     .mockResolvedValueOnce({ rows: [] }) // blocklist empty
     .mockResolvedValueOnce({
       rows: [{ supplier_id: supplierId, supplier_name: 'Supplier' }],
@@ -524,6 +538,12 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.order).toBeDefined()
+      expect(resolveProductPricesBatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restaurantId,
+          date: undefined,
+        })
+      )
 
       const { logger } = await import('../lib/logger.js')
       expect(logger.info).toHaveBeenCalledWith(
@@ -535,6 +555,48 @@ describe('Orders Routes', () => {
           totalTransactionMs: expect.any(Number),
           transactionQueryCount: expect.any(Number),
           stockLockAndReserveMs: expect.any(Number),
+        })
+      )
+    })
+
+    it('passes deliveryDate as contract as-of date to price resolver', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 9,
+          source: 'CONTRACT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: 'contract-1',
+        },
+      ])
+
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId })
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+          deliveryDate: '2026-12-15',
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(resolveProductPricesBatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restaurantId,
+          date: '2026-12-15',
         })
       )
     })
@@ -766,6 +828,171 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(false)
     })
+
+    it('rejects duplicate productId lines that could bypass quote qty or contract MOQ', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [
+            { productId, quantity: 5 },
+            { productId, quantity: 5 },
+          ],
+        })
+        .expect(400)
+
+      expect(response.body.ok).toBe(false)
+    })
+
+    it('returns 400 when open quote exists but quoteLocks are omitted', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+
+      mockRestaurantCheckoutPreflight(db, {
+        productId,
+        supplierId,
+        openQuotedProducts: [
+          {
+            original_product_id: productId,
+            substitute_product_id: null,
+            sku: 'SKU001',
+            submitted_at: new Date('2026-09-01T10:00:00Z'),
+          },
+        ],
+      })
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(400)
+
+      expect(response.body.ok).toBe(false)
+      expect(response.body.error.name).toBe('VALIDATION_ERROR')
+      expect(response.body.error.message).toContain('open quote exists')
+      expect(resolveProductPricesBatch).not.toHaveBeenCalled()
+    })
+
+    it('creates order when quoteLocks are provided for products with open quotes', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+      const quoteRequestSupplierId = '880e8400-e29b-41d4-a716-446655440003'
+      const quoteResponseItemId = '990e8400-e29b-41d4-a716-446655440004'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 8.5,
+          source: 'QUOTE_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+          quoteResponseItemId,
+        },
+      ])
+
+      mockRestaurantCheckoutPreflight(db, {
+        productId,
+        supplierId,
+        openQuotedProducts: [
+          {
+            original_product_id: productId,
+            substitute_product_id: null,
+            sku: 'SKU001',
+            submitted_at: new Date('2026-09-01T10:00:00Z'),
+          },
+        ],
+        quoteLockQtyRows: [
+          {
+            id: quoteResponseItemId,
+            quantity: 20,
+            sku: 'SKU001',
+            product_id: productId,
+          },
+        ],
+      })
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+          quoteLocks: [
+            {
+              productId,
+              quoteRequestSupplierId,
+              quoteResponseItemId,
+            },
+          ],
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(resolveProductPricesBatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restaurantId,
+          quoteLocks: [
+            {
+              productId,
+              quoteRequestSupplierId,
+              quoteResponseItemId,
+            },
+          ],
+        })
+      )
+    })
+
+    it('allows checkout without quoteLocks when no open quote exists for the product', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      const supplierId = '660e8400-e29b-41d4-a716-446655440001'
+      const restaurantId = '770e8400-e29b-41d4-a716-446655440002'
+
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getRestaurantIdForRequest).mockResolvedValueOnce(restaurantId)
+
+      const { resolveProductPricesBatch } = await import(
+        '../services/resolve-product-price.service.js'
+      )
+      vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+        {
+          productId,
+          supplierId,
+          quantity: 10,
+          unitPrice: 10.05,
+          source: 'DEFAULT_PRICE',
+          defaultPrice: 10.05,
+          contractPriceId: null,
+        },
+      ])
+
+      mockRestaurantCheckoutPreflight(db, { productId, supplierId, openQuotedProducts: [] })
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(201)
+
+      expect(response.body.ok).toBe(true)
+      expect(resolveProductPricesBatch).toHaveBeenCalled()
+    })
   })
 
   describe('PATCH /api/orders/:id', () => {
@@ -774,7 +1001,7 @@ describe('Orders Routes', () => {
       // RESTAURANT can only cancel orders
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'order-1', status: 'PENDING', restaurant_id: 'restaurant-1' }], // Order query
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }], // Order query
         })
         .mockResolvedValueOnce({
           rows: [{ supplier_id: 'supplier-1' }], // First item query for supplier_id

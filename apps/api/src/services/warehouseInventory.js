@@ -127,6 +127,20 @@ async function commitWarehouseStock(client, warehouseId, productId, quantity) {
   )
 }
 
+/** Restore on-hand qty when a dispatched (already committed) assignment is cancelled. */
+async function restoreDispatchedWarehouseStock(client, warehouseId, productId, quantity) {
+  const qty = Number(quantity)
+  if (!qty || qty <= 0) return
+
+  await client.query(
+    `UPDATE warehouse_inventory
+     SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + $1,
+         updated_at = now()
+     WHERE warehouse_id = $2 AND product_id = $3`,
+    [qty, warehouseId, productId]
+  )
+}
+
 async function lineItemsForAssignment(client, orderId, assignment) {
   if (assignment.order_item_id) {
     const { rows } = await client.query(
@@ -143,16 +157,27 @@ async function lineItemsForAssignment(client, orderId, assignment) {
 }
 
 export async function releaseInventoryForOrder(client, orderId) {
+  // Cancel before dispatch: release reserved qty. After dispatch: restore on_hand (commit already ran).
+  // Restaurant cancel is blocked after SHIPPED; supplier decline on SHIPPED still hits this path.
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('dispatched', 'delivered', 'failed')`,
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
     [orderId]
   )
 
   for (const assignment of assignments) {
     const lines = await lineItemsForAssignment(client, orderId, assignment)
     for (const line of lines) {
-      await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+      if (assignment.status === 'dispatched') {
+        await restoreDispatchedWarehouseStock(
+          client,
+          assignment.warehouse_id,
+          line.product_id,
+          line.quantity
+        )
+      } else {
+        await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+      }
     }
   }
 
@@ -332,6 +357,23 @@ export async function allWarehouseAssignmentsTerminal(client, orderId) {
   const total = Number(rows[0]?.total || 0)
   const terminal = Number(rows[0]?.terminal || 0)
   return total === 0 || total === terminal
+}
+
+/**
+ * True when every warehouse assignment for the order is delivered (none failed/pending).
+ */
+export async function allWarehouseAssignmentsDelivered(client, orderId) {
+  const { rows } = await client.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status = 'delivered')::int AS delivered
+     FROM order_warehouse_assignment
+     WHERE order_id = $1`,
+    [orderId]
+  )
+  const total = Number(rows[0]?.total || 0)
+  const delivered = Number(rows[0]?.delivered || 0)
+  return total > 0 && total === delivered
 }
 
 /**

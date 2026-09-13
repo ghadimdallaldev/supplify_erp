@@ -348,6 +348,7 @@ export const {
   useGetQuoteRequestCompareQuery,
   useCreateQuoteRequestMutation,
   useConvertQuoteResponseToCartMutation,
+  useUpdateQuoteRequestStatusMutation,
   useGetSupplierQuoteInboxQuery,
   useGetSupplierQuoteRequestDetailQuery,
   useSubmitSupplierQuoteResponseMutation,

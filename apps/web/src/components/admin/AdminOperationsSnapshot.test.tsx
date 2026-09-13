@@ -15,6 +15,8 @@ describe('AdminOperationsSnapshot', () => {
     expect(screen.getByText('Tenants over limit')).toBeInTheDocument()
     expect(screen.getByText('9')).toBeInTheDocument()
     expect(screen.getByText('7 near limit')).toBeInTheDocument()
+    expect(screen.getByTestId('admin-operations-snapshot').tagName).toBe('DETAILS')
+    expect(screen.getByTestId('admin-operations-snapshot')).not.toHaveAttribute('open')
   })
 
   it('shows Not available when tenantsOverLimit is missing', () => {

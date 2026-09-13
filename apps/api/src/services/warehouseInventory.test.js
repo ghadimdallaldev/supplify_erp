@@ -72,6 +72,40 @@ describe('warehouseInventory', () => {
     ])
   })
 
+  it('restores on_hand when cancelling dispatched warehouse assignments', async () => {
+    const client = {
+      query: vi.fn(async (sql) => {
+        if (sql.includes('FROM order_warehouse_assignment') && sql.includes('SELECT *')) {
+          return {
+            rows: [
+              {
+                id: 'a-dispatched',
+                order_id: 'order-1',
+                order_item_id: null,
+                warehouse_id: 'wh-1',
+                status: 'dispatched',
+              },
+            ],
+          }
+        }
+        if (sql.includes('FROM order_item')) {
+          return { rows: [{ product_id: 'p1', quantity: 3 }] }
+        }
+        return { rows: [] }
+      }),
+    }
+
+    await releaseInventoryForOrder(client, 'order-1')
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining('quantity_on_hand = COALESCE(quantity_on_hand, 0) +'),
+      [3, 'wh-1', 'p1']
+    )
+    expect(
+      client.query.mock.calls.some((c) => String(c[0]).includes('quantity_reserved = GREATEST'))
+    ).toBe(false)
+  })
+
   it('heals missing warehouse rows then reserves when supplierId is provided', async () => {
     let lockPass = 0
     const client = {

@@ -179,6 +179,7 @@ export const growthApi = api.injectEndpoints({
       { sponsorship: SupplierSponsorship },
       {
         prospectId: string
+        planCode?: string
         suggestedPlanId?: string
         idempotencyKey?: string
       }

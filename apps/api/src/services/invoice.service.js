@@ -149,6 +149,30 @@ export async function buildLineItemsFromReceiving(client, reportId) {
   })
 }
 
+/**
+ * Scale order-level promotion discount when only part of the order is invoiced (partial receive).
+ */
+export function prorateOrderDiscount(orderDiscount, receivedSubtotal, orderSubtotal) {
+  const discount = roundMoney(orderDiscount)
+  const received = roundMoney(receivedSubtotal)
+  const ordered = roundMoney(orderSubtotal)
+  if (discount <= 0 || ordered <= 0 || received <= 0) return 0
+  if (received >= ordered) return discount
+  return roundMoney(discount * (received / ordered))
+}
+
+export async function getOrderSubtotalForSupplier(client, orderId, supplierId) {
+  const { rows } = await client.query(
+    `
+    SELECT COALESCE(SUM(oi.line_total), 0)::numeric AS subtotal
+    FROM order_item oi
+    WHERE oi.order_id = $1 AND oi.supplier_id = $2
+    `,
+    [orderId, supplierId]
+  )
+  return roundMoney(rows[0]?.subtotal || 0)
+}
+
 export function calculateInvoiceTotals(
   lineItems,
   { taxRate = 0, orderDiscount = 0, deliveryFee = 0 } = {}
@@ -240,7 +264,12 @@ export async function createInvoiceFromReceiving(
 
   const taxConfig = await getSupplierTaxConfig(client, supplierId)
   const taxRate = parseFloat(taxConfig.tax_rate || 0)
-  const { orderDiscount } = await getOrderAdjustments(client, order.id)
+  const { orderDiscount: fullOrderDiscount } = await getOrderAdjustments(client, order.id)
+  const receivedSubtotal = roundMoney(
+    lineItems.reduce((sum, line) => sum + roundMoney(line.line_total), 0)
+  )
+  const orderSubtotal = await getOrderSubtotalForSupplier(client, order.id, supplierId)
+  const orderDiscount = prorateOrderDiscount(fullOrderDiscount, receivedSubtotal, orderSubtotal)
   const paymentTermsDays = await getSupplierPaymentTermsDays(client, supplierId)
 
   const totals = calculateInvoiceTotals(lineItems, { taxRate, orderDiscount })

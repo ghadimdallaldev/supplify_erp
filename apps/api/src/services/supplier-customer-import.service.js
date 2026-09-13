@@ -14,6 +14,26 @@ const FIELD_ALIASES = {
   notes: ['notes', 'note', 'comments', 'remarks'],
 }
 
+const IMPORT_CONCURRENCY = 8
+
+async function mapWithConcurrency(items, worker, concurrency = IMPORT_CONCURRENCY) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+  const workerCount = Math.min(concurrency, items.length)
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex++
+        if (index >= items.length) return
+        results[index] = await worker(items[index])
+      }
+    })
+  )
+
+  return results
+}
+
 function normalizeHeader(h) {
   return String(h || '')
     .trim()
@@ -39,18 +59,59 @@ function mapRow(headers, values) {
 }
 
 export function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim())
-  if (lines.length < 2) {
+  // Parse RFC 4180-style records so customer names, notes, and addresses may
+  // contain commas, escaped quotes, and newlines without shifting columns.
+  const source = String(text || '').replace(/^\uFEFF/, '')
+  const records = []
+  let record = []
+  let field = ''
+  let inQuotes = false
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (source[i + 1] === '"') {
+          field += '"'
+          i += 1
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += char
+      }
+      continue
+    }
+
+    if (char === '"' && field === '') {
+      inQuotes = true
+    } else if (char === ',') {
+      record.push(field.trim())
+      field = ''
+    } else if (char === '\n') {
+      record.push(field.trim())
+      if (record.some((value) => value !== '')) records.push(record)
+      record = []
+      field = ''
+    } else if (char !== '\r') {
+      field += char
+    }
+  }
+
+  if (inQuotes) throw new ValidationError('CSV contains an unterminated quoted field')
+  record.push(field.trim())
+  if (record.some((value) => value !== '')) records.push(record)
+
+  if (records.length < 2) {
     throw new ValidationError('CSV must include a header row and at least one data row')
   }
-  const headers = lines[0].split(',').map((h) => h.trim())
-  const rows = lines.slice(1).map((line, index) => {
-    const values = line.split(',').map((v) => v.trim().replace(/^"|"$/g, ''))
-    return { rowNumber: index + 2, raw: mapRow(headers, values) }
-  })
+  const headers = records[0]
+  const rows = records.slice(1).map((values, index) => ({
+    rowNumber: index + 2,
+    raw: mapRow(headers, values),
+  }))
   return { headers, rows }
 }
-
 function validateCustomerRow(mapped, rowNumber) {
   const errors = []
   if (!mapped.restaurant_name) {
@@ -122,7 +183,7 @@ export function buildCustomerImportErrorReportCsv(errors = []) {
   return lines.join('\n')
 }
 
-export async function executeCustomerImport(supplierId, csvText, { userId, partial = true } = {}) {
+export async function executeCustomerImport(supplierId, csvText, { userId } = {}) {
   const { rows } = parseCsv(csvText)
   const summary = { created: 0, skipped: 0, failed: 0, batchId: null }
   const rowErrors = []
@@ -136,34 +197,21 @@ export async function executeCustomerImport(supplierId, csvText, { userId, parti
   const batchId = batchRows[0].id
   summary.batchId = batchId
 
-  for (const { rowNumber, raw } of rows) {
+  const outcomes = await mapWithConcurrency(rows, async ({ rowNumber, raw }) => {
     const validationError = validateCustomerRow(raw, rowNumber)
-    if (validationError) {
-      summary.failed += 1
-      rowErrors.push(validationError)
-      if (!partial) continue
-      continue
-    }
+    if (validationError) return { type: 'failed', rowError: validationError }
 
     try {
-      if (raw.email) {
-        const { rows: dup } = await query(
-          `SELECT id FROM supplier_customer_prospect
-           WHERE supplier_id = $1 AND normalized_email = lower(trim($2))`,
-          [supplierId, raw.email]
-        )
-        if (dup.length) {
-          summary.skipped += 1
-          continue
-        }
-      }
       const addressJson = raw.address ? { street: raw.address } : {}
-      await query(
+      const { rows: inserted } = await query(
         `INSERT INTO supplier_customer_prospect (
            supplier_id, import_batch_id, restaurant_name, contact_person, phone, email,
            address_json, area_region, credit_limit, payment_terms, sales_rep, notes
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
+         ON CONFLICT (supplier_id, normalized_email)
+           WHERE normalized_email IS NOT NULL DO NOTHING
+         RETURNING id`,
         [
           supplierId,
           batchId,
@@ -179,14 +227,22 @@ export async function executeCustomerImport(supplierId, csvText, { userId, parti
           raw.notes || null,
         ]
       )
-      summary.created += 1
+      return inserted.length ? { type: 'created' } : { type: 'skipped' }
     } catch (err) {
-      if (err.code === '23505') {
-        summary.skipped += 1
-        continue
+      if (err.code === '23505') return { type: 'skipped' }
+      return {
+        type: 'failed',
+        rowError: { rowNumber, errors: [{ field: 'row', message: err.message }] },
       }
+    }
+  })
+
+  for (const outcome of outcomes) {
+    if (outcome.type === 'created') summary.created += 1
+    else if (outcome.type === 'skipped') summary.skipped += 1
+    else {
       summary.failed += 1
-      rowErrors.push({ rowNumber, errors: [{ field: 'row', message: err.message }] })
+      rowErrors.push(outcome.rowError)
     }
   }
 

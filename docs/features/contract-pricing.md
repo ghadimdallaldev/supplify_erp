@@ -33,18 +33,18 @@ flowchart TD
   I --> J[Promotions/deals apply on resolved subtotal]
 ```
 
-1. **Supplier** opens **Contract Pricing** (`/app/contract-pricing`), selects restaurant + product, sets price and optional terms.
+1. **Supplier** opens **Contract Pricing** (`/app/contract-pricing`), selects restaurant + product, sets price (or discount % off catalog) and optional terms.
 2. **Restaurant** sees **Your price** in catalog (`/app/products`) and **My Prices** (`/app/my-prices`).
 3. **Cart** uses resolved price; quantity changes re-resolve via `POST /api/restaurant-pricing/resolve`.
 4. **Order placement** calls `resolveProductPricesBatch` server-side and stores metadata on each `order_item`.
 
 ## Pricing precedence
 
-| Step | Rule                                                                                                                         |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 1    | **Contract price** if row is active, date-valid, and `quantity >= min_order_quantity`                                        |
-| 2    | Else **default catalog price** from `price` table                                                                            |
-| 3    | **Promotions/deals** unchanged — applied after line prices are resolved (existing `applyBestPromotionToOrder` / coupon flow) |
+| Step | Rule                                                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------ |
+| 1    | **Contract price** if row is active, date-valid, and `quantity >= min_order_quantity`                                    |
+| 2    | Else **default catalog price** from `price` table                                                                        |
+| 3    | **Promotions/deals** — auto best-deal skips `QUOTE_PRICE` lines; coupons/explicit promotion IDs still apply to full cart |
 
 ### Contract validity
 
@@ -52,8 +52,8 @@ A contract applies when **all** are true:
 
 - `restaurant_id`, `supplier_id`, `product_id` match
 - `is_active = true`
-- `contract_start_date` is null or `<= today`
-- `contract_end_date` is null or `>= today`
+- `contract_start_date` is null or `<= as-of date` (checkout uses requested **delivery date** when present, else today)
+- `contract_end_date` is null or `>= as-of date`
 - `min_order_quantity` is null or `<= order/catalog quantity`
 
 ### Duplicate contracts
@@ -103,6 +103,8 @@ Removed: legacy `/tiers` endpoints (no `pricing_tier` table in schema).
 
 Key columns: `supplier_id`, `restaurant_id`, `product_id`, `price`, `currency`, `contract_discount_percentage`, `contract_start_date`, `contract_end_date`, `agreement_type`, `min_order_quantity`, `is_active`, `notes`.
 
+**Discount percentage:** On create/bulk, when `contractDiscountPercentage` is set and `price` is omitted, the API derives `price = catalog × (1 − discount/100)`. When both are sent, **explicit `price` wins** and the percentage is stored for display/reporting.
+
 ### `order_item` (migration `0130_contract_pricing_productization.sql`)
 
 | Column                  | Type    | Description                                                     |
@@ -149,7 +151,7 @@ Tenant isolation enforced via `getSupplierIdForRequest` / `getRestaurantIdForReq
 2. Compute line subtotals
 3. Apply promotion/coupon/best-deal on subtotal (existing services)
 
-Contract price is the **base** for promotion eligibility and discount calculation. Promotion application may update order totals and set promotion metadata separately; line `unit_price` remains the resolved base snapshot.
+Contract price is the **base** for promotion eligibility and discount calculation. Quote-locked lines (`QUOTE_PRICE`) are excluded from automatic best-deal selection so the supplier quote is honored; explicit coupon/promotion selection may still discount the order total. Line `unit_price` remains the resolved base snapshot.
 
 ## Bulk tools — next phase
 

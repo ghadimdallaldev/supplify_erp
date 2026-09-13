@@ -98,6 +98,20 @@ export const publicApi = api.injectEndpoints({
         method: 'POST',
       }),
     }),
+    updateQuoteRequestStatus: builder.mutation<
+      QuoteRequestDetail,
+      { quoteRequestId: string; status: 'closed' | 'cancelled' }
+    >({
+      query: ({ quoteRequestId, status }) => ({
+        url: `/api/quote-requests/${quoteRequestId}`,
+        method: 'PATCH',
+        body: { status },
+      }),
+      invalidatesTags: (_r, _e, { quoteRequestId }) => [
+        'QuoteRequest',
+        { type: 'QuoteRequest', id: quoteRequestId },
+      ],
+    }),
     getSupplierQuoteInbox: builder.query<
       SupplierQuoteInboxResponse,
       {

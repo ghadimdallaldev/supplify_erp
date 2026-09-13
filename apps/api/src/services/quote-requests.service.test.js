@@ -26,6 +26,7 @@ import {
   submitQuoteResponse,
   declineQuoteRequest,
   buildCartPayloadFromResponse,
+  updateQuoteRequestStatus,
 } from './quote-requests.service.js'
 import { NotFoundError, ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
 
@@ -96,6 +97,7 @@ describe('quote-requests.service', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const detail = await declineQuoteRequest({
       supplierId: 'supplier-1',
@@ -130,11 +132,15 @@ describe('quote-requests.service', () => {
   })
 
   it('creates quote request and notifies suppliers once each', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ id: 'supplier-1' }] }).mockResolvedValueOnce({
-      rows: [
-        { id: 'product-1', supplier_id: 'supplier-1', name: 'Chicken', sku: 'CHK', unit: 'kg' },
-      ],
-    })
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'supplier-1', name: 'Fresh Co', account_status: 'ACTIVE', is_blocked: false }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'product-1', supplier_id: 'supplier-1', name: 'Chicken', sku: 'CHK', unit: 'kg' },
+        ],
+      })
 
     withTransactionMock.mockImplementation(async (fn) => {
       const client = {
@@ -165,8 +171,17 @@ describe('quote-requests.service', () => {
     )
   })
 
-  it('rejects when no eligible suppliers', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [] })
+  it('rejects when any invited supplier is ineligible', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'supplier-blocked',
+          name: 'Blocked Co',
+          account_status: 'ACTIVE',
+          is_blocked: true,
+        },
+      ],
+    })
     await expect(
       createQuoteRequest({
         restaurantId: 'rest-1',
@@ -174,7 +189,34 @@ describe('quote-requests.service', () => {
         items: [{ productId: 'product-1', quantity: 1 }],
         supplierIds: ['supplier-blocked'],
       })
-    ).rejects.toThrow('No eligible suppliers')
+    ).rejects.toThrow('Cannot invite ineligible supplier')
+  })
+
+  it('rejects products that do not belong to any invited supplier', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'supplier-1', name: 'Fresh Co', account_status: 'ACTIVE', is_blocked: false }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'product-1',
+            supplier_id: 'supplier-other',
+            name: 'Chicken',
+            sku: 'CHK',
+            unit: 'kg',
+          },
+        ],
+      })
+
+    await expect(
+      createQuoteRequest({
+        restaurantId: 'rest-1',
+        userId: 'user-1',
+        items: [{ productId: 'product-1', quantity: 1 }],
+        supplierIds: ['supplier-1'],
+      })
+    ).rejects.toThrow('do not belong to any invited supplier')
   })
 
   it('lists restaurant quote requests with pagination', async () => {
@@ -230,6 +272,7 @@ describe('quote-requests.service', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
     expect(detail.canRespond).toBe(true)
@@ -255,6 +298,7 @@ describe('quote-requests.service', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
 
     const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
     expect(detail.canRespond).toBe(false)
@@ -278,6 +322,7 @@ describe('quote-requests.service', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
@@ -344,6 +389,30 @@ describe('quote-requests.service', () => {
     expect(result.pagination.total).toBe(1)
   })
 
+  it('refuses response when supplier previously declined', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'qrs-1',
+          quote_request_id: 'qr-1',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'rest-1',
+          status: 'declined',
+          quote_request_status: 'open',
+        },
+      ],
+    })
+
+    await expect(
+      submitQuoteResponse({
+        supplierId: 'supplier-1',
+        quoteRequestSupplierId: 'qrs-1',
+        items: [{ quoteRequestItemId: 'item-1' }],
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(withTransactionMock).not.toHaveBeenCalled()
+  })
+
   it('submits quote response and notifies restaurant', async () => {
     queryMock
       .mockResolvedValueOnce({
@@ -389,6 +458,7 @@ describe('quote-requests.service', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'resp-1', note: null, submitted_at: new Date() }] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
 
     await submitQuoteResponse({
       supplierId: 'supplier-1',
@@ -401,6 +471,61 @@ describe('quote-requests.service', () => {
     expect(notifyQuoteResponseReceivedMock).toHaveBeenCalledTimes(1)
   })
 
+  it('getSupplierQuoteRequestDetail filters items to supplier-owned products', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'pending',
+            quote_request_status: 'open',
+            quote_request_note: null,
+            needed_by: null,
+            quote_request_created_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'item-1', product_id: 'product-1', quantity: 5, unit: 'kg' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ currency: 'AED' }] })
+
+    const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
+
+    const itemsSql = queryMock.mock.calls[1][0]
+    expect(itemsSql).toContain('p.supplier_id = $2')
+    expect(queryMock.mock.calls[1][1]).toEqual(['qr-1', 'supplier-1'])
+    expect(detail.defaultCurrency).toBe('AED')
+  })
+
+  it('buildCartPayloadFromResponse rejects supplier row from another quote request', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'qrs-1',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'rest-1',
+          quote_request_id: 'qr-other',
+          status: 'responded',
+          quote_request_status: 'open',
+        },
+      ],
+    })
+
+    await expect(
+      buildCartPayloadFromResponse({
+        restaurantId: 'rest-1',
+        quoteRequestId: 'qr-1',
+        quoteRequestSupplierId: 'qrs-1',
+      })
+    ).rejects.toThrow('does not belong to this quote request')
+  })
+
   it('buildCartPayloadFromResponse rejects wrong restaurant', async () => {
     queryMock.mockResolvedValueOnce({
       rows: [
@@ -409,6 +534,7 @@ describe('quote-requests.service', () => {
           supplier_id: 'supplier-1',
           restaurant_id: 'rest-other',
           status: 'responded',
+          quote_request_status: 'open',
         },
       ],
     })
@@ -421,6 +547,59 @@ describe('quote-requests.service', () => {
     ).rejects.toBeInstanceOf(ForbiddenError)
   })
 
+  it('buildCartPayloadFromResponse uses substitute product when offered', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            status: 'responded',
+            quote_request_status: 'open',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'resp-1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qri-1',
+            product_id: 'product-original',
+            substitute_product_id: 'product-sub',
+            substitute_id: 'product-sub',
+            requested_quantity: 5,
+            quantity: 5,
+            unit_price: 7.5,
+            currency: 'USD',
+            name: 'Original Rice',
+            sku: 'RICE-ORIG',
+            unit: 'kg',
+            supplier_id: 'supplier-1',
+            image_url: null,
+            description: null,
+            substitute_name: 'Substitute Rice',
+            substitute_sku: 'RICE-SUB',
+            substitute_unit: 'bag',
+            substitute_image_url: null,
+            substitute_description: 'Alt pack',
+            supplier_name: 'Fresh Co',
+            supplier_slug: 'fresh-co',
+          },
+        ],
+      })
+
+    const payload = await buildCartPayloadFromResponse({
+      restaurantId: 'rest-1',
+      quoteRequestSupplierId: 'qrs-1',
+    })
+
+    expect(payload.items[0].productId).toBe('product-sub')
+    expect(payload.items[0].originalProductId).toBe('product-original')
+    expect(payload.items[0].product.sku).toBe('RICE-SUB')
+    expect(payload.items[0].quotedUnitPrice).toBe(7.5)
+  })
+
   it('buildCartPayloadFromResponse returns cart items without creating order', async () => {
     queryMock
       .mockResolvedValueOnce({
@@ -430,6 +609,7 @@ describe('quote-requests.service', () => {
             supplier_id: 'supplier-1',
             restaurant_id: 'rest-1',
             status: 'responded',
+            quote_request_status: 'open',
           },
         ],
       })
@@ -465,5 +645,29 @@ describe('quote-requests.service', () => {
     expect(payload.items[0].quoteResponseItemId).toBe('qri-1')
     expect(payload.quoteRequestSupplierId).toBe('qrs-1')
     expect(payload.disclaimer).toBeUndefined()
+  })
+
+  it('updateQuoteRequestStatus closes an open quote request', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qr-1',
+            restaurant_id: 'rest-1',
+            status: 'closed',
+            note: null,
+            needed_by: null,
+            created_by: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'qr-1', restaurant_id: 'rest-1', status: 'closed' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await updateQuoteRequestStatus('qr-1', 'rest-1', 'closed')
+    expect(detail.quoteRequest.status).toBe('closed')
   })
 })

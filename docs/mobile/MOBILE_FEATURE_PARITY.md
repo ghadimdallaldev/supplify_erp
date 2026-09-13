@@ -2,6 +2,17 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Contract pricing, fulfillment, and quotation correctness audit
+
+- Audited and fixed critical/high business-logic defects across contract pricing, fulfillment, and quotations in the API/web monorepo; both mobile apps updated for client-contract changes.
+- **Contract pricing:** recipe cost hooks on contract PATCH now scoped to the contract restaurant; create/bulk require commercial relationship; validity uses calendar/`CURRENT_DATE` (not UTC `toISOString`); amendments re-resolve prices; discount % can derive price when price omitted (discount-only PATCH fires recipe hook); checkout uses delivery date for as-of validity; bulk dedupes productIds; Active badge respects date windows; order currency from resolved prices.
+- **Fulfillment:** receiving requires all order lines; order status transition matrix enforced (restaurant cancel only early statuses); cancel restores dispatched stock when allowed; all-rejected receive → `RECEIVED_WITH_DISPUTE` without false `RECEIVED_FULL`; multi-WH driver updates require assignment IDs; order `DELIVERED` only when all WH legs delivered; route planning syncs all pending WH legs; supplier delivery + fulfillment dispatch boards expose one row per driver assignment; board exposes real `driver_id` / `assignmentId`; POD policy helper (optional until a setting exists).
+- **Quotations:** quote locks required when an open responded quote exists; locks require RFQ `open`; close/cancel API + UI; cart merge preserves quote locks; duplicate `productId` lines rejected; supplier inbox filters own products; to-cart validates supplier row ownership; declined cannot re-respond; fail-fast ineligible suppliers; qty capped to quoted qty; notification dedup per supplier-row; substitutes flow into cart; promos skip `QUOTE_PRICE` lines; checkout no longer auto-closes whole RFQ; supplier response uses `defaultCurrency`.
+- **Mobile (Android + iOS):** cart quote-lock merge overwrite; quote close/cancel on detail; supplier response respects `canRespond`/closed RFQ + defaultCurrency; driver board rows keyed by `assignmentId` for multi-leg; delivery-status passes `driver_assignment_id` when known. Contract pricing mobile UI remains intentional subset (price/notes). Restaurant cancel UI absent on mobile (API enforces). Receiving already submits all lines.
+- **Deferred (continue next session):** supplier manual orders still skip open-quote lock guard (may be intentional phone-order path); driver deliver can set order `DELIVERED` without prior `SHIPPED` via driver path; cart quote metadata stickiness when re-adding catalog SKU; RFQ close TOCTOU during supplier respond; warehouse filter on dispatch still order-level (can show sibling WH legs); deep E2E lifecycle coverage still smoke-level; no tenant “POD required” setting yet.
+- Docs updated: `docs/features/quote-requests.md`, `docs/features/contract-pricing.md`, `docs/features/drivers-and-gps-tracking.md`, `docs/onboarding/13-acceptance-criteria.md` §25.
+- Verification: focused API suites for pricing/quotes/receiving/transitions/driver/routes/invoices/orders/board/POD passed; mobile `tsc --noEmit` on both apps.
+
 ## 2026-09-14 — Supplier catalog empty despite seeded products (web)
 
 - Web `ProductsPage` filtered supplier results by `product.supplier_email === user.email`, but `GET /api/products` list payloads do not include `supplier_email`, so every supplier saw an empty catalog while pagination still reported the real total (e.g. “0 of 500”).
@@ -736,3 +747,17 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - Web chat keeps the message textarea focused when sending with the mouse and keeps it focusable while a send/upload is in progress, so the cursor does not disappear from the composer.
 - Android and iOS chat threads now apply keyboard avoidance on both platforms so the composer moves above the software keyboard. Android continues to use the native softwareKeyboardLayoutMode resize setting.
+
+## 2026-09-14 - Customer growth and AI hardening
+
+- Fixed supplier customer CSV parsing for quoted commas, escaped quotes, BOMs, and multiline fields.
+- Customer matching now processes imports with bounded concurrency to reduce large-import latency without unbounded database load.
+- Sponsorship offers now carry and validate the supplier-selected plan code; duplicate sponsorship actions are disabled while a request is pending, and supplier-scoped transaction locking protects yearly limits/idempotency during concurrent retries.
+- AI tool capability checks and independent tool calls run concurrently, and reorder AI capability resolution avoids duplicate feature-flag lookups.
+- Android and iOS customer-growth screens remain metric/prospect views and open the web workflow for import/invite/sponsor; both mobile growth type contracts now document the optional sponsorship plan code.
+
+## 2026-09-14 - Admin dashboard hierarchy and density refresh
+
+- Web-only admin UI refresh: the platform overview now removes repeated KPI cards, prioritizes attention/activity/quick actions, and collapses operational, subscription, and growth detail until requested.
+- The admin sidebar keeps all existing destinations but collapses billing and growth groups by default, reopening the active group automatically.
+- No API, permissions, notification behavior, or mobile client contract changed; Android and iOS require no code changes.

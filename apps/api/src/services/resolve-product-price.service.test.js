@@ -208,6 +208,145 @@ describe('resolve-product-price.service', () => {
     expect(batchResults[0].source).toBe('QUOTE_PRICE')
     expect(batchResults[0].unitPrice).toBe(11.5)
     expect(batchResults[0].quoteResponseItemId).toBe(quoteResponseItemId)
+    expect(String(queryMock.mock.calls[0][0])).toContain("qr.status = 'open'")
+  })
+
+  it('resolves quote price for substitute product id in quoteLocks', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+    const quoteResponseItemId = '66666666-6666-4666-8666-666666666666'
+    const quoteRequestSupplierId = '77777777-7777-4777-8777-777777777777'
+    const substituteProductId = '88888888-8888-4888-8888-888888888888'
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            quote_response_item_id: quoteResponseItemId,
+            unit_price: '9.25',
+            currency: 'USD',
+            product_id: PRODUCT_ID,
+            substitute_product_id: substituteProductId,
+            supplier_id: SUPPLIER_ID,
+            quote_request_supplier_id: quoteRequestSupplierId,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { product_id: PRODUCT_ID, amount: '20', currency: 'USD' },
+          { product_id: substituteProductId, amount: '18', currency: 'USD' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const batchResults = await resolveProductPricesBatch({
+      restaurantId: RESTAURANT_ID,
+      items: [{ productId: substituteProductId, supplierId: SUPPLIER_ID, quantity: 1 }],
+      catalogByProductId: new Map([
+        [PRODUCT_ID, { amount: 20, currency: 'USD' }],
+        [substituteProductId, { amount: 18, currency: 'USD' }],
+      ]),
+      quoteLocks: [
+        {
+          productId: substituteProductId,
+          quoteRequestSupplierId,
+          quoteResponseItemId,
+        },
+      ],
+    })
+
+    expect(batchResults[0].source).toBe('QUOTE_PRICE')
+    expect(batchResults[0].unitPrice).toBe(9.25)
+    expect(batchResults[0].productId).toBe(substituteProductId)
+  })
+
+  it('returns null for quote price when RFQ is not open', async () => {
+    const { resolveQuotePrice } = await import('./resolve-product-price.service.js')
+    const quoteResponseItemId = '66666666-6666-4666-8666-666666666666'
+    const quoteRequestSupplierId = '77777777-7777-4777-8777-777777777777'
+
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    const quoteResult = await resolveQuotePrice({
+      restaurantId: RESTAURANT_ID,
+      quoteRequestSupplierId,
+      quoteResponseItemId,
+      productId: PRODUCT_ID,
+      supplierId: SUPPLIER_ID,
+    })
+
+    expect(quoteResult).toBeNull()
+    expect(String(queryMock.mock.calls[0][0])).toContain("qr.status = 'open'")
+  })
+
+  it('uses CURRENT_DATE in contract query when no explicit date is provided', async () => {
+    const { resolveProductPrice } = await import('./resolve-product-price.service.js')
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ amount: '20.00', currency: 'USD' }] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await resolveProductPrice({
+      restaurantId: RESTAURANT_ID,
+      supplierId: SUPPLIER_ID,
+      productId: PRODUCT_ID,
+    })
+
+    const contractSql = String(queryMock.mock.calls[1][0])
+    expect(contractSql).toContain('COALESCE($4::date, CURRENT_DATE)')
+    expect(queryMock.mock.calls[1][1][3]).toBeNull()
+  })
+
+  it('uses local calendar date string for explicit Date values', async () => {
+    const { resolveProductPrice } = await import('./resolve-product-price.service.js')
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ amount: '20.00', currency: 'USD' }] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const localDate = new Date(2026, 0, 15, 22, 0, 0)
+
+    await resolveProductPrice({
+      restaurantId: RESTAURANT_ID,
+      supplierId: SUPPLIER_ID,
+      productId: PRODUCT_ID,
+      date: localDate,
+    })
+
+    expect(queryMock.mock.calls[1][1][3]).toBe('2026-01-15')
+  })
+
+  it('passes through explicit YYYY-MM-DD date strings unchanged', async () => {
+    const { resolveProductPrice } = await import('./resolve-product-price.service.js')
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ amount: '20.00', currency: 'USD' }] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await resolveProductPrice({
+      restaurantId: RESTAURANT_ID,
+      supplierId: SUPPLIER_ID,
+      productId: PRODUCT_ID,
+      date: '2026-06-01',
+    })
+
+    expect(queryMock.mock.calls[1][1][3]).toBe('2026-06-01')
+  })
+
+  it('batch resolver passes null date for CURRENT_DATE semantics', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ product_id: PRODUCT_ID, amount: '10', currency: 'USD' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    await resolveProductPricesBatch({
+      restaurantId: RESTAURANT_ID,
+      items: [{ productId: PRODUCT_ID, supplierId: SUPPLIER_ID, quantity: 1 }],
+    })
+
+    const contractSql = String(queryMock.mock.calls[1][0])
+    expect(contractSql).toContain('COALESCE($4::date, CURRENT_DATE)')
+    expect(queryMock.mock.calls[1][1][3]).toBeNull()
   })
 
   it('enriches products with resolved pricing fields', async () => {
@@ -248,5 +387,52 @@ describe('resolve-product-price.service', () => {
     expect(enriched.catalog_price).toBe(12)
     expect(enriched.pricing_source).toBe('CONTRACT_PRICE')
     expect(enriched.contract_price_id).toBe(CONTRACT_ID)
+  })
+
+  it('findOpenQuotedProductsForOrder maps original and substitute product ids', async () => {
+    const { findOpenQuotedProductsForOrder } = await import('./resolve-product-price.service.js')
+    const substituteProductId = '88888888-8888-4888-8888-888888888888'
+
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          original_product_id: PRODUCT_ID,
+          substitute_product_id: substituteProductId,
+          sku: 'SKU-ORIG',
+          submitted_at: new Date('2026-09-10T12:00:00Z'),
+        },
+        {
+          original_product_id: PRODUCT_ID,
+          substitute_product_id: null,
+          sku: 'SKU-OLDER',
+          submitted_at: new Date('2026-09-01T12:00:00Z'),
+        },
+      ],
+    })
+
+    const quoted = await findOpenQuotedProductsForOrder({
+      restaurantId: RESTAURANT_ID,
+      productIds: [PRODUCT_ID, substituteProductId],
+    })
+
+    expect(quoted.get(PRODUCT_ID)).toEqual({ sku: 'SKU-ORIG', productId: PRODUCT_ID })
+    expect(quoted.get(substituteProductId)).toEqual({
+      sku: 'SKU-ORIG',
+      productId: substituteProductId,
+    })
+    expect(String(queryMock.mock.calls[0][0])).toContain("qr.status = 'open'")
+    expect(String(queryMock.mock.calls[0][0])).toContain('ORDER BY qr_resp.submitted_at DESC')
+  })
+
+  it('findOpenQuotedProductsForOrder returns empty map when no product ids', async () => {
+    const { findOpenQuotedProductsForOrder } = await import('./resolve-product-price.service.js')
+
+    const quoted = await findOpenQuotedProductsForOrder({
+      restaurantId: RESTAURANT_ID,
+      productIds: [],
+    })
+
+    expect(quoted.size).toBe(0)
+    expect(queryMock).not.toHaveBeenCalled()
   })
 })

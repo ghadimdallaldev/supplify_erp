@@ -1,7 +1,27 @@
 import { query } from '../lib/db.js'
 
+const MATCH_CONCURRENCY = 8
+
 function normalizePhone(phone) {
   return String(phone || '').replace(/\D/g, '')
+}
+
+async function mapWithConcurrency(items, worker, concurrency = MATCH_CONCURRENCY) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+  const workerCount = Math.min(concurrency, items.length)
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex++
+        if (index >= items.length) return
+        results[index] = await worker(items[index])
+      }
+    })
+  )
+
+  return results
 }
 
 export async function matchSingleProspect(prospectId) {
@@ -88,11 +108,7 @@ export async function matchProspectsForSupplier(supplierId, { batchId = null } =
      ORDER BY created_at ASC`,
     params
   )
-  const results = []
-  for (const row of rows) {
-    results.push(await matchProspectRow(row))
-  }
-  return results
+  return mapWithConcurrency(rows, (row) => matchProspectRow(row))
 }
 
 export async function listProspects(

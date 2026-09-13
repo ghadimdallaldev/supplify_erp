@@ -6,6 +6,7 @@ import {
   resolveTenantContext,
   requirePermission,
   getRestaurantIdForRequest,
+  getSupplierIdForRequest,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
@@ -26,6 +27,10 @@ import {
   hookRecipeCostingAfterInvoice,
 } from '../services/recipe-purchasing-hooks.service.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
+import {
+  validateAndEnrichReceivingLines,
+  sumBillableAcceptedQuantity,
+} from '../lib/receiving-line-validation.js'
 
 const router = express.Router()
 
@@ -172,11 +177,9 @@ router.get(
   requirePermission('ORDERS_VIEW'),
   async (req, res) => {
     try {
-      const { rows: suppliers } = await query('SELECT id FROM supplier WHERE contact_email = $1', [
-        req.userData.email,
-      ])
+      const supplierId = await getSupplierIdForRequest(req)
 
-      if (suppliers.length === 0) {
+      if (!supplierId) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -184,8 +187,6 @@ router.get(
           requestId: req.requestId,
         })
       }
-
-      const supplierId = suppliers[0].id
 
       const { rows: orders } = await query(
         `
@@ -240,7 +241,14 @@ router.post(
   requirePermission('RECEIVING_MANAGE'),
   async (req, res) => {
     try {
-      const { orderId, lineItems, deliveryNotes, qualityScore, qualityNotes, receivedBy } = req.body
+      const {
+        orderId,
+        lineItems: rawLineItems,
+        deliveryNotes,
+        qualityScore,
+        qualityNotes,
+        receivedBy,
+      } = req.body
 
       const restaurantId = await resolveRestaurantId(req)
 
@@ -253,19 +261,40 @@ router.post(
         })
       }
 
-      // Get supplier_id from the first order_item
-      const { rows: items } = await query(
+      const { rows: orderItems } = await query(
         `
-      SELECT DISTINCT supplier_id FROM order_item WHERE order_id = $1 LIMIT 1
+      SELECT oi.id, oi.quantity, oi.product_id, oi.unit_price, oi.supplier_id, p.unit
+      FROM order_item oi
+      LEFT JOIN product p ON p.id = oi.product_id
+      WHERE oi.order_id = $1
+      ORDER BY oi.created_at
     `,
         [orderId]
       )
 
-      if (items.length === 0) {
+      if (orderItems.length === 0) {
         throw new NotFoundError('Order items not found')
       }
 
-      const supplierId = items[0].supplier_id
+      const supplierId = orderItems[0].supplier_id
+
+      let lineItems
+      try {
+        lineItems = validateAndEnrichReceivingLines(orderItems, rawLineItems)
+      } catch (validationErr) {
+        if (validationErr instanceof ValidationError) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: validationErr.message,
+            },
+            requestId: req.requestId,
+          })
+        }
+        throw validationErr
+      }
 
       for (const line of lineItems) {
         const unit = line.unit || 'unit'
@@ -306,7 +335,7 @@ router.post(
         }
       }
 
-      // Calculate totals
+      // Calculate totals from server-side order quantities (not client-provided ordered_quantity)
       const totalItemsOrdered = lineItems.reduce(
         (sum, item) => sum + parseFloat(item.ordered_quantity || 0),
         0
@@ -315,22 +344,26 @@ router.post(
         (sum, item) => sum + parseFloat(item.received_quantity || 0),
         0
       )
+      const billableAcceptedQty = sumBillableAcceptedQuantity(lineItems)
       const totalExpectedCost = lineItems.reduce(
         (sum, item) =>
           sum + parseFloat(item.ordered_quantity || 0) * parseFloat(item.expected_unit_price || 0),
         0
       )
-      const totalActualCost = lineItems.reduce(
-        (sum, item) =>
+      const totalActualCost = lineItems.reduce((sum, item) => {
+        if (item.quality_status !== 'ACCEPTED') return sum
+        return (
           sum +
           parseFloat(item.received_quantity || 0) *
-            parseFloat(item.actual_unit_price || parseFloat(item.expected_unit_price || 0)),
-        0
-      )
+            parseFloat(item.actual_unit_price || parseFloat(item.expected_unit_price || 0))
+        )
+      }, 0)
 
-      // Determine status
+      // Determine receiving report status
       let status = 'ACCEPTED'
-      if (totalItemsReceived < totalItemsOrdered) {
+      if (billableAcceptedQty === 0) {
+        status = 'REJECTED'
+      } else if (totalItemsReceived < totalItemsOrdered) {
         status = 'PARTIAL'
       }
 
@@ -498,9 +531,15 @@ router.post(
         )
         await markReorderForecastDirty(restaurantId, { reason: 'receiving_completed' })
 
-        // Update order status to RECEIVED_PARTIAL/FULL
-        const nextStatus =
-          totalItemsReceived < totalItemsOrdered ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL'
+        // Order status: zero billable acceptance → dispute path; never RECEIVED_FULL when all rejected
+        let nextStatus
+        if (billableAcceptedQty === 0) {
+          nextStatus = 'RECEIVED_WITH_DISPUTE'
+        } else if (billableAcceptedQty < totalItemsOrdered) {
+          nextStatus = 'RECEIVED_PARTIAL'
+        } else {
+          nextStatus = 'RECEIVED_FULL'
+        }
         await client.query(
           `
         UPDATE customer_order
@@ -510,14 +549,17 @@ router.post(
           [nextStatus, orderId]
         )
 
-        // Build invoice from accepted received items
-        const createdInvoice = await createInvoiceFromReceiving(client, {
-          order,
-          report,
-          supplierId,
-          restaurantId,
-          receivedBy: receivedBy || req.userData.id,
-        })
+        // Build invoice from accepted received items (skipped when billableAcceptedQty is 0)
+        const createdInvoice =
+          billableAcceptedQty > 0
+            ? await createInvoiceFromReceiving(client, {
+                order,
+                report,
+                supplierId,
+                restaurantId,
+                receivedBy: receivedBy || req.userData.id,
+              })
+            : null
 
         const earnBaseAmount =
           totalActualCost > 0 ? totalActualCost : parseFloat(order.total_amount || 0)
