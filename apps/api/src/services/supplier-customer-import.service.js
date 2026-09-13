@@ -14,6 +14,26 @@ const FIELD_ALIASES = {
   notes: ['notes', 'note', 'comments', 'remarks'],
 }
 
+const IMPORT_CONCURRENCY = 8
+
+async function mapWithConcurrency(items, worker, concurrency = IMPORT_CONCURRENCY) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+  const workerCount = Math.min(concurrency, items.length)
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex++
+        if (index >= items.length) return
+        results[index] = await worker(items[index])
+      }
+    })
+  )
+
+  return results
+}
+
 function normalizeHeader(h) {
   return String(h || '')
     .trim()
@@ -122,7 +142,7 @@ export function buildCustomerImportErrorReportCsv(errors = []) {
   return lines.join('\n')
 }
 
-export async function executeCustomerImport(supplierId, csvText, { userId, partial = true } = {}) {
+export async function executeCustomerImport(supplierId, csvText, { userId } = {}) {
   const { rows } = parseCsv(csvText)
   const summary = { created: 0, skipped: 0, failed: 0, batchId: null }
   const rowErrors = []
@@ -136,13 +156,10 @@ export async function executeCustomerImport(supplierId, csvText, { userId, parti
   const batchId = batchRows[0].id
   summary.batchId = batchId
 
-  for (const { rowNumber, raw } of rows) {
+  const outcomes = await mapWithConcurrency(rows, async ({ rowNumber, raw }) => {
     const validationError = validateCustomerRow(raw, rowNumber)
     if (validationError) {
-      summary.failed += 1
-      rowErrors.push(validationError)
-      if (!partial) continue
-      continue
+      return { type: 'failed', rowError: validationError }
     }
 
     try {
@@ -152,10 +169,7 @@ export async function executeCustomerImport(supplierId, csvText, { userId, parti
            WHERE supplier_id = $1 AND normalized_email = lower(trim($2))`,
           [supplierId, raw.email]
         )
-        if (dup.length) {
-          summary.skipped += 1
-          continue
-        }
+        if (dup.length) return { type: 'skipped' }
       }
       const addressJson = raw.address ? { street: raw.address } : {}
       await query(
@@ -179,18 +193,24 @@ export async function executeCustomerImport(supplierId, csvText, { userId, parti
           raw.notes || null,
         ]
       )
-      summary.created += 1
+      return { type: 'created' }
     } catch (err) {
-      if (err.code === '23505') {
-        summary.skipped += 1
-        continue
+      if (err.code === '23505') return { type: 'skipped' }
+      return {
+        type: 'failed',
+        rowError: { rowNumber, errors: [{ field: 'row', message: err.message }] },
       }
-      summary.failed += 1
-      rowErrors.push({ rowNumber, errors: [{ field: 'row', message: err.message }] })
     }
-  }
+  })
 
-  await query(
+  for (const outcome of outcomes) {
+    if (outcome.type === 'created') summary.created += 1
+    else if (outcome.type === 'skipped') summary.skipped += 1
+    else {
+      summary.failed += 1
+      rowErrors.push(outcome.rowError)
+    }
+  }  await query(
     `UPDATE supplier_customer_import_batch
      SET status = 'completed', imported_rows = $2, failed_rows = $3
      WHERE id = $1`,
