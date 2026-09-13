@@ -76,4 +76,21 @@ describe('ProductsPage', () => {
     expect(() => renderWithProviders(<ProductsPage />)).not.toThrow()
     expect(screen.getByTestId('products-page')).toBeInTheDocument()
   })
+
+  it('shows supplier catalog products without requiring supplier_email on the payload', () => {
+    mockProducts.mockReturnValue({
+      data: {
+        products: [{ id: 'p1', name: 'Roma Tomatoes 001', sku: 'SKU-1', supplier_id: 'sup-1' }],
+        pagination: { total: 500, limit: 50 },
+      },
+      isLoading: false,
+      isFetching: false,
+      error: undefined,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<ProductsPage />)
+    expect(screen.getAllByText('Roma Tomatoes 001').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/No products in your catalog/i)).not.toBeInTheDocument()
+  })
 })

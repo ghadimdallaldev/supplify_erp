@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Supplier catalog empty despite seeded products (web)
+
+- Web `ProductsPage` filtered supplier results by `product.supplier_email === user.email`, but `GET /api/products` list payloads do not include `supplier_email`, so every supplier saw an empty catalog while pagination still reported the real total (e.g. “0 of 500”).
+- Fixed by trusting API tenant scoping (`p.supplier_id = active supplier`) and removing the client email filter.
+- **Mobile skipped**: mobile supplier product list does not apply this email filter.
+
 ## 2026-09-14 — Legal pack version sync (signup unblock)
 
 - Web had bumped `LEGAL_PACK_VERSION` to `2026-09-12` while API still validated `2026-06-09`, so `POST /api/register/complete` rejected every new signup with “Legal document versions have been updated…”.
@@ -725,3 +731,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Scope**: Trial/billing in-app + email CTAs pointed at dead `/app/billing`. Now use `/app/settings?tab=subscription` (or `?tab=plan` for suppliers). Web `resolveNotificationUrl` honors `metadata.ctaUrl` / remaps legacy `/app/billing`.
 - **Reason**: Web cockpit settings hosts billing; no dedicated billing route. Mobile inherits corrected API `ctaUrl`/`link` on new notifications if it navigates from metadata; no mobile UI change required for this fix.
+
+## 2026-09-14 - Chat composer focus and keyboard behavior
+
+- Web chat keeps the message textarea focused when sending with the mouse and keeps it focusable while a send/upload is in progress, so the cursor does not disappear from the composer.
+- Android and iOS chat threads now apply keyboard avoidance on both platforms so the composer moves above the software keyboard. Android continues to use the native softwareKeyboardLayoutMode resize setting.
