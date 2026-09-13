@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Legal pack version sync (signup unblock)
+
+- Web had bumped `LEGAL_PACK_VERSION` to `2026-09-12` while API still validated `2026-06-09`, so `POST /api/register/complete` rejected every new signup with “Legal document versions have been updated…”.
+- Fixed by aligning `apps/api/src/lib/legal-documents.js` to `2026-09-12` (must always match web). Existing users on the old pack will see one-time `/legal/reaccept` after API deploy — expected.
+- **Mobile skipped**: signup/legal pack acceptance for tenant creation is web-only; mobile apps do not own `LEGAL_PACK_VERSION` for registration.
+
 ## 2026-09-13 - Native chat push reliability hardening
 
 - Updated the API plus both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`; Android and iOS implementations remain identical.

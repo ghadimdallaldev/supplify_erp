@@ -1,6 +1,6 @@
 # Supplify Legal Documents Pack
 
-**Current pack version:** `2026-06-09` (must match `LEGAL_PACK_VERSION` in `apps/web/src/lib/legalDocuments.ts` and `apps/api/src/lib/legal-documents.js`).
+**Current pack version:** `2026-09-12` (must match `LEGAL_PACK_VERSION` in `apps/web/src/lib/legalDocuments.ts` and `apps/api/src/lib/legal-documents.js`).
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 

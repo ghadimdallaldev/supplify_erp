@@ -1,6 +1,6 @@
 # Legal pack re-acceptance on login
 
-**Pack version:** `2026-06-09`  
+**Pack version:** `2026-09-12`  
 **Introduced with:** Deals/Boosts legal terminology update + login gate
 
 ---
@@ -37,7 +37,7 @@ Response includes `legalStatus`:
 | Field                 | Description                                      |
 | --------------------- | ------------------------------------------------ |
 | `needsReacceptance`   | `true` if any required document missing or stale |
-| `currentPackVersion`  | Active pack (`2026-06-09`)                       |
+| `currentPackVersion`  | Active pack (`2026-09-12`)                       |
 | `acceptedPackVersion` | User’s latest version if uniform, else `null`    |
 | `requiredDocuments`   | Slugs user must accept                           |
 | `missingDocuments`    | Slugs not at current version                     |
@@ -51,7 +51,7 @@ Body (same shape as registration):
 ```json
 {
   "legalAcceptance": {
-    "packVersion": "2026-06-09",
+    "packVersion": "2026-09-12",
     "acceptedDocuments": ["terms_and_conditions", "..."],
     "electronicSignatureAttestation": true
   }
@@ -107,7 +107,7 @@ Uses existing `legal_acceptance` table (migration `0129`). No new migration.
 
 | Column             | Re-accept usage                           |
 | ------------------ | ----------------------------------------- |
-| `document_version` | Stores pack version string (`2026-06-09`) |
+| `document_version` | Stores pack version string (`2026-09-12`) |
 | `context`          | `login_refresh` for re-acceptance rows    |
 | `document_slug`    | Which document was accepted               |
 
