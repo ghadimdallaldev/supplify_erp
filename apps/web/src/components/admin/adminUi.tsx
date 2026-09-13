@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
-import { Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import { EmptyState } from '../ui/empty-state'
 import { Skeleton } from '../ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -44,6 +44,40 @@ export function AdminSectionHeader({
   )
 }
 
+export function AdminCollapsibleSection({
+  title,
+  description,
+  children,
+  defaultOpen = false,
+  className = '',
+  testId,
+}: {
+  title: string
+  description?: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+  className?: string
+  testId?: string
+}) {
+  return (
+    <details
+      className={`admin-collapsible-section ${className}`}
+      open={defaultOpen || undefined}
+      data-testid={testId}
+    >
+      <summary className="admin-collapsible-summary">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-[var(--text)]">{title}</span>
+          {description ? (
+            <span className="mt-0.5 block text-sm text-[var(--text-mid)]">{description}</span>
+          ) : null}
+        </span>
+        <ChevronDown className="admin-collapsible-chevron h-4 w-4 shrink-0" aria-hidden />
+      </summary>
+      <div className="admin-collapsible-content">{children}</div>
+    </details>
+  )
+}
 export function AdminEmptyState({
   title,
   description,

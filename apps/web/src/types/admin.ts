@@ -391,6 +391,8 @@ export interface SupplierQuoteRequestDetail {
   id: string
   quoteRequestId: string
   status: string
+  /** Catalog or prior-response currency for new quote lines */
+  defaultCurrency?: string
   restaurantId: string
   restaurantName: string
   quoteRequestNote?: string | null

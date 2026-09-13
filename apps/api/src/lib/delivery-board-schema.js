@@ -51,7 +51,8 @@ async function loadBoardSqlFragments() {
       const supplierClause = colKey('delivery_zone', 'supplier_id')
         ? ' AND dz.supplier_id = $1'
         : ''
-      zoneJoinSql = `LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
+      // Tie zone to the warehouse leg on each driver assignment row (multi-WH board).
+      zoneJoinSql = `LEFT JOIN order_warehouse_assignment owa ON owa.id = da.warehouse_assignment_id
     LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id${supplierClause}`
       deliveryAreaExpr = colKey('delivery_zone', 'name')
         ? `COALESCE(dz.name, ${cityArea})`
@@ -100,15 +101,11 @@ async function loadBoardSqlFragments() {
     ? `EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id)`
     : 'FALSE'
 
-  const driverLateralSql =
+  const driverAssignmentJoinSql =
     hasTable('driver_assignments') && hasTable('drivers')
-      ? `LEFT JOIN LATERAL (
-      SELECT da2.* FROM driver_assignments da2
-      WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
-      ORDER BY da2.created_at DESC LIMIT 1
-    ) da ON true
+      ? `LEFT JOIN driver_assignments da ON da.order_id = o.id AND da.status <> 'reassigned'
     LEFT JOIN drivers d ON d.id = da.driver_id`
-      : `LEFT JOIN LATERAL (SELECT NULL::uuid AS id, NULL::text AS status, NULL::uuid AS driver_id) da ON true
+      : `LEFT JOIN (SELECT NULL::uuid AS id, NULL::uuid AS warehouse_assignment_id, NULL::text AS status, NULL::uuid AS driver_id) da ON true
     LEFT JOIN drivers d ON FALSE`
 
   const driverNameExpr =
@@ -117,7 +114,7 @@ async function loadBoardSqlFragments() {
   return {
     zoneJoinSql,
     branchJoinSql,
-    driverLateralSql,
+    driverAssignmentJoinSql,
     deliveryAreaExpr,
     destinationLatitudeExpr,
     destinationLongitudeExpr,

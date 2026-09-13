@@ -204,9 +204,23 @@ export async function computeRecipePriceImpact(
  * @param {string} productId
  * @param {number} newPrice
  * @param {string} source
+ * @param {string | null | Function} [restaurantIdOrDbQuery] Scope to one restaurant (CONTRACT) or dbQuery for tests
  * @param {Function} [dbQuery]
  */
-export async function propagateCatalogPriceChange(productId, newPrice, source, dbQuery = query) {
+export async function propagateCatalogPriceChange(
+  productId,
+  newPrice,
+  source,
+  restaurantIdOrDbQuery = null,
+  dbQuery = query
+) {
+  let restaurantId = null
+  if (typeof restaurantIdOrDbQuery === 'function') {
+    dbQuery = restaurantIdOrDbQuery
+  } else if (restaurantIdOrDbQuery) {
+    restaurantId = restaurantIdOrDbQuery
+  }
+
   const { rows: products } = await dbQuery(
     `SELECT id, name, supplier_id FROM product WHERE id = $1`,
     [productId]
@@ -214,15 +228,25 @@ export async function propagateCatalogPriceChange(productId, newPrice, source, d
   if (!products.length) return
   const product = products[0]
 
-  const { rows: restaurants } = await dbQuery(
-    `
-    SELECT DISTINCT r.restaurant_id
-    FROM recipes r
-    JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-    WHERE ri.product_id = $1 AND r.is_active = true
-    `,
-    [productId]
-  )
+  const { rows: restaurants } = restaurantId
+    ? await dbQuery(
+        `
+        SELECT DISTINCT r.restaurant_id
+        FROM recipes r
+        JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+        WHERE ri.product_id = $1 AND r.is_active = true AND r.restaurant_id = $2
+        `,
+        [productId, restaurantId]
+      )
+    : await dbQuery(
+        `
+        SELECT DISTINCT r.restaurant_id
+        FROM recipes r
+        JOIN recipe_ingredients ri ON ri.recipe_id = r.id
+        WHERE ri.product_id = $1 AND r.is_active = true
+        `,
+        [productId]
+      )
 
   for (const { restaurant_id: restaurantId } of restaurants) {
     const cached = await dbQuery(

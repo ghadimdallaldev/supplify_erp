@@ -82,7 +82,12 @@
     "note": "Note",
     "substitute": "Substitute: {{name}}",
     "addedToCart": "Added to cart",
-    "addToCartFailed": "Could not add to cart"
+    "addToCartFailed": "Could not add to cart",
+    "closeRequest": "Close request",
+    "cancelRequest": "Cancel request",
+    "closeSuccess": "Quote request closed",
+    "cancelSuccess": "Quote request cancelled",
+    "statusUpdateFailed": "Could not update quote request"
   },
   "inbox": {
     "title": "Quote request inbox",

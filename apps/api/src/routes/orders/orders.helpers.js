@@ -188,42 +188,71 @@ function buildPackingSlipPdf(packingSlip, locale = 'en') {
 }
 
 // Validation schemas
-const orderCreateSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        quantity: z.number().positive(),
-        notes: z.string().optional(),
-      })
-    )
-    .min(1),
-  promotionId: z.string().uuid().optional(),
-  couponCode: z.string().max(64).optional(),
-  loyaltyRedeem: z
-    .array(
-      z.object({
-        supplierId: z.string().uuid(),
-        points: z.number().int().positive(),
-      })
-    )
-    .optional(),
-  quoteLocks: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        quoteRequestSupplierId: z.string().uuid(),
-        quoteResponseItemId: z.string().uuid(),
-      })
-    )
-    .optional(),
-  status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
-  deliveryDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  notes: z.string().max(2000).optional(),
-})
+const orderCreateSchema = z
+  .object({
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          quantity: z.number().positive(),
+          notes: z.string().optional(),
+        })
+      )
+      .min(1),
+    promotionId: z.string().uuid().optional(),
+    couponCode: z.string().max(64).optional(),
+    loyaltyRedeem: z
+      .array(
+        z.object({
+          supplierId: z.string().uuid(),
+          points: z.number().int().positive(),
+        })
+      )
+      .optional(),
+    quoteLocks: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          quoteRequestSupplierId: z.string().uuid(),
+          quoteResponseItemId: z.string().uuid(),
+        })
+      )
+      .optional(),
+    status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
+    deliveryDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const seenItems = new Set()
+    for (const item of data.items) {
+      if (seenItems.has(item.productId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate productId in items: ${item.productId}. Send one line per product with the total quantity.`,
+          path: ['items'],
+        })
+        return
+      }
+      seenItems.add(item.productId)
+    }
+    if (data.quoteLocks?.length) {
+      const seenLocks = new Set()
+      for (const lock of data.quoteLocks) {
+        if (seenLocks.has(lock.productId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate productId in quoteLocks: ${lock.productId}`,
+            path: ['quoteLocks'],
+          })
+          return
+        }
+        seenLocks.add(lock.productId)
+      }
+    }
+  })
 
 const supplierOrderCreateSchema = z.object({
   restaurant_id: z.string().uuid(),
@@ -513,7 +542,7 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
 
 // Legacy COMPLETED status: mark DELIVERED only. Restaurant inventory and invoices
 // are applied exclusively via receiving (prevents double-count if receive also runs).
-async function handleOrderDelivery(orderId, userData, res, req) {
+async function handleOrderDelivery(orderId, userData, res, req, previousStatus = null) {
   try {
     const result = await withTransaction(async (client) => {
       // Get order first
@@ -529,6 +558,7 @@ async function handleOrderDelivery(orderId, userData, res, req) {
       }
 
       const order = orders[0]
+      const fromStatus = previousStatus || order.status
 
       const supplierId = await getSupplierIdForRequest(req)
       if (!supplierId) {
@@ -567,6 +597,9 @@ async function handleOrderDelivery(orderId, userData, res, req) {
         [orderId]
       )
       order.status = 'DELIVERED'
+
+      // Legacy COMPLETED path must sync warehouse assignments like direct DELIVERED updates
+      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', fromStatus)
 
       logger.info('Order marked DELIVERED; inventory deferred to receiving', {
         orderId: order.id,

@@ -1691,7 +1691,7 @@ export async function notifyQuoteRequestReceived(
       tenantId: supplierId,
       tenantType: 'SUPPLIER',
       notificationCategory: 'quote_request_received',
-      referenceId: quoteRequestSupplierId,
+      referenceId: quoteRequestId,
     })
     if (alreadySent) return null
 
@@ -1749,9 +1749,10 @@ export async function notifyQuoteResponseReceived(
           supplierName: rows[0]?.name || nt('common.aSupplier', userLocale),
         }),
       }),
-      referenceId: quoteRequestId,
+      referenceId: quoteRequestSupplierId,
       referenceType: 'QUOTE_REQUEST',
       metadata: {
+        quoteRequestId,
         quoteRequestSupplierId,
         supplierId,
         ctaUrl: `/app/quote-requests/${quoteRequestId}`,
@@ -1793,9 +1794,10 @@ export async function notifyQuoteRequestDeclined(
           reasonSuffix: reasonSuffix(userLocale),
         }),
       }),
-      referenceId: quoteRequestId,
+      referenceId: quoteRequestSupplierId,
       referenceType: 'QUOTE_REQUEST',
       metadata: {
+        quoteRequestId,
         quoteRequestSupplierId,
         supplierId,
         declineReason: reason,

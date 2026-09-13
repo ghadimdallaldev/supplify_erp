@@ -38,6 +38,7 @@ function translateNavGroups(
 ): AdminNavGroupResolved[] {
   return groups.map((group) => ({
     label: t(`nav.groups.${group.labelKey}`),
+    collapsible: group.collapsible,
     items: group.items.map((item) => ({
       tab: item.tab,
       label: t(`nav.tabs.${item.labelKey}`),
