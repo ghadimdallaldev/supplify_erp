@@ -72,6 +72,11 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity = normalizeCartQuantity(existingItem.quantity + delta, item.product)
         existingItem.product = item.product
+        if (item.quoteResponseItemId) {
+          existingItem.quoteResponseItemId = item.quoteResponseItemId
+          existingItem.quoteRequestSupplierId = item.quoteRequestSupplierId
+          existingItem.quotedUnitPrice = item.quotedUnitPrice
+        }
       } else {
         state.items.push({
           ...item,

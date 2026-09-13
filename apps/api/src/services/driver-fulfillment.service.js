@@ -7,10 +7,11 @@ import {
   releaseInventoryForFailedDelivery,
   markWarehouseAssignmentDelivered,
   releaseInventoryForAssignment,
-  allWarehouseAssignmentsTerminal,
+  allWarehouseAssignmentsDelivered,
 } from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
+import { assertPodPresentWhenRequired } from '../lib/pod-requirement.js'
 
 export const DRIVER_STATUS_TRANSITIONS = {
   assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
@@ -99,6 +100,50 @@ export async function getLatestDriverAssignment(orderId) {
     [orderId, NON_REASSIGNED_STATUSES]
   )
   return rows[0] ?? null
+}
+
+const DRIVER_ASSIGNMENT_SELECT = `da.*, d.full_name AS driver_name, d.phone AS driver_phone,
+            d.vehicle_type, d.vehicle_plate`
+
+async function resolveDriverAssignmentForStatusUpdate({
+  orderId,
+  status,
+  driverAssignmentId,
+  warehouseAssignmentId,
+}) {
+  if (driverAssignmentId) {
+    const { rows } = await query(
+      `SELECT ${DRIVER_ASSIGNMENT_SELECT}
+       FROM driver_assignments da
+       JOIN drivers d ON d.id = da.driver_id
+       WHERE da.id = $1 AND da.order_id = $2
+       LIMIT 1`,
+      [driverAssignmentId, orderId]
+    )
+    if (!rows.length) {
+      throw new ValidationError('Driver assignment not found for this order')
+    }
+    return rows[0]
+  }
+
+  if (warehouseAssignmentId) {
+    const assignment = await getActiveDriverAssignment(orderId, warehouseAssignmentId)
+    if (!assignment) {
+      throw new ValidationError('No active driver assignment for this warehouse leg')
+    }
+    return assignment
+  }
+
+  if (status === 'assigned') {
+    return getLatestDriverAssignment(orderId)
+  }
+
+  const active = await listActiveDriverAssignments(orderId)
+  if (active.length === 0) return null
+  if (active.length === 1) return active[0]
+  throw new ValidationError(
+    'Multiple active driver assignments exist; specify driver_assignment_id or warehouse_assignment_id'
+  )
 }
 
 export async function assignDriverToOrder({
@@ -229,11 +274,15 @@ export async function updateDeliveryStatus({
   notes,
   failureReason,
   userId,
+  driverAssignmentId = null,
+  warehouseAssignmentId = null,
 }) {
-  const assignment =
-    status === 'assigned'
-      ? await getLatestDriverAssignment(orderId)
-      : await getActiveDriverAssignment(orderId)
+  const assignment = await resolveDriverAssignmentForStatusUpdate({
+    orderId,
+    status,
+    driverAssignmentId,
+    warehouseAssignmentId,
+  })
   if (!assignment || assignment.supplier_id !== supplierId) {
     throw new ValidationError('No active driver assignment for this order')
   }
@@ -252,6 +301,8 @@ export async function updateDeliveryStatus({
       throw new ValidationError(`Cannot transition from ${assignment.status} to ${status}`)
     }
   }
+
+  await assertPodPresentWhenRequired({ supplierId, orderId, status })
 
   const result = await withTransaction(async (client) => {
     let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
@@ -297,8 +348,10 @@ export async function updateDeliveryStatus({
 
       if (assignment.warehouse_assignment_id) {
         await markWarehouseAssignmentDelivered(client, orderId, assignment.warehouse_assignment_id)
-        const allDone = await allWarehouseAssignmentsTerminal(client, orderId)
-        if (allDone) {
+        // Order is DELIVERED only when every warehouse leg succeeded. Mixed
+        // delivered+failed legs stay at the current order status (typically SHIPPED).
+        const allDelivered = await allWarehouseAssignmentsDelivered(client, orderId)
+        if (allDelivered) {
           await client.query(
             `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
             [orderId]
@@ -400,9 +453,64 @@ export async function updateDeliveryStatus({
   return result
 }
 
-export async function reassignDriver({ supplierId, orderId, driverId, reason, assignedByUserId }) {
-  const assignment = await getActiveDriverAssignment(orderId)
-  if (!assignment || assignment.supplier_id !== supplierId) {
+async function resolveActiveDriverAssignmentForReassign({
+  orderId,
+  driverAssignmentId,
+  warehouseAssignmentId,
+}) {
+  if (driverAssignmentId) {
+    const { rows } = await query(
+      `SELECT ${DRIVER_ASSIGNMENT_SELECT}
+       FROM driver_assignments da
+       JOIN drivers d ON d.id = da.driver_id
+       WHERE da.id = $1 AND da.order_id = $2
+       LIMIT 1`,
+      [driverAssignmentId, orderId]
+    )
+    if (!rows.length) {
+      throw new ValidationError('Driver assignment not found for this order')
+    }
+    if (!ACTIVE_ASSIGNMENT_STATUSES.includes(rows[0].status)) {
+      throw new ValidationError('No active driver assignment to reassign')
+    }
+    return rows[0]
+  }
+
+  if (warehouseAssignmentId) {
+    const assignment = await getActiveDriverAssignment(orderId, warehouseAssignmentId)
+    if (!assignment) {
+      throw new ValidationError('No active driver assignment for this warehouse leg')
+    }
+    return assignment
+  }
+
+  const active = await listActiveDriverAssignments(orderId)
+  if (active.length === 0) {
+    throw new ValidationError('No active driver assignment to reassign')
+  }
+  if (active.length > 1) {
+    throw new ValidationError(
+      'Multiple active driver assignments exist; specify driver_assignment_id or warehouse_assignment_id'
+    )
+  }
+  return active[0]
+}
+
+export async function reassignDriver({
+  supplierId,
+  orderId,
+  driverId,
+  reason,
+  assignedByUserId,
+  driverAssignmentId = null,
+  warehouseAssignmentId = null,
+}) {
+  const assignment = await resolveActiveDriverAssignmentForReassign({
+    orderId,
+    driverAssignmentId,
+    warehouseAssignmentId,
+  })
+  if (assignment.supplier_id !== supplierId) {
     throw new ValidationError('No active driver assignment to reassign')
   }
 

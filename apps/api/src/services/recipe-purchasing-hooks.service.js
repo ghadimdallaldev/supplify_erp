@@ -101,12 +101,18 @@ export function hookRecipeCostingAfterInvoice(restaurantId, lines = []) {
  * @param {string} productId
  * @param {number} newPrice
  * @param {'CATALOG' | 'CONTRACT'} source
+ * @param {string | null} [restaurantId] When set with CONTRACT source, scope impact to this restaurant only
  */
-export function hookRecipeCostingAfterCatalogPriceChange(productId, newPrice, source = 'CATALOG') {
+export function hookRecipeCostingAfterCatalogPriceChange(
+  productId,
+  newPrice,
+  source = 'CATALOG',
+  restaurantId = null
+) {
   void (async () => {
     try {
       const { propagateCatalogPriceChange } = await import('./recipe-price-impact.service.js')
-      await propagateCatalogPriceChange(productId, newPrice, source)
+      await propagateCatalogPriceChange(productId, newPrice, source, restaurantId)
     } catch (error) {
       logger.warn({
         event: 'recipe_costing.catalog_hook_failed',

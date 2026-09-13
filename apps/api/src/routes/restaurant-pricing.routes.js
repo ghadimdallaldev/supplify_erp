@@ -12,29 +12,62 @@ import {
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
-import { resolveProductPricesBatch } from '../services/resolve-product-price.service.js'
+import {
+  resolveProductPricesBatch,
+  getDefaultCatalogPricesBatch,
+} from '../services/resolve-product-price.service.js'
 import { z } from 'zod'
 
 const router = express.Router()
 
 router.use(requireAuth, resolveTenantContext, resolveAdminContext)
 
+async function fireContractRecipeHook(pricing) {
+  if (pricing?.price == null) return
+  const { hookRecipeCostingAfterCatalogPriceChange } = await import(
+    '../services/recipe-purchasing-hooks.service.js'
+  )
+  hookRecipeCostingAfterCatalogPriceChange(
+    pricing.product_id,
+    Number(pricing.price),
+    'CONTRACT',
+    pricing.restaurant_id
+  )
+}
+
 const supplierRead = requireAnyPermission('CATALOG_VIEW', 'INVOICES_VIEW', 'ORDERS_VIEW')
 const supplierWrite = requireAnyPermission('CATALOG_MANAGE', 'CATALOG_EDIT')
 const restaurantRead = requirePermission('CATALOG_VIEW')
 
-const createPricingSchema = z.object({
-  restaurantId: z.string().uuid(),
-  productId: z.string().uuid(),
-  price: z.number().positive(),
-  currency: z.string().default('USD'),
+const pricingItemFields = {
+  price: z.number().positive().optional(),
+  currency: z.string().optional(),
   contractDiscountPercentage: z.number().min(0).max(100).optional(),
   contractStartDate: z.string().optional(),
   contractEndDate: z.string().optional(),
-  agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).default('CUSTOM'),
+  agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).optional(),
   minOrderQuantity: z.number().nonnegative().optional(),
   notes: z.string().optional(),
-})
+}
+
+const requirePriceOrDiscount = (data, ctx) => {
+  if (data.price == null && data.contractDiscountPercentage == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Either price or contractDiscountPercentage is required',
+    })
+  }
+}
+
+const createPricingSchema = z
+  .object({
+    restaurantId: z.string().uuid(),
+    productId: z.string().uuid(),
+    ...pricingItemFields,
+    currency: z.string().default('USD'),
+    agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).default('CUSTOM'),
+  })
+  .superRefine(requirePriceOrDiscount)
 
 const updatePricingSchema = z.object({
   price: z.number().positive().optional(),
@@ -64,17 +97,12 @@ const bulkCreateSchema = z.object({
   restaurantId: z.string().uuid(),
   items: z
     .array(
-      z.object({
-        productId: z.string().uuid(),
-        price: z.number().positive(),
-        currency: z.string().optional(),
-        contractDiscountPercentage: z.number().min(0).max(100).optional(),
-        contractStartDate: z.string().optional(),
-        contractEndDate: z.string().optional(),
-        agreementType: z.enum(['VOLUME', 'RELATIONSHIP', 'CUSTOM', 'SPECIAL']).optional(),
-        minOrderQuantity: z.number().nonnegative().optional(),
-        notes: z.string().optional(),
-      })
+      z
+        .object({
+          productId: z.string().uuid(),
+          ...pricingItemFields,
+        })
+        .superRefine(requirePriceOrDiscount)
     )
     .min(1)
     .max(500),
@@ -87,6 +115,115 @@ function mapPricingRow(row) {
     contract_discount_percentage:
       row.contract_discount_percentage != null ? Number(row.contract_discount_percentage) : null,
     min_order_quantity: row.min_order_quantity != null ? Number(row.min_order_quantity) : null,
+  }
+}
+
+function validateContractDateRange(startDate, endDate) {
+  if (!startDate || !endDate) return
+  if (String(endDate) < String(startDate)) {
+    throw new ValidationError('contractEndDate must be on or after contractStartDate')
+  }
+}
+
+/** When price is omitted, derive from catalog × (1 − discount/100). Explicit price always wins. */
+function computePriceFromCatalogDiscount(catalogAmount, discountPercent) {
+  const catalog = Number(catalogAmount)
+  const pct = Number(discountPercent)
+  if (!Number.isFinite(catalog) || catalog <= 0) {
+    throw new ValidationError('Cannot derive contract price: product has no catalog price')
+  }
+  return Math.round(catalog * (1 - pct / 100) * 100) / 100
+}
+
+async function resolveContractUpsertPrice(productId, price, contractDiscountPercentage) {
+  if (price != null) {
+    return {
+      price,
+      contractDiscountPercentage: contractDiscountPercentage ?? null,
+    }
+  }
+  if (contractDiscountPercentage == null) {
+    throw new ValidationError('Either price or contractDiscountPercentage is required')
+  }
+  const catalogMap = await getDefaultCatalogPricesBatch([productId])
+  const catalog = catalogMap.get(productId)
+  return {
+    price: computePriceFromCatalogDiscount(catalog?.amount, contractDiscountPercentage),
+    contractDiscountPercentage,
+  }
+}
+
+async function resolveBulkContractPrices(items) {
+  const needsCatalog = items.filter(
+    (item) => item.price == null && item.contractDiscountPercentage != null
+  )
+  const catalogMap =
+    needsCatalog.length > 0
+      ? await getDefaultCatalogPricesBatch(needsCatalog.map((i) => i.productId))
+      : new Map()
+
+  return items.map((item) => {
+    if (item.price != null) {
+      return {
+        ...item,
+        price: item.price,
+        contractDiscountPercentage: item.contractDiscountPercentage ?? null,
+      }
+    }
+    const catalog = catalogMap.get(item.productId)
+    return {
+      ...item,
+      price: computePriceFromCatalogDiscount(catalog?.amount, item.contractDiscountPercentage),
+      contractDiscountPercentage: item.contractDiscountPercentage ?? null,
+    }
+  })
+}
+
+function dedupeBulkItemsByProductId(items) {
+  const byProductId = new Map()
+  for (const item of items) {
+    byProductId.set(item.productId, item)
+  }
+  return [...byProductId.values()]
+}
+
+/** Follow, prior order, and not blocklisted — parity with supplier manual order / order create */
+async function assertRestaurantEligibleForContract(supplierId, restaurantId) {
+  const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
+    restaurantId,
+  ])
+  if (restaurants.length === 0) {
+    throw new NotFoundError('Restaurant not found')
+  }
+
+  const { rows: eligible } = await query(
+    `
+    SELECT r.id
+    FROM restaurant r
+    WHERE r.id = $1
+      AND r.id NOT IN (
+        SELECT sb.restaurant_id FROM supplier_blocklist sb WHERE sb.supplier_id = $2
+      )
+      AND (
+        EXISTS (
+          SELECT 1 FROM supplier_follow sf
+          WHERE sf.supplier_id = $2 AND sf.restaurant_id = r.id
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM customer_order o
+          JOIN order_item oi ON oi.order_id = o.id
+          WHERE o.restaurant_id = r.id AND oi.supplier_id = $2
+        )
+      )
+    `,
+    [restaurantId, supplierId]
+  )
+
+  if (eligible.length === 0) {
+    throw new ValidationError(
+      'This restaurant is not eligible for contract pricing. They must follow your supplier profile or have placed an order with you before, and must not be blocklisted.'
+    )
   }
 }
 
@@ -273,6 +410,7 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
     } else if (status === 'inactive') {
       conditions.push('rp.is_active = false')
     } else if (status === 'expired') {
+      // Date-expired only (includes inactive rows); UI labels inactive separately from expired.
       conditions.push('rp.contract_end_date IS NOT NULL AND rp.contract_end_date < CURRENT_DATE')
     }
 
@@ -340,12 +478,15 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       throw new NotFoundError('Product not found or does not belong to supplier')
     }
 
-    const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
-      pricingData.restaurantId,
-    ])
-    if (restaurants.length === 0) {
-      throw new NotFoundError('Restaurant not found')
-    }
+    await assertRestaurantEligibleForContract(supplierId, pricingData.restaurantId)
+    validateContractDateRange(pricingData.contractStartDate, pricingData.contractEndDate)
+
+    // Explicit price is authoritative; discount % derives from catalog only when price is omitted.
+    const resolvedPrice = await resolveContractUpsertPrice(
+      pricingData.productId,
+      pricingData.price,
+      pricingData.contractDiscountPercentage
+    )
 
     const {
       rows: [pricing],
@@ -374,9 +515,9 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
         supplierId,
         pricingData.restaurantId,
         pricingData.productId,
-        pricingData.price,
+        resolvedPrice.price,
         pricingData.currency,
-        pricingData.contractDiscountPercentage ?? null,
+        resolvedPrice.contractDiscountPercentage,
         pricingData.contractStartDate || null,
         pricingData.contractEndDate || null,
         pricingData.agreementType,
@@ -391,6 +532,8 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       productId: pricingData.productId,
     })
 
+    await fireContractRecipeHook(pricing)
+
     res.json({
       ok: true,
       data: { pricing: mapPricingRow(pricing) },
@@ -403,6 +546,14 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
         ok: false,
         data: null,
         error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
         requestId: req.requestId,
       })
     }
@@ -442,14 +593,16 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       })
     }
 
-    const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
-      bulkData.restaurantId,
-    ])
-    if (restaurants.length === 0) {
-      throw new NotFoundError('Restaurant not found')
+    await assertRestaurantEligibleForContract(supplierId, bulkData.restaurantId)
+
+    const items = dedupeBulkItemsByProductId(bulkData.items)
+    for (const item of items) {
+      validateContractDateRange(item.contractStartDate, item.contractEndDate)
     }
 
-    const productIds = bulkData.items.map((i) => i.productId)
+    const resolvedItems = await resolveBulkContractPrices(items)
+
+    const productIds = resolvedItems.map((i) => i.productId)
     const { rows: ownedProducts } = await query(
       'SELECT id FROM product WHERE id = ANY($1::uuid[]) AND supplier_id = $2',
       [productIds, supplierId]
@@ -459,8 +612,7 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
     }
 
     const created = []
-    const items = bulkData.items
-    if (items.length > 0) {
+    if (resolvedItems.length > 0) {
       const { rows: inserted } = await query(
         `
         INSERT INTO restaurant_pricing (
@@ -519,18 +671,21 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
         [
           supplierId,
           bulkData.restaurantId,
-          items.map((i) => i.productId),
-          items.map((i) => i.price),
-          items.map((i) => i.currency || 'USD'),
-          items.map((i) => i.contractDiscountPercentage ?? null),
-          items.map((i) => i.contractStartDate || null),
-          items.map((i) => i.contractEndDate || null),
-          items.map((i) => i.agreementType || 'CUSTOM'),
-          items.map((i) => i.minOrderQuantity ?? null),
-          items.map((i) => i.notes || null),
+          resolvedItems.map((i) => i.productId),
+          resolvedItems.map((i) => i.price),
+          resolvedItems.map((i) => i.currency || 'USD'),
+          resolvedItems.map((i) => i.contractDiscountPercentage ?? null),
+          resolvedItems.map((i) => i.contractStartDate || null),
+          resolvedItems.map((i) => i.contractEndDate || null),
+          resolvedItems.map((i) => i.agreementType || 'CUSTOM'),
+          resolvedItems.map((i) => i.minOrderQuantity ?? null),
+          resolvedItems.map((i) => i.notes || null),
         ]
       )
       created.push(...inserted.map(mapPricingRow))
+      for (const row of inserted) {
+        await fireContractRecipeHook(row)
+      }
     }
 
     res.json({
@@ -610,6 +765,51 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       throw new ValidationError('No fields to update')
     }
 
+    const needsExistingRow =
+      updateData.contractStartDate !== undefined ||
+      updateData.contractEndDate !== undefined ||
+      (updateData.contractDiscountPercentage !== undefined && updateData.price === undefined)
+
+    let existing = null
+    if (needsExistingRow) {
+      const { rows: existingRows } = await query(
+        `
+        SELECT product_id, contract_start_date, contract_end_date
+        FROM restaurant_pricing
+        WHERE id = $1 AND supplier_id = $2
+        `,
+        [id, supplierId]
+      )
+      if (!existingRows.length) {
+        throw new NotFoundError('Pricing not found')
+      }
+      existing = existingRows[0]
+    }
+
+    if (updateData.contractDiscountPercentage !== undefined && updateData.price === undefined) {
+      const resolvedPrice = await resolveContractUpsertPrice(
+        existing.product_id,
+        null,
+        updateData.contractDiscountPercentage
+      )
+      updateFields.push(`price = $${paramIndex++}`)
+      updateValues.push(resolvedPrice.price)
+      // Derived price must still fire recipe costing (same as explicit price PATCH).
+      updateData.price = resolvedPrice.price
+    }
+
+    if (updateData.contractStartDate !== undefined || updateData.contractEndDate !== undefined) {
+      const mergedStart =
+        updateData.contractStartDate !== undefined
+          ? updateData.contractStartDate
+          : existing?.contract_start_date
+      const mergedEnd =
+        updateData.contractEndDate !== undefined
+          ? updateData.contractEndDate
+          : existing?.contract_end_date
+      validateContractDateRange(mergedStart, mergedEnd)
+    }
+
     updateFields.push('updated_at = now()')
     updateValues.push(id, supplierId)
 
@@ -630,14 +830,7 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
     }
 
     if (updateData.price != null) {
-      const { hookRecipeCostingAfterCatalogPriceChange } = await import(
-        '../services/recipe-purchasing-hooks.service.js'
-      )
-      hookRecipeCostingAfterCatalogPriceChange(
-        pricing.product_id,
-        Number(pricing.price),
-        'CONTRACT'
-      )
+      await fireContractRecipeHook(pricing)
     }
 
     res.json({

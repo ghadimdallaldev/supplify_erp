@@ -184,7 +184,8 @@ export function SupplierCustomerGrowthPage() {
   const [executeImport, { isLoading: importing }] = useExecuteCustomerImportMutation()
   const [inviteProspect] = useInviteProspectMutation()
   const [connectProspect] = useConnectProspectMutation()
-  const [createSponsorshipOffer] = useCreateSponsorshipOfferMutation()
+  const [createSponsorshipOffer, { isLoading: creatingSponsorship }] =
+    useCreateSponsorshipOfferMutation()
   const [paySponsorship] = usePaySponsorshipMutation()
   const [retrySponsorshipPayment] = useRetrySponsorshipPaymentMutation()
   const [cancelSponsorship] = useCancelSponsorshipMutation()
@@ -587,7 +588,7 @@ export function SupplierCustomerGrowthPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  disabled={!canManageCustomers}
+                                  disabled={!canManageCustomers || creatingSponsorship}
                                   onClick={async () => {
                                     try {
                                       await connectProspect({ prospectId: p.id }).unwrap()
@@ -603,11 +604,12 @@ export function SupplierCustomerGrowthPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  disabled={!canManageCustomers}
+                                  disabled={!canManageCustomers || creatingSponsorship}
                                   onClick={async () => {
                                     try {
                                       await createSponsorshipOffer({
                                         prospectId: p.id,
+                                        planCode: sponsorPlanCode,
                                         idempotencyKey: `offer_${p.id}_${Date.now()}`,
                                       }).unwrap()
                                       toast.success(
@@ -653,11 +655,12 @@ export function SupplierCustomerGrowthPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  disabled={!canManageCustomers}
+                                  disabled={!canManageCustomers || creatingSponsorship}
                                   onClick={async () => {
                                     try {
                                       await createSponsorshipOffer({
                                         prospectId: p.id,
+                                        planCode: sponsorPlanCode,
                                         idempotencyKey: `offer_${p.id}_${Date.now()}`,
                                       }).unwrap()
                                       toast.success(

@@ -41,10 +41,10 @@ export async function resolveReorderAiCapabilities(tenantId, tenantType, smartRe
   const platformEnabled = envEnabled
     ? await isAiPlatformEnabledForTenant(tenantId, tenantType)
     : false
-  const [canExplainLlm, canAskLlm] = await Promise.all([
-    canUseReorderAiExplain(tenantId, tenantType, smartReorderFeatureValue),
-    canUseReorderAiAsk(tenantId, tenantType, smartReorderFeatureValue),
-  ])
+  const canExplainLlm =
+    platformEnabled && hasSmartReorderCapability(smartReorderFeatureValue, 'forecast')
+  const canAskLlm =
+    platformEnabled && hasSmartReorderCapability(smartReorderFeatureValue, 'seasonality')
 
   return {
     envEnabled,

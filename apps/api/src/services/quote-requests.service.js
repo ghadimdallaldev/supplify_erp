@@ -24,20 +24,39 @@ function mapQuoteRequestRow(row) {
   }
 }
 
-async function filterEligibleSuppliers(restaurantId, supplierIds, dbQuery = query) {
-  if (!supplierIds.length) return []
+async function assertAllSuppliersEligible(restaurantId, supplierIds, dbQuery = query) {
+  if (!supplierIds.length) {
+    throw new ValidationError('Select at least one supplier')
+  }
   const { rows } = await dbQuery(
     `
-    SELECT s.id
-    FROM supplier s
-    WHERE s.id = ANY($1::uuid[])
-      AND NOT EXISTS (
+    SELECT
+      s.id,
+      s.name,
+      s.account_status,
+      EXISTS (
         SELECT 1 FROM supplier_blocklist sb
         WHERE sb.supplier_id = s.id AND sb.restaurant_id = $2
-      )
+      ) AS is_blocked
+    FROM supplier s
+    WHERE s.id = ANY($1::uuid[])
     `,
     [supplierIds, restaurantId]
   )
+  if (rows.length !== supplierIds.length) {
+    throw new ValidationError('One or more suppliers were not found')
+  }
+  const ineligible = rows.filter(
+    (r) =>
+      r.is_blocked ||
+      (r.account_status != null && String(r.account_status).toUpperCase() !== 'ACTIVE')
+  )
+  if (ineligible.length) {
+    const names = ineligible.map((r) => r.name || r.id).join(', ')
+    throw new ValidationError(
+      `Cannot invite ineligible supplier(s): ${names}. They may be blocked or inactive.`
+    )
+  }
   return rows.map((r) => r.id)
 }
 
@@ -67,16 +86,26 @@ export async function createQuoteRequest(
     throw new ValidationError('Select at least one supplier')
   }
 
-  const eligibleSupplierIds = await filterEligibleSuppliers(
+  const eligibleSupplierIds = await assertAllSuppliersEligible(
     restaurantId,
     uniqueSupplierIds,
     dbQuery
   )
-  if (!eligibleSupplierIds.length) {
-    throw new ValidationError('No eligible suppliers selected (blocked or inactive)')
-  }
 
   const productMap = await validateProducts(items, dbQuery)
+  const invitedSupplierSet = new Set(eligibleSupplierIds)
+  const unmatchedProducts = []
+  for (const item of items) {
+    const product = productMap.get(item.productId)
+    if (!invitedSupplierSet.has(product.supplier_id)) {
+      unmatchedProducts.push(product.name || product.sku || item.productId)
+    }
+  }
+  if (unmatchedProducts.length) {
+    throw new ValidationError(
+      `These products do not belong to any invited supplier: ${unmatchedProducts.join(', ')}`
+    )
+  }
 
   const result = await withTransaction(async (client) => {
     const {
@@ -365,7 +394,8 @@ export async function listSupplierQuoteRequests(
     LEFT JOIN LATERAL (
       SELECT COUNT(*)::int AS item_count
       FROM quote_request_items qri
-      WHERE qri.quote_request_id = qr.id
+      JOIN product p ON p.id = qri.product_id
+      WHERE qri.quote_request_id = qr.id AND p.supplier_id = qrs.supplier_id
     ) item_stats ON true
     WHERE qrs.supplier_id = $1${filterSql}
     ORDER BY ${orderBy}
@@ -475,10 +505,10 @@ export async function getSupplierQuoteRequestDetail(
            p.image_url AS product_image_url
     FROM quote_request_items qri
     JOIN product p ON p.id = qri.product_id
-    WHERE qri.quote_request_id = $1
+    WHERE qri.quote_request_id = $1 AND p.supplier_id = $2
     ORDER BY qri.created_at ASC
     `,
-    [row.quote_request_id]
+    [row.quote_request_id, supplierId]
   )
 
   const { rows: existingResponses } = await dbQuery(
@@ -494,9 +524,31 @@ export async function getSupplierQuoteRequestDetail(
     responseItems = ri
   }
 
+  const { rows: currencyRows } = await dbQuery(
+    `
+    SELECT pr.currency
+    FROM quote_request_items qri
+    JOIN product p ON p.id = qri.product_id AND p.supplier_id = $2
+    LEFT JOIN LATERAL (
+      SELECT currency FROM price
+      WHERE product_id = p.id
+        AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
+      ORDER BY valid_from DESC
+      LIMIT 1
+    ) pr ON true
+    WHERE qri.quote_request_id = $1 AND pr.currency IS NOT NULL
+    LIMIT 1
+    `,
+    [row.quote_request_id, supplierId]
+  )
+
+  const defaultCurrency =
+    responseItems.find((ri) => ri.currency)?.currency || currencyRows[0]?.currency || 'USD'
+
   return {
     id: row.id,
     quoteRequestId: row.quote_request_id,
+    defaultCurrency,
     status: row.status,
     restaurantId: row.restaurant_id,
     restaurantName: row.restaurant_name,
@@ -558,6 +610,9 @@ export async function submitQuoteResponse(
     throw new ValidationError(
       `This quote request is ${qrs.quote_request_status} and no longer accepts responses`
     )
+  }
+  if (qrs.status === 'declined') {
+    throw new ValidationError('You have declined this quote request and cannot submit a response')
   }
 
   const { rows: requestItems } = await dbQuery(
@@ -691,12 +746,12 @@ export async function declineQuoteRequest(
 }
 
 export async function buildCartPayloadFromResponse(
-  { restaurantId, quoteRequestSupplierId },
+  { restaurantId, quoteRequestId, quoteRequestSupplierId },
   dbQuery = query
 ) {
   const { rows } = await dbQuery(
     `
-    SELECT qrs.*, qr.restaurant_id
+    SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     WHERE qrs.id = $1
@@ -705,8 +760,16 @@ export async function buildCartPayloadFromResponse(
   )
   if (!rows.length) throw new NotFoundError('Quote response not found')
   const qrs = rows[0]
+  if (quoteRequestId && qrs.quote_request_id !== quoteRequestId) {
+    throw new ValidationError('Supplier row does not belong to this quote request')
+  }
   if (qrs.restaurant_id !== restaurantId) {
     throw new ForbiddenError('Not allowed to access this quote response')
+  }
+  if (qrs.quote_request_status !== 'open') {
+    throw new ValidationError(
+      `This quote request is ${qrs.quote_request_status} and no longer accepts orders from quotes`
+    )
   }
   if (qrs.status !== 'responded') {
     throw new ValidationError('Supplier has not responded yet')
@@ -722,10 +785,14 @@ export async function buildCartPayloadFromResponse(
     `
     SELECT qri.*, qreq.product_id, qreq.quantity AS requested_quantity,
            p.name, p.sku, p.unit, p.supplier_id, p.image_url, p.description,
+           sub_p.id AS substitute_id, sub_p.name AS substitute_name, sub_p.sku AS substitute_sku,
+           sub_p.unit AS substitute_unit, sub_p.image_url AS substitute_image_url,
+           sub_p.description AS substitute_description,
            s.name AS supplier_name, s.slug AS supplier_slug
     FROM quote_response_items qri
     JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
     JOIN product p ON p.id = qreq.product_id
+    LEFT JOIN product sub_p ON sub_p.id = qri.substitute_product_id
     JOIN supplier s ON s.id = p.supplier_id
     WHERE qri.quote_response_id = $1 AND qri.is_available = true
     `,
@@ -739,19 +806,23 @@ export async function buildCartPayloadFromResponse(
   const items = lineItems.map((row) => {
     const quantity = row.quantity != null ? Number(row.quantity) : Number(row.requested_quantity)
     const quotedUnitPrice = row.unit_price != null ? Number(row.unit_price) : null
+    const useSubstitute = Boolean(row.substitute_product_id && row.substitute_id)
+    const productId = useSubstitute ? row.substitute_id : row.product_id
     return {
-      productId: row.product_id,
+      productId,
+      originalProductId: row.product_id,
+      substituteProductId: useSubstitute ? row.substitute_id : null,
       quantity,
       quotedUnitPrice,
       quoteResponseItemId: row.id,
       product: {
-        id: row.product_id,
+        id: productId,
         supplier_id: row.supplier_id,
-        sku: row.sku,
-        name: row.name,
-        description: row.description,
-        unit: row.unit,
-        image_url: row.image_url,
+        sku: useSubstitute ? row.substitute_sku : row.sku,
+        name: useSubstitute ? row.substitute_name : row.name,
+        description: useSubstitute ? row.substitute_description : row.description,
+        unit: useSubstitute ? row.substitute_unit : row.unit,
+        image_url: useSubstitute ? row.substitute_image_url : row.image_url,
         supplier_name: row.supplier_name,
         supplier_slug: row.supplier_slug,
         current_price: quotedUnitPrice,
@@ -765,6 +836,63 @@ export async function buildCartPayloadFromResponse(
     quoteRequestSupplierId: qrs.id,
     items,
   }
+}
+
+export async function updateQuoteRequestStatus(
+  quoteRequestId,
+  restaurantId,
+  status,
+  dbQuery = query
+) {
+  if (!['closed', 'cancelled'].includes(status)) {
+    throw new ValidationError('Status must be closed or cancelled')
+  }
+
+  const { rows: updated } = await dbQuery(
+    `
+    UPDATE quote_requests
+    SET status = $3, updated_at = now()
+    WHERE id = $1 AND restaurant_id = $2 AND status = 'open'
+    RETURNING *
+    `,
+    [quoteRequestId, restaurantId, status]
+  )
+  if (updated.length) {
+    return getQuoteRequestDetail(quoteRequestId, restaurantId, dbQuery)
+  }
+
+  const { rows: existing } = await dbQuery(
+    `SELECT status FROM quote_requests WHERE id = $1 AND restaurant_id = $2`,
+    [quoteRequestId, restaurantId]
+  )
+  if (!existing.length) throw new NotFoundError('Quote request not found')
+  if (existing[0].status === status) {
+    return getQuoteRequestDetail(quoteRequestId, restaurantId, dbQuery)
+  }
+  throw new ValidationError(
+    `Cannot ${status === 'cancelled' ? 'cancel' : 'close'} a quote request with status ${existing[0].status}`
+  )
+}
+
+/**
+ * @deprecated Not invoked on order create — restaurants close RFQs explicitly via PATCH status.
+ * Auto-closing on checkout blocked other suppliers from responding on multi-supplier RFQs.
+ */
+export async function closeQuoteRequestsAfterOrder(quoteLocks, dbQuery = query) {
+  if (!quoteLocks?.length) return
+  const qrsIds = [...new Set(quoteLocks.map((l) => l.quoteRequestSupplierId).filter(Boolean))]
+  if (!qrsIds.length) return
+  await dbQuery(
+    `
+    UPDATE quote_requests qr
+    SET status = 'closed', updated_at = now()
+    FROM quote_request_suppliers qrs
+    WHERE qrs.quote_request_id = qr.id
+      AND qrs.id = ANY($1::uuid[])
+      AND qr.status = 'open'
+    `,
+    [qrsIds]
+  )
 }
 
 export async function assertRestaurantOwnsQuoteRequest(

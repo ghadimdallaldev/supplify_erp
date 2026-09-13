@@ -63,6 +63,31 @@ const emptyForm: FormState = {
 
 type ContractPricingRow = Record<string, unknown>
 
+type ContractDisplayStatus = 'active' | 'inactive' | 'expired' | 'scheduled'
+
+function getContractDisplayStatus(row: Record<string, unknown>): ContractDisplayStatus {
+  const today = new Date().toISOString().slice(0, 10)
+  if (row.is_active === false) return 'inactive'
+  const start = row.contract_start_date ? String(row.contract_start_date).slice(0, 10) : null
+  const end = row.contract_end_date ? String(row.contract_end_date).slice(0, 10) : null
+  if (end && end < today) return 'expired'
+  if (start && start > today) return 'scheduled'
+  return 'active'
+}
+
+function contractStatusLabel(status: ContractDisplayStatus, t: (key: string) => string): string {
+  switch (status) {
+    case 'active':
+      return t('pricing.statusActive')
+    case 'expired':
+      return t('pricing.statusExpired')
+    case 'scheduled':
+    case 'inactive':
+    default:
+      return t('pricing.statusInactive')
+  }
+}
+
 export function ContractPricingPage() {
   const { t } = useTranslation('contracts')
   const { can } = usePermissions()
@@ -252,7 +277,8 @@ export function ContractPricingPage() {
                 tableAriaLabel={t('pricing.title')}
                 tableMinWidth={720}
                 renderCard={(row) => {
-                  const active = row.is_active !== false
+                  const displayStatus = getContractDisplayStatus(row)
+                  const isEffectivelyActive = displayStatus === 'active'
                   return (
                     <div className="space-y-3 p-4">
                       <div className="flex items-start justify-between gap-2">
@@ -263,8 +289,8 @@ export function ContractPricingPage() {
                           </p>
                           <p className="mt-1 text-sm">{String(row.restaurant_name)}</p>
                         </div>
-                        <Badge variant={active ? 'default' : 'secondary'}>
-                          {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
+                        <Badge variant={isEffectivelyActive ? 'default' : 'secondary'}>
+                          {contractStatusLabel(displayStatus, t)}
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
@@ -294,7 +320,7 @@ export function ContractPricingPage() {
                             <Pencil className="mr-1 h-3 w-3" />
                             {t('pricing.edit')}
                           </Button>
-                          {active && (
+                          {isEffectivelyActive && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -345,7 +371,8 @@ export function ContractPricingPage() {
                   </thead>
                 }
                 renderTableRow={(row) => {
-                  const active = row.is_active !== false
+                  const displayStatus = getContractDisplayStatus(row)
+                  const isEffectivelyActive = displayStatus === 'active'
                   return (
                     <tr className="border-b border-[var(--app-border)]">
                       <td className="px-4 py-3">{String(row.restaurant_name)}</td>
@@ -380,8 +407,8 @@ export function ContractPricingPage() {
                         → {row.contract_end_date ? String(row.contract_end_date).slice(0, 10) : '—'}
                       </td>
                       <td className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}>
-                        <Badge variant={active ? 'default' : 'secondary'}>
-                          {active ? t('pricing.statusActive') : t('pricing.statusInactive')}
+                        <Badge variant={isEffectivelyActive ? 'default' : 'secondary'}>
+                          {contractStatusLabel(displayStatus, t)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3">
@@ -395,7 +422,7 @@ export function ContractPricingPage() {
                             >
                               <Pencil className="h-3 w-3" />
                             </Button>
-                            {active && (
+                            {isEffectivelyActive && (
                               <Button
                                 size="sm"
                                 variant="outline"

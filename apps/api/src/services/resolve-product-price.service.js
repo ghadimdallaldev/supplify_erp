@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { toCalendarDateString } from '../lib/reservation-availability.js'
 
 /**
  * Fetch the current catalog price for a product.
@@ -47,10 +48,10 @@ export async function getDefaultCatalogPricesBatch(productIds, dbQuery = query) 
   )
 }
 
-function toDateOnly(value) {
-  if (!value) return new Date()
-  if (value instanceof Date) return value
-  return new Date(value)
+/** @returns {string | null} YYYY-MM-DD for SQL, or null to use CURRENT_DATE */
+function toContractAsOfDate(date) {
+  if (date == null) return null
+  return toCalendarDateString(date)
 }
 
 function buildDefaultResolution(defaultPrice, currency = 'USD') {
@@ -106,6 +107,7 @@ export async function resolveQuotePrice(
       qri.unit_price,
       qri.currency,
       qreq.product_id,
+      qri.substitute_product_id,
       p.supplier_id
     FROM quote_response_items qri
     JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
@@ -116,6 +118,7 @@ export async function resolveQuotePrice(
     WHERE qri.id = $1
       AND qrs.id = $2
       AND qr.restaurant_id = $3
+      AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
     `,
@@ -125,7 +128,8 @@ export async function resolveQuotePrice(
   if (!rows.length || rows[0].unit_price == null) return null
 
   const row = rows[0]
-  if (productId && row.product_id !== productId) return null
+  const effectiveProductId = row.substitute_product_id || row.product_id
+  if (productId && productId !== row.product_id && productId !== effectiveProductId) return null
   if (supplierId && row.supplier_id !== supplierId) return null
 
   const catalog = await getDefaultCatalogPrice(row.product_id, dbQuery)
@@ -153,6 +157,7 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
       qri.unit_price,
       qri.currency,
       qreq.product_id,
+      qri.substitute_product_id,
       p.supplier_id,
       qrs.id AS quote_request_supplier_id
     FROM unnest($1::uuid[], $2::uuid[]) AS v(qrs_id, qri_id)
@@ -165,6 +170,7 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
     JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
     JOIN product p ON p.id = qreq.product_id
     WHERE qr.restaurant_id = $3
+      AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
     `,
@@ -173,23 +179,27 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
 
   const lockByProductId = new Map(quoteLocks.map((l) => [l.productId, l]))
 
-  const productIds = [...new Set(rows.map((r) => r.product_id))]
+  const productIds = [
+    ...new Set(rows.flatMap((r) => [r.product_id, r.substitute_product_id].filter(Boolean))),
+  ]
   const catalogMap = await getDefaultCatalogPricesBatch(productIds, dbQuery)
 
   const resolved = new Map()
   for (const row of rows) {
-    const lock = lockByProductId.get(row.product_id)
+    const effectiveProductId = row.substitute_product_id || row.product_id
+    const lock = lockByProductId.get(effectiveProductId) ?? lockByProductId.get(row.product_id)
     if (!lock) continue
     if (lock.quoteRequestSupplierId !== row.quote_request_supplier_id) continue
     if (lock.quoteResponseItemId !== row.quote_response_item_id) continue
     if (row.unit_price == null) continue
 
-    const catalog = catalogMap.get(row.product_id)
+    const catalogProductId = effectiveProductId
+    const catalog = catalogMap.get(catalogProductId) ?? catalogMap.get(row.product_id)
     const defaultPrice = catalog?.amount ?? null
     const currency = row.currency || catalog?.currency || 'USD'
 
     resolved.set(
-      row.product_id,
+      lock.productId,
       buildQuoteResolution({
         unitPrice: Number(row.unit_price),
         currency,
@@ -200,6 +210,60 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
   }
 
   return resolved
+}
+
+/**
+ * Find order product IDs that have at least one eligible open quote response line.
+ * Used at checkout to require quoteLocks — clients cannot silently fall back to catalog/contract.
+ *
+ * @param {{ restaurantId: string, productIds: string[] }} params
+ * @param {Function} dbQuery
+ * @returns {Promise<Map<string, { sku: string | null, productId: string }>>}
+ */
+export async function findOpenQuotedProductsForOrder(
+  { restaurantId, productIds },
+  dbQuery = query
+) {
+  if (!restaurantId || !productIds?.length) return new Map()
+
+  const { rows } = await dbQuery(
+    `
+    SELECT
+      qreq.product_id AS original_product_id,
+      qri.substitute_product_id,
+      p.sku,
+      qr_resp.submitted_at
+    FROM quote_response_items qri
+    JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
+    JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+    JOIN product p ON p.id = qreq.product_id
+    WHERE qr.restaurant_id = $1
+      AND qr.status = 'open'
+      AND qrs.status = 'responded'
+      AND qri.is_available = true
+      AND qri.unit_price IS NOT NULL
+      AND (
+        qreq.product_id = ANY($2::uuid[])
+        OR qri.substitute_product_id = ANY($2::uuid[])
+      )
+    ORDER BY qr_resp.submitted_at DESC
+    `,
+    [restaurantId, productIds]
+  )
+
+  const orderProductIdSet = new Set(productIds)
+  const quoted = new Map()
+  for (const row of rows) {
+    const candidates = [row.original_product_id, row.substitute_product_id].filter(Boolean)
+    for (const pid of candidates) {
+      if (orderProductIdSet.has(pid) && !quoted.has(pid)) {
+        quoted.set(pid, { sku: row.sku ?? null, productId: pid })
+      }
+    }
+  }
+  return quoted
 }
 
 /**
@@ -217,7 +281,7 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
  * @param {Function} dbQuery
  */
 export async function resolveProductPrice(
-  { restaurantId, supplierId, productId, quantity = 1, date = new Date() },
+  { restaurantId, supplierId, productId, quantity = 1, date },
   dbQuery = query
 ) {
   const catalog = await getDefaultCatalogPrice(productId, dbQuery)
@@ -228,8 +292,7 @@ export async function resolveProductPrice(
     return buildDefaultResolution(defaultPrice, currency)
   }
 
-  const asOf = toDateOnly(date)
-  const dateStr = asOf.toISOString().slice(0, 10)
+  const dateStr = toContractAsOfDate(date)
 
   const { rows } = await dbQuery(
     `
@@ -239,8 +302,8 @@ export async function resolveProductPrice(
       AND supplier_id = $2
       AND product_id = $3
       AND is_active = true
-      AND (contract_start_date IS NULL OR contract_start_date <= $4::date)
-      AND (contract_end_date IS NULL OR contract_end_date >= $4::date)
+      AND (contract_start_date IS NULL OR contract_start_date <= COALESCE($4::date, CURRENT_DATE))
+      AND (contract_end_date IS NULL OR contract_end_date >= COALESCE($4::date, CURRENT_DATE))
       AND (min_order_quantity IS NULL OR min_order_quantity <= $5)
     ORDER BY updated_at DESC
     LIMIT 1
@@ -281,7 +344,7 @@ export async function resolveProductPrice(
  * @param {Function} dbQuery
  */
 export async function resolveProductPricesBatch(
-  { restaurantId, items, date = new Date(), catalogByProductId = null, quoteLocks = null },
+  { restaurantId, items, date, catalogByProductId = null, quoteLocks = null },
   dbQuery = query
 ) {
   if (!items?.length) return []
@@ -296,8 +359,7 @@ export async function resolveProductPricesBatch(
     ? await resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery)
     : new Map()
 
-  const asOf = toDateOnly(date)
-  const dateStr = asOf.toISOString().slice(0, 10)
+  const dateStr = toContractAsOfDate(date)
 
   const pairs = items.map((i) => [i.supplierId, i.productId])
   const uniquePairs = [...new Map(pairs.map((p) => [p.join(':'), p])).values()]
@@ -316,8 +378,8 @@ export async function resolveProductPricesBatch(
       AND supplier_id = ANY($2::uuid[])
       AND product_id = ANY($3::uuid[])
       AND is_active = true
-      AND (contract_start_date IS NULL OR contract_start_date <= $4::date)
-      AND (contract_end_date IS NULL OR contract_end_date >= $4::date)
+      AND (contract_start_date IS NULL OR contract_start_date <= COALESCE($4::date, CURRENT_DATE))
+      AND (contract_end_date IS NULL OR contract_end_date >= COALESCE($4::date, CURRENT_DATE))
     ORDER BY updated_at DESC
     `,
     [restaurantId, supplierIds, pairProductIds, dateStr]

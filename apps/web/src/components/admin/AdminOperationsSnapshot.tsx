@@ -14,7 +14,7 @@ import {
   Tag,
 } from 'lucide-react'
 import type { AdminOverview } from '../../lib/adminOverview'
-import { AppPanel } from '../ui/app-panel'
+import { AdminCollapsibleSection } from './adminUi'
 import { AdminKpiCard } from './AdminKpiCard'
 
 function SnapshotGroup({
@@ -52,7 +52,7 @@ export function AdminOperationsSnapshot({
   }
 
   return (
-    <AppPanel
+    <AdminCollapsibleSection
       title={t('operationsSnapshot.title')}
       description={t('operationsSnapshot.description')}
       testId="admin-operations-snapshot"
@@ -229,6 +229,6 @@ export function AdminOperationsSnapshot({
           </div>
         </SnapshotGroup>
       </div>
-    </AppPanel>
+    </AdminCollapsibleSection>
   )
 }

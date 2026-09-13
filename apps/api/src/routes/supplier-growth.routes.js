@@ -225,6 +225,7 @@ router.post(
 
 const createSponsorshipSchema = z.object({
   prospectId: z.string().uuid(),
+  planCode: z.enum(['silver', 'gold', 'platinum']).optional(),
   restaurantId: z.string().uuid().optional().nullable(),
   invitationId: z.string().uuid().optional().nullable(),
   suggestedPlanId: z.string().uuid().optional().nullable(),

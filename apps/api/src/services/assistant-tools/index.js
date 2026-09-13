@@ -630,15 +630,18 @@ const TOOLS = {
  * @param {AssistantToolContext} ctx
  */
 export async function resolveAvailableTools(ctx) {
-  const names = []
-  const definitions = []
-  for (const [name, tool] of Object.entries(TOOLS)) {
-    if (await tool.available(ctx)) {
-      names.push(name)
-      definitions.push(tool.definition)
-    }
+  const availableTools = await Promise.all(
+    Object.entries(TOOLS).map(async ([name, tool]) => ({
+      name,
+      definition: tool.definition,
+      enabled: await tool.available(ctx),
+    }))
+  )
+  const enabledTools = availableTools.filter((tool) => tool.enabled)
+  return {
+    names: enabledTools.map((tool) => tool.name),
+    definitions: enabledTools.map((tool) => tool.definition),
   }
-  return { names, definitions }
 }
 
 /**

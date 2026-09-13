@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -46,6 +46,12 @@ export function SupplierQuoteResponsePage() {
 
   const [note, setNote] = useState('')
   const [lines, setLines] = useState<Record<string, LineDraft>>({})
+
+  const quoteCurrency = useMemo(() => {
+    const fromResponse = data?.response?.items.find((item) => item.currency)?.currency
+    if (fromResponse) return fromResponse
+    return data?.defaultCurrency || 'USD'
+  }, [data])
 
   useEffect(() => {
     if (!data?.items) return
@@ -108,7 +114,7 @@ export function SupplierQuoteResponsePage() {
       quantity: line.quantity ? parseFloat(line.quantity) : null,
       deliveryDate: line.deliveryDate || null,
       note: line.note || null,
-      currency: 'USD',
+      currency: quoteCurrency,
     }))
 
     try {

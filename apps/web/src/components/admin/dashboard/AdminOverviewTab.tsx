@@ -9,33 +9,18 @@ import {
   useGetAdminConversionStatsQuery,
   useGetAdminHealthQuery,
 } from '../../../services/api'
-import {
-  AlertCircle,
-  RefreshCw,
-  Building2,
-  DollarSign,
-  Store,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  PauseCircle,
-  XCircle,
-  Loader2,
-  ArrowRight,
-} from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, PauseCircle, XCircle, ArrowRight } from 'lucide-react'
 import {
   deriveSystemHealth,
   formatSystemHealthLabel,
   getActiveSubscriptionCount,
-  getPaidActiveSubscriptionCount,
   getTotalTenantCount,
   type AdminOverview,
 } from '../../../lib/adminOverview'
 import { formatCurrency } from '../../../utils/format'
 import { AdminOverviewExtras } from '../AdminOverviewExtras'
 import { AdminOperationsSnapshot } from '../AdminOperationsSnapshot'
-import { AdminKpiCard } from '../AdminKpiCard'
-import { AdminErrorState, AdminLoadingSkeleton, AdminSectionHeader } from '../adminUi'
+import { AdminCollapsibleSection, AdminErrorState, AdminLoadingSkeleton } from '../adminUi'
 import { type AdminCanTabMap } from './adminDashboardShared'
 
 export interface AdminOverviewTabProps {
@@ -89,7 +74,6 @@ export function AdminOverviewTab({
   if (overviewLoading) {
     return (
       <>
-        <AdminSectionHeader title={t('overview.title')} description={t('overview.description')} />
         <AdminLoadingSkeleton rows={10} />
       </>
     )
@@ -98,7 +82,6 @@ export function AdminOverviewTab({
   if (overviewError) {
     return (
       <>
-        <AdminSectionHeader title={t('overview.title')} description={t('overview.description')} />
         <AdminErrorState
           title={t('overview.loadFailedTitle')}
           message={
@@ -115,29 +98,10 @@ export function AdminOverviewTab({
 
   return (
     <>
-      <AdminSectionHeader
-        title={t('overview.title')}
-        description={t('overview.description')}
-        action={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchOverview()}
-            disabled={overviewFetching}
-          >
-            {overviewFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
-        }
-      />
-
       <div className="mb-4">
         <SummaryStrip
           testId="admin-overview-summary"
-          columns={6}
+          columns={5}
           metrics={[
             {
               label: t('overview.totalTenants'),
@@ -181,27 +145,9 @@ export function AdminOverviewTab({
                     : 'danger',
               onClick: canAdminTab.health ? () => onNavigateTab('health') : undefined,
             },
-            {
-              label: 'Past due',
-              value: overviewData?.alerts?.pastDueSubscriptions ?? subscriptionStats.PAST_DUE ?? 0,
-              hint: 'Subscriptions needing attention',
-              tone:
-                (overviewData?.alerts?.pastDueSubscriptions ?? subscriptionStats.PAST_DUE ?? 0) > 0
-                  ? 'danger'
-                  : 'default',
-              onClick: canAdminTab.subscriptions ? () => onNavigateTab('subscriptions') : undefined,
-            },
           ]}
         />
       </div>
-
-      <AdminOperationsSnapshot
-        overview={overviewData}
-        recentErrorCount={recentErrorCount}
-        onNavigateTab={onNavigateTab}
-        onOperationsSubTab={onOperationsSubTab}
-      />
-
       <AdminOverviewExtras
         overview={overview}
         onNavigateTab={onNavigateTab}
@@ -214,73 +160,14 @@ export function AdminOverviewTab({
         }
       />
 
-      <AppPanel
-        title={t('overview.tenantsRevenueTitle')}
-        description={t('overview.tenantsRevenueDescription')}
-        testId="admin-overview-tenants-revenue"
-        className="mb-4"
-        footer={
-          overviewFetching ? (
-            <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Refreshing metrics…
-            </p>
-          ) : undefined
-        }
-      >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <AdminKpiCard
-            label={t('overview.activeSuppliers')}
-            value={overviewData?.tenants?.totalSuppliers ?? 0}
-            description={
-              (overviewData?.tenants?.newSuppliers7d || 0) > 0
-                ? `+${overviewData?.tenants?.newSuppliers7d} new this week`
-                : 'No new this week'
-            }
-            icon={Building2}
-            tone="brand"
-          />
-          <AdminKpiCard
-            label={t('overview.activeRestaurants')}
-            value={overviewData?.tenants?.totalRestaurants ?? 0}
-            description={
-              (overviewData?.tenants?.newRestaurants7d || 0) > 0
-                ? `+${overviewData?.tenants?.newRestaurants7d} new this week`
-                : 'No new this week'
-            }
-            icon={Store}
-            tone="success"
-          />
-          <AdminKpiCard
-            label={t('overview.mrr')}
-            value={formatCurrency(overviewData?.revenue?.mrr)}
-            description={`ARR: ${formatCurrency(overviewData?.revenue?.arr)}`}
-            icon={DollarSign}
-            tone="success"
-          />
-          <AdminKpiCard
-            label={t('overview.activeSubscriptions')}
-            value={getPaidActiveSubscriptionCount(overviewData)}
-            description={t('overview.activeSubsDescription')}
-            icon={CreditCard}
-            tone="brand"
-          />
-        </div>
-        {canAdminTab.finance && (
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => onNavigateTab('finance')}
-            >
-              Open finance <ArrowRight className="ml-1 h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </AppPanel>
+      <AdminOperationsSnapshot
+        overview={overviewData}
+        recentErrorCount={recentErrorCount}
+        onNavigateTab={onNavigateTab}
+        onOperationsSubTab={onOperationsSubTab}
+      />
 
-      <AppPanel
+      <AdminCollapsibleSection
         title={t('overview.subscriptionBreakdownTitle')}
         description={t('overview.subscriptionBreakdownDescription')}
         testId="admin-overview-subscription-breakdown"
@@ -329,138 +216,147 @@ export function AdminOverviewTab({
             </button>
           ))}
         </div>
-      </AppPanel>
+      </AdminCollapsibleSection>
 
       {conversionStats && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <AppPanel
-            title={t('overview.conversionFunnelTitle')}
-            description={t('overview.conversionFunnelDescription')}
-            testId="admin-overview-conversion-funnel"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <Badge variant="outline" className="text-xs">
-                {conversionStats.blocksToUpgradesConversionPercent}% conversion rate
-              </Badge>
-              {canAdminTab.plans && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => onNavigateTab('plans')}
-                >
-                  Plan limits <ArrowRight className="ml-1 h-3 w-3" />
-                </Button>
-              )}
-            </div>
-            {(() => {
-              const windowKey = `${conversionStats.days ?? 30}d`
-              const s30 = conversionStats.funnelDropOff?.[windowKey]
-              const funnelSteps = [
-                {
-                  label: 'Feature / limit blocks',
-                  value: Number(conversionStats.totalBlocks),
-                },
-                { label: 'Upgrade modal opens', value: Number(s30?.openUpgrade ?? 0) },
-                { label: 'Upgrade clicked', value: Number(s30?.clickUpgrade ?? 0) },
-                {
-                  label: 'Upgrades completed',
-                  value: Number(conversionStats.totalUpgrades),
-                },
-              ]
-              const topValue = Math.max(...funnelSteps.map((s) => s.value), 1)
-              return (
-                <div className="space-y-3">
-                  {funnelSteps.map(({ label, value }) => (
-                    <div key={label}>
-                      <div className="mb-1 flex justify-between text-xs">
-                        <span className="text-[var(--text-muted)]">{label}</span>
-                        <span className="font-semibold text-[var(--text)]">{value}</span>
-                      </div>
-                      <div
-                        className="h-1.5 overflow-hidden rounded-full"
-                        style={{ background: 'var(--app-border)' }}
-                      >
-                        <div
-                          className="h-1.5 rounded-full"
-                          style={{
-                            width: `${Math.min(100, Math.round((value / topValue) * 100))}%`,
-                            background: 'var(--brand)',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            })()}
-            {(conversionStats.mostBlockedFeature || conversionStats.mostBlockedLimit) && (
-              <div className="mt-4 space-y-1 border-t pt-3">
-                {conversionStats.mostBlockedFeature && (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Top blocked feature:{' '}
-                    <span className="font-medium text-[var(--text)]">
-                      {conversionStats.mostBlockedFeature}
-                    </span>
-                  </p>
-                )}
-                {conversionStats.mostBlockedLimit && (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Top blocked limit:{' '}
-                    <span className="font-medium text-[var(--text)]">
-                      {conversionStats.mostBlockedLimit}
-                    </span>
-                  </p>
+        <AdminCollapsibleSection
+          title="Growth insights"
+          description="Understand upgrade demand and conversion momentum."
+          className="mb-4"
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <AppPanel
+              title={t('overview.conversionFunnelTitle')}
+              description={t('overview.conversionFunnelDescription')}
+              testId="admin-overview-conversion-funnel"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <Badge variant="outline" className="text-xs">
+                  {conversionStats.blocksToUpgradesConversionPercent}% conversion rate
+                </Badge>
+                {canAdminTab.plans && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => onNavigateTab('plans')}
+                  >
+                    Plan limits <ArrowRight className="ml-1 h-3 w-3" />
+                  </Button>
                 )}
               </div>
-            )}
-          </AppPanel>
-
-          {conversionStats.funnelDropOff && (
-            <AppPanel
-              title={t('overview.funnelComparisonTitle')}
-              description={t('overview.funnelComparisonDescription')}
-              testId="admin-overview-funnel-comparison"
-            >
-              <TableScroll aria-label={t('overview.funnelComparisonTableAriaLabel')}>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-[var(--app-border)]">
-                      <th className="py-2 text-left font-medium text-[var(--text-muted)]">Step</th>
-                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">7d</th>
-                      <th className="py-2 text-right font-medium text-[var(--text-muted)]">
-                        {`${conversionStats.days ?? 30}d`}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--app-border)]">
-                    {[
-                      { label: 'Blocked', key: 'blocked' },
-                      { label: 'Open upgrade', key: 'openUpgrade' },
-                      { label: 'Click upgrade', key: 'clickUpgrade' },
-                      { label: 'Upgrade success', key: 'upgradeSuccess' },
-                    ].map(({ label, key }) => (
-                      <tr key={key}>
-                        <td className="py-2 text-[var(--text)]">{label}</td>
-                        <td className="py-2 text-right font-semibold text-[var(--text)]">
-                          {(conversionStats.funnelDropOff!['7d'] as Record<string, number>)[key] ??
-                            0}
-                        </td>
-                        <td className="py-2 text-right font-semibold text-[var(--text)]">
-                          {(
-                            conversionStats.funnelDropOff![
-                              `${conversionStats.days ?? 30}d`
-                            ] as Record<string, number>
-                          )?.[key] ?? 0}
-                        </td>
-                      </tr>
+              {(() => {
+                const windowKey = `${conversionStats.days ?? 30}d`
+                const s30 = conversionStats.funnelDropOff?.[windowKey]
+                const funnelSteps = [
+                  {
+                    label: 'Feature / limit blocks',
+                    value: Number(conversionStats.totalBlocks),
+                  },
+                  { label: 'Upgrade modal opens', value: Number(s30?.openUpgrade ?? 0) },
+                  { label: 'Upgrade clicked', value: Number(s30?.clickUpgrade ?? 0) },
+                  {
+                    label: 'Upgrades completed',
+                    value: Number(conversionStats.totalUpgrades),
+                  },
+                ]
+                const topValue = Math.max(...funnelSteps.map((s) => s.value), 1)
+                return (
+                  <div className="space-y-3">
+                    {funnelSteps.map(({ label, value }) => (
+                      <div key={label}>
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="text-[var(--text-muted)]">{label}</span>
+                          <span className="font-semibold text-[var(--text)]">{value}</span>
+                        </div>
+                        <div
+                          className="h-1.5 overflow-hidden rounded-full"
+                          style={{ background: 'var(--app-border)' }}
+                        >
+                          <div
+                            className="h-1.5 rounded-full"
+                            style={{
+                              width: `${Math.min(100, Math.round((value / topValue) * 100))}%`,
+                              background: 'var(--brand)',
+                            }}
+                          />
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </TableScroll>
+                  </div>
+                )
+              })()}
+              {(conversionStats.mostBlockedFeature || conversionStats.mostBlockedLimit) && (
+                <div className="mt-4 space-y-1 border-t pt-3">
+                  {conversionStats.mostBlockedFeature && (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Top blocked feature:{' '}
+                      <span className="font-medium text-[var(--text)]">
+                        {conversionStats.mostBlockedFeature}
+                      </span>
+                    </p>
+                  )}
+                  {conversionStats.mostBlockedLimit && (
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Top blocked limit:{' '}
+                      <span className="font-medium text-[var(--text)]">
+                        {conversionStats.mostBlockedLimit}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
             </AppPanel>
-          )}
-        </div>
+
+            {conversionStats.funnelDropOff && (
+              <AppPanel
+                title={t('overview.funnelComparisonTitle')}
+                description={t('overview.funnelComparisonDescription')}
+                testId="admin-overview-funnel-comparison"
+              >
+                <TableScroll aria-label={t('overview.funnelComparisonTableAriaLabel')}>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[var(--app-border)]">
+                        <th className="py-2 text-left font-medium text-[var(--text-muted)]">
+                          Step
+                        </th>
+                        <th className="py-2 text-right font-medium text-[var(--text-muted)]">7d</th>
+                        <th className="py-2 text-right font-medium text-[var(--text-muted)]">
+                          {`${conversionStats.days ?? 30}d`}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--app-border)]">
+                      {[
+                        { label: 'Blocked', key: 'blocked' },
+                        { label: 'Open upgrade', key: 'openUpgrade' },
+                        { label: 'Click upgrade', key: 'clickUpgrade' },
+                        { label: 'Upgrade success', key: 'upgradeSuccess' },
+                      ].map(({ label, key }) => (
+                        <tr key={key}>
+                          <td className="py-2 text-[var(--text)]">{label}</td>
+                          <td className="py-2 text-right font-semibold text-[var(--text)]">
+                            {(conversionStats.funnelDropOff!['7d'] as Record<string, number>)[
+                              key
+                            ] ?? 0}
+                          </td>
+                          <td className="py-2 text-right font-semibold text-[var(--text)]">
+                            {(
+                              conversionStats.funnelDropOff![
+                                `${conversionStats.days ?? 30}d`
+                              ] as Record<string, number>
+                            )?.[key] ?? 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableScroll>
+              </AppPanel>
+            )}
+          </div>
+        </AdminCollapsibleSection>
       )}
     </>
   )

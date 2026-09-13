@@ -235,6 +235,7 @@ export interface DispatchOrderCard {
   assignment?: {
     id: string
     status: string
+    warehouse_assignment_id?: string | null
     assigned_at?: string
     delivered_at?: string
     scheduled_delivery_date?: string | null
