@@ -187,12 +187,10 @@ export function ProductsPage() {
   } = useProductCatalogImport({ refetch, onImportSuccess: clearBulkUpload })
 
   const allProducts = useMemo(() => data?.products ?? [], [data?.products])
-  const filteredProducts = useMemo(() => {
-    if (!isSupplier) return allProducts
-    const email = user?.email?.trim().toLowerCase()
-    if (!email) return allProducts
-    return allProducts.filter((p) => p.supplier_email?.trim().toLowerCase() === email)
-  }, [allProducts, isSupplier, user?.email])
+  // API already scopes supplier catalogs by active tenant supplier_id.
+  // Do not filter by supplier_email — list payloads do not include that field,
+  // so matching on it emptied every supplier catalog (0 shown of N total).
+  const filteredProducts = allProducts
 
   const pagination = data?.pagination
   const total = pagination?.total ?? null
