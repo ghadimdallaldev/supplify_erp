@@ -61,3 +61,24 @@ describe('createPendingActivationSubscription', () => {
     ])
   })
 })
+
+describe('createOrgCoveredBranchSubscription', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 })
+  })
+
+  it('inserts an unlocked subscription for org child branches', async () => {
+    const { createOrgCoveredBranchSubscription } = await import('./subscription-activation.js')
+    const client = { query: vi.fn().mockResolvedValue({ rowCount: 1 }) }
+
+    await createOrgCoveredBranchSubscription(client, 'branch-2', 'SUPPLIER', 'free')
+
+    const [sql, params] = client.query.mock.calls[0]
+    expect(sql).toContain('INSERT INTO subscription')
+    expect(sql).toMatch(/account_locked_at,\s*lock_reason/)
+    expect(sql).toMatch(/NULL,\s*NULL\s*$|NULL,\s*NULL\s*\n/m)
+    expect(params).toEqual(['branch-2', 'SUPPLIER', 'free'])
+    expect(params).not.toContain(LOCK_REASON_PENDING_ACTIVATION)
+  })
+})

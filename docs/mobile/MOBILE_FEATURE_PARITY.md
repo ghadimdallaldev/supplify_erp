@@ -2,6 +2,20 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Org child branches inherit main unlock (no fake activate)
+
+- Bug: Creating a supplier/restaurant org Branch Account wrote a locked Free `pending_activation` subscription on the child. Switching into that branch made `GET /api/billing/status` read the child row → `/app/activate` (“Trial activation is not available”) even when Scale showed 2/3 branches included.
+- Fix: org create uses unlocked `createOrgCoveredBranchSubscription`; billing status / `getSubscriptionForBilling` resolve the main org billing tenant for access; web skips activate redirect when `usesOrgBilling`.
+- **Mobile skipped**: branch create/switch and activation gate are web cockpit; mobile opens org/settings on web where needed. No mobile API client contract change.
+- Docs: `supplier-branches.md`.
+
+## 2026-09-14 — Supplier team invites: auto-link missing org (Railway preprod)
+
+- Team invites failed on some Railway preprod suppliers with `Organization context required` when `supplier.organization_id` was null (backfill lag / seed accounts). UI looked broken or showed a vague permission error.
+- Fix: `ensureSupplierOrganizationLinked` creates + links an org on demand during `/api/org/invitations*`. Workspace membership conflicts return **409** with a clear message. Invite modal surfaces real API errors and prefers the **Driver** role when present.
+- **Mobile skipped**: team invites remain web-only.
+- **Deploy:** promote/redeploy **API + Web** on Railway `preprod` for this to take effect.
+
 ## 2026-09-14 — Supplier team invites no longer require multi_branch
 
 - Bug: Settings → Team → Invite (including **Driver**) hit `/api/org/invitations`, which was gated by `requireFeature('multi_branch')`. Growth plans have `driver_management` but not `multi_branch`, so invites failed with `FEATURE_NOT_AVAILABLE` and the modal swallowed errors (appeared broken).

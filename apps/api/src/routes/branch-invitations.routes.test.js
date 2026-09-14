@@ -9,6 +9,7 @@ const revokeBranchInvitation = vi.fn()
 const regenerateBranchInvitation = vi.fn()
 const assertSupplierInOrg = vi.fn()
 const validateBranchRoleForSupplier = vi.fn()
+const ensureSupplierOrganizationLinked = vi.fn()
 
 vi.mock('../lib/branch-invitations.js', () => ({
   createBranchInvitation: (...args) => createBranchInvitation(...args),
@@ -17,6 +18,10 @@ vi.mock('../lib/branch-invitations.js', () => ({
   regenerateBranchInvitation: (...args) => regenerateBranchInvitation(...args),
   assertSupplierInOrg: (...args) => assertSupplierInOrg(...args),
   validateBranchRoleForSupplier: (...args) => validateBranchRoleForSupplier(...args),
+}))
+
+vi.mock('../lib/supplier-org.js', () => ({
+  ensureSupplierOrganizationLinked: (...args) => ensureSupplierOrganizationLinked(...args),
 }))
 
 vi.mock('../lib/db.js', () => ({
@@ -75,8 +80,10 @@ import branchInvitationsRoutes from './branch-invitations.routes.js'
 
 function defaultQueryMock(sql) {
   const text = String(sql)
-  if (text.includes('organization_id FROM supplier')) {
-    return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
+  if (text.includes('organization_id FROM supplier') || text.includes('FROM supplier WHERE id')) {
+    return Promise.resolve({
+      rows: [{ organization_id: 'org-1', name: 'Acme Supply', slug: 'acme' }],
+    })
   }
   if (text.includes('is_main_branch = true')) {
     return Promise.resolve({ rows: [{ id: 'supplier-main' }] })
@@ -94,6 +101,11 @@ describe('branch-invitations.routes', () => {
     revokeBranchInvitation.mockReset()
     regenerateBranchInvitation.mockReset()
     ensureTenantSystemRoles.mockClear()
+    ensureSupplierOrganizationLinked.mockReset()
+    ensureSupplierOrganizationLinked.mockResolvedValue({
+      organizationId: 'org-1',
+      created: false,
+    })
     assertSupplierInOrg.mockResolvedValue(true)
     validateBranchRoleForSupplier.mockResolvedValue(true)
     query.mockReset()
@@ -131,6 +143,42 @@ describe('branch-invitations.routes', () => {
       .expect(201)
     expect(res.body.data.invitation_id).toBe('inv-driver')
     expect(res.body.error).toBeNull()
+  })
+
+  it('auto-links a supplier organization when organization_id is missing', async () => {
+    query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('FROM supplier WHERE id')) {
+        return Promise.resolve({
+          rows: [{ organization_id: null, name: 'Ghadi Preprod Supplier', slug: 'ghadi' }],
+        })
+      }
+      if (text.includes('is_main_branch = true')) {
+        return Promise.resolve({ rows: [{ id: 'branch-1' }] })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+    ensureSupplierOrganizationLinked.mockResolvedValue({
+      organizationId: 'org-created',
+      created: true,
+    })
+    createBranchInvitation.mockResolvedValue({
+      invitation: { id: 'inv-no-org' },
+      invite_url: 'http://localhost:5173/invite/branch?token=x',
+      expires_at: new Date().toISOString(),
+    })
+
+    const res = await request(app)
+      .post('/api/org/invitations')
+      .send({
+        supplier_id: 'branch-1',
+        invited_email: 'driver@example.com',
+        role_id: 'role-driver',
+      })
+      .expect(201)
+
+    expect(ensureSupplierOrganizationLinked).toHaveBeenCalledWith('branch-1')
+    expect(res.body.data.invitation_id).toBe('inv-no-org')
   })
 
   it('GET /roles seeds system roles then lists inviteable roles', async () => {
@@ -219,5 +267,23 @@ describe('branch-invitations.routes', () => {
     })
     const res = await request(app).post('/api/org/invitations/inv-1/regenerate').expect(200)
     expect(res.body.data.invite_url).toContain('token=new')
+  })
+
+  it('POST / returns WORKSPACE_MEMBERSHIP_CONFLICT with 409', async () => {
+    const err = new Error('This user is already linked to another account')
+    err.name = 'WORKSPACE_MEMBERSHIP_CONFLICT'
+    err.status = 409
+    createBranchInvitation.mockRejectedValue(err)
+
+    const res = await request(app)
+      .post('/api/org/invitations')
+      .send({
+        supplier_id: 'branch-1',
+        invited_email: 'taken@example.com',
+        role_id: 'role-driver',
+      })
+      .expect(409)
+    expect(res.body.error.name).toBe('WORKSPACE_MEMBERSHIP_CONFLICT')
+    expect(res.body.error.message).toMatch(/already linked/i)
   })
 })

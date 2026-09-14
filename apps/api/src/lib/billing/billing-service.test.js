@@ -14,6 +14,12 @@ vi.mock('../cache.js', () => ({
   deleteCache: vi.fn().mockResolvedValue(undefined),
 }))
 
+const mockResolveOrgBillingTenantId = vi.fn(async (tenantId) => tenantId)
+
+vi.mock('../org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: (...args) => mockResolveOrgBillingTenantId(...args),
+}))
+
 vi.mock('../platform-settings.js', () => ({
   getFreeSandboxDays: vi.fn().mockResolvedValue(30),
   FREE_TRIAL_MIN_DAYS: 7,
@@ -491,5 +497,51 @@ describe('unlockSubscriptionAccount', () => {
       (call) => typeof call[0] === 'string' && call[0].includes('free_sandbox_expires_at')
     )
     expect(updateCall).toBeTruthy()
+  })
+})
+
+describe('getBillingStatus org branch billing', () => {
+  beforeEach(() => {
+    mockQuery.mockReset()
+    mockResolveOrgBillingTenantId.mockReset()
+    mockResolveOrgBillingTenantId.mockImplementation(async (tenantId) => tenantId)
+  })
+
+  it('uses main-branch subscription for access when active tenant is an org child', async () => {
+    const { getBillingStatus } = await import('./billing-service.js')
+    mockResolveOrgBillingTenantId.mockResolvedValue('main-supplier')
+
+    mockQuery.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('FROM subscription s') && text.includes('subscription_plan')) {
+        return Promise.resolve({
+          rows: [
+            {
+              id: 'sub-main',
+              tenant_id: 'main-supplier',
+              tenant_type: 'SUPPLIER',
+              plan_code: 'gold',
+              plan_id: 'plan-scale',
+              status: 'ACTIVE',
+              account_locked_at: null,
+              lock_reason: null,
+              billing_cycle: 'MONTHLY',
+              price_per_month: 199,
+              price_per_year: 1990,
+            },
+          ],
+        })
+      }
+      return Promise.resolve({ rows: [] })
+    })
+
+    const status = await getBillingStatus('child-branch', 'SUPPLIER')
+
+    expect(mockResolveOrgBillingTenantId).toHaveBeenCalledWith('child-branch', 'SUPPLIER')
+    expect(status.access.pendingActivation).toBe(false)
+    expect(status.access.isLocked).toBe(false)
+    expect(status.usesOrgBilling).toBe(true)
+    expect(status.billingTenantId).toBe('main-supplier')
+    expect(status.subscription?.planCode).toBe('gold')
   })
 })

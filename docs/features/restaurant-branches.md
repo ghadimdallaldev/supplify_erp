@@ -40,6 +40,8 @@ System roles seeded per branch: Owner, Manager, Purchaser, Accountant, Inventory
 2. Step 1: branch name, address, phone, optional branch code.
 3. Step 2: generate a **branch manager** invite link (no email sent). Share the link manually.
 
+New org children are covered by the **main** subscription for unlock/access (no separate trial). Billing status resolves via `resolveOrgBillingTenantId`. Included branch slots do not require re-activation after switch.
+
 Org Owners can also use **Organization** (`/app/org`) to add branches and switch context.
 
 ## Inviting team members

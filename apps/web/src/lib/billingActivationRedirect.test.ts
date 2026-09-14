@@ -43,15 +43,18 @@ describe('billingActivationRedirect', () => {
     expect(canEnterAppShell({ pendingActivation: true, isLocked: true })).toBe(false)
   })
 
-  it('impersonating admin loads billing and may redirect', () => {
-    expect(shouldLoadBillingStatus(true, true)).toBe(true)
+  it('org-covered branch tenants never redirect to activate', () => {
     expect(
       shouldRedirectToActivate({
-        isPlatformAdmin: true,
-        isImpersonating: true,
-        pathname: '/app/orders',
+        isPlatformAdmin: false,
+        isImpersonating: false,
+        pathname: '/app/dashboard',
         access: { pendingActivation: true, isLocked: true },
+        usesOrgBilling: true,
       })
+    ).toBe(false)
+    expect(
+      canEnterAppShell({ pendingActivation: true, isLocked: true }, { usesOrgBilling: true })
     ).toBe(true)
   })
 })

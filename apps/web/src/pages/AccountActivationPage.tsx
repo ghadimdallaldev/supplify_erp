@@ -74,7 +74,7 @@ export function AccountActivationPage() {
 
   useEffect(() => {
     if (isLoading || !billing?.access) return
-    if (canLeaveActivationPage(billing.access)) {
+    if (billing.usesOrgBilling || canLeaveActivationPage(billing.access)) {
       navigate('/app', { replace: true })
     }
   }, [billing, isLoading, navigate])

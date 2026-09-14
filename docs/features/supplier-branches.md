@@ -81,6 +81,12 @@ The shared linked-accounts API (`/api/branches`) also handles basic branch list,
 
 **Team invitations** (`/api/org/invitations`) invite staff (Manager, Driver, etc.) to a branch. They require `STAFF_INVITE` / `STAFF_MANAGE` / `SETTINGS_MANAGE` and are **not** gated by `multi_branch` (same as restaurant member invites). Creating additional branches still requires `multi_branch`.
 
+### Org billing on Branch Accounts
+
+- Included branch slots on Scale (e.g. 2/3) are covered by the **main** subscription — no separate trial or payment for child branches.
+- New org children get an **unlocked** local Free subscription row for bookkeeping (`createOrgCoveredBranchSubscription`), not `pending_activation`.
+- `GET /api/billing/status` and billing access locks resolve via `resolveOrgBillingTenantId` (main branch). Switching to a child must **not** redirect to `/app/activate`.
+
 ## Feature flag
 
 `multi_branch` on subscription plans:

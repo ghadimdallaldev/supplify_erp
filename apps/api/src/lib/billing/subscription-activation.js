@@ -27,3 +27,31 @@ export async function createPendingActivationSubscription(
     [tenantId, tenantType, LOCK_REASON_PENDING_ACTIVATION, planCode]
   )
 }
+
+/**
+ * Org child Branch Accounts inherit unlock from the main-branch subscription.
+ * Keep a local Free row for bookkeeping, but never lock it behind pending activation.
+ */
+export async function createOrgCoveredBranchSubscription(
+  executor,
+  tenantId,
+  tenantType,
+  planCode = 'free'
+) {
+  const run = executor?.query ? executor.query.bind(executor) : query
+  await run(
+    `
+    INSERT INTO subscription (
+      tenant_id, tenant_type, plan_id, plan_name, status, billing_cycle,
+      current_period_start, current_period_end,
+      account_locked_at, lock_reason
+    )
+    SELECT $1, $2, sp.id, sp.name, 'ACTIVE', 'MONTHLY', now(), now() + INTERVAL '1 month',
+      NULL, NULL
+    FROM subscription_plan sp
+    WHERE sp.code = $3 AND sp.tenant_type = $2 AND sp.is_active = true
+    LIMIT 1
+    `,
+    [tenantId, tenantType, planCode]
+  )
+}
