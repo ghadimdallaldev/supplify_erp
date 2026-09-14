@@ -9,8 +9,10 @@ import { Button } from '../ui/button'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export function AdminFeaturedPlacementsPanel() {
+  const { t } = useTranslation('admin')
   const { data, isLoading, refetch } = useGetAdminFeaturedPlacementsQuery()
   const [refundFeatured] = useRefundFeaturedPlacementMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -20,11 +22,11 @@ export function AdminFeaturedPlacementsPanel() {
     setBusyId(id)
     try {
       await refundFeatured({ id, reason: 'admin_refund' }).unwrap()
-      toast.success('Featured placement refunded')
+      toast.success(t('placements.refundSuccess'))
       refetch()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Refund failed')
+      toast.error(err?.data?.error?.message || t('placements.refundFailed'))
     } finally {
       setBusyId(null)
     }
@@ -34,15 +36,15 @@ export function AdminFeaturedPlacementsPanel() {
     <Card data-testid="admin-featured-placements-panel">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          Active featured placements
+          <Sparkles className="h-4 w-4 text-[var(--amber)]" />
+          {t('placements.title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : placements.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No active featured placements</p>
+          <p className="text-sm text-[var(--text-muted)]">{t('placements.empty')}</p>
         ) : (
           <ul className="divide-y divide-[var(--app-border)]">
             {placements.map((p: any) => (
@@ -50,7 +52,9 @@ export function AdminFeaturedPlacementsPanel() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{p.supplier_name}</p>
                   <p className="text-xs text-[var(--text-muted)]">
-                    Until {new Date(p.ends_at).toLocaleDateString()}
+                    {t('placements.until', {
+                      date: new Date(p.ends_at).toLocaleDateString(),
+                    })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -61,7 +65,11 @@ export function AdminFeaturedPlacementsPanel() {
                     disabled={busyId === p.id}
                     onClick={() => handleRefund(p.id)}
                   >
-                    {busyId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Refund'}
+                    {busyId === p.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      t('placements.refund')
+                    )}
                   </Button>
                 </div>
               </li>

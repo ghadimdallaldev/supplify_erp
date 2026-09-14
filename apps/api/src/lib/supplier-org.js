@@ -11,7 +11,7 @@ import {
   getAllPermissionsForTenantType,
 } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
-import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { createOrgCoveredBranchSubscription } from './billing/subscription-activation.js'
 import { SUPPLIER_VIEWER } from './role-matrix.js'
 
 export const ORG_SYSTEM_ROLES = [
@@ -161,6 +161,46 @@ export async function createSupplierOrganization({ name, slug = null }) {
     return existing[0]
   }
   throw new Error('Could not create supplier organization')
+}
+
+/**
+ * Ensure a supplier row has an organization_id (create + link if missing).
+ * Used by team invites so single-branch / backfill-lag accounts can still invite drivers.
+ */
+export async function ensureSupplierOrganizationLinked(supplierId) {
+  if (!supplierId) {
+    throw new Error('supplierId is required')
+  }
+  const { rows } = await query(
+    `SELECT id, name, slug, organization_id, is_main_branch FROM supplier WHERE id = $1`,
+    [supplierId]
+  )
+  const supplier = rows[0]
+  if (!supplier) {
+    throw new Error('Supplier not found')
+  }
+  if (supplier.organization_id) {
+    return { organizationId: supplier.organization_id, created: false }
+  }
+
+  const org = await createSupplierOrganization({
+    name: supplier.name || 'Supplier',
+    slug: supplier.slug ? `${supplier.slug}-org` : null,
+  })
+  const linked = await linkSupplierToOrganization(supplierId, org.id, {
+    isMain: supplier.is_main_branch !== false,
+  })
+  if (!linked.ok) {
+    const { rows: again } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
+      supplierId,
+    ])
+    if (again[0]?.organization_id) {
+      return { organizationId: again[0].organization_id, created: false }
+    }
+    throw new Error('Failed to link supplier to organization')
+  }
+  await ensureOrgSystemRoles(org.id)
+  return { organizationId: org.id, created: true }
 }
 
 export async function getUserOrgMembership(userId) {
@@ -458,7 +498,7 @@ export async function createOrgBranch({
       `${name} Catalog`,
     ])
 
-    await createPendingActivationSubscription(client, branch.id, 'SUPPLIER', 'free')
+    await createOrgCoveredBranchSubscription(client, branch.id, 'SUPPLIER', 'free')
 
     // Role seeding inside the same transaction so failed post-steps cannot leave orphan tenants
     await ensureTenantSystemRoles(branch.id, 'SUPPLIER', client)

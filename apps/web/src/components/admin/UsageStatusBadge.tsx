@@ -3,11 +3,14 @@ import { cn } from '../../lib/utils'
 import type { UsageStatus } from '../../lib/adminUsageStatus'
 
 const STATUS_CLASS: Record<UsageStatus, string> = {
-  healthy: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  near_limit: 'bg-amber-50 text-amber-800 border-amber-200',
-  over_limit: 'bg-red-50 text-red-700 border-red-200',
-  unlimited: 'bg-sky-50 text-sky-700 border-sky-200',
-  unknown: 'bg-gray-50 text-gray-600 border-gray-200',
+  healthy:
+    'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
+  near_limit:
+    'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
+  over_limit:
+    'bg-[var(--red-pale)] text-[var(--red)] border-[color-mix(in_srgb,var(--red)_35%,transparent)]',
+  unlimited: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
+  unknown: 'bg-[var(--app-bg-subtle)] text-[var(--text-muted)] border-[var(--app-border)]',
 }
 
 const STATUS_KEYS: Record<UsageStatus, string> = {

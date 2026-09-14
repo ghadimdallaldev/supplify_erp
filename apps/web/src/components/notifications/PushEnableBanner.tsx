@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
-import { Button } from '../../ui/button'
-import { usePushNotifications } from '../../../hooks/usePushNotifications'
-import { ensureNamespace } from '../../../i18n'
+import { Button } from '../ui/button'
+import { usePushNotifications } from '../../hooks/usePushNotifications'
+import { ensureNamespace } from '../../i18n'
 
 type PushEnableBannerProps = {
   /** When false, banner is not shown (plan gate, etc.). */

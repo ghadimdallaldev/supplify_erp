@@ -16,6 +16,7 @@ import {
   validateBranchRoleForSupplier,
 } from '../lib/branch-invitations.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
+import { ensureSupplierOrganizationLinked } from '../lib/supplier-org.js'
 
 const router = express.Router()
 
@@ -49,8 +50,16 @@ async function resolveOrgContextFromTenant(req, res, next) {
       })
     }
 
-    const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId])
-    const organizationId = rows[0]?.organization_id
+    let { rows } = await query(`SELECT organization_id, name, slug FROM supplier WHERE id = $1`, [
+      tenantId,
+    ])
+    let organizationId = rows[0]?.organization_id
+    if (!organizationId) {
+      const linked = await ensureSupplierOrganizationLinked(tenantId)
+      organizationId = linked.organizationId
+      ;({ rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [tenantId]))
+      organizationId = rows[0]?.organization_id || organizationId
+    }
     if (!organizationId) {
       return res.status(403).json({
         ok: false,
@@ -70,7 +79,7 @@ async function resolveOrgContextFromTenant(req, res, next) {
 
     req.orgContext = {
       organizationId,
-      primarySupplierId: mainRows[0]?.id || null,
+      primarySupplierId: mainRows[0]?.id || tenantId,
     }
     next()
   } catch (error) {
@@ -155,12 +164,19 @@ router.post('/', async (req, res) => {
     })
   } catch (error) {
     logger.error('POST /api/org/invitations error:', error)
-    const status = error.status || (error.code === 'USER_LIMIT_REACHED' ? 403 : 500)
+    const isSeat = error.code === 'USER_LIMIT_REACHED'
+    const isWorkspace =
+      error.name === 'WORKSPACE_MEMBERSHIP_CONFLICT' || error.name === 'ConflictError'
+    const status = error.status || error.statusCode || (isSeat ? 403 : isWorkspace ? 409 : 500)
     res.status(status).json({
       ok: false,
       data: null,
       error: {
-        name: error.code === 'USER_LIMIT_REACHED' ? 'USER_LIMIT_REACHED' : 'INTERNAL_ERROR',
+        name: isSeat
+          ? 'USER_LIMIT_REACHED'
+          : isWorkspace
+            ? 'WORKSPACE_MEMBERSHIP_CONFLICT'
+            : 'INTERNAL_ERROR',
         message: error.message || 'Failed to create invitation',
         details: error.limitCheck || undefined,
       },

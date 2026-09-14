@@ -10,6 +10,7 @@
     "cancel": "إلغاء",
     "done": "تم",
     "save": "حفظ",
+    "saving": "جاري الحفظ…",
     "previous": "السابق",
     "next": "التالي",
     "filters": "الفلاتر",
@@ -99,6 +100,7 @@
       "revenue": "الإيرادات",
       "totalSpent": "إجمالي الإنفاق",
       "before": "قبل",
+      "after": "بعد",
       "restaurant": "المطعم",
       "overdue": "متأخر"
     },
@@ -119,7 +121,9 @@
       "resetPassword": "إعادة تعيين كلمة المرور",
       "changePlan": "تغيير الخطة"
     },
-    "edit": "تعديل"
+    "edit": "تعديل",
+    "freeTrialPlan": "تجربة مجانية",
+    "freeTrial": "تجربة مجانية"
   },
   "nav": {
     "brand": "الإدارة",
@@ -195,7 +199,20 @@
     "emptyFilteredDescription": "جرّب مصطلح بحث أو فلتر دور مختلفًا.",
     "emptyDefaultTitle": "لم يُعثر على مستخدمين",
     "emptyDefaultDescription": "يظهر المستخدمون هنا بعد التسجيل أو دعوتهم إلى مستأجر.",
-    "resetPassword": "إعادة تعيين كلمة المرور"
+    "resetPassword": "إعادة تعيين كلمة المرور",
+    "roles": {
+      "super_admin": "مسؤول أعلى",
+      "platform_admin": "مسؤول المنصة",
+      "admin": "مسؤول",
+      "restaurant": "مطعم",
+      "supplier": "مورد",
+      "driver": "سائق",
+      "owner": "مالك",
+      "manager": "مدير",
+      "viewer": "م viewer",
+      "staff": "موظف",
+      "unknown": "غير معروف"
+    }
   },
   "activity": {
     "title": "نشاط المنصة",
@@ -345,6 +362,23 @@
       "auditLogs": "سجلات التدقيق",
       "reviewDeals": "مراجعة العروض",
       "operations": "العمليات"
+    },
+    "growthInsightsTitle": "رؤى النمو",
+    "growthInsightsDescription": "افهم طلب الترقية وزخم التحويل.",
+    "conversionRate": "معدل التحويل {{percent}}%",
+    "topBlockedFeature": "أكثر ميزة محظورة:",
+    "topBlockedLimit": "أكثر حد محظور:",
+    "arrHint": "الإيراد السنوي {{value}}",
+    "funnel": {
+      "step": "الخطوة",
+      "blocks": "حظر الميزات / الحدود",
+      "openUpgrade": "فتح نافذة الترقية",
+      "clickUpgrade": "النقر على الترقية",
+      "upgradesCompleted": "ترقيات مكتملة",
+      "blocked": "محظور",
+      "upgradeSuccess": "نجاح الترقية",
+      "window7d": "7ي",
+      "windowNd": "{{days}}ي"
     }
   },
   "attention": {
@@ -385,7 +419,8 @@
     "staleGps_other": "{{count}} تسليمات بموقع GPS قديم",
     "expiredLots": "{{count}} دفعة مخزون منتهية الصلاحية",
     "expiredLots_other": "{{count}} دفعات مخزون منتهية الصلاحية",
-    "operations": "العمليات"
+    "operations": "العمليات",
+    "latestPendingDeals": "أحدث العروض المعلقة"
   },
   "executiveSummary": {
     "totalTenants": "إجمالي المستأجرين",
@@ -400,7 +435,12 @@
     "systemHealth": "صحة النظام",
     "recentErrors": "{{count}} خطأ حديث",
     "recentErrors_other": "{{count}} أخطاء حديثة",
-    "platformOperational": "حالة تشغيل المنصة"
+    "platformOperational": "حالة تشغيل المنصة",
+    "health": {
+      "healthy": "سليم",
+      "degraded": "متدهور",
+      "critical": "حرج"
+    }
   },
   "usageStatus": {
     "healthy": "سليم",
@@ -512,11 +552,26 @@
       "refundFailed": "فشل استرداد التعزيز"
     },
     "collapseDetails": "طي التفاصيل",
-    "expandDetails": "توسيع التفاصيل"
+    "expandDetails": "توسيع التفاصيل",
+    "emptyFilteredTitle": "لا عروض تطابق الفلاتر",
+    "emptyFilteredDescription": "لا عروض تطابق الفلاتر. جرّب مسح الفلاتر أو اختيار «جميع الحالات»."
   },
   "operations": {
     "title": "العمليات",
     "description": "البريد الإلكتروني وانتهاء صلاحية المخزون وإيقاع إعادة الطلب ومشكلات التنفيذ وصحة تسليم GPS (للقراءة فقط)",
+    "tabs": {
+      "summary": "ملخص",
+      "email": "البريد الإلكتروني",
+      "inventory": "المخزون وإعادة الطلب",
+      "fulfillment": "التنفيذ",
+      "gps": "GPS والتسليم"
+    },
+    "warnings": "تحذيرات",
+    "review": "مراجعة",
+    "yes": "نعم",
+    "no": "لا",
+    "on": "تشغيل",
+    "off": "إيقاف",
     "noWarningsTitle": "لا تحذيرات",
     "noWarningsDescription": "تبدو الفحوصات التشغيلية سليمة.",
     "emailFailed24h": "فشل البريد الإلكتروني (24 ساعة)",
@@ -525,10 +580,53 @@
     "expiredInventoryLots": "دفعات مخزون منتهية الصلاحية",
     "emailConfig": "البريد الإلكتروني",
     "gpsPrivacy": "GPS والخصوصية",
+    "config": {
+      "enabled": "مفعّل",
+      "logOnly": "تسجيل فقط",
+      "provider": "المزوّد",
+      "configured": "مُكوّن",
+      "platformGps": "GPS المنصة",
+      "restaurantTracking": "تتبع المطعم",
+      "driverNameVisible": "اسم السائق ظاهر",
+      "driverPhoneVisible": "هاتف السائق ظاهر",
+      "allowed": "مسموح",
+      "disabled": "معطّل"
+    },
+    "emailStatus": {
+      "all": "الكل",
+      "sent": "مُرسَل",
+      "failed": "فشل",
+      "skipped": "تخطّي",
+      "log_only": "تسجيل فقط"
+    },
+    "table": {
+      "order": "الطلب",
+      "event": "الحدث",
+      "recipient": "المستلم",
+      "chat": "محادثة",
+      "gps": "GPS"
+    },
+    "inventory": {
+      "expiryTitle": "مخزون انتهاء الصلاحية",
+      "restaurantsWithLots": "مطاعم لديها دفعات",
+      "expiring7d": "ينتهي خلال 7 أيام",
+      "expiredLots": "دفعات منتهية",
+      "remindersToday": "تذكيرات اليوم",
+      "reorderTitle": "إيقاع إعادة الطلب",
+      "activePatterns": "أنماط نشطة",
+      "restaurantsAtRisk": "مطاعم بإيقاع",
+      "quickListsTitle": "القوائم السريعة",
+      "totalLists": "إجمالي القوائم",
+      "scheduledLists": "مجدولة",
+      "restaurantsUsing": "مطاعم تستخدم",
+      "branchScopedLists": "نطاق فرع"
+    },
     "noEmailLogsTitle": "لا سجلات بريد إلكتروني",
     "noEmailLogsDescription": "لا إدخالات سجل تسليم تطابق الفلاتر.",
     "noFulfillmentIssuesTitle": "لا مشكلات تنفيذ مفتوحة",
     "noFulfillmentIssuesDescription": "ستظهر هنا مشكلات النقص والاستبدال بانتظار الحل.",
+    "noDeliveriesInProgress": "لا تسليمات قيد التنفيذ حاليًا.",
+    "gpsAdminNote": "عرض المسؤول يُظهر حالة التسليم فقط — بدون خرائط أو سجل GPS.",
     "gpsActive": "نشط",
     "gpsLive": "مباشر",
     "gpsStale": "قديم",
@@ -627,7 +725,58 @@
       "overIncludedLimit": "تجاوز الحد المشمول (ضمن الحد الفعّال)",
       "overEffectiveLimit": "تجاوز الحد الفعّال",
       "enterpriseThreshold": "عند عتبة Enterprise (6+ فروع)"
-    }
+    },
+    "orgBillingNote": "تُطبَّق الإضافات وحدود الاشتراك على مستأجر فوترة المؤسسة {{name}}{{main}}.",
+    "orgBillingMainBranch": " (الفرع الرئيسي)",
+    "inUseRatio": "{{used}} / {{limit}} قيد الاستخدام",
+    "stats": {
+      "tenantOverrides": "تجاوزات المستأجر",
+      "tenantOverridesHint": "نشطة عبر المنصة",
+      "planOverrides": "تجاوزات الخطة",
+      "planOverridesHint": "مستويات خطة {{tenantType}}",
+      "limitsAtRisk": "حدود معرّضة للخطر",
+      "limitsAtRiskHintSelected": "المستأجر المحدد ≥80% استخدام",
+      "limitsAtRiskHintNone": "اختر مستأجرًا",
+      "limitKeys": "مفاتيح الحدود",
+      "limitKeysHint": "قابلة للتكوين لـ {{tenantType}}"
+    },
+    "typeLabel": "النوع:",
+    "refreshingUsage": "جاري تحديث الاستخدام…",
+    "qtyLabel": "الكمية {{qty}}",
+    "unitPricePerMonth": "${{price}}/شهر",
+    "addonTypeLabel": "نوع الإضافة",
+    "quantityLabel": "الكمية",
+    "unitPriceLabel": "سعر الوحدة",
+    "reasonRequiredLabel": "السبب (مطلوب)",
+    "removeAddon": "إزالة الإضافة",
+    "grantUpdateAddon": "منح / تحديث الإضافة",
+    "selectPlanTier": "اختر مستوى الخطة",
+    "selectLimit": "اختر الحد",
+    "planDefaultLabel": "افتراضي الخطة:",
+    "currentOverrideLabel": "التجاوز الحالي:",
+    "previewLabel": "معاينة:",
+    "overrideValueLabel": "قيمة التجاوز",
+    "savePlanOverride": "حفظ تجاوز الخطة",
+    "tenantOverrideDescription": "يُطبَّق فقط على {{name}} (يُحلّ مستأجر الفوترة تلقائيًا).",
+    "currentEffectiveLabel": "الفعّال الحالي:",
+    "planBaseLabel": "أساس الخطة",
+    "savedOverrideLabel": "التجاوز المحفوظ:",
+    "saveTenantOverride": "حفظ تجاوز المستأجر",
+    "overridesForSelectedTitle": "تجاوزات المستأجر المحدد",
+    "activeOverridesTitle": "التجاوزات النشطة",
+    "loadingOverridesPanel": "جاري تحميل التجاوزات…",
+    "overrideRowsShown": "يُعرض {{count}} صف تجاوز",
+    "overrideRowsShown_other": "يُعرض {{count}} صفوف تجاوز",
+    "refreshingOverrides": "جاري تحديث التجاوزات…",
+    "searchOverridesHeading": "البحث في التجاوزات",
+    "tenantOverridesHeading": "تجاوزات المستأجر",
+    "planTierOverridesHeading": "تجاوزات مستوى الخطة ({{tenantType}})",
+    "noTenantOverridesSearch": "لا نتائج مطابقة للبحث على هذا المستأجر.",
+    "noTenantOverridesDefault": "لا يوجد تجاوزات مُكوّنة لهذا المستأجر.",
+    "noPlanOverridesSearch": "لا نتائج مطابقة للبحث.",
+    "noPlanOverridesDefault": "لا تجاوزات خطة نشطة لخطط {{tenantType}}.",
+    "confirmDisableTenantOverride": "تعطيل تجاوز المستأجر هذا؟",
+    "confirmDisablePlanOverride": "تعطيل تجاوز الخطة هذا؟"
   },
   "subscriptions": {
     "title": "الاشتراكات",
@@ -647,7 +796,23 @@
     "emptyDefaultTitle": "لا اشتراكات بعد",
     "emptyFilteredDescription": "عدّل البحث أو فلاتر الحالة أو نوع المستأجر وحاول مرة أخرى.",
     "emptyDefaultDescription": "تظهر الاشتراكات هنا عندما يسجّل المستأجرون ويختارون خطة.",
-    "unknownTenant": "مستأجر غير معروف"
+    "unknownTenant": "مستأجر غير معروف",
+    "needsAttentionBadge": "يحتاج انتباهاً",
+    "stats": {
+      "total": "الإجمالي",
+      "totalHint": "اشتراكات المستأجرين الفريدة",
+      "activeTrial": "نشط / تجريبي",
+      "activeTrialHint": "نشط أو تجريبي",
+      "needsAttention": "يحتاج انتباهاً",
+      "needsAttentionHint": "مقفل أو بانتظار التفعيل",
+      "atRisk": "معرّض للخطر",
+      "atRiskHint": "موقوف أو ملغى أو متأخر الدفع"
+    },
+    "actions": {
+      "extendTrial": "تمديد التجربة",
+      "activate": "تفعيل",
+      "changePlan": "تغيير الخطة"
+    }
   },
   "plans": {
     "subscriptionDefaultsTitle": "الإعدادات الافتراضية للاشتراك",
@@ -699,7 +864,56 @@
     "restaurantsTitle": "المطاعم",
     "restaurantsFailedTitle": "فشل تحميل المطاعم",
     "restaurantsFailedMessage": "فشل طلب دليل المطاعم.",
-    "restaurantsTableAriaLabel": "مستأجرو المطاعم"
+    "restaurantsTableAriaLabel": "مستأجرو المطاعم",
+    "noSubscriptionStatus": "بدون اشتراك",
+    "stats": {
+      "products": "المنتجات",
+      "revenue": "الإيرادات",
+      "orders30d": "الطلبات (30 يوماً)",
+      "loadedHint": "{{count}} محمّل",
+      "loadedVsTotal": "المحمّل مقابل الإجمالي",
+      "activeTrial": "نشط / تجريبي",
+      "acrossLoaded": "عبر المستأجرين المحمّلين",
+      "loadedTotal": "الإجمالي المحمّل",
+      "platformTenants": "من أصل {{total}} مستأجراً على المنصة",
+      "activeSubs": "اشتراكات نشطة"
+    },
+    "titleAll": "كل المستأجرين",
+    "titleSuppliers": "الموردون",
+    "titleRestaurants": "المطاعم",
+    "descriptionAll": "إدارة حسابات الموردين والمطاعم عبر المنصة.",
+    "descriptionSuppliers": "حسابات الموردين والاشتراكات وإجراءات الدعم.",
+    "descriptionRestaurants": "حسابات المطاعم والاشتراكات وإجراءات الدعم.",
+    "searchAllPlaceholder": "ابحث عن المستأجرين بالاسم أو البريد…",
+    "searchSuppliersPlaceholder": "ابحث عن الموردين بالاسم أو البريد…",
+    "searchRestaurantsPlaceholder": "ابحث عن المطاعم بالاسم أو البريد…",
+    "loadingSuppliers": "جارٍ تحميل الموردين…",
+    "loadingRestaurants": "جارٍ تحميل المطاعم…",
+    "updatingSuppliers": "جارٍ تحديث الموردين…",
+    "updatingRestaurants": "جارٍ تحديث المطاعم…",
+    "suppliersShown": "{{count}} supplier shown{{suffix}}",
+    "suppliersShown_other": "{{count}} suppliers shown{{suffix}}",
+    "restaurantsShown": "{{count}} restaurant shown{{suffix}}",
+    "restaurantsShown_other": "{{count}} restaurants shown{{suffix}}",
+    "shownLoadedSuffix": " of {{loaded}} loaded",
+    "shownTotalSuffix": " · {{total}} total",
+    "emptySuppliersFilteredTitle": "لا يوجد موردون يطابقون عوامل التصفية",
+    "emptySuppliersDefaultTitle": "لا يوجد موردون",
+    "emptySuppliersFilteredDescription": "عدّل البحث أو عوامل تصفية الحالة وحاول مرة أخرى.",
+    "emptySuppliersDefaultDescription": "تظهر مستأجرو الموردين هنا بعد التسجيل.",
+    "emptyRestaurantsFilteredTitle": "لا توجد مطاعم تطابق عوامل التصفية",
+    "emptyRestaurantsDefaultTitle": "لا توجد مطاعم",
+    "emptyRestaurantsFilteredDescription": "عدّل البحث أو عوامل تصفية الحالة وحاول مرة أخرى.",
+    "emptyRestaurantsDefaultDescription": "تظهر مستأجرو المطاعم هنا بعد التسجيل.",
+    "supplierProductsWarehouses": "{{products}} منتجات · {{warehouses}} مستودعات",
+    "restaurantOrdersSpent": "{{orders}} طلبات (30 يوماً) · {{spent}} منفق",
+    "loadMoreSuppliers": "تحميل المزيد من الموردين ({{loaded}} من {{total}})",
+    "loadMoreRestaurants": "تحميل المزيد من المطاعم ({{loaded}} من {{total}})",
+    "noSubscription": "لا يوجد اشتراك نشط لهذا {{entity}}. عيّن خطة من تبويب الاشتراكات.",
+    "impersonationSuccess": "انتحال هوية {{name}}",
+    "impersonationFailed": "فشل بدء انتحال الهوية",
+    "impersonationSuspendedDefault": "هذا المستأجر موقوف أو غير نشط.",
+    "impersonationSuspendedConfirm": "{{message}}\\n\\nمتابعة انتحال الهوية للدعم؟"
   },
   "usage": {
     "tenantsUnderPressure": "مستأجرون تحت الضغط",
@@ -772,13 +986,34 @@
     "title": "المالية",
     "description": "GMV والإيرادات المتكررة والفواتير المستحقة وأفضل المستأجرين حسب الإيرادات.",
     "unavailableTitle": "بيانات المالية غير متاحة",
+    "apiFailedMessage": "فشل طلب API المالية. لا تُعرض الأرقام كصفر لتجنب بيانات مضللة.",
+    "mrrDisclaimer": "يستبعد MRR وARR خطط التجربة المجانية وEnterprise (الاشتراكات المدفوعة فقط).",
+    "metrics": {
+      "gmv": "GMV (كل الوقت)",
+      "gmvHint": "إجمالي قيمة الفواتير",
+      "mrr": "MRR",
+      "mrrHint": "ARR {{arr}} · خطط مدفوعة فقط",
+      "outstanding": "مستحق",
+      "outstandingHint": "بانتظار الدفع",
+      "overdue": "متأخر",
+      "overdueHint": "تجاوز تاريخ الاستحقاق"
+    },
     "revenueByPlan": "الإيرادات حسب الخطة",
+    "plansWithSubscriptions": "{{count}} خطة باشتراكات نشطة",
+    "plansWithSubscriptions_other": "{{count}} خطط باشتراكات نشطة",
+    "subsAbbrev": "{{count}} اشتراك",
+    "perMonth": "/شهر",
     "noPlanRevenueTitle": "لا إيرادات للخطط بعد",
     "noPlanRevenueDescription": "يظهر تفصيل الإيرادات عندما يشترك المستأجرون في خطط مدفوعة.",
     "topTenantsByRevenue": "أفضل المستأجرين حسب الإيرادات",
+    "topTenantsDescription": "أفضل {{shown}} من {{total}} مستأجر",
+    "topTenantsDescription_other": "أفضل {{shown}} من {{total}} مستأجرين",
     "noTenantRevenueTitle": "لا إيرادات للمستأجرين بعد",
     "noTenantRevenueDescription": "سيُصنّف نشاط الفواتير والمدفوعات المستأجرين هنا.",
     "overdueBalances": "أرصدة متأخرة",
+    "overdueTenantsDescription": "{{count}} مستأجر بفواتير متأخرة",
+    "overdueTenantsDescription_other": "{{count}} مستأجرين بفواتير متأخرة",
+    "overdueBreakdownUnavailable": "إجمالي المتأخر للمنصة {{amount}} لكن لا يتوفر تفصيل لكل مستأجر.",
     "overdueBalancesTableAriaLabel": "أرصدة المستأجرين المتأخرة"
   },
   "audit": {
@@ -789,9 +1024,30 @@
     "searchAriaLabel": "البحث في سجلات التدقيق",
     "fromDateAriaLabel": "من تاريخ",
     "toDateAriaLabel": "إلى تاريخ",
+    "dateRangeTo": "إلى",
     "recentEntries": "الإدخالات الأخيرة",
     "loading": "جاري تحميل سجلات التدقيق…",
+    "loadingTrail": "جاري تحميل سجل التدقيق…",
+    "totalEntries": "{{total}} إدخال إجمالي",
+    "totalEntries_one": "{{total}} إدخال إجمالي",
+    "entriesPage": "{{total}} إدخال إجمالي · صفحة {{page}} من {{pageCount}}",
+    "entriesPage_one": "{{total}} إدخال إجمالي · صفحة {{page}} من {{pageCount}}",
+    "emptyFilteredTitle": "لا سجلات تدقيق تطابق الفلاتر",
+    "emptyDefaultTitle": "لا إدخالات تدقيق بعد",
+    "emptyFilteredDescription": "عدّل البحث أو نوع الإجراء أو نطاق التاريخ وحاول مرة أخرى.",
+    "emptyDefaultDescription": "ستظهر إجراءات المسؤول مثل تغييرات الخطة وانتحال الهوية والتجاوزات هنا.",
+    "changeLabel": "التغيير",
+    "ipAddress": "عنوان IP",
+    "metadata": "البيانات الوصفية",
+    "showingRange": "عرض {{from}}–{{to}} من {{total}}",
     "tableAriaLabel": "سجل تدقيق المسؤول"
+  },
+  "platformSettings": {
+    "trialLengthTitle": "مدة التجربة",
+    "trialLengthDescription": "تُقفل مساحات عمل التجربة المجانية تلقائيًا بعد هذا العدد من الأيام ما لم يرقِّ المستأجر إلى خطة مدفوعة. هذه ليست طبقة مجانية دائمة.",
+    "trialLengthDescriptionCompact": "يُطبَّق على تفعيلات التجربة المجانية الجديدة على مستوى المنصة. تُقفل مساحات العمل تلقائيًا بعد هذه الفترة ما لم يتم الترقية.",
+    "trialLengthDaysLabel": "مدة التجربة (أيام)",
+    "trialLengthDaysHelp": "النطاق المسموح: 7–90 يومًا (الافتراضي 30)"
   },
   "features": {
     "title": "الميزات",
@@ -800,15 +1056,84 @@
     "searchGlobalAriaLabel": "البحث في أعلام الميزات العامة",
     "filterGlobalModeAriaLabel": "التصفية حسب الوضع العام",
     "globalFlagsTitle": "أعلام الميزات العامة",
+    "globalFlagsFilter": "الأعلام العامة",
+    "tenantOverridesFilter": "تجاوزات المستأجر",
+    "featureSearch": "بحث الميزات",
     "loadFailedTitle": "تعذّر تحميل أعلام الميزات",
+    "loadFailedMessage": "تحقق من اتصالك وحاول مرة أخرى.",
     "globalTableAriaLabel": "أعلام الميزات العامة",
     "searchTenantPlaceholder": "البحث في ميزات المستأجر…",
     "searchTenantAriaLabel": "البحث في تجاوزات ميزات المستأجر",
     "tenantOverridesTitle": "تجاوزات لكل مستأجر",
     "noTenantSelectedTitle": "لم يُختر مستأجر",
     "noTenantSelectedDescription": "اختر مطعمًا أو موردًا لفحص وتجاوز الوصول إلى الميزات.",
+    "selectTenantHint": "اختر مستأجرًا لمراجعة الميزات الفعّالة.",
     "tenantLoadFailedTitle": "تعذّر تحميل تجاوزات المستأجر",
-    "tenantTableAriaLabel": "تجاوزات ميزات المستأجر"
+    "tenantLoadFailedMessage": "ربما أُزيل المستأجر أو لا تملك صلاحية.",
+    "tenantTableAriaLabel": "تجاوزات ميزات المستأجر",
+    "selectedTenant": "المستأجر المختار",
+    "loadingPlatformFlags": "جاري تحميل أعلام المنصة…",
+    "updatingFlags": "جاري تحديث الأعلام…",
+    "updatingOverrides": "جاري تحديث التجاوزات…",
+    "loadingOverridesFor": "جاري تحميل تجاوزات {{name}}…",
+    "flagsShown": "يُعرض {{shown}} من {{total}} ميزة",
+    "flagsShown_other": "يُعرض {{shown}} من {{total}} ميزات",
+    "featuresForTenant": "{{shown}} من {{total}} ميزات لـ {{name}}",
+    "stats": {
+      "totalFeatures": "إجمالي الميزات",
+      "totalFeaturesHint": "مفاتيح المنصة الأساسية",
+      "forcedOn": "مفعّل قسرًا",
+      "forcedOnHint": "تجاوز عام",
+      "forcedOff": "معطّل قسرًا",
+      "forcedOffHint": "مفتاح إيقاف عام",
+      "inheritPlans": "وراثة الخطط",
+      "inheritPlansHint": "لا تجاوز عام"
+    },
+    "modeFilter": {
+      "allModes": "جميع الأوضاع",
+      "inheritFromPlans": "الوراثة من الخطط",
+      "forcedOn": "مفعّل قسرًا",
+      "forcedOff": "معطّل قسرًا"
+    },
+    "globalMode": {
+      "onGlobal": "تشغيل (عام)",
+      "offGlobal": "إيقاف (عام)",
+      "inheritFromPlans": "الوراثة من الخطط"
+    },
+    "source": {
+      "tenantOverride": "تجاوز المستأجر",
+      "global": "عام",
+      "plan": "خطة",
+      "default": "افتراضي"
+    },
+    "effective": {
+      "on": "تشغيل",
+      "off": "إيقاف"
+    },
+    "table": {
+      "feature": "الميزة",
+      "globalMode": "الوضع العام",
+      "effective": "الفعّال",
+      "source": "المصدر"
+    },
+    "actions": {
+      "inherit": "وراثة",
+      "on": "تشغيل",
+      "off": "إيقاف",
+      "forceOn": "فرض التشغيل",
+      "forceOff": "فرض الإيقاف",
+      "clearOverride": "مسح التجاوز"
+    },
+    "empty": {
+      "noFlagsMatchTitle": "لا أعلام تطابق الفلاتر",
+      "noFlagsMatchDescription": "جرّب مصطلح بحث أو فلتر وضع عام مختلفًا.",
+      "noFlagsTitle": "لا أعلام ميزات مُكوّنة",
+      "noFlagsDescription": "تظهر أعلام الميزات هنا بعد تسجيلها في المنصة.",
+      "noFeaturesMatchTitle": "لا ميزات تطابق البحث",
+      "noFeaturesMatchDescription": "جرّب مصطلح بحث مختلفًا.",
+      "noFeaturesTitle": "لا ميزات لهذا المستأجر",
+      "noFeaturesDescription": "تظهر الميزات الفعّالة هنا عندما يكون للمستأجر خطة اشتراك."
+    }
   },
   "diagnostics": {
     "description": "تشخيصات تشغيلية للقراءة فقط · {{tenantType}}",
@@ -840,6 +1165,11 @@
   },
   "limitsToasts": {
     "selectTenantFirst": "اختر مستأجرًا أولاً",
+    "addonRemoved": "تمت إزالة الإضافة",
+    "addonSaved": "تم حفظ الإضافة",
+    "addonUpdateFailed": "فشل تحديث الإضافة",
+    "planOverrideSaveFailed": "فشل حفظ تجاوز الخطة",
+    "tenantOverrideSaveFailed": "فشل حفظ تجاوز المستأجر",
     "addonReasonRequired": "يرجى إدخال سبب لتغيير هذه الإضافة",
     "planOverrideRequired": "الخطة ومفتاح الحد والقيمة مطلوبة",
     "overrideReasonRequired": "يرجى إدخال سبب لهذا التجاوز",
@@ -851,15 +1181,50 @@
     "planOverrideDisabled": "تم تعطيل تجاوز الخطة",
     "disableFailed": "فشل تعطيل التجاوز"
   },
+  "growth": {
+    "title": "برنامج الإحالة والرعاية",
+    "description": "كوّن خصومات الإحالة ومكافآت الموردين والرعاية المدفوعة من المورد (شهريًا فقط). الحدود مرتبطة برمز خطة المورد (مثل gold / platinum).",
+    "firstPaidDiscount": "خصم أول اشتراك مدفوع (%)",
+    "referralValidity": "صلاحية الإحالة (أيام)",
+    "supplierReward": "مكافأة تحويل المورد",
+    "rewardOptions": {
+      "freeMonth": "شهر اشتراك مجاني واحد",
+      "accountCredit": "رصيد حساب (فوترة المنصة)"
+    },
+    "sponsorshipEnabled": "الرعاية مفعّلة",
+    "offerExpiry": "انتهاء عرض الرعاية (أيام)",
+    "discountApplies": "ينطبق خصم الإحالة على",
+    "discountAppliesOptions": {
+      "firstRestaurantFunded": "أول دورة ممولة من المطعم (بعد الشهر المُرعى)",
+      "sponsoredCycle": "الدورة المُرعاة (تُستهلك عند التفعيل)"
+    },
+    "requirePm": "يتطلب طريقة دفع المطعم قبل تفعيل الرعاية",
+    "sponsorshipLimitsTitle": "حدود الرعاية سنويًا (حسب رمز خطة المورد)",
+    "sponsorshipLimitsDescription": "الحد الأقصى للرعايات لكل سنة تقويمية. اتركه فارغًا لغير محدود. Supplier Growth يستخدم gold؛ Supplier Scale يستخدم platinum.",
+    "unlimitedPlaceholder": "غير محدود",
+    "saving": "جاري الحفظ…",
+    "saveButton": "حفظ إعدادات النمو"
+  },
+  "placements": {
+    "title": "الظهور المميز النشط",
+    "empty": "لا ظهور مميز نشط",
+    "until": "حتى {{date}}",
+    "refund": "استرداد",
+    "refundSuccess": "تم استرداد الظهور المميز",
+    "refundFailed": "فشل الاسترداد"
+  },
   "growthToasts": {
     "discountRange": "يجب أن يكون الخصم بين 0 و100 بالمئة",
     "validityMin": "يجب أن تكون صلاحية الإحالة يومًا واحدًا على الأقل",
+    "offerExpiryRange": "يجب أن يكون انتهاء العرض بين 1 و90 يومًا",
+    "sponsorshipLimitInvalid": "يجب أن يكون حد الرعاية لـ {{plan}} رقمًا صحيحًا",
     "saved": "تم حفظ إعدادات برنامج النمو",
     "saveFailed": "فشل حفظ إعدادات النمو"
   },
   "platformToasts": {
     "daysRange": "أدخل رقمًا بين 7 و90 يومًا",
-    "saved": "تم حفظ إعدادات المنصة"
+    "saved": "تم حفظ إعدادات المنصة",
+    "saveFailed": "فشل حفظ الإعدادات"
   },
   "subscriptionsToasts": {
     "trialExtended": "تم تمديد التجربة المجانية",
@@ -872,13 +1237,101 @@
     "usageExceeds": "الاستخدام يتجاوز الخطة المستهدفة. راجع المعاينة أو فرض التغيير."
   },
   "changePlan": {
-    "title": "تغيير الخطة — {{name}}"
+    "title": "تغيير الخطة — {{name}}",
+    "description": "اختر خطة مستهدفة ومعاينة الحدود أو تغييرات الميزات قبل التطبيق.",
+    "targetPlan": "الخطة المستهدفة",
+    "loadingPlans": "جارٍ تحميل الخطط…",
+    "selectPlan": "اختر خطة",
+    "noPlansForTenant": "لا توجد خطط لمستأجري {{tenantType}}. أنشئ واحدة في تبويب الخطط.",
+    "previewImpact": "معاينة التأثير",
+    "noImpact": "لا تأثير: الاستخدام ضمن حدود الخطة المستهدفة؛ لا تغييرات في الميزات.",
+    "usageExceedsTitle": "الاستخدام سيتجاوز الحدود:",
+    "limitEntry": "{{label}}: {{usage}} > {{limit}}",
+    "featureChangesTitle": "تغييرات الميزات:",
+    "featuresEnabled": "مفعّل: {{features}}",
+    "featuresDisabled": "معطّل: {{features}}",
+    "forceChange": "فرض التغيير على أي حال (السماح بتجاوز الحدود)",
+    "applyChange": "تطبيق التغيير",
+    "tenantFallback": "المستأجر",
+    "selectedPlanFallback": "الخطة المحددة",
+    "updateSuccess": "تم تحديث الخطة إلى {{plan}}",
+    "updateSuccessOrgBilling": "تم تحديث الخطة إلى {{plan}} (طُبّقت على اشتراك فوترة المؤسسة)",
+    "updateFailed": "فشل تحديث الخطة",
+    "forceReason": "تغيير خطة من المسؤول (الاستخدام يتجاوز حدود الهدف)",
+    "forceHint": "مرّر allowExceedance: true لفرض التغيير."
   },
   "plansToasts": {
     "created": "تم إنشاء الخطة"
   },
   "featuresToasts": {
     "overrideCleared": "تم مسح التجاوز",
-    "clearFailed": "فشل مسح التجاوز"
+    "clearFailed": "فشل مسح التجاوز",
+    "globalUpdated": "عام {{key}}: {{mode}}",
+    "updateFailed": "فشل تحديث {{key}}",
+    "tenantEnabled": "تم تفعيل {{name}} للمستأجر",
+    "tenantDisabled": "تم تعطيل {{name}} للمستأجر",
+    "tenantUpdateFailed": "فشل تحديث {{name}}"
+  },
+  "pageHeaders": {
+    "platform": {
+      "title": "مركز قيادة المنصة",
+      "subtitle": "راقب المستأجرين والاشتراكات والاستخدام والعمليات وصحة النظام من مكان واحد."
+    },
+    "suppliers": {
+      "title": "مركز تحكم الموردين",
+      "subtitle": "إدارة حسابات الموردين والحصص والمنتجات والمستودعات والتنفيذ والفوترة."
+    },
+    "restaurants": {
+      "title": "مركز تحكم المطاعم",
+      "subtitle": "إدارة حسابات المطاعم والاشتراكات وحدود الطلبات والاستخدام والنشاط."
+    },
+    "settings": {
+      "title": "إعدادات الحساب",
+      "subtitle": "إدارة ملفك الشخصي والأمان والإشعارات وتفضيلات المسؤول."
+    }
+  },
+  "addonKeys": {
+    "restaurant_extra_branch": "فرع إضافي",
+    "supplier_extra_branch": "فرع إضافي",
+    "supplier_extra_warehouse": "مستودع إضافي",
+    "supplier_active_customer_locations_50": "50 موقع عميل نشط"
+  },
+  "limitKeys": {
+    "branches": "الفروع",
+    "warehouses": "المستودعات",
+    "users": "المستخدمون",
+    "orders_per_day": "الطلبات يومياً",
+    "suppliers_per_restaurant": "الموردون لكل مطعم",
+    "restaurant_inventory_skus": "وحدات مخزون المطعم",
+    "chats_per_day": "المحادثات يومياً",
+    "open_conversations": "محادثات مفتوحة",
+    "storage_mb": "التخزين (ميغابايت)",
+    "quick_lists": "القوائم السريعة",
+    "quick_list_items": "عناصر القائمة السريعة",
+    "scheduled_quick_lists": "القوائم السريعة المجدولة",
+    "deal_redemptions_per_day": "استرداد العروض يومياً",
+    "supplier_products_skus": "وحدات منتجات المورد",
+    "active_customer_locations_monthly": "مواقع العملاء النشطة",
+    "promotions": "العروض النشطة",
+    "drivers": "السائقون",
+    "ai_requests_per_day": "طلبات المساعد الذكي يومياً"
+  },
+  "featureKeys": {
+    "order_calendar": "تقويم الطلبات",
+    "reports": "التقارير",
+    "smart_reorder": "إعادة الطلب الذكية",
+    "ai_platform": "المساعد الذكي + إعادة الطلب",
+    "multi_branch": "متعدد الفروع",
+    "disputes_returns": "النزاعات والمرتجعات",
+    "advanced_roles": "أدوار متقدمة",
+    "supplier_reviews": "تقييمات الموردين",
+    "tenant_audit_log": "سجل النشاط",
+    "custom_branding": "علامة تجارية مخصصة",
+    "warehouses": "المستودعات",
+    "multi_warehouse": "مستودعات متعددة",
+    "fulfillment": "التنفيذ واللوجستيات",
+    "driver_management": "إدارة السائقين",
+    "promotions": "العروض",
+    "supplier_deals": "عروض الموردين"
   }
 }

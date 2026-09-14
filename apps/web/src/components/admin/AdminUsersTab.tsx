@@ -41,9 +41,21 @@ function roleTone(role: string): string {
   const normalized = role.toLowerCase()
   if (normalized.includes('admin'))
     return 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
-  if (normalized.includes('owner')) return 'bg-amber-50 text-amber-800 border-amber-200'
-  if (normalized.includes('manager')) return 'bg-sky-50 text-sky-800 border-sky-200'
+  if (normalized.includes('owner'))
+    return 'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]'
+  if (normalized.includes('manager'))
+    return 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]'
   return 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]'
+}
+
+function formatRoleLabel(
+  role: string,
+  t: (key: string, opts?: { defaultValue?: string }) => string
+) {
+  const key = role.toLowerCase().replace(/\s+/g, '_')
+  return t(`users.roles.${key}`, {
+    defaultValue: role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  })
 }
 
 export function AdminUsersTab() {
@@ -107,7 +119,7 @@ export function AdminUsersTab() {
               <option value="all">{t('common.allRoles')}</option>
               {roleOptions.map((role) => (
                 <option key={role} value={role}>
-                  {role.replace(/_/g, ' ')}
+                  {formatRoleLabel(role, t)}
                 </option>
               ))}
             </SelectTrigger>
@@ -207,9 +219,7 @@ export function AdminUsersTab() {
                         variant="outline"
                         className={cn('mt-2 text-xs capitalize', roleTone(String(user.role || '')))}
                       >
-                        {String(user.role || 'unknown')
-                          .replace(/_/g, ' ')
-                          .toLowerCase()}
+                        {formatRoleLabel(String(user.role || 'unknown'), t)}
                       </Badge>
                     </div>
                   </div>
@@ -283,9 +293,7 @@ export function AdminUsersTab() {
                           variant="outline"
                           className={cn('text-xs capitalize', roleTone(String(user.role || '')))}
                         >
-                          {String(user.role || 'unknown')
-                            .replace(/_/g, ' ')
-                            .toLowerCase()}
+                          {formatRoleLabel(String(user.role || 'unknown'), t)}
                         </Badge>
                       </td>
                       <td

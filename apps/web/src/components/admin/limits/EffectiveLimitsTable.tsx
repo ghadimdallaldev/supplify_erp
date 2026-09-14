@@ -66,7 +66,7 @@ export function EffectiveLimitsTable({
   return (
     <div className="space-y-2" data-testid="admin-effective-limits-table">
       {atRiskCount > 0 && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+        <p className="text-xs text-[var(--amber)] bg-[var(--amber-pale)] border border-[color-mix(in_srgb,var(--amber)_35%,transparent)] rounded-md px-2 py-1.5">
           {t('limits.atRiskCount', { count: atRiskCount })}
         </p>
       )}
@@ -77,11 +77,17 @@ export function EffectiveLimitsTable({
             className="rounded-xl border border-[var(--app-border)] p-4 space-y-2"
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="font-medium">{formatLimitKeyLabel(row.key)}</p>
+              <p className="font-medium">
+                {t(`limitKeys.${row.key}`, { defaultValue: formatLimitKeyLabel(row.key) })}
+              </p>
               <UsageStatusBadge status={row.status} />
             </div>
             <p className="text-sm text-[var(--text-muted)]">
-              {row.used} / {formatLimitValue(row.effective)} in use
+              {t('limits.inUseRatio', {
+                used: row.used,
+                limit: formatLimitValue(row.effective),
+                defaultValue: `${row.used} / ${formatLimitValue(row.effective)} in use`,
+              })}
             </p>
             {row.effective != null && row.effective !== -1 && (
               <UsageProgressBar used={row.used} limit={row.effective} status={row.status} />
@@ -115,7 +121,9 @@ export function EffectiveLimitsTable({
           <tbody className="divide-y">
             {rows.map((row) => (
               <tr key={row.key} className="hover:bg-[var(--brand-ultra)]/30">
-                <td className="px-3 py-2 font-medium">{formatLimitKeyLabel(row.key)}</td>
+                <td className="px-3 py-2 font-medium">
+                  {t(`limitKeys.${row.key}`, { defaultValue: formatLimitKeyLabel(row.key) })}
+                </td>
                 <td
                   className={cn(
                     'px-3 py-2 text-[var(--text-muted)]',

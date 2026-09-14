@@ -30,6 +30,9 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
 
   const roles = useMemo(() => rolesData?.roles ?? [], [rolesData?.roles])
   const rolesForbidden = rolesError && (rolesQueryError as { status?: number })?.status === 403
+  const rolesErrorMessage = rolesError
+    ? getApiErrorMessage(rolesQueryError, 'Could not load invite roles')
+    : null
 
   useEffect(() => {
     if (!open) {
@@ -42,7 +45,10 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
 
   useEffect(() => {
     if (roles.length && !roleId) {
-      const preferred = roles.find((r) => r.name === 'Manager') ?? roles[0]
+      const preferred =
+        roles.find((r) => r.name === 'Driver') ??
+        roles.find((r) => r.name === 'Manager') ??
+        roles[0]
       setRoleId(preferred.id)
     }
   }, [roles, roleId])
@@ -82,7 +88,12 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
               <p className="text-sm text-[var(--text-muted)]">Loading roles…</p>
             ) : rolesForbidden ? (
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                You don&apos;t have permission to invite team members. Ask an owner or manager.
+                {rolesErrorMessage ||
+                  "You don't have permission to invite team members. Ask an owner or manager."}
+              </p>
+            ) : rolesError ? (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                {rolesErrorMessage}
               </p>
             ) : roles.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)]">

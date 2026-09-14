@@ -32,24 +32,6 @@ function sponsorshipLimitsFromData(
   }, {} as SponsorshipLimitForm)
 }
 
-function parseSponsorshipLimits(form: SponsorshipLimitForm): Record<string, number | null> | null {
-  const parsed: Record<string, number | null> = {}
-  for (const key of SPONSORSHIP_PLAN_KEYS) {
-    const raw = form[key].trim()
-    if (!raw) {
-      parsed[key] = null
-      continue
-    }
-    const num = Number(raw)
-    if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
-      toast.error(`Sponsorship limit for ${SPONSORSHIP_PLAN_LABELS[key]} must be a whole number`)
-      return null
-    }
-    parsed[key] = num
-  }
-  return parsed
-}
-
 export function AdminGrowthSettingsPanel() {
   const { t } = useTranslation('admin')
   const { data, isLoading } = useGetAdminGrowthSettingsQuery()
@@ -83,6 +65,28 @@ export function AdminGrowthSettingsPanel() {
     }
   }, [data])
 
+  const parseSponsorshipLimits = (
+    form: SponsorshipLimitForm
+  ): Record<string, number | null> | null => {
+    const parsed: Record<string, number | null> = {}
+    for (const key of SPONSORSHIP_PLAN_KEYS) {
+      const raw = form[key].trim()
+      if (!raw) {
+        parsed[key] = null
+        continue
+      }
+      const num = Number(raw)
+      if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
+        toast.error(
+          t('growthToasts.sponsorshipLimitInvalid', { plan: SPONSORSHIP_PLAN_LABELS[key] })
+        )
+        return null
+      }
+      parsed[key] = num
+    }
+    return parsed
+  }
+
   const handleSave = async () => {
     const discountNum = Number(discount)
     const validityNum = Number(validityDays)
@@ -96,7 +100,7 @@ export function AdminGrowthSettingsPanel() {
       return
     }
     if (!Number.isFinite(offerDays) || offerDays < 1 || offerDays > 90) {
-      toast.error('Offer expiry must be between 1 and 90 days')
+      toast.error(t('growthToasts.offerExpiryRange'))
       return
     }
     const parsedLimits = parseSponsorshipLimits(sponsorshipLimits)
@@ -123,11 +127,8 @@ export function AdminGrowthSettingsPanel() {
   return (
     <Card data-testid="admin-growth-settings-panel">
       <CardHeader>
-        <CardTitle>Referral &amp; sponsorship program</CardTitle>
-        <CardDescription>
-          Configure referral discounts, supplier rewards, and supplier-paid sponsorship (monthly
-          only). Caps are keyed by supplier plan code (e.g. gold / platinum).
-        </CardDescription>
+        <CardTitle>{t('growth.title')}</CardTitle>
+        <CardDescription>{t('growth.description')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 max-w-md">
         {isLoading ? (
@@ -135,7 +136,7 @@ export function AdminGrowthSettingsPanel() {
         ) : (
           <>
             <div>
-              <Label htmlFor="firstPaidDiscount">First paid subscription discount (%)</Label>
+              <Label htmlFor="firstPaidDiscount">{t('growth.firstPaidDiscount')}</Label>
               <Input
                 id="firstPaidDiscount"
                 type="number"
@@ -147,7 +148,7 @@ export function AdminGrowthSettingsPanel() {
               />
             </div>
             <div>
-              <Label htmlFor="referralValidity">Referral validity (days)</Label>
+              <Label htmlFor="referralValidity">{t('growth.referralValidity')}</Label>
               <Input
                 id="referralValidity"
                 type="number"
@@ -158,15 +159,15 @@ export function AdminGrowthSettingsPanel() {
               />
             </div>
             <div>
-              <Label htmlFor="supplierReward">Supplier conversion reward</Label>
+              <Label htmlFor="supplierReward">{t('growth.supplierReward')}</Label>
               <select
                 id="supplierReward"
                 className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-transparent px-3 py-2 text-sm"
                 value={rewardType}
                 onChange={(e) => setRewardType(e.target.value as 'free_month' | 'account_credit')}
               >
-                <option value="free_month">1 free month of subscription</option>
-                <option value="account_credit">Account credit (platform billing)</option>
+                <option value="free_month">{t('growth.rewardOptions.freeMonth')}</option>
+                <option value="account_credit">{t('growth.rewardOptions.accountCredit')}</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -176,10 +177,10 @@ export function AdminGrowthSettingsPanel() {
                 checked={sponsorshipEnabled}
                 onChange={(e) => setSponsorshipEnabled(e.target.checked)}
               />
-              <Label htmlFor="sponsorshipEnabled">Sponsorship enabled</Label>
+              <Label htmlFor="sponsorshipEnabled">{t('growth.sponsorshipEnabled')}</Label>
             </div>
             <div>
-              <Label htmlFor="offerExpiry">Sponsorship offer expiry (days)</Label>
+              <Label htmlFor="offerExpiry">{t('growth.offerExpiry')}</Label>
               <Input
                 id="offerExpiry"
                 type="number"
@@ -191,7 +192,7 @@ export function AdminGrowthSettingsPanel() {
               />
             </div>
             <div>
-              <Label htmlFor="discountApplies">Referral discount applies to</Label>
+              <Label htmlFor="discountApplies">{t('growth.discountApplies')}</Label>
               <select
                 id="discountApplies"
                 className="mt-1 w-full rounded-md border border-[var(--app-border)] bg-transparent px-3 py-2 text-sm"
@@ -203,9 +204,11 @@ export function AdminGrowthSettingsPanel() {
                 }
               >
                 <option value="first_restaurant_funded">
-                  First restaurant-funded cycle (after sponsored month)
+                  {t('growth.discountAppliesOptions.firstRestaurantFunded')}
                 </option>
-                <option value="sponsored_cycle">Sponsored cycle (consume on activation)</option>
+                <option value="sponsored_cycle">
+                  {t('growth.discountAppliesOptions.sponsoredCycle')}
+                </option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -215,17 +218,14 @@ export function AdminGrowthSettingsPanel() {
                 checked={requirePm}
                 onChange={(e) => setRequirePm(e.target.checked)}
               />
-              <Label htmlFor="requirePm">
-                Require restaurant payment method before sponsorship activation
-              </Label>
+              <Label htmlFor="requirePm">{t('growth.requirePm')}</Label>
             </div>
             <fieldset className="space-y-3">
               <legend className="text-sm font-medium text-[var(--text)]">
-                Sponsorship limits per year (by supplier plan code)
+                {t('growth.sponsorshipLimitsTitle')}
               </legend>
               <p className="text-xs text-[var(--text-muted)]">
-                Max sponsorships per calendar year. Leave blank for unlimited. Supplier Growth uses
-                code gold; Supplier Scale uses platinum.
+                {t('growth.sponsorshipLimitsDescription')}
               </p>
               {SPONSORSHIP_PLAN_KEYS.map((planKey) => (
                 <div key={planKey}>
@@ -236,7 +236,7 @@ export function AdminGrowthSettingsPanel() {
                     id={`sponsorship-${planKey}`}
                     type="number"
                     min={0}
-                    placeholder={planKey === 'enterprise' ? 'Unlimited' : '0'}
+                    placeholder={planKey === 'enterprise' ? t('growth.unlimitedPlaceholder') : '0'}
                     value={sponsorshipLimits[planKey]}
                     onChange={(e) =>
                       setSponsorshipLimits((prev) => ({ ...prev, [planKey]: e.target.value }))
@@ -247,7 +247,7 @@ export function AdminGrowthSettingsPanel() {
               ))}
             </fieldset>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save growth settings'}
+              {saving ? t('growth.saving') : t('growth.saveButton')}
             </Button>
           </>
         )}

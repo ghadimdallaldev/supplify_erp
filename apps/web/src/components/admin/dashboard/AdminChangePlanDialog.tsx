@@ -17,6 +17,8 @@ import {
   useUpdateAdminSubscriptionMutation,
 } from '../../../services/api'
 import { dedupeAdminPlans } from './adminDashboardShared'
+import { formatLimitKeyLabel } from '../../../lib/adminLimitLabels'
+import { FEATURE_KEY_LABELS } from '../../../lib/planComparison'
 
 export type AdminChangePlanTarget = {
   id: string
@@ -76,6 +78,13 @@ function AdminChangePlanDialogContent({
     [changePlanPlansData?.plans, modal.tenantType]
   )
 
+  const labelLimit = (key: string) =>
+    t(`limitKeys.${key}`, { defaultValue: formatLimitKeyLabel(key) })
+  const labelFeature = (key: string) =>
+    t(`featureKeys.${key}`, {
+      defaultValue: FEATURE_KEY_LABELS[key] ?? key.replace(/_/g, ' '),
+    })
+
   const runPreviewPlanChange = async () => {
     if (!targetPlanId) return
     try {
@@ -107,11 +116,11 @@ function AdminChangePlanDialogContent({
         selectedPlan?.name ||
         result.subscription?.plan_name ||
         result.subscription?.plan_code ||
-        'selected plan'
+        t('changePlan.selectedPlanFallback')
       toast.success(
         result.appliedViaOrgBilling
-          ? `Plan updated to ${planLabel} (applied to organization billing subscription)`
-          : `Plan updated to ${planLabel}`
+          ? t('changePlan.updateSuccessOrgBilling', { plan: planLabel })
+          : t('changePlan.updateSuccess', { plan: planLabel })
       )
       onClose()
     } catch (err: unknown) {
@@ -128,30 +137,33 @@ function AdminChangePlanDialogContent({
             limit: number
           }>,
           featureDiff: { enabled: [], disabled: [] },
-          recommendedActions: ['Pass allowExceedance: true to force change.'],
+          recommendedActions: [t('changePlan.forceHint')],
         })
       } else {
-        toast.error(e?.data?.error?.message || 'Failed to update plan')
+        toast.error(e?.data?.error?.message || t('changePlan.updateFailed'))
       }
     }
   }
+
+  const tenantTypeLabel =
+    modal.tenantType === 'SUPPLIER' ? t('common.supplier') : t('common.restaurant')
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{t('changePlan.title', { name: modal.tenantName })}</DialogTitle>
-          <DialogDescription>
-            Select a target plan and preview limits or feature changes before applying.
-          </DialogDescription>
+          <DialogDescription>{t('changePlan.description')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div>
-            <Label>Target plan</Label>
+            <Label>{t('changePlan.targetPlan')}</Label>
             <Select value={targetPlanId} onValueChange={(value) => setTargetPlanId(value)}>
-              <SelectTrigger className="w-full mt-1" disabled={changePlanPlansLoading}>
+              <SelectTrigger className="mt-1 w-full" disabled={changePlanPlansLoading}>
                 <option value="">
-                  {changePlanPlansLoading ? 'Loading plans…' : 'Select plan'}
+                  {changePlanPlansLoading
+                    ? t('changePlan.loadingPlans')
+                    : t('changePlan.selectPlan')}
                 </option>
                 {changePlanPlanOptions.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -161,9 +173,8 @@ function AdminChangePlanDialogContent({
               </SelectTrigger>
             </Select>
             {!changePlanPlansLoading && changePlanPlanOptions.length === 0 && (
-              <p className="mt-1 text-sm text-amber-600">
-                No plans found for {modal.tenantType.toLowerCase()} tenants. Create one on the Plans
-                tab.
+              <p className="mt-1 text-sm text-[var(--amber)]">
+                {t('changePlan.noPlansForTenant', { tenantType: tenantTypeLabel.toLowerCase() })}
               </p>
             )}
           </div>
@@ -173,22 +184,26 @@ function AdminChangePlanDialogContent({
             onClick={runPreviewPlanChange}
             disabled={!targetPlanId}
           >
-            Preview impact
+            {t('changePlan.previewImpact')}
           </Button>
           {changePlanPreview && (
-            <div className="border rounded-lg p-4 space-y-3 text-sm">
+            <div className="space-y-3 rounded-lg border border-[var(--app-border)] p-4 text-sm">
               {!hasPreviewContent(changePlanPreview) && (
-                <p className="text-[var(--text-muted)]">
-                  No impact: usage is within target plan limits; no feature changes.
-                </p>
+                <p className="text-[var(--text-muted)]">{t('changePlan.noImpact')}</p>
               )}
               {(changePlanPreview.willExceed?.length ?? 0) > 0 && (
                 <div>
-                  <p className="font-semibold text-amber-700">Usage would exceed limits:</p>
-                  <ul className="list-disc pl-4 mt-1">
+                  <p className="font-semibold text-[var(--amber)]">
+                    {t('changePlan.usageExceedsTitle')}
+                  </p>
+                  <ul className="mt-1 list-disc pl-4">
                     {changePlanPreview.willExceed!.map((e) => (
                       <li key={e.limitKey}>
-                        {e.limitKey}: {e.usage} &gt; {e.limit}
+                        {t('changePlan.limitEntry', {
+                          label: labelLimit(e.limitKey),
+                          usage: e.usage,
+                          limit: e.limit,
+                        })}
                       </li>
                     ))}
                   </ul>
@@ -197,15 +212,25 @@ function AdminChangePlanDialogContent({
               {((changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 ||
                 (changePlanPreview.featureDiff?.disabled?.length ?? 0) > 0) && (
                 <div>
-                  <p className="font-semibold text-[var(--text-mid)]">Feature changes:</p>
+                  <p className="font-semibold text-[var(--text-mid)]">
+                    {t('changePlan.featureChangesTitle')}
+                  </p>
                   {(changePlanPreview.featureDiff?.enabled?.length ?? 0) > 0 && (
                     <p className="text-[var(--mint)]">
-                      Enabled: {changePlanPreview.featureDiff!.enabled!.join(', ')}
+                      {t('changePlan.featuresEnabled', {
+                        features: changePlanPreview
+                          .featureDiff!.enabled!.map(labelFeature)
+                          .join(', '),
+                      })}
                     </p>
                   )}
                   {(changePlanPreview.featureDiff?.disabled?.length ?? 0) > 0 && (
-                    <p className="text-amber-600">
-                      Disabled: {changePlanPreview.featureDiff!.disabled!.join(', ')}
+                    <p className="text-[var(--amber)]">
+                      {t('changePlan.featuresDisabled', {
+                        features: changePlanPreview
+                          .featureDiff!.disabled!.map(labelFeature)
+                          .join(', '),
+                      })}
                     </p>
                   )}
                 </div>
@@ -222,17 +247,17 @@ function AdminChangePlanDialogContent({
                     checked={changePlanForce}
                     onChange={(e) => setChangePlanForce(e.target.checked)}
                   />
-                  <span>Force change anyway (allow exceedance)</span>
+                  <span>{t('changePlan.forceChange')}</span>
                 </label>
               )}
             </div>
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={applyPlanChange} disabled={!targetPlanId}>
-              Apply change
+              {t('changePlan.applyChange')}
             </Button>
           </div>
         </div>
@@ -249,18 +274,18 @@ export function useAdminChangePlanDialog() {
     setChangePlanModal({
       subId: sub.id,
       tenantType: sub.tenant_type,
-      tenantName: sub.tenant_name || 'Tenant',
+      tenantName: sub.tenant_name || '',
       targetPlanId: '',
     })
   }, [])
 
-  const closeChangePlan = useCallback(() => {
-    setChangePlanModal(null)
-  }, [])
-
   const ChangePlanDialog = changePlanModal ? (
-    <AdminChangePlanDialogContent modal={changePlanModal} onClose={closeChangePlan} />
+    <AdminChangePlanDialogContent
+      key={changePlanModal.subId}
+      modal={changePlanModal}
+      onClose={() => setChangePlanModal(null)}
+    />
   ) : null
 
-  return { openChangePlan, ChangePlanDialog, closeChangePlan }
+  return { openChangePlan, ChangePlanDialog }
 }

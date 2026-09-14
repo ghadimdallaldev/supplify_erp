@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { AdminEmptyState } from './adminUi'
@@ -14,24 +15,20 @@ export type AttentionItem = {
 }
 
 const severityStyles: Record<AttentionSeverity, string> = {
-  critical: 'border-red-200 bg-red-50 text-red-800',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800',
-  info: 'border-sky-200 bg-sky-50 text-sky-800',
-  healthy: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  critical:
+    'border-[color-mix(in_srgb,var(--red)_35%,transparent)] bg-[var(--red-pale)] text-[var(--red)]',
+  warning:
+    'border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] text-[var(--amber)]',
+  info: 'border-[var(--app-border-mid)] bg-[var(--brand-ultra)] text-[var(--brand-mid)]',
+  healthy:
+    'border-[color-mix(in_srgb,var(--mint)_35%,transparent)] bg-[var(--mint-pale)] text-[var(--mint)]',
 }
 
 const badgeStyles: Record<AttentionSeverity, string> = {
-  critical: 'bg-red-100 text-red-700',
-  warning: 'bg-amber-100 text-amber-800',
-  info: 'bg-sky-100 text-sky-700',
-  healthy: 'bg-emerald-100 text-emerald-700',
-}
-
-const badgeLabels: Record<AttentionSeverity, string> = {
-  critical: 'Critical',
-  warning: 'Warning',
-  info: 'Info',
-  healthy: 'Healthy',
+  critical: 'bg-[color-mix(in_srgb,var(--red)_18%,transparent)] text-[var(--red)]',
+  warning: 'bg-[color-mix(in_srgb,var(--amber)_18%,transparent)] text-[var(--amber)]',
+  info: 'bg-[color-mix(in_srgb,var(--brand)_12%,transparent)] text-[var(--brand-mid)]',
+  healthy: 'bg-[color-mix(in_srgb,var(--mint)_18%,transparent)] text-[var(--mint)]',
 }
 
 export function buildAttentionItems(
@@ -40,7 +37,8 @@ export function buildAttentionItems(
     pendingApproval?: number
     pendingPayment?: number
     recentErrorCount?: number
-  } = {}
+  } = {},
+  t: TFunction
 ): AttentionItem[] {
   const alerts = (overview?.alerts || {}) as Record<string, number>
   const operational = (overview?.operational || {}) as Record<string, number>
@@ -50,11 +48,11 @@ export function buildAttentionItems(
   if (pendingApproval > 0) {
     items.push({
       id: 'deals-pending',
-      label: `${pendingApproval} deal${pendingApproval > 1 ? 's' : ''} pending approval`,
-      detail: 'Supplier deals waiting for your review',
+      label: t('attention.dealsPending', { count: pendingApproval }),
+      detail: t('attention.dealsPendingDetail'),
       severity: 'warning',
       tab: 'deals',
-      actionLabel: 'Review deals',
+      actionLabel: t('attention.reviewDeals'),
     })
   }
 
@@ -62,11 +60,11 @@ export function buildAttentionItems(
   if (pendingPayment > 0) {
     items.push({
       id: 'deals-payment',
-      label: `${pendingPayment} deal${pendingPayment > 1 ? 's' : ''} pending payment`,
-      detail: 'Approved deals awaiting activation payment',
+      label: t('attention.dealsPayment', { count: pendingPayment }),
+      detail: t('attention.dealsPaymentDetail'),
       severity: 'info',
       tab: 'deals',
-      actionLabel: 'Review deals',
+      actionLabel: t('attention.reviewDeals'),
     })
   }
 
@@ -74,11 +72,11 @@ export function buildAttentionItems(
   if (pastDue > 0) {
     items.push({
       id: 'past-due',
-      label: `${pastDue} past-due subscription${pastDue > 1 ? 's' : ''}`,
-      detail: 'Billing may need follow-up',
+      label: t('attention.pastDue', { count: pastDue }),
+      detail: t('attention.pastDueDetail'),
       severity: 'critical',
       tab: 'subscriptions',
-      actionLabel: 'Review subscriptions',
+      actionLabel: t('attention.reviewSubscriptions'),
     })
   }
 
@@ -86,10 +84,10 @@ export function buildAttentionItems(
   if (trialsExpiring > 0) {
     items.push({
       id: 'trials',
-      label: `${trialsExpiring} trial${trialsExpiring > 1 ? 's' : ''} expiring in 7 days`,
+      label: t('attention.trialsExpiring', { count: trialsExpiring }),
       severity: 'warning',
       tab: 'subscriptions',
-      actionLabel: 'Review subscriptions',
+      actionLabel: t('attention.reviewSubscriptions'),
     })
   }
 
@@ -97,11 +95,11 @@ export function buildAttentionItems(
   if (healthIssues > 0) {
     items.push({
       id: 'health',
-      label: `${healthIssues} recent system error${healthIssues > 1 ? 's' : ''}`,
-      detail: 'Check health tab for details',
+      label: t('attention.healthErrors', { count: healthIssues }),
+      detail: t('attention.healthErrorsDetail'),
       severity: 'critical',
       tab: 'health',
-      actionLabel: 'View health',
+      actionLabel: t('attention.viewHealth'),
     })
   }
 
@@ -109,10 +107,10 @@ export function buildAttentionItems(
   if (overdueInvoices > 0) {
     items.push({
       id: 'overdue-invoices',
-      label: `${overdueInvoices} overdue invoice${overdueInvoices > 1 ? 's' : ''}`,
+      label: t('attention.overdueInvoices', { count: overdueInvoices }),
       severity: 'warning',
       tab: 'finance',
-      actionLabel: 'Open finance',
+      actionLabel: t('attention.openFinance'),
     })
   }
 
@@ -120,11 +118,11 @@ export function buildAttentionItems(
   if (emailFailed >= 1) {
     items.push({
       id: 'email-failures',
-      label: `${emailFailed} failed email${emailFailed > 1 ? 's' : ''} in 24h`,
-      detail: 'Review delivery logs in Operations',
+      label: t('attention.emailFailed', { count: emailFailed }),
+      detail: t('attention.emailFailedDetail'),
       severity: emailFailed >= 5 ? 'warning' : 'info',
       tab: 'operations',
-      actionLabel: 'Operations',
+      actionLabel: t('attention.operations'),
     })
   }
 
@@ -132,10 +130,10 @@ export function buildAttentionItems(
   if (openFulfillment >= 1) {
     items.push({
       id: 'fulfillment-issues',
-      label: `${openFulfillment} open fulfillment issue${openFulfillment > 1 ? 's' : ''}`,
+      label: t('attention.fulfillmentIssues', { count: openFulfillment }),
       severity: openFulfillment >= 10 ? 'warning' : 'info',
       tab: 'operations',
-      actionLabel: 'Operations',
+      actionLabel: t('attention.operations'),
     })
   }
 
@@ -143,10 +141,10 @@ export function buildAttentionItems(
   if (staleGps >= 1) {
     items.push({
       id: 'stale-gps',
-      label: `${staleGps} deliver${staleGps > 1 ? 'ies' : 'y'} with stale GPS`,
+      label: t('attention.staleGps', { count: staleGps }),
       severity: staleGps >= 10 ? 'warning' : 'info',
       tab: 'operations',
-      actionLabel: 'Operations',
+      actionLabel: t('attention.operations'),
     })
   }
 
@@ -154,10 +152,10 @@ export function buildAttentionItems(
   if (expiredLots >= 1) {
     items.push({
       id: 'expired-lots',
-      label: `${expiredLots} expired inventory lot${expiredLots > 1 ? 's' : ''}`,
+      label: t('attention.expiredLots', { count: expiredLots }),
       severity: expiredLots >= 20 ? 'warning' : 'info',
       tab: 'operations',
-      actionLabel: 'Operations',
+      actionLabel: t('attention.operations'),
     })
   }
 
@@ -181,7 +179,7 @@ export function AttentionPanel({
         <AdminEmptyState
           title={t('attention.allClearTitle')}
           description={t('attention.allClearDescription')}
-          icon={<CheckCircle2 className="h-8 w-8 text-emerald-500" />}
+          icon={<CheckCircle2 className="h-8 w-8 text-[var(--mint)]" />}
         />
       ) : (
         items.map((item) => (
@@ -196,7 +194,7 @@ export function AttentionPanel({
               <span
                 className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${badgeStyles[item.severity]}`}
               >
-                {badgeLabels[item.severity]}
+                {t(`attention.severity.${item.severity}`)}
               </span>
             </div>
             {item.detail && <p className="mt-0.5 text-xs opacity-80">{item.detail}</p>}
@@ -210,7 +208,9 @@ export function AttentionPanel({
       )}
       {pendingDeals.length > 0 && (
         <div className="border-t border-[var(--app-border)] pt-2">
-          <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">Latest pending deals</p>
+          <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">
+            {t('attention.latestPendingDeals')}
+          </p>
           <ul className="space-y-1.5">
             {pendingDeals.slice(0, 3).map((deal) => (
               <li key={String(deal.id)} className="text-xs">
@@ -219,7 +219,7 @@ export function AttentionPanel({
                   className="text-left text-[var(--text)] hover:underline"
                   onClick={() => onNavigateTab('deals')}
                 >
-                  {String(deal.name)} · {String(deal.supplier_name || 'Supplier')}
+                  {String(deal.name)} · {String(deal.supplier_name || t('common.supplier'))}
                 </button>
               </li>
             ))}

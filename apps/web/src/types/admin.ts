@@ -204,6 +204,8 @@ export interface BillingStatus {
   gracePeriodDays: number
   availableGateways?: string[]
   gateways?: string[]
+  billingTenantId?: string
+  usesOrgBilling?: boolean
 }
 /** Plan recommendation from GET /api/subscriptions/recommendation */
 export interface PlanRecommendation {

@@ -20,7 +20,15 @@ import {
 import { formatCurrency } from '../../../utils/format'
 import { AdminOverviewExtras } from '../AdminOverviewExtras'
 import { AdminOperationsSnapshot } from '../AdminOperationsSnapshot'
-import { AdminCollapsibleSection, AdminErrorState, AdminLoadingSkeleton } from '../adminUi'
+import {
+  AdminCollapsibleSection,
+  AdminErrorState,
+  AdminLoadingSkeleton,
+  AdminSectionHeader,
+} from '../adminUi'
+import { getTranslatedStatusLabel } from '../../ui/status-badge'
+import { formatLimitKeyLabel } from '../../../lib/adminLimitLabels'
+import { FEATURE_KEY_LABELS } from '../../../lib/planComparison'
 import { type AdminCanTabMap } from './adminDashboardShared'
 
 export interface AdminOverviewTabProps {
@@ -37,6 +45,7 @@ export function AdminOverviewTab({
   onOperationsSubTab,
 }: AdminOverviewTabProps) {
   const { t } = useTranslation('admin')
+  const { t: tCommon } = useTranslation('common')
   const {
     data: overview,
     isLoading: overviewLoading,
@@ -86,7 +95,7 @@ export function AdminOverviewTab({
           title={t('overview.loadFailedTitle')}
           message={
             (overviewQueryError as { data?: { message?: string } })?.data?.message ||
-            'The overview API request failed. Metrics are not shown as zero to avoid a misleading empty dashboard.'
+            t('overview.loadFailedMessage')
           }
           onRetry={() => refetchOverview()}
         />
@@ -98,6 +107,7 @@ export function AdminOverviewTab({
 
   return (
     <>
+      <AdminSectionHeader title={t('overview.title')} description={t('overview.description')} />
       <div className="mb-4">
         <SummaryStrip
           testId="admin-overview-summary"
@@ -120,23 +130,27 @@ export function AdminOverviewTab({
             {
               label: t('overview.mrr'),
               value: formatCurrency(overviewData?.revenue?.mrr),
-              hint: `ARR ${formatCurrency(overviewData?.revenue?.arr)}`,
+              hint: t('overview.arrHint', { value: formatCurrency(overviewData?.revenue?.arr) }),
               tone: 'brand',
               onClick: canAdminTab.finance ? () => onNavigateTab('finance') : undefined,
             },
             {
-              label: 'Orders today',
+              label: t('overview.ordersToday'),
               value: overviewData?.orders?.today ?? 0,
-              hint: `${overviewData?.orders?.week ?? 0} this week`,
+              hint: t('executiveSummary.ordersThisWeek', {
+                count: overviewData?.orders?.week ?? 0,
+              }),
               tone: 'default',
             },
             {
-              label: 'System health',
-              value: formatSystemHealthLabel(systemHealth),
+              label: t('overview.systemHealth'),
+              value: t(`executiveSummary.health.${systemHealth}`, {
+                defaultValue: formatSystemHealthLabel(systemHealth),
+              }),
               hint:
                 recentErrorCount > 0
-                  ? `${recentErrorCount} recent error${recentErrorCount > 1 ? 's' : ''}`
-                  : 'Platform operational status',
+                  ? t('executiveSummary.recentErrors', { count: recentErrorCount })
+                  : t('executiveSummary.platformOperational'),
               tone:
                 systemHealth === 'healthy'
                   ? 'mint'
@@ -187,8 +201,18 @@ export function AdminOverviewTab({
               color: 'var(--brand)',
               bg: 'var(--brand-ultra)',
             },
-            { status: 'PAST_DUE', icon: AlertCircle, color: '#ef4444', bg: '#fef2f2' },
-            { status: 'SUSPENDED', icon: PauseCircle, color: '#f59e0b', bg: '#fffbeb' },
+            {
+              status: 'PAST_DUE',
+              icon: AlertCircle,
+              color: 'var(--red)',
+              bg: 'var(--red-pale)',
+            },
+            {
+              status: 'SUSPENDED',
+              icon: PauseCircle,
+              color: 'var(--amber)',
+              bg: 'var(--amber-pale)',
+            },
             {
               status: 'CANCELLED',
               icon: XCircle,
@@ -207,7 +231,7 @@ export function AdminOverviewTab({
               <Icon className="h-4 w-4 flex-shrink-0" style={{ color }} />
               <div>
                 <p className="text-xs font-semibold" style={{ color }}>
-                  {status}
+                  {getTranslatedStatusLabel(status, tCommon)}
                 </p>
                 <p className="text-xl font-black text-[var(--text)]">
                   {String(subscriptionStats[status] ?? 0)}
@@ -220,8 +244,8 @@ export function AdminOverviewTab({
 
       {conversionStats && (
         <AdminCollapsibleSection
-          title="Growth insights"
-          description="Understand upgrade demand and conversion momentum."
+          title={t('overview.growthInsightsTitle')}
+          description={t('overview.growthInsightsDescription')}
           className="mb-4"
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -232,7 +256,9 @@ export function AdminOverviewTab({
             >
               <div className="mb-4 flex items-center justify-between">
                 <Badge variant="outline" className="text-xs">
-                  {conversionStats.blocksToUpgradesConversionPercent}% conversion rate
+                  {t('overview.conversionRate', {
+                    percent: conversionStats.blocksToUpgradesConversionPercent,
+                  })}
                 </Badge>
                 {canAdminTab.plans && (
                   <Button
@@ -241,7 +267,7 @@ export function AdminOverviewTab({
                     className="h-7 text-xs"
                     onClick={() => onNavigateTab('plans')}
                   >
-                    Plan limits <ArrowRight className="ml-1 h-3 w-3" />
+                    {t('overview.extras.planLimits')} <ArrowRight className="ml-1 h-3 w-3" />
                   </Button>
                 )}
               </div>
@@ -250,13 +276,19 @@ export function AdminOverviewTab({
                 const s30 = conversionStats.funnelDropOff?.[windowKey]
                 const funnelSteps = [
                   {
-                    label: 'Feature / limit blocks',
+                    label: t('overview.funnel.blocks'),
                     value: Number(conversionStats.totalBlocks),
                   },
-                  { label: 'Upgrade modal opens', value: Number(s30?.openUpgrade ?? 0) },
-                  { label: 'Upgrade clicked', value: Number(s30?.clickUpgrade ?? 0) },
                   {
-                    label: 'Upgrades completed',
+                    label: t('overview.funnel.openUpgrade'),
+                    value: Number(s30?.openUpgrade ?? 0),
+                  },
+                  {
+                    label: t('overview.funnel.clickUpgrade'),
+                    value: Number(s30?.clickUpgrade ?? 0),
+                  },
+                  {
+                    label: t('overview.funnel.upgradesCompleted'),
                     value: Number(conversionStats.totalUpgrades),
                   },
                 ]
@@ -287,20 +319,28 @@ export function AdminOverviewTab({
                 )
               })()}
               {(conversionStats.mostBlockedFeature || conversionStats.mostBlockedLimit) && (
-                <div className="mt-4 space-y-1 border-t pt-3">
+                <div className="mt-4 space-y-1 border-t border-[var(--app-border)] pt-3">
                   {conversionStats.mostBlockedFeature && (
                     <p className="text-xs text-[var(--text-muted)]">
-                      Top blocked feature:{' '}
+                      {t('overview.topBlockedFeature')}{' '}
                       <span className="font-medium text-[var(--text)]">
-                        {conversionStats.mostBlockedFeature}
+                        {t(`featureKeys.${conversionStats.mostBlockedFeature}`, {
+                          defaultValue:
+                            FEATURE_KEY_LABELS[conversionStats.mostBlockedFeature] ??
+                            String(conversionStats.mostBlockedFeature).replace(/_/g, ' '),
+                        })}
                       </span>
                     </p>
                   )}
                   {conversionStats.mostBlockedLimit && (
                     <p className="text-xs text-[var(--text-muted)]">
-                      Top blocked limit:{' '}
+                      {t('overview.topBlockedLimit')}{' '}
                       <span className="font-medium text-[var(--text)]">
-                        {conversionStats.mostBlockedLimit}
+                        {t(`limitKeys.${conversionStats.mostBlockedLimit}`, {
+                          defaultValue: formatLimitKeyLabel(
+                            String(conversionStats.mostBlockedLimit)
+                          ),
+                        })}
                       </span>
                     </p>
                   )}
@@ -319,23 +359,27 @@ export function AdminOverviewTab({
                     <thead>
                       <tr className="border-b border-[var(--app-border)]">
                         <th className="py-2 text-left font-medium text-[var(--text-muted)]">
-                          Step
+                          {t('overview.funnel.step')}
                         </th>
-                        <th className="py-2 text-right font-medium text-[var(--text-muted)]">7d</th>
                         <th className="py-2 text-right font-medium text-[var(--text-muted)]">
-                          {`${conversionStats.days ?? 30}d`}
+                          {t('overview.funnel.window7d')}
+                        </th>
+                        <th className="py-2 text-right font-medium text-[var(--text-muted)]">
+                          {t('overview.funnel.windowNd', {
+                            days: conversionStats.days ?? 30,
+                          })}
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-border)]">
                       {[
-                        { label: 'Blocked', key: 'blocked' },
-                        { label: 'Open upgrade', key: 'openUpgrade' },
-                        { label: 'Click upgrade', key: 'clickUpgrade' },
-                        { label: 'Upgrade success', key: 'upgradeSuccess' },
-                      ].map(({ label, key }) => (
+                        { labelKey: 'overview.funnel.blocked', key: 'blocked' },
+                        { labelKey: 'overview.funnel.openUpgrade', key: 'openUpgrade' },
+                        { labelKey: 'overview.funnel.clickUpgrade', key: 'clickUpgrade' },
+                        { labelKey: 'overview.funnel.upgradeSuccess', key: 'upgradeSuccess' },
+                      ].map(({ labelKey, key }) => (
                         <tr key={key}>
-                          <td className="py-2 text-[var(--text)]">{label}</td>
+                          <td className="py-2 text-[var(--text)]">{t(labelKey)}</td>
                           <td className="py-2 text-right font-semibold text-[var(--text)]">
                             {(conversionStats.funnelDropOff!['7d'] as Record<string, number>)[
                               key

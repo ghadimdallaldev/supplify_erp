@@ -11,7 +11,7 @@ import {
   getAllPermissionsForTenantType,
 } from './tenant-roles.js'
 import { slugifyName } from './register-account.js'
-import { createPendingActivationSubscription } from './billing/subscription-activation.js'
+import { createOrgCoveredBranchSubscription } from './billing/subscription-activation.js'
 import { RESTAURANT_VIEWER } from './role-matrix.js'
 
 export const RESTAURANT_ORG_SYSTEM_ROLES = [
@@ -418,7 +418,7 @@ export async function createRestaurantOrgBranch({
     )
     const branch = branchRows[0]
 
-    await createPendingActivationSubscription(client, branch.id, 'RESTAURANT', 'free')
+    await createOrgCoveredBranchSubscription(client, branch.id, 'RESTAURANT', 'free')
 
     // Role seeding inside the same transaction so failed post-steps cannot leave orphan tenants
     await ensureTenantSystemRoles(branch.id, 'RESTAURANT', client)
