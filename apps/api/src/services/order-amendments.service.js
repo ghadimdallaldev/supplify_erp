@@ -275,6 +275,15 @@ export async function notifyAmendmentParty(order, amendment, action) {
 
 export async function acceptAmendment(amendmentId, orderId, responderUserId, responseNotes) {
   return withTransaction(async (client) => {
+    const { rows: orders } = await client.query(
+      `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+    if (!orders.length) throw new NotFoundError('Order not found')
+    if (!canAmendOrderStatus(orders[0].status)) {
+      throw new ValidationError('Order cannot be amended after processing')
+    }
+
     const { rows: amendments } = await client.query(
       `SELECT * FROM order_amendments WHERE id = $1 AND order_id = $2 FOR UPDATE`,
       [amendmentId, orderId]

@@ -2,6 +2,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import {
   assertNoPendingAmendment,
+  canAmendOrderStatus,
   getOrderForAmendment,
   notifyAmendmentParty,
 } from './order-amendments.service.js'
@@ -98,6 +99,9 @@ export async function proposeOrderSubstitution({
   const order = await getOrderForAmendment(orderId)
   if (order.supplier_id !== supplierId) {
     throw new ValidationError('Access denied')
+  }
+  if (!canAmendOrderStatus(order.status)) {
+    throw new ValidationError('Shortages and substitutions cannot be proposed after processing')
   }
 
   const { rows: items } = await query(

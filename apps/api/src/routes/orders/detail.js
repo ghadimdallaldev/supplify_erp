@@ -111,13 +111,13 @@ router.get('/:id', async (req, res, next) => {
         `
         SELECT
           oi.*,
-          p.name as product_name,
-          p.sku as product_sku,
+          COALESCE(p.name, 'Unavailable product') as product_name,
+          COALESCE(p.sku, oi.product_id::text) as product_sku,
           s.name as supplier_name,
           s.slug as supplier_slug,
           pick.location_code
         FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
+        LEFT JOIN product p ON p.id = oi.product_id
         JOIN supplier s ON s.id = oi.supplier_id
         LEFT JOIN LATERAL (
           SELECT pli.location_code

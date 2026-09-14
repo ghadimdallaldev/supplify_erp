@@ -27,6 +27,17 @@ export function LoginPage() {
   const [inviteRegistered, setInviteRegistered] = useState(false)
   const [inEmbeddedFrame, setInEmbeddedFrame] = useState(false)
 
+  const getInviteReturnUrl = () => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    const type = params.get('type')
+    if (!token || !type) return undefined
+    const inviteUrl = new URL('/invite', window.location.origin)
+    inviteUrl.searchParams.set('token', token)
+    inviteUrl.searchParams.set('type', type)
+    return inviteUrl.toString()
+  }
+
   useEffect(() => {
     setInEmbeddedFrame(isEmbeddedFrame())
   }, [])
@@ -48,7 +59,7 @@ export function LoginPage() {
       // Continue into Keycloak so the user sees the OTP page (not a dead-end SPA screen).
       if (!isEmbeddedFrame()) {
         setIsLoading(true)
-        redirectToAuth('login')
+        redirectToAuth('login', getInviteReturnUrl())
       }
     } else if (errorParam) {
       setError(t('authFailed'))
@@ -58,13 +69,13 @@ export function LoginPage() {
   const handleLogin = () => {
     if (inEmbeddedFrame) return
     setIsLoading(true)
-    redirectToAuth('login')
+    redirectToAuth('login', getInviteReturnUrl())
   }
 
   const handleSignup = () => {
     if (inEmbeddedFrame) return
     setIsLoading(true)
-    redirectToAuth('register')
+    redirectToAuth('register', getInviteReturnUrl())
   }
 
   const features = [

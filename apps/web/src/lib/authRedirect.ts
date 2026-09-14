@@ -5,8 +5,12 @@ import { DEV_API_ORIGIN } from './env'
  * URL that starts the OIDC flow (full-page navigation, never inside an iframe).
  * In dev, use the API origin directly so auth cookies match VITE_API_URL (see apps/web/env.example).
  */
-export function getOAuthStartUrl(path: 'login' | 'register'): string {
-  const url = apiUrl(`/auth/${path}`)
+export function getOAuthStartUrl(path: 'login' | 'register', redirectUrl?: string): string {
+  const baseUrl = apiUrl(`/auth/${path}`)
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  const url = redirectUrl
+    ? `${baseUrl}${separator}redirect=${encodeURIComponent(redirectUrl)}`
+    : baseUrl
   if (import.meta.env.VITE_API_URL) {
     return url
   }
@@ -48,8 +52,8 @@ export function navigateForOAuth(url: string): void {
   window.location.replace(url)
 }
 
-export function redirectToAuth(path: 'login' | 'register'): void {
-  navigateForOAuth(getOAuthStartUrl(path))
+export function redirectToAuth(path: 'login' | 'register', redirectUrl?: string): void {
+  navigateForOAuth(getOAuthStartUrl(path, redirectUrl))
 }
 
 /** Clears Supplify cookies and Keycloak SSO session (use before signup if stuck on a demo user). */
