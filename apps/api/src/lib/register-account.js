@@ -56,8 +56,20 @@ async function uniqueSlug(client, table, baseSlug) {
   throw new ValidationError('Could not generate a unique organization URL slug')
 }
 
+/**
+ * True when the signed-in user still needs owner org registration (`/register/complete`).
+ * Invited team members (any role) already have workspace membership — they must NOT be
+ * sent to organization setup even though they are not the tenant contact_email.
+ */
 export async function userNeedsTenantSetup(user) {
   if (!user || user.role === 'ADMIN') return false
+
+  // Invite accept / branch join binds membership before the user is an owner.
+  if (user.id) {
+    const membership = await getUserWorkspaceMembership(user.id)
+    if (membership) return false
+  }
+
   if (user.role === 'PENDING') return true
   const email = (user.email || '').trim().toLowerCase()
   if (!email) return true

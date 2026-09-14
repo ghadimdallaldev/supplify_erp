@@ -97,6 +97,12 @@ describe('register-account', () => {
     createPendingActivationSubscription.mockResolvedValue(undefined)
   })
 
+  beforeEach(async () => {
+    const { getUserWorkspaceMembership } = await import('./workspace-membership.js')
+    getUserWorkspaceMembership.mockReset()
+    getUserWorkspaceMembership.mockResolvedValue(null)
+  })
+
   describe('slugifyName', () => {
     it('slugifies business names', async () => {
       const { slugifyName } = await import('./register-account.js')
@@ -106,9 +112,11 @@ describe('register-account', () => {
   })
 
   describe('userNeedsTenantSetup', () => {
-    it('returns true for PENDING role', async () => {
+    it('returns true for PENDING role without workspace', async () => {
+      const { getUserWorkspaceMembership } = await import('./workspace-membership.js')
+      getUserWorkspaceMembership.mockResolvedValueOnce(null)
       const { userNeedsTenantSetup } = await import('./register-account.js')
-      expect(await userNeedsTenantSetup({ role: 'PENDING', email: 'a@b.com' })).toBe(true)
+      expect(await userNeedsTenantSetup({ id: 'u1', role: 'PENDING', email: 'a@b.com' })).toBe(true)
     })
 
     it('returns false for admin', async () => {
@@ -116,10 +124,32 @@ describe('register-account', () => {
       expect(await userNeedsTenantSetup({ role: 'ADMIN', email: 'admin@b.com' })).toBe(false)
     })
 
-    it('returns true when no tenant exists for email', async () => {
+    it('returns false when user already has workspace membership (invited staff)', async () => {
+      const { getUserWorkspaceMembership } = await import('./workspace-membership.js')
+      getUserWorkspaceMembership.mockResolvedValueOnce({
+        user_id: 'u-driver',
+        workspace_type: 'SUPPLIER',
+        status: 'active',
+      })
+      const { userNeedsTenantSetup } = await import('./register-account.js')
+      expect(
+        await userNeedsTenantSetup({
+          id: 'u-driver',
+          role: 'SUPPLIER',
+          email: 'driver@b.com',
+        })
+      ).toBe(false)
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
+    it('returns true when no tenant exists for email and no membership', async () => {
+      const { getUserWorkspaceMembership } = await import('./workspace-membership.js')
+      getUserWorkspaceMembership.mockResolvedValueOnce(null)
       const { userNeedsTenantSetup } = await import('./register-account.js')
       mockQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
-      expect(await userNeedsTenantSetup({ role: 'RESTAURANT', email: 'new@b.com' })).toBe(true)
+      expect(await userNeedsTenantSetup({ id: 'u2', role: 'RESTAURANT', email: 'new@b.com' })).toBe(
+        true
+      )
     })
   })
 

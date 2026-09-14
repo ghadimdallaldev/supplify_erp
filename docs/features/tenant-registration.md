@@ -18,7 +18,9 @@ New users register in Keycloak, complete organization setup in Supplify, then un
 4. `POST /api/register/complete` creates tenant, org, roles, catalog (supplier), default warehouse (supplier), and a subscription row with `lock_reason = pending_activation`.
 5. User is redirected to `/app/activate` (billing middleware blocks other app routes until unlocked).
 
-`AuthGuard` sends users with `role === PENDING` or `needsSetup === true` back to `/register/complete`. After complete, the client refetches `GET /auth/me` before navigating into the app shell.
+`AuthGuard` sends users with `needsSetup === true` (or unresolved `PENDING`) to `/register/complete`. After complete, the client refetches `GET /auth/me` before navigating into the app shell.
+
+**Invited team members** (Driver, Manager, Viewer, etc.) already have `user_workspace_membership` after invite accept. `GET /api/register/status` must return `needsSetup: false` for them — they are not organization owners and must not see org setup. Ownership is no longer inferred only from matching `contact_email` on the tenant row.
 
 ## Activation Flow
 

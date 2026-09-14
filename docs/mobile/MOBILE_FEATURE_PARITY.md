@@ -2,6 +2,23 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Invited staff wrongly sent to organization setup
+
+- **Bug:** After accepting any supplier/restaurant team invite (Driver, Manager, etc.), web AuthGuard redirected to `/register/complete` (“set up organization”).
+- **Root cause:** `userNeedsTenantSetup` only checked whether the user’s email was a tenant `contact_email` (owner). Invited members join via `user_workspace_membership` and are never contact_email, so `needsSetup` stayed `true`.
+- **Fix:** `userNeedsTenantSetup` returns `false` when an active workspace membership exists; AuthGuard prefers `needsSetup` over bare `PENDING`; RegisterComplete “already set up” escape goes to `/app`.
+- **Mobile:** skipped — mobile apps do not use `/api/register/status` / RegisterComplete org-setup gate (no `needsSetup` client). API contract change is additive/corrective for web session routing only.
+- Docs: `docs/features/tenant-registration.md`.
+
+## 2026-09-14 — Mobile order crash: permission-gated nav + safe amendment/status render
+
+- **Symptom:** Tapping order-related actions (order detail Receive/Dispute, catalog Cart, quick-list → cart) could hard-close the app when the target stack screen was not registered for the user’s RBAC, or when amendment `change_type` / order `status` was null.
+- **Fix (both `supplify-mobile` and `supplify-mobile-ios`):**
+  - Gate Cart / Receive / CreateDispute UI and navigation with the same permissions used to register those screens (`ORDERS_CREATE`, `RECEIVING_*`, `ORDERS_MANAGE`).
+  - Harden amendment labels (`change_type` / `changeType` fallback) on restaurant and supplier order detail.
+  - Null-safe `StatusPill` / `statusTone` / `prettyStatus` and supplier order search status filter.
+- **Mobile:** implemented in both repos. No ERP API contract change.
+
 ## 2026-09-14 — Admin UI i18n (Limits, Health, Audit, Platform settings, Deals filters)
 
 - Wired remaining hard-coded English on `AdminLimitsTab`, `AdminHealthTab`, `AdminAuditTab`, `AdminPlatformSettingsPanel`, and `AdminDealsPanel` clear-filters/empty states to `useTranslation('admin')`; added matching EN/AR keys under `limits.*`, `health.*`, `audit.*`, `platformSettings.*`, `addonKeys.*`, and `common.*`.
