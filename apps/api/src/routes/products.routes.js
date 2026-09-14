@@ -301,6 +301,21 @@ router.get('/', async (req, res) => {
     const restaurantId =
       tenant?.tenantType === 'RESTAURANT' ? await getRestaurantIdForRequest(req) : null
     const userId = req.userData?.id ?? null
+    let requestedSupplierIds = null
+    if (params.supplier) {
+      const { rows: supplierScopeRows } = await query(
+        `SELECT id
+         FROM supplier
+         WHERE COALESCE(organization_id, id) = $1
+           AND COALESCE(is_branch_active, TRUE) = TRUE
+         ORDER BY is_main_branch DESC, created_at ASC, id ASC`,
+        [params.supplier]
+      )
+      // Keep the requested UUID as a no-result sentinel when the public scope
+      // does not exist; never broaden an unknown supplier to the full catalog.
+      requestedSupplierIds = supplierScopeRows.map((row) => row.id)
+      if (!requestedSupplierIds.length) requestedSupplierIds = [params.supplier]
+    }
 
     const whereConditions = []
     const queryParams = []
@@ -384,8 +399,8 @@ router.get('/', async (req, res) => {
 
     // Supplier filter
     if (params.supplier) {
-      whereConditions.push(`p.supplier_id = $${paramIndex}`)
-      queryParams.push(params.supplier)
+      whereConditions.push(`p.supplier_id = ANY($${paramIndex}::uuid[])`)
+      queryParams.push(requestedSupplierIds)
       paramIndex++
     }
 
@@ -394,7 +409,8 @@ router.get('/', async (req, res) => {
       whereConditions.push(`
         NOT EXISTS (
           SELECT 1 FROM supplier_blocklist sb
-          WHERE sb.supplier_id = p.supplier_id
+          JOIN supplier blocked_supplier ON blocked_supplier.id = sb.supplier_id
+          WHERE COALESCE(blocked_supplier.organization_id, blocked_supplier.id) = COALESCE(s.organization_id, s.id)
             AND sb.restaurant_id = $${paramIndex}
         )
       `)
@@ -939,18 +955,25 @@ router.get('/:id', async (req, res) => {
         `
         SELECT 1
         FROM supplier_follow sf
-        WHERE sf.supplier_id = $1
+        JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
+        WHERE COALESCE(followed_supplier.organization_id, followed_supplier.id) =
+              COALESCE(s.organization_id, s.id)
           AND sf.restaurant_id = $2
           AND NOT EXISTS (
             SELECT 1 FROM supplier_blocklist sb
-            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+            JOIN supplier blocked_supplier ON blocked_supplier.id = sb.supplier_id
+            WHERE COALESCE(blocked_supplier.organization_id, blocked_supplier.id) =
+                  COALESCE(s.organization_id, s.id)
+              AND sb.restaurant_id = $2
           )
         UNION
         SELECT 1
         FROM customer_order o
         JOIN order_item oi ON oi.order_id = o.id
+        JOIN supplier historical_supplier ON historical_supplier.id = oi.supplier_id
         WHERE o.restaurant_id = $2
-          AND oi.supplier_id = $1
+          AND COALESCE(historical_supplier.organization_id, historical_supplier.id) =
+              COALESCE(s.organization_id, s.id)
         LIMIT 1
       `,
         [product.supplier_id, restaurantId]

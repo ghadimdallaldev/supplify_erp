@@ -21,7 +21,10 @@ import {
   isFeatureEnabled,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
-import { notifyOrderStatusChange } from '../../services/notification.service.js'
+import {
+  notifyFulfillmentTransfer,
+  notifyOrderStatusChange,
+} from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
   hasActiveSupplierOrderPromotions,
@@ -79,6 +82,21 @@ router.get('/:id/warehouses', async (req, res, next) => {
       })
     }
 
+    if (tenant?.tenantType === 'SUPPLIER') {
+      const { rows: supplierItems } = await query(
+        `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+        [id, tenant.tenantId]
+      )
+      if (!supplierItems.length) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+    }
+
     const assignments = await loadOrderWarehouseAssignments(id)
     res.json({
       ok: true,
@@ -101,17 +119,30 @@ router.get('/:id/warehouses', async (req, res, next) => {
 router.patch(
   '/:id/warehouses/:assignmentId',
   requireRole(['SUPPLIER']),
-  requirePermission('ORDERS_MANAGE'),
+  resolveTenantContext,
+  requirePermission('FULFILLMENT_TRANSFER'),
   async (req, res) => {
     try {
       const orderId = req.params.id
       const assignmentId = req.params.assignmentId
       const newWarehouseId = req.body?.warehouse_id ?? req.body?.warehouseId
+      const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
       if (!newWarehouseId) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: { name: 'VALIDATION_ERROR', message: 'warehouse_id is required' },
+          requestId: req.requestId,
+        })
+      }
+      if (reason.length < 3 || reason.length > 500) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'A transfer reason of 3-500 characters is required',
+          },
           requestId: req.requestId,
         })
       }
@@ -149,6 +180,7 @@ router.patch(
           newWarehouseId,
           supplierId,
           assignedBy: req.userData?.id || 'manual',
+          reason,
         })
       })
 
@@ -160,6 +192,32 @@ router.patch(
           requestId: req.requestId,
         })
       }
+
+      await writeAuditLog(req, {
+        action_type: 'fulfillment.transfer',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: assignment.id,
+        payload_json: {
+          resource_type: 'order_warehouse_assignment',
+          order_id: orderId,
+          assignment_id: assignment.id,
+          warehouse_id: assignment.warehouse_id,
+          reason,
+          assignment_source: 'manual',
+        },
+      })
+      notifyFulfillmentTransfer({
+        orderId,
+        supplierId,
+        assignment,
+        reason,
+      }).catch((notificationError) => {
+        logger.warn('Fulfillment transfer notification failed', {
+          orderId,
+          error: notificationError.message,
+        })
+      })
 
       res.json({
         ok: true,
@@ -184,6 +242,19 @@ router.patch(
           requestId: req.requestId,
         })
       }
+      if (
+        error?.code === 'SUPPLIER_TENANT_MISMATCH' ||
+        error?.code === 'SUPPLIER_ORGANIZATION_MISMATCH' ||
+        error?.code === 'ZONE_INELIGIBLE' ||
+        error?.code === 'FULFILLMENT_NOT_AVAILABLE'
+      ) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message },
+          requestId: req.requestId,
+        })
+      }
       if (String(error?.message || '').includes('Insufficient stock')) {
         return res.status(409).json({
           ok: false,
@@ -205,6 +276,7 @@ router.patch(
 router.post(
   '/:id/warehouses/:assignmentId/dispatch',
   requireRole(['SUPPLIER']),
+  resolveTenantContext,
   requirePermission('ORDERS_MANAGE'),
   async (req, res) => {
     try {

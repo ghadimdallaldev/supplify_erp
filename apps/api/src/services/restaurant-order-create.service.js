@@ -77,12 +77,21 @@ export async function createRestaurantOrdersInTransaction({
       rows: [order],
     } = await q(
       `
-          INSERT INTO customer_order (restaurant_id, currency, status, notes, requested_delivery_date)
-          VALUES ($1, $2, $3, $4, $5::date)
+          INSERT INTO customer_order (
+            restaurant_id, supplier_organization_id, branch_id, delivery_location_snapshot,
+            requested_delivery_method, requested_delivery_time,
+            currency, status, notes, requested_delivery_date
+          )
+          VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::date)
           RETURNING *
         `,
       [
         restaurantId,
+        supplier.organization_id || null,
+        orderData?.branchId || null,
+        orderData?.deliveryLocationSnapshot || null,
+        orderData?.deliveryMethod || null,
+        orderData?.deliveryTime || null,
         orderCurrency,
         orderStatus,
         orderData?.notes || null,

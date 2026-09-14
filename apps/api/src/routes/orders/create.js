@@ -48,6 +48,14 @@ import {
   findOpenQuoteLocksForOrder,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
+import { resolveOrderDeliveryLocation } from '../../services/restaurant-delivery-location.service.js'
+import {
+  claimOrderPlacementKey,
+  completeOrderPlacementKey,
+  hashOrderPlacementPayload,
+  lookupOrderPlacementKey,
+  IdempotencyConflictError,
+} from '../../services/order-placement-idempotency.service.js'
 import {
   assertLineQuantityRules,
   assertSupplierMinimumOrderAmount,
@@ -84,7 +92,7 @@ router.post(
       const orderCreateTimings = {}
       let phaseStart = performance.now()
 
-      const orderData = orderCreateSchema.parse(req.body)
+      let orderData = orderCreateSchema.parse(req.body)
 
       const restaurantId = await getRestaurantIdForRequest(req)
       orderCreateTimings.restaurantLookupMs = elapsedMsSince(phaseStart)
@@ -99,6 +107,34 @@ router.post(
           requestId: req.requestId,
         })
       }
+      const requestedBranchId = orderData.branchId || orderData.branch_id || null
+      const idempotencyKey =
+        req.get('Idempotency-Key') || orderData.idempotencyKey || orderData.idempotency_key || null
+      const normalizedPlacementPayload = { ...orderData, branchId: requestedBranchId }
+      delete normalizedPlacementPayload.branch_id
+      delete normalizedPlacementPayload.idempotencyKey
+      delete normalizedPlacementPayload.idempotency_key
+      const idempotencyHash = hashOrderPlacementPayload(normalizedPlacementPayload)
+      const existingPlacement = await lookupOrderPlacementKey(query, {
+        restaurantId,
+        key: idempotencyKey,
+        requestHash: idempotencyHash,
+      })
+      if (existingPlacement) {
+        return res.status(200).json({
+          ok: true,
+          data: existingPlacement,
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const deliveryLocation = await resolveOrderDeliveryLocation(restaurantId, requestedBranchId)
+      orderData = {
+        ...orderData,
+        branchId: deliveryLocation.branchId,
+        deliveryLocationSnapshot: deliveryLocation.snapshot,
+      }
 
       // Group items by supplier - split into separate orders per supplier
       const orderStatus = orderData.status || 'PLACED'
@@ -112,12 +148,14 @@ router.post(
       SELECT
         p.id,
         p.supplier_id,
+        s.organization_id,
         p.sku,
         p.category_id,
         p.name,
         COALESCE(pis.moq, 1) AS moq,
         COALESCE(pis.order_multiple, 1) AS order_multiple
       FROM product p
+      JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       WHERE p.id = ANY($1)
       `,
@@ -206,6 +244,26 @@ router.post(
       }
 
       // Validate and group items by supplier
+      const tenantIdsByOrganization = new Map()
+      for (const item of orderData.items) {
+        const product = productMap.get(item.productId)
+        if (!product) continue
+        const organizationKey = product.organization_id || product.supplier_id
+        if (!tenantIdsByOrganization.has(organizationKey)) {
+          tenantIdsByOrganization.set(organizationKey, new Set())
+        }
+        tenantIdsByOrganization.get(organizationKey).add(product.supplier_id)
+      }
+      for (const [organizationId, tenantIds] of tenantIdsByOrganization.entries()) {
+        if (tenantIds.size > 1) {
+          const error = new ValidationError(
+            'This basket contains products owned by different supplier branches. Place one compatible supplier-branch basket at a time.'
+          )
+          error.code = 'NO_SINGLE_FULFILLMENT_LOCATION'
+          error.details = { supplierOrganizationId: organizationId }
+          throw error
+        }
+      }
       phaseStart = performance.now()
       const supplierGroups = new Map()
       for (const item of orderData.items) {
@@ -249,7 +307,11 @@ router.post(
           FROM supplier_blocklist sb
           JOIN supplier s ON s.id = sb.supplier_id
           WHERE sb.restaurant_id = $1
-            AND sb.supplier_id = ANY($2::uuid[])
+            AND COALESCE(s.organization_id, s.id) IN (
+              SELECT COALESCE(s2.organization_id, s2.id)
+              FROM supplier s2
+              WHERE s2.id = ANY($2::uuid[])
+            )
           `,
           [restaurantId, cartSupplierIds]
         )
@@ -269,13 +331,17 @@ router.post(
             AND (
               EXISTS (
                 SELECT 1 FROM supplier_follow sf
-                WHERE sf.supplier_id = s.id AND sf.restaurant_id = $1
+                JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
+                WHERE COALESCE(followed_supplier.organization_id, followed_supplier.id) = COALESCE(s.organization_id, s.id)
+                  AND sf.restaurant_id = $1
               )
               OR EXISTS (
                 SELECT 1
                 FROM customer_order o
                 JOIN order_item oi ON oi.order_id = o.id
-                WHERE o.restaurant_id = $1 AND oi.supplier_id = s.id
+                JOIN supplier historical_supplier ON historical_supplier.id = oi.supplier_id
+                WHERE o.restaurant_id = $1
+                  AND COALESCE(historical_supplier.organization_id, historical_supplier.id) = COALESCE(s.organization_id, s.id)
               )
             )
           `,
@@ -348,6 +414,7 @@ router.post(
         if (supplierIds.length) {
           const { rows: supplierRows } = await query(
             `SELECT id, default_warehouse_id, fulfillment_mode, multi_warehouse_enabled, name,
+                    organization_id,
                     minimum_order_amount, last_order_mode, last_order_cutoff_type, last_order_cutoff_time,
                     last_order_cutoff_minutes, last_order_rollover_days, last_order_timezone
              FROM supplier WHERE id = ANY($1::uuid[])`,
@@ -433,8 +500,18 @@ router.post(
 
       phaseStart = performance.now()
       let result
+      let idempotencyReplay = null
       try {
         result = await withTransaction(async (client) => {
+          const idempotencyClaim = await claimOrderPlacementKey(client, {
+            restaurantId,
+            key: idempotencyKey,
+            requestHash: idempotencyHash,
+          })
+          if (idempotencyClaim.replay) {
+            idempotencyReplay = idempotencyClaim.replay
+            return []
+          }
           const txResult = await createRestaurantOrdersInTransaction({
             client,
             restaurantId,
@@ -534,6 +611,11 @@ router.post(
           transactionTiming = txResult
           txPhaseTimings.promotionMs = txResult.timings.promotionMs
           txPhaseTimings.warehouseMs = txResult.timings.warehouseRoutingMs
+          const responseData =
+            txResult.orders.length === 1
+              ? { order: txResult.orders[0] }
+              : { orders: txResult.orders }
+          await completeOrderPlacementKey(client, idempotencyClaim, responseData)
           return txResult.orders
         })
       } catch (txError) {
@@ -563,6 +645,14 @@ router.post(
       }
       orderCreateTimings.orderTransactionMs = elapsedMsSince(phaseStart)
       orderCreateTimings.promotionMs = txPhaseTimings.promotionMs
+      if (idempotencyReplay) {
+        return res.status(200).json({
+          ok: true,
+          data: idempotencyReplay,
+          error: null,
+          requestId: req.requestId,
+        })
+      }
       orderCreateTimings.warehouseMs = txPhaseTimings.warehouseMs
 
       if (transactionTiming) {
@@ -610,6 +700,16 @@ router.post(
               resource_type: 'order',
               total_amount: order.total_amount,
               promotion: order.appliedPromotion || null,
+              supplier_organization_id: order.supplier_organization_id || null,
+              branch_id: order.branch_id || null,
+              delivery_location_snapshot: order.delivery_location_snapshot || null,
+              fulfillment_assignment: order.warehouseFulfillment
+                ? {
+                    warehouse_id: order.warehouseFulfillment.warehouseId,
+                    supplier_tenant_id: order.warehouseFulfillment.supplierTenantId || null,
+                    reason: order.warehouseFulfillment.reason || null,
+                  }
+                : null,
             },
           })
         }
@@ -685,13 +785,23 @@ router.post(
         })
       }
 
+      if (error instanceof IdempotencyConflictError) {
+        return res.status(error.status || 409).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message },
+          requestId: req.requestId,
+        })
+      }
+
       if (error instanceof ValidationError) {
-        return res.status(400).json({
+        return res.status(error.status || 400).json({
           ok: false,
           data: null,
           error: {
-            name: 'VALIDATION_ERROR',
+            name: error.code || 'VALIDATION_ERROR',
             message: error.message,
+            details: error.details,
           },
           requestId: req.requestId,
         })
@@ -721,7 +831,7 @@ router.post(
   requirePermission('ORDERS_CREATE'),
   async (req, res) => {
     try {
-      const orderData = supplierOrderCreateSchema.parse(req.body)
+      let orderData = supplierOrderCreateSchema.parse(req.body)
 
       const supplierId = await getSupplierIdForRequest(req)
 
@@ -735,6 +845,45 @@ router.post(
           },
           requestId: req.requestId,
         })
+      }
+      const requestedBranchId = orderData.branchId || orderData.branch_id || null
+      const idempotencyKey =
+        req.get('Idempotency-Key') || orderData.idempotencyKey || orderData.idempotency_key || null
+      const normalizedPlacementPayload = { ...orderData, branchId: requestedBranchId }
+      delete normalizedPlacementPayload.branch_id
+      delete normalizedPlacementPayload.idempotencyKey
+      delete normalizedPlacementPayload.idempotency_key
+      const idempotencyHash = hashOrderPlacementPayload(normalizedPlacementPayload)
+      const existingPlacement = await lookupOrderPlacementKey(query, {
+        restaurantId: orderData.restaurant_id,
+        key: idempotencyKey,
+        requestHash: idempotencyHash,
+      })
+      if (existingPlacement) {
+        return res.status(200).json({
+          ok: true,
+          data: existingPlacement,
+          error: null,
+          requestId: req.requestId,
+        })
+      }
+
+      const deliveryLocation = await resolveOrderDeliveryLocation(
+        orderData.restaurant_id,
+        requestedBranchId
+      )
+      orderData = {
+        ...orderData,
+        branchId: deliveryLocation.branchId,
+        deliveryLocationSnapshot: deliveryLocation.snapshot,
+      }
+
+      const { rows: supplierProfiles } = await query(`SELECT * FROM supplier WHERE id = $1`, [
+        supplierId,
+      ])
+      const supplierProfile = supplierProfiles[0]
+      if (!supplierProfile) {
+        throw new ValidationError('Supplier record not found for user')
       }
 
       // Verify restaurant is an eligible customer (follows supplier or has ordered before)
@@ -792,7 +941,18 @@ router.post(
       const quoteLocks = [...lockByProductId.values()]
 
       // Create order with transaction
+      let idempotencyReplay = null
       const result = await withTransaction(async (client) => {
+        const idempotencyClaim = await claimOrderPlacementKey(client, {
+          restaurantId: orderData.restaurant_id,
+          key: idempotencyKey,
+          requestHash: idempotencyHash,
+        })
+        if (idempotencyClaim.replay) {
+          idempotencyReplay = idempotencyClaim.replay
+          return null
+        }
+
         const manualResolveItems = orderData.items.map((item) => ({
           productId: item.productId,
           supplierId,
@@ -860,11 +1020,25 @@ router.post(
           rows: [order],
         } = await client.query(
           `
-        INSERT INTO customer_order (restaurant_id, currency, status, notes)
-        VALUES ($1, $2, 'PLACED', $3)
+        INSERT INTO customer_order (
+          restaurant_id, supplier_organization_id, branch_id, delivery_location_snapshot,
+          requested_delivery_method, requested_delivery_time,
+          currency, status, notes, requested_delivery_date
+        )
+        VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'PLACED', $8, $9::date)
         RETURNING *
       `,
-          [orderData.restaurant_id, orderCurrency, orderData.notes || null]
+          [
+            orderData.restaurant_id,
+            supplierProfile.organization_id || null,
+            orderData.branchId || null,
+            orderData.deliveryLocationSnapshot || null,
+            orderData.deliveryMethod || null,
+            orderData.deliveryTime || null,
+            orderCurrency,
+            orderData.notes || null,
+            orderData.deliveryDate || null,
+          ]
         )
 
         let totalAmount = 0
@@ -934,16 +1108,14 @@ router.post(
         SET total_amount = $1, placed_at = now()
         WHERE id = $2
       `,
+
           [totalAmount, order.id]
         )
 
-        const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
-          supplierId,
-        ])
         const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
         const reserved = await reserveStockForPlacedOrder(client, {
           supplierId,
-          supplier: supplierRows[0] || { id: supplierId },
+          supplier: supplierProfile,
           order: { ...order, restaurant_id: order.restaurant_id },
           orderItems,
           multiWarehouseActive: multiActive,
@@ -956,18 +1128,30 @@ router.post(
           reserveLegacy: true,
         })
 
-        return {
+        const createdOrder = {
           ...order,
           total_amount: totalAmount,
           items: orderItems,
           warehouseFulfillment: reserved.fulfillment,
           stockMode: reserved.mode,
         }
+        await completeOrderPlacementKey(client, idempotencyClaim, { order: createdOrder })
+        return createdOrder
       })
+
+      if (idempotencyReplay) {
+        return res.status(200).json({
+          ok: true,
+          data: idempotencyReplay,
+          error: null,
+          requestId: req.requestId,
+        })
+      }
 
       logger.info('Manual order created by supplier', {
         orderId: result.id,
         restaurantId: result.restaurant_id,
+
         totalAmount: result.total_amount,
         itemCount: result.items.length,
         actor: req.userData.id,
@@ -998,6 +1182,27 @@ router.post(
             name: 'VALIDATION_ERROR',
             message: 'Invalid order data',
             details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof IdempotencyConflictError) {
+        return res.status(error.status || 409).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message },
+          requestId: req.requestId,
+        })
+      }
+
+      if (error instanceof ValidationError) {
+        return res.status(error.status || 400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: error.code || 'VALIDATION_ERROR',
+            message: error.message,
+            details: error.details,
           },
           requestId: req.requestId,
         })

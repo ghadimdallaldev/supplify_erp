@@ -74,12 +74,12 @@ export const warehousesApi = api.injectEndpoints({
     }),
     reassignOrderWarehouse: builder.mutation<
       { assignment: any },
-      { orderId: string; assignmentId: string; warehouseId: string }
+      { orderId: string; assignmentId: string; warehouseId: string; reason: string }
     >({
-      query: ({ orderId, assignmentId, warehouseId }) => ({
+      query: ({ orderId, assignmentId, warehouseId, reason }) => ({
         url: `/api/orders/${orderId}/warehouses/${assignmentId}`,
         method: 'PATCH',
-        body: { warehouse_id: warehouseId },
+        body: { warehouse_id: warehouseId, reason },
       }),
       invalidatesTags: ['Inventory', 'Order'],
     }),

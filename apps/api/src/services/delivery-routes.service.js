@@ -1,6 +1,12 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError, ForbiddenError } from '../middlewares/errorHandler.js'
-import { assertSupplierOwnsOrder, updateDeliveryStatus } from './driver-fulfillment.service.js'
+import {
+  assertSupplierOwnsOrder,
+  updateDeliveryStatus,
+  listActiveDriverAssignments,
+  runDeliveryPostCommitEffects,
+  DRIVER_STATUS_TRANSITIONS,
+} from './driver-fulfillment.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 import { getLatestLocationsForDrivers } from './driver-location.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
@@ -823,77 +829,138 @@ const STOP_TO_ASSIGNMENT = {
   FAILED: 'failed',
 }
 
+const TERMINAL_STOP_DB_STATUSES = new Set(['COMPLETED', 'FAILED'])
+
+/**
+ * Advance a route stop (and its linked driver assignment legs) as one atomic operation.
+ * Assignment updates, stop mutation, and optional route completion share one transaction;
+ * notifications / cache invalidation run only after commit.
+ */
 export async function updateRouteStop(
   supplierId,
   routeId,
   stopId,
   { status, notes, failureReason, userId, permissions }
 ) {
-  const route = await getDeliveryRoute(supplierId, routeId)
-  const stop = route.stops.find((s) => s.id === stopId)
-  if (!stop) throw new NotFoundError('Stop not found')
-
   const dbStatus = status ? mapStopStatusIn(status) : null
   if (dbStatus && !['PLANNED', 'IN_TRANSIT', 'COMPLETED', 'FAILED'].includes(dbStatus)) {
     throw new ValidationError('Invalid stop status')
   }
 
-  if (dbStatus) {
-    const assignmentStatus = STOP_TO_ASSIGNMENT[status]
-    if (assignmentStatus) {
-      const { listActiveDriverAssignments } = await import('./driver-fulfillment.service.js')
-      const activeAssignments = await listActiveDriverAssignments(stop.orderId)
-      // Multi-WH: one route stop may map to several driver legs — update each explicitly.
-      const targets = activeAssignments.length ? activeAssignments : [{ id: null, status: null }]
+  const postCommitEffects = []
 
-      for (const assignment of targets) {
-        if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
+  await withTransaction(async (client) => {
+    const { rows: routeRows } = await client.query(
+      `SELECT id, status FROM delivery_route
+       WHERE id = $1 AND supplier_id = $2
+       FOR UPDATE`,
+      [routeId, supplierId]
+    )
+    if (!routeRows.length) throw new NotFoundError('Route not found')
+    const routeRow = routeRows[0]
+
+    const { rows: stopRows } = await client.query(
+      `SELECT id, order_id, status, notes FROM route_stop
+       WHERE id = $1 AND route_id = $2
+       FOR UPDATE`,
+      [stopId, routeId]
+    )
+    if (!stopRows.length) throw new NotFoundError('Stop not found')
+    const stopRow = stopRows[0]
+    const orderId = stopRow.order_id
+
+    if (dbStatus) {
+      const assignmentStatus = STOP_TO_ASSIGNMENT[status]
+      if (assignmentStatus) {
+        const activeAssignments = await listActiveDriverAssignments(orderId, {
+          client,
+          forUpdate: true,
+        })
+        // Multi-WH: one route stop may map to several driver legs — update each explicitly.
+        const targets = activeAssignments.length ? activeAssignments : [{ id: null, status: null }]
+
+        // Validate every leg's transition before mutating any, so failures are predictable.
+        for (const assignment of targets) {
+          if (!assignment?.id) continue
+          const hops = []
+          if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
+            hops.push('picked_up')
+          }
+          hops.push(assignmentStatus)
+          let fromStatus = assignment.status
+          for (const toStatus of hops) {
+            if (fromStatus === toStatus) continue
+            const allowed = DRIVER_STATUS_TRANSITIONS[fromStatus] ?? []
+            if (!allowed.includes(toStatus)) {
+              throw new ValidationError(`Cannot transition from ${fromStatus} to ${toStatus}`)
+            }
+            fromStatus = toStatus
+          }
+        }
+
+        for (const assignment of targets) {
+          if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
+            await updateDeliveryStatus({
+              supplierId,
+              orderId,
+              status: 'picked_up',
+              notes,
+              userId,
+              driverAssignmentId: assignment.id,
+              client,
+              postCommitEffects,
+            })
+          }
           await updateDeliveryStatus({
             supplierId,
-            orderId: stop.orderId,
-            status: 'picked_up',
+            orderId,
+            status: assignmentStatus,
             notes,
+            failureReason,
             userId,
             driverAssignmentId: assignment.id,
+            client,
+            postCommitEffects,
           })
         }
-        await updateDeliveryStatus({
-          supplierId,
-          orderId: stop.orderId,
-          status: assignmentStatus,
-          notes,
-          failureReason,
-          userId,
-          driverAssignmentId: assignment.id,
-        })
       }
     }
-  }
 
-  if (notes !== undefined || dbStatus) {
-    await query(
+    if (notes !== undefined || dbStatus) {
       // IN_TRANSIT is a departure, not an arrival — record it in departed_at so
-      // actual_arrival stays comparable to estimated_arrival.
-      `UPDATE route_stop SET
-         status = COALESCE($1, status),
-         notes = COALESCE($2, notes),
-         completed_at = CASE WHEN $1 = 'COMPLETED' THEN now() ELSE completed_at END,
-         departed_at = CASE WHEN $1 = 'IN_TRANSIT' THEN COALESCE(departed_at, now()) ELSE departed_at END,
-         actual_arrival = CASE WHEN $1 = 'COMPLETED' THEN COALESCE(actual_arrival, now()) ELSE actual_arrival END
-       WHERE id = $3 AND route_id = $4`,
-      [dbStatus, notes ?? null, stopId, routeId]
-    )
-  }
+      // actual_arrival stays comparable to estimated_arrival. Row is locked above.
+      await client.query(
+        `UPDATE route_stop SET
+           status = COALESCE($1, status),
+           notes = COALESCE($2, notes),
+           completed_at = CASE WHEN $1 = 'COMPLETED' THEN now() ELSE completed_at END,
+           departed_at = CASE WHEN $1 = 'IN_TRANSIT' THEN COALESCE(departed_at, now()) ELSE departed_at END,
+           actual_arrival = CASE WHEN $1 = 'COMPLETED' THEN COALESCE(actual_arrival, now()) ELSE actual_arrival END
+         WHERE id = $3 AND route_id = $4`,
+        [dbStatus, notes ?? null, stopId, routeId]
+      )
+    }
 
-  const updated = await getDeliveryRoute(supplierId, routeId)
+    if (dbStatus && TERMINAL_STOP_DB_STATUSES.has(dbStatus) && routeRow.status === 'IN_PROGRESS') {
+      const { rows: siblingStops } = await client.query(
+        `SELECT status FROM route_stop WHERE route_id = $1`,
+        [routeId]
+      )
+      const allDone = siblingStops.every((s) => TERMINAL_STOP_DB_STATUSES.has(s.status))
+      if (allDone) {
+        await client.query(
+          `UPDATE delivery_route
+           SET status = 'COMPLETED', completed_at = now(), updated_at = now()
+           WHERE id = $1 AND supplier_id = $2 AND status = 'IN_PROGRESS'`,
+          [routeId, supplierId]
+        )
+      }
+    }
+  })
 
-  const allDone = updated.stops.every((s) => ['DELIVERED', 'FAILED'].includes(s.status))
-  if (allDone && updated.status === 'IN_PROGRESS') {
-    await updateDeliveryRoute(supplierId, routeId, { status: 'COMPLETED' })
-    return getDeliveryRoute(supplierId, routeId)
-  }
-
-  return updated
+  await runDeliveryPostCommitEffects(postCommitEffects)
+  await invalidateDispatchCacheForSupplier(supplierId)
+  return getDeliveryRoute(supplierId, routeId)
 }
 
 export async function cancelDeliveryRoute(supplierId, routeId) {

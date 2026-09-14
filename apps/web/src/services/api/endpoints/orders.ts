@@ -57,7 +57,11 @@ export const ordersApi = api.injectEndpoints({
       query: (body) => ({
         url: '/api/orders',
         method: 'POST',
-        body,
+        body: (() => {
+          const { idempotencyKey: _idempotencyKey, ...requestBody } = body
+          return requestBody
+        })(),
+        ...(body.idempotencyKey ? { headers: { 'Idempotency-Key': body.idempotencyKey } } : {}),
       }),
       invalidatesTags: ['Order'],
     }),
@@ -65,7 +69,11 @@ export const ordersApi = api.injectEndpoints({
       query: (body) => ({
         url: '/api/orders/manual',
         method: 'POST',
-        body,
+        body: (() => {
+          const { idempotencyKey: _idempotencyKey, ...requestBody } = body
+          return requestBody
+        })(),
+        ...(body.idempotencyKey ? { headers: { 'Idempotency-Key': body.idempotencyKey } } : {}),
       }),
       invalidatesTags: ['Order'],
     }),

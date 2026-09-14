@@ -39,6 +39,7 @@ import {
   supplierUpdateSchema,
   supplierListSchema,
 } from './suppliers.helpers.js'
+import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
 
 const router = express.Router()
 
@@ -59,13 +60,16 @@ router.get(
 
       const { rows } = await query(
         `
-      SELECT 
+      SELECT DISTINCT ON (COALESCE(s.organization_id, s.id))
         s.*,
+        COALESCE(so.id, s.id) AS supplier_organization_id,
+        COALESCE(so.name, s.name) AS organization_name,
         sf.created_at as followed_at
       FROM supplier s
       JOIN supplier_follow sf ON sf.supplier_id = s.id
+      LEFT JOIN supplier_organizations so ON so.id = s.organization_id
       WHERE sf.restaurant_id = $1
-      ORDER BY sf.created_at DESC
+      ORDER BY COALESCE(s.organization_id, s.id), sf.created_at DESC
     `,
         [restaurantId]
       )
@@ -106,11 +110,12 @@ router.post(
         throw new ValidationError('Restaurant not found')
       }
       const restaurantId = tenant.tenantId
+      const supplierScope = await resolveSupplierScope(id)
 
       // Check if already followed
       const { rows: existing } = await query(
-        'SELECT * FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2',
-        [id, restaurantId]
+        'SELECT * FROM supplier_follow WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
+        [supplierScope.supplierIds, restaurantId]
       )
 
       if (existing.length > 0) {
@@ -160,7 +165,7 @@ router.post(
       }
 
       await query('INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)', [
-        id,
+        supplierScope.tenantId,
         restaurantId,
       ])
 
@@ -211,11 +216,12 @@ router.delete(
         throw new ValidationError('Restaurant not found')
       }
       const restaurantId = tenant.tenantId
+      const supplierScope = await resolveSupplierScope(id)
 
-      await query('DELETE FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2', [
-        id,
-        restaurantId,
-      ])
+      await query(
+        'DELETE FROM supplier_follow WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
+        [supplierScope.supplierIds, restaurantId]
+      )
 
       logger.info('Supplier unfollowed', { supplierId: id, restaurantId })
 
@@ -255,12 +261,13 @@ router.post(
         throw new ValidationError('Restaurant not found')
       }
       const restaurantId = tenant.tenantId
+      const supplierScope = await resolveSupplierScope(id)
       const { reason } = req.body
 
       // Check if already blocked
       const { rows: existing } = await query(
-        'SELECT * FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2',
-        [id, restaurantId]
+        'SELECT * FROM supplier_blocklist WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
+        [supplierScope.supplierIds, restaurantId]
       )
 
       if (existing.length > 0) {
@@ -277,7 +284,7 @@ router.post(
 
       await query(
         'INSERT INTO supplier_blocklist (supplier_id, restaurant_id, reason) VALUES ($1, $2, $3)',
-        [id, restaurantId, reason || null]
+        [supplierScope.tenantId, restaurantId, reason || null]
       )
 
       logger.info('Supplier blocked', { supplierId: id, restaurantId, reason })
@@ -317,11 +324,12 @@ router.delete(
         throw new ValidationError('Restaurant not found')
       }
       const restaurantId = tenant.tenantId
+      const supplierScope = await resolveSupplierScope(id)
 
-      await query('DELETE FROM supplier_blocklist WHERE supplier_id = $1 AND restaurant_id = $2', [
-        id,
-        restaurantId,
-      ])
+      await query(
+        'DELETE FROM supplier_blocklist WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
+        [supplierScope.supplierIds, restaurantId]
+      )
 
       logger.info('Supplier unblocked', { supplierId: id, restaurantId })
 

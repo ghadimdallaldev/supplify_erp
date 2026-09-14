@@ -3,6 +3,7 @@ import {
   useCreateOrderMutation,
   useGetActivePromotionsQuery,
   useGetEntitlementsQuery,
+  useGetRestaurantDeliveryLocationsQuery,
   useResolveContractPricesMutation,
 } from '../services/api'
 import { updateItemResolvedPrice } from '../features/cart/cartSlice'
@@ -101,6 +102,7 @@ export function CartPage() {
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
   const [createOrder] = useCreateOrderMutation()
   const [resolveContractPrices] = useResolveContractPricesMutation()
+  const { data: deliveryLocations } = useGetRestaurantDeliveryLocationsQuery()
   const ownerEmail = user?.email ?? null
 
   // Draft management
@@ -112,8 +114,26 @@ export function CartPage() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [selectedBranchId, setSelectedBranchId] = useState('')
+  const placementKeyRef = useRef<string | null>(null)
   const [couponCode, setCouponCode] = useState(searchParams.get('coupon') || '')
   const [promotionId, setPromotionId] = useState(searchParams.get('dealId') || '')
+  const deliveryBranches = useMemo(
+    () => deliveryLocations?.branches ?? [],
+    [deliveryLocations?.branches]
+  )
+
+  useEffect(() => {
+    if (deliveryBranches.length === 1) {
+      setSelectedBranchId((current) => current || deliveryBranches[0].id)
+    } else if (deliveryBranches.length > 1) {
+      setSelectedBranchId((current) =>
+        deliveryBranches.some((branch) => branch.id === current) ? current : ''
+      )
+    } else {
+      setSelectedBranchId('')
+    }
+  }, [deliveryBranches])
 
   useEffect(() => {
     const c = searchParams.get('coupon')
@@ -262,9 +282,22 @@ export function CartPage() {
       })
       return
     }
+    if (deliveryBranches.length > 1 && !selectedBranchId) {
+      toast.error(
+        t('toast.deliveryLocationRequired', {
+          defaultValue: 'Choose a delivery location before placing the order.',
+        })
+      )
+      return
+    }
 
     setIsPlacingOrder(true)
     try {
+      const placementKey =
+        placementKeyRef.current ||
+        globalThis.crypto?.randomUUID?.() ||
+        'web-order-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+      placementKeyRef.current = placementKey
       const items = groups.flatMap((group) =>
         group.items.map((item) => ({
           productId: item.productId,
@@ -287,6 +320,8 @@ export function CartPage() {
         quoteLocks: quoteLocks.length ? quoteLocks : undefined,
         deliveryDate: deliveryDate || undefined,
         notes: deliveryNotes || undefined,
+        branchId: selectedBranchId || undefined,
+        idempotencyKey: placementKey,
         couponCode: canRedeemDeals ? couponCode.trim() || undefined : undefined,
         promotionId: canRedeemDeals ? promotionId || undefined : undefined,
       }).unwrap()
@@ -295,6 +330,8 @@ export function CartPage() {
       setShowOrderDetails(false)
       setDeliveryDate('')
       setDeliveryNotes('')
+      setSelectedBranchId('')
+      placementKeyRef.current = null
       if (supplierOrderCount > 1) {
         toast.success(t('toast.ordersPlaced', { count: supplierOrderCount }))
         navigate('/app/orders')
@@ -780,6 +817,38 @@ export function CartPage() {
                     <span>{t('page.combinedTotal')}</span>
                     <span>${formatPrice(checkoutTotal)}</span>
                   </div>
+                </div>
+              )}
+              {deliveryBranches.length > 1 && (
+                <div className="space-y-2">
+                  <Label htmlFor="delivery-location">
+                    {t('page.deliveryLocation', { defaultValue: 'Delivery location' })}
+                  </Label>
+                  <select
+                    id="delivery-location"
+                    className="w-full rounded-md border border-[var(--app-border)] bg-background px-3 py-2 text-sm"
+                    value={selectedBranchId}
+                    onChange={(event) => setSelectedBranchId(event.target.value)}
+                  >
+                    <option value="">
+                      {t('page.chooseDeliveryLocation', {
+                        defaultValue: 'Choose a delivery location',
+                      })}
+                    </option>
+                    {deliveryBranches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                        {branch.code ? ' (' + branch.code + ')' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedBranchId && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {t('page.deliveryLocationRequired', {
+                        defaultValue: 'A delivery location is required.',
+                      })}
+                    </p>
+                  )}
                 </div>
               )}
               <div className="space-y-2">

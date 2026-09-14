@@ -90,7 +90,7 @@ router.get('/', optionalAuth, async (req, res) => {
           whereConditions.push(`
             NOT EXISTS (
               SELECT 1 FROM supplier_blocklist sb
-              WHERE sb.supplier_id = s.id AND sb.restaurant_id = $${paramIndex}
+              WHERE sb.supplier_id = ANY(scope.supplier_ids) AND sb.restaurant_id = $${paramIndex}
             )
           `)
           queryParams.push(restaurantId)
@@ -109,10 +109,28 @@ router.get('/', optionalAuth, async (req, res) => {
 
     // Build the SELECT with joined aggregates (no per-row correlated subqueries)
     let sql = `
-      SELECT 
+      WITH supplier_scopes AS (
+        SELECT
+          COALESCE(s0.organization_id, s0.id) AS public_id,
+          ARRAY_AGG(
+            s0.id
+            ORDER BY
+              COALESCE(s0.is_branch_active, TRUE) DESC,
+              s0.is_main_branch DESC,
+              s0.created_at ASC,
+              s0.id ASC
+          ) AS supplier_ids
+        FROM supplier s0
+        WHERE COALESCE(s0.is_branch_active, TRUE) = TRUE
+        GROUP BY COALESCE(s0.organization_id, s0.id)
+      )
+      SELECT
         s.*,
-        COALESCE(stats.product_count, 0) as product_count,
-        COALESCE(stats.avg_price, 0) as avg_price
+        scope.public_id AS supplier_organization_id,
+        COALESCE(so.name, s.name) AS organization_name,
+        scope.supplier_ids,
+        COALESCE(stats.product_count, 0) AS product_count,
+        COALESCE(stats.avg_price, 0) AS avg_price
     `
 
     // Add follow status check for restaurants
@@ -120,7 +138,7 @@ router.get('/', optionalAuth, async (req, res) => {
       sql += `,
         EXISTS (
           SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = s.id 
+          WHERE sf.supplier_id = ANY(scope.supplier_ids)
             AND sf.restaurant_id = $${paramIndex}
         ) as is_followed`
       queryParams.push(restaurantId)
@@ -133,7 +151,9 @@ router.get('/', optionalAuth, async (req, res) => {
         (feat.is_featured IS TRUE) as is_featured`
 
     sql += `
-      FROM supplier s
+      FROM supplier_scopes scope
+      JOIN supplier s ON s.id = scope.supplier_ids[1]
+      LEFT JOIN supplier_organizations so ON so.id = s.organization_id
       LEFT JOIN LATERAL (
         SELECT
           COUNT(DISTINCT p.id)::int AS product_count,
@@ -141,19 +161,19 @@ router.get('/', optionalAuth, async (req, res) => {
         FROM product p
         LEFT JOIN price pr ON pr.product_id = p.id
           AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
-        WHERE p.supplier_id = s.id
+        WHERE p.supplier_id = ANY(scope.supplier_ids)
       ) stats ON true
       LEFT JOIN LATERAL (
         SELECT TRUE AS is_featured
         FROM supplier_featured_placements fp
-        WHERE fp.supplier_id = s.id
+        WHERE fp.supplier_id = ANY(scope.supplier_ids)
           AND fp.status = 'active'
           AND fp.starts_at <= NOW()
           AND fp.ends_at > NOW()
         LIMIT 1
       ) feat ON true
       ${whereClause}
-      ORDER BY (feat.is_featured IS TRUE) DESC, s.created_at DESC
+      ORDER BY (feat.is_featured IS TRUE) DESC, scope.public_id, s.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
@@ -169,6 +189,11 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const suppliersWithReviews = await attachReviewFields(rows)
     const suppliersWithDeals = await attachStoreDealFields(suppliersWithReviews, { restaurantId })
+    const publicSuppliers = suppliersWithDeals.map(({ supplier_ids, ...supplier }) => ({
+      ...supplier,
+      id: supplier.supplier_organization_id || supplier.id,
+      tenant_id: supplier.id,
+    }))
 
     // Get total count
     // Build count params separately - exclude is_followed param and limit/offset
@@ -190,7 +215,20 @@ router.get('/', optionalAuth, async (req, res) => {
       countParams.push(restaurantId)
     }
 
-    const countSql = `SELECT COUNT(*) as total FROM supplier s ${whereClause}`
+    const countSql = `
+      WITH supplier_scopes AS (
+        SELECT COALESCE(s0.organization_id, s0.id) AS public_id,
+               ARRAY_AGG(s0.id) AS supplier_ids
+        FROM supplier s0
+        WHERE COALESCE(s0.is_branch_active, TRUE) = TRUE
+        GROUP BY COALESCE(s0.organization_id, s0.id)
+      )
+      SELECT COUNT(*) AS total
+      FROM supplier_scopes scope
+      JOIN supplier s ON s.id = scope.supplier_ids[1]
+      LEFT JOIN supplier_organizations so ON so.id = s.organization_id
+      ${whereClause}
+    `
     const { rows: countRows } = await query(countSql, countParams)
 
     logEvent(log, 'info', 'supplier.list', {
@@ -205,7 +243,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json({
       ok: true,
       data: {
-        suppliers: suppliersWithDeals,
+        suppliers: publicSuppliers,
         pagination: {
           total: parseInt(countRows[0].total),
           limit: params.limit,

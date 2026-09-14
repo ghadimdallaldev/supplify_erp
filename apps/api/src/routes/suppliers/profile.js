@@ -21,8 +21,6 @@ import { restaurantSupplierMutationGuard } from '../../lib/route-permissions.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../../lib/safe-update.js'
 import {
-  getSupplierRatingSummary,
-  getRecentReviewsForSupplier,
   getSupplierRatingSummariesBatch,
   getRecentReviewsForSuppliersBatch,
 } from '../../services/reviews.service.js'
@@ -56,6 +54,7 @@ import {
   brandingUpdateSchema,
   multiWarehouseFeature,
 } from './suppliers.helpers.js'
+import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
 
 const router = express.Router()
 
@@ -645,6 +644,8 @@ router.get(
       }
 
       // Calculate statistics from orders (exclude drafts/cancels; spend = delivered only)
+      const supplierScope = await resolveSupplierScope(supplierId)
+
       const { rows: orderStats } = await query(
         `
       SELECT 
@@ -660,9 +661,9 @@ router.get(
       FROM customer_order o
       INNER JOIN order_item oi ON oi.order_id = o.id
       WHERE o.restaurant_id = $1 
-        AND oi.supplier_id = $2
+        AND oi.supplier_id = ANY($2::uuid[])
     `,
-        [restaurantId, supplierId]
+        [restaurantId, supplierScope.supplierIds]
       )
 
       const totalOrders = parseInt(orderStats[0]?.total_orders || 0)
@@ -713,72 +714,61 @@ async function handleGetSupplierById(req, res) {
   try {
     const { id } = req.params
 
-    // Get restaurant ID for follow status if user is a restaurant
+    // Restaurant-facing supplier IDs are organization IDs after catalog
+    // consolidation. Internal supplier users retain exact tenant access.
     let restaurantId = null
     if (req.userData && req.userData.role === 'RESTAURANT') {
       restaurantId = await getRestaurantIdForRequest(req)
     }
 
-    // Build query with product_count and avg_price via LATERAL (match catalog list)
-    let sql = `
-      SELECT 
+    const supplierScope = restaurantId ? await resolveSupplierScope(id) : null
+    const supplierIds = supplierScope?.supplierIds?.length
+      ? supplierScope.supplierIds
+      : [supplierScope?.tenantId || id]
+    const relationshipFields = restaurantId
+      ? [
+          ',',
+          '        EXISTS (',
+          '          SELECT 1 FROM supplier_follow sf',
+          '          WHERE sf.supplier_id = ANY($1::uuid[])',
+          '            AND sf.restaurant_id = $2',
+          '        ) as is_followed,',
+          '        EXISTS (',
+          '          SELECT 1 FROM supplier_blocklist sb',
+          '          WHERE sb.supplier_id = ANY($1::uuid[])',
+          '            AND sb.restaurant_id = $2',
+          '        ) as is_blocked',
+          '      ',
+        ].join('\n')
+      : ', false as is_followed, false as is_blocked'
+    const result = await query(
+      `
+      SELECT
         s.*,
+        COALESCE(so.id, s.id) AS supplier_organization_id,
+        COALESCE(so.name, s.name) AS organization_name,
         COALESCE(stats.product_count, 0) as product_count,
         COALESCE(stats.avg_price, 0) as avg_price
-    `
-
-    // Add follow status if restaurant
-    let rows
-    if (restaurantId) {
-      sql += `,
-        EXISTS (
-          SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = s.id 
-            AND sf.restaurant_id = $2
-        ) as is_followed,
-        EXISTS (
-          SELECT 1 FROM supplier_blocklist sb
-          WHERE sb.supplier_id = s.id
-            AND sb.restaurant_id = $2
-        ) as is_blocked
-      `
-      const result = await query(
-        `${sql}
+        ${relationshipFields}
       FROM supplier s
+      LEFT JOIN supplier_organizations so ON so.id = s.organization_id
       LEFT JOIN LATERAL (
         SELECT
           COUNT(DISTINCT p.id)::int AS product_count,
-          COALESCE(AVG(pr.amount), 0) AS avg_price
+          COALESCE(AVG(pr.amount), 0) as avg_price
         FROM product p
         LEFT JOIN price pr ON pr.product_id = p.id
           AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
-        WHERE p.supplier_id = s.id
+        WHERE p.supplier_id = ANY($1::uuid[])
       ) stats ON true
-      WHERE s.id = $1`,
-        [id, restaurantId]
-      )
-      rows = result.rows
-    } else {
-      sql += `, false as is_followed, false as is_blocked`
-      const result = await query(
-        `${sql}
-      FROM supplier s
-      LEFT JOIN LATERAL (
-        SELECT
-          COUNT(DISTINCT p.id)::int AS product_count,
-          COALESCE(AVG(pr.amount), 0) AS avg_price
-        FROM product p
-        LEFT JOIN price pr ON pr.product_id = p.id
-          AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
-        WHERE p.supplier_id = s.id
-      ) stats ON true
-      WHERE s.id = $1`,
-        [id]
-      )
-      rows = result.rows
-    }
+      WHERE s.id = ANY($1::uuid[])
+      ORDER BY s.is_branch_active DESC, s.is_main_branch DESC, s.created_at ASC, s.id ASC
+      LIMIT 1
+      `,
+      restaurantId ? [supplierIds, restaurantId] : [supplierIds]
+    )
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         ok: false,
         data: null,
@@ -790,14 +780,31 @@ async function handleGetSupplierById(req, res) {
       })
     }
 
-    const supplier = rows[0]
-    const summary = await getSupplierRatingSummary(supplier.id)
-    const recent_reviews = await getRecentReviewsForSupplier(supplier.id, 5)
+    const supplier = result.rows[0]
+    const [summaries, reviewsBySupplier] = await Promise.all([
+      getSupplierRatingSummariesBatch(supplierIds),
+      getRecentReviewsForSuppliersBatch(supplierIds, 5),
+    ])
+    let reviewCount = 0
+    let weightedRating = 0
+    const recentReviews = []
+    for (const supplierId of supplierIds) {
+      const summary = summaries.get(supplierId)
+      const count = Number(summary?.review_count || 0)
+      reviewCount += count
+      weightedRating += Number(summary?.avg_overall || 0) * count
+      recentReviews.push(...(reviewsBySupplier.get(supplierId) || []))
+    }
+    recentReviews.sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    )
     const enriched = {
       ...supplier,
-      avg_overall: Number(summary.avg_overall) || 0,
-      review_count: summary.review_count ?? 0,
-      recent_reviews,
+      id: supplier.supplier_organization_id || supplier.id,
+      tenant_id: supplier.id,
+      avg_overall: reviewCount ? weightedRating / reviewCount : 0,
+      review_count: reviewCount,
+      recent_reviews: recentReviews.slice(0, 5),
     }
 
     // Check access permissions
@@ -832,5 +839,4 @@ async function handleGetSupplierById(req, res) {
     })
   }
 }
-
 export default router

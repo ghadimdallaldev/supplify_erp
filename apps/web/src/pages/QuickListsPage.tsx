@@ -56,6 +56,7 @@ import { PageShell } from '../components/ui/page-shell'
 import { SummaryStrip } from '../components/ui/app-panel'
 import { Skeleton } from '../components/ui/skeleton'
 import { parseDaysOfWeek } from '../utils/parseDaysOfWeek'
+import { cartItemsFromQuickList } from '../lib/quickListCart'
 import {
   LazyQuickListCreateDialog,
   LazyQuickListProductDialog,
@@ -215,34 +216,41 @@ export function QuickListsPage() {
       return
     }
 
-    // If list doesn't have items array, fetch it from API
-    if (!list.items || list.items.length === 0) {
+    let items = Array.isArray(list.items) ? list.items : []
+    // Prefer detail query when open (fresher after edits); still works from list payload.
+    if (
+      selectedListDetails?.id === listId &&
+      Array.isArray(selectedListDetails.items) &&
+      selectedListDetails.items.length > 0
+    ) {
+      items = selectedListDetails.items
+    }
+
+    if (items.length === 0) {
       toast.error(t('quickLists.toastListEmpty'))
       return
     }
 
     try {
-      // Add all items from the quick list to cart
-      for (const item of list.items) {
-        // Fetch product details
-        const product = catalogProducts.find((p: any) => p.id === item.product_id)
-        if (product) {
-          addItem({
-            productId: product.id,
-            product,
-            quantity: parseFloat(item.quantity) || 1,
-          })
-        }
+      // Build cart lines from list-item API fields. Do not rely on catalogProducts —
+      // that query is skipped unless the add-products dialog is open.
+      const cartItems = cartItemsFromQuickList(items, catalogProducts)
+      if (cartItems.length === 0) {
+        toast.error(t('quickLists.toastAddToCartFailed'))
+        return
+      }
+
+      for (const cartItem of cartItems) {
+        addItem(cartItem)
       }
 
       toast.success(
         t('quickLists.toastAddedToCart', {
-          count: list.items?.length || 0,
+          count: cartItems.length,
           name: list.name,
         })
       )
 
-      // Optionally navigate to cart
       setTimeout(() => {
         navigate('/app/cart')
       }, 500)

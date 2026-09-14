@@ -31,9 +31,14 @@ export function OrderItemsTab({ orderId }: OrderItemsTabProps) {
       )}
       <div className="space-y-4">
         {order.items?.map((item: any, idx: number) => {
-          const assignment = ((order as any).warehouseAssignments || []).find(
-            (a: any) => a.order_item_id === item.id
-          )
+          const assignments = ((order as any).warehouseAssignments || []) as Array<{
+            order_item_id?: string | null
+            warehouse_name?: string | null
+            status?: string | null
+          }>
+          const assignment =
+            assignments.find((a) => a.order_item_id === item.id) ||
+            assignments.find((a) => !a.order_item_id)
           return (
             <div
               key={item.id || idx}

@@ -63,6 +63,13 @@
       "supplier": "Driver assigned to order #{{orderId}}"
     },
     "out_for_delivery": {
+      "fulfillment": {
+        "transfer": {
+          "title": "Fulfillment reassigned",
+          "message": "Order #{{orderId}} was reassigned to a new fulfillment location. Reason: {{reason}}",
+          "defaultReason": "operational fulfillment change"
+        }
+      },
       "title": "Out for delivery",
       "restaurant": "Your order #{{orderId}} is out for delivery",
       "supplier": "Order #{{orderId}} is out for delivery"
