@@ -53,10 +53,13 @@ export async function invalidateBillingSubscriptionCache(tenantId, tenantType) {
 }
 
 /**
- * Latest subscription row for tenant (any non-cancelled status).
+ * Latest subscription row for billing access (org main branch when applicable).
+ * Org child Branch Accounts share the main subscription for lock / pending-activation.
  */
 export async function getSubscriptionForBilling(tenantId, tenantType) {
-  const cacheKey = billingSubCacheKey(tenantId, tenantType)
+  const { resolveOrgBillingTenantId } = await import('../org-billing-tenant.js')
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+  const cacheKey = billingSubCacheKey(billingTenantId, tenantType)
   const cached = await getCache(cacheKey)
   if (cached !== null) return cached === 'null' ? null : cached
 
@@ -72,7 +75,7 @@ export async function getSubscriptionForBilling(tenantId, tenantType) {
        AND s.status NOT IN ('CANCELLED')
      ORDER BY s.created_at DESC
      LIMIT 1`,
-      [tenantId, tenantType]
+      [billingTenantId, tenantType]
     )
     const row = rows[0] || null
     await setCache(cacheKey, row ?? 'null', BILLING_SUB_CACHE_TTL_SECONDS).catch(() => {})
@@ -164,7 +167,11 @@ export function buildPlatformAdminBillingStatus(gateways = []) {
 }
 
 export async function getBillingStatus(tenantId, tenantType) {
-  // Subscription (cached), payment methods, and open invoices are all independent Ã¢â‚¬â€ fetch in parallel.
+  // Subscription (cached), payment methods, and open invoices are all independent —
+  // fetch in parallel. Org children resolve billing to the main branch.
+  const { resolveOrgBillingTenantId } = await import('../org-billing-tenant.js')
+  const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
+
   let subscription, paymentMethods, openInvoices, defaultPaymentMethod
   try {
     const [sub, pmRes, invRes] = await Promise.all([
@@ -174,14 +181,14 @@ export async function getBillingStatus(tenantId, tenantType) {
          FROM billing_payment_method
          WHERE tenant_id = $1 AND tenant_type = $2 AND status = 'ACTIVE'
          ORDER BY is_default DESC, created_at DESC`,
-        [tenantId, tenantType]
+        [billingTenantId, tenantType]
       ),
       query(
         `SELECT id, invoice_number, amount, currency, status, due_date, billing_cycle, plan_name, period_start, period_end, created_at
          FROM billing_invoice
          WHERE tenant_id = $1 AND tenant_type = $2 AND status = 'OPEN'
          ORDER BY due_date ASC`,
-        [tenantId, tenantType]
+        [billingTenantId, tenantType]
       ),
     ])
     subscription = sub
@@ -197,7 +204,7 @@ export async function getBillingStatus(tenantId, tenantType) {
   }
 
   const access = computeBillingAccessState(subscription)
-  const activeAddons = subscription ? await getActiveTenantAddons(tenantId, tenantType) : []
+  const activeAddons = subscription ? await getActiveTenantAddons(billingTenantId, tenantType) : []
   const recurringTotal = subscription
     ? calculateRecurringSubscriptionTotal(
         {
@@ -244,6 +251,8 @@ export async function getBillingStatus(tenantId, tenantType) {
     })),
     gracePeriodDays: GRACE_PERIOD_DAYS,
     availableGateways: [process.env.BILLING_GATEWAY || 'stub'],
+    billingTenantId,
+    usesOrgBilling: billingTenantId !== tenantId,
   }
 }
 

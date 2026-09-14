@@ -131,12 +131,20 @@ export function Layout() {
         isImpersonating,
         pathname: location.pathname,
         access: billingStatus?.access,
+        usesOrgBilling: Boolean(billingStatus?.usesOrgBilling),
       })
     ) {
       return
     }
     navigate('/app/activate', { replace: true })
-  }, [isPlatformAdmin, isImpersonating, billingStatus?.access, location.pathname, navigate])
+  }, [
+    isPlatformAdmin,
+    isImpersonating,
+    billingStatus?.access,
+    billingStatus?.usesOrgBilling,
+    location.pathname,
+    navigate,
+  ])
   const blockedCountLast7d = useAppSelector((state) => state.monetization.blockedCountLast7d)
   const recentBlockedSummary = useAppSelector((state) => state.monetization.recentBlockedSummary)
 
