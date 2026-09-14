@@ -111,7 +111,7 @@ End-to-end onboarding for a **supplier** tenant: from first login through catalo
 | **Navigation path**      | `/app/settings` → **Team & roles** (`?tab=team`)                                                                                                            |
 | **Required data**        | Invitee email, role (system or custom), optional name.                                                                                                      |
 | **Expected result**      | Invite email sent; invitee accepts at `/invite?token=…&type=…` → `POST /api/invites/accept`; user bound to org workspace.                                   |
-| **Possible errors**      | Seat/role limits on plan; email mismatch on invite accept; expired token.                                                                                   |
+| **Possible errors**      | Seat/role limits on plan; email mismatch on invite accept; expired token. Team invites are **not** gated by `multi_branch`.                                 |
 | **Validation checklist** | [ ] Invite link opens `/invite`. [ ] New member sees sidebar scoped to permissions. [ ] Driver role only sees **My Deliveries** (`/app/driver-deliveries`). |
 
 **API:** Invite validate/accept routes; org role assignment via tenant RBAC.

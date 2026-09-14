@@ -35,6 +35,10 @@ vi.mock('../lib/dispatch-cache.js', () => ({
   invalidateDispatchCacheForSupplier: vi.fn(),
 }))
 
+vi.mock('../lib/pod-requirement.js', () => ({
+  assertPodPresentWhenRequired: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { query, withTransaction } from '../lib/db.js'
 import {
   updateDeliveryStatus,
@@ -67,11 +71,11 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE driver_assignments
+      .mockResolvedValueOnce({ rows: [] }) // warehouse lookup (no WH assignment)
+      .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] }) // order status
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE customer_order DELIVERED
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE order_warehouse_assignment
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'delivered', driver_name: 'Ali' }],
       })
@@ -101,6 +105,35 @@ describe('driver-fulfillment.service', () => {
       expect.objectContaining({ id: 'order-1' }),
       'DELIVERED'
     )
+  })
+
+  it('rejects driver delivered when order is not yet SHIPPED', async () => {
+    const assignment = {
+      id: 'da-1',
+      order_id: 'order-1',
+      supplier_id: 'sup-1',
+      driver_id: 'drv-1',
+      status: 'out_for_delivery',
+      warehouse_assignment_id: null,
+    }
+
+    query.mockResolvedValueOnce({ rows: [assignment] })
+
+    const clientQuery = vi.fn()
+    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+
+    clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ status: 'PROCESSING' }] })
+
+    await expect(
+      updateDeliveryStatus({
+        supplierId: 'sup-1',
+        orderId: 'order-1',
+        status: 'delivered',
+      })
+    ).rejects.toThrow(/must be shipped first/)
   })
 
   it('returns existing assignment when status is unchanged (idempotent)', async () => {

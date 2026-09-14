@@ -20,16 +20,7 @@ vi.mock('../lib/branch-invitations.js', () => ({
 }))
 
 vi.mock('../lib/db.js', () => ({
-  query: vi.fn().mockImplementation((sql) => {
-    const text = String(sql)
-    if (text.includes('organization_id FROM supplier')) {
-      return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
-    }
-    if (text.includes('is_main_branch = true')) {
-      return Promise.resolve({ rows: [{ id: 'supplier-main' }] })
-    }
-    return Promise.resolve({ rows: [] })
-  }),
+  query: vi.fn(),
 }))
 
 vi.mock('../lib/rbac.js', () => ({
@@ -56,14 +47,42 @@ vi.mock('../lib/rbac.js', () => ({
 }))
 
 vi.mock('../lib/subscription.js', () => ({
-  requireFeature: () => (req, res, next) => next(),
+  // If team invites are ever re-gated on multi_branch, these route tests fail.
+  requireFeature: (featureKey) => {
+    if (featureKey === 'multi_branch') {
+      return (req, res) =>
+        res.status(403).json({
+          ok: false,
+          error: { name: 'FEATURE_NOT_AVAILABLE', message: 'multi_branch wrongly gated' },
+        })
+    }
+    return (req, res, next) => next()
+  },
+}))
+
+const ensureTenantSystemRoles = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('../lib/tenant-roles.js', () => ({
+  ensureTenantSystemRoles: (...args) => ensureTenantSystemRoles(...args),
 }))
 
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
+import { query } from '../lib/db.js'
 import branchInvitationsRoutes from './branch-invitations.routes.js'
+
+function defaultQueryMock(sql) {
+  const text = String(sql)
+  if (text.includes('organization_id FROM supplier')) {
+    return Promise.resolve({ rows: [{ organization_id: 'org-1' }] })
+  }
+  if (text.includes('is_main_branch = true')) {
+    return Promise.resolve({ rows: [{ id: 'supplier-main' }] })
+  }
+  return Promise.resolve({ rows: [] })
+}
 
 describe('branch-invitations.routes', () => {
   let app
@@ -74,8 +93,11 @@ describe('branch-invitations.routes', () => {
     listBranchInvitations.mockReset()
     revokeBranchInvitation.mockReset()
     regenerateBranchInvitation.mockReset()
+    ensureTenantSystemRoles.mockClear()
     assertSupplierInOrg.mockResolvedValue(true)
     validateBranchRoleForSupplier.mockResolvedValue(true)
+    query.mockReset()
+    query.mockImplementation(defaultQueryMock)
 
     app = express()
     app.use(express.json())
@@ -90,6 +112,46 @@ describe('branch-invitations.routes', () => {
       next()
     })
     app.use('/api/org/invitations', branchInvitationsRoutes)
+  })
+
+  it('POST / creates invitation without requiring multi_branch (driver invites on Growth)', async () => {
+    createBranchInvitation.mockResolvedValue({
+      invitation: { id: 'inv-driver' },
+      invite_url: 'http://localhost:5173/invite/branch?token=driver',
+      expires_at: new Date().toISOString(),
+    })
+    const res = await request(app)
+      .post('/api/org/invitations')
+      .send({
+        supplier_id: 'branch-1',
+        invited_name: 'Sam Driver',
+        invited_email: 'driver@example.com',
+        role_id: 'role-driver',
+      })
+      .expect(201)
+    expect(res.body.data.invitation_id).toBe('inv-driver')
+    expect(res.body.error).toBeNull()
+  })
+
+  it('GET /roles seeds system roles then lists inviteable roles', async () => {
+    query.mockImplementation((sql) => {
+      const text = String(sql)
+      if (text.includes('FROM tenant_roles')) {
+        return Promise.resolve({
+          rows: [
+            { id: 'role-driver', name: 'Driver', description: 'Deliveries' },
+            { id: 'role-mgr', name: 'Manager', description: 'Ops' },
+          ],
+        })
+      }
+      return defaultQueryMock(sql)
+    })
+
+    const res = await request(app)
+      .get('/api/org/invitations/roles?supplier_id=branch-1')
+      .expect(200)
+    expect(ensureTenantSystemRoles).toHaveBeenCalledWith('branch-1', 'SUPPLIER')
+    expect(res.body.data.roles.map((r) => r.name)).toContain('Driver')
   })
 
   it('POST / creates invitation and returns invite_url', async () => {

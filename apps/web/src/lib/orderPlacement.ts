@@ -8,7 +8,13 @@ export function isDisputeReplacementOrder(
   return String(source) === PLACEMENT_SOURCE_DISPUTE_REPLACEMENT
 }
 
-export function formatOrderRef(orderId: unknown): string {
+/** Canonical short order ref: first 8 UUID chars, uppercase (matches notifications). */
+export function orderShortId(orderId: unknown): string {
   const id = String(orderId || '')
-  return id ? `#${id.slice(0, 8).toUpperCase()}` : '—'
+  return id ? id.slice(0, 8).toUpperCase() : ''
+}
+
+export function formatOrderRef(orderId: unknown): string {
+  const short = orderShortId(orderId)
+  return short ? `#${short}` : '—'
 }

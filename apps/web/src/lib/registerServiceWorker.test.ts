@@ -71,4 +71,44 @@ describe('registerServiceWorker', () => {
     const { registerServiceWorker } = await import('./registerServiceWorker')
     expect(() => registerServiceWorker()).not.toThrow()
   })
+
+  it('ensureServiceWorkerForPush registers immediately even in development', async () => {
+    vi.stubEnv('MODE', 'development')
+
+    const registration = {
+      pushManager: {},
+      active: { state: 'activated' },
+    }
+    const register = vi.fn().mockResolvedValue(registration)
+    const ready = Promise.resolve(registration)
+
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('navigator', {
+      serviceWorker: { register, ready },
+    })
+
+    const { ensureServiceWorkerForPush } = await import('./registerServiceWorker')
+    const result = await ensureServiceWorkerForPush()
+
+    expect(register).toHaveBeenCalledWith('/sw.js')
+    expect(result).toBe(registration)
+  })
+
+  it('ensureServiceWorkerForPush times out instead of hanging when ready never resolves', async () => {
+    vi.stubEnv('MODE', 'development')
+
+    const register = vi.fn().mockResolvedValue({ active: null })
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        register,
+        ready: new Promise(() => {
+          /* never resolves — previous hang bug */
+        }),
+      },
+    })
+
+    const { ensureServiceWorkerForPush } = await import('./registerServiceWorker')
+    await expect(ensureServiceWorkerForPush(50)).rejects.toThrow(/timed out|not available/i)
+  })
 })

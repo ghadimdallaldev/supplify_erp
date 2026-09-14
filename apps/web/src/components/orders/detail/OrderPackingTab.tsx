@@ -9,6 +9,7 @@ import {
   usePackingSlipActions,
 } from './orderDetailShared'
 import { formatPrice } from '../../../utils/format'
+import { orderShortId } from '../../../lib/orderPlacement'
 
 export interface OrderPackingTabProps {
   orderId: string
@@ -60,7 +61,7 @@ export function OrderPackingTab({ orderId }: OrderPackingTabProps) {
           <div className="text-center">
             <h2 className="text-2xl font-bold">{t('packingTab.header')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              {t('packingTab.orderNumber', { id: order.id.slice(-8).toUpperCase() })}
+              {t('packingTab.orderNumber', { id: orderShortId(order.id) })}
             </p>
           </div>
 

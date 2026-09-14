@@ -79,6 +79,8 @@ All routes: `requireAuth`, supplier role, org membership (except admin with `org
 
 The shared linked-accounts API (`/api/branches`) also handles basic branch list, create, switch, and unlink for both restaurants **and** suppliers. It accepts `{ tenantId, tenantType }` on `POST /api/branches/switch`; bearer-authenticated clients additionally receive `{ activeTenantToken }` in the JSON response. The `/api/org` routes above are the authoritative supplier org-management API.
 
+**Team invitations** (`/api/org/invitations`) invite staff (Manager, Driver, etc.) to a branch. They require `STAFF_INVITE` / `STAFF_MANAGE` / `SETTINGS_MANAGE` and are **not** gated by `multi_branch` (same as restaurant member invites). Creating additional branches still requires `multi_branch`.
+
 ## Feature flag
 
 `multi_branch` on subscription plans:

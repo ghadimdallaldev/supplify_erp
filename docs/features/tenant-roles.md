@@ -83,7 +83,7 @@ Order approvals (`approvals_budgets`) were removed from the product in 2026-05. 
 ## Frontend
 
 - **Settings → Team:** Users and Roles sub-tabs when `advanced_roles` is on (entitlements hook). Supplier: **Settings → Team & roles** tab (`TeamRolesPanel` + branch invitations).
-- **Invite:** Role dropdown uses tenant roles when enabled; otherwise Owner / Viewer only. Custom roles can be invited (not Owner via link).
+- **Invite:** Role dropdown uses tenant roles when enabled; otherwise Owner / Viewer only. Custom roles can be invited (not Owner via link). Supplier team invites (`/api/org/invitations`, including **Driver**) require `STAFF_INVITE` and are **not** gated by `multi_branch` — single-branch Growth plans can invite drivers. `multi_branch` only gates creating additional branches / org switcher.
 
 ## Demo logins (`seed:tier-catalog`)
 

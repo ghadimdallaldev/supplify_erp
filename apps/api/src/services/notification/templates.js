@@ -21,8 +21,11 @@ function nt(key, locale = DEFAULT_LOCALE, params = {}) {
   return t(`notifications.${key}`, resolveLocale(locale), params)
 }
 
-function orderShortId(order) {
-  return order.id.slice(0, 8)
+/** Canonical short order ref: first 8 UUID chars, uppercase (matches web/mobile). */
+export function orderShortId(order) {
+  return String(order?.id || '')
+    .slice(0, 8)
+    .toUpperCase()
 }
 
 export const DEFAULT_NOTIFICATION_PREFS = {

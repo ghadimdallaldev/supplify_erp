@@ -101,11 +101,41 @@ function parseWarehouseFilter(req) {
   return raw
 }
 
-async function warehouseFilterClause(req, supplierId, paramIndex = 1) {
+/**
+ * Warehouse filter for fulfillment queries.
+ * - mode 'order' (default): match if the order has any WH assignment in the warehouse
+ *   (unassigned board bucket, routes without driver_assignments join).
+ * - mode 'assignment': scope to the driver_assignments (`da`) warehouse leg so
+ *   multi-WH sibling legs are hidden on the per-leg dispatch board.
+ */
+async function warehouseFilterClause(req, supplierId, paramIndex = 1, { mode = 'order' } = {}) {
   const warehouseId = parseWarehouseFilter(req)
   if (!warehouseId) return { clause: '', params: [], warehouseId: null }
 
-  // Allow filtering whenever assignments exist (single-WH and multi-WH).
+  if (mode === 'assignment') {
+    return {
+      clause: ` AND (
+        (
+          da.id IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM order_warehouse_assignment owa
+            WHERE owa.id = da.warehouse_assignment_id
+              AND owa.warehouse_id = $${paramIndex}
+          )
+        )
+        OR (
+          da.id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM order_warehouse_assignment owa
+            WHERE owa.order_id = o.id AND owa.warehouse_id = $${paramIndex}
+          )
+        )
+      )`,
+      params: [warehouseId],
+      warehouseId,
+    }
+  }
+
   return {
     clause: ` AND EXISTS (
       SELECT 1 FROM order_warehouse_assignment owa

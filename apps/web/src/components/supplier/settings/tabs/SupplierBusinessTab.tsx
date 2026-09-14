@@ -44,6 +44,7 @@ function emptyBusinessForm(): SupplierBusinessSettings {
     lastOrderCutoffMinutes: 30,
     lastOrderRolloverDays: 1,
     lastOrderTimezone: 'UTC',
+    podRequired: false,
   }
 }
 
@@ -72,6 +73,7 @@ export function SupplierBusinessTab() {
         lastOrderCutoffMinutes: data.business.lastOrderCutoffMinutes ?? 30,
         lastOrderRolloverDays: data.business.lastOrderRolloverDays ?? 1,
         lastOrderTimezone: data.business.lastOrderTimezone ?? 'UTC',
+        podRequired: Boolean(data.business.podRequired),
       })
     }
   }, [data?.business])
@@ -134,6 +136,7 @@ export function SupplierBusinessTab() {
         lastOrderCutoffMinutes: form.lastOrderCutoffMinutes ?? null,
         lastOrderRolloverDays: form.lastOrderRolloverDays ?? 1,
         lastOrderTimezone: form.lastOrderTimezone ?? 'UTC',
+        podRequired: Boolean(form.podRequired),
       }).unwrap()
       toast.success(t('business.toast.saved'))
     } catch (err: unknown) {
@@ -367,6 +370,32 @@ export function SupplierBusinessTab() {
                   }
                 />
                 <p className="text-xs text-[var(--text-muted)]">{t('business.minOrderHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pod-required">
+                  {t('business.podRequired', { defaultValue: 'Require proof of delivery' })}
+                </Label>
+                <label
+                  htmlFor="pod-required"
+                  className="flex min-h-[44px] items-center gap-2 text-sm text-[var(--text-mid)]"
+                >
+                  <input
+                    id="pod-required"
+                    type="checkbox"
+                    checked={Boolean(form.podRequired)}
+                    disabled={isBusy}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        podRequired: event.target.checked,
+                      }))
+                    }
+                  />
+                  {t('business.podRequiredHint', {
+                    defaultValue:
+                      'Drivers and dispatch must attach POD before marking an order delivered',
+                  })}
+                </label>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="payment-terms">{t('business.paymentTerms')}</Label>
