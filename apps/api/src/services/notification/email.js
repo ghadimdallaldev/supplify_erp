@@ -35,13 +35,20 @@ const emailService = {
         userId,
         tenantId,
       })
+      const orderId =
+        metadata?.orderId ||
+        metadata?.order_id ||
+        (String(referenceType || '').toUpperCase() === 'ORDER' ? referenceId : null)
+      const ctaTarget = metadata?.ctaUrl || (orderId ? `/app/orders/${orderId}` : metadata?.link)
       const emailMetadata =
         metadata && typeof metadata === 'object'
           ? {
               ...metadata,
-              ctaUrl: metadata.ctaUrl ? buildAppUrl(metadata.ctaUrl) : metadata.ctaUrl,
+              ctaUrl: ctaTarget ? buildAppUrl(ctaTarget) : undefined,
             }
-          : {}
+          : ctaTarget
+            ? { ctaUrl: buildAppUrl(ctaTarget) }
+            : {}
       const result = await sendTemplateEmail({
         to: email,
         template,

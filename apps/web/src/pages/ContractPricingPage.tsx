@@ -40,6 +40,7 @@ const AGREEMENT_TYPES = ['CUSTOM', 'VOLUME', 'RELATIONSHIP', 'SPECIAL'] as const
 type FormState = {
   restaurantId: string
   productId: string
+  productLabel: string
   price: string
   contractDiscountPercentage: string
   contractStartDate: string
@@ -52,6 +53,7 @@ type FormState = {
 const emptyForm: FormState = {
   restaurantId: '',
   productId: '',
+  productLabel: '',
   price: '',
   contractDiscountPercentage: '',
   contractStartDate: '',
@@ -98,10 +100,21 @@ export function ContractPricingPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm)
+  const [productSearch, setProductSearch] = useState('')
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('')
+  const [productOffset, setProductOffset] = useState(0)
 
   useEffect(() => {
     void ensureNamespace('contracts')
   }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim())
+      setProductOffset(0)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [productSearch])
 
   const queryParams = useMemo(
     () => ({
@@ -112,9 +125,18 @@ export function ContractPricingPage() {
     [statusFilter, search, restaurantFilter]
   )
 
+  const PRODUCT_PAGE_SIZE = 50
+
   const { data, isLoading, refetch } = useGetContractPricingQuery(queryParams)
   const { data: restaurantsData } = useGetRestaurantsQuery({ limit: 200, offset: 0 })
-  const { data: productsData } = useGetProductsQuery({ limit: 500, offset: 0 })
+  const { data: productsData } = useGetProductsQuery(
+    {
+      limit: PRODUCT_PAGE_SIZE,
+      offset: productOffset,
+      q: debouncedProductSearch || undefined,
+    },
+    { skip: !dialogOpen }
+  )
   const [createPricing, { isLoading: creating }] = useCreateContractPricingMutation()
   const [updatePricing, { isLoading: updating }] = useUpdateContractPricingMutation()
   const [deactivatePricing] = useDeactivateContractPricingMutation()
@@ -122,10 +144,14 @@ export function ContractPricingPage() {
   const pricing = data?.pricing ?? []
   const restaurants = restaurantsData?.restaurants ?? []
   const products = productsData?.products ?? []
+  const hasNextProductPage = Boolean(productsData?.pagination?.nextCursor)
 
   const openCreate = () => {
     setEditingId(null)
     setForm(emptyForm)
+    setProductSearch('')
+    setDebouncedProductSearch('')
+    setProductOffset(0)
     setDialogOpen(true)
   }
 
@@ -134,6 +160,7 @@ export function ContractPricingPage() {
     setForm({
       restaurantId: String(row.restaurant_id),
       productId: String(row.product_id),
+      productLabel: `${row.product_name ?? 'Product'}${row.product_sku ? ` (${row.product_sku})` : ''}`,
       price: String(row.price ?? ''),
       contractDiscountPercentage:
         row.contract_discount_percentage != null ? String(row.contract_discount_percentage) : '',
@@ -145,6 +172,9 @@ export function ContractPricingPage() {
       minOrderQuantity: row.min_order_quantity != null ? String(row.min_order_quantity) : '',
       notes: row.notes ? String(row.notes) : '',
     })
+    setProductSearch('')
+    setDebouncedProductSearch('')
+    setProductOffset(0)
     setDialogOpen(true)
   }
 
@@ -174,6 +204,7 @@ export function ContractPricingPage() {
         await updatePricing({
           id: editingId,
           ...payload,
+          contractEndDate: form.contractEndDate || null,
         }).unwrap()
         toast.success(t('pricing.toast.updated'))
       } else {
@@ -404,7 +435,10 @@ export function ContractPricingPage() {
                         {row.contract_start_date
                           ? String(row.contract_start_date).slice(0, 10)
                           : '—'}{' '}
-                        → {row.contract_end_date ? String(row.contract_end_date).slice(0, 10) : '—'}
+                        →{' '}
+                        {row.contract_end_date
+                          ? String(row.contract_end_date).slice(0, 10)
+                          : 'Forever'}
                       </td>
                       <td className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}>
                         <Badge variant={isEffectivelyActive ? 'default' : 'secondary'}>
@@ -471,12 +505,30 @@ export function ContractPricingPage() {
               </div>
               <div>
                 <Label>{t('pricing.product')}</Label>
+                {!editingId ? (
+                  <div className="relative mt-1 mb-2">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                    <Input
+                      placeholder={t('pricing.dialog.searchProducts', {
+                        defaultValue: 'Search products by name or SKU',
+                      })}
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                ) : null}
                 <Select
                   value={form.productId}
                   onValueChange={(value) => setForm({ ...form, productId: value })}
                 >
                   <SelectTrigger className="mt-1" disabled={!!editingId}>
                     <option value="">{t('pricing.dialog.selectProduct')}</option>
+                    {editingId &&
+                    form.productId &&
+                    !products.some((p) => String(p.id) === form.productId) ? (
+                      <option value={form.productId}>{form.productLabel || form.productId}</option>
+                    ) : null}
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.sku})
@@ -484,6 +536,35 @@ export function ContractPricingPage() {
                     ))}
                   </SelectTrigger>
                 </Select>
+                {!editingId ? (
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={productOffset === 0}
+                      onClick={() =>
+                        setProductOffset((value) => Math.max(0, value - PRODUCT_PAGE_SIZE))
+                      }
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {products.length
+                        ? `${productOffset + 1}–${productOffset + products.length}`
+                        : '0'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!hasNextProductPage}
+                      onClick={() => setProductOffset((value) => value + PRODUCT_PAGE_SIZE)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                ) : null}
               </div>
               <div>
                 <Label>{t('pricing.dialog.contractPrice')}</Label>
@@ -533,7 +614,27 @@ export function ContractPricingPage() {
                     type="date"
                     value={form.contractEndDate}
                     onChange={(e) => setForm({ ...form, contractEndDate: e.target.value })}
+                    disabled={!form.contractEndDate}
                   />
+                  <label
+                    className={
+                      'mt-2 flex min-h-[44px] items-center gap-2 text-sm text-[var(--text-mid)]'
+                    }
+                  >
+                    <input
+                      type={'checkbox'}
+                      checked={!form.contractEndDate}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          contractEndDate: event.target.checked
+                            ? ''
+                            : new Date().toISOString().slice(0, 10),
+                        })
+                      }
+                    />
+                    {'Forever (no expiry)'}
+                  </label>
                 </div>
               </div>
               <div>

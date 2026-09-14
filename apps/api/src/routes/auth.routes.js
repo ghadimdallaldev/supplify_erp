@@ -105,8 +105,11 @@ function saveSession(req) {
  */
 async function redirectUnverifiedEmailToLogin(req, res, idTokenHint = null) {
   const hint = idTokenHint || req.cookies?.id_token || null
+  const oauthRedirect = req.session?.oauthRedirect
   await clearLocalAuthSession(req, res)
-  const loginContinue = `${callbackOrigin(req)}/auth/login`
+  const loginContinue = oauthRedirect
+    ? `${callbackOrigin(req)}/auth/login?redirect=${encodeURIComponent(oauthRedirect)}`
+    : `${callbackOrigin(req)}/auth/login`
   const logoutUrl = await getKeycloakLogoutUrl(loginContinue, hint)
   logger.warn('Blocking auth until email OTP verification completes', {
     next: loginContinue,
@@ -160,6 +163,11 @@ router.get('/login', async (req, res) => {
 
     // Store state in session and force save before redirect (avoids lost oauthState).
     req.session.oauthState = state
+    if (isAllowedWebRedirect(req.query.redirect)) {
+      req.session.oauthRedirect = req.query.redirect
+    } else {
+      delete req.session.oauthRedirect
+    }
     await saveSession(req)
 
     logger.info('Login initiated')
@@ -181,6 +189,7 @@ router.get('/login', async (req, res) => {
 router.get('/register', async (req, res) => {
   const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
   try {
+    const oauthRedirect = isAllowedWebRedirect(req.query.redirect) ? req.query.redirect : null
     // Keycloak blocks registration when another SSO session is active — end it first.
     // Skip the logout hop when there is no app session (avoids a pointless redirect).
     // When ending SSO, pass id_token_hint so Keycloak does not show "Do you want to log out?".
@@ -191,7 +200,9 @@ router.get('/register', async (req, res) => {
       )
       if (hasAppSession) {
         await clearLocalAuthSession(req, res)
-        const continueUrl = `${callbackOrigin(req)}/auth/register?continue=1`
+        const continueUrl = oauthRedirect
+          ? `${callbackOrigin(req)}/auth/register?continue=1&redirect=${encodeURIComponent(oauthRedirect)}`
+          : `${callbackOrigin(req)}/auth/register?continue=1`
         const logoutUrl = await getKeycloakLogoutUrl(continueUrl, idTokenHint)
         logger.info('Registration: clearing Keycloak SSO session before signup', {
           silentLogout: Boolean(idTokenHint),
@@ -203,6 +214,11 @@ router.get('/register', async (req, res) => {
     const state = randomBytes(32).toString('hex')
     req.session.oauthState = state
     req.session.registrationFlow = true
+    if (oauthRedirect) {
+      req.session.oauthRedirect = oauthRedirect
+    } else {
+      delete req.session.oauthRedirect
+    }
     await saveSession(req)
 
     const redirectUri = `${callbackOrigin(req)}/auth/callback`
@@ -265,6 +281,9 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${process.env.WEB_ORIGIN}/login?error=invalid_state`)
     }
 
+    const oauthRedirect = isAllowedWebRedirect(req.session.oauthRedirect)
+      ? req.session.oauthRedirect
+      : null
     delete req.session.registrationFlow
     delete req.session.oauthState
 
@@ -289,6 +308,8 @@ router.get('/callback', async (req, res) => {
       })
       return redirectUnverifiedEmailToLogin(req, res, tokens.id_token)
     }
+
+    delete req.session.oauthRedirect
 
     // Decode the access token to get roles from realm_access and resource_access
     const tokenParts = tokens.access_token.split('.')
@@ -318,7 +339,9 @@ router.get('/callback', async (req, res) => {
 
     const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173'
     let redirectUrl
-    if (user.role === 'STAFF_PORTAL') {
+    if (oauthRedirect && user.role !== 'STAFF_PORTAL') {
+      redirectUrl = oauthRedirect
+    } else if (user.role === 'STAFF_PORTAL') {
       redirectUrl = `${webOrigin}/staff/dashboard`
     } else {
       const needsSetup = await userNeedsTenantSetup(user)

@@ -19,7 +19,11 @@ import {
 } from '../services/invoice.service.js'
 import { requireFeature } from '../lib/subscription.js'
 import { notifyLeaveReviewIfEligible } from '../services/reviews.service.js'
-import { notifyInvoiceIssued } from '../services/notification.service.js'
+import {
+  notifyDisputeOpened,
+  notifyInvoiceIssued,
+  notifyOrderStatusChange,
+} from '../services/notification.service.js'
 import { createLotFromReceivingLine } from '../services/inventory-expiry.service.js'
 import { earnLoyaltyOnOrderReceive } from '../services/loyalty.service.js'
 import {
@@ -28,6 +32,7 @@ import {
 } from '../services/recipe-purchasing-hooks.service.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 import {
+  buildReceivingDiscrepancies,
   validateAndEnrichReceivingLines,
   sumBillableAcceptedQuantity,
 } from '../lib/receiving-line-validation.js'
@@ -115,11 +120,11 @@ router.get(
           `
           SELECT 
             oi.*,
-            p.name as product_name,
-            p.sku,
-            p.unit
+            COALESCE(p.name, 'Unavailable product') as product_name,
+            COALESCE(p.sku, oi.product_id::text) AS sku,
+            COALESCE(p.unit, 'unit') AS unit
           FROM order_item oi
-          JOIN product p ON p.id = oi.product_id
+          LEFT JOIN product p ON p.id = oi.product_id
           WHERE oi.order_id = ANY($1::uuid[])
         `,
           [orderIds]
@@ -263,7 +268,8 @@ router.post(
 
       const { rows: orderItems } = await query(
         `
-      SELECT oi.id, oi.quantity, oi.product_id, oi.unit_price, oi.supplier_id, p.unit
+      SELECT oi.id, oi.quantity, oi.product_id, oi.unit_price, oi.supplier_id,
+             p.unit, p.name AS product_name, p.sku
       FROM order_item oi
       LEFT JOIN product p ON p.id = oi.product_id
       WHERE oi.order_id = $1
@@ -345,6 +351,7 @@ router.post(
         0
       )
       const billableAcceptedQty = sumBillableAcceptedQuantity(lineItems)
+      const discrepancies = buildReceivingDiscrepancies(lineItems)
       const totalExpectedCost = lineItems.reduce(
         (sum, item) =>
           sum + parseFloat(item.ordered_quantity || 0) * parseFloat(item.expected_unit_price || 0),
@@ -363,7 +370,7 @@ router.post(
       let status = 'ACCEPTED'
       if (billableAcceptedQty === 0) {
         status = 'REJECTED'
-      } else if (totalItemsReceived < totalItemsOrdered) {
+      } else if (billableAcceptedQty < totalItemsOrdered) {
         status = 'PARTIAL'
       }
 
@@ -532,8 +539,87 @@ router.post(
         await markReorderForecastDirty(restaurantId, { reason: 'receiving_completed' })
 
         // Order status: zero billable acceptance → dispute path; never RECEIVED_FULL when all rejected
+        let autoDispute = null
+        if (discrepancies.length > 0) {
+          let disputeItemsToAdd = discrepancies
+          let disputedAmount = discrepancies.reduce((sum, item) => sum + item.disputedAmount, 0)
+          const hasQualityIssue = discrepancies.some((item) => item.qualityStatus !== 'ACCEPTED')
+          const { rows: activeDisputes } = await client.query(
+            `SELECT * FROM disputes
+             WHERE order_id = $1 AND status IN ('open', 'under_review', 'escalated')
+             FOR UPDATE`,
+            [orderId]
+          )
+
+          if (activeDisputes.length > 0) {
+            const { rows: existingItems } = await client.query(
+              `SELECT order_item_id FROM dispute_items WHERE dispute_id = $1`,
+              [activeDisputes[0].id]
+            )
+            const existingOrderItemIds = new Set(
+              existingItems.map((item) => String(item.order_item_id))
+            )
+            disputeItemsToAdd = discrepancies.filter(
+              (item) => !existingOrderItemIds.has(String(item.orderItemId))
+            )
+            disputedAmount = disputeItemsToAdd.reduce((sum, item) => sum + item.disputedAmount, 0)
+            const { rows } = await client.query(
+              `UPDATE disputes
+               SET receiving_report_id = COALESCE(receiving_report_id, $2),
+                   disputed_amount = COALESCE(disputed_amount, 0) + $3,
+                   updated_at = now()
+               WHERE id = $1
+               RETURNING *`,
+              [activeDisputes[0].id, report.id, disputedAmount]
+            )
+            autoDispute = rows[0]
+          } else {
+            const { rows } = await client.query(
+              `INSERT INTO disputes (
+                 order_id, restaurant_id, supplier_id, receiving_report_id,
+                 type, status, description, disputed_amount, created_by
+               ) VALUES ($1,$2,$3,$4,$5,'open',$6,$7,$8)
+               RETURNING *`,
+              [
+                orderId,
+                restaurantId,
+                supplierId,
+                report.id,
+                hasQualityIssue ? 'quality_issue' : 'short_delivery',
+                'Automatically opened from receiving discrepancies',
+                disputedAmount,
+                receivedBy || req.userData.id,
+              ]
+            )
+            autoDispute = rows[0]
+          }
+
+          for (const item of disputeItemsToAdd) {
+            await client.query(
+              `INSERT INTO dispute_items (
+                 dispute_id, order_item_id, product_name, quantity_ordered,
+                 quantity_received, unit_price, issue_description
+               )
+               SELECT $1,$2,$3,$4,$5,$6,$7
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM dispute_items
+                 WHERE dispute_id = $1 AND order_item_id = $2
+               )`,
+              [
+                autoDispute.id,
+                item.orderItemId,
+                item.productName,
+                item.quantityOrdered,
+                item.quantityReceived,
+                item.unitPrice,
+                item.issueDescription,
+              ]
+            )
+          }
+        }
+
         let nextStatus
-        if (billableAcceptedQty === 0) {
+        if (autoDispute) {
           nextStatus = 'RECEIVED_WITH_DISPUTE'
         } else if (billableAcceptedQty < totalItemsOrdered) {
           nextStatus = 'RECEIVED_PARTIAL'
@@ -561,6 +647,14 @@ router.post(
               })
             : null
 
+        if (autoDispute && createdInvoice) {
+          const { rows } = await client.query(
+            `UPDATE disputes SET invoice_id = $2, updated_at = now() WHERE id = $1 RETURNING *`,
+            [autoDispute.id, createdInvoice.id]
+          )
+          autoDispute = rows[0]
+        }
+
         const earnBaseAmount =
           totalActualCost > 0 ? totalActualCost : parseFloat(order.total_amount || 0)
         const loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
@@ -571,7 +665,20 @@ router.post(
           createdBy: req.userData?.id,
         })
 
-        return { report, createdInvoice, loyaltyEarn }
+        return { report, createdInvoice, loyaltyEarn, autoDispute, nextStatus }
+      })
+
+      if (result.autoDispute) {
+        notifyDisputeOpened(result.autoDispute).catch((err) => {
+          logger.warn('Automatic dispute notification failed', { error: err.message, orderId })
+        })
+      }
+
+      notifyOrderStatusChange(
+        { id: orderId, restaurant_id: restaurantId, supplier_id: supplierId },
+        result.nextStatus
+      ).catch((err) => {
+        logger.warn('Receiving status notification failed', { error: err.message, orderId })
       })
 
       if (result.createdInvoice) {

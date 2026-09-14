@@ -125,6 +125,21 @@
     "brand": "Admin",
     "searchPlaceholder": "Search admin…",
     "logoutTitle": "{{name}} — click to logout",
+    "workspaces": "Workspaces",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "skipToContent": "Skip to content",
+    "theme": {
+      "switchToDark": "Switch to dark theme",
+      "switchToLight": "Switch to light theme",
+      "saveFailed": "Theme changed here, but the preference could not be saved"
+    },
+    "userMenu": {
+      "open": "Open account menu",
+      "platformAdmin": "Platform admin",
+      "settings": "Account settings",
+      "signOut": "Sign out"
+    },
     "groups": {
       "monitor": "Monitor",
       "accounts": "Accounts",
@@ -160,7 +175,8 @@
       "sections": "Admin sections",
       "openMenu": "Open admin menu",
       "closeMenu": "Close admin menu",
-      "openSearch": "Open search"
+      "openSearch": "Open search",
+      "breadcrumb": "Breadcrumb"
     }
   },
   "users": {

@@ -69,6 +69,9 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
       ? itemsSubtotal - Number(order.total_amount)
       : 0)
   const amendments = amendmentsData?.amendments || []
+  const canAmend = ['PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING'].includes(
+    order.status
+  )
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -117,7 +120,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{t('detailsTab.amendments')}</CardTitle>
-            {!['CANCELLED', 'COMPLETED'].includes(order.status) && amendmentsEnabled && (
+            {canAmend && amendmentsEnabled && (
               <Button size="sm" variant="outline" onClick={() => setShowAmendmentForm((v) => !v)}>
                 {t('detailsTab.requestChange')}
               </Button>
@@ -175,7 +178,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
                     <Badge variant="outline">{String(a.status)}</Badge>
                   </div>
                   <p className="text-[var(--text-muted)] mt-1">{String(a.description)}</p>
-                  {a.status === 'pending' && (
+                  {a.status === 'pending' && canAmend && (
                     <div className="flex gap-2 mt-2">
                       <Button
                         size="sm"

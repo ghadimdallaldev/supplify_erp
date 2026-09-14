@@ -78,6 +78,7 @@ import {
 } from '../services/product-substitutes.service.js'
 import {
   acceptAmendment,
+  canAmendOrderStatus,
   getOrderForAmendment,
   notifyAmendmentParty,
 } from '../services/order-amendments.service.js'
@@ -1100,12 +1101,15 @@ router.post(
       const supplierId = await resolveSupplier(req)
       const order = await getOrderForAmendment(req.params.orderId)
       if (order.supplier_id !== supplierId) throw new ValidationError('Access denied')
+      if (!canAmendOrderStatus(order.status)) {
+        throw new ValidationError('Order cannot be amended after processing')
+      }
 
       const { rows } = await query(
         `
         UPDATE order_amendments
         SET status = 'rejected', responded_by = $3, response_notes = $4, responded_at = NOW(), updated_at = NOW()
-        WHERE id = $1 AND order_id = $2 AND status = 'pending'
+        WHERE id = $1 AND order_id = $2 AND status = 'pending' AND requested_by <> $3
         RETURNING *
         `,
         [
@@ -1155,18 +1159,25 @@ router.post(
     try {
       const supplierId = await resolveSupplier(req)
       const body = fulfillmentIssueBaseSchema.parse(req.body)
-      const result = await createShortageIssue({
+      const common = {
         orderId: req.params.orderId,
         supplierId,
         orderItemId: body.orderItemId,
         createdByUserId: req.userData.id,
-        shortageQuantity: body.shortageQuantity,
         availableQuantity: body.availableQuantity,
-        replacementProductId: body.replacementProductId,
         replacementQuantity: body.replacementQuantity,
         replacementUnit: body.replacementUnit,
         message: body.message,
-      })
+      }
+      const result = body.replacementProductId
+        ? await createSubstitutionIssue({
+            ...common,
+            substituteProductId: body.replacementProductId,
+          })
+        : await createShortageIssue({
+            ...common,
+            shortageQuantity: body.shortageQuantity,
+          })
       res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

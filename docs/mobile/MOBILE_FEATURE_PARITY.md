@@ -2,6 +2,26 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Order workflow and receiving integrity
+
+- API/web fixes keep list item counts and product details aligned across order cards, detail, receiving, and packing documents; product/SKU search and paginated product selection no longer stop at an arbitrary first page.
+- Shipping and delivery status changes now require an active driver assignment. The legacy `COMPLETED` input maps to delivery only from `SHIPPED`.
+- Invite login and signup retain the validated `/invite?token=...&type=...` return URL through Keycloak, so authenticated users return to the acceptance screen.
+- Order-related email notifications infer a direct order CTA for placement/status, shortages, amendments, disputes, invoices, and receiving completion. Receiving completion status alerts target the **supplier** (restaurant already knows).
+- Contract prices can explicitly be saved as **Forever (no expiry)**; clearing a prior end date sends `null`. Contract product picker supports name/SKU search and pagination (no first-page hard cap).
+- Shortage/substitution creation and amendment responses are rejected after `PROCESSING`; replacement suggestions continue through the counterparty amendment approval flow.
+- Receiving requires every line and normalizes both web snake-case and mobile camel-case fields from authoritative order data. Short or non-accepted lines create/extend one active dispute inside the same transaction as the report, inventory, order status, and invoice.
+- **Android + iOS:** identical catalog infinite pagination and live cart CTA, corrected `POST` driver assignment client, editable actual receiving quantity/quality/notes for every line, safe amendment history rendering, receive action only after delivery, and supplier per-line shortage reporting in mutable stages.
+- No new environment variable, feature key, or permission key was introduced.
+- Verification: focused API regression suites, root/web typecheck, and `npx tsc --noEmit` in both mobile repositories pass.
+
+## 2026-09-14 — Admin console shell revamp (web)
+
+- Reworked the platform-admin shell in `apps/web`: collapsible icon-rail sidebar (persisted per browser), vertical workspace switcher, sticky translucent top bar with breadcrumb, light/dark theme toggle wired to `PATCH /auth/admin-preferences`, account menu (settings + sign out) replacing the avatar-as-logout button, skip-to-content link, Escape/scroll-lock on the mobile drawer, and tab-panel enter animation. `.dark` now overrides the Supplify hex tokens so the admin dark theme actually darkens.
+- No new endpoint, env var, feature key, or permission key. The preferences endpoint and `AdminUserPreferences` type are unchanged.
+- **Mobile skipped**: admin-only. The native apps have no admin surface (the mobile admin hub deep-links into this web console).
+- Docs: `docs/ui/ADMIN_SHELL_REVAMP.md`, `docs/ui/README.md`, `docs/admin/admin-guide.md`.
+
 ## 2026-09-14 — Contract pricing, fulfillment, and quotation correctness audit
 
 - Audited and fixed critical/high business-logic defects across contract pricing, fulfillment, and quotations in the API/web monorepo; both mobile apps updated for client-contract changes.

@@ -36,7 +36,11 @@ import { ordersDriverRoutes } from '../orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
 import { hasPermission } from '../../lib/permissions.js'
-import { updateDriverDeliveryStatus, getSupplierIdForOrder } from '../../lib/driver-delivery.js'
+import {
+  updateDriverDeliveryStatus,
+  getSupplierIdForOrder,
+  getActiveDriverAssignment,
+} from '../../lib/driver-delivery.js'
 import { resolveDeliveryPodFlags } from '../../lib/pod-requirement.js'
 import {
   resolveProductPricesBatch,
@@ -62,7 +66,10 @@ import {
 } from './orders.helpers.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
-import { assertValidOrderStatusTransition } from '../../lib/order-status-transitions.js'
+import {
+  assertValidOrderStatusTransition,
+  requiresDriverAssignment,
+} from '../../lib/order-status-transitions.js'
 
 const router = express.Router()
 
@@ -159,6 +166,21 @@ router.patch('/:id', async (req, res) => {
 
     // Add supplier_id to order object for notification logic
     order.supplier_id = supplier_id
+
+    if (requiresDriverAssignment(updateData.status)) {
+      const assignment = await getActiveDriverAssignment(id)
+      if (!assignment) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'DRIVER_REQUIRED',
+            message: 'Assign a driver before marking this order shipped or delivered.',
+          },
+          requestId: req.requestId,
+        })
+      }
+    }
 
     // Check permissions based on role and status transition
     if (req.userData.role === 'RESTAURANT') {

@@ -261,19 +261,19 @@ router.get(
       }
       const itemsQuery = supplierId
         ? `
-        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+        SELECT oi.*, COALESCE(p.name, 'Unavailable product') as product_name, COALESCE(p.sku, oi.product_id::text) as product_sku, COALESCE(p.unit, 'unit') AS unit,
           s.name as supplier_name
         FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
+        LEFT JOIN product p ON p.id = oi.product_id
         JOIN supplier s ON s.id = oi.supplier_id
         WHERE oi.order_id = $1 AND oi.supplier_id = $2
         ORDER BY p.name
       `
         : `
-        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+        SELECT oi.*, COALESCE(p.name, 'Unavailable product') as product_name, COALESCE(p.sku, oi.product_id::text) as product_sku, COALESCE(p.unit, 'unit') AS unit,
           s.name as supplier_name
         FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
+        LEFT JOIN product p ON p.id = oi.product_id
         JOIN supplier s ON s.id = oi.supplier_id
         WHERE oi.order_id = $1
         ORDER BY s.name, p.name
@@ -342,19 +342,19 @@ router.get(
       // Get order items (filter by supplier if supplier role)
       const itemsQuery = supplierId
         ? `
-        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+        SELECT oi.*, COALESCE(p.name, 'Unavailable product') as product_name, COALESCE(p.sku, oi.product_id::text) as product_sku, COALESCE(p.unit, 'unit') AS unit,
           s.name as supplier_name
         FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
+        LEFT JOIN product p ON p.id = oi.product_id
         JOIN supplier s ON s.id = oi.supplier_id
         WHERE oi.order_id = $1 AND oi.supplier_id = $2
         ORDER BY p.name
       `
         : `
-        SELECT oi.*, p.name as product_name, p.sku as product_sku, p.unit,
+        SELECT oi.*, COALESCE(p.name, 'Unavailable product') as product_name, COALESCE(p.sku, oi.product_id::text) as product_sku, COALESCE(p.unit, 'unit') AS unit,
           s.name as supplier_name
         FROM order_item oi
-        JOIN product p ON p.id = oi.product_id
+        LEFT JOIN product p ON p.id = oi.product_id
         JOIN supplier s ON s.id = oi.supplier_id
         WHERE oi.order_id = $1
         ORDER BY s.name, p.name

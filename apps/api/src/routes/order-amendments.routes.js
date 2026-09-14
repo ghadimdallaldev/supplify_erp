@@ -180,6 +180,9 @@ router.post(
     try {
       const { orderId, amendmentId } = req.params
       const order = await assertOrderAccess(req, orderId)
+      if (!canAmendOrderStatus(order.status)) {
+        throw new ValidationError('Order cannot be amended after processing')
+      }
       const { responseNotes } = req.body || {}
       const { amendment, newTotal } = await acceptAmendment(
         amendmentId,
@@ -230,14 +233,21 @@ router.post(
         `
       UPDATE order_amendments
       SET status = 'rejected', responded_by = $1, response_notes = $2, responded_at = NOW(), updated_at = NOW()
-      WHERE id = $3 AND order_id = $4 AND status = 'pending'
+      WHERE id = $3 AND order_id = $4 AND status = 'pending' AND requested_by <> $1
       RETURNING *
       `,
         [req.userData.id, notes, amendmentId, orderId]
       )
-      if (!rows.length) throw new NotFoundError('Pending amendment not found')
-      if (rows[0].requested_by === req.userData.id) {
-        throw new ValidationError('You cannot reject your own amendment request')
+      if (!rows.length) {
+        const { rows: ownPending } = await query(
+          `SELECT id FROM order_amendments
+           WHERE id = $1 AND order_id = $2 AND status = 'pending' AND requested_by = $3`,
+          [amendmentId, orderId, req.userData.id]
+        )
+        if (ownPending.length) {
+          throw new ValidationError('You cannot reject your own amendment request')
+        }
+        throw new NotFoundError('Pending amendment not found')
       }
 
       await notifyAmendmentParty(order, rows[0], 'rejected')
