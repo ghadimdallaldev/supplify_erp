@@ -42,6 +42,7 @@ export const ORG_SYSTEM_ROLES = [
       'CHAT_SEND',
       'FULFILLMENT_VIEW',
       'FULFILLMENT_MANAGE',
+      'FULFILLMENT_TRANSFER',
     ],
   },
   {
@@ -73,6 +74,7 @@ export const ORG_SYSTEM_ROLES = [
       'CHAT_SEND',
       'FULFILLMENT_VIEW',
       'FULFILLMENT_MANAGE',
+      'FULFILLMENT_TRANSFER',
     ],
   },
 ]

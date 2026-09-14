@@ -118,6 +118,7 @@ const CATEGORY_PREF_MAP = {
   quote_response_received: 'notify_order_new',
   billing_trial_extended: 'notify_billing',
   billing_account_locked: 'notify_billing',
+  fulfillment_transfer: 'notify_order_new',
   deal_submitted: 'notify_promotions',
   deal_rejected: 'notify_promotions',
   deal_expired: 'notify_promotions',
@@ -386,6 +387,35 @@ export async function notifyOrderStatusChange(order, status) {
   return notifyTenantUsers({
     tenantId: order.restaurant_id,
     tenantType: 'RESTAURANT',
+    ...payload,
+  })
+}
+export async function notifyFulfillmentTransfer({ orderId, supplierId, assignment, reason }) {
+  if (!orderId || !supplierId || !assignment) return null
+  const orderRef = orderShortId({ id: orderId })
+  const payload = {
+    notificationType: 'ORDER',
+    notificationCategory: 'FULFILLMENT_TRANSFER',
+    contentForLocale: (locale) => ({
+      title: nt('fulfillment.transfer.title', locale),
+      message: nt('fulfillment.transfer.message', locale, {
+        orderId: orderRef,
+        reason: reason || nt('fulfillment.transfer.defaultReason', locale),
+      }),
+    }),
+    referenceId: orderId,
+    referenceType: 'ORDER',
+    metadata: {
+      order_id: orderId,
+      assignment_id: assignment.id,
+      warehouse_id: assignment.warehouse_id,
+      assignment_source: 'manual',
+      reason: reason || null,
+    },
+  }
+  return notifyTenantUsers({
+    tenantId: supplierId,
+    tenantType: 'SUPPLIER',
     ...payload,
   })
 }

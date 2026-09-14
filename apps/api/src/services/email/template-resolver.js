@@ -41,6 +41,7 @@ const CATEGORY_TEMPLATE_MAP = {
   staff_announcement: 'staff.announcement',
   staff_document: 'staff.document',
   scheduled_order: 'order.scheduled',
+  fulfillment_transfer: 'order.fulfillment_issue',
   dispute_opened: 'dispute.opened',
   dispute_resolved: 'dispute.resolved',
   dispute_rejected: 'dispute.resolved',

@@ -130,6 +130,12 @@ function mockRestaurantCheckoutPreflight(
 ) {
   db.query
     .mockResolvedValueOnce({
+      rows: [{ id: 'restaurant-1', name: 'Restaurant', address_json: {} }],
+    }) // delivery location restaurant
+    .mockResolvedValueOnce({ rows: [] }) // no active restaurant branches
+
+  db.query
+    .mockResolvedValueOnce({
       rows: [
         {
           id: productId,
@@ -1007,6 +1013,9 @@ describe('Orders Routes', () => {
           rows: [{ supplier_id: 'supplier-1' }], // First item query for supplier_id
         })
         .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        }) // transactional order lock
+        .mockResolvedValueOnce({
           rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }], // UPDATE order
         })
         .mockResolvedValueOnce({
@@ -1038,6 +1047,9 @@ describe('Orders Routes', () => {
         .mockResolvedValueOnce({
           rows: [{ supplier_id: 'supplier-1' }],
         })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        }) // transactional order lock
         .mockResolvedValueOnce({
           rows: [
             {

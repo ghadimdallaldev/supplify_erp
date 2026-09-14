@@ -30,6 +30,7 @@ import {
   listPublicSupplierProducts,
   assertRestaurantNotBlocklisted,
   isUuid,
+  resolveSupplierScope,
 } from './public-supplier-catalog.service.js'
 import { NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 
@@ -121,6 +122,17 @@ describe('public-supplier-catalog.service', () => {
       .mockResolvedValueOnce({
         rows: [
           {
+            id: 'supplier-1',
+            tenant_id: 'supplier-1',
+            organization_id: null,
+            public_id: 'supplier-1',
+            public_name: 'Fresh Co',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
             id: 'product-1',
             name: 'Chicken',
             sku: 'CHK',
@@ -144,9 +156,46 @@ describe('public-supplier-catalog.service', () => {
   })
 
   it('assertRestaurantNotBlocklisted throws for blocklisted restaurant', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'supplier-1',
+            tenant_id: 'supplier-1',
+            organization_id: null,
+            public_id: 'supplier-1',
+            public_name: 'Fresh Co',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
     await expect(assertRestaurantNotBlocklisted('rest-1', 'supplier-1')).rejects.toBeInstanceOf(
       ForbiddenError
     )
+  })
+
+  it('returns all active child tenants for an organization without merging products', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'tenant-a',
+            tenant_id: 'tenant-a',
+            organization_id: 'org-1',
+            public_id: 'org-1',
+            public_name: 'Fresh Group',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'tenant-a' }, { id: 'tenant-b' }],
+      })
+
+    const scope = await resolveSupplierScope('org-1')
+    expect(scope).toMatchObject({
+      id: 'org-1',
+      tenantId: 'tenant-a',
+      supplierIds: ['tenant-a', 'tenant-b'],
+    })
   })
 })

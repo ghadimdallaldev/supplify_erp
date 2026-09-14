@@ -20,31 +20,60 @@ export const brandingUpdateSchema = z.object({
 
 export async function attachReviewFields(suppliers) {
   if (!suppliers.length) return suppliers
-  const ids = suppliers.map((s) => s.id)
+  const ids = [
+    ...new Set(
+      suppliers.flatMap((supplier) =>
+        Array.isArray(supplier.supplier_ids) && supplier.supplier_ids.length
+          ? supplier.supplier_ids
+          : [supplier.id]
+      )
+    ),
+  ]
   const [summaries, reviewsBySupplier] = await Promise.all([
     getSupplierRatingSummariesBatch(ids),
     getRecentReviewsForSuppliersBatch(ids, 3),
   ])
   return suppliers.map((s) => {
-    const summary = summaries.get(s.id) || {
-      avg_overall: 0,
-      review_count: 0,
+    const scopeIds =
+      Array.isArray(s.supplier_ids) && s.supplier_ids.length ? s.supplier_ids : [s.id]
+    let reviewCount = 0
+    let weightedRating = 0
+    const recentReviews = []
+    for (const id of scopeIds) {
+      const summary = summaries.get(id)
+      const count = Number(summary?.review_count || 0)
+      reviewCount += count
+      weightedRating += Number(summary?.avg_overall || 0) * count
+      recentReviews.push(...(reviewsBySupplier.get(id) || []))
     }
+    recentReviews.sort(
+      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    )
     return {
       ...s,
-      avg_overall: Number(summary.avg_overall) || 0,
-      review_count: summary.review_count ?? 0,
-      recent_reviews: reviewsBySupplier.get(s.id) || [],
+      avg_overall: reviewCount ? weightedRating / reviewCount : 0,
+      review_count: reviewCount,
+      recent_reviews: recentReviews.slice(0, 3),
     }
   })
 }
 
 export async function attachStoreDealFields(suppliers, { restaurantId } = {}) {
   if (!suppliers.length) return suppliers
-  const ids = suppliers.map((s) => s.id)
+  const ids = [
+    ...new Set(
+      suppliers.flatMap((supplier) =>
+        Array.isArray(supplier.supplier_ids) && supplier.supplier_ids.length
+          ? supplier.supplier_ids
+          : [supplier.id]
+      )
+    ),
+  ]
   const storeDeals = await getActiveStoreWideDealsBatch(ids, restaurantId)
   return suppliers.map((s) => {
-    const deal = storeDeals.get(s.id)
+    const scopeIds =
+      Array.isArray(s.supplier_ids) && s.supplier_ids.length ? s.supplier_ids : [s.id]
+    const deal = scopeIds.map((id) => storeDeals.get(id)).find(Boolean)
     return {
       ...s,
       has_store_deal: Boolean(deal),

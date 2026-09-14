@@ -372,6 +372,27 @@ router.patch('/:id', async (req, res) => {
     updateValues.push(id)
 
     const rows = await withTransaction(async (client) => {
+      const { rows: lockedOrders } = await client.query(
+        `SELECT * FROM customer_order WHERE id = $1 FOR UPDATE`,
+        [id]
+      )
+      if (!lockedOrders.length) throw new NotFoundError('Order not found')
+      const lockedOrder = lockedOrders[0]
+      if (lockedOrder.status !== order.status) {
+        const stateError = new ValidationError(
+          `Order state changed from ${order.status} to ${lockedOrder.status}; refresh and retry`
+        )
+        stateError.code = 'ORDER_STATE_CHANGED'
+        stateError.status = 409
+        throw stateError
+      }
+      if (updateData.status && updateData.status !== lockedOrder.status) {
+        assertValidOrderStatusTransition({
+          role: req.userData.role,
+          from: lockedOrder.status,
+          to: updateData.status,
+        })
+      }
       const { rows: updated } = await client.query(
         `
         UPDATE customer_order
@@ -383,14 +404,19 @@ router.patch('/:id', async (req, res) => {
       )
 
       if (updateData.status && updateData.status !== order.status) {
-        await syncWarehouseFulfillmentOnOrderStatus(client, id, updateData.status, order.status)
+        await syncWarehouseFulfillmentOnOrderStatus(
+          client,
+          id,
+          updateData.status,
+          lockedOrder.status
+        )
       }
 
       // Unified release: WH-assigned → release reservations; legacy-only → restore inventory.
       // syncWarehouse already releases WH on CANCELLED/REJECTED (idempotent).
       if (
         (updateData.status === 'CANCELLED' || updateData.status === 'REJECTED') &&
-        order.status !== updateData.status
+        lockedOrder.status !== updateData.status
       ) {
         await restoreSupplierStockForOrder(client, id)
       }

@@ -176,4 +176,26 @@ describe('restaurant-delivery-location.service', () => {
       ).rejects.toThrow('Branch not found')
     })
   })
+  it('requires an explicit location when multiple operational branches exist', async () => {
+    query
+      .mockResolvedValueOnce({
+        rows: [{ id: 'restaurant-1', name: 'Test Restaurant', address_json: {} }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'branch-1', name: 'Downtown', code: 'DT', address: {} },
+          { id: 'branch-2', name: 'Airport', code: 'AP', address: {} },
+        ],
+      })
+
+    const { resolveOrderDeliveryLocation } = await import(
+      './restaurant-delivery-location.service.js'
+    )
+    const error = await resolveOrderDeliveryLocation('restaurant-1').catch((value) => value)
+    expect(error).toBeInstanceOf(ValidationError)
+    expect(error).toMatchObject({
+      code: 'DELIVERY_LOCATION_REQUIRED',
+      details: { locationCount: 2 },
+    })
+  })
 })

@@ -1,6 +1,5 @@
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { query } from './db.js'
-import { getProofOfDelivery } from '../services/driver-fulfillment.service.js'
 
 /**
  * Look up whether this supplier requires proof of delivery before delivered status.
@@ -12,9 +11,11 @@ export async function isPodRequiredForSupplier(supplierId, dbQuery = query) {
   return Boolean(rows[0]?.pod_required)
 }
 
-export async function orderHasProofOfDeliveryRecord(orderId) {
-  const proof = await getProofOfDelivery(orderId)
-  return Boolean(proof)
+export async function orderHasProofOfDeliveryRecord(orderId, dbQuery = query) {
+  const { rows } = await dbQuery(`SELECT 1 FROM proof_of_delivery WHERE order_id = $1 LIMIT 1`, [
+    orderId,
+  ])
+  return Boolean(rows[0])
 }
 
 /** Response flags for delivery-status endpoints — podRequired reflects policy, not capture state. */
@@ -25,10 +26,20 @@ export async function resolveDeliveryPodFlags({ supplierId, orderId, deliverySta
   return { podRequired, hasPod }
 }
 
-export async function assertPodPresentWhenRequired({ supplierId, orderId, status }) {
+/**
+ * Ensure POD exists when the supplier requires it for `delivered`.
+ * Pass `dbQuery` (e.g. `client.query.bind(client)`) when validating inside a transaction
+ * so the check sees the same snapshot as the status mutation.
+ */
+export async function assertPodPresentWhenRequired({
+  supplierId,
+  orderId,
+  status,
+  dbQuery = query,
+}) {
   if (status !== 'delivered') return
-  if (!(await isPodRequiredForSupplier(supplierId))) return
-  const hasPod = await orderHasProofOfDeliveryRecord(orderId)
+  if (!(await isPodRequiredForSupplier(supplierId, dbQuery))) return
+  const hasPod = await orderHasProofOfDeliveryRecord(orderId, dbQuery)
   if (!hasPod) {
     throw new ValidationError('Proof of delivery is required before marking delivered')
   }

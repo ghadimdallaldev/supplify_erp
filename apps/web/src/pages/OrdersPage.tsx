@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   useGetOrdersQuery,
@@ -96,6 +96,7 @@ export function OrdersPage() {
       price?: number
     }>
   >([])
+  const manualPlacementKeyRef = useRef<string | null>(null)
   const { can } = usePermissions()
   const { isEffectiveSupplier: isSupplier } = useImpersonation()
   const { persona } = useWorkspaceRole()
@@ -218,10 +219,13 @@ export function OrdersPage() {
     }
 
     try {
+      const idempotencyKey =
+        manualPlacementKeyRef.current || (manualPlacementKeyRef.current = crypto.randomUUID())
       await createManualOrder({
         restaurant_id: selectedRestaurant,
         items: manualOrderItems,
         notes: orderNotes,
+        idempotencyKey,
       }).unwrap()
 
       toast.success(t('toast.orderCreated'))
@@ -230,10 +234,14 @@ export function OrdersPage() {
       setSelectedRestaurant('')
       setOrderNotes('')
       setManualOrderItems([])
+      manualPlacementKeyRef.current = null
       refetch()
     } catch (error: any) {
       const errorMessage = error?.data?.error?.message || t('toast.createFailed')
       const errorName = error?.data?.error?.name
+      if (errorName === 'IDEMPOTENCY_PAYLOAD_MISMATCH') {
+        manualPlacementKeyRef.current = null
+      }
 
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
       if (errorName === 'LIMIT_EXCEEDED') {

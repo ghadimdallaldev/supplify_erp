@@ -145,7 +145,7 @@ export function SupplierDetailPage() {
 
     try {
       const result = await createConversation({
-        supplierId: id,
+        supplierId: supplier.tenant_id || id,
       }).unwrap()
 
       toast.success(t('detail.toast.openingConversation'))
@@ -272,7 +272,13 @@ export function SupplierDetailPage() {
                           to="/app/quote-requests/new"
                           state={{
                             prefill: {
-                              supplierIds: [supplier.id],
+                              supplierIds: [
+                                ...new Set(
+                                  (productsData?.products ?? []).map(
+                                    (product) => product.supplier_id || supplier.tenant_id || id
+                                  )
+                                ),
+                              ],
                               items: (productsData?.products ?? []).slice(0, 5).map((p) => ({
                                 productId: p.id,
                                 quantity: 1,

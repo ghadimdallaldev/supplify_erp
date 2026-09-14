@@ -266,6 +266,9 @@ export interface PublicSupplier {
   id: string
   slug: string
   name: string
+  tenant_id?: string | null
+  supplier_organization_id?: string | null
+  organization_name?: string | null
   logoUrl?: string | null
   brandDisplayName?: string | null
   brandPrimary?: string | null
@@ -278,6 +281,7 @@ export interface PublicSupplier {
 
 export interface PublicSupplierProduct {
   id: string
+  supplierId?: string | null
   name: string
   sku: string
   category?: string | null

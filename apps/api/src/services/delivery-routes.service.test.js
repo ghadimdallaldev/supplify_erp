@@ -1,27 +1,69 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ValidationError } from '../middlewares/errorHandler.js'
 
 const queryMock = vi.fn()
 const clientQueryMock = vi.fn()
+let committedOps = []
+let pendingOps = []
+let txShouldFailAfterFn = false
 
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
-  withTransaction: (fn) => fn({ query: (...args) => clientQueryMock(...args) }),
+  withTransaction: async (fn) => {
+    pendingOps = []
+    const client = {
+      query: async (...args) => {
+        pendingOps.push({ sql: String(args[0]), params: args[1] })
+        return clientQueryMock(...args)
+      },
+    }
+    try {
+      const result = await fn(client)
+      if (txShouldFailAfterFn) {
+        throw new Error('simulated commit failure')
+      }
+      committedOps.push(...pendingOps)
+      return result
+    } catch (error) {
+      pendingOps = []
+      throw error
+    }
+  },
 }))
 
 const assertSupplierOwnsOrderMock = vi.fn().mockResolvedValue({ id: 'o1', status: 'SHIPPED' })
+const updateDeliveryStatusMock = vi.fn().mockResolvedValue({})
+const listActiveDriverAssignmentsMock = vi.fn().mockResolvedValue([])
+const runDeliveryPostCommitEffectsMock = vi.fn(async (effects = []) => {
+  for (const effect of effects) await effect()
+})
+const notifyEffectMock = vi.fn()
 
 vi.mock('./driver-fulfillment.service.js', () => ({
   assertSupplierOwnsOrder: (...args) => assertSupplierOwnsOrderMock(...args),
-  updateDeliveryStatus: vi.fn().mockResolvedValue({}),
-  getActiveDriverAssignment: vi.fn().mockResolvedValue(null),
+  updateDeliveryStatus: (...args) => updateDeliveryStatusMock(...args),
+  listActiveDriverAssignments: (...args) => listActiveDriverAssignmentsMock(...args),
+  runDeliveryPostCommitEffects: (...args) => runDeliveryPostCommitEffectsMock(...args),
+  DRIVER_STATUS_TRANSITIONS: {
+    assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
+    picked_up: ['out_for_delivery', 'failed', 'rescheduled'],
+    out_for_delivery: ['delivered', 'failed', 'rescheduled'],
+    rescheduled: ['assigned'],
+  },
 }))
 
+const invalidateDispatchCacheForSupplierMock = vi.fn()
+
 vi.mock('../lib/dispatch-cache.js', () => ({
-  invalidateDispatchCacheForSupplier: vi.fn(),
+  invalidateDispatchCacheForSupplier: (...args) => invalidateDispatchCacheForSupplierMock(...args),
 }))
 
 vi.mock('../lib/delivery-zone-join.js', () => ({
   getDeliveryZoneJoinSql: vi.fn().mockResolvedValue(''),
+}))
+
+vi.mock('./driver-location.service.js', () => ({
+  getLatestLocationsForDrivers: vi.fn().mockResolvedValue(new Map()),
 }))
 
 describe('delivery-routes.service', () => {
@@ -29,6 +71,11 @@ describe('delivery-routes.service', () => {
     vi.clearAllMocks()
     queryMock.mockReset()
     clientQueryMock.mockReset()
+    committedOps = []
+    pendingOps = []
+    txShouldFailAfterFn = false
+    updateDeliveryStatusMock.mockResolvedValue({})
+    listActiveDriverAssignmentsMock.mockResolvedValue([])
   })
 
   it('rejects order already on active route', async () => {
@@ -222,10 +269,8 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock.mockResolvedValue({ rowCount: 1 })
 
@@ -254,7 +299,6 @@ describe('delivery-routes.service', () => {
         },
       ],
     })
-    queryMock.mockResolvedValueOnce({ rows: [] })
     queryMock.mockResolvedValueOnce({ rows: [] })
 
     await expect(reorderRouteStops('s1', 'r1', ['stop-a'])).rejects.toThrow(/finished route/i)
@@ -340,10 +384,8 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock.mockResolvedValue({ rowCount: 1 })
 
@@ -373,9 +415,7 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, driver_name: 'Alex' }] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED', driver_name: 'Alex' }] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
     const route = await cancelDeliveryRoute('s1', 'r1')
@@ -405,9 +445,7 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [baseRoute] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...baseRoute, status: 'CANCELLED' }] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
     await cancelDeliveryRoute('s1', 'r1')
@@ -591,12 +629,265 @@ describe('delivery-routes.service', () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ ...routeRow, driver_name: 'Alex' }] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...routeRow, driver_name: 'Alex' }] })
       .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [] })
 
     const route = await buildDriverRouteFromAssignments('s1', 'd1')
     expect(route.stops.length).toBe(2)
+  })
+
+  describe('updateRouteStop atomicity', () => {
+    const routeId = 'r1'
+    const stopId = 'stop-1'
+    const orderId = 'o1'
+
+    function mockSuccessfulRouteReload({
+      routeStatus = 'IN_PROGRESS',
+      stopStatus = 'COMPLETED',
+    } = {}) {
+      const routeRow = {
+        id: routeId,
+        route_number: 'R-1',
+        route_label: 'R-1',
+        area: null,
+        driver_id: 'd1',
+        driver_name: 'Alex',
+        driver_name_legacy: null,
+        vehicle_info: null,
+        status: routeStatus,
+        scheduled_date: '2026-05-28',
+        started_at: null,
+        completed_at: routeStatus === 'COMPLETED' ? new Date() : null,
+      }
+      const stopRows = [
+        {
+          id: stopId,
+          route_id: routeId,
+          order_id: orderId,
+          sequence_number: 1,
+          status: stopStatus,
+          restaurant_name: 'Cafe',
+          address_json: {},
+          total_amount: 0,
+          item_count: 0,
+          notes: null,
+          completed_at: null,
+          assignment_status: 'delivered',
+          destination_latitude: null,
+          destination_longitude: null,
+          delivery_area: 'North',
+        },
+      ]
+      queryMock
+        .mockResolvedValueOnce({ rows: [routeRow] })
+        .mockResolvedValueOnce({ rows: stopRows })
+    }
+
+    it('rolls back earlier assignment work when a later leg fails', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1' },
+      ])
+
+      updateDeliveryStatusMock
+        .mockImplementationOnce(async ({ client, postCommitEffects }) => {
+          await client.query('UPDATE driver_assignments SET status = $1 WHERE id = $2', [
+            'delivered',
+            'da-a',
+          ])
+          postCommitEffects.push(() => notifyEffectMock('leg-a'))
+          return { id: 'da-a', status: 'delivered' }
+        })
+        .mockImplementationOnce(async () => {
+          throw new ValidationError('Cannot transition from out_for_delivery to delivered')
+        })
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      await expect(
+        updateRouteStop('s1', routeId, stopId, { status: 'DELIVERED', userId: 'u1' })
+      ).rejects.toThrow(/Cannot transition/)
+
+      expect(committedOps).toHaveLength(0)
+      expect(notifyEffectMock).not.toHaveBeenCalled()
+      expect(invalidateDispatchCacheForSupplierMock).not.toHaveBeenCalled()
+      expect(
+        pendingOps.some((op) => op.sql.includes('UPDATE route_stop')) ||
+          committedOps.some((op) => op.sql.includes('UPDATE route_stop'))
+      ).toBe(false)
+    })
+
+    it('does not commit stop/route changes or side effects when commit fails', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+      txShouldFailAfterFn = true
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+      ])
+
+      updateDeliveryStatusMock.mockImplementationOnce(async ({ client, postCommitEffects }) => {
+        await client.query('UPDATE driver_assignments SET status = $1 WHERE id = $2', [
+          'delivered',
+          'da-a',
+        ])
+        postCommitEffects.push(() => notifyEffectMock('delivered'))
+        return { id: 'da-a', status: 'delivered' }
+      })
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
+        }
+        if (text.includes('SELECT status FROM route_stop')) {
+          return { rows: [{ status: 'COMPLETED' }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      await expect(
+        updateRouteStop('s1', routeId, stopId, { status: 'DELIVERED', userId: 'u1' })
+      ).rejects.toThrow(/simulated commit failure/)
+
+      expect(committedOps).toHaveLength(0)
+      expect(notifyEffectMock).not.toHaveBeenCalled()
+      expect(runDeliveryPostCommitEffectsMock).not.toHaveBeenCalled()
+      expect(invalidateDispatchCacheForSupplierMock).not.toHaveBeenCalled()
+    })
+
+    it('advances multi-leg assignments, completes the final stop, and notifies after commit', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1' },
+      ])
+
+      updateDeliveryStatusMock.mockImplementation(
+        async ({ client, postCommitEffects, driverAssignmentId }) => {
+          await client.query('UPDATE driver_assignments SET status = $1 WHERE id = $2', [
+            'delivered',
+            driverAssignmentId,
+          ])
+          postCommitEffects.push(() => notifyEffectMock(driverAssignmentId))
+          return { id: driverAssignmentId, status: 'delivered' }
+        }
+      )
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
+        }
+        if (text.includes('SELECT status FROM route_stop')) {
+          return { rows: [{ status: 'COMPLETED' }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      mockSuccessfulRouteReload({ routeStatus: 'COMPLETED', stopStatus: 'COMPLETED' })
+
+      const result = await updateRouteStop('s1', routeId, stopId, {
+        status: 'DELIVERED',
+        userId: 'u1',
+      })
+
+      expect(updateDeliveryStatusMock).toHaveBeenCalledTimes(2)
+      expect(updateDeliveryStatusMock.mock.calls[0][0].client).toBeTruthy()
+      expect(updateDeliveryStatusMock.mock.calls[1][0].client).toBe(
+        updateDeliveryStatusMock.mock.calls[0][0].client
+      )
+      expect(committedOps.some((op) => op.sql.includes('UPDATE route_stop'))).toBe(true)
+      expect(
+        committedOps.some(
+          (op) => op.sql.includes('UPDATE delivery_route') && op.sql.includes("'COMPLETED'")
+        )
+      ).toBe(true)
+      expect(runDeliveryPostCommitEffectsMock).toHaveBeenCalled()
+      expect(notifyEffectMock).toHaveBeenCalledWith('da-a')
+      expect(notifyEffectMock).toHaveBeenCalledWith('da-b')
+      expect(invalidateDispatchCacheForSupplierMock).toHaveBeenCalledWith('s1')
+      expect(result.status).toBe('COMPLETED')
+    })
+
+    it('leaves the route IN_PROGRESS when other stops remain open', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+      ])
+      updateDeliveryStatusMock.mockResolvedValueOnce({ id: 'da-a', status: 'delivered' })
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
+        }
+        if (text.includes('SELECT status FROM route_stop')) {
+          return { rows: [{ status: 'COMPLETED' }, { status: 'PLANNED' }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      mockSuccessfulRouteReload({ routeStatus: 'IN_PROGRESS', stopStatus: 'COMPLETED' })
+
+      const result = await updateRouteStop('s1', routeId, stopId, {
+        status: 'DELIVERED',
+        userId: 'u1',
+      })
+
+      expect(
+        committedOps.some(
+          (op) => op.sql.includes('UPDATE delivery_route') && op.sql.includes("'COMPLETED'")
+        )
+      ).toBe(false)
+      expect(result.status).toBe('IN_PROGRESS')
+    })
+
+    it('rejects invalid assignment transitions before mutating the stop', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'assigned', supplier_id: 's1' },
+      ])
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'PLANNED', notes: null }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      await expect(
+        updateRouteStop('s1', routeId, stopId, { status: 'DELIVERED', userId: 'u1' })
+      ).rejects.toThrow(/Cannot transition from assigned to delivered/)
+
+      expect(updateDeliveryStatusMock).not.toHaveBeenCalled()
+      expect(committedOps).toHaveLength(0)
+    })
   })
 })

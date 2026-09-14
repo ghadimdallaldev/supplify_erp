@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { logger } from '../lib/logger.js'
 import { buildObjectPublicUrl } from './storage/storage.service.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import {
@@ -12,6 +13,24 @@ import {
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 import { assertPodPresentWhenRequired } from '../lib/pod-requirement.js'
+
+function dbQuery(client) {
+  return client ? (text, params) => client.query(text, params) : query
+}
+
+/** Run irreversible side effects after DB commit; failures must not undo committed state. */
+export async function runDeliveryPostCommitEffects(effects = []) {
+  for (const effect of effects) {
+    try {
+      await effect()
+    } catch (error) {
+      logger.warn({
+        event: 'delivery.status.side_effect.failed',
+        error: error?.message ?? String(error),
+      })
+    }
+  }
+}
 
 export const DRIVER_STATUS_TRANSITIONS = {
   assigned: ['picked_up', 'out_for_delivery', 'failed', 'reassigned', 'rescheduled'],
@@ -45,9 +64,15 @@ export async function assertRestaurantOwnsOrder(restaurantId, orderId) {
   return rows[0]
 }
 
-export async function getActiveDriverAssignment(orderId, warehouseAssignmentId = null) {
+export async function getActiveDriverAssignment(
+  orderId,
+  warehouseAssignmentId = null,
+  { client = null, forUpdate = false } = {}
+) {
+  const run = dbQuery(client)
+  const lock = forUpdate && client ? ' FOR UPDATE OF da' : ''
   if (warehouseAssignmentId) {
-    const { rows } = await query(
+    const { rows } = await run(
       `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
               d.vehicle_type, d.vehicle_plate
        FROM driver_assignments da
@@ -56,47 +81,57 @@ export async function getActiveDriverAssignment(orderId, warehouseAssignmentId =
          AND da.warehouse_assignment_id = $2
          AND da.status = ANY($3::text[])
        ORDER BY da.assigned_at DESC
-       LIMIT 1`,
+       LIMIT 1${lock}`,
       [orderId, warehouseAssignmentId, ACTIVE_ASSIGNMENT_STATUSES]
     )
     return rows[0] ?? null
   }
 
-  const { rows } = await query(
+  const { rows } = await run(
     `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
             d.vehicle_type, d.vehicle_plate
      FROM driver_assignments da
      JOIN drivers d ON d.id = da.driver_id
      WHERE da.order_id = $1 AND da.status = ANY($2::text[])
      ORDER BY da.assigned_at DESC
-     LIMIT 1`,
+     LIMIT 1${lock}`,
     [orderId, ACTIVE_ASSIGNMENT_STATUSES]
   )
   return rows[0] ?? null
 }
 
-export async function listActiveDriverAssignments(orderId) {
-  const { rows } = await query(
+export async function listActiveDriverAssignments(
+  orderId,
+  { client = null, forUpdate = false } = {}
+) {
+  const run = dbQuery(client)
+  const lock = forUpdate && client ? ' FOR UPDATE OF da' : ''
+  const { rows } = await run(
     `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
             d.vehicle_type, d.vehicle_plate
      FROM driver_assignments da
      JOIN drivers d ON d.id = da.driver_id
      WHERE da.order_id = $1 AND da.status = ANY($2::text[])
-     ORDER BY da.assigned_at DESC`,
+     ORDER BY da.assigned_at DESC${lock}`,
     [orderId, ACTIVE_ASSIGNMENT_STATUSES]
   )
   return rows
 }
 
-export async function getLatestDriverAssignment(orderId) {
-  const { rows } = await query(
+export async function getLatestDriverAssignment(
+  orderId,
+  { client = null, forUpdate = false } = {}
+) {
+  const run = dbQuery(client)
+  const lock = forUpdate && client ? ' FOR UPDATE OF da' : ''
+  const { rows } = await run(
     `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone,
             d.vehicle_type, d.vehicle_plate
      FROM driver_assignments da
      JOIN drivers d ON d.id = da.driver_id
      WHERE da.order_id = $1 AND da.status <> ALL($2::text[])
      ORDER BY da.created_at DESC
-     LIMIT 1`,
+     LIMIT 1${lock}`,
     [orderId, NON_REASSIGNED_STATUSES]
   )
   return rows[0] ?? null
@@ -110,14 +145,18 @@ async function resolveDriverAssignmentForStatusUpdate({
   status,
   driverAssignmentId,
   warehouseAssignmentId,
+  client = null,
+  forUpdate = false,
 }) {
+  const run = dbQuery(client)
+  const lock = forUpdate && client ? ' FOR UPDATE OF da' : ''
   if (driverAssignmentId) {
-    const { rows } = await query(
+    const { rows } = await run(
       `SELECT ${DRIVER_ASSIGNMENT_SELECT}
        FROM driver_assignments da
        JOIN drivers d ON d.id = da.driver_id
        WHERE da.id = $1 AND da.order_id = $2
-       LIMIT 1`,
+       LIMIT 1${lock}`,
       [driverAssignmentId, orderId]
     )
     if (!rows.length) {
@@ -127,7 +166,10 @@ async function resolveDriverAssignmentForStatusUpdate({
   }
 
   if (warehouseAssignmentId) {
-    const assignment = await getActiveDriverAssignment(orderId, warehouseAssignmentId)
+    const assignment = await getActiveDriverAssignment(orderId, warehouseAssignmentId, {
+      client,
+      forUpdate,
+    })
     if (!assignment) {
       throw new ValidationError('No active driver assignment for this warehouse leg')
     }
@@ -135,10 +177,10 @@ async function resolveDriverAssignmentForStatusUpdate({
   }
 
   if (status === 'assigned') {
-    return getLatestDriverAssignment(orderId)
+    return getLatestDriverAssignment(orderId, { client, forUpdate })
   }
 
-  const active = await listActiveDriverAssignments(orderId)
+  const active = await listActiveDriverAssignments(orderId, { client, forUpdate })
   if (active.length === 0) return null
   if (active.length === 1) return active[0]
   throw new ValidationError(
@@ -267,6 +309,17 @@ export async function assignDriverToOrder({
   return created.length === 1 ? created[0] : created
 }
 
+/**
+ * Advance a driver assignment status.
+ *
+ * @param {object} opts
+ * @param {import('pg').PoolClient} [opts.client] - When set, DB work joins this transaction
+ *   (caller owns COMMIT/ROLLBACK). Notifications are queued on `postCommitEffects` and must
+ *   run only after the outer transaction commits.
+ * @param {Array<() => Promise<void>>} [opts.postCommitEffects] - Mutable bag for deferred
+ *   side effects when `client` is provided. Ignored for standalone calls (effects run after
+ *   this function's own commit).
+ */
 export async function updateDeliveryStatus({
   supplierId,
   orderId,
@@ -276,12 +329,88 @@ export async function updateDeliveryStatus({
   userId,
   driverAssignmentId = null,
   warehouseAssignmentId = null,
+  client = null,
+  postCommitEffects = null,
+}) {
+  if (client) {
+    return applyDeliveryStatusUpdate({
+      supplierId,
+      orderId,
+      status,
+      notes,
+      failureReason,
+      driverAssignmentId,
+      warehouseAssignmentId,
+      client,
+      postCommitEffects: postCommitEffects ?? [],
+    })
+  }
+
+  // Fast path (unlocked): preserve prior behavior of skipping a transaction on no-ops.
+  const peek = await resolveDriverAssignmentForStatusUpdate({
+    orderId,
+    status,
+    driverAssignmentId,
+    warehouseAssignmentId,
+  })
+  if (!peek || peek.supplier_id !== supplierId) {
+    throw new ValidationError('No active driver assignment for this order')
+  }
+  if (status === 'assigned' && peek.status !== 'rescheduled') {
+    throw new ValidationError('Only rescheduled assignments can be marked ready to dispatch')
+  }
+  if (peek.status === status) {
+    if (notes == null && !(status === 'failed' && failureReason)) {
+      return peek
+    }
+  } else {
+    const allowed = DRIVER_STATUS_TRANSITIONS[peek.status] ?? []
+    if (!allowed.includes(status)) {
+      throw new ValidationError(`Cannot transition from ${peek.status} to ${status}`)
+    }
+  }
+
+  await assertPodPresentWhenRequired({ supplierId, orderId, status })
+
+  const effects = []
+  const result = await withTransaction((txClient) =>
+    applyDeliveryStatusUpdate({
+      supplierId,
+      orderId,
+      status,
+      notes,
+      failureReason,
+      driverAssignmentId,
+      warehouseAssignmentId,
+      client: txClient,
+      postCommitEffects: effects,
+      // Skip duplicate transition/POD checks already done unlocked; re-validate under lock.
+      skipPrechecks: false,
+    })
+  )
+  await runDeliveryPostCommitEffects(effects)
+  await invalidateDispatchCacheForSupplier(supplierId)
+  return result
+}
+
+async function applyDeliveryStatusUpdate({
+  supplierId,
+  orderId,
+  status,
+  notes,
+  failureReason,
+  driverAssignmentId,
+  warehouseAssignmentId,
+  client,
+  postCommitEffects,
 }) {
   const assignment = await resolveDriverAssignmentForStatusUpdate({
     orderId,
     status,
     driverAssignmentId,
     warehouseAssignmentId,
+    client,
+    forUpdate: true,
   })
   if (!assignment || assignment.supplier_id !== supplierId) {
     throw new ValidationError('No active driver assignment for this order')
@@ -302,163 +431,174 @@ export async function updateDeliveryStatus({
     }
   }
 
-  await assertPodPresentWhenRequired({ supplierId, orderId, status })
+  // Validate POD against the locked transaction snapshot before mutating.
+  await assertPodPresentWhenRequired({
+    supplierId,
+    orderId,
+    status,
+    dbQuery: (text, params) => client.query(text, params),
+  })
 
-  const result = await withTransaction(async (client) => {
-    let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
-    const params = [status, notes ?? null]
-    let orderMarkedDelivered = false
+  let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
+  const params = [status, notes ?? null]
+  let orderMarkedDelivered = false
 
-    if (status === 'picked_up') {
-      assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
-    } else if (status === 'out_for_delivery') {
-      assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
-    } else if (status === 'delivered') {
-      assignmentUpdate += `, delivered_at = now()`
-    } else if (status === 'failed') {
-      assignmentUpdate += `, failed_at = now(), failure_reason = $3`
-      params.push(failureReason ?? null)
-    } else if (status === 'rescheduled') {
-      assignmentUpdate += `, notes = COALESCE($2, notes)`
-    } else if (status === 'assigned' && assignment.status === 'rescheduled') {
-      assignmentUpdate += `, scheduled_delivery_date = CURRENT_DATE`
+  if (status === 'picked_up') {
+    assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
+  } else if (status === 'out_for_delivery') {
+    assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
+  } else if (status === 'delivered') {
+    assignmentUpdate += `, delivered_at = now()`
+  } else if (status === 'failed') {
+    assignmentUpdate += `, failed_at = now(), failure_reason = $3`
+    params.push(failureReason ?? null)
+  } else if (status === 'rescheduled') {
+    assignmentUpdate += `, notes = COALESCE($2, notes)`
+  } else if (status === 'assigned' && assignment.status === 'rescheduled') {
+    assignmentUpdate += `, scheduled_delivery_date = CURRENT_DATE`
+  }
+
+  const whereParam = params.length + 1
+  // Compare-and-set: refuse if another writer already moved this assignment.
+  params.push(assignment.id, assignment.status)
+  const { rowCount } = await client.query(
+    `UPDATE driver_assignments SET ${assignmentUpdate}
+     WHERE id = $${whereParam} AND status = $${whereParam + 1}`,
+    params
+  )
+  if (rowCount === 0 && assignment.status !== status) {
+    throw new ValidationError(
+      `Cannot transition from ${assignment.status} to ${status}; assignment changed concurrently`
+    )
+  }
+
+  const { rows: whRows } = await client.query(
+    `SELECT warehouse_id FROM order_warehouse_assignment
+     WHERE id = $1`,
+    [assignment.warehouse_assignment_id]
+  )
+  const warehouseId = whRows[0]?.warehouse_id ?? null
+
+  if (status === 'delivered') {
+    const { rows: orders } = await client.query(
+      `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+    const oldStatus = orders[0]?.status
+
+    // Driver delivery may only promote the order to DELIVERED after SHIPPED
+    // (or leave it already DELIVERED). Earlier fulfillment states must ship first.
+    if (oldStatus && oldStatus !== 'SHIPPED' && oldStatus !== 'DELIVERED') {
+      throw new ValidationError(
+        `Cannot mark order delivered from ${oldStatus}; order must be shipped first`
+      )
     }
 
-    const whereParam = params.length + 1
-    params.push(assignment.id)
-
-    await client.query(
-      `UPDATE driver_assignments SET ${assignmentUpdate} WHERE id = $${whereParam}`,
-      params
-    )
-
-    const { rows: whRows } = await client.query(
-      `SELECT warehouse_id FROM order_warehouse_assignment
-       WHERE id = $1`,
-      [assignment.warehouse_assignment_id]
-    )
-    const warehouseId = whRows[0]?.warehouse_id ?? null
-
-    if (status === 'delivered') {
-      const { rows: orders } = await client.query(
-        `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
-        [orderId]
-      )
-      const oldStatus = orders[0]?.status
-
-      // Driver delivery may only promote the order to DELIVERED after SHIPPED
-      // (or leave it already DELIVERED). Earlier fulfillment states must ship first.
-      if (oldStatus && oldStatus !== 'SHIPPED' && oldStatus !== 'DELIVERED') {
-        throw new ValidationError(
-          `Cannot mark order delivered from ${oldStatus}; order must be shipped first`
-        )
-      }
-
-      if (assignment.warehouse_assignment_id) {
-        await markWarehouseAssignmentDelivered(client, orderId, assignment.warehouse_assignment_id)
-        // Order is DELIVERED only when every warehouse leg succeeded. Mixed
-        // delivered+failed legs stay at the current order status (typically SHIPPED).
-        const allDelivered = await allWarehouseAssignmentsDelivered(client, orderId)
-        if (allDelivered && oldStatus === 'SHIPPED') {
-          await client.query(
-            `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
-            [orderId]
-          )
-          orderMarkedDelivered = true
-        }
-      } else if (oldStatus === 'SHIPPED') {
+    if (assignment.warehouse_assignment_id) {
+      await markWarehouseAssignmentDelivered(client, orderId, assignment.warehouse_assignment_id)
+      // Order is DELIVERED only when every warehouse leg succeeded. Mixed
+      // delivered+failed legs stay at the current order status (typically SHIPPED).
+      const allDelivered = await allWarehouseAssignmentsDelivered(client, orderId)
+      if (allDelivered && oldStatus === 'SHIPPED') {
         await client.query(
           `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
           [orderId]
         )
         orderMarkedDelivered = true
-        await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', oldStatus)
-        await client.query(
-          `UPDATE order_warehouse_assignment
-           SET status = 'delivered'
-           WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
-          [orderId]
-        )
       }
-    }
-
-    if (status === 'failed') {
-      if (assignment.warehouse_assignment_id) {
-        await releaseInventoryForAssignment(client, orderId, assignment.warehouse_assignment_id)
-      } else {
-        await releaseInventoryForFailedDelivery(client, orderId)
-      }
-      await createFulfillmentException(client, {
-        supplierId,
-        orderId,
-        driverAssignmentId: assignment.id,
-        warehouseId,
-        type: 'failed_delivery',
-        description: failureReason
-          ? `Driver delivery failed: ${failureReason}`
-          : 'Driver marked delivery as failed',
-      })
-    }
-
-    const { rows: updatedAssignment } = await client.query(
-      `SELECT da.*, d.full_name AS driver_name
-       FROM driver_assignments da
-       JOIN drivers d ON d.id = da.driver_id
-       WHERE da.id = $1`,
-      [assignment.id]
-    )
-
-    try {
-      const { rows: orderRows } = await query(
-        `SELECT o.*, s.name AS supplier_name, r.name AS restaurant_name
-         FROM customer_order o
-         JOIN order_item oi ON oi.order_id = o.id
-         JOIN supplier s ON s.id = oi.supplier_id
-         JOIN restaurant r ON r.id = o.restaurant_id
-         WHERE o.id = $1
-         LIMIT 1`,
+    } else if (oldStatus === 'SHIPPED') {
+      await client.query(
+        `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
         [orderId]
       )
-      if (orderRows[0]) {
-        orderRows[0].supplier_id = supplierId
-        if (status === 'delivered') {
-          if (orderMarkedDelivered) {
-            await notifyOrderStatusChange(orderRows[0], 'DELIVERED')
-          }
-          await notifyDriverDeliveryMilestone({
-            order: orderRows[0],
-            supplierId,
-            milestone: 'delivered',
-            driverName: updatedAssignment[0]?.driver_name,
-            driverId: assignment.driver_id,
-          })
-        } else if (status === 'out_for_delivery') {
-          await notifyDriverDeliveryMilestone({
-            order: orderRows[0],
-            supplierId,
-            milestone: 'out_for_delivery',
-            driverName: updatedAssignment[0]?.driver_name,
-            driverId: assignment.driver_id,
-          })
-        } else if (status === 'failed') {
-          await notifyDriverDeliveryMilestone({
-            order: orderRows[0],
-            supplierId,
-            milestone: 'failed_delivery',
-            driverName: updatedAssignment[0]?.driver_name,
-            driverId: assignment.driver_id,
-          })
-        }
-      }
-    } catch {
-      /* non-blocking */
+      orderMarkedDelivered = true
+      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', oldStatus)
+      await client.query(
+        `UPDATE order_warehouse_assignment
+         SET status = 'delivered'
+         WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+        [orderId]
+      )
     }
+  }
 
-    return updatedAssignment[0]
-  })
+  if (status === 'failed') {
+    if (assignment.warehouse_assignment_id) {
+      await releaseInventoryForAssignment(client, orderId, assignment.warehouse_assignment_id)
+    } else {
+      await releaseInventoryForFailedDelivery(client, orderId)
+    }
+    await createFulfillmentException(client, {
+      supplierId,
+      orderId,
+      driverAssignmentId: assignment.id,
+      warehouseId,
+      type: 'failed_delivery',
+      description: failureReason
+        ? `Driver delivery failed: ${failureReason}`
+        : 'Driver marked delivery as failed',
+    })
+  }
 
-  await invalidateDispatchCacheForSupplier(supplierId)
-  return result
+  const { rows: updatedAssignment } = await client.query(
+    `SELECT da.*, d.full_name AS driver_name
+     FROM driver_assignments da
+     JOIN drivers d ON d.id = da.driver_id
+     WHERE da.id = $1`,
+    [assignment.id]
+  )
+
+  const { rows: orderRows } = await client.query(
+    `SELECT o.*, s.name AS supplier_name, r.name AS restaurant_name
+     FROM customer_order o
+     JOIN order_item oi ON oi.order_id = o.id
+     JOIN supplier s ON s.id = oi.supplier_id
+     JOIN restaurant r ON r.id = o.restaurant_id
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId]
+  )
+  if (orderRows[0]) {
+    const order = { ...orderRows[0], supplier_id: supplierId }
+    const driverName = updatedAssignment[0]?.driver_name
+    const driverId = assignment.driver_id
+    if (status === 'delivered') {
+      if (orderMarkedDelivered) {
+        postCommitEffects.push(() => notifyOrderStatusChange(order, 'DELIVERED'))
+      }
+      postCommitEffects.push(() =>
+        notifyDriverDeliveryMilestone({
+          order,
+          supplierId,
+          milestone: 'delivered',
+          driverName,
+          driverId,
+        })
+      )
+    } else if (status === 'out_for_delivery') {
+      postCommitEffects.push(() =>
+        notifyDriverDeliveryMilestone({
+          order,
+          supplierId,
+          milestone: 'out_for_delivery',
+          driverName,
+          driverId,
+        })
+      )
+    } else if (status === 'failed') {
+      postCommitEffects.push(() =>
+        notifyDriverDeliveryMilestone({
+          order,
+          supplierId,
+          milestone: 'failed_delivery',
+          driverName,
+          driverId,
+        })
+      )
+    }
+  }
+
+  return updatedAssignment[0]
 }
 
 async function resolveActiveDriverAssignmentForReassign({

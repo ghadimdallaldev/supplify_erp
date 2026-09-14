@@ -334,7 +334,7 @@ async function insertAssignment(
 /**
  * Assign warehouses to an order within an existing transaction.
  */
-export async function assignWarehousesToOrder(
+async function assignWarehousesToOrderLegacy(
   client,
   { order, orderItems, supplier, multiWarehouseActive }
 ) {
@@ -471,4 +471,292 @@ export function buildSimulationFromPayload({
     restaurantInZoneByWarehouse,
     defaultWarehouseId,
   })
+}
+function ruleMatchesCandidate(item, warehouseId, rules) {
+  const productRules = rules.filter(
+    (rule) =>
+      rule.rule_type === 'product' && rule.product_id === (item.product_id ?? item.productId)
+  )
+  if (productRules.length && !productRules.some((rule) => rule.warehouse_id === warehouseId)) {
+    return false
+  }
+
+  const categoryRules = rules.filter(
+    (rule) => rule.rule_type === 'category' && rule.category_id === item.category_id
+  )
+  if (
+    !productRules.length &&
+    categoryRules.length &&
+    !categoryRules.some((rule) => rule.warehouse_id === warehouseId)
+  ) {
+    return false
+  }
+
+  return true
+}
+
+function candidateRuleRank(items, warehouseId, rules, zoneEligible) {
+  const matching = []
+  for (const item of items) {
+    const productRule = rules.find(
+      (rule) =>
+        rule.rule_type === 'product' &&
+        rule.product_id === (item.product_id ?? item.productId) &&
+        rule.warehouse_id === warehouseId
+    )
+    const categoryRule = rules.find(
+      (rule) =>
+        rule.rule_type === 'category' &&
+        rule.category_id === item.category_id &&
+        rule.warehouse_id === warehouseId
+    )
+    if (productRule) matching.push([1, Number(productRule.priority ?? 1)])
+    else if (categoryRule) matching.push([2, Number(categoryRule.priority ?? 1)])
+  }
+  if (zoneEligible) {
+    const zoneRule = rules.find(
+      (rule) => rule.rule_type === 'zone' && rule.warehouse_id === warehouseId
+    )
+    if (zoneRule) matching.push([3, Number(zoneRule.priority ?? 1)])
+  }
+  const defaultRule = rules.find(
+    (rule) => rule.rule_type === 'default' && rule.warehouse_id === warehouseId
+  )
+  if (defaultRule) matching.push([5, Number(defaultRule.priority ?? 1)])
+  if (!matching.length) return [4, Number.MAX_SAFE_INTEGER]
+  matching.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  return matching[0]
+}
+
+/**
+ * Resolve one warehouse for the complete order. The context is deliberately
+ * supplier-tenant scoped: organization membership alone never permits a
+ * sibling tenant's warehouse to fulfill another tenant's product.
+ */
+export function resolveSingleWarehouseForOrder(items, context) {
+  const warehouses = (context.warehouses || []).filter((warehouse) => warehouse.is_active !== false)
+  const rules = (context.rules || []).filter((rule) => rule.is_active !== false)
+  const failures = []
+  const eligible = []
+
+  for (const warehouse of warehouses) {
+    const warehouseFailures = []
+    if (context.zoneEligibleByWarehouse?.get(warehouse.id) === false) {
+      warehouseFailures.push({ code: 'OUTSIDE_SERVICE_ZONE' })
+    }
+    for (const item of items) {
+      const productId = item.product_id ?? item.productId
+      if (!ruleMatchesCandidate(item, warehouse.id, rules)) {
+        warehouseFailures.push({ productId, code: 'CATALOG_OR_ROUTING_RULE_MISMATCH' })
+        continue
+      }
+      const stock = context.warehouseStock?.get(`${warehouse.id}:${productId}`)
+      if (!stock || Number(stock.quantity_available) < Number(item.quantity)) {
+        warehouseFailures.push({ productId, code: 'INSUFFICIENT_STOCK' })
+      }
+    }
+    if (!warehouseFailures.length) {
+      const [ruleRank, rulePriority] = candidateRuleRank(
+        items,
+        warehouse.id,
+        rules,
+        context.zoneEligibleByWarehouse?.get(warehouse.id) === true
+      )
+      const isDefault =
+        warehouse.id === context.defaultWarehouseId ||
+        Boolean(warehouse.is_default ?? warehouse.is_main)
+      const warehousePoint = extractLatLng(warehouse.address)
+      const destinationPoint = extractLatLng(context.destinationAddress)
+      const distance =
+        warehousePoint && destinationPoint
+          ? haversineDistanceKm(
+              warehousePoint.lat,
+              warehousePoint.lng,
+              destinationPoint.lat,
+              destinationPoint.lng
+            )
+          : Number.POSITIVE_INFINITY
+      eligible.push({ warehouse, ruleRank, rulePriority, isDefault, distance })
+    } else {
+      failures.push({ warehouseId: warehouse.id, reasons: warehouseFailures })
+    }
+  }
+
+  if (!eligible.length) {
+    const error = new Error('No single supplier fulfillment location can fulfill this basket')
+    error.code = 'NO_SINGLE_FULFILLMENT_LOCATION'
+    error.details = { failures }
+    throw error
+  }
+
+  eligible.sort(
+    (a, b) =>
+      a.ruleRank - b.ruleRank ||
+      a.rulePriority - b.rulePriority ||
+      Number(b.isDefault) - Number(a.isDefault) ||
+      a.distance - b.distance ||
+      String(a.warehouse.id).localeCompare(String(b.warehouse.id))
+  )
+  const selected = eligible[0]
+  return {
+    warehouseId: selected.warehouse.id,
+    warehouse: selected.warehouse,
+    ruleType:
+      selected.ruleRank === 1
+        ? 'product'
+        : selected.ruleRank === 2
+          ? 'category'
+          : selected.ruleRank === 3
+            ? 'zone'
+            : selected.ruleRank === 5
+              ? 'default'
+              : 'configured_priority',
+    distanceKm: Number.isFinite(selected.distance) ? selected.distance : null,
+  }
+}
+
+async function loadCanonicalRoutingContext(client, supplier, order, orderItems) {
+  const supplierId = supplier.id
+  const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
+  const { rows: warehouses } = await client.query(
+    `SELECT * FROM warehouse
+     WHERE ${supplierCol} = $1 AND is_active = TRUE
+     ORDER BY created_at ASC, id ASC`,
+    [supplierId]
+  )
+  const { rows: rules } = await client.query(
+    `SELECT * FROM warehouse_routing_rule
+     WHERE supplier_id = $1 AND is_active = TRUE
+     ORDER BY priority ASC, created_at ASC, id ASC`,
+    [supplierId]
+  )
+  const productIds = orderItems.map((item) => item.product_id)
+  const { rows: products } = productIds.length
+    ? await client.query(
+        `SELECT id, supplier_id, category_id FROM product WHERE id = ANY($1::uuid[])`,
+        [productIds]
+      )
+    : { rows: [] }
+  const productMap = new Map(products.map((product) => [product.id, product]))
+  const mismatched = products.filter((product) => product.supplier_id !== supplierId)
+  if (mismatched.length || productMap.size !== productIds.length) {
+    const error = new Error('Product is not owned by the active supplier tenant')
+    error.code = 'SUPPLIER_TENANT_MISMATCH'
+    error.details = {
+      supplierTenantId: supplierId,
+      productIds: mismatched.map((product) => product.id),
+    }
+    throw error
+  }
+
+  const { rows: stockRows } = productIds.length
+    ? await client.query(
+        `SELECT wi.warehouse_id, wi.product_id, wi.quantity_available
+         FROM warehouse_inventory wi
+         JOIN warehouse w ON w.id = wi.warehouse_id
+         WHERE wi.product_id = ANY($1::uuid[])
+           AND w.${supplierCol} = $2 AND w.is_active = TRUE`,
+        [productIds, supplierId]
+      )
+    : { rows: [] }
+  const warehouseStock = new Map(
+    stockRows.map((row) => [`${row.warehouse_id}:${row.product_id}`, row])
+  )
+
+  let destinationAddress = order.delivery_location_snapshot || null
+  if (destinationAddress?.address && typeof destinationAddress.address === 'object') {
+    destinationAddress = { ...destinationAddress, ...destinationAddress.address }
+  }
+  if (!destinationAddress && order.branch_id) {
+    const { rows } = await client.query(
+      `SELECT name, address, delivery_latitude AS latitude, delivery_longitude AS longitude,
+              delivery_location_label AS label
+       FROM branch WHERE id = $1 AND tenant_id = $2 AND COALESCE(is_active, TRUE) = TRUE`,
+      [order.branch_id, order.restaurant_id]
+    )
+    destinationAddress = rows[0] ? { ...rows[0], ...(rows[0].address || {}) } : null
+  }
+  if (!destinationAddress) {
+    const { rows } = await client.query(
+      `SELECT address_json, delivery_latitude AS latitude, delivery_longitude AS longitude,
+              delivery_location_label AS label
+       FROM restaurant WHERE id = $1`,
+      [order.restaurant_id]
+    )
+    destinationAddress = rows[0] ? { ...rows[0], ...(rows[0].address_json || {}) } : null
+  }
+
+  const { rows: zones } = await client.query(
+    `SELECT dz.id, dz.warehouse_id, dz.zone_type, dz.postal_codes, dz.geometry,
+            dz.coverage_area_json, dz.radius_km, dz.center_lat, dz.center_lng
+     FROM delivery_zone dz
+     JOIN warehouse w ON w.id = dz.warehouse_id
+     WHERE w.${supplierCol} = $1 AND dz.is_active = TRUE AND dz.warehouse_id IS NOT NULL`,
+    [supplierId]
+  )
+  const zoneEligibleByWarehouse = new Map()
+  for (const warehouse of warehouses) {
+    const warehouseZones = zones.filter((zone) => zone.warehouse_id === warehouse.id)
+    zoneEligibleByWarehouse.set(
+      warehouse.id,
+      warehouseZones.length === 0 ||
+        warehouseZones.some((zone) => restaurantMatchesZone(zone, destinationAddress))
+    )
+  }
+  const enrichedItems = orderItems.map((item) => ({
+    ...item,
+    category_id: productMap.get(item.product_id)?.category_id ?? null,
+  }))
+  const activeIds = new Set(warehouses.map((warehouse) => warehouse.id))
+  const defaultWarehouseId =
+    (supplier.default_warehouse_id && activeIds.has(supplier.default_warehouse_id)
+      ? supplier.default_warehouse_id
+      : null) ||
+    warehouses.find((warehouse) => warehouse.is_default || warehouse.is_main)?.id ||
+    null
+  return {
+    warehouses,
+    rules,
+    warehouseStock,
+    zoneEligibleByWarehouse,
+    destinationAddress,
+    defaultWarehouseId,
+    enrichedItems,
+  }
+}
+
+export async function assignWarehousesToOrder(client, { order, orderItems, supplier }) {
+  const context = await loadCanonicalRoutingContext(client, supplier, order, orderItems)
+  const resolution = resolveSingleWarehouseForOrder(context.enrichedItems, context)
+  await reserveWarehouseStockBatch(
+    client,
+    resolution.warehouseId,
+    orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
+    { supplierId: supplier.id }
+  )
+  const { rows } = await client.query(
+    `INSERT INTO order_warehouse_assignment
+       (order_id, order_item_id, warehouse_id, assigned_by, assignment_source, assignment_reason)
+     VALUES ($1, NULL, $2, 'auto', 'automatic', $3::jsonb)
+     RETURNING *`,
+    [
+      order.id,
+      resolution.warehouseId,
+      JSON.stringify({
+        type: 'automatic_eligibility',
+        ruleType: resolution.ruleType,
+        supplierTenantId: supplier.id,
+        supplierOrganizationId: supplier.organization_id || null,
+        distanceKm: resolution.distanceKm,
+      }),
+    ]
+  )
+  return {
+    mode: 'single',
+    warehouseId: resolution.warehouseId,
+    supplierTenantId: supplier.id,
+    assignments: rows,
+    reason: resolution.ruleType,
+  }
 }

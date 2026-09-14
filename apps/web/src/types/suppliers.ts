@@ -5,6 +5,10 @@ export interface Supplier {
   id: string
   name: string
   slug: string
+  organization_id?: string | null
+  supplier_organization_id?: string | null
+  organization_name?: string | null
+  tenant_id?: string | null
   vat_no?: string
   contact_email: string
   phone?: string

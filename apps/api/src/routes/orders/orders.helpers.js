@@ -219,6 +219,12 @@ const orderCreateSchema = z
       )
       .optional(),
     status: z.enum(['DRAFT', 'PLACED']).default('PLACED'),
+    branchId: z.string().uuid().optional(),
+    branch_id: z.string().uuid().optional(),
+    deliveryMethod: z.string().max(64).optional(),
+    deliveryTime: z.string().max(64).optional(),
+    idempotencyKey: z.string().min(8).max(200).optional(),
+    idempotency_key: z.string().min(8).max(200).optional(),
     deliveryDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -280,6 +286,12 @@ const supplierOrderCreateSchema = z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
       .optional(),
+    branchId: z.string().uuid().optional(),
+    branch_id: z.string().uuid().optional(),
+    deliveryMethod: z.string().max(64).optional(),
+    deliveryTime: z.string().max(64).optional(),
+    idempotencyKey: z.string().min(8).max(200).optional(),
+    idempotency_key: z.string().min(8).max(200).optional(),
   })
   .superRefine((data, ctx) => {
     const seenItems = new Set()

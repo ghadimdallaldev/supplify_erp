@@ -27,7 +27,18 @@ function toValidationError(error) {
     message.includes('no warehouse inventory row') ||
     message.includes('Warehouse stock could not be assigned')
   ) {
-    return new ValidationError(message)
+    const mapped = new ValidationError(message, error.details || null)
+    if (error.code) mapped.code = error.code
+    return mapped
+  }
+  if (
+    ['NO_SINGLE_FULFILLMENT_LOCATION', 'SUPPLIER_TENANT_MISMATCH', 'ZONE_INELIGIBLE'].includes(
+      error?.code
+    )
+  ) {
+    const mapped = new ValidationError(message, error.details || null)
+    mapped.code = error.code
+    return mapped
   }
   return error
 }
