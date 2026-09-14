@@ -76,12 +76,13 @@ const EVENT_VISUAL_KEYS: Record<
   },
   order_confirmed: {
     icon: Package,
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    badgeClass: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
     labelKey: 'activity.badges.acknowledged',
   },
   order_completed: {
     icon: Truck,
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badgeClass:
+      'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
     labelKey: 'activity.badges.completed',
   },
   deal_activity: {
@@ -91,12 +92,13 @@ const EVENT_VISUAL_KEYS: Record<
   },
   cart_updated: {
     icon: ShoppingCart,
-    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    badgeClass: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border)]',
     labelKey: 'activity.badges.cart',
   },
   new_tenant: {
     icon: Users,
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badgeClass:
+      'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
     labelKey: 'activity.badges.registration',
   },
   plan_changed: {
@@ -106,7 +108,8 @@ const EVENT_VISUAL_KEYS: Record<
   },
   subscription_status: {
     icon: Shield,
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    badgeClass:
+      'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
     labelKey: 'activity.badges.subscription',
   },
   staff_added: {
@@ -121,17 +124,19 @@ const EVENT_VISUAL_KEYS: Record<
   },
   invoice_issued: {
     icon: Receipt,
-    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+    badgeClass:
+      'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
     labelKey: 'activity.badges.invoice',
   },
   payment_received: {
     icon: CreditCard,
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    badgeClass:
+      'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
     labelKey: 'activity.badges.payment',
   },
   quick_list: {
     icon: Package,
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    badgeClass: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
     labelKey: 'activity.badges.quickList',
   },
   receiving: {
@@ -141,7 +146,7 @@ const EVENT_VISUAL_KEYS: Record<
   },
   chat_started: {
     icon: MessageSquare,
-    badgeClass: 'bg-sky-50 text-sky-800 border-sky-200',
+    badgeClass: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
     labelKey: 'activity.badges.chat',
   },
 }
@@ -341,7 +346,7 @@ export function AdminActivityTab({ active }: AdminActivityTabProps) {
         ) : (
           <>
             {partial && (
-              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="mb-4 rounded-lg border border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] px-3 py-2 text-xs text-[var(--amber)]">
                 {t('activity.partialSources')}
                 {failedSources?.length ? ` (${failedSources.join(', ')})` : ''}.{' '}
                 {t('activity.partialResults')}

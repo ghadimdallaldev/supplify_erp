@@ -14,7 +14,7 @@ import {
   type AdminThemePreference,
 } from '../../../lib/adminPreferences'
 import { adminPortalBasePath, resolveAdminPortal } from './adminNavConfig'
-import { getAdminPageHeader } from '../../../lib/adminPageHeaders'
+import { getAdminPageHeaderKeys } from '../../../lib/adminPageHeaders'
 import type { AdminTabKey } from '../dashboard/adminDashboardShared'
 import { useAdminPortalLinks, useAdminTabLabels } from './useAdminNavLabels'
 
@@ -59,16 +59,18 @@ export function AdminTopBar({ selectedTab, onOpenMobileNav }: AdminTopBarProps) 
   const portal = resolveAdminPortal(location.pathname)
   const isSettings = location.pathname.startsWith('/app/settings')
   const headerContext = isSettings ? 'settings' : portal
+  const headerKeys = getAdminPageHeaderKeys(headerContext)
+  const portalKeys = getAdminPageHeaderKeys(isSettings ? 'settings' : portal)
   const portalLabel =
     portalLinks.find((link) => link.id === (isSettings ? 'platform' : portal))?.label ??
-    getAdminPageHeader(headerContext).title
+    t(portalKeys.titleKey)
 
   const pageTitle = isSettings
-    ? getAdminPageHeader('settings').title
+    ? t(getAdminPageHeaderKeys('settings').titleKey)
     : selectedTab
       ? tabLabels[selectedTab]
-      : getAdminPageHeader(portal).title
-  const pageSubtitle = getAdminPageHeader(headerContext).subtitle
+      : t(getAdminPageHeaderKeys(portal).titleKey)
+  const pageSubtitle = t(headerKeys.subtitleKey)
 
   const displayName = user?.displayName || user?.email || ''
   const initials = initialsFor(displayName || 'U')

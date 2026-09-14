@@ -81,7 +81,7 @@ export function AdminTenantDiagnosticsDrawer({
               {snapshot?.writeBlocked && (
                 <p className="flex flex-wrap items-center gap-2">
                   <AdminStatusBadge status="blocked" />
-                  <span className="text-red-600">{t('diagnostics.writeBlocked')}</span>
+                  <span className="text-[var(--red)]">{t('diagnostics.writeBlocked')}</span>
                 </p>
               )}
             </Section>

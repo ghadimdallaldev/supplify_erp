@@ -39,7 +39,7 @@ export function AdminPlatformSettingsPanel({
     } catch (e: unknown) {
       const msg =
         (e as { data?: { error?: { message?: string } } })?.data?.error?.message ||
-        'Failed to save settings'
+        t('platformToasts.saveFailed')
       toast.error(msg)
     }
   }
@@ -51,12 +51,12 @@ export function AdminPlatformSettingsPanel({
     >
       <CardHeader className={variant === 'compact' ? 'px-4 py-3' : undefined}>
         <CardTitle className={variant === 'compact' ? 'text-base' : undefined}>
-          Trial length
+          {t('platformSettings.trialLengthTitle')}
         </CardTitle>
         <CardDescription>
           {variant === 'compact'
-            ? 'Applies to new Free Trial activations platform-wide. Workspaces auto-lock after this period unless upgraded.'
-            : 'Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid plan. This is not a forever-free tier.'}
+            ? t('platformSettings.trialLengthDescriptionCompact')
+            : t('platformSettings.trialLengthDescription')}
         </CardDescription>
       </CardHeader>
       <CardContent
@@ -67,7 +67,7 @@ export function AdminPlatformSettingsPanel({
         ) : (
           <>
             <div>
-              <Label htmlFor="freeSandboxDays">Trial length (days)</Label>
+              <Label htmlFor="freeSandboxDays">{t('platformSettings.trialLengthDaysLabel')}</Label>
               <Input
                 id="freeSandboxDays"
                 type="number"
@@ -78,11 +78,11 @@ export function AdminPlatformSettingsPanel({
                 className="mt-1"
               />
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                Allowed range: 7–90 days (default 30)
+                {t('platformSettings.trialLengthDaysHelp')}
               </p>
             </div>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t('common.saving') : t('common.save')}
             </Button>
           </>
         )}

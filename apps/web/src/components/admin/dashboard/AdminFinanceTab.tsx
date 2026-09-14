@@ -39,7 +39,7 @@ type TenantRevenueRow = {
 function tenantTypeTone(type?: string): string {
   return type === 'SUPPLIER'
     ? 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
-    : 'bg-sky-50 text-sky-800 border-sky-200'
+    : 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]'
 }
 
 export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
@@ -86,16 +86,14 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
           title={t('finance.unavailableTitle')}
           message={
             (financeQueryError as { data?: { message?: string } })?.data?.message ||
-            'The finance API request failed. Figures are not shown as zero to avoid misleading data.'
+            t('finance.apiFailedMessage')
           }
           onRetry={() => refetchFinance()}
         />
       ) : (
         <>
           {financeData?.mrrExcludesFreeTrial && (
-            <p className="mb-3 text-xs text-[var(--text-muted)]">
-              MRR and ARR exclude Free Trial and Enterprise plans (paid subscriptions only).
-            </p>
+            <p className="mb-3 text-xs text-[var(--text-muted)]">{t('finance.mrrDisclaimer')}</p>
           )}
 
           <div className="mb-4">
@@ -103,27 +101,29 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
               testId="admin-finance-stats"
               metrics={[
                 {
-                  label: 'GMV (all time)',
+                  label: t('finance.metrics.gmv'),
                   value: formatCurrency(financeData?.gmv ?? 0),
-                  hint: 'Total invoice value',
+                  hint: t('finance.metrics.gmvHint'),
                   tone: 'brand',
                 },
                 {
-                  label: 'MRR',
+                  label: t('finance.metrics.mrr'),
                   value: formatCurrency(financeData?.mrr ?? 0),
-                  hint: `ARR ${formatCurrency(financeData?.arr ?? 0)} · paid plans only`,
+                  hint: t('finance.metrics.mrrHint', {
+                    arr: formatCurrency(financeData?.arr ?? 0),
+                  }),
                   tone: 'mint',
                 },
                 {
-                  label: 'Outstanding',
+                  label: t('finance.metrics.outstanding'),
                   value: formatCurrency(financeData?.outstanding ?? 0),
-                  hint: 'Awaiting payment',
+                  hint: t('finance.metrics.outstandingHint'),
                   tone: 'amber',
                 },
                 {
-                  label: 'Overdue',
+                  label: t('finance.metrics.overdue'),
                   value: formatCurrency(financeData?.overdue ?? 0),
-                  hint: 'Past due date',
+                  hint: t('finance.metrics.overdueHint'),
                   tone: (financeData?.overdue ?? 0) > 0 ? 'danger' : 'default',
                 },
               ]}
@@ -133,13 +133,13 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
           <div className="grid gap-4 lg:grid-cols-2">
             <AppPanel
               title={t('finance.revenueByPlan')}
-              description={`${revenueByPlan.length} plan${revenueByPlan.length === 1 ? '' : 's'} with active subscriptions`}
+              description={t('finance.plansWithSubscriptions', { count: revenueByPlan.length })}
               testId="admin-finance-revenue-by-plan"
               footer={
                 financeFetching ? (
                   <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Updating…
+                    {t('common.updating')}
                   </p>
                 ) : undefined
               }
@@ -168,12 +168,14 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                             </Badge>
                           )}
                           <span className="text-[var(--text-muted)]">
-                            {row.subscriptionCount ?? 0} subs
+                            {t('finance.subsAbbrev', { count: row.subscriptionCount ?? 0 })}
                           </span>
                         </div>
                         <span className="shrink-0 font-semibold tabular-nums text-[var(--text)]">
                           {formatCurrency(row.mrr ?? 0)}
-                          <span className="font-normal text-[var(--text-muted)]">/mo</span>
+                          <span className="font-normal text-[var(--text-muted)]">
+                            {t('finance.perMonth')}
+                          </span>
                         </span>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-[var(--app-border)]">
@@ -192,7 +194,11 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
 
             <AppPanel
               title={t('finance.topTenantsByRevenue')}
-              description={`Top ${Math.min(8, topTenants.length)} of ${topTenants.length} tenant${topTenants.length === 1 ? '' : 's'}`}
+              description={t('finance.topTenantsDescription', {
+                shown: Math.min(8, topTenants.length),
+                total: topTenants.length,
+                count: topTenants.length,
+              })}
               testId="admin-finance-top-tenants"
             >
               {topTenants.length === 0 ? (
@@ -244,7 +250,9 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
             <div className="mt-4">
               <AppPanel
                 title={t('finance.overdueBalances')}
-                description={`${overdueTenants.length} tenant${overdueTenants.length === 1 ? '' : 's'} with past-due invoices`}
+                description={t('finance.overdueTenantsDescription', {
+                  count: overdueTenants.length,
+                })}
                 testId="admin-finance-overdue"
               >
                 <div className="space-y-3 lg:hidden">
@@ -289,9 +297,9 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
                             responsiveDataListClasses.columnSecondary
                           )}
                         >
-                          Type
+                          {t('common.table.type')}
                         </th>
-                        <th className="px-4 py-3 text-right">Overdue</th>
+                        <th className="px-4 py-3 text-right">{t('common.table.overdue')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-border)]">
@@ -352,8 +360,9 @@ export function AdminFinanceTab({ active }: AdminFinanceTabProps) {
             <div className="mt-4 flex items-start gap-2 rounded-lg border border-[var(--amber-pale)] bg-[var(--amber-pale)]/40 px-3 py-2 text-xs text-[var(--amber)]">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Platform overdue total is {formatCurrency(financeData?.overdue ?? 0)} but no
-                per-tenant breakdown is available.
+                {t('finance.overdueBreakdownUnavailable', {
+                  amount: formatCurrency(financeData?.overdue ?? 0),
+                })}
               </span>
             </div>
           )}

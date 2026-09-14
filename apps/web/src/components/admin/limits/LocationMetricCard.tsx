@@ -63,17 +63,17 @@ export function LocationMetricCard({
         })}
       </p>
       {metric.overIncludedLimit && !metric.overEffectiveLimit && (
-        <span className="inline-flex rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+        <span className="inline-flex rounded-md border border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] px-2 py-0.5 text-xs font-semibold text-[var(--amber)]">
           {t('limits.location.overIncludedLimit')}
         </span>
       )}
       {metric.overEffectiveLimit && (
-        <span className="inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
+        <span className="inline-flex rounded-md border border-[color-mix(in_srgb,var(--red)_35%,transparent)] bg-[var(--red-pale)] px-2 py-0.5 text-xs font-semibold text-[var(--red)]">
           {t('limits.location.overEffectiveLimit')}
         </span>
       )}
       {showEnterprise && metric.atEnterpriseThreshold && (
-        <span className="inline-flex rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
+        <span className="inline-flex rounded-md border border-[color-mix(in_srgb,var(--red)_35%,transparent)] bg-[var(--red-pale)] px-2 py-0.5 text-xs font-semibold text-[var(--red)]">
           {t('limits.location.enterpriseThreshold')}
         </span>
       )}

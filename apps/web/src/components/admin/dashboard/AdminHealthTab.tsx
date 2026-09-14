@@ -46,8 +46,10 @@ function formatUserLabel(userId?: string, role?: string): string {
 
 function statusCodeTone(code?: number): string {
   if (!code) return 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]'
-  if (code >= 500) return 'bg-[var(--red-pale)] text-[var(--red)] border-red-200'
-  if (code >= 400) return 'bg-[var(--amber-pale)] text-[var(--amber)] border-amber-200'
+  if (code >= 500)
+    return 'bg-[var(--red-pale)] text-[var(--red)] border-[color-mix(in_srgb,var(--red)_35%,transparent)]'
+  if (code >= 400)
+    return 'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]'
   return 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]'
 }
 
@@ -159,27 +161,27 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                 testId="admin-health-subscription-stats"
                 metrics={[
                   {
-                    label: 'Active',
+                    label: t('health.metrics.active'),
                     value: activeCount,
-                    hint: 'Paid or fully active subscriptions',
+                    hint: t('health.metrics.activeHint'),
                     tone: 'mint',
                   },
                   {
-                    label: 'Trialing',
+                    label: t('health.metrics.trialing'),
                     value: trialingCount,
-                    hint: 'Free trial or sandbox',
+                    hint: t('health.metrics.trialingHint'),
                     tone: 'brand',
                   },
                   {
-                    label: 'Past due',
+                    label: t('health.metrics.pastDue'),
                     value: pastDueCount,
-                    hint: 'Billing attention needed',
+                    hint: t('health.metrics.pastDueHint'),
                     tone: pastDueCount > 0 ? 'danger' : 'default',
                   },
                   {
-                    label: 'Trials expiring (7d)',
+                    label: t('health.metrics.trialsExpiring'),
                     value: trialsExpiring,
-                    hint: 'Trials ending within a week',
+                    hint: t('health.metrics.trialsExpiringHint'),
                     tone: trialsExpiring > 0 ? 'amber' : 'default',
                   },
                 ]}
@@ -193,7 +195,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                 title={t('health.checksUnavailableTitle')}
                 message={
                   (healthQueryError as { data?: { message?: string } })?.data?.message ||
-                  'The health API request failed.'
+                  t('health.healthApiFailed')
                 }
                 onRetry={() => refetchHealth()}
               />
@@ -206,8 +208,12 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                 title={t('health.dbPoolTitle')}
                 description={
                   healthData?.dbPool
-                    ? `${poolUtilization}% utilization · ${healthData.dbPool.idle} idle of ${healthData.dbPool.total} connections`
-                    : 'Pool metrics not available from this environment'
+                    ? t('health.dbPoolUtilization', {
+                        percent: poolUtilization,
+                        idle: healthData.dbPool.idle,
+                        total: healthData.dbPool.total,
+                      })
+                    : t('health.dbPoolUnavailable')
                 }
                 testId="admin-health-db-pool"
               >
@@ -215,14 +221,14 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                   <>
                     <div className="grid grid-cols-3 gap-3 text-center">
                       {[
-                        { label: 'Total', value: healthData.dbPool.total },
+                        { label: t('health.metrics.total'), value: healthData.dbPool.total },
                         {
-                          label: 'Idle',
+                          label: t('health.metrics.idle'),
                           value: healthData.dbPool.idle,
-                          note: 'available',
+                          note: t('health.metrics.idleNote'),
                         },
                         {
-                          label: 'Waiting',
+                          label: t('health.metrics.waiting'),
                           value: healthData.dbPool.waiting,
                           alert: healthData.dbPool.waiting > 0,
                         },
@@ -251,7 +257,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                     </div>
                     <div className="mt-4">
                       <div className="mb-1 flex justify-between text-xs text-[var(--text-muted)]">
-                        <span>Pool utilization</span>
+                        <span>{t('health.poolUtilization')}</span>
                         <span>{poolUtilization}%</span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-[var(--app-border)]">
@@ -274,7 +280,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
               {emailFailures.length > 0 && (
                 <AppPanel
                   title={t('health.emailFailuresTitle')}
-                  description={`${emailFailures.length} failed delivery attempt${emailFailures.length === 1 ? '' : 's'}`}
+                  description={t('health.emailFailuresCount', { count: emailFailures.length })}
                   testId="admin-health-email-failures"
                 >
                   <div className="space-y-3 lg:hidden">
@@ -286,7 +292,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                         <div className="flex items-start justify-between gap-2">
                           <Badge
                             variant="outline"
-                            className="border-amber-200 bg-amber-50 text-xs font-medium text-amber-800"
+                            className="border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] text-xs font-medium text-[var(--amber)]"
                           >
                             {e.eventType}
                           </Badge>
@@ -309,16 +315,16 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                       <thead>
                         <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                           <th className="px-4 py-3">{t('common.table.time')}</th>
-                          <th className="px-4 py-3">Event</th>
+                          <th className="px-4 py-3">{t('common.table.event')}</th>
                           <th
                             className={cn(
                               'hidden px-4 py-3',
                               responsiveDataListClasses.columnSecondary
                             )}
                           >
-                            Recipient
+                            {t('common.table.recipient')}
                           </th>
-                          <th className="px-4 py-3">Error</th>
+                          <th className="px-4 py-3">{t('common.table.error')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--app-border)]">
@@ -333,7 +339,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                             <td className="px-4 py-3.5">
                               <Badge
                                 variant="outline"
-                                className="border-amber-200 bg-amber-50 text-xs font-medium text-amber-800"
+                                className="border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] text-xs font-medium text-[var(--amber)]"
                               >
                                 {e.eventType}
                               </Badge>
@@ -358,7 +364,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                     </table>
                   </TableScroll>
                   <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    Job and webhook failure collectors are not configured yet.
+                    {t('health.emailCollectorsNote')}
                   </p>
                 </AppPanel>
               )}
@@ -368,16 +374,19 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                 description={
                   apiErrors.length === 0
                     ? healthData
-                      ? 'No errors logged in system_event'
-                      : 'Health endpoint did not return data'
-                    : `${filteredApiErrors.length} of ${apiErrors.length} error${apiErrors.length === 1 ? '' : 's'} shown`
+                      ? t('health.apiErrorsEmptyWithData')
+                      : t('health.apiErrorsNoData')
+                    : t('health.apiErrorsShown', {
+                        filtered: filteredApiErrors.length,
+                        total: apiErrors.length,
+                      })
                 }
                 testId="admin-health-api-errors"
                 footer={
                   healthFetching && !healthLoading ? (
                     <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Updating…
+                      {t('common.updating')}
                     </p>
                   ) : undefined
                 }
@@ -391,11 +400,13 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                         <Activity className="h-8 w-8 text-[var(--text-muted)]" />
                       )
                     }
-                    title={healthData ? 'No recent API errors' : 'Health checks limited'}
+                    title={
+                      healthData ? t('health.noApiErrorsTitle') : t('health.healthLimitedTitle')
+                    }
                     description={
                       healthData
-                        ? 'No errors logged in system_event. Job/webhook failure tracking is not configured yet.'
-                        : 'The health endpoint did not return error data for this environment.'
+                        ? t('health.noApiErrorsDescription')
+                        : t('health.healthLimitedDescription')
                     }
                   />
                 ) : (
@@ -403,7 +414,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                     <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
                       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                         <Filter className="h-3.5 w-3.5" />
-                        Filter errors
+                        {t('health.filterErrors')}
                       </div>
                       <div className="relative min-w-0">
                         <Search
@@ -432,7 +443,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                             size="sm"
                             onClick={() => setErrorSearch('')}
                           >
-                            Clear search
+                            {t('common.clearSearch')}
                           </Button>
                         }
                       />
@@ -472,7 +483,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                             <thead>
                               <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
                                 <th className="px-4 py-3">{t('common.table.time')}</th>
-                                <th className="px-4 py-3">Method</th>
+                                <th className="px-4 py-3">{t('common.table.method')}</th>
                                 <th className="px-4 py-3">{t('common.table.status')}</th>
                                 <th
                                   className={cn(
@@ -480,7 +491,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                                     responsiveDataListClasses.columnTertiary
                                   )}
                                 >
-                                  Source
+                                  {t('common.table.source')}
                                 </th>
                                 <th
                                   className={cn(
@@ -488,7 +499,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                                     responsiveDataListClasses.columnSecondary
                                   )}
                                 >
-                                  Request ID
+                                  {t('common.table.requestId')}
                                 </th>
                                 <th
                                   className={cn(
@@ -506,7 +517,7 @@ export function AdminHealthTab({ active }: AdminHealthTabProps) {
                                 >
                                   {t('common.table.tenant')}
                                 </th>
-                                <th className="px-4 py-3">Message</th>
+                                <th className="px-4 py-3">{t('common.table.message')}</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--app-border)]">

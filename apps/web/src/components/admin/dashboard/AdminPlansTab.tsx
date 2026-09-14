@@ -371,7 +371,9 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                       .slice(0, 3)
                       .map(([key, value]) => (
                         <div key={key} className="flex justify-between text-xs">
-                          <span className="text-[var(--text-muted)]">{getLimitLabel(key)}</span>
+                          <span className="text-[var(--text-muted)]">
+                            {t(`limitKeys.${key}`, { defaultValue: getLimitLabel(key) })}
+                          </span>
                           <span
                             className={`font-semibold ${value === -1 ? 'text-[var(--mint)]' : 'text-[var(--text)]'}`}
                           >
@@ -483,7 +485,9 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                     }
                   />
                   {editPlanModal.plan.code === 'free' ? (
-                    <p className="mt-1 text-xs text-amber-800">{t('plans.freeTrialBoundsHelp')}</p>
+                    <p className="mt-1 text-xs text-[var(--amber)]">
+                      {t('plans.freeTrialBoundsHelp')}
+                    </p>
                   ) : null}
                 </div>
                 <div>
@@ -537,9 +541,9 @@ export function AdminPlansTab({ active }: AdminPlansTabProps) {
                 <p className="text-sm text-[var(--red)]">{editPlanJsonError}</p>
               ) : null}
               {editPlanModal.plan.code === 'enterprise' && editPlanForm.isActive ? (
-                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                <div className="rounded-md border border-[color-mix(in_srgb,var(--amber)_40%,transparent)] bg-[var(--amber-pale)] p-3 text-sm text-[var(--amber)]">
                   <p className="font-semibold">{t('plans.enterpriseActivationTitle')}</p>
-                  <p className="mt-1 text-amber-900">{t('plans.enterpriseActivationMessage')}</p>
+                  <p className="mt-1 opacity-90">{t('plans.enterpriseActivationMessage')}</p>
                   <label className="mt-2 flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"

@@ -1,5 +1,37 @@
 export type AdminPageContext = 'platform' | 'suppliers' | 'restaurants' | 'settings'
 
+export type AdminPageHeaderKeys = {
+  titleKey: string
+  subtitleKey: string
+}
+
+/** i18n keys under the `admin` namespace (`pageHeaders.*`). */
+export function getAdminPageHeaderKeys(context: AdminPageContext): AdminPageHeaderKeys {
+  switch (context) {
+    case 'suppliers':
+      return {
+        titleKey: 'pageHeaders.suppliers.title',
+        subtitleKey: 'pageHeaders.suppliers.subtitle',
+      }
+    case 'restaurants':
+      return {
+        titleKey: 'pageHeaders.restaurants.title',
+        subtitleKey: 'pageHeaders.restaurants.subtitle',
+      }
+    case 'settings':
+      return {
+        titleKey: 'pageHeaders.settings.title',
+        subtitleKey: 'pageHeaders.settings.subtitle',
+      }
+    default:
+      return {
+        titleKey: 'pageHeaders.platform.title',
+        subtitleKey: 'pageHeaders.platform.subtitle',
+      }
+  }
+}
+
+/** @deprecated Prefer getAdminPageHeaderKeys + t(). Kept for tests / English fallback. */
 export function getAdminPageHeader(context: AdminPageContext): {
   title: string
   subtitle: string

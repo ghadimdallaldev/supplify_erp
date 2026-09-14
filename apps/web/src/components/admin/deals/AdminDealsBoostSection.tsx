@@ -91,7 +91,7 @@ export function AdminDealsBoostSection() {
             <p className="mt-2 font-semibold tabular-nums">
               ${Number(activationPricing.amount).toFixed(2)}
               {Number(activationPricing.amount) === 0 ? (
-                <span className="ml-2 text-xs font-normal text-emerald-700">
+                <span className="ml-2 text-xs font-normal text-[var(--mint)]">
                   · {String(activationPricing.badge_label || t('deals.boost.freeAfterApproval'))}
                 </span>
               ) : null}
