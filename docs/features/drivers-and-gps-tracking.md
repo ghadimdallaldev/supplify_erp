@@ -236,7 +236,21 @@ order-level.
 
 ## Manual and automatic route stop ordering
 
-Drivers and suppliers can **manually order delivery stops** on a route. Suppliers can also **optimize stop order** from the depot using nearest-neighbor heuristics (coordinates required on stops).
+Drivers and suppliers can **manually order delivery stops** on a route. Suppliers can also **optimize stop order** from the depot using nearest-neighbor heuristics (coordinates required on stops). Stop status changes (`OUT_FOR_DELIVERY` / `DELIVERED` / `FAILED`) sync to `driver_assignments` through `updateRouteStop`.
+
+### Route-stop advancement transaction boundary
+
+`updateRouteStop` is one logical operation: **advance this stop** (and every active driver leg for its order). It runs inside a single `withTransaction`:
+
+1. `SELECT … FOR UPDATE` on `delivery_route` and `route_stop`
+2. Lock and validate every active `driver_assignments` leg for the stop’s order
+3. Apply assignment status updates via `updateDeliveryStatus({ client, postCommitEffects })` (no nested commit)
+4. Update the `route_stop` row
+5. If every stop is terminal and the route is `IN_PROGRESS`, mark the route `COMPLETED` in the same transaction
+
+After commit: run queued notifications / milestones, then invalidate the dispatch cache once. If the transaction rolls back, no success notifications or cache invalidation run. Standalone `PATCH /api/orders/:id/delivery-status` still opens its own transaction and defers the same side effects until after commit.
+
+POD checks for `delivered` use the transaction client so they see the same snapshot as the mutation.
 
 ### Data model
 

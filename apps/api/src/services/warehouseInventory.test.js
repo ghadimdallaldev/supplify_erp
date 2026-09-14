@@ -24,6 +24,18 @@ function createClient() {
     queries,
     query: vi.fn(async (sql, params) => {
       queries.push({ sql, params })
+      if (sql.includes('FROM customer_order')) {
+        return {
+          rows: [
+            {
+              id: 'order-1',
+              status: 'PLACED',
+              supplier_organization_id: null,
+              delivery_location_snapshot: null,
+            },
+          ],
+        }
+      }
       if (sql.includes('FROM order_warehouse_assignment') && sql.includes('SELECT *')) {
         return {
           rows: [
@@ -38,7 +50,7 @@ function createClient() {
         }
       }
       if (sql.includes('FROM order_item')) {
-        return { rows: [{ product_id: 'p1', quantity: 2 }] }
+        return { rows: [{ id: 'item-1', product_id: 'p1', quantity: 2, supplier_id: 'sup-1' }] }
       }
       return { rows: [] }
     }),
@@ -138,6 +150,18 @@ describe('warehouseInventory', () => {
     const client = {
       query: vi.fn(async (sql, params) => {
         queries.push({ sql, params })
+        if (sql.includes('FROM customer_order')) {
+          return {
+            rows: [
+              {
+                id: 'order-1',
+                status: 'PLACED',
+                supplier_organization_id: null,
+                delivery_location_snapshot: null,
+              },
+            ],
+          }
+        }
         if (sql.includes('FROM order_warehouse_assignment') && sql.includes('FOR UPDATE')) {
           return {
             rows: [
@@ -152,10 +176,10 @@ describe('warehouseInventory', () => {
           }
         }
         if (sql.includes('FROM warehouse') && sql.includes('is_active = TRUE')) {
-          return { rows: [{ id: 'wh-new' }] }
+          return { rows: [{ id: 'wh-new', supplier_id: 'sup-1', organization_id: null }] }
         }
         if (sql.includes('FROM order_item')) {
-          return { rows: [{ product_id: 'p1', quantity: 3 }] }
+          return { rows: [{ id: 'item-1', product_id: 'p1', quantity: 3, supplier_id: 'sup-1' }] }
         }
         if (sql.includes('FROM warehouse_inventory') && sql.includes('FOR UPDATE')) {
           return { rows: [{ product_id: 'p1', quantity_available: 10 }] }

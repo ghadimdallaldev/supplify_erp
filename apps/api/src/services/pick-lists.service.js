@@ -206,7 +206,16 @@ async function loadOrderItemsForPicking(supplierId, orderId, warehouseId) {
       oi.quantity,
       owa.warehouse_id
     FROM order_item oi
-    LEFT JOIN order_warehouse_assignment owa ON owa.order_item_id = oi.id
+    LEFT JOIN LATERAL (
+      SELECT owa.warehouse_id
+      FROM order_warehouse_assignment owa
+      WHERE owa.order_id = oi.order_id
+        AND (owa.order_item_id = oi.id OR owa.order_item_id IS NULL)
+      ORDER BY
+        CASE WHEN owa.order_item_id = oi.id THEN 0 ELSE 1 END,
+        owa.assigned_at DESC NULLS LAST
+      LIMIT 1
+    ) owa ON TRUE
     WHERE oi.order_id = $1 AND oi.supplier_id = $2
       ${warehouseClause}
     ORDER BY oi.id

@@ -109,3 +109,11 @@ The shared linked-accounts API (`/api/branches`) also handles basic branch list,
 
 1. Org Owner assigns **Regional Manager** via `POST /api/org/users/:userId/role`.
 2. Grant branches: `POST /api/org/users/:userId/branches` with `{ "supplierId": "..." }`.
+
+## Fulfillment ownership for organization ordering (2026-09-14)
+
+A supplier organization is a customer-facing consolidation of linked supplier tenant accounts; it is not itself a product, catalog, pricing, or stock owner. New fulfillment is resolved through the selected tenant and then a warehouse owned by that same tenant. A sibling tenant's warehouse cannot fulfill another tenant's product merely because both tenants share an organization.
+
+Restaurant users do not select supplier branches or warehouses. A new basket must resolve to one compatible supplier tenant and one warehouse for all lines. Tenant-specific products are retained as separate catalog entries when there is no canonical product identity; no fuzzy SKU/name merging is performed.
+
+Transfers use existing organization/tenant RBAC and the FULFILLMENT_TRANSFER capability. Organization scope does not bypass explicit branch access, and transfers preserve the placed financial snapshots.

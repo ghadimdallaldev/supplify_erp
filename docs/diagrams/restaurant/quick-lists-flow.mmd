@@ -4,7 +4,7 @@ flowchart TD
   Create[Create quick_list + items] --> Limits[checkLimit quick_lists\nquick_list_items\nscheduled_quick_lists]
   Limits --> Schedule{is_scheduled?}
   Schedule -->|yes| Cron[Scheduler places order\nscheduled_order_grace_per_day Free only]
-  Schedule -->|no| Manual[User runs list → checkout]
+  Schedule -->|no| Manual[Order now → cart from list-item joins → checkout]
   Manual --> Place[Place order flow]
   Cron --> Place
   Tier[Plan feature quick_lists\nSilver automated_weekly → Platinum ai catalog string] -.-> Limits

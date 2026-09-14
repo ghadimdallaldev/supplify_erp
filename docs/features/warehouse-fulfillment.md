@@ -113,3 +113,15 @@ Service: `pick-lists.service.js`
 - Supplier delivery board / route planning use `getDeliveryZoneJoinSql()` (`apps/api/src/lib/delivery-zone-join.js`) to pick warehouse vs branch join mode at runtime.
 
 Migrations: `0081_warehouse_fulfillment.sql`, `0161_consumer_ordering.sql`, `0165_supplier_delivery_zone_columns.sql`.
+
+## Canonical non-split assignment (2026-09-14)
+
+The historical per-line routing model remains readable for old orders. New orders use one order-level assignment and require one warehouse to fulfill the complete basket. The resolver is supplier-tenant scoped:
+
+Supplier Organization → eligible supplier tenant → eligible warehouse
+
+Eligibility checks service zones, existing tenant product/catalog capability, warehouse stock where tracked, operational and delivery rules, MOQ/business rules, contract compatibility, and configured routing priority. Distance is only a tie-breaker when existing reliable coordinates are available. If no single warehouse satisfies the basket, placement returns NO_SINGLE_FULFILLMENT_LOCATION; it does not create a partial split order.
+
+A warehouse is not a replacement name for a supplier branch. The branch is the sellable supplier tenant; the warehouse is its fulfillment location. warehouse_inventory remains the stock source of truth when warehouse fulfillment is active. No duplicate warehouse-product availability table was added.
+
+Fulfillment transfer is transactional and preserves financial snapshots. It is limited to compatible pending/picking assignments and authorized supplier scope, records a reason/source/version, and rejects incompatible tenant, zone, stock, status, or driver-state changes.

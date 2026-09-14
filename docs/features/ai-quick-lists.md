@@ -23,6 +23,17 @@ Internal feature values may still use legacy strings. Resolve capability through
 | `full_schedule` / `true`      | full_schedule    | Full schedule + auto-create | -                              | -                           |
 | `ai_smart_automation`         | smart_automation | Full schedule + auto-create | Yes, forecast based            | Yes, via reorder assistance |
 
+## Manual order vs scheduled order
+
+Both paths stay available on the same Ordering List:
+
+| Path                           | How it works                                                                                                                                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Order / Order now** (manual) | Web/mobile load list items into the cart from quick-list API joins (`product_id`, `supplier_id`, name, price, qty), then the user checks out via the normal cart → `POST /api/orders` flow. No dedicated “order from list” API. |
+| **Schedule / cron**            | `scheduled-orders.service` creates orders server-side when `auto_create_order` is on (`placement_source = scheduled_quick_list`). Reminders only when auto-create is off.                                                       |
+
+Web maps list lines with `cartItemsFromQuickList` / `quickListItemToProduct` (`apps/web/src/lib/quickListCart.ts`) so Order now does not depend on the add-products catalog query (that query is skipped unless the product picker is open). Mobile already maps the same joins via `itemToProduct` on the Quick Lists screen.
+
 ## API
 
 | Method | Path                                    | Notes                                                                       |

@@ -80,3 +80,13 @@ Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/suppl
 - [x] Android and iOS source changes synchronized.
 - [x] iOS tests, typecheck, Expo Doctor, and production export run.
 - [x] `MOBILE_FEATURE_PARITY.md` updated.
+
+## 2026-09-14 - Fulfillment routing hardening
+
+- [x] API order placement, delivery-location, warehouse assignment, and transfer contracts updated in both mobile repositories.
+- [x] Android and iOS checkout retain idempotency keys and require an explicit branch when restaurant locations are ambiguous.
+- [x] Supplier warehouse assignment/reassignment API types and mutation hooks are synchronized.
+- [x] Existing RBAC model extended with FULFILLMENT_TRANSFER; no roles invented.
+- [x] Organization catalog views preserve tenant-specific product identity; no fuzzy deduplication.
+- [x] API focused routing, location, stock, catalog, and idempotency tests pass.
+- [x] Mobile typechecks run for Android and iOS.

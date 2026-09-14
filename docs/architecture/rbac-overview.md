@@ -209,3 +209,9 @@ New staff or multi-tenant users must be assigned roles via `user_role` (e.g. whe
 - Manual spot checks: [regression-checklist.md](../qa/regression-checklist.md) **RBAC-X01–X08** (2026-09-10) and §6.16 / §7.10
 
 After deploy, system roles are synced automatically by the `migrate` container (`sync-system-roles.mjs`). On dev machines: `pnpm db:sync-roles`.
+
+## Fulfillment transfer capability (2026-09-14)
+
+FULFILLMENT_TRANSFER is an additive permission key in the existing legacy, named tenant-role, and supplier-organization permission stores. It is granted to existing supplier Owner/Manager/Warehouse Manager capabilities and appropriate organization roles; no new role names were introduced.
+
+The permission is necessary but not sufficient: the server also checks supplier tenant ownership of every order line, warehouse ownership, organization/branch scope, assignment status, order status, and target-zone/stock eligibility. A supplier user cannot move an order to another supplier organization or escape assigned branch scope.

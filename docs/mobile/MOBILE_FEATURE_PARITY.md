@@ -2,6 +2,28 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Route-stop advancement is atomic (server-only)
+
+**Change:** `updateRouteStop` now advances linked driver assignment legs, the `route_stop` row, and optional `delivery_route` completion inside a single DB transaction. `updateDeliveryStatus` accepts an optional shared client so multi-leg updates cannot partially commit. Notifications and dispatch-cache invalidation run only after commit (same post-commit pattern as scheduled orders).
+
+**Mobile:** Skipped — no API contract, payload, or client flow change. Drivers still call the same route-stop / delivery-status endpoints.
+
+**Docs:** `docs/features/drivers-and-gps-tracking.md` (transaction boundary).
+
+---
+
+## 2026-09-14 — Ordering Lists manual Order now empties cart (web fix)
+
+**Symptom:** On web Ordering Lists, **Order** / **Order now** showed a success toast and navigated to cart, but no lines appeared.
+
+**Root cause:** `handleOrderFromList` resolved products only from `catalogProducts` (`useGetProductsQuery` with `skip: !showProductDialog`). With the product picker closed that cache is empty, so every list line was skipped silently while the toast still used `list.items.length`.
+
+**Fix (web):** Build cart lines from quick-list API item joins via `cartItemsFromQuickList` / `quickListItemToProduct` (`apps/web/src/lib/quickListCart.ts`). Prefer catalog product when present; fail the toast when zero lines map. Scheduled/cron auto-create path unchanged.
+
+**Mobile:** Skipped — Android/iOS already map list items with `itemToProduct` and load the cart on list tap (`QuickListsScreen.tsx`). No API/contract change.
+
+---
+
 ## 2026-09-14 — Driver feature hardening: pick waves, GPS sharing, delivery confirmation, ETAs
 
 Six defects across the driver/fulfillment path, with root causes:
@@ -927,3 +949,12 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - Web-only admin UI refresh: the platform overview now removes repeated KPI cards, prioritizes attention/activity/quick actions, and collapses operational, subscription, and growth detail until requested.
 - The admin sidebar keeps all existing destinations but collapses billing and growth groups by default, reopening the active group automatically.
 - No API, permissions, notification behavior, or mobile client contract changed; Android and iOS require no code changes.
+
+## 2026-09-14 - Supplier organization fulfillment routing and idempotent checkout
+
+- Restaurant checkout now sends an explicit restaurant delivery branch when multiple active operational locations exist; one active branch remains backward-compatible and ambiguous locations fail closed with a structured DELIVERY_LOCATION_REQUIRED error.
+- Android and iOS cart flows send the same branch/delivery contract and retain a placement key across retries. The API enforces database-backed restaurant-scoped idempotency, replay, payload mismatch rejection, and transactional rollback behavior.
+- The API consolidates supplier discovery at the organization level without merging tenant-specific products, then routes new non-split baskets through the compatible supplier tenant to one tenant-owned warehouse. Existing line-level assignments remain readable.
+- Supplier reassignment now has matching Android/iOS warehouse API contracts and web controls; server checks tenant ownership, organization/branch scope, status, stock, service zones, immutable financial snapshots, reason, audit event, and transfer notification.
+- Both mobile repositories were updated and typechecked for the shared order, supplier, warehouse, notification, and permission contracts.
+- Deferred: device-level push delivery and production database migration execution require the deployment environment and credentials.

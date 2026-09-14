@@ -4,6 +4,7 @@ import {
   simulateWarehouseRouting,
   buildSimulationFromPayload,
   restaurantMatchesZone,
+  resolveSingleWarehouseForOrder,
 } from './warehouseRouting.js'
 
 const warehouses = [
@@ -187,6 +188,65 @@ describe('warehouseRouting', () => {
       })
       const direct = simulateWarehouseRouting(items, baseContext())
       expect(built[0].warehouseId).toBe(direct[0].warehouseId)
+    })
+  })
+
+  describe('resolveSingleWarehouseForOrder', () => {
+    it('selects one warehouse that can fulfill every line', () => {
+      const result = resolveSingleWarehouseForOrder(
+        [
+          { product_id: 'p1', quantity: 2, category_id: 'c1' },
+          { product_id: 'p2', quantity: 1, category_id: 'c2' },
+        ],
+        {
+          warehouses: [
+            { id: 'wh-east', is_active: true },
+            { id: 'wh-west', is_active: true, is_default: true },
+          ],
+          warehouseStock: new Map([
+            ['wh-east:p1', { quantity_available: 2 }],
+            ['wh-east:p2', { quantity_available: 0 }],
+            ['wh-west:p1', { quantity_available: 2 }],
+            ['wh-west:p2', { quantity_available: 1 }],
+          ]),
+        }
+      )
+
+      expect(result).toMatchObject({
+        warehouseId: 'wh-west',
+        ruleType: 'configured_priority',
+      })
+    })
+
+    it('rejects a basket that would require split fulfillment', () => {
+      expect(() =>
+        resolveSingleWarehouseForOrder(
+          [
+            { product_id: 'p1', quantity: 1 },
+            { product_id: 'p2', quantity: 1 },
+          ],
+          {
+            warehouses: [
+              { id: 'wh-east', is_active: true },
+              { id: 'wh-west', is_active: true },
+            ],
+            warehouseStock: new Map([
+              ['wh-east:p1', { quantity_available: 1 }],
+              ['wh-west:p2', { quantity_available: 1 }],
+            ]),
+          }
+        )
+      ).toThrowError(expect.objectContaining({ code: 'NO_SINGLE_FULFILLMENT_LOCATION' }))
+    })
+
+    it('fails a warehouse outside the service zone even when stock is available', () => {
+      expect(() =>
+        resolveSingleWarehouseForOrder([{ product_id: 'p1', quantity: 1 }], {
+          warehouses: [{ id: 'wh-east', is_active: true }],
+          warehouseStock: new Map([['wh-east:p1', { quantity_available: 5 }]]),
+          zoneEligibleByWarehouse: new Map([['wh-east', false]]),
+        })
+      ).toThrowError(expect.objectContaining({ code: 'NO_SINGLE_FULFILLMENT_LOCATION' }))
     })
   })
 })

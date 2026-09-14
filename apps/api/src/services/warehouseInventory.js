@@ -217,10 +217,23 @@ export async function commitDispatchInventoryForOrder(client, orderId) {
  */
 export async function reassignOrderWarehouseAssignment(
   client,
-  { orderId, assignmentId, newWarehouseId, supplierId, assignedBy = 'manual' }
+  { orderId, assignmentId, newWarehouseId, supplierId, assignedBy = 'manual', reason = null }
 ) {
   if (!newWarehouseId) {
     throw new Error('newWarehouseId is required')
+  }
+
+  const { rows: orderRows } = await client.query(
+    `SELECT id, status, supplier_organization_id, delivery_location_snapshot
+     FROM customer_order WHERE id = $1 FOR UPDATE`,
+    [orderId]
+  )
+  if (!orderRows.length) return null
+  const order = orderRows[0]
+  if (!['PLACED', 'CONFIRMED', 'FULFILLING'].includes(order.status)) {
+    const err = new Error('Fulfillment can only be reassigned for an active order')
+    err.code = 'INVALID_STATUS'
+    throw err
   }
 
   const { rows: locked } = await client.query(
@@ -245,19 +258,92 @@ export async function reassignOrderWarehouseAssignment(
   const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
   const { rows: targetRows } = await client.query(
-    `SELECT id FROM warehouse
-     WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
-    [newWarehouseId, supplierId]
+    `SELECT w.id, w.${supplierCol} AS supplier_id, s.organization_id
+     FROM warehouse w
+     JOIN supplier s ON s.id = w.${supplierCol}
+     WHERE w.id = $1 AND w.is_active = TRUE AND s.is_branch_active = TRUE`,
+    [newWarehouseId]
   )
   if (!targetRows.length) {
     const err = new Error('Target warehouse not found or inactive')
     err.code = 'WAREHOUSE_NOT_FOUND'
     throw err
   }
+  const target = targetRows[0]
+  if (target.supplier_id !== supplierId) {
+    const err = new Error('Target warehouse is outside the active supplier tenant')
+    err.code = 'SUPPLIER_TENANT_MISMATCH'
+    throw err
+  }
 
-  const lines = await lineItemsForAssignment(client, orderId, assignment)
+  const { rows: itemRows } = await client.query(
+    `SELECT oi.id, oi.product_id, oi.supplier_id, oi.quantity
+     FROM order_item oi
+     WHERE oi.order_id = $1
+     ORDER BY oi.id`,
+    [orderId]
+  )
+  const lines = assignment.order_item_id
+    ? itemRows.filter((item) => item.id === assignment.order_item_id)
+    : itemRows
+  if (!lines.length) {
+    const err = new Error('Order has no fulfillable lines for this assignment')
+    err.code = 'FULFILLMENT_NOT_AVAILABLE'
+    throw err
+  }
+  const lineSupplierIds = [...new Set(lines.map((line) => line.supplier_id))]
+  if (lineSupplierIds.length !== 1 || lineSupplierIds[0] !== target.supplier_id) {
+    const err = new Error('Target tenant cannot fulfill the committed order lines')
+    err.code = 'SUPPLIER_TENANT_MISMATCH'
+    throw err
+  }
+  if (order.supplier_organization_id && target.organization_id !== order.supplier_organization_id) {
+    const err = new Error('Target warehouse belongs to another supplier organization')
+    err.code = 'SUPPLIER_ORGANIZATION_MISMATCH'
+    throw err
+  }
+
+  const { rows: targetInventory } = await client.query(
+    `SELECT product_id, quantity_available
+     FROM warehouse_inventory
+     WHERE warehouse_id = $1 AND product_id = ANY($2::uuid[])
+     FOR UPDATE`,
+    [newWarehouseId, lines.map((line) => line.product_id)]
+  )
+  const targetAvailable = new Map(
+    targetInventory.map((row) => [row.product_id, Number(row.quantity_available)])
+  )
   for (const line of lines) {
-    await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+    if (
+      !targetAvailable.has(line.product_id) ||
+      targetAvailable.get(line.product_id) < Number(line.quantity)
+    ) {
+      const err = new Error(`Insufficient stock at warehouse for product ${line.product_id}`)
+      err.code = 'INSUFFICIENT_STOCK'
+      throw err
+    }
+  }
+
+  const { rows: zones } = await client.query(
+    `SELECT dz.* FROM delivery_zone dz
+     WHERE dz.supplier_id = $1 AND dz.warehouse_id = $2 AND dz.is_active = TRUE`,
+    [target.supplier_id, newWarehouseId]
+  )
+  if (zones.length) {
+    const { restaurantMatchesZone } = await import('./warehouseRouting.js')
+    if (
+      !zones.some((zone) => restaurantMatchesZone(zone, order.delivery_location_snapshot || null))
+    ) {
+      const err = new Error('Target warehouse does not serve the committed delivery location')
+      err.code = 'ZONE_INELIGIBLE'
+      throw err
+    }
+  }
+
+  const previousWarehouseId = assignment.warehouse_id
+  const previousLines = await lineItemsForAssignment(client, orderId, assignment)
+  for (const line of previousLines) {
+    await releaseWarehouseStock(client, previousWarehouseId, line.product_id, line.quantity)
   }
 
   await reserveWarehouseStockBatch(
@@ -267,15 +353,27 @@ export async function reassignOrderWarehouseAssignment(
     { supplierId }
   )
 
+  const assignmentReason = JSON.stringify({
+    type: 'manual_transfer',
+    reason: reason || null,
+    actor_id: assignedBy && assignedBy !== 'manual' ? assignedBy : null,
+    from_warehouse_id: previousWarehouseId,
+    to_warehouse_id: newWarehouseId,
+    supplier_tenant_id: target.supplier_id,
+    supplier_organization_id: target.organization_id || null,
+  })
   const { rows: updated } = await client.query(
     `UPDATE order_warehouse_assignment
      SET warehouse_id = $1,
-         assigned_by = $2,
+         assigned_by = 'manual',
+         assignment_source = 'manual',
+         assignment_reason = $2::jsonb,
+         version = COALESCE(version, 1) + 1,
          assigned_at = now(),
          status = CASE WHEN status = 'picking' THEN 'picking' ELSE 'pending' END
      WHERE id = $3
      RETURNING *`,
-    [newWarehouseId, assignedBy, assignmentId]
+    [newWarehouseId, assignmentReason, assignmentId]
   )
   return updated[0] ?? null
 }

@@ -65,13 +65,14 @@ describe('driver-fulfillment.service', () => {
       warehouse_assignment_id: null,
     }
 
-    query.mockResolvedValueOnce({ rows: [assignment] })
+    query.mockResolvedValueOnce({ rows: [assignment] }) // unlocked peek
 
     const clientQuery = vi.fn()
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE driver_assignments
+      .mockResolvedValueOnce({ rows: [assignment] }) // locked resolve
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // UPDATE driver_assignments
       .mockResolvedValueOnce({ rows: [] }) // warehouse lookup (no WH assignment)
       .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] }) // order status
       .mockResolvedValueOnce({ rows: [] }) // UPDATE customer_order DELIVERED
@@ -79,17 +80,16 @@ describe('driver-fulfillment.service', () => {
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'delivered', driver_name: 'Ali' }],
       })
-
-    query.mockResolvedValueOnce({
-      rows: [
-        {
-          id: 'order-1',
-          restaurant_id: 'rest-1',
-          supplier_name: 'Sup',
-          restaurant_name: 'Rest',
-        },
-      ],
-    })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'order-1',
+            restaurant_id: 'rest-1',
+            supplier_name: 'Sup',
+            restaurant_name: 'Rest',
+          },
+        ],
+      })
 
     await updateDeliveryStatus({
       supplierId: 'sup-1',
@@ -105,6 +105,53 @@ describe('driver-fulfillment.service', () => {
       expect.objectContaining({ id: 'order-1' }),
       'DELIVERED'
     )
+    expect(invalidateDispatchCacheForSupplier).toHaveBeenCalledWith('sup-1')
+  })
+
+  it('does not notify when the delivery-status transaction fails', async () => {
+    const assignment = {
+      id: 'da-1',
+      order_id: 'order-1',
+      supplier_id: 'sup-1',
+      driver_id: 'drv-1',
+      status: 'out_for_delivery',
+      warehouse_assignment_id: null,
+    }
+
+    query.mockResolvedValueOnce({ rows: [assignment] })
+
+    const clientQuery = vi.fn()
+    withTransaction.mockImplementationOnce(async (fn) => {
+      await fn({ query: clientQuery })
+      throw new Error('commit failed')
+    })
+
+    clientQuery
+      .mockResolvedValueOnce({ rows: [assignment] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ ...assignment, status: 'delivered', driver_name: 'Ali' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
+        ],
+      })
+
+    await expect(
+      updateDeliveryStatus({
+        supplierId: 'sup-1',
+        orderId: 'order-1',
+        status: 'delivered',
+      })
+    ).rejects.toThrow(/commit failed/)
+
+    expect(notifyOrderStatusChange).not.toHaveBeenCalled()
+    expect(invalidateDispatchCacheForSupplier).not.toHaveBeenCalled()
   })
 
   it('rejects driver delivered when order is not yet SHIPPED', async () => {
@@ -123,7 +170,8 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [assignment] }) // locked resolve
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ status: 'PROCESSING' }] })
 
@@ -174,17 +222,17 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [assignment] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'out_for_delivery', driver_name: 'Ali' }],
       })
-
-    query.mockResolvedValueOnce({
-      rows: [
-        { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
-      ],
-    })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
+        ],
+      })
 
     await updateDeliveryStatus({
       supplierId: 'sup-1',
@@ -196,6 +244,8 @@ describe('driver-fulfillment.service', () => {
       (c) => typeof c[0] === 'string' && c[0].includes('UPDATE driver_assignments')
     )
     expect(updateCall?.[1]?.[0]).toBe('out_for_delivery')
+    expect(updateCall?.[1]?.at(-2)).toBe('da-1')
+    expect(updateCall?.[1]?.at(-1)).toBe('assigned')
   })
 
   it('submitProofOfDelivery upserts proof with ON CONFLICT (order_id)', async () => {
@@ -266,17 +316,17 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [assignment] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [{ warehouse_id: 'warehouse-b' }] })
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'picked_up', driver_name: 'Ali' }],
       })
-
-    query.mockResolvedValueOnce({
-      rows: [
-        { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
-      ],
-    })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
+        ],
+      })
 
     const result = await updateDeliveryStatus({
       supplierId: 'sup-1',
@@ -289,7 +339,8 @@ describe('driver-fulfillment.service', () => {
     const updateCall = clientQuery.mock.calls.find(
       (c) => typeof c[0] === 'string' && c[0].includes('UPDATE driver_assignments')
     )
-    expect(updateCall?.[1]?.slice(-1)[0]).toBe('da-b')
+    expect(updateCall?.[1]?.at(-2)).toBe('da-b')
+    expect(updateCall?.[1]?.at(-1)).toBe('assigned')
   })
 
   it('does not mark order DELIVERED when warehouse legs are mixed delivered and failed', async () => {
@@ -309,18 +360,18 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
-      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [assignment] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [{ warehouse_id: 'warehouse-a' }] })
       .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] })
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'delivered', driver_name: 'Ali' }],
       })
-
-    query.mockResolvedValueOnce({
-      rows: [
-        { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
-      ],
-    })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
+        ],
+      })
 
     await updateDeliveryStatus({
       supplierId: 'sup-1',

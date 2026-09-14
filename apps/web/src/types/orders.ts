@@ -1,10 +1,32 @@
 // Order types
+export interface DeliveryLocationSnapshot {
+  id: string
+  type: 'RESTAURANT_BRANCH' | 'RESTAURANT_ACCOUNT' | string
+  name?: string | null
+  code?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  label?: string | null
+  addressNotes?: string | null
+  address?: Record<string, unknown> | null
+}
+
 export interface Order {
   id: string
   restaurant_id: string
   status: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   total_amount: number
   currency: string
+  supplier_organization_id?: string | null
+  branch_id?: string | null
+  delivery_location_snapshot?: DeliveryLocationSnapshot | null
+  requested_delivery_method?: string | null
+  requested_delivery_time?: string | null
+  warehouseFulfillment?: {
+    warehouseId: string
+    supplierTenantId?: string
+    reason?: string
+  } | null
   placed_at?: string
   created_at: string
   updated_at: string
@@ -41,6 +63,11 @@ export interface CreateOrderRequest {
   couponCode?: string
   deliveryDate?: string
   notes?: string
+  branchId?: string
+  branch_id?: string
+  deliveryMethod?: string
+  deliveryTime?: string
+  idempotencyKey?: string
   quoteLocks?: Array<{
     productId: string
     quoteRequestSupplierId: string
@@ -56,6 +83,12 @@ export interface CreateManualOrderRequest {
     notes?: string
   }[]
   notes?: string
+  branchId?: string
+  branch_id?: string
+  deliveryMethod?: string
+  deliveryTime?: string
+  deliveryDate?: string
+  idempotencyKey?: string
 }
 
 export interface UpdateOrderRequest {

@@ -305,7 +305,7 @@ export function PublicSupplierCatalogPage({
       quantity: 1,
       product: {
         id: product.id,
-        supplier_id: supplier.id,
+        supplier_id: product.supplierId || supplier.id,
         sku: product.sku,
         name: product.name,
         description: product.description || undefined,
@@ -329,7 +329,7 @@ export function PublicSupplierCatalogPage({
       state: {
         prefill: {
           items: [{ productId: product.id, quantity: 1 }],
-          supplierIds: [supplier.id],
+          supplierIds: [product.supplierId || supplier.id],
         },
       },
     })

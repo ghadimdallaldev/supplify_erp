@@ -63,6 +63,13 @@
       "supplier": "تم تعيين سائق للطلب #{{orderId}}"
     },
     "out_for_delivery": {
+      "fulfillment": {
+        "transfer": {
+          "title": "تم تغيير موقع التنفيذ",
+          "message": "تم نقل الطلب #{{orderId}} إلى موقع تنفيذ جديد. السبب: {{reason}}",
+          "defaultReason": "تغيير تشغيلي في التنفيذ"
+        }
+      },
       "title": "في الطريق للتسليم",
       "restaurant": "طلبك #{{orderId}} في الطريق للتسليم",
       "supplier": "الطلب #{{orderId}} في الطريق للتسليم"

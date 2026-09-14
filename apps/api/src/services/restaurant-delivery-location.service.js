@@ -54,6 +54,71 @@ export async function listRestaurantDeliveryLocations(restaurantId) {
 }
 
 /**
+ * Resolve the delivery location for a supplier order. Missing location data
+ * remains compatible only when there is one active operational branch (or no
+ * branches, where the legacy restaurant address is the only destination).
+ */
+export async function resolveOrderDeliveryLocation(
+  restaurantId,
+  requestedBranchId = null,
+  dbQuery = query
+) {
+  const { rows: restaurantRows } = await dbQuery(
+    `SELECT id, name, address_json, delivery_latitude, delivery_longitude,
+            delivery_location_label, delivery_address_notes
+     FROM restaurant WHERE id = $1`,
+    [restaurantId]
+  )
+  if (!restaurantRows.length) throw new NotFoundError('Restaurant not found')
+
+  const { rows: branches } = await dbQuery(
+    `SELECT id, name, code, address, delivery_latitude, delivery_longitude,
+            delivery_location_label, delivery_address_notes
+     FROM branch
+     WHERE tenant_id = $1 AND COALESCE(is_active, TRUE) = TRUE
+     ORDER BY name ASC, id ASC`,
+    [restaurantId]
+  )
+
+  let selected = null
+  if (requestedBranchId) {
+    selected = branches.find((branch) => branch.id === requestedBranchId)
+    if (!selected) {
+      const error = new ValidationError('Selected delivery location is not available')
+      error.code = 'DELIVERY_LOCATION_INVALID'
+      throw error
+    }
+  } else if (branches.length === 1) {
+    selected = branches[0]
+  } else if (branches.length > 1) {
+    const error = new ValidationError(
+      'Select a restaurant delivery location before placing this order'
+    )
+    error.code = 'DELIVERY_LOCATION_REQUIRED'
+    error.details = { locationCount: branches.length }
+    throw error
+  }
+
+  const row = selected || restaurantRows[0]
+  const location = mapDeliveryLocationRow(row)
+  return {
+    branchId: selected?.id || null,
+    source: selected ? 'branch' : 'restaurant',
+    snapshot: {
+      id: location.id,
+      type: selected ? 'RESTAURANT_BRANCH' : 'RESTAURANT_ACCOUNT',
+      name: location.name,
+      code: location.code || null,
+      latitude: location.deliveryLatitude,
+      longitude: location.deliveryLongitude,
+      label: location.deliveryLocationLabel,
+      addressNotes: location.deliveryAddressNotes,
+      address: selected?.address || row.address_json || null,
+    },
+  }
+}
+
+/**
  * First defined alias wins. Accepts camelCase (web), snake_case (legacy web),
  * and the bare `latitude`/`label`/`addressNotes` shape shipped by mobile clients.
  */

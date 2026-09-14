@@ -413,3 +413,13 @@ GET /api/inventory?warehouse_id=xyz-789
 ---
 
 Last Updated: 2026-08-06
+
+## Ordering ownership boundary (2026-09-14)
+
+For supplier ordering, supplier_organizations is the customer-facing parent and supplier is the sellable child tenant. Products, catalogs, prices, contract prices, and historical order ownership remain child-tenant scoped. warehouse is a fulfillment location owned by one child tenant; it is not a synonym for a supplier branch account.
+
+New orders resolve Supplier Organization → eligible Supplier Tenant → eligible Warehouse. The tenant must own all products in the basket and the warehouse must belong to that tenant. Organization-level catalog views aggregate discovery only and never fuzzy-merge tenant-specific product rows without a canonical product identity.
+
+Restaurant branch rows are operational delivery destinations under a restaurant tenant. Explicit branches are snapshotted to orders; omitted locations auto-resolve only when exactly one active operational branch exists. Multiple active branches require an explicit location because choosing one silently could misroute delivery.
+
+Historical order_item.supplier_id and line-level warehouse assignments remain available for compatibility. New non-split orders use customer_order.supplier_organization_id plus one order-level warehouse assignment. Financial snapshots are not recalculated during reassignment.

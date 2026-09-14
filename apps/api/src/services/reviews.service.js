@@ -8,32 +8,63 @@ export { DELIVERED_ORDER_STATUSES }
 
 const EDIT_WINDOW_DAYS = 7
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function resolveSupplierReviewScope(supplierId) {
+  if (!UUID_PATTERN.test(String(supplierId))) {
+    return [supplierId]
+  }
+  const { rows } = await query(
+    `
+    SELECT id
+    FROM supplier
+    WHERE id = $1 OR organization_id = $1
+    ORDER BY is_branch_active DESC, is_main_branch DESC, created_at ASC, id ASC
+    `,
+    [supplierId]
+  )
+  return rows.length ? rows.map((row) => row.id) : [supplierId]
+}
 export async function recalculateSupplierRatingSummary(supplierId) {
   await query('SELECT refresh_supplier_rating_summary($1)', [supplierId])
 }
 
 export async function getSupplierRatingSummary(supplierId) {
+  const supplierIds = await resolveSupplierReviewScope(supplierId)
   const { rows } = await query(
     `
-    SELECT supplier_id, review_count, avg_overall, avg_quality, avg_delivery, avg_value, updated_at
+    SELECT
+      COALESCE(SUM(review_count), 0)::int AS review_count,
+      COALESCE(
+        SUM(COALESCE(avg_overall, 0) * review_count) / NULLIF(SUM(review_count), 0),
+        0
+      ) AS avg_overall,
+      COALESCE(
+        SUM(COALESCE(avg_quality, 0) * review_count) / NULLIF(SUM(review_count), 0),
+        0
+      ) AS avg_quality,
+      COALESCE(
+        SUM(COALESCE(avg_delivery, 0) * review_count) / NULLIF(SUM(review_count), 0),
+        0
+      ) AS avg_delivery,
+      COALESCE(
+        SUM(COALESCE(avg_value, 0) * review_count) / NULLIF(SUM(review_count), 0),
+        0
+      ) AS avg_value
     FROM supplier_rating_summaries
-    WHERE supplier_id = $1
+    WHERE supplier_id = ANY($1::uuid[])
     `,
-    [supplierId]
+    [supplierIds]
   )
-  if (!rows.length) {
-    return {
-      supplier_id: supplierId,
-      review_count: 0,
-      avg_overall: 0,
-      avg_quality: null,
-      avg_delivery: null,
-      avg_value: null,
-    }
+  return {
+    supplier_id: supplierId,
+    review_count: Number(rows[0]?.review_count || 0),
+    avg_overall: Number(rows[0]?.avg_overall || 0),
+    avg_quality: rows[0]?.avg_quality ?? null,
+    avg_delivery: rows[0]?.avg_delivery ?? null,
+    avg_value: rows[0]?.avg_value ?? null,
   }
-  return rows[0]
 }
-
 export async function getSupplierRatingSummariesBatch(supplierIds) {
   if (!supplierIds?.length) return new Map()
   const { rows } = await query(
@@ -96,6 +127,7 @@ export async function getRecentReviewsForSuppliersBatch(supplierIds, limitPerSup
 }
 
 export async function getRecentReviewsForSupplier(supplierId, limit = 3) {
+  const supplierIds = await resolveSupplierReviewScope(supplierId)
   const { rows } = await query(
     `
     SELECT
@@ -109,15 +141,14 @@ export async function getRecentReviewsForSupplier(supplierId, limit = 3) {
       r.name AS restaurant_name
     FROM supplier_reviews sr
     JOIN restaurant r ON r.id = sr.restaurant_id
-    WHERE sr.supplier_id = $1
+    WHERE sr.supplier_id = ANY($1::uuid[])
     ORDER BY sr.created_at DESC
     LIMIT $2
     `,
-    [supplierId, limit]
+    [supplierIds, limit]
   )
   return rows
 }
-
 export async function assertOrderEligibleForReview({ orderId, supplierId, restaurantId }) {
   const { rows: orders } = await query(
     `
@@ -135,10 +166,18 @@ export async function assertOrderEligibleForReview({ orderId, supplierId, restau
     throw new ValidationError('Order must be delivered before leaving a review')
   }
 
+  const supplierIds = await resolveSupplierReviewScope(supplierId)
+  const supplierPredicate =
+    supplierIds.length === 1 && supplierIds[0] === supplierId
+      ? 'supplier_id = $2'
+      : 'supplier_id = ANY($2::uuid[])'
+  const supplierParam =
+    supplierIds.length === 1 && supplierIds[0] === supplierId ? supplierIds[0] : supplierIds
   const { rows: supplierItems } = await query(
-    `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
-    [orderId, supplierId]
+    `SELECT supplier_id FROM order_item WHERE order_id = $1 AND ${supplierPredicate} LIMIT 1`,
+    [orderId, supplierParam]
   )
+
   if (!supplierItems.length) {
     throw new ValidationError('Order does not include items from this supplier')
   }
@@ -150,7 +189,7 @@ export async function assertOrderEligibleForReview({ orderId, supplierId, restau
     throw new ValidationError('A review already exists for this order')
   }
 
-  return order
+  return { ...order, supplierId: supplierItems[0].supplier_id }
 }
 
 export async function createSupplierReview({
@@ -164,7 +203,7 @@ export async function createSupplierReview({
   valueRating,
   comment,
 }) {
-  await assertOrderEligibleForReview({ orderId, supplierId, restaurantId })
+  const eligibility = await assertOrderEligibleForReview({ orderId, supplierId, restaurantId })
 
   const { rows } = await query(
     `
@@ -176,7 +215,7 @@ export async function createSupplierReview({
     RETURNING *
     `,
     [
-      supplierId,
+      eligibility.supplierId,
       restaurantId,
       orderId,
       reviewerUserId,
@@ -255,6 +294,7 @@ export async function deleteSupplierReview(reviewId, userId) {
 }
 
 export async function listSupplierReviews(supplierId, { limit = 20, offset = 0 }) {
+  const supplierIds = await resolveSupplierReviewScope(supplierId)
   const { rows } = await query(
     `
     SELECT
@@ -269,21 +309,20 @@ export async function listSupplierReviews(supplierId, { limit = 20, offset = 0 }
       r.name AS restaurant_name
     FROM supplier_reviews sr
     JOIN restaurant r ON r.id = sr.restaurant_id
-    WHERE sr.supplier_id = $1
+    WHERE sr.supplier_id = ANY($1::uuid[])
     ORDER BY sr.created_at DESC
     LIMIT $2 OFFSET $3
     `,
-    [supplierId, limit, offset]
+    [supplierIds, limit, offset]
   )
 
   const { rows: countRows } = await query(
-    `SELECT COUNT(*)::int AS total FROM supplier_reviews WHERE supplier_id = $1`,
-    [supplierId]
+    `SELECT COUNT(*)::int AS total FROM supplier_reviews WHERE supplier_id = ANY($1::uuid[])`,
+    [supplierIds]
   )
 
   return { reviews: rows, total: countRows[0]?.total ?? 0 }
 }
-
 export async function listMyReviews(restaurantId, { limit = 50, offset = 0 }) {
   const { rows } = await query(
     `
