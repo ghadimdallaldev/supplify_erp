@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { assertValidOrderStatusTransition } from './order-status-transitions.js'
+import {
+  assertValidOrderStatusTransition,
+  requiresDriverAssignment,
+} from './order-status-transitions.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 
 describe('order-status-transitions', () => {
@@ -63,7 +66,7 @@ describe('order-status-transitions', () => {
     }
   })
 
-  it('allows legacy COMPLETED path to DELIVERED from fulfillment states', () => {
+  it('allows legacy COMPLETED path only after shipping', () => {
     expect(() =>
       assertValidOrderStatusTransition({
         role: 'SUPPLIER',
@@ -72,6 +75,21 @@ describe('order-status-transitions', () => {
         legacyCompleted: true,
       })
     ).not.toThrow()
+    expect(() =>
+      assertValidOrderStatusTransition({
+        role: 'SUPPLIER',
+        from: 'PROCESSING',
+        to: 'DELIVERED',
+        legacyCompleted: true,
+      })
+    ).toThrow(ValidationError)
+  })
+
+  it('requires a driver for shipping and delivery status changes', () => {
+    expect(requiresDriverAssignment('SHIPPED')).toBe(true)
+    expect(requiresDriverAssignment('DELIVERED')).toBe(true)
+    expect(requiresDriverAssignment('COMPLETED')).toBe(true)
+    expect(requiresDriverAssignment('PROCESSING')).toBe(false)
   })
 
   it('blocks transitions from terminal statuses', () => {

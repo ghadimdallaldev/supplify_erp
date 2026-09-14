@@ -82,9 +82,8 @@ router.get('/', async (req, res) => {
       whereConditions.push(`EXISTS (
         SELECT 1
         FROM order_item oi_s
-        JOIN product p_s ON p_s.id = oi_s.product_id
         WHERE oi_s.order_id = o.id
-          AND p_s.supplier_id = $${paramIndex}
+          AND oi_s.supplier_id = $${paramIndex}
       )`)
       queryParams.push(tenant.tenantId)
       paramIndex++
@@ -207,10 +206,10 @@ router.get('/', async (req, res) => {
             `
             SELECT
               oi.*,
-              p.name as product_name,
-              p.sku as product_sku
+              COALESCE(p.name, 'Unavailable product') as product_name,
+              COALESCE(p.sku, oi.product_id::text) as product_sku
             FROM order_item oi
-            JOIN product p ON p.id = oi.product_id
+            LEFT JOIN product p ON p.id = oi.product_id
             WHERE oi.order_id = ANY($1)
           `,
             [orderIds]

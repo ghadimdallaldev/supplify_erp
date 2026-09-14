@@ -37,14 +37,39 @@ export function validateAndEnrichReceivingLines(orderItems, lineItems) {
       throw new ValidationError(`Unknown order item ${orderItemId}`)
     }
 
+    const receivedQuantity = line.received_quantity ?? line.receivedQuantity ?? orderItem.quantity
+    const qualityStatus = String(
+      line.quality_status ?? line.qualityStatus ?? 'ACCEPTED'
+    ).toUpperCase()
+    const allowedQualityStatuses = new Set([
+      'ACCEPTED',
+      'DAMAGED',
+      'EXPIRED',
+      'WRONG_ITEM',
+      'SHORT',
+    ])
+    if (!allowedQualityStatuses.has(qualityStatus)) {
+      throw new ValidationError(`Invalid quality status for order item ${orderItemId}`)
+    }
+
     enriched.push({
       ...line,
       orderItemId,
       productId: line.productId ?? line.product_id ?? orderItem.product_id,
+      product_name:
+        orderItem.product_name ?? line.product_name ?? line.productName ?? 'Unknown product',
+      sku: orderItem.sku ?? line.sku ?? 'N/A',
       ordered_quantity: parseFloat(orderItem.quantity),
+      received_quantity: receivedQuantity,
       unit: line.unit || orderItem.unit || 'unit',
       expected_unit_price:
         line.expected_unit_price ?? line.expectedUnitPrice ?? orderItem.unit_price,
+      actual_unit_price: line.actual_unit_price ?? line.actualUnitPrice ?? orderItem.unit_price,
+      quality_status: qualityStatus,
+      notes: line.notes ?? '',
+      expiryDate: line.expiryDate ?? line.expiry_date,
+      batchLotNumber: line.batchLotNumber ?? line.batch_lot_number,
+      storageLocation: line.storageLocation ?? line.storage_location,
     })
   }
 
@@ -69,4 +94,32 @@ export function sumBillableAcceptedQuantity(lineItems) {
     }
     return sum
   }, 0)
+}
+
+export function buildReceivingDiscrepancies(lineItems) {
+  return (lineItems || [])
+    .map((item) => {
+      const ordered = Number(item.ordered_quantity || 0)
+      const received = Number(item.received_quantity || 0)
+      const qualityStatus = String(item.quality_status || 'ACCEPTED').toUpperCase()
+      const missing = Math.max(ordered - received, 0)
+      const rejected = qualityStatus === 'ACCEPTED' ? 0 : received
+      const disputedQuantity = missing + rejected
+      if (disputedQuantity <= 0) return null
+      const reasons = []
+      if (missing > 0) reasons.push(`short by ${missing} ${item.unit || 'unit'}`)
+      if (rejected > 0) reasons.push(`${received} marked ${qualityStatus.toLowerCase()}`)
+      const unitPrice = Number(item.actual_unit_price || item.expected_unit_price || 0)
+      return {
+        orderItemId: item.orderItemId,
+        productName: item.product_name,
+        quantityOrdered: ordered,
+        quantityReceived: received,
+        unitPrice,
+        disputedAmount: disputedQuantity * unitPrice,
+        issueDescription: reasons.join('; '),
+        qualityStatus,
+      }
+    })
+    .filter(Boolean)
 }

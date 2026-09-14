@@ -83,6 +83,8 @@ export function OrdersPage() {
   const [selectedRestaurant, setSelectedRestaurant] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('')
+  const [productOffset, setProductOffset] = useState(0)
   const [declineOrderId, setDeclineOrderId] = useState<string | null>(null)
   const [declineOrderLabel, setDeclineOrderLabel] = useState<string | undefined>()
   const [manualOrderItems, setManualOrderItems] = useState<
@@ -114,6 +116,14 @@ export function OrdersPage() {
   }, [search])
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim())
+      setProductOffset(0)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [productSearch])
+
+  useEffect(() => {
     setOffset(0)
   }, [status, debouncedSearch, dateFrom, dateTo, restaurantFilter])
 
@@ -126,7 +136,8 @@ export function OrdersPage() {
       to: dateTo || undefined,
       limit: ORDERS_PAGE_SIZE,
       offset,
-      includeItems: false,
+      // Cards and rows show the real products and item count.
+      includeItems: true,
     },
     {
       refetchOnMountOrArgChange: false,
@@ -155,7 +166,7 @@ export function OrdersPage() {
 
   const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
   const { data: productsData } = useGetProductsQuery(
-    { limit: 100 },
+    { limit: 50, offset: productOffset, q: debouncedProductSearch || undefined },
     { skip: !isSupplier || !showManualOrderDialog }
   )
   const [updateOrder] = useUpdateOrderMutation()
@@ -258,11 +269,7 @@ export function OrdersPage() {
     }
   }
 
-  const filteredProducts = productsData?.products?.filter(
-    (product: any) =>
-      product.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(productSearch.toLowerCase())
-  )
+  const filteredProducts = productsData?.products ?? []
 
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
@@ -814,6 +821,30 @@ export function OrdersPage() {
                       {t('page.noProductsFound')}
                     </div>
                   )}
+                </div>
+                <div className={'flex items-center justify-between'}>
+                  <Button
+                    type={'button'}
+                    variant={'outline'}
+                    disabled={productOffset === 0}
+                    onClick={() => setProductOffset((value) => Math.max(0, value - 50))}
+                  >
+                    {t('page.previous')}
+                  </Button>
+                  <span className={'text-xs text-[var(--text-muted)]'}>
+                    {t('page.paginationShowing', {
+                      start: filteredProducts.length ? productOffset + 1 : 0,
+                      end: productOffset + filteredProducts.length,
+                    })}
+                  </span>
+                  <Button
+                    type={'button'}
+                    variant={'outline'}
+                    disabled={!productsData?.pagination?.nextCursor}
+                    onClick={() => setProductOffset((value) => value + 50)}
+                  >
+                    {t('page.next')}
+                  </Button>
                 </div>
               </div>
 
