@@ -254,19 +254,61 @@ const orderCreateSchema = z
     }
   })
 
-const supplierOrderCreateSchema = z.object({
-  restaurant_id: z.string().uuid(),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().uuid(),
-        quantity: z.number().positive(),
-        notes: z.string().optional(),
-      })
-    )
-    .min(1),
-  notes: z.string().optional(),
-})
+const supplierOrderCreateSchema = z
+  .object({
+    restaurant_id: z.string().uuid(),
+    items: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          quantity: z.number().positive(),
+          notes: z.string().optional(),
+        })
+      )
+      .min(1),
+    notes: z.string().optional(),
+    quoteLocks: z
+      .array(
+        z.object({
+          productId: z.string().uuid(),
+          quoteRequestSupplierId: z.string().uuid(),
+          quoteResponseItemId: z.string().uuid(),
+        })
+      )
+      .optional(),
+    deliveryDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    const seenItems = new Set()
+    for (const item of data.items) {
+      if (seenItems.has(item.productId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate productId in items: ${item.productId}. Send one line per product with the total quantity.`,
+          path: ['items'],
+        })
+        return
+      }
+      seenItems.add(item.productId)
+    }
+    if (data.quoteLocks?.length) {
+      const seenLocks = new Set()
+      for (const lock of data.quoteLocks) {
+        if (seenLocks.has(lock.productId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Duplicate productId in quoteLocks: ${lock.productId}`,
+            path: ['quoteLocks'],
+          })
+          return
+        }
+        seenLocks.add(lock.productId)
+      }
+    }
+  })
 
 const deliveryStatusSchema = z.enum([
   'assigned',

@@ -341,24 +341,32 @@ export async function updateDeliveryStatus({
 
     if (status === 'delivered') {
       const { rows: orders } = await client.query(
-        `SELECT status FROM customer_order WHERE id = $1`,
+        `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
         [orderId]
       )
       const oldStatus = orders[0]?.status
+
+      // Driver delivery may only promote the order to DELIVERED after SHIPPED
+      // (or leave it already DELIVERED). Earlier fulfillment states must ship first.
+      if (oldStatus && oldStatus !== 'SHIPPED' && oldStatus !== 'DELIVERED') {
+        throw new ValidationError(
+          `Cannot mark order delivered from ${oldStatus}; order must be shipped first`
+        )
+      }
 
       if (assignment.warehouse_assignment_id) {
         await markWarehouseAssignmentDelivered(client, orderId, assignment.warehouse_assignment_id)
         // Order is DELIVERED only when every warehouse leg succeeded. Mixed
         // delivered+failed legs stay at the current order status (typically SHIPPED).
         const allDelivered = await allWarehouseAssignmentsDelivered(client, orderId)
-        if (allDelivered) {
+        if (allDelivered && oldStatus === 'SHIPPED') {
           await client.query(
             `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
             [orderId]
           )
           orderMarkedDelivered = true
         }
-      } else {
+      } else if (oldStatus === 'SHIPPED') {
         await client.query(
           `UPDATE customer_order SET status = 'DELIVERED', updated_at = now() WHERE id = $1`,
           [orderId]

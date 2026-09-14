@@ -2,6 +2,39 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Supplier team invites no longer require multi_branch
+
+- Bug: Settings → Team → Invite (including **Driver**) hit `/api/org/invitations`, which was gated by `requireFeature('multi_branch')`. Growth plans have `driver_management` but not `multi_branch`, so invites failed with `FEATURE_NOT_AVAILABLE` and the modal swallowed errors (appeared broken).
+- Fix: remove `multi_branch` from supplier invitation routes (align with restaurant member invites). Seed system roles on `GET /roles`. Surface invite/role errors in `BranchInviteModal`.
+- **Mobile skipped**: team invites remain web-only (`OpenOnWebRow` → supplier settings); no mobile invite API client change.
+- Docs: `tenant-roles.md`, `03-supplier-onboarding.md`.
+
+## 2026-09-14 — Web push Enable hung on missing service worker
+
+- Clicking **Enable** for browser push awaited `navigator.serviceWorker.ready` without registering a worker first. In local/dev the SW is intentionally not auto-registered (HMR), so the promise never resolved and the button appeared dead.
+- Fix: `ensureServiceWorkerForPush()` registers `/sw.js` on demand (including dev), times out instead of hanging, and pins the SW so the dev cleanup path does not unregister it mid-enable. Enable/Disable buttons show a spinner while busy.
+- Shared `PushEnableBanner` popup now shows a spinner + inline error (failures were easy to miss on the floating prompt).
+- **Mobile skipped**: native push uses Expo device tokens, not Web Push / service workers.
+
+## 2026-09-14 — Order short-id display consistency
+
+- Orders list/detail/packing on web used the **last** 8 UUID characters while notifications and most other surfaces used the **first** 8, so acknowledge alerts looked like a different order number (`#486DB23D` vs `#28EDEA5F` for the same UUID).
+- Canonical short ref is now first 8 chars, uppercase (`orderShortId` / `formatOrderRef`) across API notifications, web orders UI, and both mobile chat order tags.
+- **Android + iOS:** chat order picker/chips updated; shared `orderShortId` / `formatOrderRef` helpers added under `src/utils/format.ts`.
+- No API contract, env var, feature key, or permission key change.
+
+## 2026-09-14 — Deferred defect closure (quotes, driver, cart, dispatch, POD)
+
+- **Supplier manual orders** auto-apply open quote locks for the supplier’s products (same quote price precedence as restaurant checkout; qty capped to quoted qty). Optional client `quoteLocks` still accepted.
+- **Driver deliver** may promote `customer_order` to `DELIVERED` only from `SHIPPED` (or leave already-`DELIVERED`); earlier statuses reject with “must be shipped first”.
+- **Cart quote stickiness:** catalog re-add of the same SKU clears quote lock metadata on web + Android + iOS so checkout does not reuse stale RFQ prices.
+- **RFQ respond TOCTOU:** `submitQuoteResponse` re-checks `quote_requests.status = 'open'` under `FOR UPDATE` inside the write transaction.
+- **Dispatch warehouse filter:** assignment-mode filter scopes to `da.warehouse_assignment_id` so multi-WH sibling legs are hidden; unassigned bucket stays order-level.
+- **Tenant POD required:** migration `0205_supplier_pod_required.sql` adds `supplier.pod_required`; `PATCH /api/suppliers/me/business` + web Supplier Business settings toggle; `isPodRequiredForSupplier` reads the column and `assertPodPresentWhenRequired` enforces on deliver.
+- **Android + iOS:** cart store clears quote locks on catalog re-add (tests added). Driver apps already honor `podRequired` from delivery-status responses — no new mobile settings screen (supplier business settings remain web).
+- Docs: `quote-requests.md`, `drivers-and-gps-tracking.md`, this parity log.
+- Verification: focused API suites (driver, quotes, pricing locks, POD, warehouse filter) + cart tests + mobile `tsc`.
+
 ## 2026-09-14 — Order workflow and receiving integrity
 
 - API/web fixes keep list item counts and product details aligned across order cards, detail, receiving, and packing documents; product/SKU search and paginated product selection no longer stop at an arbitrary first page.
@@ -29,7 +62,7 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 - **Fulfillment:** receiving requires all order lines; order status transition matrix enforced (restaurant cancel only early statuses); cancel restores dispatched stock when allowed; all-rejected receive → `RECEIVED_WITH_DISPUTE` without false `RECEIVED_FULL`; multi-WH driver updates require assignment IDs; order `DELIVERED` only when all WH legs delivered; route planning syncs all pending WH legs; supplier delivery + fulfillment dispatch boards expose one row per driver assignment; board exposes real `driver_id` / `assignmentId`; POD policy helper (optional until a setting exists).
 - **Quotations:** quote locks required when an open responded quote exists; locks require RFQ `open`; close/cancel API + UI; cart merge preserves quote locks; duplicate `productId` lines rejected; supplier inbox filters own products; to-cart validates supplier row ownership; declined cannot re-respond; fail-fast ineligible suppliers; qty capped to quoted qty; notification dedup per supplier-row; substitutes flow into cart; promos skip `QUOTE_PRICE` lines; checkout no longer auto-closes whole RFQ; supplier response uses `defaultCurrency`.
 - **Mobile (Android + iOS):** cart quote-lock merge overwrite; quote close/cancel on detail; supplier response respects `canRespond`/closed RFQ + defaultCurrency; driver board rows keyed by `assignmentId` for multi-leg; delivery-status passes `driver_assignment_id` when known. Contract pricing mobile UI remains intentional subset (price/notes). Restaurant cancel UI absent on mobile (API enforces). Receiving already submits all lines.
-- **Deferred (continue next session):** supplier manual orders still skip open-quote lock guard (may be intentional phone-order path); driver deliver can set order `DELIVERED` without prior `SHIPPED` via driver path; cart quote metadata stickiness when re-adding catalog SKU; RFQ close TOCTOU during supplier respond; warehouse filter on dispatch still order-level (can show sibling WH legs); deep E2E lifecycle coverage still smoke-level; no tenant “POD required” setting yet.
+- **Deferred (continue next session):** deep E2E lifecycle coverage still smoke-level.
 - Docs updated: `docs/features/quote-requests.md`, `docs/features/contract-pricing.md`, `docs/features/drivers-and-gps-tracking.md`, `docs/onboarding/13-acceptance-criteria.md` §25.
 - Verification: focused API suites for pricing/quotes/receiving/transitions/driver/routes/invoices/orders/board/POD passed; mobile `tsc --noEmit` on both apps.
 

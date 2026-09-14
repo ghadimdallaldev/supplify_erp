@@ -1,13 +1,15 @@
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { query } from './db.js'
 import { getProofOfDelivery } from '../services/driver-fulfillment.service.js'
 
 /**
- * Proof of delivery is optional for all suppliers — there is no supplier/tenant
- * setting that blocks delivery confirmation without a POD record yet. When such
- * a setting is added, implement the lookup here and enforce in updateDeliveryStatus.
+ * Look up whether this supplier requires proof of delivery before delivered status.
+ * Defaults to false when the supplier row is missing.
  */
-export async function isPodRequiredForSupplier(_supplierId) {
-  return false
+export async function isPodRequiredForSupplier(supplierId, dbQuery = query) {
+  if (!supplierId) return false
+  const { rows } = await dbQuery(`SELECT pod_required FROM supplier WHERE id = $1`, [supplierId])
+  return Boolean(rows[0]?.pod_required)
 }
 
 export async function orderHasProofOfDeliveryRecord(orderId) {

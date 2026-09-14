@@ -22,7 +22,7 @@ import { ResponsiveDataList, responsiveDataListClasses } from '../ui/responsive-
 import { cn } from '../../lib/utils'
 import { formatPrice } from '../../utils/format'
 import { resolveOrderStatusLabel } from './detail/orderDetailShared'
-import { isDisputeReplacementOrder } from '../../lib/orderPlacement'
+import { isDisputeReplacementOrder, orderShortId } from '../../lib/orderPlacement'
 import { getActiveDisputeForOrder } from '../../lib/disputeHelpers'
 
 const thClass =
@@ -266,7 +266,7 @@ export function OrdersResponsiveList({
                 <div className="mb-2 flex flex-wrap items-center gap-2 sm:gap-3">
                   <CardTitle className="text-lg">
                     {t('page.orderNumber', {
-                      id: order.id.slice(-8).toUpperCase(),
+                      id: orderShortId(order.id),
                     })}
                   </CardTitle>
                   <span className="inline-flex items-center gap-1">
@@ -487,10 +487,10 @@ export function OrdersResponsiveList({
               to={`/app/orders/${order.id}`}
               className="font-medium tabular-nums text-[var(--brand-mid)] hover:underline"
               title={t('page.orderNumber', {
-                id: order.id.slice(-8).toUpperCase(),
+                id: orderShortId(order.id),
               })}
             >
-              #{order.id.slice(-8).toUpperCase()}
+              #{orderShortId(order.id)}
             </Link>
           </td>
           <td

@@ -628,6 +628,17 @@ export async function submitQuoteResponse(
   }
 
   const result = await withTransaction(async (client) => {
+    // Re-check RFQ status under row lock so a concurrent close/cancel cannot race.
+    const { rows: lockedQr } = await client.query(
+      `SELECT id, status FROM quote_requests WHERE id = $1 FOR UPDATE`,
+      [qrs.quote_request_id]
+    )
+    if (!lockedQr.length || lockedQr[0].status !== 'open') {
+      throw new ValidationError(
+        `This quote request is ${lockedQr[0]?.status || 'unavailable'} and no longer accepts responses`
+      )
+    }
+
     const { rows: existing } = await client.query(
       `SELECT id FROM quote_responses WHERE quote_request_supplier_id = $1`,
       [quoteRequestSupplierId]

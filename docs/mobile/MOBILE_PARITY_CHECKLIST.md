@@ -34,6 +34,17 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 
 Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS). No Expo workspace belongs inside the ERP.
 
+## 2026-09-14 — Deferred defect closure (quotes, driver, cart, dispatch, POD)
+
+- [x] Manual-order open-quote locks auto-applied server-side; restaurant checkout guard unchanged.
+- [x] Driver deliver requires prior `SHIPPED` before order `DELIVERED`.
+- [x] Web + Android + iOS cart clears quote metadata on catalog re-add; tests added.
+- [x] RFQ respond uses `FOR UPDATE` status re-check (TOCTOU closed).
+- [x] Dispatch warehouse filter is assignment-leg scoped.
+- [x] `supplier.pod_required` + business settings API/UI; driver `podRequired` flag already consumed on mobile.
+- [x] `MOBILE_FEATURE_PARITY.md` dated entry; domain docs updated.
+- [x] Focused API + cart tests; both mobile typechecks.
+
 ## 2026-09-14 — Order workflow and receiving integrity
 
 - [x] API receiving/order/amendment/product contracts synchronized with Android and iOS types and query hooks.

@@ -4,7 +4,7 @@ import {
   useSubscribePushMutation,
   useUnsubscribePushMutation,
 } from '../services/api'
-import { registerServiceWorker } from '../lib/registerServiceWorker'
+import { ensureServiceWorkerForPush, registerServiceWorker } from '../lib/registerServiceWorker'
 
 const PUSH_ENABLED_KEY = 'supplify_push_enabled'
 const PUSH_DISMISSED_KEY = 'supplify_push_banner_dismissed'
@@ -28,6 +28,8 @@ export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   )
+  const [enabling, setEnabling] = useState(false)
+  const [disabling, setDisabling] = useState(false)
 
   const { data: vapidData } = useGetVapidPublicKeyQuery(undefined, {
     skip: typeof window === 'undefined' || !('serviceWorker' in navigator),
@@ -59,51 +61,63 @@ export function usePushNotifications() {
         'Notifications are blocked for this site. Reset permission in your browser site settings, then try again.'
       )
     }
-    const perm = await Notification.requestPermission()
-    setPermission(perm)
-    if (perm !== 'granted') {
-      throw new Error(
-        perm === 'denied'
-          ? 'Notifications are blocked for this site. Reset permission in your browser site settings, then try again.'
-          : 'Notification permission was not granted'
-      )
-    }
-    const registration = await navigator.serviceWorker.ready
-    let subscription
+    // Request permission in the same user-gesture turn before any await/state work.
+    const permissionPromise = Notification.requestPermission()
+    setEnabling(true)
     try {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
-      })
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
+      const perm = await permissionPromise
+      setPermission(perm)
+      if (perm !== 'granted') {
         throw new Error(
-          'Push notifications are not available in this browser (use HTTPS or localhost with valid VAPID keys).'
+          perm === 'denied'
+            ? 'Notifications are blocked for this site. Reset permission in your browser site settings, then try again.'
+            : 'Notification permission was not granted'
         )
       }
-      throw err
+      const registration = await ensureServiceWorkerForPush()
+      let subscription
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey),
+        })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          throw new Error(
+            'Push notifications are not available in this browser (use HTTPS or localhost with valid VAPID keys).'
+          )
+        }
+        throw err
+      }
+      const json = subscription.toJSON()
+      await subscribePush({
+        endpoint: json.endpoint!,
+        keys: { p256dh: json.keys!.p256dh!, auth: json.keys!.auth! },
+      }).unwrap()
+      localStorage.setItem(PUSH_ENABLED_KEY, 'true')
+      localStorage.setItem(PUSH_DISMISSED_KEY, 'true')
+      setSubscribed(true)
+      setBannerVisible(false)
+    } finally {
+      setEnabling(false)
     }
-    const json = subscription.toJSON()
-    await subscribePush({
-      endpoint: json.endpoint!,
-      keys: { p256dh: json.keys!.p256dh!, auth: json.keys!.auth! },
-    }).unwrap()
-    localStorage.setItem(PUSH_ENABLED_KEY, 'true')
-    localStorage.setItem(PUSH_DISMISSED_KEY, 'true')
-    setSubscribed(true)
-    setBannerVisible(false)
   }, [subscribePush, vapidData?.publicKey])
 
   const disablePush = useCallback(async () => {
     if (!('serviceWorker' in navigator)) return
-    const registration = await navigator.serviceWorker.ready
-    const subscription = await registration.pushManager.getSubscription()
-    if (subscription) {
-      await unsubscribePush({ endpoint: subscription.endpoint }).unwrap()
-      await subscription.unsubscribe()
+    setDisabling(true)
+    try {
+      const registration = await ensureServiceWorkerForPush()
+      const subscription = await registration.pushManager.getSubscription()
+      if (subscription) {
+        await unsubscribePush({ endpoint: subscription.endpoint }).unwrap()
+        await subscription.unsubscribe()
+      }
+      localStorage.setItem(PUSH_ENABLED_KEY, 'false')
+      setSubscribed(false)
+    } finally {
+      setDisabling(false)
     }
-    localStorage.setItem(PUSH_ENABLED_KEY, 'false')
-    setSubscribed(false)
   }, [unsubscribePush])
 
   const pushUnavailableReason = !('serviceWorker' in navigator)
@@ -117,14 +131,17 @@ export function usePushNotifications() {
     ? 'Notifications are blocked for this site. Reset them in your browser (see instructions below), then click Enable again.'
     : null
 
+  const busy = enabling || disabling || subscribing || unsubscribing
+
   return {
     bannerVisible,
     dismissBanner,
     enablePush,
     disablePush,
     subscribed,
-    subscribing,
-    unsubscribing,
+    subscribing: busy,
+    unsubscribing: busy,
+    enabling: busy,
     permission,
     pushAvailable: Boolean(vapidData?.publicKey),
     pushUnavailableReason,

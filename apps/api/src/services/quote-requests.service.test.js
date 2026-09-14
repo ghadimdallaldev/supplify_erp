@@ -63,6 +63,38 @@ describe('quote-requests.service', () => {
     expect(notifyQuoteResponseReceivedMock).not.toHaveBeenCalled()
   })
 
+  it('refuses a response when the RFQ is closed after the initial read (TOCTOU)', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            status: 'pending',
+            quote_request_status: 'open',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'item-1' }] })
+
+    const clientQuery = vi.fn().mockResolvedValueOnce({
+      rows: [{ id: 'qr-1', status: 'closed' }],
+    })
+    withTransactionMock.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+
+    await expect(
+      submitQuoteResponse({
+        supplierId: 'supplier-1',
+        quoteRequestSupplierId: 'qrs-1',
+        items: [{ quoteRequestItemId: 'item-1', unitPrice: 10 }],
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(clientQuery.mock.calls[0][0]).toMatch(/FOR UPDATE/)
+    expect(notifyQuoteResponseReceivedMock).not.toHaveBeenCalled()
+  })
+
   it('declines a pending request, stores the reason and notifies the restaurant', async () => {
     queryMock
       // load the inbox row
@@ -432,10 +464,11 @@ describe('quote-requests.service', () => {
       const client = {
         query: vi
           .fn()
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'resp-1' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
+          .mockResolvedValueOnce({ rows: [{ id: 'qr-1', status: 'open' }] }) // FOR UPDATE lock
+          .mockResolvedValueOnce({ rows: [] }) // existing response
+          .mockResolvedValueOnce({ rows: [{ id: 'resp-1' }] }) // insert response
+          .mockResolvedValueOnce({ rows: [] }) // insert item
+          .mockResolvedValueOnce({ rows: [] }), // update qrs status
       }
       return fn(client)
     })
