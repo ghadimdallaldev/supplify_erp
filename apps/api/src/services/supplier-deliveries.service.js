@@ -3,6 +3,7 @@ import { getDeliveryBoardSqlFragments } from '../lib/delivery-board-schema.js'
 import { logger } from '../lib/logger.js'
 import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-location.service.js'
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
+import { isEtaEligibleAssignmentStatus } from './delivery-eta.service.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -91,7 +92,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
     area: areaName,
     orderCount: areaOrders.length,
     pending: areaOrders.filter((o) => o.deliveryStatus === 'pending').length,
-    outForDelivery: areaOrders.filter((o) => o.deliveryStatus === 'out_for_delivery').length,
+    outForDelivery: countInTransit(areaOrders),
     delivered: areaOrders.filter((o) => o.deliveryStatus === 'delivered').length,
   }))
 
@@ -111,7 +112,10 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
       total: orders.length,
       pending: orders.filter((o) => o.deliveryStatus === 'pending').length,
       assigned: orders.filter((o) => o.deliveryStatus === 'assigned').length,
-      outForDelivery: orders.filter((o) => o.deliveryStatus === 'out_for_delivery').length,
+      // Keeps counting picked_up as in transit, as it did before picked_up became
+      // visible in its own right.
+      outForDelivery: countInTransit(orders),
+      pickedUp: orders.filter((o) => o.deliveryStatus === 'picked_up').length,
       delivered: orders.filter((o) => o.deliveryStatus === 'delivered').length,
       failed: orders.filter((o) => o.deliveryStatus === 'failed').length,
       rescheduled: orders.filter((o) => o.deliveryStatus === 'rescheduled').length,
@@ -213,10 +217,12 @@ export function mapBoardRow(r, locationMap) {
   const destinationCoordinatesAvailable =
     destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)
   const deliveryStatus = normalizeDeliveryStatus(r.delivery_status)
+  // Use the ETA service's own eligibility rule: listing 'assigned' here advertised an
+  // ETA that calculateDeliveryEta then refused as assignment_not_active.
   const etaAvailable =
     destinationCoordinatesAvailable &&
     Boolean(tracking?.hasLocation) &&
-    ['assigned', 'out_for_delivery'].includes(deliveryStatus)
+    isEtaEligibleAssignmentStatus(deliveryStatus)
 
   return {
     orderId: r.order_id,
@@ -240,12 +246,28 @@ export function mapBoardRow(r, locationMap) {
   }
 }
 
+/**
+ * Report the assignment status faithfully.
+ *
+ * `picked_up` used to be collapsed into `out_for_delivery`, which hid a real state
+ * from drivers: their primary action became "Delivered" for a delivery they had not
+ * declared departure on, and GPS tracking never started. Suppliers still want both
+ * counted as in transit — see IN_TRANSIT_DELIVERY_STATUSES.
+ */
 function normalizeDeliveryStatus(raw) {
   const s = String(raw || 'pending').toLowerCase()
   if (s === 'failed') return 'failed'
   if (s === 'rescheduled') return 'rescheduled'
   if (s === 'assigned') return 'assigned'
-  if (['picked_up', 'out_for_delivery'].includes(s)) return 'out_for_delivery'
+  if (s === 'picked_up') return 'picked_up'
+  if (s === 'out_for_delivery') return 'out_for_delivery'
   if (s === 'delivered') return 'delivered'
   return 'pending'
+}
+
+/** Both count as "on the road" in supplier-facing totals. */
+const IN_TRANSIT_DELIVERY_STATUSES = ['picked_up', 'out_for_delivery']
+
+function countInTransit(orders) {
+  return orders.filter((o) => IN_TRANSIT_DELIVERY_STATUSES.includes(o.deliveryStatus)).length
 }

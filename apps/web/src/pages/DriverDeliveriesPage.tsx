@@ -30,6 +30,11 @@ import {
   isTerminalDriverDeliveryStatus,
   routeStopIsComplete,
 } from '../lib/driverDeliveryUi'
+import {
+  driverStatusNeedsProofOfDelivery,
+  type DriverDeliveryStatus,
+} from '../lib/driverDeliveryActions'
+import { ProofOfDeliveryDialog } from '../components/fulfillment/ProofOfDeliveryDialog'
 import { ensureNamespace } from '../i18n'
 
 export function DriverDeliveriesPage() {
@@ -52,6 +57,9 @@ export function DriverDeliveriesPage() {
   const [buildRoute, { isLoading: buildingRoute }] = useBuildDriverRouteFromAssignmentsMutation()
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [showCompleted, setShowCompleted] = useState(false)
+  // Order awaiting proof-of-delivery capture before it is marked delivered.
+  const [podOrderId, setPodOrderId] = useState<string | null>(null)
+  const [podStop, setPodStop] = useState<{ stopId: string; orderId: string } | null>(null)
 
   const orders = useMemo(() => data?.orders ?? [], [data?.orders])
   const activeRoute = routeData?.route ?? null
@@ -72,6 +80,15 @@ export function DriverDeliveriesPage() {
         active.push(order)
       }
     }
+    // The board orders rows by COALESCE(da.id, o.id) — effectively UUID order — so
+    // "next" has to be established here, or the sticky bar acts on an arbitrary
+    // delivery rather than the one due soonest.
+    active.sort((a, b) => {
+      const at = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY
+      const bt = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY
+      if (at !== bt) return at - bt
+      return a.orderId.localeCompare(b.orderId)
+    })
     return { activeOrders: active, completedOrders: completed }
   }, [orders, routeOrderIds])
 
@@ -173,7 +190,7 @@ export function DriverDeliveriesPage() {
     }
   }
 
-  const handleRouteStopStatus = async (
+  const applyRouteStopStatus = async (
     stopId: string,
     orderId: string,
     status: 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED'
@@ -201,16 +218,47 @@ export function DriverDeliveriesPage() {
     }
   }
 
-  const handleStatus = async (orderId: string, status: string) => {
+  const handleRouteStopStatus = async (
+    stopId: string,
+    orderId: string,
+    status: 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'FAILED'
+  ) => {
+    // Route stops go through the same proof-of-delivery capture as standalone ones.
+    if (status === 'DELIVERED') {
+      setPodStop({ stopId, orderId })
+      return
+    }
+    await applyRouteStopStatus(stopId, orderId, status)
+  }
+
+  const handleRouteStopPodSubmitted = async () => {
+    const target = podStop
+    setPodStop(null)
+    if (!target) return
+    await applyRouteStopStatus(target.stopId, target.orderId, 'DELIVERED')
+  }
+
+  const orderByIdRef = useMemo(() => {
+    const map = new Map<string, (typeof orders)[number]>()
+    for (const order of orders) map.set(order.orderId, order)
+    return map
+  }, [orders])
+
+  const applyStatus = async (orderId: string, status: DriverDeliveryStatus) => {
+    const order = orderByIdRef.get(orderId)
     try {
       await updateStatus({
         orderId,
-        status: status as 'out_for_delivery' | 'delivered' | 'failed' | 'rescheduled',
+        status,
         notes: notes[orderId] || undefined,
         failure_reason:
           status === 'failed'
             ? notes[orderId] || t('driverDeliveries.deliveryFailedDefault')
             : undefined,
+        // Without these a multi-warehouse order has several active legs and the API
+        // cannot tell which one to advance, so it rejects the update outright.
+        driver_assignment_id: order?.assignmentId ?? undefined,
+        warehouse_assignment_id: order?.warehouseAssignmentId ?? undefined,
       }).unwrap()
       toast.success(t('driverDeliveries.toast.statusUpdated'))
       refetch()
@@ -223,6 +271,24 @@ export function DriverDeliveriesPage() {
     }
   }
 
+  const handleStatus = async (orderId: string, status: string) => {
+    // Delivering is irreversible, and suppliers with pod_required have the API reject
+    // `delivered` until proof exists. Capture proof first — that also stops a stray
+    // second tap from delivering the order the instant the previous action resolves.
+    if (driverStatusNeedsProofOfDelivery(status)) {
+      setPodOrderId(orderId)
+      return
+    }
+    await applyStatus(orderId, status as DriverDeliveryStatus)
+  }
+
+  const handlePodSubmitted = async () => {
+    const orderId = podOrderId
+    setPodOrderId(null)
+    if (!orderId) return
+    await applyStatus(orderId, 'delivered')
+  }
+
   const hasWork =
     Boolean(activeRoute?.stops.length) || activeOrders.length > 0 || completedOrders.length > 0
 
@@ -231,12 +297,14 @@ export function DriverDeliveriesPage() {
     primarySuccess?: boolean
     onPrimary: () => void
     onProblem?: () => void
+    targetLabel?: string | null
   } | null = null
 
   if (nextRouteStop) {
     if (nextRouteStop.status === 'PLANNED') {
       stickyAction = {
         primaryLabel: t('driverDeliveries.onTheWay'),
+        targetLabel: nextRouteStop.restaurantName,
         onPrimary: () =>
           handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'OUT_FOR_DELIVERY'),
         onProblem: () => handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'FAILED'),
@@ -245,6 +313,7 @@ export function DriverDeliveriesPage() {
       stickyAction = {
         primaryLabel: t('driverDeliveries.delivered'),
         primarySuccess: true,
+        targetLabel: nextRouteStop.restaurantName,
         onPrimary: () =>
           handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'DELIVERED'),
         onProblem: () => handleRouteStopStatus(nextRouteStop.id, nextRouteStop.orderId, 'FAILED'),
@@ -258,6 +327,7 @@ export function DriverDeliveriesPage() {
       stickyAction = {
         primaryLabel: primary.label,
         primarySuccess: primary.value === 'delivered',
+        targetLabel: nextStandaloneOrder.restaurantName,
         onPrimary: () => handleStatus(nextStandaloneOrder.orderId, primary.value),
         onProblem: problem
           ? () => handleStatus(nextStandaloneOrder.orderId, problem.value)
@@ -274,7 +344,7 @@ export function DriverDeliveriesPage() {
       <PageShell
         data-testid="driver-deliveries-page"
         maxWidth="full"
-        className="mx-auto flex max-w-lg flex-col gap-4 overflow-x-hidden p-3 pb-28 sm:p-4 sm:pb-24"
+        className="mx-auto flex max-w-lg flex-col gap-4 overflow-x-hidden p-3 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-8"
       >
         <DriverDeliveriesHeader
           activeCount={activeCount}
@@ -447,9 +517,32 @@ export function DriverDeliveriesPage() {
             primarySuccess={stickyAction.primarySuccess}
             onPrimary={stickyAction.onPrimary}
             onProblem={stickyAction.onProblem}
+            problemLabel={t('driverDeliveries.actions.problem')}
+            targetLabel={stickyAction.targetLabel}
             disabled={updating}
           />
         ) : null}
+
+        <ProofOfDeliveryDialog
+          open={podOrderId != null}
+          orderId={podOrderId}
+          onOpenChange={(open) => {
+            if (!open) setPodOrderId(null)
+          }}
+          onSubmitted={() => {
+            void handlePodSubmitted()
+          }}
+        />
+        <ProofOfDeliveryDialog
+          open={podStop != null}
+          orderId={podStop?.orderId ?? null}
+          onOpenChange={(open) => {
+            if (!open) setPodStop(null)
+          }}
+          onSubmitted={() => {
+            void handleRouteStopPodSubmitted()
+          }}
+        />
       </PageShell>
     </RequirePermission>
   )
