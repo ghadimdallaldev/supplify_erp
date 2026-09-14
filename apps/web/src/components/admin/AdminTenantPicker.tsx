@@ -166,7 +166,7 @@ export function AdminTenantPicker({
                       <span>Plan: {formatPlanCodeLabel(t.planCode, t.tenantType)}</span>
                       <AdminStatusBadge status={t.status} />
                       {!t.isMainBranch && t.organizationId ? (
-                        <span className="text-amber-700">Branch (org)</span>
+                        <span className="text-[var(--amber)]">Branch (org)</span>
                       ) : null}
                     </div>
                   </button>

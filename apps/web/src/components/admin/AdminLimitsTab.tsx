@@ -48,12 +48,8 @@ import { EffectiveLimitsTable } from './limits/EffectiveLimitsTable'
 import { OverridesTable } from './limits/OverridesTable'
 import type { Entitlements } from '../../types/admin'
 
-const SUPPLIER_ADDON_OPTIONS = [
-  { key: 'supplier_extra_branch', label: 'Extra branch' },
-  { key: 'supplier_extra_warehouse', label: 'Extra warehouse' },
-]
-
-const RESTAURANT_ADDON_OPTIONS = [{ key: 'restaurant_extra_branch', label: 'Extra branch' }]
+const SUPPLIER_ADDON_KEYS = ['supplier_extra_branch', 'supplier_extra_warehouse'] as const
+const RESTAURANT_ADDON_KEYS = ['restaurant_extra_branch'] as const
 
 export function AdminLimitsTab() {
   const { t } = useTranslation('admin')
@@ -237,8 +233,10 @@ export function AdminLimitsTab() {
     }
   }, [overridesData, entitlements, tenantType])
 
-  const addonOptions =
-    tenantType === 'RESTAURANT' ? RESTAURANT_ADDON_OPTIONS : SUPPLIER_ADDON_OPTIONS
+  const addonOptionKeys = tenantType === 'RESTAURANT' ? RESTAURANT_ADDON_KEYS : SUPPLIER_ADDON_KEYS
+
+  const addonLabel = (key: string) =>
+    t(`addonKeys.${key}`, { defaultValue: formatAddonKeyLabel(key) })
 
   const handleGrantAddon = async () => {
     if (!tenantId) {
@@ -257,12 +255,12 @@ export function AdminLimitsTab() {
         quantity: addonQty,
         reason: addonReason.trim(),
       }).unwrap()
-      toast.success(addonQty === 0 ? 'Add-on removed' : 'Add-on saved')
+      toast.success(addonQty === 0 ? t('limitsToasts.addonRemoved') : t('limitsToasts.addonSaved'))
       refetchAddons()
       refetchEntitlements()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to update add-on')
+      toast.error(err?.data?.error?.message || t('limitsToasts.addonUpdateFailed'))
     }
   }
 
@@ -293,7 +291,7 @@ export function AdminLimitsTab() {
       refetchOverrides()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to save plan override')
+      toast.error(err?.data?.error?.message || t('limitsToasts.planOverrideSaveFailed'))
     }
   }
 
@@ -322,7 +320,7 @@ export function AdminLimitsTab() {
       refetchEntitlements()
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
-      toast.error(err?.data?.error?.message || 'Failed to save tenant override')
+      toast.error(err?.data?.error?.message || t('limitsToasts.tenantOverrideSaveFailed'))
     }
   }
 
@@ -366,25 +364,27 @@ export function AdminLimitsTab() {
         columns={4}
         metrics={[
           {
-            label: 'Tenant overrides',
+            label: t('limits.stats.tenantOverrides'),
             value: summaryStats.activeTenantOverrides,
-            hint: 'Active across platform',
+            hint: t('limits.stats.tenantOverridesHint'),
           },
           {
-            label: 'Plan overrides',
+            label: t('limits.stats.planOverrides'),
             value: summaryStats.activePlanOverrides,
-            hint: `${tenantType.toLowerCase()} plan tiers`,
+            hint: t('limits.stats.planOverridesHint', { tenantType: tenantType.toLowerCase() }),
           },
           {
-            label: 'Limits at risk',
-            value: tenantId ? summaryStats.limitsAtRisk : '—',
+            label: t('limits.stats.limitsAtRisk'),
+            value: tenantId ? summaryStats.limitsAtRisk : t('common.emDash'),
             tone: summaryStats.limitsAtRisk > 0 ? 'amber' : 'default',
-            hint: tenantId ? 'Selected tenant ≥80% usage' : 'Select a tenant',
+            hint: tenantId
+              ? t('limits.stats.limitsAtRiskHintSelected')
+              : t('limits.stats.limitsAtRiskHintNone'),
           },
           {
-            label: 'Limit keys',
+            label: t('limits.stats.limitKeys'),
             value: limitKeys.length,
-            hint: `Configurable for ${tenantType.toLowerCase()}`,
+            hint: t('limits.stats.limitKeysHint', { tenantType: tenantType.toLowerCase() }),
             tone: 'brand',
           },
         ]}
@@ -412,7 +412,7 @@ export function AdminLimitsTab() {
       {tenantId && addonsError && (
         <AdminErrorState
           title={t('limits.addonsFailedTitle')}
-          message="Could not fetch subscription add-on data for this tenant."
+          message={t('limits.addonsFailedMessage')}
           onRetry={() => refetchAddons()}
         />
       )}
@@ -427,15 +427,20 @@ export function AdminLimitsTab() {
             <div className="space-y-3 text-sm">
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 <span>
-                  <span className="text-[var(--text-muted)]">Type:</span> {tenantType}
+                  <span className="text-[var(--text-muted)]">{t('limits.typeLabel')}</span>{' '}
+                  {tenantType}
                 </span>
                 <AdminStatusBadge status={selectedTenant?.status ?? 'active'} />
               </div>
               {addonData.usesOrgBilling && (
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
-                  Add-ons and subscription limits apply to org billing tenant{' '}
-                  <strong>{addonData.billingTenantName}</strong>
-                  {addonData.billingTenantId !== tenantId ? ' (main branch)' : ''}.
+                <p className="text-xs text-[var(--amber)] bg-[var(--amber-pale)] border border-[color-mix(in_srgb,var(--amber)_35%,transparent)] rounded-md px-2 py-1.5">
+                  {t('limits.orgBillingNote', {
+                    name: addonData.billingTenantName,
+                    main:
+                      addonData.billingTenantId !== tenantId
+                        ? t('limits.orgBillingMainBranch')
+                        : '',
+                  })}
                 </p>
               )}
               <div className="grid gap-3 md:grid-cols-2">
@@ -457,14 +462,16 @@ export function AdminLimitsTab() {
             testId="admin-limits-effective-table"
             footer={
               entitlementsFetching && !entitlementsLoading ? (
-                <span className="text-xs text-[var(--text-muted)]">Refreshing usage…</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  {t('limits.refreshingUsage')}
+                </span>
               ) : undefined
             }
           >
             {entitlementsError ? (
               <AdminErrorState
                 title={t('limits.entitlementsFailedTitle')}
-                message="Could not fetch full limit and usage snapshot."
+                message={t('limits.entitlementsFailedMessage')}
                 onRetry={() => refetchEntitlements()}
               />
             ) : (
@@ -494,10 +501,12 @@ export function AdminLimitsTab() {
                           className="flex items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] p-4"
                         >
                           <div>
-                            <p className="font-medium">{formatAddonKeyLabel(key)}</p>
+                            <p className="font-medium">{addonLabel(key)}</p>
                             <p className="text-sm text-[var(--text-muted)]">
-                              Qty {qty}
-                              {a.unit_price_monthly != null ? ` · $${a.unit_price_monthly}/mo` : ''}
+                              {t('limits.qtyLabel', { qty })}
+                              {a.unit_price_monthly != null
+                                ? ` · ${t('limits.unitPricePerMonth', { price: a.unit_price_monthly })}`
+                                : ''}
                             </p>
                           </div>
                           <Button
@@ -505,7 +514,7 @@ export function AdminLimitsTab() {
                             variant="outline"
                             onClick={() => editAddonRow(key, qty)}
                           >
-                            Edit
+                            {t('common.edit')}
                           </Button>
                         </article>
                       )
@@ -518,9 +527,9 @@ export function AdminLimitsTab() {
                     <table className="w-full min-w-[520px] text-sm">
                       <thead>
                         <tr className="border-b bg-[var(--app-bg-subtle)]/50 text-left text-xs text-[var(--text-muted)]">
-                          <th className="px-3 py-2">Type</th>
-                          <th className="px-3 py-2">Qty</th>
-                          <th className="px-3 py-2">Unit price</th>
+                          <th className="px-3 py-2">{t('common.table.type')}</th>
+                          <th className="px-3 py-2">{t('limits.quantityLabel')}</th>
+                          <th className="px-3 py-2">{t('limits.unitPriceLabel')}</th>
                           <th className="px-3 py-2 text-right">{t('common.table.actions')}</th>
                         </tr>
                       </thead>
@@ -530,10 +539,12 @@ export function AdminLimitsTab() {
                           const qty = Number(a.quantity) || 0
                           return (
                             <tr key={String(a.id)} className="hover:bg-[var(--brand-ultra)]/30">
-                              <td className="px-3 py-2 font-medium">{formatAddonKeyLabel(key)}</td>
+                              <td className="px-3 py-2 font-medium">{addonLabel(key)}</td>
                               <td className="px-3 py-2">{qty}</td>
                               <td className="px-3 py-2 text-[var(--text-muted)]">
-                                {a.unit_price_monthly != null ? `$${a.unit_price_monthly}/mo` : '—'}
+                                {a.unit_price_monthly != null
+                                  ? t('limits.unitPricePerMonth', { price: a.unit_price_monthly })
+                                  : t('common.emDash')}
                               </td>
                               <td className="px-3 py-2 text-right">
                                 <Button
@@ -541,7 +552,7 @@ export function AdminLimitsTab() {
                                   variant="outline"
                                   onClick={() => editAddonRow(key, qty)}
                                 >
-                                  Edit
+                                  {t('common.edit')}
                                 </Button>
                               </td>
                             </tr>
@@ -560,19 +571,19 @@ export function AdminLimitsTab() {
 
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-end">
                 <div>
-                  <Label>Add-on type</Label>
+                  <Label>{t('limits.addonTypeLabel')}</Label>
                   <Select value={addonKey} onValueChange={(value) => setAddonKey(value)}>
                     <SelectTrigger className="mt-1.5 w-full">
-                      {addonOptions.map((o) => (
-                        <option key={o.key} value={o.key}>
-                          {o.label}
+                      {addonOptionKeys.map((key) => (
+                        <option key={key} value={key}>
+                          {addonLabel(key)}
                         </option>
                       ))}
                     </SelectTrigger>
                   </Select>
                 </div>
                 <div>
-                  <Label>Quantity</Label>
+                  <Label>{t('limits.quantityLabel')}</Label>
                   <div className="mt-1 flex items-center gap-1">
                     <Button
                       type="button"
@@ -607,7 +618,7 @@ export function AdminLimitsTab() {
                   </div>
                 </div>
                 <div className="md:col-span-2">
-                  <Label>Reason (required)</Label>
+                  <Label>{t('limits.reasonRequiredLabel')}</Label>
                   <Input
                     className="mt-1.5"
                     value={addonReason}
@@ -623,7 +634,7 @@ export function AdminLimitsTab() {
                   className="w-full sm:w-auto"
                 >
                   {savingAddon ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  {addonQty === 0 ? 'Remove add-on' : 'Grant / update add-on'}
+                  {addonQty === 0 ? t('limits.removeAddon') : t('limits.grantUpdateAddon')}
                 </Button>
               </div>
             </div>
@@ -655,7 +666,7 @@ export function AdminLimitsTab() {
                 }}
               >
                 <SelectTrigger className="mt-1.5 w-full">
-                  <option value="">Select plan tier</option>
+                  <option value="">{t('limits.selectPlanTier')}</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {formatPlanCodeLabel(p.code, tenantType)} ({p.name})
@@ -665,13 +676,13 @@ export function AdminLimitsTab() {
               </Select>
             </div>
             <div>
-              <Label>Limit</Label>
+              <Label>{t('common.table.limit')}</Label>
               <Select value={planLimitKey} onValueChange={(value) => setPlanLimitKey(value)}>
                 <SelectTrigger className="mt-1.5 w-full" disabled={!planId}>
-                  <option value="">Select limit</option>
+                  <option value="">{t('limits.selectLimit')}</option>
                   {limitKeys.map((k) => (
                     <option key={k} value={k}>
-                      {formatLimitKeyLabel(k)}
+                      {t(`limitKeys.${k}`, { defaultValue: formatLimitKeyLabel(k) })}
                     </option>
                   ))}
                 </SelectTrigger>
@@ -679,19 +690,21 @@ export function AdminLimitsTab() {
             </div>
             {planLimitKey && (
               <div className="md:col-span-2 rounded-md bg-[var(--app-bg-subtle)]/80 px-3 py-2 text-sm">
-                <span className="text-[var(--text-muted)]">Plan default: </span>
+                <span className="text-[var(--text-muted)]">{t('limits.planDefaultLabel')} </span>
                 <strong>{formatLimitValue(planDefaultLimit)}</strong>
                 {existingPlanOverride && (
                   <>
                     {' · '}
-                    <span className="text-[var(--text-muted)]">Current override: </span>
+                    <span className="text-[var(--text-muted)]">
+                      {t('limits.currentOverrideLabel')}{' '}
+                    </span>
                     <strong>{String(existingPlanOverride.override_value)}</strong>
                   </>
                 )}
                 {planOverrideValue !== '' && (
                   <>
                     {' · '}
-                    <span className="text-[var(--text-muted)]">Preview: </span>
+                    <span className="text-[var(--text-muted)]">{t('limits.previewLabel')} </span>
                     <strong>
                       {formatLimitValue(planDefaultLimit)} → {planOverrideValue}
                     </strong>
@@ -700,7 +713,7 @@ export function AdminLimitsTab() {
               </div>
             )}
             <div>
-              <Label>Override value</Label>
+              <Label>{t('limits.overrideValueLabel')}</Label>
               <Input
                 type="number"
                 min={0}
@@ -710,7 +723,7 @@ export function AdminLimitsTab() {
               />
             </div>
             <div>
-              <Label>Reason (required)</Label>
+              <Label>{t('limits.reasonRequiredLabel')}</Label>
               <Input
                 className="mt-1.5"
                 value={planReason}
@@ -724,7 +737,7 @@ export function AdminLimitsTab() {
             className="w-full sm:w-auto"
           >
             {savingPlanOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Save plan override
+            {t('limits.savePlanOverride')}
           </Button>
         </div>
       </AppPanel>
@@ -732,26 +745,26 @@ export function AdminLimitsTab() {
       {tenantId && (
         <AppPanel
           title={t('limits.tenantOverrideTitle')}
-          description={`Applies only to ${selectedTenant?.name} (billing tenant resolved automatically).`}
+          description={t('limits.tenantOverrideDescription', { name: selectedTenant?.name ?? '' })}
           testId="admin-limits-tenant-override"
         >
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label>Limit</Label>
+                <Label>{t('common.table.limit')}</Label>
                 <Select value={tenantLimitKey} onValueChange={(value) => setTenantLimitKey(value)}>
                   <SelectTrigger className="mt-1.5 w-full">
-                    <option value="">Select limit</option>
+                    <option value="">{t('limits.selectLimit')}</option>
                     {limitKeys.map((k) => (
                       <option key={k} value={k}>
-                        {formatLimitKeyLabel(k)}
+                        {t(`limitKeys.${k}`, { defaultValue: formatLimitKeyLabel(k) })}
                       </option>
                     ))}
                   </SelectTrigger>
                 </Select>
               </div>
               <div>
-                <Label>Override value</Label>
+                <Label>{t('limits.overrideValueLabel')}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -762,22 +775,26 @@ export function AdminLimitsTab() {
               </div>
               {tenantLimitKey && effectiveData?.resolved && (
                 <div className="md:col-span-2 rounded-md bg-[var(--app-bg-subtle)]/80 px-3 py-2 text-sm">
-                  <span className="text-[var(--text-muted)]">Current effective: </span>
+                  <span className="text-[var(--text-muted)]">
+                    {t('limits.currentEffectiveLabel')}{' '}
+                  </span>
                   <strong>{formatLimitValue(effectiveData.resolved.effectiveLimit)}</strong>
-                  <span className="text-[var(--text-muted)]"> (plan base </span>
+                  <span className="text-[var(--text-muted)]"> ({t('limits.planBaseLabel')} </span>
                   <strong>{formatLimitValue(effectiveData.resolved.baseLimit)}</strong>
                   <span className="text-[var(--text-muted)]">)</span>
                   {existingTenantOverride && (
                     <>
                       {' · '}
-                      <span className="text-[var(--text-muted)]">Saved override: </span>
+                      <span className="text-[var(--text-muted)]">
+                        {t('limits.savedOverrideLabel')}{' '}
+                      </span>
                       <strong>{String(existingTenantOverride.override_value)}</strong>
                     </>
                   )}
                   {tenantOverrideValue !== '' && (
                     <>
                       {' · '}
-                      <span className="text-[var(--text-muted)]">Preview: </span>
+                      <span className="text-[var(--text-muted)]">{t('limits.previewLabel')} </span>
                       <strong>
                         {formatLimitValue(effectiveData.resolved.effectiveLimit)} →{' '}
                         {tenantOverrideValue}
@@ -787,7 +804,7 @@ export function AdminLimitsTab() {
                 </div>
               )}
               <div className="md:col-span-2">
-                <Label>Reason (required)</Label>
+                <Label>{t('limits.reasonRequiredLabel')}</Label>
                 <Input
                   value={tenantReason}
                   onChange={(e) => setTenantReason(e.target.value)}
@@ -801,23 +818,27 @@ export function AdminLimitsTab() {
               className="w-full sm:w-auto"
             >
               {savingTenantOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save tenant override
+              {t('limits.saveTenantOverride')}
             </Button>
           </div>
         </AppPanel>
       )}
 
       <AppPanel
-        title={tenantId ? 'Overrides for selected tenant' : 'Active overrides'}
+        title={tenantId ? t('limits.overridesForSelectedTitle') : t('limits.activeOverridesTitle')}
         description={
           overridesLoading
-            ? 'Loading overrides…'
-            : `${filteredTenantOverrides.length + filteredPlanOverrides.length} override row${filteredTenantOverrides.length + filteredPlanOverrides.length === 1 ? '' : 's'} shown`
+            ? t('limits.loadingOverridesPanel')
+            : t('limits.overrideRowsShown', {
+                count: filteredTenantOverrides.length + filteredPlanOverrides.length,
+              })
         }
         testId="admin-limits-overrides"
         footer={
           overridesFetching && !overridesLoading ? (
-            <span className="text-xs text-[var(--text-muted)]">Refreshing overrides…</span>
+            <span className="text-xs text-[var(--text-muted)]">
+              {t('limits.refreshingOverrides')}
+            </span>
           ) : undefined
         }
       >
@@ -833,7 +854,7 @@ export function AdminLimitsTab() {
             <div className="rounded-lg border border-[var(--app-border)] p-3">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <Filter className="h-4 w-4 text-[var(--text-mid)]" aria-hidden />
-                Search overrides
+                {t('limits.searchOverridesHeading')}
               </h3>
               <div className="relative">
                 <Search
@@ -863,14 +884,16 @@ export function AdminLimitsTab() {
 
             {tenantId && (
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">Tenant overrides</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
+                  {t('limits.tenantOverridesHeading')}
+                </h3>
                 {filteredTenantOverrides.length === 0 ? (
                   <AdminEmptyState
                     title={t('limits.noTenantOverridesTitle')}
                     description={
                       overrideSearch
-                        ? 'No matches for your search on this tenant.'
-                        : 'None configured for this tenant.'
+                        ? t('limits.noTenantOverridesSearch')
+                        : t('limits.noTenantOverridesDefault')
                     }
                   />
                 ) : (
@@ -879,7 +902,7 @@ export function AdminLimitsTab() {
                     kind="tenant"
                     tenantName={selectedTenant?.name}
                     onDisable={async (id) => {
-                      if (!window.confirm('Disable this tenant override?')) return
+                      if (!window.confirm(t('limits.confirmDisableTenantOverride'))) return
                       try {
                         await updateTenantOverride({ id, is_active: false }).unwrap()
                         toast.success(t('limitsToasts.overrideDisabled'))
@@ -897,15 +920,17 @@ export function AdminLimitsTab() {
 
             <div>
               <h3 className="mb-3 text-sm font-semibold text-[var(--text)]">
-                Plan-tier overrides ({tenantType})
+                {t('limits.planTierOverridesHeading', { tenantType })}
               </h3>
               {filteredPlanOverrides.length === 0 ? (
                 <AdminEmptyState
                   title={t('limits.noPlanOverridesTitle')}
                   description={
                     overrideSearch
-                      ? 'No matches for your search.'
-                      : `No active plan overrides for ${tenantType.toLowerCase()} plans.`
+                      ? t('limits.noPlanOverridesSearch')
+                      : t('limits.noPlanOverridesDefault', {
+                          tenantType: tenantType.toLowerCase(),
+                        })
                   }
                 />
               ) : (
@@ -913,7 +938,7 @@ export function AdminLimitsTab() {
                   rows={filteredPlanOverrides}
                   kind="plan"
                   onDisable={async (id) => {
-                    if (!window.confirm('Disable this plan override?')) return
+                    if (!window.confirm(t('limits.confirmDisablePlanOverride'))) return
                     try {
                       await updatePlanOverride({ id, is_active: false }).unwrap()
                       toast.success(t('limitsToasts.planOverrideDisabled'))

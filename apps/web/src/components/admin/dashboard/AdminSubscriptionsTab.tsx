@@ -9,7 +9,7 @@ import { AppPanel, SummaryStrip } from '../../ui/app-panel'
 import { TableScroll } from '../../ui/table-scroll'
 import { responsiveDataListClasses } from '../../ui/responsive-data-list'
 import { cn } from '../../../lib/utils'
-import { StatusBadge } from '../../ui/status-badge'
+import { StatusBadge, getTranslatedStatusLabel } from '../../ui/status-badge'
 import {
   useGetAdminSubscriptionsQuery,
   useUnlockAdminSubscriptionMutation,
@@ -52,7 +52,7 @@ export interface AdminSubscriptionsTabProps {
 function tenantTypeTone(type: string): string {
   return type === 'SUPPLIER'
     ? 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]'
-    : 'bg-sky-50 text-sky-800 border-sky-200'
+    : 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]'
 }
 
 function needsAttention(sub: SubscriptionRow): boolean {
@@ -65,6 +65,7 @@ function needsAttention(sub: SubscriptionRow): boolean {
 
 export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscriptionsTabProps) {
   const { t } = useTranslation('admin')
+  const { t: tCommon } = useTranslation('common')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -169,9 +170,9 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
             testId="admin-subscriptions-stats"
             metrics={[
               {
-                label: 'Total',
+                label: t('subscriptions.stats.total'),
                 value: stats.total,
-                hint: 'Unique tenant subscriptions',
+                hint: t('subscriptions.stats.totalHint'),
                 active: !attentionOnly && statusFilter === 'all' && tenantTypeFilter === 'all',
                 onClick: () => {
                   setAttentionOnly(false)
@@ -180,24 +181,24 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                 },
               },
               {
-                label: 'Active / trial',
+                label: t('subscriptions.stats.activeTrial'),
                 value: stats.activeCount,
                 tone: 'mint',
-                hint: 'ACTIVE or TRIALING',
+                hint: t('subscriptions.stats.activeTrialHint'),
               },
               {
-                label: 'Needs attention',
+                label: t('subscriptions.stats.needsAttention'),
                 value: stats.attentionCount,
                 tone: stats.attentionCount > 0 ? 'amber' : 'default',
-                hint: 'Locked or pending activation',
+                hint: t('subscriptions.stats.needsAttentionHint'),
                 active: attentionOnly,
                 onClick: () => setAttentionOnly((v) => !v),
               },
               {
-                label: 'At risk',
+                label: t('subscriptions.stats.atRisk'),
                 value: stats.suspendedCount,
                 tone: stats.suspendedCount > 0 ? 'danger' : 'default',
-                hint: 'Suspended, cancelled, or past due',
+                hint: t('subscriptions.stats.atRiskHint'),
               },
             ]}
           />
@@ -207,7 +208,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
       <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          Filters
+          {t('common.filters')}
         </div>
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_auto]">
           <div className="relative min-w-0">
@@ -232,7 +233,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
               <option value="all">{t('common.allStatuses')}</option>
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status.replace(/_/g, ' ')}
+                  {getTranslatedStatusLabel(status, tCommon)}
                 </option>
               ))}
             </SelectTrigger>
@@ -330,8 +331,69 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                       variant="outline"
                       className={cn('text-xs capitalize', tenantTypeTone(sub.tenant_type))}
                     >
-                      {sub.tenant_type.toLowerCase()}
+                      {sub.tenant_type === 'SUPPLIER'
+                        ? t('common.supplier')
+                        : t('common.restaurant')}
                     </Badge>
+                    {needsAttention(sub) && (
+                      <Badge
+                        variant="outline"
+                        className="border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] text-[10px] font-medium text-[var(--amber)]"
+                      >
+                        {t('subscriptions.needsAttentionBadge')}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {sub.lock_reason === 'free_sandbox_expired' && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={isExtendingTrial}
+                        onClick={async () => {
+                          try {
+                            await extendFreeTrial({ id: sub.id }).unwrap()
+                            toast.success(t('subscriptionsToasts.trialExtended'))
+                          } catch {
+                            toast.error(t('subscriptionsToasts.trialExtendFailed'))
+                          }
+                        }}
+                      >
+                        {t('subscriptions.actions.extendTrial')}
+                      </Button>
+                    )}
+                    {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
+                      <Button
+                        size="sm"
+                        disabled={isUnlocking}
+                        onClick={async () => {
+                          try {
+                            await unlockSubscription({
+                              id: sub.id,
+                              reason: 'admin_activation',
+                            }).unwrap()
+                            toast.success(t('subscriptionsToasts.activated'))
+                          } catch {
+                            toast.error(t('subscriptionsToasts.activateFailed'))
+                          }
+                        }}
+                      >
+                        {t('subscriptions.actions.activate')}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        onOpenChangePlan({
+                          id: sub.id,
+                          tenant_type: sub.tenant_type,
+                          tenant_name: sub.tenant_name,
+                        })
+                      }
+                    >
+                      {t('subscriptions.actions.changePlan')}
+                    </Button>
                   </div>
                 </article>
               ))}
@@ -349,12 +411,12 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                     <th
                       className={cn('hidden px-4 py-3', responsiveDataListClasses.columnSecondary)}
                     >
-                      Type
+                      {t('common.table.type')}
                     </th>
                     <th
                       className={cn('hidden px-4 py-3', responsiveDataListClasses.columnTertiary)}
                     >
-                      Created
+                      {t('common.table.created')}
                     </th>
                     <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
@@ -373,9 +435,9 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                           {needsAttention(sub) && (
                             <Badge
                               variant="outline"
-                              className="mt-1.5 border-amber-200 bg-amber-50 text-[10px] font-medium text-amber-800"
+                              className="mt-1.5 border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] text-[10px] font-medium text-[var(--amber)]"
                             >
-                              Needs attention
+                              {t('subscriptions.needsAttentionBadge')}
                             </Badge>
                           )}
                         </div>
@@ -398,7 +460,9 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                           variant="outline"
                           className={cn('text-xs capitalize', tenantTypeTone(sub.tenant_type))}
                         >
-                          {sub.tenant_type.toLowerCase()}
+                          {sub.tenant_type === 'SUPPLIER'
+                            ? t('common.supplier')
+                            : t('common.restaurant')}
                         </Badge>
                       </td>
                       <td
@@ -425,7 +489,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                                 }
                               }}
                             >
-                              Extend trial
+                              {t('subscriptions.actions.extendTrial')}
                             </Button>
                           )}
                           {(sub.account_locked_at || sub.lock_reason === 'pending_activation') && (
@@ -444,7 +508,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                                 }
                               }}
                             >
-                              Activate
+                              {t('subscriptions.actions.activate')}
                             </Button>
                           )}
                           <Button
@@ -458,7 +522,7 @@ export function AdminSubscriptionsTab({ active, onOpenChangePlan }: AdminSubscri
                               })
                             }
                           >
-                            Change plan
+                            {t('subscriptions.actions.changePlan')}
                           </Button>
                         </div>
                       </td>

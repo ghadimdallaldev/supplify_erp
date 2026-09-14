@@ -52,6 +52,10 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   PAUSED: 'muted',
   inactive: 'muted',
   INACTIVE: 'muted',
+  SUSPENDED: 'warning',
+  suspended: 'warning',
+  NONE: 'muted',
+  none: 'muted',
   draft: 'neutral',
   DRAFT: 'neutral',
   IN_STOCK: 'success',
@@ -59,21 +63,25 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
   OUT_OF_STOCK: 'danger',
 }
 
+/** Token-based tones so badges survive light/dark theme flips. */
 const TONE_CLASSES: Record<StatusTone, string> = {
-  success: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  warning: 'bg-amber-50 text-amber-800 border-amber-200',
-  danger: 'bg-red-50 text-red-800 border-red-200',
-  info: 'bg-sky-50 text-sky-800 border-sky-200',
-  neutral: 'bg-slate-50 text-slate-700 border-slate-200',
+  success:
+    'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
+  warning:
+    'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
+  danger:
+    'bg-[var(--red-pale)] text-[var(--red)] border-[color-mix(in_srgb,var(--red)_35%,transparent)]',
+  info: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
+  neutral: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border)]',
   muted: 'bg-[var(--app-border)]/40 text-[var(--text-muted)] border-[var(--app-border)]',
 }
 
 const TONE_DOT_CLASSES: Record<StatusTone, string> = {
-  success: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  danger: 'bg-red-500',
-  info: 'bg-sky-500',
-  neutral: 'bg-slate-400',
+  success: 'bg-[var(--mint)]',
+  warning: 'bg-[var(--amber)]',
+  danger: 'bg-[var(--red)]',
+  info: 'bg-[var(--brand-mid)]',
+  neutral: 'bg-[var(--text-muted)]',
   muted: 'bg-[var(--app-border-mid)]',
 }
 
@@ -111,6 +119,18 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
   DELIVERED: 'delivered',
   CANCELLED: 'cancelled',
   cancelled: 'cancelled',
+  TRIALING: 'trialing',
+  trialing: 'trialing',
+  PAST_DUE: 'pastDue',
+  past_due: 'pastDue',
+  SUSPENDED: 'suspended',
+  suspended: 'suspended',
+  NONE: 'none',
+  none: 'none',
+  EXPIRED: 'expired',
+  expired: 'expired',
+  OVERDUE: 'overdue',
+  overdue: 'overdue',
   LOW_STOCK: 'lowStock',
   OUT_OF_STOCK: 'outOfStock',
   IN_STOCK: 'inStock',
@@ -204,15 +224,14 @@ export function StatusBadge({
   const displayLabel = label ?? getTranslatedStatusLabel(status, t)
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold ${TONE_CLASSES[tone]} ${className}`}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold',
+        TONE_CLASSES[tone],
+        className
+      )}
       title={displayLabel}
     >
-      {showDot && (
-        <span
-          aria-hidden
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT_CLASSES[tone]}`}
-        />
-      )}
+      {showDot && <StatusDot tone={tone} />}
       {displayLabel}
     </span>
   )

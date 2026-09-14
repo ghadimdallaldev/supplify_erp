@@ -36,12 +36,13 @@ type AuditLog = {
 
 const ACTION_BADGE_TONES: Record<string, string> = {
   subscription: 'bg-[var(--brand-pale)] text-[var(--brand)] border-[var(--brand)]/20',
-  plan: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  plan: 'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]',
   impersonation: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
-  override: 'bg-amber-50 text-amber-800 border-amber-200',
+  override:
+    'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
   feature_flag: 'bg-cyan-50 text-cyan-800 border-cyan-200',
-  tenant: 'bg-sky-50 text-sky-800 border-sky-200',
-  user: 'bg-slate-100 text-slate-700 border-slate-200',
+  tenant: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
+  user: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border)]',
 }
 
 function auditActionTone(actionType?: string): string {
@@ -56,13 +57,14 @@ function auditActionTone(actionType?: string): string {
 }
 
 function AuditActionBadge({ actionType }: { actionType?: string }) {
+  const { t } = useTranslation('admin')
   return (
     <Badge
       variant="outline"
       className={cn('max-w-[220px] truncate font-medium', auditActionTone(actionType))}
       title={actionType}
     >
-      {actionType || 'unknown'}
+      {actionType || t('common.unknown')}
     </Badge>
   )
 }
@@ -144,7 +146,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
       <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          Filters
+          {t('common.filters')}
         </div>
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_auto_auto]">
           <div className="relative min-w-0">
@@ -195,7 +197,9 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
               }}
               aria-label={t('audit.fromDateAriaLabel')}
             />
-            <span className="shrink-0 text-sm text-[var(--text-muted)]">to</span>
+            <span className="shrink-0 text-sm text-[var(--text-muted)]">
+              {t('audit.dateRangeTo')}
+            </span>
             <Input
               type="date"
               className="h-10 w-full min-w-[9.5rem] text-sm"
@@ -210,7 +214,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
 
           {hasActiveFilters && (
             <Button type="button" variant="ghost" size="sm" className="h-10" onClick={clearFilters}>
-              Clear
+              {t('common.clear')}
             </Button>
           )}
         </div>
@@ -220,8 +224,10 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
         title={t('audit.recentEntries')}
         description={
           auditLoading
-            ? 'Loading audit trail…'
-            : `${total} total entr${total === 1 ? 'y' : 'ies'}${total > 0 ? ` · page ${page} of ${pageCount}` : ''}`
+            ? t('audit.loadingTrail')
+            : total > 0
+              ? t('audit.entriesPage', { total, page, pageCount })
+              : t('audit.totalEntries', { total })
         }
         testId="admin-audit-panel"
       >
@@ -230,16 +236,16 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
         ) : logs.length === 0 ? (
           <AdminEmptyState
             icon={<Shield className="h-8 w-8 text-[var(--text-muted)]" />}
-            title={hasActiveFilters ? 'No audit logs match your filters' : 'No audit entries yet'}
+            title={hasActiveFilters ? t('audit.emptyFilteredTitle') : t('audit.emptyDefaultTitle')}
             description={
               hasActiveFilters
-                ? 'Adjust the search, action type, or date range and try again.'
-                : 'Admin actions such as plan changes, impersonation, and overrides will appear here.'
+                ? t('audit.emptyFilteredDescription')
+                : t('audit.emptyDefaultDescription')
             }
             action={
               hasActiveFilters ? (
                 <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                  Clear filters
+                  {t('common.clearFilters')}
                 </Button>
               ) : undefined
             }
@@ -272,18 +278,18 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">{t('common.table.action')}</th>
                     <th
                       className={cn('hidden px-4 py-3', responsiveDataListClasses.columnSecondary)}
                     >
-                      Target
+                      {t('common.table.target')}
                     </th>
                     <th
                       className={cn('hidden px-4 py-3', responsiveDataListClasses.columnTertiary)}
                     >
-                      Description
+                      {t('common.table.description')}
                     </th>
-                    <th className="px-4 py-3">Admin</th>
+                    <th className="px-4 py-3">{t('common.table.admin')}</th>
                     <th className="px-4 py-3">{t('common.table.time')}</th>
                     <th className="px-4 py-3 w-10" aria-label={t('common.expandRowAriaLabel')} />
                   </tr>
@@ -343,7 +349,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                                 {log.action_description && (
                                   <div>
                                     <p className="mb-1 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                                      Description
+                                      {t('common.table.description')}
                                     </p>
                                     <p className="text-sm text-[var(--text)]">
                                       {log.action_description}
@@ -353,7 +359,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                                 {log.target_tenant_id && (
                                   <div>
                                     <p className="mb-1 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                                      Tenant
+                                      {t('common.table.tenant')}
                                     </p>
                                     <p className="font-mono text-sm text-[var(--text)]">
                                       {log.target_tenant_type} · {log.target_tenant_id}
@@ -363,7 +369,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                                 {log.ip_address && (
                                   <div>
                                     <p className="mb-1 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                                      IP address
+                                      {t('audit.ipAddress')}
                                     </p>
                                     <p className="font-mono text-sm text-[var(--text)]">
                                       {log.ip_address}
@@ -373,21 +379,23 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                                 {(log.old_value != null || log.new_value != null) && (
                                   <div className="md:col-span-2">
                                     <p className="mb-2 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                                      Change
+                                      {t('audit.changeLabel')}
                                     </p>
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                       {log.old_value != null && (
-                                        <div className="rounded-lg border border-red-200 bg-red-50/80 p-3">
-                                          <p className="mb-1 font-semibold text-red-700">Before</p>
+                                        <div className="rounded-lg border border-[color-mix(in_srgb,var(--red)_35%,transparent)] bg-[var(--red-pale)]/80 p-3">
+                                          <p className="mb-1 font-semibold text-[var(--red)]">
+                                            {t('common.table.before')}
+                                          </p>
                                           <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[var(--text)]">
                                             {JSON.stringify(log.old_value, null, 2)}
                                           </pre>
                                         </div>
                                       )}
                                       {log.new_value != null && (
-                                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3">
-                                          <p className="mb-1 font-semibold text-emerald-700">
-                                            After
+                                        <div className="rounded-lg border border-[color-mix(in_srgb,var(--mint)_35%,transparent)] bg-[var(--mint-pale)]/80 p-3">
+                                          <p className="mb-1 font-semibold text-[var(--mint)]">
+                                            {t('common.table.after')}
                                           </p>
                                           <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-[var(--text)]">
                                             {JSON.stringify(log.new_value, null, 2)}
@@ -400,7 +408,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                                 {log.metadata && Object.keys(log.metadata).length > 0 && (
                                   <div className="md:col-span-2">
                                     <p className="mb-1 font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                                      Metadata
+                                      {t('audit.metadata')}
                                     </p>
                                     <pre className="max-h-24 overflow-auto whitespace-pre-wrap text-[var(--text)]">
                                       {JSON.stringify(log.metadata, null, 2)}
@@ -421,8 +429,11 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
             {total > AUDIT_PAGE_SIZE && (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border)] pt-4">
                 <p className="text-xs text-[var(--text-muted)]">
-                  Showing {auditOffset + 1}–{Math.min(auditOffset + AUDIT_PAGE_SIZE, total)} of{' '}
-                  {total}
+                  {t('audit.showingRange', {
+                    from: auditOffset + 1,
+                    to: Math.min(auditOffset + AUDIT_PAGE_SIZE, total),
+                    total,
+                  })}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -434,10 +445,10 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                       setAuditExpandedId(null)
                     }}
                   >
-                    Previous
+                    {t('common.previous')}
                   </Button>
                   <span className="text-sm text-[var(--text-muted)]">
-                    Page {page} of {pageCount}
+                    {t('activity.pageOf', { page, pageCount })}
                   </span>
                   <Button
                     variant="outline"
@@ -448,7 +459,7 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                       setAuditExpandedId(null)
                     }}
                   >
-                    Next
+                    {t('common.next')}
                   </Button>
                 </div>
               </div>

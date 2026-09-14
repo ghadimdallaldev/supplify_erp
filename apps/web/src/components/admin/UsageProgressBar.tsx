@@ -3,11 +3,11 @@ import type { UsageStatus } from '../../lib/adminUsageStatus'
 import { usagePercent } from '../../lib/adminUsageStatus'
 
 const barColors: Record<UsageStatus, string> = {
-  healthy: 'bg-emerald-500',
-  near_limit: 'bg-amber-500',
-  over_limit: 'bg-red-500',
-  unlimited: 'bg-sky-500',
-  unknown: 'bg-[var(--brand-mid)]',
+  healthy: 'bg-[var(--mint)]',
+  near_limit: 'bg-[var(--amber)]',
+  over_limit: 'bg-[var(--red)]',
+  unlimited: 'bg-[var(--brand-mid)]',
+  unknown: 'bg-[var(--text-muted)]',
 }
 
 export function UsageProgressBar({

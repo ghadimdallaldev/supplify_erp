@@ -79,6 +79,7 @@ import { consumerRoutes, consumerPublicRoutes } from './routes/consumer/index.js
 import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
 import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
 import { registerCronJobs } from './lib/register-cron-jobs.js'
+import { startCronsAfterMigrations } from './lib/start-crons-after-migrations.js'
 import path from 'node:path'
 import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
 import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
@@ -128,6 +129,15 @@ async function runStartupSchemaTasks() {
       code: error.code,
     })
     process.exit(1)
+  }
+
+  // After migrations only — immediate cron ticks must not compete for the DB pool.
+  try {
+    startCronsAfterMigrations({
+      registerCrons: () => registerCronJobs({ trackInterval }),
+    })
+  } catch (error) {
+    logger.error('Cron registration failed after migrations', { error: error.message })
   }
 
   try {
@@ -589,8 +599,6 @@ server.listen(PORT, HOST, () => {
   runStartupSchemaTasks().catch((error) => {
     logger.error('Startup schema tasks failed', { error: error.message })
   })
-
-  registerCronJobs({ trackInterval })
 
   if (config.NODE_ENV !== 'production') {
     import('./lib/keycloak-admin.js')

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
@@ -34,33 +35,43 @@ interface AdminFeatureFlagsPanelProps {
 
 type GlobalModeFilter = 'all' | 'inherit' | 'on' | 'off'
 
-function globalModeLabel(globalOverride: boolean | null) {
-  if (globalOverride === true) return 'On (global)'
-  if (globalOverride === false) return 'Off (global)'
-  return 'Inherit from plans'
+function featureDisplayLabel(t: TFunction<'admin'>, featureKey: string, featureName: string) {
+  const fromCatalog = t(`featureKeys.${featureKey}`, { defaultValue: '' })
+  return fromCatalog || featureName
+}
+
+function globalModeLabel(t: TFunction<'admin'>, globalOverride: boolean | null) {
+  if (globalOverride === true) return t('features.globalMode.onGlobal')
+  if (globalOverride === false) return t('features.globalMode.offGlobal')
+  return t('features.globalMode.inheritFromPlans')
 }
 
 function globalModeTone(globalOverride: boolean | null): string {
-  if (globalOverride === true) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (globalOverride === false) return 'bg-red-50 text-red-700 border-red-200'
+  if (globalOverride === true) {
+    return 'bg-[var(--mint-pale)] text-[var(--mint)] border-[color-mix(in_srgb,var(--mint)_35%,transparent)]'
+  }
+  if (globalOverride === false) {
+    return 'bg-[var(--red-pale)] text-[var(--red)] border-[color-mix(in_srgb,var(--red)_35%,transparent)]'
+  }
   return 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]'
 }
 
-function sourceLabel(source: EffectiveFeature['source']) {
+function sourceLabel(t: TFunction<'admin'>, source: EffectiveFeature['source']) {
   const map: Record<EffectiveFeature['source'], string> = {
-    tenant_override: 'Tenant override',
-    global: 'Global',
-    plan: 'Plan',
-    default: 'Default',
+    tenant_override: t('features.source.tenantOverride'),
+    global: t('features.source.global'),
+    plan: t('features.source.plan'),
+    default: t('features.source.default'),
   }
   return map[source] ?? source
 }
 
 function sourceTone(source: EffectiveFeature['source']): string {
   const map: Record<EffectiveFeature['source'], string> = {
-    tenant_override: 'bg-amber-50 text-amber-800 border-amber-200',
+    tenant_override:
+      'bg-[var(--amber-pale)] text-[var(--amber)] border-[color-mix(in_srgb,var(--amber)_35%,transparent)]',
     global: 'bg-[var(--app-bg-subtle)] text-[var(--text)] border-[var(--app-border-mid)]',
-    plan: 'bg-sky-50 text-sky-800 border-sky-200',
+    plan: 'bg-[var(--brand-ultra)] text-[var(--brand-mid)] border-[var(--app-border-mid)]',
     default: 'bg-[var(--app-bg-subtle)] text-[var(--text-mid)] border-[var(--app-border)]',
   }
   return (
@@ -86,11 +97,11 @@ function isFeatureOn(enabled: unknown): boolean {
   return Boolean(enabled)
 }
 
-function effectiveStatusLabel(enabled: unknown): string {
+function effectiveStatusLabel(t: TFunction<'admin'>, enabled: unknown): string {
   if (typeof enabled === 'string' && enabled !== 'true' && enabled !== 'false') {
     return enabled.replace(/_/g, ' ')
   }
-  return isFeatureOn(enabled) ? 'On' : 'Off'
+  return isFeatureOn(enabled) ? t('features.effective.on') : t('features.effective.off')
 }
 
 export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeatureFlagsPanelProps) {
@@ -114,16 +125,16 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
   const [debouncedTenantFeatureSearch, setDebouncedTenantFeatureSearch] = useState('')
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedGlobalSearch(globalSearch.trim()), 300)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => setDebouncedGlobalSearch(globalSearch.trim()), 300)
+    return () => window.clearTimeout(timer)
   }, [globalSearch])
 
   useEffect(() => {
-    const t = window.setTimeout(
+    const timer = window.setTimeout(
       () => setDebouncedTenantFeatureSearch(tenantFeatureSearch.trim()),
       300
     )
-    return () => window.clearTimeout(t)
+    return () => window.clearTimeout(timer)
   }, [tenantFeatureSearch])
 
   const selectedTenantId = selectedTenant?.id ?? ''
@@ -184,20 +195,21 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
   const hasGlobalFilters = Boolean(debouncedGlobalSearch) || globalModeFilter !== 'all'
   const hasTenantFeatureFilter = Boolean(debouncedTenantFeatureSearch)
 
-  const selectedTenantName = selectedTenant?.name ?? 'Selected tenant'
+  const selectedTenantName = selectedTenant?.name ?? t('features.selectedTenant')
 
   const handleGlobalChange = async (featureKey: string, mode: 'inherit' | 'on' | 'off') => {
     try {
       await updateGlobalFlag({ featureKey, mode }).unwrap()
-      toast.success(`Global ${featureKey}: ${mode}`)
+      toast.success(t('featuresToasts.globalUpdated', { key: featureKey, mode }))
       if (selectedTenantId) refetchTenant()
     } catch {
-      toast.error(`Failed to update ${featureKey}`)
+      toast.error(t('featuresToasts.updateFailed', { key: featureKey }))
     }
   }
 
   const handleTenantToggle = async (feature: EffectiveFeature, enabled: boolean) => {
     if (!selectedTenantId) return
+    const label = featureDisplayLabel(t, feature.featureKey, feature.featureName)
     try {
       await setTenantOverride({
         tenantType,
@@ -205,9 +217,13 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         featureKey: feature.featureKey,
         enabled,
       }).unwrap()
-      toast.success(`${feature.featureName} ${enabled ? 'enabled' : 'disabled'} for tenant`)
+      toast.success(
+        enabled
+          ? t('featuresToasts.tenantEnabled', { name: label })
+          : t('featuresToasts.tenantDisabled', { name: label })
+      )
     } catch {
-      toast.error(`Failed to update ${feature.featureName}`)
+      toast.error(t('featuresToasts.tenantUpdateFailed', { name: label }))
     }
   }
 
@@ -257,31 +273,31 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             testId="admin-feature-flags-stats"
             metrics={[
               {
-                label: 'Total features',
+                label: t('features.stats.totalFeatures'),
                 value: globalStats.total,
-                hint: 'Canonical platform keys',
+                hint: t('features.stats.totalFeaturesHint'),
                 tone: 'brand',
               },
               {
-                label: 'Forced on',
+                label: t('features.stats.forcedOn'),
                 value: globalStats.forcedOn,
-                hint: 'Global override',
+                hint: t('features.stats.forcedOnHint'),
                 tone: globalStats.forcedOn > 0 ? 'mint' : 'default',
                 active: globalModeFilter === 'on',
                 onClick: () => setGlobalModeFilter(globalModeFilter === 'on' ? 'all' : 'on'),
               },
               {
-                label: 'Forced off',
+                label: t('features.stats.forcedOff'),
                 value: globalStats.forcedOff,
-                hint: 'Global kill-switch',
+                hint: t('features.stats.forcedOffHint'),
                 tone: globalStats.forcedOff > 0 ? 'danger' : 'default',
                 active: globalModeFilter === 'off',
                 onClick: () => setGlobalModeFilter(globalModeFilter === 'off' ? 'all' : 'off'),
               },
               {
-                label: 'Inherit plans',
+                label: t('features.stats.inheritPlans'),
                 value: globalStats.inherit,
-                hint: 'No global override',
+                hint: t('features.stats.inheritPlansHint'),
                 tone: 'default',
                 active: globalModeFilter === 'inherit',
                 onClick: () =>
@@ -295,7 +311,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
       <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          Global flags
+          {t('features.globalFlagsFilter')}
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -318,10 +334,10 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               onChange={(e) => setGlobalModeFilter(e.target.value as GlobalModeFilter)}
               aria-label={t('features.filterGlobalModeAriaLabel')}
             >
-              <option value="all">All modes</option>
-              <option value="inherit">Inherit from plans</option>
-              <option value="on">Forced on</option>
-              <option value="off">Forced off</option>
+              <option value="all">{t('features.modeFilter.allModes')}</option>
+              <option value="inherit">{t('features.modeFilter.inheritFromPlans')}</option>
+              <option value="on">{t('features.modeFilter.forcedOn')}</option>
+              <option value="off">{t('features.modeFilter.forcedOff')}</option>
             </select>
           </div>
           {hasGlobalFilters && (
@@ -333,7 +349,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               onClick={clearGlobalFilters}
             >
               <X className="mr-1.5 h-4 w-4" />
-              Clear filters
+              {t('common.clearFilters')}
             </Button>
           )}
         </div>
@@ -343,8 +359,12 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         title={t('features.globalFlagsTitle')}
         description={
           flagsLoading
-            ? 'Loading platform flags…'
-            : `${filteredGlobalFlags.length} of ${globalFlags.length} feature${globalFlags.length === 1 ? '' : 's'} shown`
+            ? t('features.loadingPlatformFlags')
+            : t('features.flagsShown', {
+                shown: filteredGlobalFlags.length,
+                total: globalFlags.length,
+                count: filteredGlobalFlags.length,
+              })
         }
         testId="admin-global-feature-flags-panel"
         className="mb-4"
@@ -352,7 +372,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
           flagsFetching && !flagsLoading ? (
             <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating flags…
+              {t('features.updatingFlags')}
             </p>
           ) : undefined
         }
@@ -362,22 +382,26 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         ) : flagsError ? (
           <AdminErrorState
             title={t('features.loadFailedTitle')}
-            message="Check your connection and try again."
+            message={t('features.loadFailedMessage')}
             onRetry={() => refetchFlags()}
           />
         ) : filteredGlobalFlags.length === 0 ? (
           <AdminEmptyState
             icon={<Flag className="h-8 w-8 text-[var(--text-muted)]" />}
-            title={hasGlobalFilters ? 'No flags match your filters' : 'No feature flags configured'}
+            title={
+              hasGlobalFilters
+                ? t('features.empty.noFlagsMatchTitle')
+                : t('features.empty.noFlagsTitle')
+            }
             description={
               hasGlobalFilters
-                ? 'Try a different search term or global mode filter.'
-                : 'Feature flags appear here once they are registered in the platform.'
+                ? t('features.empty.noFlagsMatchDescription')
+                : t('features.empty.noFlagsDescription')
             }
             action={
               hasGlobalFilters ? (
                 <Button type="button" variant="outline" size="sm" onClick={clearGlobalFilters}>
-                  Clear filters
+                  {t('common.clearFilters')}
                 </Button>
               ) : undefined
             }
@@ -390,13 +414,15 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                   key={flag.featureKey}
                   className="rounded-md border border-[var(--app-border)] p-4 space-y-2"
                 >
-                  <p className="font-medium">{flag.featureName}</p>
+                  <p className="font-medium">
+                    {featureDisplayLabel(t, flag.featureKey, flag.featureName)}
+                  </p>
                   <p className="font-mono text-xs text-[var(--text-muted)]">{flag.featureKey}</p>
                   <Badge
                     variant="outline"
                     className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
                   >
-                    {globalModeLabel(flag.globalOverride)}
+                    {globalModeLabel(t, flag.globalOverride)}
                   </Badge>
                 </article>
               ))}
@@ -408,8 +434,8 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    <th className="px-4 py-3">Feature</th>
-                    <th className="px-4 py-3">Global mode</th>
+                    <th className="px-4 py-3">{t('features.table.feature')}</th>
+                    <th className="px-4 py-3">{t('features.table.globalMode')}</th>
                     <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
                 </thead>
@@ -420,7 +446,9 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                       className="transition-colors hover:bg-[var(--brand-ultra)]/35"
                     >
                       <td className="px-4 py-3.5">
-                        <p className="font-medium text-[var(--text)]">{flag.featureName}</p>
+                        <p className="font-medium text-[var(--text)]">
+                          {featureDisplayLabel(t, flag.featureKey, flag.featureName)}
+                        </p>
                         <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
                           {flag.featureKey}
                         </p>
@@ -430,7 +458,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                           variant="outline"
                           className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
                         >
-                          {globalModeLabel(flag.globalOverride)}
+                          {globalModeLabel(t, flag.globalOverride)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3.5">
@@ -449,7 +477,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                               disabled={updatingGlobal}
                               onClick={() => handleGlobalChange(flag.featureKey, mode)}
                             >
-                              {mode}
+                              {t(`features.actions.${mode}`)}
                             </Button>
                           ))}
                         </div>
@@ -466,7 +494,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
       <div className="mb-4 rounded-md border border-[var(--app-border)] bg-[var(--surface)] p-4">
         <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
-          Tenant overrides
+          {t('features.tenantOverridesFilter')}
         </div>
         <AdminTenantPicker
           tenantType={tenantType}
@@ -481,7 +509,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         />
         <div className="mt-4">
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-mid)]">
-            Feature search
+            {t('features.featureSearch')}
           </label>
           <div className="relative max-w-md">
             <Search
@@ -504,17 +532,21 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         title={t('features.tenantOverridesTitle')}
         description={
           !selectedTenantId
-            ? 'Select a tenant to review effective features.'
+            ? t('features.selectTenantHint')
             : tenantLoading
-              ? `Loading overrides for ${selectedTenantName}…`
-              : `${filteredEffectiveFeatures.length} of ${effectiveFeatures.length} features for ${selectedTenantName}`
+              ? t('features.loadingOverridesFor', { name: selectedTenantName })
+              : t('features.featuresForTenant', {
+                  shown: filteredEffectiveFeatures.length,
+                  total: effectiveFeatures.length,
+                  name: selectedTenantName,
+                })
         }
         testId="admin-tenant-feature-overrides-panel"
         footer={
           tenantFetching && !tenantLoading && selectedTenantId ? (
             <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Updating overrides…
+              {t('features.updatingOverrides')}
             </p>
           ) : undefined
         }
@@ -530,7 +562,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
         ) : tenantError ? (
           <AdminErrorState
             title={t('features.tenantLoadFailedTitle')}
-            message="The tenant may have been removed or you may lack permission."
+            message={t('features.tenantLoadFailedMessage')}
             onRetry={() => refetchTenant()}
           />
         ) : filteredEffectiveFeatures.length === 0 ? (
@@ -538,13 +570,13 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
             icon={<Flag className="h-8 w-8 text-[var(--text-muted)]" />}
             title={
               hasTenantFeatureFilter
-                ? 'No features match your search'
-                : 'No features for this tenant'
+                ? t('features.empty.noFeaturesMatchTitle')
+                : t('features.empty.noFeaturesTitle')
             }
             description={
               hasTenantFeatureFilter
-                ? 'Try a different search term.'
-                : 'Effective features appear here once the tenant has a subscription plan.'
+                ? t('features.empty.noFeaturesMatchDescription')
+                : t('features.empty.noFeaturesDescription')
             }
             action={
               hasTenantFeatureFilter ? (
@@ -557,7 +589,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                     setDebouncedTenantFeatureSearch('')
                   }}
                 >
-                  Clear search
+                  {t('common.clearSearch')}
                 </Button>
               ) : undefined
             }
@@ -570,7 +602,10 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                   key={feature.featureKey}
                   className="rounded-md border border-[var(--app-border)] p-4 space-y-2"
                 >
-                  <p className="font-medium">{feature.featureName}</p>
+                  <p className="font-medium">
+                    {featureDisplayLabel(t, feature.featureKey, feature.featureName)}
+                  </p>
+                  <p className="font-mono text-xs text-[var(--text-muted)]">{feature.featureKey}</p>
                   <StatusBadge status={feature.enabled ? 'ACTIVE' : 'INACTIVE'} />
                 </article>
               ))}
@@ -582,9 +617,9 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--app-border)] bg-[var(--app-bg-subtle)]/60 text-left text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                    <th className="px-4 py-3">Feature</th>
-                    <th className="px-4 py-3">Effective</th>
-                    <th className="px-4 py-3">Source</th>
+                    <th className="px-4 py-3">{t('features.table.feature')}</th>
+                    <th className="px-4 py-3">{t('features.table.effective')}</th>
+                    <th className="px-4 py-3">{t('features.table.source')}</th>
                     <th className="px-4 py-3 text-right">{t('common.table.actions')}</th>
                   </tr>
                 </thead>
@@ -597,7 +632,9 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                         className="transition-colors hover:bg-[var(--brand-ultra)]/35"
                       >
                         <td className="px-4 py-3.5">
-                          <p className="font-medium text-[var(--text)]">{feature.featureName}</p>
+                          <p className="font-medium text-[var(--text)]">
+                            {featureDisplayLabel(t, feature.featureKey, feature.featureName)}
+                          </p>
                           <p className="mt-0.5 font-mono text-xs text-[var(--text-muted)]">
                             {feature.featureKey}
                           </p>
@@ -605,7 +642,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                         <td className="px-4 py-3.5">
                           <StatusBadge
                             status={on ? 'ACTIVE' : 'INACTIVE'}
-                            label={effectiveStatusLabel(feature.enabled)}
+                            label={effectiveStatusLabel(t, feature.enabled)}
                           />
                         </td>
                         <td className="px-4 py-3.5">
@@ -613,7 +650,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                             variant="outline"
                             className={cn('text-xs font-medium', sourceTone(feature.source))}
                           >
-                            {sourceLabel(feature.source)}
+                            {sourceLabel(t, feature.source)}
                           </Badge>
                         </td>
                         <td className="px-4 py-3.5">
@@ -624,7 +661,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                               disabled={savingOverride || clearingOverride}
                               onClick={() => handleTenantToggle(feature, true)}
                             >
-                              Force on
+                              {t('features.actions.forceOn')}
                             </Button>
                             <Button
                               size="sm"
@@ -632,7 +669,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                               disabled={savingOverride || clearingOverride}
                               onClick={() => handleTenantToggle(feature, false)}
                             >
-                              Force off
+                              {t('features.actions.forceOff')}
                             </Button>
                             {feature.source === 'tenant_override' && (
                               <Button
@@ -641,7 +678,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                                 disabled={savingOverride || clearingOverride}
                                 onClick={() => handleClearOverride(feature.featureKey)}
                               >
-                                Clear override
+                                {t('features.actions.clearOverride')}
                               </Button>
                             )}
                           </div>

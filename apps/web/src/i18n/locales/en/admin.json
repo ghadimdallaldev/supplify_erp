@@ -10,6 +10,7 @@
     "cancel": "Cancel",
     "done": "Done",
     "save": "Save",
+    "saving": "Saving…",
     "previous": "Previous",
     "next": "Next",
     "filters": "Filters",
@@ -99,6 +100,7 @@
       "revenue": "Revenue",
       "totalSpent": "Total spent",
       "before": "Before",
+      "after": "After",
       "restaurant": "Restaurant",
       "overdue": "Overdue"
     },
@@ -119,7 +121,9 @@
       "resetPassword": "Reset password",
       "changePlan": "Change plan"
     },
-    "edit": "Edit"
+    "edit": "Edit",
+    "freeTrialPlan": "Free Trial",
+    "freeTrial": "Free Trial"
   },
   "nav": {
     "brand": "Admin",
@@ -195,7 +199,20 @@
     "emptyFilteredDescription": "Try a different search term or role filter.",
     "emptyDefaultTitle": "No users found",
     "emptyDefaultDescription": "Users appear here after they register or are invited to a tenant.",
-    "resetPassword": "Reset password"
+    "resetPassword": "Reset password",
+    "roles": {
+      "super_admin": "Super admin",
+      "platform_admin": "Platform admin",
+      "admin": "Admin",
+      "restaurant": "Restaurant",
+      "supplier": "Supplier",
+      "driver": "Driver",
+      "owner": "Owner",
+      "manager": "Manager",
+      "viewer": "Viewer",
+      "staff": "Staff",
+      "unknown": "Unknown"
+    }
   },
   "activity": {
     "title": "Platform activity",
@@ -325,6 +342,23 @@
     "tenantsRevenueDescription": "Registered tenants and recurring revenue snapshot",
     "subscriptionBreakdownTitle": "Subscription status breakdown",
     "subscriptionBreakdownDescription": "Live subscription counts by billing status",
+    "growthInsightsTitle": "Growth insights",
+    "growthInsightsDescription": "Understand upgrade demand and conversion momentum.",
+    "conversionRate": "{{percent}}% conversion rate",
+    "topBlockedFeature": "Top blocked feature:",
+    "topBlockedLimit": "Top blocked limit:",
+    "arrHint": "ARR {{value}}",
+    "funnel": {
+      "step": "Step",
+      "blocks": "Feature / limit blocks",
+      "openUpgrade": "Upgrade modal opens",
+      "clickUpgrade": "Upgrade clicked",
+      "upgradesCompleted": "Upgrades completed",
+      "blocked": "Blocked",
+      "upgradeSuccess": "Upgrade success",
+      "window7d": "7d",
+      "windowNd": "{{days}}d"
+    },
     "conversionFunnelTitle": "Conversion funnel (30d)",
     "conversionFunnelDescription": "Upgrade path from feature blocks to completed upgrades",
     "funnelComparisonTitle": "7-day vs 30-day comparison",
@@ -385,7 +419,8 @@
     "staleGps_other": "{{count}} deliveries with stale GPS",
     "expiredLots": "{{count}} expired inventory lot",
     "expiredLots_other": "{{count}} expired inventory lots",
-    "operations": "Operations"
+    "operations": "Operations",
+    "latestPendingDeals": "Latest pending deals"
   },
   "executiveSummary": {
     "totalTenants": "Total tenants",
@@ -400,7 +435,74 @@
     "systemHealth": "System health",
     "recentErrors": "{{count}} recent error",
     "recentErrors_other": "{{count}} recent errors",
-    "platformOperational": "Platform operational status"
+    "platformOperational": "Platform operational status",
+    "health": {
+      "healthy": "Healthy",
+      "degraded": "Degraded",
+      "critical": "Critical"
+    }
+  },
+  "pageHeaders": {
+    "platform": {
+      "title": "Platform Command Center",
+      "subtitle": "Monitor tenants, subscriptions, usage, operations, and system health from one place."
+    },
+    "suppliers": {
+      "title": "Supplier Control Center",
+      "subtitle": "Manage supplier accounts, quotas, products, warehouses, fulfillment, and billing."
+    },
+    "restaurants": {
+      "title": "Restaurant Control Center",
+      "subtitle": "Manage restaurant accounts, subscriptions, ordering limits, usage, and activity."
+    },
+    "settings": {
+      "title": "Account Settings",
+      "subtitle": "Manage your profile, security, notifications, and admin preferences."
+    }
+  },
+  "addonKeys": {
+    "restaurant_extra_branch": "Extra branch",
+    "supplier_extra_branch": "Extra branch",
+    "supplier_extra_warehouse": "Extra warehouse",
+    "supplier_active_customer_locations_50": "50 active customer locations"
+  },
+  "limitKeys": {
+    "branches": "Branches",
+    "warehouses": "Warehouses",
+    "users": "Users",
+    "orders_per_day": "Orders per day",
+    "suppliers_per_restaurant": "Suppliers per restaurant",
+    "restaurant_inventory_skus": "Restaurant inventory SKUs",
+    "chats_per_day": "Chats per day",
+    "open_conversations": "Open conversations",
+    "storage_mb": "Storage (MB)",
+    "quick_lists": "Quick lists",
+    "quick_list_items": "Quick list items",
+    "scheduled_quick_lists": "Scheduled quick lists",
+    "deal_redemptions_per_day": "Deal redemptions per day",
+    "supplier_products_skus": "Supplier product SKUs",
+    "active_customer_locations_monthly": "Active customer locations",
+    "promotions": "Active deals",
+    "drivers": "Drivers",
+    "ai_requests_per_day": "AI assist requests per day"
+  },
+  "featureKeys": {
+    "order_calendar": "Order calendar",
+    "reports": "Reports",
+    "smart_reorder": "Smart reorder",
+    "ai_platform": "AI assistant + reorder LLM",
+    "multi_branch": "Multi-branch",
+    "disputes_returns": "Disputes & returns",
+    "advanced_roles": "Advanced roles",
+    "supplier_reviews": "Supplier reviews",
+    "tenant_audit_log": "Activity log",
+    "custom_branding": "Custom branding",
+    "warehouses": "Warehouses",
+    "multi_warehouse": "Multi-warehouse",
+    "fulfillment": "Fulfillment & logistics",
+    "driver_management": "Driver management",
+    "promotions": "Deals",
+    "supplier_deals": "Supplier deals"
   },
   "usageStatus": {
     "healthy": "Healthy",
@@ -512,11 +614,26 @@
       "refundFailed": "Failed to refund boost"
     },
     "collapseDetails": "Collapse details",
-    "expandDetails": "Expand details"
+    "expandDetails": "Expand details",
+    "emptyFilteredTitle": "No deals match your filters",
+    "emptyFilteredDescription": "No deals match your filters. Try clearing filters or choosing “All statuses”."
   },
   "operations": {
     "title": "Operations",
     "description": "Email, inventory expiry, reorder cadence, fulfillment issues, and GPS delivery health (read-only)",
+    "tabs": {
+      "summary": "Summary",
+      "email": "Email",
+      "inventory": "Inventory & reorder",
+      "fulfillment": "Fulfillment",
+      "gps": "GPS & delivery"
+    },
+    "warnings": "Warnings",
+    "review": "Review",
+    "yes": "Yes",
+    "no": "No",
+    "on": "On",
+    "off": "Off",
     "noWarningsTitle": "No warnings",
     "noWarningsDescription": "Operational checks look clear.",
     "emailFailed24h": "Email failed (24h)",
@@ -525,10 +642,53 @@
     "expiredInventoryLots": "Expired inventory lots",
     "emailConfig": "Email",
     "gpsPrivacy": "GPS & privacy",
+    "config": {
+      "enabled": "Enabled",
+      "logOnly": "Log-only",
+      "provider": "Provider",
+      "configured": "Configured",
+      "platformGps": "Platform GPS",
+      "restaurantTracking": "Restaurant tracking",
+      "driverNameVisible": "Driver name visible",
+      "driverPhoneVisible": "Driver phone visible",
+      "allowed": "Allowed",
+      "disabled": "Disabled"
+    },
+    "emailStatus": {
+      "all": "All",
+      "sent": "Sent",
+      "failed": "Failed",
+      "skipped": "Skipped",
+      "log_only": "Log only"
+    },
+    "table": {
+      "order": "Order",
+      "event": "Event",
+      "recipient": "Recipient",
+      "chat": "Chat",
+      "gps": "GPS"
+    },
+    "inventory": {
+      "expiryTitle": "Expiry inventory",
+      "restaurantsWithLots": "Restaurants with lots",
+      "expiring7d": "Expiring in 7 days",
+      "expiredLots": "Expired lots",
+      "remindersToday": "Reminders today",
+      "reorderTitle": "Reorder cadence",
+      "activePatterns": "Active patterns",
+      "restaurantsAtRisk": "Restaurants with cadence",
+      "quickListsTitle": "Quick lists",
+      "totalLists": "Total lists",
+      "scheduledLists": "Scheduled",
+      "restaurantsUsing": "Restaurants using",
+      "branchScopedLists": "Branch-scoped"
+    },
     "noEmailLogsTitle": "No email logs",
     "noEmailLogsDescription": "No delivery log entries match filters.",
     "noFulfillmentIssuesTitle": "No open fulfillment issues",
     "noFulfillmentIssuesDescription": "Shortage and substitution issues awaiting resolution will appear here.",
+    "noDeliveriesInProgress": "No in-progress deliveries right now.",
+    "gpsAdminNote": "Admin view shows delivery state only — no maps or GPS ping history.",
     "gpsActive": "Active",
     "gpsLive": "Live",
     "gpsStale": "Stale",
@@ -582,6 +742,57 @@
     "addonsFailedTitle": "Failed to load add-ons",
     "addonsFailedMessage": "Could not fetch subscription add-on data for this tenant.",
     "tenantSummary": "Tenant summary",
+    "orgBillingNote": "Add-ons and subscription limits apply to org billing tenant {{name}}{{main}}.",
+    "orgBillingMainBranch": " (main branch)",
+    "inUseRatio": "{{used}} / {{limit}} in use",
+    "stats": {
+      "tenantOverrides": "Tenant overrides",
+      "tenantOverridesHint": "Active across platform",
+      "planOverrides": "Plan overrides",
+      "planOverridesHint": "{{tenantType}} plan tiers",
+      "limitsAtRisk": "Limits at risk",
+      "limitsAtRiskHintSelected": "Selected tenant ≥80% usage",
+      "limitsAtRiskHintNone": "Select a tenant",
+      "limitKeys": "Limit keys",
+      "limitKeysHint": "Configurable for {{tenantType}}"
+    },
+    "typeLabel": "Type:",
+    "refreshingUsage": "Refreshing usage…",
+    "qtyLabel": "Qty {{qty}}",
+    "unitPricePerMonth": "${{price}}/mo",
+    "addonTypeLabel": "Add-on type",
+    "quantityLabel": "Quantity",
+    "unitPriceLabel": "Unit price",
+    "reasonRequiredLabel": "Reason (required)",
+    "removeAddon": "Remove add-on",
+    "grantUpdateAddon": "Grant / update add-on",
+    "selectPlanTier": "Select plan tier",
+    "selectLimit": "Select limit",
+    "planDefaultLabel": "Plan default:",
+    "currentOverrideLabel": "Current override:",
+    "previewLabel": "Preview:",
+    "overrideValueLabel": "Override value",
+    "savePlanOverride": "Save plan override",
+    "tenantOverrideDescription": "Applies only to {{name}} (billing tenant resolved automatically).",
+    "currentEffectiveLabel": "Current effective:",
+    "planBaseLabel": "plan base",
+    "savedOverrideLabel": "Saved override:",
+    "saveTenantOverride": "Save tenant override",
+    "overridesForSelectedTitle": "Overrides for selected tenant",
+    "activeOverridesTitle": "Active overrides",
+    "loadingOverridesPanel": "Loading overrides…",
+    "overrideRowsShown": "{{count}} override row shown",
+    "overrideRowsShown_other": "{{count}} override rows shown",
+    "refreshingOverrides": "Refreshing overrides…",
+    "searchOverridesHeading": "Search overrides",
+    "tenantOverridesHeading": "Tenant overrides",
+    "planTierOverridesHeading": "Plan-tier overrides ({{tenantType}})",
+    "noTenantOverridesSearch": "No matches for your search on this tenant.",
+    "noTenantOverridesDefault": "None configured for this tenant.",
+    "noPlanOverridesSearch": "No matches for your search.",
+    "noPlanOverridesDefault": "No active plan overrides for {{tenantType}} plans.",
+    "confirmDisableTenantOverride": "Disable this tenant override?",
+    "confirmDisablePlanOverride": "Disable this plan override?",
     "branches": "Branches",
     "warehouses": "Warehouses",
     "effectiveLimitsTitle": "Effective limits vs usage",
@@ -647,7 +858,23 @@
     "emptyDefaultTitle": "No subscriptions yet",
     "emptyFilteredDescription": "Adjust search, status, or tenant type filters and try again.",
     "emptyDefaultDescription": "Subscriptions appear here when tenants register and select a plan.",
-    "unknownTenant": "Unknown tenant"
+    "unknownTenant": "Unknown tenant",
+    "needsAttentionBadge": "Needs attention",
+    "stats": {
+      "total": "Total",
+      "totalHint": "Unique tenant subscriptions",
+      "activeTrial": "Active / trial",
+      "activeTrialHint": "Active or trialing",
+      "needsAttention": "Needs attention",
+      "needsAttentionHint": "Locked or pending activation",
+      "atRisk": "At risk",
+      "atRiskHint": "Suspended, cancelled, or past due"
+    },
+    "actions": {
+      "extendTrial": "Extend trial",
+      "activate": "Activate",
+      "changePlan": "Change plan"
+    }
   },
   "plans": {
     "subscriptionDefaultsTitle": "Subscription Defaults",
@@ -692,6 +919,15 @@
   "tenants": {
     "searchAriaLabel": "Search tenants",
     "filterStatusAriaLabel": "Filter by subscription status",
+    "titleAll": "All tenants",
+    "titleSuppliers": "Suppliers",
+    "titleRestaurants": "Restaurants",
+    "descriptionAll": "Manage supplier and restaurant accounts across the platform.",
+    "descriptionSuppliers": "Supplier accounts, subscriptions, and support actions.",
+    "descriptionRestaurants": "Restaurant accounts, subscriptions, and support actions.",
+    "searchAllPlaceholder": "Search tenants by name or email…",
+    "searchSuppliersPlaceholder": "Search suppliers by name or email…",
+    "searchRestaurantsPlaceholder": "Search restaurants by name or email…",
     "suppliersTitle": "Suppliers",
     "suppliersFailedTitle": "Failed to load suppliers",
     "suppliersFailedMessage": "The supplier directory request failed.",
@@ -699,7 +935,47 @@
     "restaurantsTitle": "Restaurants",
     "restaurantsFailedTitle": "Failed to load restaurants",
     "restaurantsFailedMessage": "The restaurant directory request failed.",
-    "restaurantsTableAriaLabel": "Restaurant tenants"
+    "restaurantsTableAriaLabel": "Restaurant tenants",
+    "loadingSuppliers": "Loading suppliers…",
+    "loadingRestaurants": "Loading restaurants…",
+    "updatingSuppliers": "Updating suppliers…",
+    "updatingRestaurants": "Updating restaurants…",
+    "suppliersShown": "{{count}} supplier shown{{suffix}}",
+    "suppliersShown_other": "{{count}} suppliers shown{{suffix}}",
+    "restaurantsShown": "{{count}} restaurant shown{{suffix}}",
+    "restaurantsShown_other": "{{count}} restaurants shown{{suffix}}",
+    "shownLoadedSuffix": " of {{loaded}} loaded",
+    "shownTotalSuffix": " · {{total}} total",
+    "emptySuppliersFilteredTitle": "No suppliers match your filters",
+    "emptySuppliersDefaultTitle": "No suppliers found",
+    "emptySuppliersFilteredDescription": "Adjust search or status filters and try again.",
+    "emptySuppliersDefaultDescription": "Supplier tenants appear here after registration.",
+    "emptyRestaurantsFilteredTitle": "No restaurants match your filters",
+    "emptyRestaurantsDefaultTitle": "No restaurants found",
+    "emptyRestaurantsFilteredDescription": "Adjust search or status filters and try again.",
+    "emptyRestaurantsDefaultDescription": "Restaurant tenants appear here after registration.",
+    "supplierProductsWarehouses": "{{products}} products · {{warehouses}} warehouses",
+    "restaurantOrdersSpent": "{{orders}} orders (30d) · {{spent}} spent",
+    "loadMoreSuppliers": "Load more suppliers ({{loaded}} of {{total}})",
+    "loadMoreRestaurants": "Load more restaurants ({{loaded}} of {{total}})",
+    "noSubscription": "No active subscription for this {{entity}}. Assign a plan from the Subscriptions tab.",
+    "impersonationSuccess": "Impersonating {{name}}",
+    "impersonationFailed": "Failed to start impersonation",
+    "impersonationSuspendedDefault": "This tenant is suspended or inactive.",
+    "impersonationSuspendedConfirm": "{{message}}\n\nContinue impersonation for support?",
+    "stats": {
+      "loadedHint": "{{count}} loaded",
+      "loadedVsTotal": "Loaded vs total",
+      "activeTrial": "Active / trial",
+      "acrossLoaded": "Across loaded tenants",
+      "loadedTotal": "Loaded total",
+      "platformTenants": "Of {{total}} platform tenants",
+      "activeSubs": "Active subs",
+      "products": "Products",
+      "revenue": "Revenue",
+      "orders30d": "Orders (30d)"
+    },
+    "noSubscriptionStatus": "No subscription"
   },
   "usage": {
     "tenantsUnderPressure": "Tenants under pressure",
@@ -772,13 +1048,34 @@
     "title": "Finance",
     "description": "GMV, recurring revenue, outstanding invoices, and top tenants by revenue.",
     "unavailableTitle": "Finance data unavailable",
+    "apiFailedMessage": "The finance API request failed. Figures are not shown as zero to avoid misleading data.",
+    "mrrDisclaimer": "MRR and ARR exclude Free Trial and Enterprise plans (paid subscriptions only).",
+    "metrics": {
+      "gmv": "GMV (all time)",
+      "gmvHint": "Total invoice value",
+      "mrr": "MRR",
+      "mrrHint": "ARR {{arr}} · paid plans only",
+      "outstanding": "Outstanding",
+      "outstandingHint": "Awaiting payment",
+      "overdue": "Overdue",
+      "overdueHint": "Past due date"
+    },
     "revenueByPlan": "Revenue by plan",
+    "plansWithSubscriptions": "{{count}} plan with active subscriptions",
+    "plansWithSubscriptions_other": "{{count}} plans with active subscriptions",
+    "subsAbbrev": "{{count}} subs",
+    "perMonth": "/mo",
     "noPlanRevenueTitle": "No plan revenue yet",
     "noPlanRevenueDescription": "Revenue breakdown appears when tenants subscribe to paid plans.",
     "topTenantsByRevenue": "Top tenants by revenue",
+    "topTenantsDescription": "Top {{shown}} of {{total}} tenant",
+    "topTenantsDescription_other": "Top {{shown}} of {{total}} tenants",
     "noTenantRevenueTitle": "No tenant revenue yet",
     "noTenantRevenueDescription": "Invoice and payment activity will rank tenants here.",
     "overdueBalances": "Overdue balances",
+    "overdueTenantsDescription": "{{count}} tenant with past-due invoices",
+    "overdueTenantsDescription_other": "{{count}} tenants with past-due invoices",
+    "overdueBreakdownUnavailable": "Platform overdue total is {{amount}} but no per-tenant breakdown is available.",
     "overdueBalancesTableAriaLabel": "Overdue tenant balances"
   },
   "audit": {
@@ -789,9 +1086,30 @@
     "searchAriaLabel": "Search audit logs",
     "fromDateAriaLabel": "From date",
     "toDateAriaLabel": "To date",
+    "dateRangeTo": "to",
     "recentEntries": "Recent entries",
     "loading": "Loading audit logs…",
+    "loadingTrail": "Loading audit trail…",
+    "totalEntries": "{{total}} total entries",
+    "totalEntries_one": "{{total}} total entry",
+    "entriesPage": "{{total}} total entries · page {{page}} of {{pageCount}}",
+    "entriesPage_one": "{{total}} total entry · page {{page}} of {{pageCount}}",
+    "emptyFilteredTitle": "No audit logs match your filters",
+    "emptyDefaultTitle": "No audit entries yet",
+    "emptyFilteredDescription": "Adjust the search, action type, or date range and try again.",
+    "emptyDefaultDescription": "Admin actions such as plan changes, impersonation, and overrides will appear here.",
+    "changeLabel": "Change",
+    "ipAddress": "IP address",
+    "metadata": "Metadata",
+    "showingRange": "Showing {{from}}–{{to}} of {{total}}",
     "tableAriaLabel": "Admin audit log"
+  },
+  "platformSettings": {
+    "trialLengthTitle": "Trial length",
+    "trialLengthDescription": "Free Trial workspaces auto-lock after this many days unless the tenant upgrades to a paid plan. This is not a forever-free tier.",
+    "trialLengthDescriptionCompact": "Applies to new Free Trial activations platform-wide. Workspaces auto-lock after this period unless upgraded.",
+    "trialLengthDaysLabel": "Trial length (days)",
+    "trialLengthDaysHelp": "Allowed range: 7–90 days (default 30)"
   },
   "features": {
     "title": "Features",
@@ -800,15 +1118,84 @@
     "searchGlobalAriaLabel": "Search global feature flags",
     "filterGlobalModeAriaLabel": "Filter by global mode",
     "globalFlagsTitle": "Global feature flags",
+    "globalFlagsFilter": "Global flags",
+    "tenantOverridesFilter": "Tenant overrides",
+    "featureSearch": "Feature search",
     "loadFailedTitle": "Could not load feature flags",
+    "loadFailedMessage": "Check your connection and try again.",
     "globalTableAriaLabel": "Global feature flags",
     "searchTenantPlaceholder": "Search tenant features…",
     "searchTenantAriaLabel": "Search tenant feature overrides",
     "tenantOverridesTitle": "Per-tenant overrides",
     "noTenantSelectedTitle": "No tenant selected",
     "noTenantSelectedDescription": "Choose a restaurant or supplier to inspect and override feature access.",
+    "selectTenantHint": "Select a tenant to review effective features.",
     "tenantLoadFailedTitle": "Could not load tenant overrides",
-    "tenantTableAriaLabel": "Tenant feature overrides"
+    "tenantLoadFailedMessage": "The tenant may have been removed or you may lack permission.",
+    "tenantTableAriaLabel": "Tenant feature overrides",
+    "selectedTenant": "Selected tenant",
+    "loadingPlatformFlags": "Loading platform flags…",
+    "updatingFlags": "Updating flags…",
+    "updatingOverrides": "Updating overrides…",
+    "loadingOverridesFor": "Loading overrides for {{name}}…",
+    "flagsShown": "{{shown}} of {{total}} feature shown",
+    "flagsShown_other": "{{shown}} of {{total}} features shown",
+    "featuresForTenant": "{{shown}} of {{total}} features for {{name}}",
+    "stats": {
+      "totalFeatures": "Total features",
+      "totalFeaturesHint": "Canonical platform keys",
+      "forcedOn": "Forced on",
+      "forcedOnHint": "Global override",
+      "forcedOff": "Forced off",
+      "forcedOffHint": "Global kill-switch",
+      "inheritPlans": "Inherit plans",
+      "inheritPlansHint": "No global override"
+    },
+    "modeFilter": {
+      "allModes": "All modes",
+      "inheritFromPlans": "Inherit from plans",
+      "forcedOn": "Forced on",
+      "forcedOff": "Forced off"
+    },
+    "globalMode": {
+      "onGlobal": "On (global)",
+      "offGlobal": "Off (global)",
+      "inheritFromPlans": "Inherit from plans"
+    },
+    "source": {
+      "tenantOverride": "Tenant override",
+      "global": "Global",
+      "plan": "Plan",
+      "default": "Default"
+    },
+    "effective": {
+      "on": "On",
+      "off": "Off"
+    },
+    "table": {
+      "feature": "Feature",
+      "globalMode": "Global mode",
+      "effective": "Effective",
+      "source": "Source"
+    },
+    "actions": {
+      "inherit": "Inherit",
+      "on": "On",
+      "off": "Off",
+      "forceOn": "Force on",
+      "forceOff": "Force off",
+      "clearOverride": "Clear override"
+    },
+    "empty": {
+      "noFlagsMatchTitle": "No flags match your filters",
+      "noFlagsMatchDescription": "Try a different search term or global mode filter.",
+      "noFlagsTitle": "No feature flags configured",
+      "noFlagsDescription": "Feature flags appear here once they are registered in the platform.",
+      "noFeaturesMatchTitle": "No features match your search",
+      "noFeaturesMatchDescription": "Try a different search term.",
+      "noFeaturesTitle": "No features for this tenant",
+      "noFeaturesDescription": "Effective features appear here once the tenant has a subscription plan."
+    }
   },
   "diagnostics": {
     "description": "Read-only operational diagnostics · {{tenantType}}",
@@ -840,6 +1227,11 @@
   },
   "limitsToasts": {
     "selectTenantFirst": "Select a tenant first",
+    "addonRemoved": "Add-on removed",
+    "addonSaved": "Add-on saved",
+    "addonUpdateFailed": "Failed to update add-on",
+    "planOverrideSaveFailed": "Failed to save plan override",
+    "tenantOverrideSaveFailed": "Failed to save tenant override",
     "addonReasonRequired": "Please enter a reason for this add-on change",
     "planOverrideRequired": "Plan, limit key, and value are required",
     "overrideReasonRequired": "Please enter a reason for this override",
@@ -851,15 +1243,50 @@
     "planOverrideDisabled": "Plan override disabled",
     "disableFailed": "Failed to disable override"
   },
+  "growth": {
+    "title": "Referral & sponsorship program",
+    "description": "Configure referral discounts, supplier rewards, and supplier-paid sponsorship (monthly only). Caps are keyed by supplier plan code (e.g. gold / platinum).",
+    "firstPaidDiscount": "First paid subscription discount (%)",
+    "referralValidity": "Referral validity (days)",
+    "supplierReward": "Supplier conversion reward",
+    "rewardOptions": {
+      "freeMonth": "1 free month of subscription",
+      "accountCredit": "Account credit (platform billing)"
+    },
+    "sponsorshipEnabled": "Sponsorship enabled",
+    "offerExpiry": "Sponsorship offer expiry (days)",
+    "discountApplies": "Referral discount applies to",
+    "discountAppliesOptions": {
+      "firstRestaurantFunded": "First restaurant-funded cycle (after sponsored month)",
+      "sponsoredCycle": "Sponsored cycle (consume on activation)"
+    },
+    "requirePm": "Require restaurant payment method before sponsorship activation",
+    "sponsorshipLimitsTitle": "Sponsorship limits per year (by supplier plan code)",
+    "sponsorshipLimitsDescription": "Max sponsorships per calendar year. Leave blank for unlimited. Supplier Growth uses code gold; Supplier Scale uses platinum.",
+    "unlimitedPlaceholder": "Unlimited",
+    "saving": "Saving…",
+    "saveButton": "Save growth settings"
+  },
+  "placements": {
+    "title": "Active featured placements",
+    "empty": "No active featured placements",
+    "until": "Until {{date}}",
+    "refund": "Refund",
+    "refundSuccess": "Featured placement refunded",
+    "refundFailed": "Refund failed"
+  },
   "growthToasts": {
     "discountRange": "Discount must be between 0 and 100 percent",
     "validityMin": "Referral validity must be at least 1 day",
+    "offerExpiryRange": "Offer expiry must be between 1 and 90 days",
+    "sponsorshipLimitInvalid": "Sponsorship limit for {{plan}} must be a whole number",
     "saved": "Growth program settings saved",
     "saveFailed": "Failed to save growth settings"
   },
   "platformToasts": {
     "daysRange": "Enter a number between 7 and 90 days",
-    "saved": "Platform settings saved"
+    "saved": "Platform settings saved",
+    "saveFailed": "Failed to save settings"
   },
   "subscriptionsToasts": {
     "trialExtended": "Free Trial extended",
@@ -872,13 +1299,39 @@
     "usageExceeds": "Usage exceeds target plan. Check preview or force change."
   },
   "changePlan": {
-    "title": "Change plan — {{name}}"
+    "title": "Change plan — {{name}}",
+    "description": "Select a target plan and preview limits or feature changes before applying.",
+    "targetPlan": "Target plan",
+    "loadingPlans": "Loading plans…",
+    "selectPlan": "Select plan",
+    "noPlansForTenant": "No plans found for {{tenantType}} tenants. Create one on the Plans tab.",
+    "previewImpact": "Preview impact",
+    "noImpact": "No impact: usage is within target plan limits; no feature changes.",
+    "usageExceedsTitle": "Usage would exceed limits:",
+    "limitEntry": "{{label}}: {{usage}} > {{limit}}",
+    "featureChangesTitle": "Feature changes:",
+    "featuresEnabled": "Enabled: {{features}}",
+    "featuresDisabled": "Disabled: {{features}}",
+    "forceChange": "Force change anyway (allow exceedance)",
+    "applyChange": "Apply change",
+    "tenantFallback": "Tenant",
+    "selectedPlanFallback": "selected plan",
+    "updateSuccess": "Plan updated to {{plan}}",
+    "updateSuccessOrgBilling": "Plan updated to {{plan}} (applied to organization billing subscription)",
+    "updateFailed": "Failed to update plan",
+    "forceReason": "Admin plan change (usage exceeds target limits)",
+    "forceHint": "Pass allowExceedance: true to force change."
   },
   "plansToasts": {
     "created": "Plan created"
   },
   "featuresToasts": {
     "overrideCleared": "Override cleared",
-    "clearFailed": "Failed to clear override"
+    "clearFailed": "Failed to clear override",
+    "globalUpdated": "Global {{key}}: {{mode}}",
+    "updateFailed": "Failed to update {{key}}",
+    "tenantEnabled": "{{name}} enabled for tenant",
+    "tenantDisabled": "{{name}} disabled for tenant",
+    "tenantUpdateFailed": "Failed to update {{name}}"
   }
 }

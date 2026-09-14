@@ -149,11 +149,11 @@ export function AdminOperationsPanel({
 
       <Tabs key={initialSubTab} value={subTab} onValueChange={(v) => setSubTab(v as OpsSubTab)}>
         <TabsList className="flex w-max gap-0 flex-wrap">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="email">Email</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory & reorder</TabsTrigger>
-          <TabsTrigger value="fulfillment">Fulfillment</TabsTrigger>
-          <TabsTrigger value="gps">GPS & delivery</TabsTrigger>
+          <TabsTrigger value="summary">{t('operations.tabs.summary')}</TabsTrigger>
+          <TabsTrigger value="email">{t('operations.tabs.email')}</TabsTrigger>
+          <TabsTrigger value="inventory">{t('operations.tabs.inventory')}</TabsTrigger>
+          <TabsTrigger value="fulfillment">{t('operations.tabs.fulfillment')}</TabsTrigger>
+          <TabsTrigger value="gps">{t('operations.tabs.gps')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="summary" className="space-y-4 mt-4">
@@ -165,8 +165,8 @@ export function AdminOperationsPanel({
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
-                      Warnings
+                      <AlertCircle className="h-4 w-4 text-[var(--amber)]" />
+                      {t('operations.warnings')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
@@ -180,7 +180,7 @@ export function AdminOperationsPanel({
                           <AdminStatusBadge status={w.severity} />
                           {w.tab === 'deals' && onNavigateDeals && (
                             <Button size="sm" variant="ghost" onClick={onNavigateDeals}>
-                              Review
+                              {t('operations.review')}
                             </Button>
                           )}
                         </div>
@@ -220,19 +220,42 @@ export function AdminOperationsPanel({
 
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <ConfigCard title={t('operations.emailConfig')}>
-                  <p>Enabled: {summary?.email?.enabled ? 'Yes' : 'No'}</p>
-                  <p>Log-only: {summary?.email?.logOnly ? 'Yes' : 'No'}</p>
-                  <p>Provider: {summary?.email?.providerLabel ?? '—'}</p>
-                  <p>Configured: {summary?.email?.providerConfigured ? 'Yes' : 'No'}</p>
+                  <p>
+                    {t('operations.config.enabled')}:{' '}
+                    {summary?.email?.enabled ? t('operations.yes') : t('operations.no')}
+                  </p>
+                  <p>
+                    {t('operations.config.logOnly')}:{' '}
+                    {summary?.email?.logOnly ? t('operations.yes') : t('operations.no')}
+                  </p>
+                  <p>
+                    {t('operations.config.provider')}:{' '}
+                    {summary?.email?.providerLabel ?? t('common.emDash')}
+                  </p>
+                  <p>
+                    {t('operations.config.configured')}:{' '}
+                    {summary?.email?.providerConfigured ? t('operations.yes') : t('operations.no')}
+                  </p>
                 </ConfigCard>
                 <ConfigCard title={t('operations.gpsPrivacy')}>
-                  <p>Platform GPS: {summary?.gps?.platformGpsEnabled ? 'On' : 'Off'}</p>
                   <p>
-                    Restaurant tracking:{' '}
-                    {summary?.gps?.restaurantTrackingAllowed ? 'Allowed' : 'Disabled'}
+                    {t('operations.config.platformGps')}:{' '}
+                    {summary?.gps?.platformGpsEnabled ? t('operations.on') : t('operations.off')}
                   </p>
-                  <p>Driver name visible: {summary?.gps?.showDriverName ? 'Yes' : 'No'}</p>
-                  <p>Driver phone visible: {summary?.gps?.showDriverPhone ? 'Yes' : 'No'}</p>
+                  <p>
+                    {t('operations.config.restaurantTracking')}:{' '}
+                    {summary?.gps?.restaurantTrackingAllowed
+                      ? t('operations.config.allowed')
+                      : t('operations.config.disabled')}
+                  </p>
+                  <p>
+                    {t('operations.config.driverNameVisible')}:{' '}
+                    {summary?.gps?.showDriverName ? t('operations.yes') : t('operations.no')}
+                  </p>
+                  <p>
+                    {t('operations.config.driverPhoneVisible')}:{' '}
+                    {summary?.gps?.showDriverPhone ? t('operations.yes') : t('operations.no')}
+                  </p>
                 </ConfigCard>
               </div>
             </>
@@ -253,7 +276,7 @@ export function AdminOperationsPanel({
                 <SelectTrigger className="mt-1 block w-auto">
                   {EMAIL_STATUS_OPTIONS.map((s) => (
                     <option key={s || 'all'} value={s}>
-                      {s || 'All'}
+                      {s ? t(`operations.emailStatus.${s}`) : t('operations.emailStatus.all')}
                     </option>
                   ))}
                 </SelectTrigger>
@@ -274,9 +297,9 @@ export function AdminOperationsPanel({
                   <tr className="bg-[var(--surface-mid)]">
                     <th className="text-left px-3 py-2">{t('common.table.time')}</th>
                     <th className="text-left px-3 py-2">{t('common.table.tenant')}</th>
-                    <th className="text-left px-3 py-2">Event</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.event')}</th>
                     <th className="text-left px-3 py-2">{t('common.table.status')}</th>
-                    <th className="text-left px-3 py-2">Recipient</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.recipient')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,7 +330,7 @@ export function AdminOperationsPanel({
                 disabled={emailOffset === 0}
                 onClick={() => setEmailOffset(Math.max(0, emailOffset - 25))}
               >
-                Previous
+                {t('common.previous')}
               </Button>
               <Button
                 size="sm"
@@ -315,7 +338,7 @@ export function AdminOperationsPanel({
                 disabled={emailOffset + 25 >= (emailLogsData.total || 0)}
                 onClick={() => setEmailOffset(emailOffset + 25)}
               >
-                Next
+                {t('common.next')}
               </Button>
             </div>
           )}
@@ -327,29 +350,65 @@ export function AdminOperationsPanel({
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="p-4">
-                <CardTitle className="text-base mb-2">Expiry inventory</CardTitle>
+                <CardTitle className="text-base mb-2">
+                  {t('operations.inventory.expiryTitle')}
+                </CardTitle>
                 <ul className="text-sm space-y-1 text-[var(--text-muted)]">
-                  <li>Restaurants with lots: {summary?.expiry?.restaurantsWithLots ?? 0}</li>
-                  <li>Expiring in 7 days: {summary?.expiry?.expiring7d ?? 0}</li>
-                  <li>Expired lots: {summary?.expiry?.expiredLots ?? 0}</li>
-                  <li>Reminders sent today: {summary?.expiry?.remindersToday ?? 0}</li>
+                  <li>
+                    {t('operations.inventory.restaurantsWithLots')}:{' '}
+                    {summary?.expiry?.restaurantsWithLots ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.expiring7d')}: {summary?.expiry?.expiring7d ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.expiredLots')}: {summary?.expiry?.expiredLots ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.remindersToday')}:{' '}
+                    {summary?.expiry?.remindersToday ?? 0}
+                  </li>
                 </ul>
               </Card>
               <Card className="p-4">
-                <CardTitle className="text-base mb-2">Reorder cadence</CardTitle>
+                <CardTitle className="text-base mb-2">
+                  {t('operations.inventory.reorderTitle')}
+                </CardTitle>
                 <ul className="text-sm space-y-1 text-[var(--text-muted)]">
-                  <li>Active patterns: {summary?.reorder?.activeCadencePatterns ?? 0}</li>
-                  <li>Reminders today: {summary?.reorder?.missedRemindersToday ?? 0}</li>
-                  <li>Restaurants with cadence: {summary?.reorder?.restaurantsAtRisk ?? 0}</li>
+                  <li>
+                    {t('operations.inventory.activePatterns')}:{' '}
+                    {summary?.reorder?.activeCadencePatterns ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.remindersToday')}:{' '}
+                    {summary?.reorder?.missedRemindersToday ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.restaurantsAtRisk')}:{' '}
+                    {summary?.reorder?.restaurantsAtRisk ?? 0}
+                  </li>
                 </ul>
               </Card>
               <Card className="p-4 md:col-span-2">
-                <CardTitle className="text-base mb-2">Quick lists</CardTitle>
+                <CardTitle className="text-base mb-2">
+                  {t('operations.inventory.quickListsTitle')}
+                </CardTitle>
                 <ul className="text-sm space-y-1 text-[var(--text-muted)]">
-                  <li>Total lists: {summary?.quickLists?.totalLists ?? 0}</li>
-                  <li>Scheduled: {summary?.quickLists?.scheduledLists ?? 0}</li>
-                  <li>Restaurants using: {summary?.quickLists?.restaurantsUsing ?? 0}</li>
-                  <li>Branch-scoped: {summary?.quickLists?.branchScopedLists ?? 0}</li>
+                  <li>
+                    {t('operations.inventory.totalLists')}: {summary?.quickLists?.totalLists ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.scheduledLists')}:{' '}
+                    {summary?.quickLists?.scheduledLists ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.restaurantsUsing')}:{' '}
+                    {summary?.quickLists?.restaurantsUsing ?? 0}
+                  </li>
+                  <li>
+                    {t('operations.inventory.branchScopedLists')}:{' '}
+                    {summary?.quickLists?.branchScopedLists ?? 0}
+                  </li>
                 </ul>
               </Card>
             </div>
@@ -369,12 +428,12 @@ export function AdminOperationsPanel({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[var(--surface-mid)]">
-                    <th className="text-left px-3 py-2">Order</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.order')}</th>
                     <th className="text-left px-3 py-2">{t('common.supplier')}</th>
                     <th className="text-left px-3 py-2">{t('common.restaurant')}</th>
-                    <th className="text-left px-3 py-2">Type</th>
+                    <th className="text-left px-3 py-2">{t('common.table.type')}</th>
                     <th className="text-left px-3 py-2">{t('common.table.status')}</th>
-                    <th className="text-left px-3 py-2">Chat</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.chat')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -385,7 +444,9 @@ export function AdminOperationsPanel({
                       <td className="px-3 py-2">{String(row.restaurantName)}</td>
                       <td className="px-3 py-2">{String(row.issueType)}</td>
                       <td className="px-3 py-2">{String(row.status)}</td>
-                      <td className="px-3 py-2">{row.hasChat ? 'Yes' : '—'}</td>
+                      <td className="px-3 py-2">
+                        {row.hasChat ? t('operations.yes') : t('common.emDash')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -424,16 +485,18 @@ export function AdminOperationsPanel({
           {deliveriesLoading ? (
             <AdminLoadingSkeleton rows={4} />
           ) : !deliveriesData?.deliveries?.length ? (
-            <p className="text-sm text-[var(--text-muted)]">No in-progress deliveries right now.</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {t('operations.noDeliveriesInProgress')}
+            </p>
           ) : (
             <div className="rounded-lg border border-[var(--app-border)] overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[var(--surface-mid)]">
-                    <th className="text-left px-3 py-2">Order</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.order')}</th>
                     <th className="text-left px-3 py-2">{t('common.supplier')}</th>
                     <th className="text-left px-3 py-2">{t('common.table.status')}</th>
-                    <th className="text-left px-3 py-2">GPS</th>
+                    <th className="text-left px-3 py-2">{t('operations.table.gps')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -451,9 +514,7 @@ export function AdminOperationsPanel({
               </table>
             </div>
           )}
-          <p className="text-xs text-[var(--text-muted)]">
-            Admin view shows delivery state only — no maps or GPS ping history.
-          </p>
+          <p className="text-xs text-[var(--text-muted)]">{t('operations.gpsAdminNote')}</p>
         </TabsContent>
       </Tabs>
 

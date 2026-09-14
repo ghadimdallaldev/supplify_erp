@@ -341,13 +341,13 @@ export function AdminDealsPanel() {
               title={ADMIN_EMPTY_STATE.title}
               description={
                 hasActiveFilters
-                  ? 'No deals match your filters. Try clearing filters or choosing “All statuses”.'
+                  ? t('deals.emptyFilteredDescription')
                   : ADMIN_EMPTY_STATE.description
               }
               action={
                 hasActiveFilters ? (
                   <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                    Clear filters
+                    {t('common.clearFilters')}
                   </Button>
                 ) : undefined
               }
@@ -617,7 +617,7 @@ export function AdminDealsPanel() {
                                       </div>
                                     </>
                                   ) : isPending ? (
-                                    <div className="sm:col-span-2 text-amber-800">
+                                    <div className="sm:col-span-2 text-[var(--amber)]">
                                       No boost package selected — cannot approve for publishing.
                                     </div>
                                   ) : null}
@@ -629,7 +629,7 @@ export function AdminDealsPanel() {
                             <tr>
                               <td
                                 colSpan={10}
-                                className="px-3 py-3 bg-amber-50/80 dark:bg-amber-950/20 border-t border-amber-200/50"
+                                className="px-3 py-3 bg-[var(--amber-pale)]/80 border-t border-[color-mix(in_srgb,var(--amber)_35%,transparent)]"
                               >
                                 <div className="flex flex-wrap gap-2 items-end">
                                   <div className="flex-1 min-w-[12rem]">

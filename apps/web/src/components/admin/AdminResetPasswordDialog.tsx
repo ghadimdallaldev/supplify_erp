@@ -145,8 +145,8 @@ export function AdminResetPasswordDialog({
         )}
 
         {issuedPassword && (
-          <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-amber-950">
+          <div className="space-y-3 rounded-lg border border-[color-mix(in_srgb,var(--amber)_35%,transparent)] bg-[var(--amber-pale)] px-4 py-3">
+            <p className="text-sm font-medium text-[var(--amber)]">
               {t('resetPassword.temporaryShownOnce')}
             </p>
             <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ export function AdminResetPasswordDialog({
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-xs text-amber-900/80">{t('resetPassword.shareSecurely')}</p>
+            <p className="text-xs text-[var(--amber)]/80">{t('resetPassword.shareSecurely')}</p>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { AppPanel } from '../ui/app-panel'
 import {
   useGetAdminActivityQuery,
   useGetAdminDealInsightsQuery,
@@ -67,11 +67,15 @@ export function AdminOverviewExtras({
       : []
   const recentEvents = Array.isArray(activityData?.events) ? activityData.events : []
 
-  const attentionItems = buildAttentionItems(overview, {
-    pendingApproval: Number(insights?.pending_approval || 0),
-    pendingPayment: Number(insights?.pending_payment || 0),
-    recentErrorCount: recentErrors.length,
-  })
+  const attentionItems = buildAttentionItems(
+    overview,
+    {
+      pendingApproval: Number(insights?.pending_approval || 0),
+      pendingPayment: Number(insights?.pending_payment || 0),
+      recentErrorCount: recentErrors.length,
+    },
+    t
+  )
 
   const allQuickActions: QuickAction[] = [
     { label: t('overview.extras.manageTenants'), tab: 'tenants', icon: Users },
@@ -98,26 +102,18 @@ export function AdminOverviewExtras({
         className="relative z-0 grid w-full gap-3 sm:grid-cols-2 lg:grid-cols-3"
         data-testid="admin-overview-panels"
       >
-        <Card className="lg:col-span-1">
-          <CardHeader className="px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">
-              {t('overview.extras.needsAttention')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
-            <AttentionPanel
-              items={attentionItems}
-              onNavigateTab={onNavigateTab}
-              pendingDeals={pendingDeals}
-            />
-          </CardContent>
-        </Card>
+        <AppPanel title={t('overview.extras.needsAttention')} className="lg:col-span-1">
+          <AttentionPanel
+            items={attentionItems}
+            onNavigateTab={onNavigateTab}
+            pendingDeals={pendingDeals}
+          />
+        </AppPanel>
 
-        <Card className="lg:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">
-              {t('overview.extras.recentActivity')}
-            </CardTitle>
+        <AppPanel
+          title={t('overview.extras.recentActivity')}
+          className="lg:col-span-1"
+          action={
             <Button
               variant="ghost"
               size="sm"
@@ -126,28 +122,23 @@ export function AdminOverviewExtras({
             >
               {t('overview.extras.viewAll')} <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
-            <RecentActivityList
-              events={recentEvents}
-              isLoading={activityLoading}
-              isError={activityError}
-              errorMessage={(activityQueryError as { data?: { message?: string } })?.data?.message}
-              onRetry={() => refetchActivity()}
-            />
-          </CardContent>
-        </Card>
+          }
+        >
+          <RecentActivityList
+            events={recentEvents}
+            isLoading={activityLoading}
+            isError={activityError}
+            errorMessage={(activityQueryError as { data?: { message?: string } })?.data?.message}
+            onRetry={() => refetchActivity()}
+          />
+        </AppPanel>
 
-        <Card className="lg:col-span-1 overflow-visible">
-          <CardHeader className="px-4 pb-2 pt-4">
-            <CardTitle className="text-sm font-semibold">
-              {t('overview.extras.quickActions')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 pt-0">
-            <QuickActionGrid actions={quickActions} onNavigateTab={onNavigateTab} />
-          </CardContent>
-        </Card>
+        <AppPanel
+          title={t('overview.extras.quickActions')}
+          className="lg:col-span-1 overflow-visible"
+        >
+          <QuickActionGrid actions={quickActions} onNavigateTab={onNavigateTab} />
+        </AppPanel>
       </div>
     </div>
   )

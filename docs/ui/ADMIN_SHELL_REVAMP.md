@@ -73,9 +73,9 @@ Coverage: `apps/web/src/components/admin/shell/AdminShell.test.tsx`.
 
 ## Not in scope / follow-ups
 
-- Tab panels still contain hard-coded English strings and a few raw palette colours
-  (e.g. `#fef2f2` in the Overview subscription breakdown). They render acceptably in dark mode but
-  are not token-pure.
-- The non-admin `Sidebar`/`Header` do not share code with the admin shell. A shared rail primitive
-  is a possible next step.
+- Remaining admin tabs (Tenants, Operations, Feature flags, Finance, Deals, Growth,
+  Audit, Activity) still have pockets of hard-coded English; Overview / Subscriptions /
+  Plans / Limits / shared status badges were polished in the 2026-09-14 tab pass.
+- The non-admin `Sidebar`/`Header` do not share code with the admin shell. A shared rail
+  primitive is a possible next step.
 - Mobile apps: not applicable, there is no admin surface in the native apps.

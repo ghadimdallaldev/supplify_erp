@@ -2,6 +2,31 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Admin UI i18n (Limits, Health, Audit, Platform settings, Deals filters)
+
+- Wired remaining hard-coded English on `AdminLimitsTab`, `AdminHealthTab`, `AdminAuditTab`, `AdminPlatformSettingsPanel`, and `AdminDealsPanel` clear-filters/empty states to `useTranslation('admin')`; added matching EN/AR keys under `limits.*`, `health.*`, `audit.*`, `platformSettings.*`, `addonKeys.*`, and `common.*`.
+- **Mobile:** skipped — platform-admin web UI only; no API/auth/type contract change.
+
+## 2026-09-14 — Admin UI i18n + token polish (Features, Finance, Operations, Placements, Growth)
+
+- Wired `useTranslation('admin')` on Feature Flags, Finance, Operations, Featured Placements, and Growth Settings panels; added EN/AR keys under `features.*`, `finance.*`, `operations.*`, `placements.*`, and `growth.*`. Replaced light-only Tailwind palette (`bg-emerald-50`, `bg-amber-50`, `bg-sky-50`, etc.) with design tokens (`--mint-pale`, `--amber-pale`, `--brand-ultra`, etc.).
+- **Mobile:** skipped — platform-admin surface only; no API/auth/type contract change.
+
+## 2026-09-14 — Admin UI polish + i18n (web-only)
+
+- Dense ops-console polish on admin Overview / Subscriptions / Plans / Limits: token-based status badges, AppPanel vocabulary on overview extras, humanized subscription statuses and limit/feature keys, fixed hard-coded English on high-traffic panels.
+- **Mobile:** skipped — platform-admin surface only; no mobile admin app or client contract change.
+
+## 2026-09-14 — Railway preprod outage: API crash loop + web build break
+
+- **Symptom:** `supplify-api-preprod` CRASHED (502); `supplify-web-preprod` / `supplify-web-dev` FAILED builds. Prod/dev API stayed healthy. Preprod API recovered after restart.
+- **API root cause:** On listen, ~21 crons fired immediately in parallel with `RUN_MIGRATIONS_ON_START`, stampeding the Postgres pool (`connectionTimeoutMillis=5000`) → `Database migration failed after listen — shutting down` → restart storm.
+- **API fix:** register crons only after `markStartupMigrationsReady()` via `startCronsAfterMigrations`.
+- **Web root cause:** `PushEnableBanner.tsx` imported `../../ui/button` (and wrong hooks/i18n depth) → Vite `Could not resolve "../../ui/button"`.
+- **Web fix:** correct relative imports to `../ui/button`, `../../hooks/...`, `../../i18n`.
+- **Mobile skipped:** Railway deploy / web-only push banner imports; no mobile API contract change.
+- **Deploy:** promote/redeploy **API + Web** on Railway `dev` and `preprod`.
+
 ## 2026-09-14 — Org child branches inherit main unlock (no fake activate)
 
 - Bug: Creating a supplier/restaurant org Branch Account wrote a locked Free `pending_activation` subscription on the child. Switching into that branch made `GET /api/billing/status` read the child row → `/app/activate` (“Trial activation is not available”) even when Scale showed 2/3 branches included.

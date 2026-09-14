@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
-import { StatusBadge } from '../../ui/status-badge'
+import { StatusBadge, getTranslatedStatusLabel } from '../../ui/status-badge'
 import { Input } from '../../ui/input'
 import { Select, SelectTrigger } from '../../ui/select'
 import { AppPanel, SummaryStrip } from '../../ui/app-panel'
@@ -69,15 +69,15 @@ export type AdminTenantsTabProps = {
   onNavigateTab: (tab: AdminTabKey) => void
 }
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'TRIALING', label: 'Trialing' },
-  { value: 'PAST_DUE', label: 'Past due' },
-  { value: 'SUSPENDED', label: 'Suspended' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'NONE', label: 'No subscription' },
-]
+const STATUS_OPTION_VALUES = [
+  'all',
+  'ACTIVE',
+  'TRIALING',
+  'PAST_DUE',
+  'SUSPENDED',
+  'CANCELLED',
+  'NONE',
+] as const
 
 function matchesSearch(row: TenantRow, q: string): boolean {
   if (!q) return true
@@ -101,6 +101,7 @@ export function AdminTenantsTab({
   onTenantDiag,
 }: AdminTenantsTabProps) {
   const { t } = useTranslation('admin')
+  const { t: tCommon } = useTranslation('common')
   const { can } = usePermissions()
   const canResetPassword = can('ADMIN_SUPPORT')
 
@@ -180,7 +181,7 @@ export function AdminTenantsTab({
           tenantType,
           acknowledgeSuspended,
         }).unwrap()
-        toast.success(`Impersonating ${tenantLabel}`)
+        toast.success(t('tenants.impersonationSuccess', { name: tenantLabel }))
         window.location.assign(result.redirectTo || '/app/dashboard')
       } catch (err: unknown) {
         const e = err as {
@@ -198,17 +199,19 @@ export function AdminTenantsTab({
           !acknowledgeSuspended
         ) {
           const ok = window.confirm(
-            `${e.data.error.message || 'This tenant is suspended or inactive.'}\n\nContinue impersonation for support?`
+            t('tenants.impersonationSuspendedConfirm', {
+              message: e.data.error.message || t('tenants.impersonationSuspendedDefault'),
+            })
           )
           if (ok) {
             return handleStartImpersonation(tenantId, tenantType, tenantLabel, true)
           }
           return
         }
-        toast.error(e?.data?.error?.message || 'Failed to start impersonation')
+        toast.error(e?.data?.error?.message || t('tenants.impersonationFailed'))
       }
     },
-    [startImpersonation]
+    [startImpersonation, t]
   )
 
   const openChangePlanForTenant = (
@@ -276,15 +279,15 @@ export function AdminTenantsTab({
   }
 
   const headerTitle = showSuppliersOnly
-    ? 'Suppliers'
+    ? t('tenants.titleSuppliers')
     : showRestaurantsOnly
-      ? 'Restaurants'
-      : 'All tenants'
+      ? t('tenants.titleRestaurants')
+      : t('tenants.titleAll')
   const headerDescription = showSuppliersOnly
-    ? 'Supplier accounts, subscriptions, and support actions.'
+    ? t('tenants.descriptionSuppliers')
     : showRestaurantsOnly
-      ? 'Restaurant accounts, subscriptions, and support actions.'
-      : 'Manage supplier and restaurant accounts across the platform.'
+      ? t('tenants.descriptionRestaurants')
+      : t('tenants.descriptionAll')
 
   return (
     <div data-testid="admin-tenants-tab">
@@ -310,25 +313,25 @@ export function AdminTenantsTab({
               columns={4}
               metrics={[
                 {
-                  label: 'Suppliers',
+                  label: t('tenants.titleSuppliers'),
                   value: suppliersTotal,
                   hint: `${suppliersForUi?.length ?? 0} loaded`,
                   tone: 'brand',
                 },
                 {
-                  label: 'Restaurants',
+                  label: t('tenants.titleRestaurants'),
                   value: restaurantsTotal,
                   hint: `${restaurantsForUi?.length ?? 0} loaded`,
                   tone: 'brand',
                 },
                 {
-                  label: 'Active / trial',
+                  label: t('tenants.stats.activeTrial'),
                   value: activeSubsCount,
-                  hint: 'Across loaded tenants',
+                  hint: t('tenants.stats.acrossLoaded'),
                   tone: 'mint',
                 },
                 {
-                  label: 'Loaded total',
+                  label: t('tenants.stats.loadedTotal'),
                   value: (suppliersForUi?.length ?? 0) + (restaurantsForUi?.length ?? 0),
                   hint: `Of ${suppliersTotal + restaurantsTotal} platform tenants`,
                 },
@@ -344,13 +347,13 @@ export function AdminTenantsTab({
               columns={4}
               metrics={[
                 {
-                  label: 'Suppliers',
+                  label: t('tenants.titleSuppliers'),
                   value: `${suppliersForUi?.length ?? 0} / ${suppliersTotal}`,
-                  hint: 'Loaded vs total',
+                  hint: t('tenants.stats.loadedVsTotal'),
                   tone: 'brand',
                 },
                 {
-                  label: 'Active subs',
+                  label: t('tenants.stats.activeSubs'),
                   value:
                     suppliersForUi?.filter(
                       (s) =>
@@ -359,7 +362,7 @@ export function AdminTenantsTab({
                   tone: 'mint',
                 },
                 {
-                  label: 'Products',
+                  label: t('tenants.stats.products', { defaultValue: 'Products' }),
                   value:
                     suppliersForUi?.reduce(
                       (sum, s) => sum + parseInt(String(s.product_count || 0), 10),
@@ -367,7 +370,7 @@ export function AdminTenantsTab({
                     ) ?? 0,
                 },
                 {
-                  label: 'Revenue',
+                  label: t('tenants.stats.revenue', { defaultValue: 'Revenue' }),
                   value: formatCurrency(
                     suppliersForUi?.reduce(
                       (sum, s) => sum + parseFloat(String(s.total_revenue || 0)),
@@ -387,13 +390,13 @@ export function AdminTenantsTab({
               columns={3}
               metrics={[
                 {
-                  label: 'Restaurants',
+                  label: t('tenants.titleRestaurants'),
                   value: `${restaurantsForUi?.length ?? 0} / ${restaurantsTotal}`,
-                  hint: 'Loaded vs total',
+                  hint: t('tenants.stats.loadedVsTotal'),
                   tone: 'brand',
                 },
                 {
-                  label: 'Active subs',
+                  label: t('tenants.stats.activeSubs'),
                   value:
                     restaurantsForUi?.filter(
                       (r) =>
@@ -402,7 +405,7 @@ export function AdminTenantsTab({
                   tone: 'mint',
                 },
                 {
-                  label: 'Orders (30d)',
+                  label: t('tenants.stats.orders30d', { defaultValue: 'Orders (30d)' }),
                   value:
                     restaurantsForUi?.reduce(
                       (sum, r) => sum + parseInt(String(r.orders_last_30d || 0), 10),
@@ -429,10 +432,10 @@ export function AdminTenantsTab({
                 className="h-10 pl-9"
                 placeholder={
                   showSuppliersOnly
-                    ? 'Search suppliers by name or email…'
+                    ? t('tenants.searchSuppliersPlaceholder')
                     : showRestaurantsOnly
-                      ? 'Search restaurants by name or email…'
-                      : 'Search tenants by name or email…'
+                      ? t('tenants.searchRestaurantsPlaceholder')
+                      : t('tenants.searchAllPlaceholder')
                 }
                 value={tenantSearch}
                 onChange={(e) => setTenantSearch(e.target.value)}
@@ -445,9 +448,15 @@ export function AdminTenantsTab({
                 className="h-10 w-full"
                 aria-label={t('tenants.filterStatusAriaLabel')}
               >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                {STATUS_OPTION_VALUES.map((value) => (
+                  <option key={value} value={value}>
+                    {value === 'all'
+                      ? t('common.allStatuses')
+                      : value === 'NONE'
+                        ? t('tenants.noSubscriptionStatus', {
+                            defaultValue: 'No subscription',
+                          })
+                        : getTranslatedStatusLabel(value, tCommon)}
                   </option>
                 ))}
               </SelectTrigger>
@@ -474,7 +483,7 @@ export function AdminTenantsTab({
               title={t('tenants.suppliersTitle')}
               description={
                 suppliersLoading && supplierListOffset === 0
-                  ? 'Loading suppliers…'
+                  ? t('tenants.loadingSuppliers')
                   : `${filteredSuppliers.length} supplier${filteredSuppliers.length === 1 ? '' : 's'} shown${filteredSuppliers.length !== (suppliersForUi?.length ?? 0) ? ` of ${suppliersForUi?.length ?? 0} loaded` : ''}${suppliersTotal > 0 ? ` · ${suppliersTotal} total` : ''}`
               }
               testId="admin-tenants-suppliers"
@@ -482,7 +491,7 @@ export function AdminTenantsTab({
                 suppliersFetching && !suppliersLoading ? (
                   <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Updating suppliers…
+                    {t('tenants.updatingSuppliers')}
                   </p>
                 ) : undefined
               }
@@ -490,7 +499,7 @@ export function AdminTenantsTab({
               {suppliersError ? (
                 <AdminErrorState
                   title={t('tenants.suppliersFailedTitle')}
-                  message="The supplier directory request failed."
+                  message={t('tenants.suppliersFailedMessage')}
                   onRetry={() => refetchSuppliers()}
                 />
               ) : suppliersLoading && supplierListOffset === 0 ? (
@@ -499,17 +508,19 @@ export function AdminTenantsTab({
                 <AdminEmptyState
                   icon={<Building2 className="h-8 w-8 text-[var(--text-muted)]" />}
                   title={
-                    hasActiveFilters ? 'No suppliers match your filters' : 'No suppliers found'
+                    hasActiveFilters
+                      ? t('tenants.emptySuppliersFilteredTitle')
+                      : t('tenants.emptySuppliersDefaultTitle')
                   }
                   description={
                     hasActiveFilters
-                      ? 'Adjust search or status filters and try again.'
-                      : 'Supplier tenants appear here after registration.'
+                      ? t('tenants.emptySuppliersFilteredDescription')
+                      : t('tenants.emptySuppliersDefaultDescription')
                   }
                   action={
                     hasActiveFilters ? (
                       <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                        Clear filters
+                        {t('common.clearFilters')}
                       </Button>
                     ) : undefined
                   }
@@ -537,7 +548,8 @@ export function AdminTenantsTab({
                           <Badge variant="outline" className="font-normal">
                             {formatPlanDisplayName(
                               supplier.plan_code,
-                              supplier.plan_name || 'Free Trial'
+                              supplier.plan_name ||
+                                t('common.freeTrial', { defaultValue: 'Free Trial' })
                             )}
                           </Badge>
                           <span className="text-[var(--text-muted)]">
@@ -673,7 +685,8 @@ export function AdminTenantsTab({
                               <Badge variant="outline" className="font-normal">
                                 {formatPlanDisplayName(
                                   supplier.plan_code,
-                                  supplier.plan_name || 'Free Trial'
+                                  supplier.plan_name ||
+                                    t('common.freeTrial', { defaultValue: 'Free Trial' })
                                 )}
                               </Badge>
                             </td>
@@ -795,7 +808,10 @@ export function AdminTenantsTab({
                             Loading…
                           </>
                         ) : (
-                          `Load more suppliers (${suppliersForUi?.length ?? 0} of ${suppliersTotal})`
+                          t('tenants.loadMoreSuppliers', {
+                            loaded: suppliersForUi?.length ?? 0,
+                            total: suppliersTotal,
+                          })
                         )}
                       </Button>
                     </div>
@@ -810,7 +826,7 @@ export function AdminTenantsTab({
               title={t('tenants.restaurantsTitle')}
               description={
                 restaurantsLoading && restaurantListOffset === 0
-                  ? 'Loading restaurants…'
+                  ? t('tenants.loadingRestaurants')
                   : `${filteredRestaurants.length} restaurant${filteredRestaurants.length === 1 ? '' : 's'} shown${filteredRestaurants.length !== (restaurantsForUi?.length ?? 0) ? ` of ${restaurantsForUi?.length ?? 0} loaded` : ''}${restaurantsTotal > 0 ? ` · ${restaurantsTotal} total` : ''}`
               }
               testId="admin-tenants-restaurants"
@@ -818,7 +834,7 @@ export function AdminTenantsTab({
                 restaurantsFetching && !restaurantsLoading ? (
                   <p className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Updating restaurants…
+                    {t('tenants.updatingRestaurants')}
                   </p>
                 ) : undefined
               }
@@ -826,7 +842,7 @@ export function AdminTenantsTab({
               {restaurantsError ? (
                 <AdminErrorState
                   title={t('tenants.restaurantsFailedTitle')}
-                  message="The restaurant directory request failed."
+                  message={t('tenants.restaurantsFailedMessage')}
                   onRetry={() => refetchRestaurants()}
                 />
               ) : restaurantsLoading && restaurantListOffset === 0 ? (
@@ -835,17 +851,19 @@ export function AdminTenantsTab({
                 <AdminEmptyState
                   icon={<Users className="h-8 w-8 text-[var(--text-muted)]" />}
                   title={
-                    hasActiveFilters ? 'No restaurants match your filters' : 'No restaurants found'
+                    hasActiveFilters
+                      ? t('tenants.emptyRestaurantsFilteredTitle')
+                      : t('tenants.emptyRestaurantsDefaultTitle')
                   }
                   description={
                     hasActiveFilters
-                      ? 'Adjust search or status filters and try again.'
-                      : 'Restaurant tenants appear here after registration.'
+                      ? t('tenants.emptyRestaurantsFilteredDescription')
+                      : t('tenants.emptyRestaurantsDefaultDescription')
                   }
                   action={
                     hasActiveFilters ? (
                       <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-                        Clear filters
+                        {t('common.clearFilters')}
                       </Button>
                     ) : undefined
                   }
@@ -873,7 +891,8 @@ export function AdminTenantsTab({
                           <Badge variant="outline" className="font-normal">
                             {formatPlanDisplayName(
                               restaurant.plan_code,
-                              restaurant.plan_name || 'Free Trial'
+                              restaurant.plan_name ||
+                                t('common.freeTrial', { defaultValue: 'Free Trial' })
                             )}
                           </Badge>
                           <span className="text-[var(--text-muted)]">
@@ -1001,7 +1020,8 @@ export function AdminTenantsTab({
                               <Badge variant="outline" className="font-normal">
                                 {formatPlanDisplayName(
                                   restaurant.plan_code,
-                                  restaurant.plan_name || 'Free Trial'
+                                  restaurant.plan_name ||
+                                    t('common.freeTrial', { defaultValue: 'Free Trial' })
                                 )}
                               </Badge>
                             </td>
@@ -1115,7 +1135,10 @@ export function AdminTenantsTab({
                             Loading…
                           </>
                         ) : (
-                          `Load more restaurants (${restaurantsForUi?.length ?? 0} of ${restaurantsTotal})`
+                          t('tenants.loadMoreRestaurants', {
+                            loaded: restaurantsForUi?.length ?? 0,
+                            total: restaurantsTotal,
+                          })
                         )}
                       </Button>
                     </div>

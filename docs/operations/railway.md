@@ -133,6 +133,8 @@ pnpm db:migrate
 
 Restaurant-operations features require migrations **0133–0137** (and any later pending files). **Email dedup** requires **0136** (`0136_email_delivery_log.sql`). Railway API services use `RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env` so SQL runs after listen on deploy.
 
+In-process crons register **only after** startup migrations mark ready (`startCronsAfterMigrations`). Registering crons in parallel with migrations stampedes the Postgres pool on Railway and can crash-loop the API (`timeout exceeded when trying to connect` → shut down).
+
 Committed Railway API defaults (`deploy/railway/<env>/api.env`, copied into the image) set `CRONS_ENABLED=true` for in-process jobs including operational reminders.
 
 ### Email (transactional notifications)
