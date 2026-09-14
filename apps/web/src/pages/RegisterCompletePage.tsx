@@ -90,7 +90,9 @@ export function RegisterCompletePage() {
     }
     if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
       if (status?.needsSetup === false) {
-        navigate('/app/activate', { replace: true })
+        // Invited staff already joined a workspace — do not force owner activation UX.
+        // Layout still redirects true pending-activation owners to /app/activate.
+        navigate('/app', { replace: true })
       }
     }
   }, [user, status, navigate, dispatch])
