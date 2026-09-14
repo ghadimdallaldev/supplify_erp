@@ -20,6 +20,7 @@ import {
   SettingsSection,
 } from './onboardingShared'
 import { ensureNamespace } from '../../../i18n'
+import { PushEnableBanner } from '../../notifications/PushEnableBanner'
 
 export function OnboardingNotificationsTab() {
   const { t } = useTranslation(['settings', 'suppliers'])
@@ -185,7 +186,13 @@ export function OnboardingNotificationsTab() {
                             )
                           }}
                         >
-                          {push.subscribed ? 'Disable' : 'Enable'}
+                          {push.subscribing || push.unsubscribing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : push.subscribed ? (
+                            'Disable'
+                          ) : (
+                            'Enable'
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -206,27 +213,7 @@ export function OnboardingNotificationsTab() {
         </SettingsSection>
       </div>
 
-      {pushNotificationsEnabled && push.bannerVisible ? (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4">
-          <p className="text-sm font-medium text-[var(--text)]">Enable push notifications?</p>
-          <p className="mt-1 text-xs text-[var(--text-mid)]">
-            Stay updated on orders and messages.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              onClick={() =>
-                push.enablePush().catch(() => toast.error(t('suppliers:pushBanner.enableFailed')))
-              }
-            >
-              Enable
-            </Button>
-            <Button size="sm" variant="outline" onClick={push.dismissBanner}>
-              Not now
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {pushNotificationsEnabled ? <PushEnableBanner allowed={pushNotificationsEnabled} /> : null}
     </>
   )
 }

@@ -163,7 +163,13 @@ export function SupplierNotificationsTab() {
                             )
                           }}
                         >
-                          {push.subscribed ? t('notifications.disable') : t('notifications.enable')}
+                          {push.subscribing || push.unsubscribing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : push.subscribed ? (
+                            t('notifications.disable')
+                          ) : (
+                            t('notifications.enable')
+                          )}
                         </Button>
                       </div>
                     </div>

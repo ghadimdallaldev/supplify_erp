@@ -4,7 +4,12 @@ vi.mock('../services/driver-fulfillment.service.js', () => ({
   getProofOfDelivery: vi.fn(),
 }))
 
+vi.mock('./db.js', () => ({
+  query: vi.fn(),
+}))
+
 import { getProofOfDelivery } from '../services/driver-fulfillment.service.js'
+import { query } from './db.js'
 import {
   isPodRequiredForSupplier,
   resolveDeliveryPodFlags,
@@ -16,11 +21,16 @@ describe('pod-requirement', () => {
     vi.clearAllMocks()
   })
 
-  it('treats POD as optional for all suppliers today', async () => {
+  it('reads pod_required from the supplier row', async () => {
+    query.mockResolvedValueOnce({ rows: [{ pod_required: false }] })
     expect(await isPodRequiredForSupplier('sup-1')).toBe(false)
+
+    query.mockResolvedValueOnce({ rows: [{ pod_required: true }] })
+    expect(await isPodRequiredForSupplier('sup-1')).toBe(true)
   })
 
-  it('resolveDeliveryPodFlags never advertises podRequired when policy is optional', async () => {
+  it('resolveDeliveryPodFlags advertises podRequired when supplier policy requires it', async () => {
+    query.mockResolvedValueOnce({ rows: [{ pod_required: true }] })
     getProofOfDelivery.mockResolvedValueOnce(null)
     await expect(
       resolveDeliveryPodFlags({
@@ -28,19 +38,23 @@ describe('pod-requirement', () => {
         orderId: 'order-1',
         deliveryStatus: 'delivered',
       })
-    ).resolves.toEqual({ podRequired: false, hasPod: false })
+    ).resolves.toEqual({ podRequired: true, hasPod: false })
+  })
 
-    getProofOfDelivery.mockResolvedValueOnce({ id: 'pod-1' })
+  it('blocks delivered when POD is required and missing', async () => {
+    query.mockResolvedValueOnce({ rows: [{ pod_required: true }] })
+    getProofOfDelivery.mockResolvedValueOnce(null)
     await expect(
-      resolveDeliveryPodFlags({
+      assertPodPresentWhenRequired({
         supplierId: 'sup-1',
         orderId: 'order-1',
-        deliveryStatus: 'delivered',
+        status: 'delivered',
       })
-    ).resolves.toEqual({ podRequired: false, hasPod: true })
+    ).rejects.toThrow(/Proof of delivery is required/)
   })
 
   it('does not block delivered when POD is optional', async () => {
+    query.mockResolvedValueOnce({ rows: [{ pod_required: false }] })
     getProofOfDelivery.mockResolvedValueOnce(null)
     await expect(
       assertPodPresentWhenRequired({

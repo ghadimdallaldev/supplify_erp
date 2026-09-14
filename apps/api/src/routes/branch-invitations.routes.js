@@ -5,7 +5,6 @@ import {
   resolveTenantContext,
   requireAnyPermission,
 } from '../lib/rbac.js'
-import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -16,14 +15,12 @@ import {
   revokeBranchInvitation,
   validateBranchRoleForSupplier,
 } from '../lib/branch-invitations.js'
+import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
 
 const router = express.Router()
 
-const multiBranchFeature = requireFeature(
-  'multi_branch',
-  (req) => req.orgContext?.primarySupplierId,
-  () => 'SUPPLIER'
-)
+// Team/staff invitations (including Driver) must work on single-branch plans.
+// `multi_branch` only gates branch creation / org switcher — not inviting teammates.
 
 async function resolveOrgContextFromTenant(req, res, next) {
   try {
@@ -87,8 +84,7 @@ router.use(
   requireRole(['SUPPLIER', 'ADMIN']),
   resolveTenantContext,
   requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE'),
-  resolveOrgContextFromTenant,
-  multiBranchFeature
+  resolveOrgContextFromTenant
 )
 
 router.post('/', async (req, res) => {
@@ -193,6 +189,7 @@ router.get('/roles', async (req, res) => {
         requestId: req.requestId,
       })
     }
+    await ensureTenantSystemRoles(supplierId, 'SUPPLIER')
     const { rows } = await query(
       `
       SELECT id, name, description

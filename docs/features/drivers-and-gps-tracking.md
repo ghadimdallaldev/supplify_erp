@@ -183,11 +183,19 @@ instead of stacking duplicates. A POD must carry at least one of a photo
 (`file_key`), a signature (`signature_file_key`) or a `recipient_name` — the web
 dialog disables save until one is present and the API rejects the rest with a 400.
 
-POD capture is **optional** for delivery confirmation today — there is no supplier
-setting that blocks `delivered` without a POD record. API responses expose
-`podRequired` (policy) and `hasPod` (record exists) separately; `podRequired` stays
-`false` until a tenant setting is added (`apps/api/src/lib/pod-requirement.js`).
-When that setting exists, `updateDeliveryStatus` will reject `delivered` without POD.
+POD capture is controlled by `supplier.pod_required` (default `false`). When enabled via
+Supplier Settings → Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),
+`isPodRequiredForSupplier` returns true and `updateDeliveryStatus` rejects `delivered`
+without a POD record. API responses expose `podRequired` (policy) and `hasPod`
+(record exists) separately via `resolveDeliveryPodFlags`.
+
+Driver delivery may only promote `customer_order.status` to `DELIVERED` when the order
+is already `SHIPPED` (idempotent if already `DELIVERED`). Earlier fulfillment statuses
+must ship first.
+
+Dispatch board `warehouse_id` filtering is **leg-scoped** on `GET /api/fulfillment/dispatch`
+(assignment rows use `da.warehouse_assignment_id`); the unassigned bucket remains
+order-level.
 
 ### Rollback notes
 

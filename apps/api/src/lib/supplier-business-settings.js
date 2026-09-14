@@ -51,6 +51,7 @@ export const supplierBusinessSettingsUpdateSchema = z
     lastOrderCutoffMinutes: z.number().int().min(1).max(1440).nullable().optional(),
     lastOrderRolloverDays: z.number().int().min(1).max(14).optional(),
     lastOrderTimezone: z.string().max(64).optional(),
+    podRequired: z.boolean().optional(),
   })
   .refine(
     (body) =>
@@ -64,7 +65,8 @@ export const supplierBusinessSettingsUpdateSchema = z
       body.lastOrderCutoffTime !== undefined ||
       body.lastOrderCutoffMinutes !== undefined ||
       body.lastOrderRolloverDays !== undefined ||
-      body.lastOrderTimezone !== undefined,
+      body.lastOrderTimezone !== undefined ||
+      body.podRequired !== undefined,
     { message: 'At least one field is required' }
   )
 
@@ -134,5 +136,6 @@ export function mapSupplierBusinessSettingsRow(row) {
       row.last_order_cutoff_minutes != null ? Number(row.last_order_cutoff_minutes) : null,
     lastOrderRolloverDays: Number(row.last_order_rollover_days ?? 1) || 1,
     lastOrderTimezone: row.last_order_timezone || 'UTC',
+    podRequired: Boolean(row.pod_required),
   }
 }

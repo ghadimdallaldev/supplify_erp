@@ -30,7 +30,7 @@ import { useImpersonation } from '../hooks/useImpersonation'
 import { usePermissions } from '../hooks/usePermissions'
 import { toast } from 'sonner'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
-import { formatOrderRef, isDisputeReplacementOrder } from '../lib/orderPlacement'
+import { formatOrderRef, isDisputeReplacementOrder, orderShortId } from '../lib/orderPlacement'
 import { LazyTabMount } from '../components/LazyTabMount'
 import {
   VALID_ORDER_TABS,
@@ -240,7 +240,7 @@ export function OrderDetailPage() {
               </Link>
             </Button>
           }
-          title={t('detail.orderNumber', { id: order.id.slice(-8).toUpperCase() })}
+          title={t('detail.orderNumber', { id: orderShortId(order.id) })}
           description={order.restaurant_name}
           actions={
             <>
