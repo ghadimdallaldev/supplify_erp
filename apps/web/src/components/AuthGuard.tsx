@@ -45,10 +45,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   )
 
+  // Prefer API needsSetup (workspace membership aware). PENDING alone is not enough —
+  // invited staff can briefly show stale PENDING while membership already exists.
   const needsRegister =
     isAppRoute &&
     data &&
-    (data.role === 'PENDING' || (registerStatus?.needsSetup === true && data.role !== 'ADMIN'))
+    data.role !== 'ADMIN' &&
+    (registerStatus?.needsSetup === true ||
+      (data.role === 'PENDING' && registerStatus?.needsSetup !== false))
 
   const staleRegistrationState =
     isAppRoute &&
