@@ -5,6 +5,24 @@ const ETA_ACTIVE_ASSIGNMENT_STATUSES = new Set(['picked_up', 'out_for_delivery']
 const TERMINAL_DELIVERY_STATUSES = new Set(['delivered', 'failed', 'cancelled'])
 const TERMINAL_ORDER_STATUSES = new Set(['CANCELLED'])
 
+/**
+ * Whether a driver-assignment status can carry an ETA at all. Callers that surface
+ * an `etaAvailable` flag MUST use this instead of their own status list, or the
+ * board promises ETAs that calculateDeliveryEta then refuses.
+ */
+export function isEtaEligibleAssignmentStatus(assignmentStatus) {
+  return ETA_ACTIVE_ASSIGNMENT_STATUSES.has(String(assignmentStatus || '').toLowerCase())
+}
+
+/**
+ * Beyond this age a GPS fix says where the driver *was*, not where they are, so an
+ * ETA derived from it is fiction regardless of how precise the arithmetic looks.
+ */
+export function getEtaMaxLocationAgeSeconds() {
+  const configured = config.DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS
+  return Number.isFinite(configured) && configured > 0 ? configured : 900
+}
+
 function roundDistanceKm(km) {
   return Math.round(km * 10) / 10
 }
@@ -13,10 +31,8 @@ function roundMinutes(value) {
   return Math.max(1, Math.round(value))
 }
 
-/**
- * Great-circle distance in km, rounded to 1 decimal place.
- */
-export function haversineDistanceKm(lat1, lng1, lat2, lng2) {
+/** Great-circle distance in km, unrounded — sum legs with this, round only the total. */
+function exactHaversineDistanceKm(lat1, lng1, lat2, lng2) {
   const toRad = (deg) => (deg * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLng = toRad(lng2 - lng1)
@@ -24,8 +40,14 @@ export function haversineDistanceKm(lat1, lng1, lat2, lng2) {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  const km = 6371 * c
-  return roundDistanceKm(km)
+  return 6371 * c
+}
+
+/**
+ * Great-circle distance in km, rounded to 1 decimal place.
+ */
+export function haversineDistanceKm(lat1, lng1, lat2, lng2) {
+  return roundDistanceKm(exactHaversineDistanceKm(lat1, lng1, lat2, lng2))
 }
 
 export function getDeliveryEtaConfig() {
@@ -150,6 +172,20 @@ export function calculateDeliveryEta({
     return unavailable('driver_location_missing')
   }
 
+  // An ETA computed from an old fix reads as precise but is meaningless — withhold it
+  // rather than quoting minutes from a position the driver has long since left.
+  const recordedAtIso = loc.recordedAt ?? loc.recorded_at ?? null
+  let locationAgeSeconds = null
+  if (recordedAtIso) {
+    const recordedMs = new Date(recordedAtIso).getTime()
+    if (Number.isFinite(recordedMs)) {
+      locationAgeSeconds = Math.max(0, Math.round((Date.now() - recordedMs) / 1000))
+      if (locationAgeSeconds > getEtaMaxLocationAgeSeconds()) {
+        return unavailable('driver_location_stale')
+      }
+    }
+  }
+
   const { speedKmh, minMultiplier, maxMultiplier, serviceTimeMinutes } =
     etaConfig ?? getDeliveryEtaConfig()
 
@@ -158,10 +194,11 @@ export function calculateDeliveryEta({
   let distanceKm = 0
   let serviceMinutes = 0
 
+  // Accumulate unrounded legs; rounding each one drifts the total on long routes.
   const priorStops = routeContext?.priorStops ?? []
   for (const stop of priorStops) {
     if (stop?.latitude == null || stop?.longitude == null) continue
-    distanceKm += haversineDistanceKm(
+    distanceKm += exactHaversineDistanceKm(
       fromLat,
       fromLng,
       Number(stop.latitude),
@@ -172,7 +209,7 @@ export function calculateDeliveryEta({
     serviceMinutes += serviceTimeMinutes
   }
 
-  distanceKm += haversineDistanceKm(
+  distanceKm += exactHaversineDistanceKm(
     fromLat,
     fromLng,
     Number(destination.latitude),
@@ -194,6 +231,9 @@ export function calculateDeliveryEta({
     distanceKm: roundDistanceKm(distanceKm),
     confidence: tracking?.isStale ? 'LOW' : 'MEDIUM',
     calculatedAt: new Date().toISOString(),
+    // calculatedAt is when we did the arithmetic; these say how fresh the input was.
+    locationRecordedAt: recordedAtIso,
+    locationAgeSeconds,
     unavailableReason: null,
     stopsBefore,
     nextStop,

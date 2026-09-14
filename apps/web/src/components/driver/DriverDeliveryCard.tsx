@@ -15,6 +15,9 @@ export type DriverDeliveryOrder = {
   deliveryStatus: string
   scheduledAt?: string | null
   hasPod?: boolean
+  /** Needed to target the right leg when an order spans several warehouses. */
+  assignmentId?: string | null
+  warehouseAssignmentId?: string | null
 }
 
 type Props = {
