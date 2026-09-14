@@ -18,8 +18,8 @@ const SUPPLIER_TRANSITIONS = {
   SHIPPED: ['DELIVERED', 'CANCELLED'],
 }
 
-/** Legacy COMPLETED PATCH maps to DELIVERED; allow from pre-delivery fulfillment states. */
-const LEGACY_COMPLETED_TO_DELIVERED_FROM = new Set(['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'])
+/** Legacy COMPLETED PATCH maps to DELIVERED, but may not skip the shipping step. */
+const LEGACY_COMPLETED_TO_DELIVERED_FROM = new Set(['SHIPPED'])
 
 const TERMINAL_STATUSES = new Set([
   'CANCELLED',
@@ -31,6 +31,10 @@ const TERMINAL_STATUSES = new Set([
 
 function normalizeRole(role) {
   return String(role || '').toUpperCase()
+}
+
+export function requiresDriverAssignment(status) {
+  return new Set(['SHIPPED', 'DELIVERED', 'COMPLETED']).has(String(status || '').toUpperCase())
 }
 
 function allowedTargetsForRole(role, fromStatus) {
@@ -70,7 +74,7 @@ export function assertValidOrderStatusTransition({ role, from, to, legacyComplet
   if (legacyCompleted && toStatus === 'DELIVERED') {
     if (!LEGACY_COMPLETED_TO_DELIVERED_FROM.has(fromStatus)) {
       throw new ValidationError(
-        `Cannot mark order delivered from ${fromStatus}; order must be acknowledged or in fulfillment`
+        `Cannot mark order delivered from ${fromStatus}; order must be shipped first`
       )
     }
     return

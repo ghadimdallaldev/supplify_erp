@@ -56,6 +56,8 @@ A contract applies when **all** are true:
 - `contract_end_date` is null or `>= as-of date`
 - `min_order_quantity` is null or `<= order/catalog quantity`
 
+An omitted/null `contract_end_date` means the price is valid forever. The supplier editor exposes this explicitly as **Forever (no expiry)** and sends `null` when an existing expiry is cleared. Supplier contract-price rows are returned without the product catalog's default 20-row page limit. The web create dialog product picker searches by name/SKU and paginates (50 per page) so large catalogs are fully selectable.
+
 ### Duplicate contracts
 
 DB unique constraint: `(supplier_id, restaurant_id, product_id)`. Upsert on create. If multiple rows ever existed, resolver picks `ORDER BY updated_at DESC LIMIT 1`.

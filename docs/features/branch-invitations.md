@@ -19,7 +19,7 @@ Shareable invite links let org owners onboard branch managers without email deli
 ## Invite link format
 
 ```
-https://<app-domain>/invite/branch?token=<96-char-hex>
+https://<app-domain>/invite?token=<96-char-hex>&type=<invite-type>
 ```
 
 Tokens are generated with `crypto.randomBytes(48)` (96 hex characters). They are stored in `branch_invitations.token` and validated on every public request.
@@ -32,31 +32,33 @@ The invitee opens the link and sees:
 - **Expired**: message to contact the org admin for a new link.
 - **Invalid / already used**: sign-in prompt.
 
+If the invitee signs in or creates an account first, the web client sends the invite URL as a validated OAuth return target. The API stores it in the session through the Keycloak round trip and redirects back to the same token/type acceptance screen after authentication.
+
 On success, the API creates (or reuses) a Keycloak user and `app_user`, assigns `tenant_user_roles` for the invited branch role, marks the invitation `accepted`, sets the active branch cookie, and returns an auth session.
 
 ## Managing invitations
 
 From **Organization** → branch card → **Invitations**, or `/app/org/branches/:supplierId`:
 
-| Status   | Actions                          |
-|----------|----------------------------------|
-| Pending  | Copy Link (regenerates token), Revoke |
-| Accepted | Shows accepter name              |
-| Expired / Revoked | Resend (regenerates)      |
+| Status            | Actions                               |
+| ----------------- | ------------------------------------- |
+| Pending           | Copy Link (regenerates token), Revoke |
+| Accepted          | Shows accepter name                   |
+| Expired / Revoked | Resend (regenerates)                  |
 
 **Invite Someone New** opens the same invite modal as step 2 of branch creation.
 
 ## API
 
-| Method | Path | Auth |
-|--------|------|------|
-| POST | `/api/org/invitations` | Org Owner + `multi_branch` |
-| GET | `/api/org/invitations` | Org Owner + `multi_branch` |
-| GET | `/api/org/invitations/roles?supplier_id=` | Org Owner |
-| DELETE | `/api/org/invitations/:id` | Org Owner |
-| POST | `/api/org/invitations/:id/regenerate` | Org Owner |
-| GET | `/api/public/invitations/branch?token=` | Public |
-| POST | `/api/public/invitations/branch/accept` | Public (optional session) |
+| Method | Path                                      | Auth                       |
+| ------ | ----------------------------------------- | -------------------------- |
+| POST   | `/api/org/invitations`                    | Org Owner + `multi_branch` |
+| GET    | `/api/org/invitations`                    | Org Owner + `multi_branch` |
+| GET    | `/api/org/invitations/roles?supplier_id=` | Org Owner                  |
+| DELETE | `/api/org/invitations/:id`                | Org Owner                  |
+| POST   | `/api/org/invitations/:id/regenerate`     | Org Owner                  |
+| GET    | `/api/public/invitations/branch?token=`   | Public                     |
+| POST   | `/api/public/invitations/branch/accept`   | Public (optional session)  |
 
 ## Background job
 

@@ -265,9 +265,22 @@ export function buildOrderStatusNotification(order, status, locale = DEFAULT_LOC
     DELIVERED: 'delivered',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',
+    RECEIVED_FULL: 'received',
+    RECEIVED_PARTIAL: 'received',
+    RECEIVED_WITH_DISPUTE: 'received',
   }
   const key = keyMap[status]
   if (!key) return null
+
+  if (key === 'received') {
+    const receivedMessage =
+      status === 'RECEIVED_FULL'
+        ? `Order #${orderId} was received in full.`
+        : status === 'RECEIVED_PARTIAL'
+          ? `Order #${orderId} was partially received.`
+          : `Order #${orderId} was received with a dispute.`
+    return { title: 'Order receiving completed', message: receivedMessage }
+  }
 
   if (status === 'PLACED') {
     return {
@@ -337,6 +350,14 @@ export async function notifyOrderStatusChange(order, status) {
     (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
 
   if (status === 'PLACED') {
+    return notifyTenantUsers({
+      tenantId: order.supplier_id,
+      tenantType: 'SUPPLIER',
+      ...payload,
+    })
+  }
+
+  if (String(status).startsWith('RECEIVED_')) {
     return notifyTenantUsers({
       tenantId: order.supplier_id,
       tenantType: 'SUPPLIER',
@@ -849,7 +870,11 @@ export async function notifyInvoiceIssued(invoice, locale = DEFAULT_LOCALE) {
     }),
     referenceId: invoice.id,
     referenceType: 'INVOICE',
-    metadata: { invoice_number: invoice.invoice_number, total_amount: invoice.total_amount },
+    metadata: {
+      invoice_number: invoice.invoice_number,
+      total_amount: invoice.total_amount,
+      orderId: invoice.order_id || invoice.orderId,
+    },
   })
   return sent[0] || null
 }
@@ -1213,6 +1238,7 @@ export async function notifyDisputeResolved(
   const metadata = {
     disputeId: dispute.id,
     resolutionType,
+    orderId: dispute.orderId || dispute.order_id,
   }
   if (replacementId) {
     metadata.replacementOrderId = replacementId

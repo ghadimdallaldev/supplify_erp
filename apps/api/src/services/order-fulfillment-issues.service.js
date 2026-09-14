@@ -1,7 +1,7 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { getOrCreateConversation, postConversationMessage } from '../lib/chat-conversation.js'
-import { getOrderForAmendment } from './order-amendments.service.js'
+import { canAmendOrderStatus, getOrderForAmendment } from './order-amendments.service.js'
 import { proposeOrderSubstitution } from './product-substitutes.service.js'
 import { notifyTenantUsers } from './notification.service.js'
 
@@ -89,6 +89,27 @@ export async function createShortageIssue({
   const item = await loadOrderItem(orderId, orderItemId, supplierId)
   const order = await getOrderForAmendment(orderId)
   if (order.supplier_id !== supplierId) throw new ValidationError('Access denied')
+  if (!canAmendOrderStatus(order.status)) {
+    throw new ValidationError('Shortages and substitutions cannot be reported after processing')
+  }
+
+  const orderedQuantity = Number(item.quantity)
+  const available = availableQuantity == null ? null : Number(availableQuantity)
+  const shortage =
+    shortageQuantity == null
+      ? available == null
+        ? null
+        : orderedQuantity - available
+      : Number(shortageQuantity)
+  if (
+    shortage == null ||
+    (available != null &&
+      (!Number.isFinite(available) || available < 0 || available > orderedQuantity)) ||
+    (shortage != null &&
+      (!Number.isFinite(shortage) || shortage <= 0 || shortage > orderedQuantity))
+  ) {
+    throw new ValidationError('Shortage quantities must be within the ordered quantity')
+  }
 
   let replacementName = null
   if (replacementProductId) {
@@ -146,8 +167,8 @@ export async function createShortageIssue({
         item.restaurant_id,
         createdByUserId,
         item.quantity,
-        shortageQuantity ?? null,
-        availableQuantity ?? null,
+        shortage,
+        available,
         replacementProductId || null,
         replacementQuantity ?? null,
         replacementUnit || item.product_unit,
@@ -170,6 +191,7 @@ export async function createShortageIssue({
       referenceType: conversation ? 'CONVERSATION' : 'ORDER',
       metadata: {
         link: conversation ? `/app/chat?conversation=${conversation.id}` : `/app/orders/${orderId}`,
+        orderId,
         issueId: issue.id,
         issueType: 'shortage',
       },
@@ -192,6 +214,11 @@ export async function createSubstitutionIssue({
   proposeAmendment = true,
 }) {
   const item = await loadOrderItem(orderId, orderItemId, supplierId)
+  const order = await getOrderForAmendment(orderId)
+  if (order.supplier_id !== supplierId) throw new ValidationError('Access denied')
+  if (!canAmendOrderStatus(order.status)) {
+    throw new ValidationError('Shortages and substitutions cannot be reported after processing')
+  }
 
   let replacementName = null
   let replacementUnitResolved = replacementUnit
@@ -282,6 +309,7 @@ export async function createSubstitutionIssue({
     referenceType: 'CONVERSATION',
     metadata: {
       link: `/app/chat?conversation=${conversation.id}`,
+      orderId,
       issueId: rows[0].id,
       issueType: 'substitution',
     },

@@ -149,6 +149,7 @@ describe('Auth Routes', () => {
   beforeEach(async () => {
     clearAllMocks()
     authConfigState.AUTH_EMAIL_OTP_ENABLED = false
+    authConfigState.WEB_ORIGINS = ['http://localhost:5173']
     db = setupMocks()
 
     // Sync db mocks
@@ -208,6 +209,24 @@ describe('Auth Routes', () => {
       await request(appWithSession).get('/auth/login')
 
       expect(session.oauthState).toBeDefined()
+    })
+
+    it('preserves an allowed invite return URL in the OAuth session', async () => {
+      const session = {}
+      const appWithSession = express()
+      appWithSession.use((req, _res, next) => {
+        req.session = session
+        req.session.save = (callback) => callback?.(null)
+        next()
+      })
+      appWithSession.use('/auth', authRoutes)
+
+      const inviteUrl = 'http://localhost:5173/invite?token=test-token&type=sb'
+      await request(appWithSession)
+        .get(`/auth/login?redirect=${encodeURIComponent(inviteUrl)}`)
+        .expect(302)
+
+      expect(session.oauthRedirect).toBe(inviteUrl)
     })
   })
 

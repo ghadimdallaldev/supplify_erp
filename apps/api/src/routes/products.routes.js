@@ -322,7 +322,9 @@ router.get('/', async (req, res) => {
         orderByClause = `ts_rank(p.search_vector, plainto_tsquery('simple', $${paramIndex})) DESC, p.created_at DESC`
         paramIndex++
       } else {
-        whereConditions.push(`LOWER(p.name) LIKE $${paramIndex}`)
+        whereConditions.push(
+          `(LOWER(p.name) LIKE $${paramIndex} OR LOWER(p.sku) LIKE $${paramIndex})`
+        )
         queryParams.push(`%${params.q.toLowerCase()}%`)
         paramIndex++
       }

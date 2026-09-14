@@ -180,6 +180,8 @@ stateDiagram-v2
 
 **Supplier status whitelist** (`orders/update.js`) — Suppliers may only set: `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `COMPLETED`, `CANCELLED`. Restaurants may only set `CANCELLED`.
 
+**Driver invariant** — an active driver assignment is required before `SHIPPED`, `DELIVERED`, or legacy `COMPLETED`. `COMPLETED` is accepted only from `SHIPPED` and maps to `DELIVERED`.
+
 **Delivery route eligibility** — `PLACED`, `PENDING_APPROVAL` (legacy), `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED` for planned routes; dispatch on `PROCESSING` / `SHIPPED` (`delivery-route-order-statuses.js`).
 
 ---

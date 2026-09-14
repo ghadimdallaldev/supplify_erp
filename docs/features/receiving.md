@@ -11,8 +11,10 @@ Plan feature key: `receiving_quality` (Silver+ for restaurants).
 3. Supplier may also mark **Delivered** from Orders list or order detail (**Mark Delivered**).
 4. Restaurant opens **Receiving** (`/app/receiving`) — pending list includes orders with status `DELIVERED` or legacy `COMPLETED`, without an accepted receiving report.
 5. Restaurant taps **Receive Now** (or **Receive order** on order detail tracking panel / Quick Actions), confirms quantities/quality, submits.
-6. API creates `receiving_report` + line items, updates inventory, sets order to `RECEIVED_PARTIAL` or `RECEIVED_FULL`.
-7. **Receiving history** tab lists past reports (not orders without a report).
+6. API validates that every order line appears exactly once, normalizes the mobile/web payload, and creates the report, line items, accepted inventory, invoice, order status, and any automatic dispute in one transaction.
+7. A short quantity or any non-`ACCEPTED` quality creates or extends the order's single active dispute and sets the order to `RECEIVED_WITH_DISPUTE`. A discrepancy-free receipt becomes `RECEIVED_FULL`.
+8. Suppliers are notified of receiving completion (`RECEIVED_*` status) and of any automatically opened dispute.
+9. **Receiving history** tab lists past reports (not orders without a report).
 
 Deep link: `/app/receiving?order={orderId}` opens the receive dialog when the order is in the pending list.
 
@@ -33,6 +35,8 @@ Restaurant tenant resolution uses active branch context (`getRestaurantIdForRequ
 - `RestaurantOrderTrackingPanel.tsx` — restaurant order detail; **Receive order** CTA when delivered (links to `/app/receiving?order={id}`).
 
 ## Order timeline
+
+Android and iOS expose an actual-quantity, quality-status, and notes field for every line and submit every line. They do not offer receiving while an order is merely `SHIPPED`.
 
 `buildOrderTimeline()` treats `DELIVERED` as completed delivery step; driver milestones (`driver-assigned`, `driver-picked-up`, etc.) appear when tracking API returns assignment data. **Confirm receipt** is the active restaurant step until receiving is recorded. See `apps/web/src/lib/orderTimeline.ts`.
 

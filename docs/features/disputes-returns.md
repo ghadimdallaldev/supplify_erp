@@ -20,7 +20,7 @@ Restaurants can open formal disputes on **delivered / received / invoiced / comp
 - Only one active dispute per order (`open`, `under_review`, or `escalated`).
 - Order status must be one of: `DELIVERED`, `RECEIVED_PARTIAL`, `RECEIVED_FULL`, `INVOICED`, `COMPLETED`.
 - When a dispute is opened after receiving, order status becomes **`RECEIVED_WITH_DISPUTE`** (visible on order list and timeline for restaurant and supplier). When the dispute is resolved, rejected, or cancelled, status returns to `RECEIVED_PARTIAL` or `RECEIVED_FULL` based on the receiving report.
-- During receiving, disputes are prompted **once** when the user taps **Complete receiving** and any line had a short quantity or non-accepted quality (not one dialog per line).
+- During receiving, the API automatically opens (or extends) **one active dispute** when any line is short or has non-accepted quality. Dispute creation is part of the same transaction as receiving, inventory, invoice, and order state, so a retry cannot leave a partial receipt.
 - Optional `items[]` on create for partial-line disputes (`quantityOrdered` vs `quantityReceived`).
 - Restaurant can **cancel** while status is `open`.
 

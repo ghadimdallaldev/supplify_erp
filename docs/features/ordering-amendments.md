@@ -14,6 +14,8 @@ Amendments are allowed while status is one of: `PLACED`, `PENDING_APPROVAL`, `AC
 
 Only one **pending** amendment per order at a time.
 
+The mutable-status rule is checked again under the order lock when a response is accepted, and it is also enforced for supplier shortage/substitution endpoints. A request created earlier cannot be applied after the order has shipped. Requesters cannot accept or reject their own request.
+
 ## API
 
 Mounted at `/api/orders/:orderId/amendments` (requires `ORDERS_VIEW` / `ORDERS_MANAGE`).
@@ -34,6 +36,8 @@ Mounted at `/api/orders/:orderId/amendments` (requires `ORDERS_VIEW` / `ORDERS_M
 - `delivery_date_change` / `other` — status only (no line changes unless items provided)
 
 Notifications are sent to the **counterparty tenant team** via `notifyTenantUsers` (not only the primary contact email).
+
+Supplier fulfillment issues may report a shortage alone or suggest a configured replacement. A replacement suggestion creates an `item_substitution` amendment and waits for restaurant approval before changing the order line. Android and iOS render amendment history defensively even when optional product information is absent.
 
 ## Database
 

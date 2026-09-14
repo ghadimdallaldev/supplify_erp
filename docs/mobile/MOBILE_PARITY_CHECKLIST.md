@@ -34,6 +34,15 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 
 Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS). No Expo workspace belongs inside the ERP.
 
+## 2026-09-14 — Order workflow and receiving integrity
+
+- [x] API receiving/order/amendment/product contracts synchronized with Android and iOS types and query hooks.
+- [x] Order lifecycle updated on both platforms: driver assignment uses `POST`, and receiving is offered only after delivery.
+- [x] Catalog pagination, cart count/action, actual receiving fields, amendment rendering, and supplier shortage reporting are identical on Android and iOS.
+- [x] Order emails resolve to the relevant web order; no native deep-link contract changed.
+- [x] Android and iOS `npx tsc --noEmit` pass.
+- [x] `MOBILE_FEATURE_PARITY.md` and affected order, receiving, dispute, and pricing docs updated.
+
 ## 2026-09-12 - ERP/mobile end-to-end audit
 
 - [x] Platform-admin users have a mobile hub linking every admin-console destination.
