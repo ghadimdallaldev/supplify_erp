@@ -435,4 +435,42 @@ describe('resolve-product-price.service', () => {
     expect(quoted.size).toBe(0)
     expect(queryMock).not.toHaveBeenCalled()
   })
+
+  it('findOpenQuoteLocksForOrder returns latest locks scoped to supplier', async () => {
+    const { findOpenQuoteLocksForOrder } = await import('./resolve-product-price.service.js')
+
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          original_product_id: PRODUCT_ID,
+          substitute_product_id: null,
+          quote_request_supplier_id: 'qrs-new',
+          quote_response_item_id: 'qri-new',
+          submitted_at: new Date('2026-09-10T12:00:00Z'),
+        },
+        {
+          original_product_id: PRODUCT_ID,
+          substitute_product_id: null,
+          quote_request_supplier_id: 'qrs-old',
+          quote_response_item_id: 'qri-old',
+          submitted_at: new Date('2026-09-01T12:00:00Z'),
+        },
+      ],
+    })
+
+    const locks = await findOpenQuoteLocksForOrder({
+      restaurantId: RESTAURANT_ID,
+      productIds: [PRODUCT_ID],
+      supplierId: SUPPLIER_ID,
+    })
+
+    expect(locks).toEqual([
+      {
+        productId: PRODUCT_ID,
+        quoteRequestSupplierId: 'qrs-new',
+        quoteResponseItemId: 'qri-new',
+      },
+    ])
+    expect(String(queryMock.mock.calls[0][0])).toContain('qrs.supplier_id')
+  })
 })

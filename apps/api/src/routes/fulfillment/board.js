@@ -395,7 +395,7 @@ router.get('/dispatch', async (req, res) => {
     }
 
     const { days } = parseDispatchQuery(req.query)
-    const whFilter = await warehouseFilterClause(req, supplierId, 2)
+    const whFilter = await warehouseFilterClause(req, supplierId, 2, { mode: 'assignment' })
     const warehouseId = parseWarehouseFilter(req) || null
     const cacheKey = dispatchCacheKey(supplierId, days, warehouseId)
     const cached = await getCache(cacheKey)

@@ -76,6 +76,11 @@ const cartSlice = createSlice({
           existingItem.quoteResponseItemId = item.quoteResponseItemId
           existingItem.quoteRequestSupplierId = item.quoteRequestSupplierId
           existingItem.quotedUnitPrice = item.quotedUnitPrice
+        } else {
+          // Catalog re-add clears stale quote locks so checkout does not reuse RFQ prices.
+          delete existingItem.quoteResponseItemId
+          delete existingItem.quoteRequestSupplierId
+          delete existingItem.quotedUnitPrice
         }
       } else {
         state.items.push({

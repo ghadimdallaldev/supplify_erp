@@ -393,7 +393,7 @@ router.get(
       const { rows } = await query(
         `SELECT business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
                 last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
-                last_order_rollover_days, last_order_timezone
+                last_order_rollover_days, last_order_timezone, pod_required
          FROM supplier WHERE id = $1`,
         [supplierId]
       )
@@ -471,6 +471,10 @@ router.patch(
         fields.push(`last_order_timezone = $${paramIndex++}`)
         values.push(body.lastOrderTimezone)
       }
+      if (body.podRequired !== undefined) {
+        fields.push(`pod_required = $${paramIndex++}`)
+        values.push(body.podRequired)
+      }
 
       values.push(supplierId)
       const { rows } = await query(
@@ -479,7 +483,7 @@ router.patch(
          WHERE id = $${paramIndex}
          RETURNING business_hours_json, minimum_order_amount, payment_terms, return_policy, terms_and_conditions,
                    last_order_mode, last_order_cutoff_type, last_order_cutoff_time, last_order_cutoff_minutes,
-                   last_order_rollover_days, last_order_timezone`,
+                   last_order_rollover_days, last_order_timezone, pod_required`,
         values
       )
       if (!rows.length) throw new NotFoundError('Supplier not found')

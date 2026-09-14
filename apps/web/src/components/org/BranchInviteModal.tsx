@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Select, SelectTrigger } from '../ui/select'
 import { useCreateBranchInvitationMutation, useGetBranchInviteRolesQuery } from '../../services/api'
+import { getApiErrorMessage } from '../../lib/apiError'
 
 type Props = {
   open: boolean
@@ -19,10 +21,15 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
   const [submitted, setSubmitted] = useState(false)
 
   const [createInvitation, { isLoading }] = useCreateBranchInvitationMutation()
-  const { data: rolesData } = useGetBranchInviteRolesQuery(
-    { supplier_id: supplierId },
-    { skip: !open || !supplierId }
-  )
+  const {
+    data: rolesData,
+    isLoading: rolesLoading,
+    isError: rolesError,
+    error: rolesQueryError,
+  } = useGetBranchInviteRolesQuery({ supplier_id: supplierId }, { skip: !open || !supplierId })
+
+  const roles = useMemo(() => rolesData?.roles ?? [], [rolesData?.roles])
+  const rolesForbidden = rolesError && (rolesQueryError as { status?: number })?.status === 403
 
   useEffect(() => {
     if (!open) {
@@ -34,24 +41,27 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
   }, [open])
 
   useEffect(() => {
-    const roles = rolesData?.roles ?? []
     if (roles.length && !roleId) {
       const preferred = roles.find((r) => r.name === 'Manager') ?? roles[0]
       setRoleId(preferred.id)
     }
-  }, [rolesData, roleId])
+  }, [roles, roleId])
 
-  const selectedRoleName = (rolesData?.roles ?? []).find((r) => r.id === roleId)?.name
+  const selectedRoleName = roles.find((r) => r.id === roleId)?.name
 
   const handleGenerate = async () => {
     if (!roleId || !managerEmail.trim()) return
-    await createInvitation({
-      supplier_id: supplierId,
-      invited_name: managerName.trim() || undefined,
-      invited_email: managerEmail.trim() || undefined,
-      role_id: roleId,
-    }).unwrap()
-    setSubmitted(true)
+    try {
+      await createInvitation({
+        supplier_id: supplierId,
+        invited_name: managerName.trim() || undefined,
+        invited_email: managerEmail.trim() || undefined,
+        role_id: roleId,
+      }).unwrap()
+      setSubmitted(true)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Failed to send invitation'))
+    }
   }
 
   const resetForAnother = () => {
@@ -68,6 +78,18 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
         </DialogHeader>
         {!submitted ? (
           <div className="space-y-3">
+            {rolesLoading ? (
+              <p className="text-sm text-[var(--text-muted)]">Loading roles…</p>
+            ) : rolesForbidden ? (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                You don&apos;t have permission to invite team members. Ask an owner or manager.
+              </p>
+            ) : roles.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                No roles are available yet. Refresh and try again, or contact support if this
+                persists.
+              </p>
+            ) : null}
             <label className="block text-sm">
               <span className="text-[var(--text-muted)]">Name</span>
               <input
@@ -92,7 +114,7 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
               <span className="text-[var(--text-muted)]">Role</span>
               <Select value={roleId} onValueChange={setRoleId}>
                 <SelectTrigger className="mt-1">
-                  {(rolesData?.roles ?? []).map((role) => (
+                  {roles.map((role) => (
                     <option key={role.id} value={role.id}>
                       {role.name}
                     </option>
@@ -109,8 +131,10 @@ export function BranchInviteModal({ open, supplierId, branchName, onClose }: Pro
             <Button
               type="button"
               className="w-full"
-              disabled={isLoading || !roleId}
-              onClick={() => handleGenerate().catch(() => {})}
+              disabled={
+                isLoading || !roleId || !managerEmail.trim() || roles.length === 0 || rolesLoading
+              }
+              onClick={() => void handleGenerate()}
             >
               Generate Invite Link
             </Button>

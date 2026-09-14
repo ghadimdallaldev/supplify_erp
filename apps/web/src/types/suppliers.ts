@@ -56,6 +56,8 @@ export interface SupplierBusinessSettings {
   lastOrderCutoffMinutes?: number | null
   lastOrderRolloverDays?: number
   lastOrderTimezone?: string
+  /** When true, drivers must capture POD before marking delivered */
+  podRequired?: boolean
 }
 
 export interface UpdateSupplierBusinessSettingsRequest {
@@ -70,6 +72,7 @@ export interface UpdateSupplierBusinessSettingsRequest {
   lastOrderCutoffMinutes?: number | null
   lastOrderRolloverDays?: number
   lastOrderTimezone?: string
+  podRequired?: boolean
 }
 
 export interface CreateSupplierRequest {

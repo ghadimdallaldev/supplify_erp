@@ -45,6 +45,7 @@ import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
   findOpenQuotedProductsForOrder,
+  findOpenQuoteLocksForOrder,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
 import {
@@ -775,6 +776,21 @@ router.post(
         })
       }
 
+      const productIds = orderData.items.map((item) => item.productId)
+      const clientLocks = orderData.quoteLocks ?? []
+      const lockByProductId = new Map(clientLocks.map((lock) => [lock.productId, lock]))
+      const autoQuoteLocks = await findOpenQuoteLocksForOrder({
+        restaurantId: orderData.restaurant_id,
+        productIds,
+        supplierId,
+      })
+      for (const lock of autoQuoteLocks) {
+        if (!lockByProductId.has(lock.productId)) {
+          lockByProductId.set(lock.productId, lock)
+        }
+      }
+      const quoteLocks = [...lockByProductId.values()]
+
       // Create order with transaction
       const result = await withTransaction(async (client) => {
         const manualResolveItems = orderData.items.map((item) => ({
@@ -785,9 +801,50 @@ router.post(
         const manualResolved = await resolveProductPricesBatch({
           restaurantId: orderData.restaurant_id,
           items: manualResolveItems,
+          quoteLocks: quoteLocks.length ? quoteLocks : undefined,
           date: orderData.deliveryDate ?? undefined,
         })
         const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
+
+        if (quoteLocks.length) {
+          const qriIds = quoteLocks.map((lock) => lock.quoteResponseItemId)
+          const { rows: quotedQtyRows } = await client.query(
+            `
+            SELECT qri.id, qri.quantity, qreq.product_id, p.sku
+            FROM quote_response_items qri
+            JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+            JOIN product p ON p.id = qreq.product_id
+            WHERE qri.id = ANY($1::uuid[])
+            `,
+            [qriIds]
+          )
+          const quotedQtyByResponseItemId = new Map(
+            quotedQtyRows.map((row) => [
+              row.id,
+              {
+                quantity: row.quantity != null ? Number(row.quantity) : null,
+                sku: row.sku,
+              },
+            ])
+          )
+          for (const item of orderData.items) {
+            const lock = lockByProductId.get(item.productId)
+            if (!lock) continue
+            const resolved = manualResolvedMap.get(item.productId)
+            if (resolved?.source !== 'QUOTE_PRICE') {
+              throw new ValidationError(
+                `Quoted price is no longer available for ${item.productId}. Re-check the open quote before placing a manual order.`
+              )
+            }
+            const quoted = quotedQtyByResponseItemId.get(lock.quoteResponseItemId)
+            if (quoted?.quantity != null && item.quantity > quoted.quantity) {
+              throw new ValidationError(
+                `Quantity for ${quoted.sku || item.productId} exceeds the quoted quantity of ${quoted.quantity}`
+              )
+            }
+          }
+        }
+
         const currencies = [
           ...new Set([...manualResolvedMap.values()].map((resolved) => resolved.currency || 'USD')),
         ]

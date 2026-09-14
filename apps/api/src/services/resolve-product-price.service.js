@@ -267,6 +267,73 @@ export async function findOpenQuotedProductsForOrder(
 }
 
 /**
+ * Build quoteLocks for open RFQ responses covering the given products.
+ * Used by supplier manual orders so phone/chat paths honor quoted prices
+ * instead of silently falling back to catalog/contract.
+ *
+ * @param {{ restaurantId: string, productIds: string[], supplierId?: string | null }}
+ * @param {Function} dbQuery
+ * @returns {Promise<Array<{ productId: string, quoteRequestSupplierId: string, quoteResponseItemId: string }>>}
+ */
+export async function findOpenQuoteLocksForOrder(
+  { restaurantId, productIds, supplierId = null },
+  dbQuery = query
+) {
+  if (!restaurantId || !productIds?.length) return []
+
+  const params = [restaurantId, productIds]
+  let supplierClause = ''
+  if (supplierId) {
+    params.push(supplierId)
+    supplierClause = ` AND qrs.supplier_id = $${params.length}`
+  }
+
+  const { rows } = await dbQuery(
+    `
+    SELECT
+      qreq.product_id AS original_product_id,
+      qri.substitute_product_id,
+      qrs.id AS quote_request_supplier_id,
+      qri.id AS quote_response_item_id,
+      qr_resp.submitted_at
+    FROM quote_response_items qri
+    JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
+    JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
+    JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+    WHERE qr.restaurant_id = $1
+      AND qr.status = 'open'
+      AND qrs.status = 'responded'
+      AND qri.is_available = true
+      AND qri.unit_price IS NOT NULL
+      AND (
+        qreq.product_id = ANY($2::uuid[])
+        OR qri.substitute_product_id = ANY($2::uuid[])
+      )
+      ${supplierClause}
+    ORDER BY qr_resp.submitted_at DESC
+    `,
+    params
+  )
+
+  const orderProductIdSet = new Set(productIds)
+  const locksByProductId = new Map()
+  for (const row of rows) {
+    const candidates = [row.original_product_id, row.substitute_product_id].filter(Boolean)
+    for (const pid of candidates) {
+      if (orderProductIdSet.has(pid) && !locksByProductId.has(pid)) {
+        locksByProductId.set(pid, {
+          productId: pid,
+          quoteRequestSupplierId: row.quote_request_supplier_id,
+          quoteResponseItemId: row.quote_response_item_id,
+        })
+      }
+    }
+  }
+  return [...locksByProductId.values()]
+}
+
+/**
  * Resolve unit price for a restaurant + supplier + product.
  * Precedence: active contract price (if min qty met) → default catalog price.
  * Uniqueness: DB enforces one row per (supplier, restaurant, product).

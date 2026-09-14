@@ -82,4 +82,26 @@ describe('cartSlice addItem', () => {
     expect(line.quoteRequestSupplierId).toBe('qrs-2')
     expect(line.quotedUnitPrice).toBe(8.25)
   })
+
+  it('clears quote lock metadata when re-adding the same SKU from catalog', () => {
+    const initial = cartReducer(undefined, { type: 'init' })
+    const withQuote = cartReducer(initial, addItem({ item: quoteItem() }))
+    const merged = cartReducer(
+      withQuote,
+      addItem({
+        item: {
+          productId: 'product-1',
+          quantity: 1,
+          product: baseProduct,
+        },
+      })
+    )
+
+    const line = merged.items[0]
+    expect(line.quantity).toBe(6)
+    expect(line.quoteResponseItemId).toBeUndefined()
+    expect(line.quoteRequestSupplierId).toBeUndefined()
+    expect(line.quotedUnitPrice).toBeUndefined()
+    expect(line.product.current_price).toBe(10)
+  })
 })
