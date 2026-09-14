@@ -83,8 +83,13 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
         )
         return
       }
-      await Promise.all(
-        trackableRef.current.map((delivery) =>
+      const deliveries = trackableRef.current
+      if (deliveries.length === 0) return
+
+      // One rejected order must not discard the fix for every other delivery, which
+      // is what Promise.all + unwrap() did: a single 4xx stopped all location sharing.
+      const results = await Promise.allSettled(
+        deliveries.map((delivery) =>
           sendLocation({
             orderId: delivery.orderId,
             latitude: point.latitude,
@@ -98,6 +103,11 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
           }).unwrap()
         )
       )
+
+      const delivered = results.filter((r) => r.status === 'fulfilled').length
+      if (delivered === 0) {
+        throw new Error('Location could not be shared for any active delivery')
+      }
       setTrackingStatus((prev) =>
         prev ? { ...prev, lastSyncedAt: new Date().toISOString(), error: null } : prev
       )
@@ -179,8 +189,14 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
     }
   }
 
+  // "Started" is not "sharing": the watch can be registered while permission is
+  // refused or every upload fails. Only report active once a fix actually reached
+  // the server, so the header cannot claim location is on while it is not.
+  const reportedTrackingActive =
+    trackingActive && trackingStatus?.gpsState === 'TRACKING_ACTIVE' && !trackingStatus.error
+
   return {
-    trackingActive,
+    trackingActive: reportedTrackingActive,
     gpsError,
     permissionDenied,
     trackableCount: trackable.length,

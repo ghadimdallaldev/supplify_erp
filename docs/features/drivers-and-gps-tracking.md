@@ -172,7 +172,27 @@ assignment** (`assignmentId`, `warehouseAssignmentId`), not one row per order.
 Unassigned orders still appear once as `deliveryStatus: pending`. Board `stats` count
 delivery legs, so multi-WH orders can contribute multiple rows. Clients must pass
 `driver_assignment_id` (or `warehouse_assignment_id`) when updating status on
-multi-leg orders.
+multi-leg orders — omitting them makes the API reject the update as ambiguous.
+
+`deliveryStatus` reports the assignment status faithfully, including `picked_up`. It used
+to be collapsed into `out_for_delivery`, which hid a real state: the driver's primary
+action became "Delivered" for a delivery they had never declared departure on, so one tap
+could deliver it and GPS tracking never started. `stats.outForDelivery` still counts
+`picked_up` and `out_for_delivery` together as in transit, and `stats.pickedUp` breaks the
+former out.
+
+**Trackable statuses.** Only `assigned`, `picked_up` and `out_for_delivery` accept location
+pings. `pending` means _no driver assignment_ (`COALESCE(da.status, 'pending')`) and the
+location endpoint rejects it, so clients must not ping those orders — doing so previously
+failed the whole batch and stopped all location sharing. Clients ping **every** active
+delivery and tolerate per-order failure (`Promise.allSettled`) rather than all-or-nothing.
+
+**Web provider throttle.** `webDriverLocationProvider` throttles uploads to
+`VITE_GPS_UPDATE_INTERVAL_SECONDS` (default 15s) and never overlaps requests;
+`watchPosition` otherwise fires continuously and the API's `GPS_MIN_SEND_INTERVAL_SECONDS`
+drops the excess. It reports `TRACKING_ACTIVE` only after a fix actually reaches the
+server, and surfaces upload failures instead of swallowing them — the UI must never claim
+location is being shared when it is not.
 
 ### Proof of delivery
 
@@ -182,6 +202,15 @@ One POD row per order, enforced by a unique index on `proof_of_delivery(order_id
 instead of stacking duplicates. A POD must carry at least one of a photo
 (`file_key`), a signature (`signature_file_key`) or a `recipient_name` — the web
 dialog disables save until one is present and the API rejects the rest with a 400.
+
+**Order of operations when confirming a delivery: submit the proof, then set
+`delivered`.** When the supplier has `pod_required` set, `assertPodPresentWhenRequired`
+makes the API reject `delivered` until a proof row exists, so the reverse order fails every
+time for those suppliers. Proof-first also means a failure on the status step leaves the
+proof on file to retry, rather than an order marked delivered with no proof. Web routes the
+"Delivered" action through `ProofOfDeliveryDialog` (which doubles as the confirmation for an
+irreversible action); mobile routes it through `DeliveryProofScreen`, both via
+`confirmDeliveryWithProof`.
 
 POD capture is controlled by `supplier.pod_required` (default `false`). When enabled via
 Supplier Settings → Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),

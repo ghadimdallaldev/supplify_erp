@@ -2,6 +2,63 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-14 — Driver feature hardening: pick waves, GPS sharing, delivery confirmation, ETAs
+
+Six defects across the driver/fulfillment path, with root causes:
+
+- **Pick wave generation always failed (500).** `resolveEligibleOrderIds` emitted
+  `SELECT DISTINCT o.id … ORDER BY o.created_at`, which Postgres rejects (42P10), so every
+  auto-generated wave failed. Survived because the service tests mock `lib/db.js`, so no SQL
+  was ever executed. Fixed by selecting `o.created_at`; added a test asserting the
+  DISTINCT/ORDER BY invariant over every statement the service emits, plus a repo-wide sweep
+  (no other instances).
+- **Driver location never shared on web / web-mobile.** Four compounding causes:
+  `webDriverLocationProvider` did `void onPoint(point)`, swallowing every upload failure while
+  the header still read “Location active”; the provider never throttled (`watchPosition` fires
+  continuously and `getGpsUpdateIntervalMs` was unused), so the API's
+  `GPS_MIN_SEND_INTERVAL_SECONDS` dropped nearly everything; `gpsState` was set to
+  `TRACKING_ACTIVE` before any fix arrived; and `useDriverLocationTracking` used
+  `Promise.all(...).unwrap()`, so one rejected order discarded the fix for all of them.
+  `isTrackableDeliveryStatus` also treated `pending` (no driver assignment — the endpoint
+  rejects it) as trackable, which guaranteed those rejections.
+- **Oversized driver action bar overlapping content.** Two stacked full-width buttons stood
+  ~130px tall against `pb-28` (112px) reserved. Now one compact row that also names the
+  delivery it acts on; page padding uses `calc(7rem + env(safe-area-inset-bottom))`.
+- **“I’m on the way” delivering the order.** The web sent no `driver_assignment_id` /
+  `warehouse_assignment_id`, so multi-warehouse orders were rejected as ambiguous; `delivered`
+  fired immediately with no confirmation and no proof capture, so once the first action resolved
+  the “Delivered” button sat under the driver’s finger; and the board collapsed `picked_up` into
+  `out_for_delivery`, making “Delivered” the primary action for a delivery the driver had never
+  departed on. `rescheduled`/`pending` also offered buttons that always errored. The board's
+  row order (`COALESCE(da.id, o.id)`) meant “next delivery” was effectively arbitrary.
+- **Delivery confirmation failing in both mobile apps.** `DeliveryProofScreen` called
+  `updateStatus('delivered')` **before** `submitPod`, but the API rejects `delivered` until a
+  proof row exists whenever the supplier sets `pod_required` — so confirmation failed every
+  time for those suppliers, and when it did pass it could leave an order delivered with no
+  proof. Now ordered proof-first via shared `confirmDeliveryWithProof`.
+- **Inaccurate ETAs.** The board advertised `etaAvailable` for `assigned` while the ETA service
+  refused it as `assignment_not_active`; both now use the service's own
+  `isEtaEligibleAssignmentStatus`. A GPS fix of any age produced a confident ETA — now withheld
+  past `DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS` (900s) with `locationRecordedAt` /
+  `locationAgeSeconds` exposed. Route legs were each rounded to 0.1km before summing
+  (measured 0.2km drift over 8 legs); only the total is rounded now. `route_stop.actual_arrival`
+  was being stamped on departure (`IN_TRANSIT`) — migration `0206` adds `departed_at` and
+  `actual_arrival` is now set on completion.
+
+- **Mobile:** implemented in **both** `supplify-mobile` and `supplify-mobile-ios` —
+  proof-before-delivered ordering, `picked_up` keeps the departure step, no actions for
+  `pending`/`rescheduled`, `pending` no longer trackable, GPS pings every active delivery
+  (previously only the first, so other stops' restaurants saw no location) tolerating per-order
+  failure, and `warehouse_assignment_id` threaded through proof/problem screens.
+  Typecheck clean and 80/80 tests pass in both.
+- **API contract changes:** `deliveryStatus` on the delivery board can now be `picked_up`
+  (previously collapsed); `stats.pickedUp` added while `stats.outForDelivery` still counts both
+  as in transit; ETA payloads gained `locationRecordedAt` / `locationAgeSeconds` and the
+  `driver_location_stale` reason; route stops expose `departedAt` / `actualArrival` /
+  `estimatedArrival`.
+- Docs: `docs/features/driver-deliveries.md`, `docs/guides/environment-variables.md`,
+  `docs/architecture/rbac-overview.md` (unchanged — no new permission keys).
+
 ## 2026-09-14 — Invited staff wrongly sent to organization setup
 
 - **Bug:** After accepting any supplier/restaurant team invite (Driver, Manager, etc.), web AuthGuard redirected to `/register/complete` (“set up organization”).

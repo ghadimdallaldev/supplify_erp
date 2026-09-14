@@ -128,21 +128,37 @@ export function DriverDispatchBoard({
     }
   }
 
-  const advanceStatus = async (order: DispatchOrderCard, next: string) => {
+  const applyStatus = async (order: DispatchOrderCard, next: string) => {
     try {
       await updateDeliveryStatus({
         orderId: order.id,
         status: next as 'picked_up' | 'out_for_delivery' | 'delivered' | 'rescheduled' | 'assigned',
         driver_assignment_id: order.assignment?.id,
+        warehouse_assignment_id: order.assignment?.warehouse_assignment_id ?? undefined,
       }).unwrap()
-      if (next === 'delivered') {
-        setPodOrder(order)
-      }
       toast.success(t('dispatch.toast.markedAs', { status: next.replace(/_/g, ' ') }))
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || t('dispatch.toast.statusUpdateFailed'))
     }
+  }
+
+  const advanceStatus = async (order: DispatchOrderCard, next: string) => {
+    // Capture proof before setting delivered: suppliers with pod_required have the
+    // API reject `delivered` until a proof row exists, so setting the status first
+    // failed and the proof dialog never opened.
+    if (next === 'delivered') {
+      setPodOrder(order)
+      return
+    }
+    await applyStatus(order, next)
+  }
+
+  const handlePodSubmitted = async () => {
+    const order = podOrder
+    setPodOrder(null)
+    if (!order) return
+    await applyStatus(order, 'delivered')
   }
 
   const handleFail = async () => {
@@ -569,6 +585,9 @@ export function DriverDispatchBoard({
               orderId={podOrder?.id ?? null}
               onOpenChange={(open) => {
                 if (!open) setPodOrder(null)
+              }}
+              onSubmitted={() => {
+                void handlePodSubmitted()
               }}
             />
 

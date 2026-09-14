@@ -25,20 +25,35 @@ Service: [`delivery-eta.service.js`](../../apps/api/src/services/delivery-eta.se
 
 ### Formula
 
-1. **Distance** — haversine great-circle distance between driver GPS and destination (rounded to **1 decimal km**).
-2. **Base time** — `(distanceKm / speedKmh) × 60` minutes.
+1. **Distance** — haversine great-circle distance between driver GPS and destination. Legs are
+   summed **unrounded** and only the reported total is rounded to 1 decimal km; rounding each
+   leg first drifted the total measurably on multi-stop routes (~0.2 km over 8 legs).
+2. **Base time** — `(distanceKm / speedKmh) × 60` minutes, from the unrounded distance.
 3. **Range** — `etaMinutesMin = max(1, round(base × minMultiplier))`, `etaMinutesMax = max(min, round(base × maxMultiplier))`.
 
 Default speed and multipliers are configurable (see below). This is a **straight-line city estimate**, not turn-by-turn routing.
 
+### Eligibility and freshness
+
+- An ETA is produced only for assignment statuses `picked_up` and `out_for_delivery`
+  (`isEtaEligibleAssignmentStatus`). Callers that expose an `etaAvailable` flag must use that
+  helper rather than their own status list — the delivery board previously advertised an ETA for
+  `assigned`, which the ETA service then refused as `assignment_not_active`.
+- A GPS fix older than `DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS` yields
+  `etaAvailable: false` with `unavailableReason: 'driver_location_stale'`. An old fix says where
+  the driver _was_, so quoting precise minutes from it is misleading.
+- `calculatedAt` is when the arithmetic ran; `locationRecordedAt` and `locationAgeSeconds`
+  report how fresh the input actually was (supplier payloads only).
+
 ### Environment (API)
 
-| Variable                            | Default | Purpose                                   |
-| ----------------------------------- | ------- | ----------------------------------------- |
-| `DELIVERY_ETA_CITY_SPEED_KMH`       | `20`    | Assumed average city speed                |
-| `DELIVERY_ETA_MIN_MULTIPLIER`       | `1.0`   | Lower bound on ETA range                  |
-| `DELIVERY_ETA_MAX_MULTIPLIER`       | `1.5`   | Upper bound on ETA range                  |
-| `DELIVERY_ETA_SERVICE_TIME_MINUTES` | `5`     | Minutes added per prior stop on the route |
+| Variable                                | Default | Purpose                                            |
+| --------------------------------------- | ------- | -------------------------------------------------- |
+| `DELIVERY_ETA_CITY_SPEED_KMH`           | `20`    | Assumed average city speed                         |
+| `DELIVERY_ETA_MIN_MULTIPLIER`           | `1.0`   | Lower bound on ETA range                           |
+| `DELIVERY_ETA_MAX_MULTIPLIER`           | `1.5`   | Upper bound on ETA range                           |
+| `DELIVERY_ETA_SERVICE_TIME_MINUTES`     | `5`     | Minutes added per prior stop on the route          |
+| `DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS` | `900`   | Past this GPS fix age the ETA is withheld as stale |
 
 Configured in dev via [`deploy/railway/development/api.env`](../../deploy/railway/development/api.env).
 
@@ -92,6 +107,7 @@ Maps are separate from ETA math:
 | Assignment not `picked_up` or `out_for_delivery`     | `assignment_not_active`      |
 | No destination coordinates                           | `destination_missing`        |
 | No driver `latestLocation`                           | `driver_location_missing`    |
+| GPS fix older than the max age                       | `driver_location_stale`      |
 
 Restaurant payloads omit `unavailableReason`; UI shows friendly copy instead.
 
@@ -126,7 +142,18 @@ Restaurant payloads omit `unavailableReason`; UI shows friendly copy instead.
 
 ### Stale GPS
 
-When driver GPS is stale (`tracking.isStale === true`), ETA **remains available** with `confidence: "LOW"`. Supplier UI shows a subtle “Low confidence” badge; restaurant UI does not expose confidence.
+Two levels:
+
+1. **Soft (stale but usable)** — `tracking.isStale === true` while the fix is still within
+   `DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS`: ETA **remains available** with `confidence: "LOW"`.
+   Supplier UI shows a subtle “Low confidence” badge; restaurant UI does not expose confidence.
+2. **Hard (too old to use)** — the fix is older than `DELIVERY_ETA_MAX_LOCATION_AGE_SECONDS`
+   (default 900s): ETA is **withheld** with `unavailableReason: 'driver_location_stale'`. An
+   old fix says where the driver _was_, so quoting precise minutes from it misleads both the
+   supplier and the restaurant.
+
+Supplier payloads also carry `locationRecordedAt` and `locationAgeSeconds` — `calculatedAt` is
+only when the arithmetic ran, so it must not be read as the data's freshness.
 
 ### Visibility matrix
 

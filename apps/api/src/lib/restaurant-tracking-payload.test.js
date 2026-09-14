@@ -37,12 +37,18 @@ describe('restaurant-tracking-payload', () => {
         driver_phone: '+961123',
         assigned_at: '2026-06-03T09:00:00Z',
       },
+      // Must be a recent fix: an ETA is withheld past the staleness cutoff by
+      // design, and this case covers payload sanitization rather than staleness.
       tracking: {
         enabled: true,
         hasLocation: true,
-        lastSeenAt: '2026-06-03T10:00:00Z',
+        lastSeenAt: new Date().toISOString(),
         isStale: false,
-        latestLocation: { latitude: 33.89, longitude: 35.5, recordedAt: '2026-06-03T10:00:00Z' },
+        latestLocation: {
+          latitude: 33.89,
+          longitude: 35.5,
+          recordedAt: new Date().toISOString(),
+        },
       },
       destination: { latitude: 33.9, longitude: 35.51, label: 'Gate A' },
     })

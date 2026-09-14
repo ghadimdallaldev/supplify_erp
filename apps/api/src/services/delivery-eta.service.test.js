@@ -5,13 +5,20 @@ import {
   haversineDistanceKm,
   sanitizeEtaForRestaurant,
   buildRouteEtaContext,
+  isEtaEligibleAssignmentStatus,
 } from './delivery-eta.service.js'
 
 const destination = { latitude: 33.9, longitude: 35.51, label: 'Gate A' }
+// Fixture must stay recent: a fix older than the staleness cutoff withholds the ETA
+// by design, and these cases exercise the ETA arithmetic rather than staleness.
 const tracking = {
   hasLocation: true,
   isStale: false,
-  latestLocation: { latitude: 33.89, longitude: 35.5, recordedAt: '2026-06-03T10:00:00Z' },
+  latestLocation: {
+    latitude: 33.89,
+    longitude: 35.5,
+    recordedAt: new Date().toISOString(),
+  },
 }
 
 describe('delivery-eta.service', () => {
@@ -30,7 +37,10 @@ describe('delivery-eta.service', () => {
     })
     expect(eta.etaAvailable).toBe(true)
     expect(eta.etaMinutesMin).toBe(4)
-    expect(eta.etaMinutesMax).toBe(6)
+    // Minutes come from the true 1.4453km, not the 1.4km display rounding, so the
+    // upper bound is round(4.336 * 1.5) = 7. The previous expectation of 6 was
+    // produced by rounding the distance before computing time.
+    expect(eta.etaMinutesMax).toBe(7)
     expect(eta.distanceKm).toBe(1.4)
     expect(eta.confidence).toBe('MEDIUM')
     expect(eta.calculatedAt).toBeTruthy()
@@ -232,4 +242,129 @@ describe('delivery-eta.service', () => {
     expect(eta.nextStop).toBe(true)
     expect(eta.stopsBefore).toBe(0)
   })
+
+  it('reports the ETA as available for picked_up as well as out_for_delivery', () => {
+    for (const assignmentStatus of ['picked_up', 'out_for_delivery']) {
+      expect(isEtaEligibleAssignmentStatus(assignmentStatus), assignmentStatus).toBe(true)
+      const eta = calculateDeliveryEta({
+        tracking: freshTracking(),
+        destination,
+        assignmentStatus,
+        orderStatus: 'SHIPPED',
+      })
+      expect(eta.etaAvailable, assignmentStatus).toBe(true)
+    }
+  })
+
+  it('does not promise an ETA before the driver has departed', () => {
+    expect(isEtaEligibleAssignmentStatus('assigned')).toBe(false)
+    const eta = calculateDeliveryEta({
+      tracking: freshTracking(),
+      destination,
+      assignmentStatus: 'assigned',
+      orderStatus: 'SHIPPED',
+    })
+    expect(eta.etaAvailable).toBe(false)
+    expect(eta.unavailableReason).toBe('assignment_not_active')
+  })
+
+  // A GPS fix hours old produces a precise-looking but meaningless ETA.
+  it('withholds the ETA when the last GPS fix is older than the hard cutoff', () => {
+    const eta = calculateDeliveryEta({
+      tracking: {
+        hasLocation: true,
+        isStale: true,
+        latestLocation: {
+          latitude: 33.89,
+          longitude: 35.5,
+          recordedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+        },
+      },
+      destination,
+      assignmentStatus: 'out_for_delivery',
+      orderStatus: 'SHIPPED',
+    })
+    expect(eta.etaAvailable).toBe(false)
+    expect(eta.unavailableReason).toBe('driver_location_stale')
+  })
+
+  it('exposes the age of the GPS fix the ETA was derived from', () => {
+    const recordedAt = new Date(Date.now() - 90 * 1000).toISOString()
+    const eta = calculateDeliveryEta({
+      tracking: {
+        hasLocation: true,
+        isStale: false,
+        latestLocation: { latitude: 33.89, longitude: 35.5, recordedAt },
+      },
+      destination,
+      assignmentStatus: 'out_for_delivery',
+      orderStatus: 'SHIPPED',
+    })
+    expect(eta.etaAvailable).toBe(true)
+    expect(eta.locationRecordedAt).toBe(recordedAt)
+    expect(eta.locationAgeSeconds).toBeGreaterThanOrEqual(89)
+    expect(eta.locationAgeSeconds).toBeLessThanOrEqual(120)
+  })
+
+  // Each leg used to be rounded to 0.1km before being summed, so multi-stop
+  // routes accumulated a systematic distance (and therefore time) error.
+  it('rounds only the total distance, not each route leg', () => {
+    const legs = Array.from({ length: 8 }, (_, i) => ({
+      order_id: `o${i + 1}`,
+      sequence_number: i + 1,
+      status: 'PLANNED',
+      latitude: 33.89 + (i + 1) * 0.004,
+      longitude: 35.5 + (i + 1) * 0.004,
+    }))
+    legs.push({
+      order_id: 'target',
+      sequence_number: 9,
+      status: 'PLANNED',
+      latitude: 33.93,
+      longitude: 35.54,
+    })
+
+    const eta = calculateDeliveryEta({
+      tracking: freshTracking(),
+      destination: { latitude: 33.93, longitude: 35.54 },
+      assignmentStatus: 'out_for_delivery',
+      orderStatus: 'SHIPPED',
+      routeContext: buildRouteEtaContext(legs, 'target'),
+      etaConfig: { speedKmh: 20, minMultiplier: 1, maxMultiplier: 1, serviceTimeMinutes: 0 },
+    })
+
+    // Sum of unrounded legs; each pre-rounded leg would drift from this.
+    let expected = 0
+    let [lat, lng] = [33.89, 35.5]
+    for (const leg of legs.slice(0, 8)) {
+      expected += exactHaversineKm(lat, lng, leg.latitude, leg.longitude)
+      lat = leg.latitude
+      lng = leg.longitude
+    }
+    expected += exactHaversineKm(lat, lng, 33.93, 35.54)
+
+    expect(eta.distanceKm).toBeCloseTo(Math.round(expected * 10) / 10, 5)
+  })
 })
+
+function freshTracking() {
+  return {
+    hasLocation: true,
+    isStale: false,
+    latestLocation: {
+      latitude: 33.89,
+      longitude: 35.5,
+      recordedAt: new Date().toISOString(),
+    },
+  }
+}
+
+function exactHaversineKm(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}

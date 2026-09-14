@@ -81,6 +81,9 @@ function mapStopRow(row) {
     itemCount: row.item_count ?? 0,
     notes: row.notes,
     completedAt: row.completed_at,
+    departedAt: row.departed_at ?? null,
+    actualArrival: row.actual_arrival ?? null,
+    estimatedArrival: row.estimated_arrival ?? null,
     assignmentStatus: row.assignment_status ?? null,
     destinationCoordinatesAvailable: destLat != null && destLng != null,
     destinationLatitude: destLat,
@@ -869,11 +872,14 @@ export async function updateRouteStop(
 
   if (notes !== undefined || dbStatus) {
     await query(
+      // IN_TRANSIT is a departure, not an arrival — record it in departed_at so
+      // actual_arrival stays comparable to estimated_arrival.
       `UPDATE route_stop SET
          status = COALESCE($1, status),
          notes = COALESCE($2, notes),
          completed_at = CASE WHEN $1 = 'COMPLETED' THEN now() ELSE completed_at END,
-         actual_arrival = CASE WHEN $1 = 'IN_TRANSIT' THEN COALESCE(actual_arrival, now()) ELSE actual_arrival END
+         departed_at = CASE WHEN $1 = 'IN_TRANSIT' THEN COALESCE(departed_at, now()) ELSE departed_at END,
+         actual_arrival = CASE WHEN $1 = 'COMPLETED' THEN COALESCE(actual_arrival, now()) ELSE actual_arrival END
        WHERE id = $3 AND route_id = $4`,
       [dbStatus, notes ?? null, stopId, routeId]
     )

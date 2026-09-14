@@ -46,6 +46,55 @@ describe('pick-lists.service', () => {
     await expect(generateWave('s1', { date: '2026-06-17' })).rejects.toThrow(/no eligible orders/i)
   })
 
+  // Postgres rejects `SELECT DISTINCT ... ORDER BY <expr not in select list>` with
+  // error 42P10, so the auto-generate path 500s on a real database even though the
+  // mocked tests above pass. Guard the invariant on every SQL this service emits.
+  it('never emits SELECT DISTINCT ordered by a column outside the select list', async () => {
+    const { generateWave } = await import('./pick-lists.service.js')
+    queryMock.mockResolvedValue({ rows: [] })
+
+    await expect(generateWave('s1', { date: '2026-06-17' })).rejects.toThrow(/no eligible orders/i)
+
+    const statements = queryMock.mock.calls.map(([sql]) => String(sql))
+    expect(statements.length).toBeGreaterThan(0)
+
+    for (const sql of statements) {
+      const distinctMatch = /select\s+distinct\s+(?!on\s*\()([\s\S]*?)\bfrom\b/i.exec(sql)
+      const orderMatch = /\border\s+by\s+([\s\S]*?)(?:\blimit\b|$)/i.exec(sql)
+      if (!distinctMatch || !orderMatch) continue
+
+      const selected = distinctMatch[1]
+        .split(',')
+        .map((part) =>
+          part
+            .trim()
+            .split(/\s+as\s+/i)[0]
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+      const ordered = orderMatch[1]
+        .split(',')
+        .map((part) =>
+          part
+            .trim()
+            .replace(/\s+(asc|desc)$/i, '')
+            .replace(/\s+nulls\s+\w+$/i, '')
+            .toLowerCase()
+        )
+        .filter(Boolean)
+
+      for (const term of ordered) {
+        // Positional (`ORDER BY 1`) is always legal for DISTINCT.
+        if (/^\d+$/.test(term)) continue
+        expect(
+          selected,
+          `SELECT DISTINCT ordered by "${term}" which is not in the select list:\n${sql}`
+        ).toContain(term)
+      }
+    }
+  })
+
   it('generates wave with pick lists for explicit order ids', async () => {
     const { generateWave } = await import('./pick-lists.service.js')
     const orderId = '11111111-1111-4111-8111-111111111111'

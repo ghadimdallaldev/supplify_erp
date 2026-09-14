@@ -123,13 +123,40 @@ describe('supplier-deliveries.service', () => {
         orderStatus: 'SHIPPED',
         restaurantName: 'Cafe One',
         deliveryArea: 'North',
-        deliveryStatus: 'out_for_delivery',
+        // picked_up is reported as itself: collapsing it into out_for_delivery hid a
+        // real state and made "Delivered" the driver's primary action before they had
+        // declared departure.
+        deliveryStatus: 'picked_up',
         assignmentId: 'da-1',
         warehouseAssignmentId: 'wh-1',
         driverId: 'drv-1',
         driverName: 'Sam',
         hasPod: false,
       })
+    })
+
+    it('reports out_for_delivery distinctly from picked_up', () => {
+      const base = {
+        order_id: 'o-3',
+        order_status: 'SHIPPED',
+        restaurant_name: 'Cafe Three',
+        delivery_area: 'East',
+        assignment_id: 'da-3',
+        warehouse_assignment_id: null,
+        driver_id: 'drv-3',
+        driver_name: 'Ada',
+        has_pod: false,
+        scheduled_at: '2026-09-14T10:00:00.000Z',
+        destination_latitude: null,
+        destination_longitude: null,
+        destination_label: 'Cafe Three',
+      }
+      expect(
+        mapBoardRow({ ...base, delivery_status: 'out_for_delivery' }, new Map()).deliveryStatus
+      ).toBe('out_for_delivery')
+      expect(mapBoardRow({ ...base, delivery_status: 'picked_up' }, new Map()).deliveryStatus).toBe(
+        'picked_up'
+      )
     })
 
     it('maps unassigned orders as pending with null assignment ids', () => {

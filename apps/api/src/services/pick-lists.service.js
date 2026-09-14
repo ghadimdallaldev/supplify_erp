@@ -166,7 +166,9 @@ async function resolveEligibleOrderIds(supplierId, { scheduledDate, warehouseId,
 
   const { rows } = await query(
     `
-    SELECT DISTINCT o.id
+    -- created_at must be selected: Postgres rejects SELECT DISTINCT ordered by a
+    -- column outside the select list (42P10). (id, created_at) still dedupes per order.
+    SELECT DISTINCT o.id, o.created_at
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     WHERE o.status = ANY($3::order_status[])
