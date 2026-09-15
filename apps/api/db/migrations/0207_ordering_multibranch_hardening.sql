@@ -73,7 +73,8 @@ COMMENT ON TABLE order_placement_idempotency IS
 UPDATE customer_order co
 SET supplier_organization_id = s.organization_id
 FROM (
-  SELECT order_id, MIN(supplier_id) AS supplier_id
+  -- PG has no min(uuid); pick the sole supplier_id (HAVING guarantees one distinct).
+  SELECT order_id, (array_agg(supplier_id))[1] AS supplier_id
   FROM order_item
   GROUP BY order_id
   HAVING COUNT(DISTINCT supplier_id) = 1
