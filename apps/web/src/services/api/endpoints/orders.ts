@@ -279,6 +279,23 @@ export const ordersApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
+    retryFailedDelivery: builder.mutation<
+      { driverAssignment: unknown; warehouseAssignment?: unknown },
+      {
+        orderId: string
+        source_driver_assignment_id: string
+        driver_id: string
+        warehouse_id?: string
+        reason: string
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/orders/${orderId}/delivery-retry`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     reassignDriverOnOrder: builder.mutation<
       { assignment: unknown },
       { orderId: string; driver_id: string; reason?: string }

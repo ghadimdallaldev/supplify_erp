@@ -109,6 +109,7 @@ export const {
   useDeactivateDriverMutation,
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
+  useRetryFailedDeliveryMutation,
   useUpdateOrderDeliveryStatusMutation,
   useRolloverAssignmentToTomorrowMutation,
   useGetPickWavesQuery,

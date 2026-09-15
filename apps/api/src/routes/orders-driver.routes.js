@@ -42,6 +42,8 @@ import {
   MAX_UPLOAD_BYTES,
 } from '../lib/sanitize-upload.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
+import { getDriverDeliveryDetail } from '../services/driver-delivery-detail.service.js'
+import { retryFailedDelivery } from '../services/delivery-retry.service.js'
 
 const router = express.Router({ mergeParams: true })
 
@@ -85,9 +87,15 @@ const deliveryStatusSchema = z.object({
 })
 const reassignSchema = z.object({
   driver_id: z.string().uuid(),
-  reason: z.string().optional().nullable(),
+  reason: z.string().trim().min(3).max(2000),
   driver_assignment_id: z.string().uuid().optional().nullable(),
   warehouse_assignment_id: z.string().uuid().optional().nullable(),
+})
+const retryDeliverySchema = z.object({
+  source_driver_assignment_id: z.string().uuid(),
+  driver_id: z.string().uuid(),
+  warehouse_id: z.string().uuid().optional().nullable(),
+  reason: z.string().min(3).max(2000),
 })
 const podSchema = z
   .object({
@@ -108,7 +116,7 @@ const podSchema = z
 const podPresignSchema = z.object({
   fileName: z.string().min(1),
   fileType: z.string().min(1),
-  fileSize: z.number().optional().nullable(),
+  fileSize: z.number().int().nonnegative().max(MAX_UPLOAD_BYTES).optional().nullable(),
 })
 
 const locationSchema = z.object({
@@ -122,6 +130,54 @@ const locationSchema = z.object({
   route_stop_id: z.string().uuid().optional().nullable(),
 })
 
+router.get(
+  '/:id/driver-detail',
+  ...supplierFulfillmentGate,
+  requireAnyPermission('FULFILLMENT_VIEW', 'DRIVER_DELIVERIES_VIEW'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) throw new ForbiddenError('Supplier not found')
+      const permissions = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(permissions)) {
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          permissions,
+        })
+      }
+      const detail = await getDriverDeliveryDetail(req.params.id, supplierId)
+      res.json({ ok: true, data: detail, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+router.post(
+  '/:id/delivery-retry',
+  ...supplierFulfillmentGate,
+  requirePermission('FULFILLMENT_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) throw new ForbiddenError('Supplier not found')
+      const body = retryDeliverySchema.parse(req.body)
+      const data = await retryFailedDelivery({
+        orderId: req.params.id,
+        supplierId,
+        sourceDriverAssignmentId: body.source_driver_assignment_id,
+        driverId: body.driver_id,
+        warehouseId: body.warehouse_id,
+        reason: body.reason,
+        assignedByUserId: req.userData?.id,
+      })
+      res.status(201).json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
 router.post(
   '/:id/assign-driver',
   ...supplierFulfillmentGate,

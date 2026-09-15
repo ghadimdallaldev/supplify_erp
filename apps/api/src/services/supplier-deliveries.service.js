@@ -4,6 +4,7 @@ import { logger } from '../lib/logger.js'
 import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-location.service.js'
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
 import { isEtaEligibleAssignmentStatus } from './delivery-eta.service.js'
+import { resolveDestinationFromOrderRow } from '../lib/delivery-coordinates.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -147,7 +148,17 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
       ${sql.scheduledAtExpr} AS scheduled_at,
       ${sql.destinationLatitudeExpr} AS destination_latitude,
       ${sql.destinationLongitudeExpr} AS destination_longitude,
-      ${sql.destinationLabelExpr} AS destination_label
+      ${sql.destinationLabelExpr} AS destination_label,
+      ${sql.branchDestinationLatitudeExpr} AS branch_delivery_latitude,
+      ${sql.branchDestinationLongitudeExpr} AS branch_delivery_longitude,
+      ${sql.branchDestinationLabelExpr} AS branch_delivery_location_label,
+      ${sql.branchNameExpr} AS branch_name,
+      ${sql.branchAddressExpr} AS branch_address,
+      ${sql.restaurantDestinationLatitudeExpr} AS restaurant_delivery_latitude,
+      ${sql.restaurantDestinationLongitudeExpr} AS restaurant_delivery_longitude,
+      ${sql.restaurantDestinationLabelExpr} AS restaurant_delivery_location_label,
+      o.delivery_location_snapshot,
+      r.address_json AS restaurant_address
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
     JOIN restaurant r ON r.id = o.restaurant_id
@@ -182,7 +193,8 @@ async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr
       ${scheduledAtExpr} AS scheduled_at,
       NULL::numeric AS destination_latitude,
       NULL::numeric AS destination_longitude,
-      r.name AS destination_label
+      r.name AS destination_label,
+      o.delivery_location_snapshot
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
     JOIN restaurant r ON r.id = o.restaurant_id
@@ -212,8 +224,21 @@ export function mapBoardRow(r, locationMap) {
       : null,
     allowDriverFallback: true,
   })
-  const destLat = r.destination_latitude != null ? Number(r.destination_latitude) : null
-  const destLng = r.destination_longitude != null ? Number(r.destination_longitude) : null
+  const destination = resolveDestinationFromOrderRow({
+    delivery_location_snapshot: r.delivery_location_snapshot,
+    branch_delivery_latitude: r.branch_delivery_latitude,
+    branch_delivery_longitude: r.branch_delivery_longitude,
+    branch_delivery_location_label: r.branch_delivery_location_label,
+    branch_name: r.branch_name,
+    branch_address: r.branch_address,
+    restaurant_delivery_latitude: r.restaurant_delivery_latitude,
+    restaurant_delivery_longitude: r.restaurant_delivery_longitude,
+    restaurant_delivery_location_label: r.restaurant_delivery_location_label,
+    restaurant_address: r.restaurant_address,
+    restaurant_name: r.restaurant_name,
+  })
+  const destLat = destination?.latitude != null ? Number(destination.latitude) : null
+  const destLng = destination?.longitude != null ? Number(destination.longitude) : null
   const destinationCoordinatesAvailable =
     destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)
   const deliveryStatus = normalizeDeliveryStatus(r.delivery_status)
@@ -241,7 +266,9 @@ export function mapBoardRow(r, locationMap) {
     destinationCoordinatesAvailable,
     destinationLatitude: destinationCoordinatesAvailable ? destLat : null,
     destinationLongitude: destinationCoordinatesAvailable ? destLng : null,
-    destinationLabel: destinationCoordinatesAvailable ? r.destination_label : null,
+    destinationLabel: destination?.label ?? r.destination_label ?? null,
+    destinationAddress: destination?.address ?? null,
+    scheduledDeliveryDate: r.scheduled_at ? String(r.scheduled_at).slice(0, 10) : null,
     etaAvailable,
   }
 }

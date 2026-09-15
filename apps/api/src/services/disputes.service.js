@@ -132,6 +132,12 @@ async function loadDisputeDetail(disputeId, { restaurantId, supplierId } = {}) {
     [disputeId]
   )
 
+  const resolutionEffectResult = await query(
+    `SELECT id, effect_type, amount, currency, reference, credit_note_id, replacement_order_id, effect_data, created_by, created_at FROM dispute_resolution_effects WHERE dispute_id = $1`,
+    [disputeId]
+  )
+  const resolutionEffects = resolutionEffectResult?.rows ?? []
+
   let replacementOrder = null
   if (dispute.replacementOrderId) {
     const { rows: replacementRows } = await query(
@@ -151,6 +157,7 @@ async function loadDisputeDetail(disputeId, { restaurantId, supplierId } = {}) {
     attachments,
     creditNotes,
     replacementOrder,
+    resolutionEffect: resolutionEffects[0] || null,
   }
 }
 
@@ -421,13 +428,43 @@ export async function rejectDispute(disputeId, supplierId, resolutionNotes) {
     supplierId,
   ])
   if (!rows.length) throw new NotFoundError('Dispute not found')
-  if (!['open', 'under_review', 'escalated'].includes(rows[0].status)) {
-    throw new ValidationError('Dispute is already closed')
+
+  const isSameRejection = (effect) => {
+    if (effect?.effect_type !== 'no_action') return false
+    const data =
+      typeof effect.effect_data === 'string' ? JSON.parse(effect.effect_data) : effect.effect_data
+    return data?.rejected === true && data.notes === resolutionNotes
+  }
+
+  if (!ACTIVE_STATUSES.includes(rows[0].status)) {
+    const { rows: effects } = await query(
+      `SELECT effect_type, effect_data FROM dispute_resolution_effects WHERE dispute_id = $1`,
+      [disputeId]
+    )
+    if (isSameRejection(effects[0])) return loadDisputeDetail(disputeId, { supplierId })
+    throw new ConflictError('Dispute is already closed')
   }
 
   const orderId = rows[0].order_id
 
-  await withTransaction(async (client) => {
+  const result = await withTransaction(async (client) => {
+    const { rows: locked } = await client.query(
+      `SELECT * FROM disputes WHERE id = $1 AND supplier_id = $2 FOR UPDATE`,
+      [disputeId, supplierId]
+    )
+    if (!locked.length) throw new NotFoundError('Dispute not found')
+    const { rows: effects } = await client.query(
+      `SELECT effect_type, effect_data FROM dispute_resolution_effects WHERE dispute_id = $1 FOR UPDATE`,
+      [disputeId]
+    )
+    if (!ACTIVE_STATUSES.includes(locked[0].status)) {
+      if (isSameRejection(effects[0])) return { idempotent: true }
+      throw new ConflictError('Dispute is already closed')
+    }
+    await client.query(
+      `INSERT INTO dispute_resolution_effects (dispute_id, effect_type, effect_data) VALUES ($1, 'no_action', $2::jsonb) ON CONFLICT (dispute_id) DO NOTHING`,
+      [disputeId, JSON.stringify({ rejected: true, notes: resolutionNotes })]
+    )
     await client.query(
       `
       UPDATE disputes
@@ -441,66 +478,118 @@ export async function rejectDispute(disputeId, supplierId, resolutionNotes) {
       [disputeId, resolutionNotes]
     )
     await restoreOrderStatusAfterDisputeClosed(client, orderId)
+    return { idempotent: false }
   })
 
   const detail = await loadDisputeDetail(disputeId, { supplierId })
+  if (result?.idempotent) return detail
   await notifyDisputeResolved({ ...detail.dispute, resolutionNotes }, 'rejected')
   return detail
 }
-
 export async function resolveDispute(
   disputeId,
   supplierId,
-  { resolutionType, resolutionNotes, creditNoteAmount, creditNoteNotes }
-) {
-  if (!resolutionType) {
-    throw new ValidationError('resolutionType is required')
+  {
+    resolutionType,
+    resolutionNotes,
+    creditNoteAmount,
+    creditNoteNotes,
+    refundAmount,
+    refundReference,
+    userId = null,
   }
+) {
+  if (!resolutionType) throw new ValidationError('resolutionType is required')
+  if (!['credit_note', 'replacement', 'refund', 'no_action'].includes(resolutionType))
+    throw new ValidationError('Unsupported resolution type')
 
-  const { rows } = await query(`SELECT * FROM disputes WHERE id = $1 AND supplier_id = $2`, [
+  const preflight = await query(`SELECT * FROM disputes WHERE id = $1 AND supplier_id = $2`, [
     disputeId,
     supplierId,
   ])
-  if (!rows.length) throw new NotFoundError('Dispute not found')
-  if (!['open', 'under_review', 'escalated'].includes(rows[0].status)) {
-    throw new ValidationError('Dispute is already closed')
-  }
-
-  const disputeRow = rows[0]
-
-  if (resolutionType === 'credit_note') {
-    const amount = Number(creditNoteAmount)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new ValidationError(
-        'creditNoteAmount must be a positive number for credit note resolution'
-      )
-    }
-    const maxAmount = disputeRow.disputed_amount != null ? Number(disputeRow.disputed_amount) : null
-    if (maxAmount != null && amount > maxAmount) {
-      throw new ValidationError(`Credit note amount cannot exceed disputed amount (${maxAmount})`)
-    }
-  }
-
-  if (resolutionType === 'replacement' && disputeRow.replacement_order_id) {
+  if (!preflight?.rows?.length) throw new NotFoundError('Dispute not found')
+  const preflightDispute = preflight.rows[0]
+  if (
+    resolutionType === 'replacement' &&
+    preflightDispute.replacement_order_id &&
+    ACTIVE_STATUSES.includes(preflightDispute.status)
+  )
     throw new ValidationError('A replacement order already exists for this dispute')
+  if (resolutionType === 'credit_note' || resolutionType === 'refund') {
+    const requestedAmount = Number(resolutionType === 'refund' ? refundAmount : creditNoteAmount)
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0)
+      throw new ValidationError(
+        resolutionType === 'refund'
+          ? 'refundAmount must be positive'
+          : 'creditNoteAmount must be positive'
+      )
+    if (
+      preflightDispute.disputed_amount != null &&
+      requestedAmount > Number(preflightDispute.disputed_amount)
+    )
+      throw new ValidationError(
+        `Resolution amount cannot exceed disputed amount (${preflightDispute.disputed_amount})`
+      )
+    if (resolutionType === 'refund' && !refundReference?.trim())
+      throw new ValidationError('refundReference is required for refund resolution')
   }
+  let idempotent = false
+  const result = await withTransaction(async (client) => {
+    const locked = await client.query(
+      `SELECT * FROM disputes WHERE id = $1 AND supplier_id = $2 FOR UPDATE`,
+      [disputeId, supplierId]
+    )
+    const rows = locked?.rows?.length ? locked.rows : preflight.rows
+    const disputeRow = rows[0]
+    const { rows: existingEffects } = await client.query(
+      `SELECT * FROM dispute_resolution_effects WHERE dispute_id = $1 FOR UPDATE`,
+      [disputeId]
+    )
+    const existing = existingEffects[0]
+    if (existing) {
+      const requestedAmount = resolutionType === 'refund' ? refundAmount : creditNoteAmount
+      const same =
+        existing.effect_type === resolutionType &&
+        (requestedAmount == null || Number(existing.amount) === Number(requestedAmount)) &&
+        (resolutionType !== 'refund' || existing.reference === refundReference)
+      if (!same) throw new ConflictError('This dispute already has a conflicting resolution effect')
+      idempotent = true
+      return { replacementOrderId: existing.replacement_order_id }
+    }
+    if (!ACTIVE_STATUSES.includes(disputeRow.status))
+      throw new ConflictError('Dispute is already closed without a matching resolution effect')
 
-  let replacementOrderId = null
+    let amount = null
+    if (resolutionType === 'credit_note' || resolutionType === 'refund') {
+      amount = Number(resolutionType === 'refund' ? refundAmount : creditNoteAmount)
+      if (!Number.isFinite(amount) || amount <= 0)
+        throw new ValidationError(
+          resolutionType === 'refund'
+            ? 'refundAmount must be positive'
+            : 'creditNoteAmount must be positive'
+        )
+      if (disputeRow.disputed_amount != null && amount > Number(disputeRow.disputed_amount))
+        throw new ValidationError(
+          `Resolution amount cannot exceed disputed amount (${disputeRow.disputed_amount})`
+        )
+      if (resolutionType === 'refund' && !refundReference?.trim())
+        throw new ValidationError('refundReference is required for refund resolution')
+    }
 
-  await withTransaction(async (client) => {
+    let replacementOrderId = null
+    let creditNote = null
+    let invoiceAdjustment = null
     if (resolutionType === 'replacement') {
       const { rows: disputeItems } = await client.query(
         `SELECT * FROM dispute_items WHERE dispute_id = $1 ORDER BY created_at`,
         [disputeId]
       )
       const { rows: originalOrders } = await client.query(
-        `SELECT * FROM customer_order WHERE id = $1`,
+        `SELECT * FROM customer_order WHERE id = $1 FOR UPDATE`,
         [disputeRow.order_id]
       )
-      if (!originalOrders.length) {
+      if (!originalOrders.length)
         throw new ValidationError('Original order not found for replacement')
-      }
-
       replacementOrderId = await createReplacementOrderFromDispute(client, {
         disputeRow,
         disputeItems,
@@ -508,62 +597,87 @@ export async function resolveDispute(
       })
     }
 
-    await client.query(
-      `
-      UPDATE disputes
-      SET status = 'resolved',
-          resolution_type = $2,
-          resolution_notes = $3,
-          resolved_at = NOW(),
-          updated_at = NOW()
-      WHERE id = $1
-      `,
-      [disputeId, resolutionType, resolutionNotes || null]
-    )
-
-    if (resolutionType === 'credit_note') {
-      const amount = Number(creditNoteAmount)
+    if (resolutionType === 'credit_note' || resolutionType === 'refund') {
       const creditNoteNumber = await generateCreditNoteNumber(client)
-      await client.query(
-        `
-        INSERT INTO credit_note (
-          credit_note_number, invoice_id, supplier_id, restaurant_id,
-          issue_date, reason, description,
-          credit_amount, applied_amount, remaining_amount,
-          status, currency, order_id, notes, dispute_id
-        ) VALUES (
-          $1, $2, $3, $4, CURRENT_DATE, 'RETURN', $5,
-          $6, 0, $6, 'ISSUED', 'USD', $7, $8, $9
-        )
-        `,
+      const reason = resolutionType === 'refund' ? 'OTHER' : 'RETURN'
+      const description =
+        resolutionType === 'refund'
+          ? `Auditable refund adjustment: ${refundReference.trim()}`
+          : creditNoteNotes || `Credit for dispute ${disputeId.slice(0, 8)}`
+      const { rows } = await client.query(
+        `INSERT INTO credit_note (credit_note_number, invoice_id, supplier_id, restaurant_id, issue_date, reason, description, credit_amount, applied_amount, remaining_amount, status, currency, order_id, notes, dispute_id)
+         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, 0, $7, 'ISSUED', 'USD', $8, $9, $10) RETURNING *`,
         [
           creditNoteNumber,
           disputeRow.invoice_id,
           disputeRow.supplier_id,
           disputeRow.restaurant_id,
-          creditNoteNotes || `Credit for dispute ${disputeId.slice(0, 8)}`,
+          reason,
+          description,
           amount,
           disputeRow.order_id,
-          creditNoteNotes || null,
+          resolutionNotes || null,
           disputeId,
         ]
       )
+      creditNote = rows[0] || null
+      if (creditNote && disputeRow.invoice_id) {
+        try {
+          const applied = await applyCreditToInvoice(client, {
+            creditNoteId: creditNote.id,
+            invoiceId: disputeRow.invoice_id,
+            creditAmount: amount,
+            recordedBy: userId,
+          })
+          invoiceAdjustment = {
+            status: 'applied',
+            invoiceId: disputeRow.invoice_id,
+            amount: applied?.appliedAmount ?? amount,
+          }
+        } catch (error) {
+          if (error instanceof ValidationError || error instanceof NotFoundError)
+            invoiceAdjustment = {
+              status: 'not_applied',
+              invoiceId: disputeRow.invoice_id,
+              reason: error.message,
+            }
+          else throw error
+        }
+      }
     }
 
+    const effectData = {
+      resolutionNotes: resolutionNotes || null,
+      creditNoteNotes: creditNoteNotes || null,
+      invoiceAdjustment,
+      refundReference: resolutionType === 'refund' ? refundReference.trim() : null,
+    }
+    const { rows: effects } = await client.query(
+      `INSERT INTO dispute_resolution_effects (dispute_id, effect_type, amount, currency, reference, credit_note_id, replacement_order_id, effect_data, created_by)
+       VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7::jsonb, $8) RETURNING *`,
+      [
+        disputeId,
+        resolutionType,
+        amount,
+        resolutionType === 'refund' ? refundReference.trim() : null,
+        creditNote?.id ?? null,
+        replacementOrderId,
+        JSON.stringify(effectData),
+        userId,
+      ]
+    )
+    await client.query(
+      `UPDATE disputes SET status = 'resolved', resolution_type = $2, resolution_notes = $3, replacement_order_id = COALESCE($4, replacement_order_id), resolved_at = now(), updated_at = now() WHERE id = $1`,
+      [disputeId, resolutionType, resolutionNotes || null, replacementOrderId]
+    )
     await restoreOrderStatusAfterDisputeClosed(client, disputeRow.order_id)
+    return { replacementOrderId, effect: effects[0] }
   })
 
   const detail = await loadDisputeDetail(disputeId, { supplierId })
-  if (resolutionType === 'credit_note') {
-    const { rows } = await query(
-      `SELECT * FROM credit_note WHERE dispute_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [disputeId]
-    )
-    detail.creditNote = rows[0] || null
-  }
-
+  if (idempotent) return detail
   await notifyDisputeResolved(detail.dispute, 'resolved', {
-    replacementOrderId: replacementOrderId || detail.dispute.replacementOrderId || null,
+    replacementOrderId: result.replacementOrderId || detail.dispute.replacementOrderId || null,
   })
   return detail
 }
