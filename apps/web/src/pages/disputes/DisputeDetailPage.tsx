@@ -69,6 +69,8 @@ export function DisputeDetailPage() {
   const [resolutionType, setResolutionType] = useState('credit_note')
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [creditAmount, setCreditAmount] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReference, setRefundReference] = useState('')
 
   useEffect(() => {
     void ensureNamespace('disputes')
@@ -120,6 +122,7 @@ export function DisputeDetailPage() {
   const items = (data.items as Array<Record<string, unknown>>) ?? []
   const creditNotes = (data.creditNotes as Array<Record<string, unknown>>) ?? []
   const replacementOrder = data.replacementOrder as Record<string, unknown> | null | undefined
+  const resolutionEffect = data.resolutionEffect as Record<string, unknown> | null | undefined
   const replacementOrderId = String(
     dispute.replacementOrderId ?? dispute.replacement_order_id ?? replacementOrder?.id ?? ''
   )
@@ -145,6 +148,8 @@ export function DisputeDetailPage() {
           resolutionType,
           resolutionNotes: resolutionNotes || undefined,
           creditNoteAmount: creditAmount ? Number(creditAmount) : undefined,
+          refundAmount: refundAmount ? Number(refundAmount) : undefined,
+          refundReference: refundReference || undefined,
         },
       }).unwrap()
       toast.success(t('detail.toast.resolved'))
@@ -229,6 +234,16 @@ export function DisputeDetailPage() {
           }
         />
 
+        {resolutionEffect && (
+          <Card>
+            <CardContent className="py-4 text-sm">
+              Resolution effect:{' '}
+              {String(resolutionEffect.effect_type ?? resolutionEffect.effectType ?? 'recorded')}{' '}
+              {resolutionEffect.amount ? `· ${String(resolutionEffect.amount)}` : ''}
+              {resolutionEffect.reference ? ` · ${String(resolutionEffect.reference)}` : ''}
+            </CardContent>
+          </Card>
+        )}
         {replacementOrderId && (
           <Card className="border-sky-300 bg-sky-50/50 dark:border-sky-800 dark:bg-sky-950/20">
             <CardHeader>
@@ -442,6 +457,21 @@ export function DisputeDetailPage() {
                   </SelectTrigger>
                 </Select>
               </div>
+              {resolutionType === 'refund' && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    type="number"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    placeholder="Refund amount"
+                  />
+                  <Input
+                    value={refundReference}
+                    onChange={(e) => setRefundReference(e.target.value)}
+                    placeholder="Refund reference"
+                  />
+                </div>
+              )}
               {resolutionType === 'credit_note' && (
                 <div>
                   <Label>{t('detail.resolveDialog.creditAmount')}</Label>

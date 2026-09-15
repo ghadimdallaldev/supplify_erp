@@ -500,9 +500,13 @@ export async function reactivateRestaurantOrgBranch(restaurantId) {
  * Clears org branch access rows for this restaurant.
  */
 export async function unlinkRestaurantFromOrganization(restaurantId, { client = null } = {}) {
-  const db = client ? (sql, params) => client.query(sql, params) : query
+  if (!client)
+    return withTransaction((transactionClient) =>
+      unlinkRestaurantFromOrganization(restaurantId, { client: transactionClient })
+    )
+  const db = (sql, params) => client.query(sql, params)
   const { rows } = await db(
-    `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1`,
+    `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1 FOR UPDATE`,
     [restaurantId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }

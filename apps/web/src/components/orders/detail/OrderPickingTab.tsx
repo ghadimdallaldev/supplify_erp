@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   useGetOrderQuery,
@@ -16,6 +16,112 @@ import { useImpersonation } from '../../../hooks/useImpersonation'
 import { usePermissions } from '../../../hooks/usePermissions'
 import { toast } from 'sonner'
 
+function TransferPanel({
+  orderId,
+  assignment,
+  warehouses,
+  onComplete,
+}: {
+  orderId: string
+  assignment: any
+  warehouses: any[]
+  onComplete: () => void
+}) {
+  const { t } = useTranslation('orders')
+  const [targetWarehouseId, setTargetWarehouseId] = useState(assignment.warehouse_id || '')
+  const [transferReason, setTransferReason] = useState('')
+  const [reassign, { isLoading }] = useReassignOrderWarehouseMutation()
+
+  const submit = async () => {
+    if (
+      !targetWarehouseId ||
+      targetWarehouseId === assignment.warehouse_id ||
+      transferReason.trim().length < 3
+    )
+      return
+    try {
+      await reassign({
+        orderId,
+        assignmentId: assignment.id,
+        warehouseId: targetWarehouseId,
+        reason: transferReason.trim(),
+      }).unwrap()
+      toast.success(
+        t('pickingTab.transferSuccess', { defaultValue: 'Fulfillment location updated.' })
+      )
+      setTransferReason('')
+      onComplete()
+    } catch (error: any) {
+      toast.error(
+        error?.data?.error?.message ||
+          t('pickingTab.transferFailed', { defaultValue: 'Could not update fulfillment location.' })
+      )
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-[var(--app-border)] p-4 space-y-3">
+      <div>
+        <p className="font-semibold">
+          {assignment.order_item_id ? 'Item fulfillment leg' : 'Order fulfillment leg'}
+        </p>
+        <p className="text-sm text-[var(--text-muted)]">
+          Transfer only this warehouse leg. Other supplier or warehouse lines remain unchanged.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`transfer-warehouse-${assignment.id}`}>
+            {t('pickingTab.destinationWarehouse', { defaultValue: 'Destination warehouse' })}
+          </Label>
+          <select
+            id={`transfer-warehouse-${assignment.id}`}
+            className="w-full rounded-md border border-[var(--app-border)] bg-background px-3 py-2 text-sm"
+            value={targetWarehouseId}
+            onChange={(event) => setTargetWarehouseId(event.target.value)}
+          >
+            <option value="">
+              {t('pickingTab.chooseWarehouse', { defaultValue: 'Choose a warehouse' })}
+            </option>
+            {warehouses.map((warehouse: any) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name || warehouse.code || warehouse.id}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`transfer-reason-${assignment.id}`}>
+            {t('pickingTab.transferReason', { defaultValue: 'Reason' })}
+          </Label>
+          <Input
+            id={`transfer-reason-${assignment.id}`}
+            value={transferReason}
+            onChange={(event) => setTransferReason(event.target.value)}
+            placeholder={t('pickingTab.transferReasonPlaceholder', {
+              defaultValue: 'e.g. temporary stock outage',
+            })}
+            maxLength={500}
+          />
+        </div>
+      </div>
+      <Button
+        onClick={() => void submit()}
+        disabled={
+          isLoading ||
+          !targetWarehouseId ||
+          targetWarehouseId === assignment.warehouse_id ||
+          transferReason.trim().length < 3
+        }
+      >
+        {isLoading
+          ? t('pickingTab.transferring', { defaultValue: 'Updating…' })
+          : t('pickingTab.transfer', { defaultValue: 'Transfer fulfillment leg' })}
+      </Button>
+    </div>
+  )
+}
+
 export interface OrderPickingTabProps {
   orderId: string
 }
@@ -30,13 +136,7 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
   const { data: assignmentData } = useGetOrderWarehouseAssignmentsQuery(orderId, {
     skip: !isEffectiveSupplier,
   })
-  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
-    skip: !canTransfer,
-  })
-  const [reassignOrderWarehouse, { isLoading: isTransferring }] =
-    useReassignOrderWarehouseMutation()
-  const [targetWarehouseId, setTargetWarehouseId] = useState('')
-  const [transferReason, setTransferReason] = useState('')
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, { skip: !canTransfer })
 
   const order = data?.order
   const assignments = (assignmentData?.assignments ||
@@ -49,41 +149,12 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
     warehouse_name?: string
     warehouse_code?: string
   }>
-  const orderLevelAssignment = assignments.find((a) => !a.order_item_id)
 
-  useEffect(() => {
-    if (orderLevelAssignment && !targetWarehouseId) {
-      setTargetWarehouseId(orderLevelAssignment.warehouse_id || '')
-    }
-  }, [orderLevelAssignment, targetWarehouseId])
+  if (isLoading || !data?.order) return <OrderDetailTabLoading />
 
-  if (isLoading || !data?.order) {
-    return <OrderDetailTabLoading />
-  }
-
-  const submitTransfer = async () => {
-    if (!orderLevelAssignment || !targetWarehouseId || transferReason.trim().length < 3) return
-    try {
-      await reassignOrderWarehouse({
-        orderId,
-        assignmentId: orderLevelAssignment.id,
-        warehouseId: targetWarehouseId,
-        reason: transferReason.trim(),
-      }).unwrap()
-      toast.success(
-        t('pickingTab.transferSuccess', {
-          defaultValue: 'Fulfillment location updated.',
-        })
-      )
-      setTransferReason('')
-      await refetch()
-    } catch (error: any) {
-      toast.error(
-        error?.data?.error?.message ||
-          t('pickingTab.transferFailed', { defaultValue: 'Could not update fulfillment location.' })
-      )
-    }
-  }
+  const transferableAssignments = assignments.filter((assignment) =>
+    ['pending', 'picking'].includes(assignment.status || '')
+  )
 
   return (
     <Card>
@@ -103,78 +174,24 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {canTransfer &&
-          orderLevelAssignment &&
-          ['pending', 'picking'].includes(orderLevelAssignment.status || '') && (
-            <div className="mb-5 rounded-lg border border-[var(--app-border)] p-4 space-y-3">
-              <div>
-                <p className="font-semibold">
-                  {t('pickingTab.transferTitle', { defaultValue: 'Transfer fulfillment' })}
-                </p>
-                <p className="text-sm text-[var(--text-muted)]">
-                  {t('pickingTab.transferDescription', {
-                    defaultValue:
-                      'Move this complete order only when the destination warehouse can honor its committed stock and delivery terms.',
-                  })}
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-warehouse">
-                    {t('pickingTab.destinationWarehouse', {
-                      defaultValue: 'Destination warehouse',
-                    })}
-                  </Label>
-                  <select
-                    id="transfer-warehouse"
-                    className="w-full rounded-md border border-[var(--app-border)] bg-background px-3 py-2 text-sm"
-                    value={targetWarehouseId}
-                    onChange={(event) => setTargetWarehouseId(event.target.value)}
-                  >
-                    <option value="">
-                      {t('pickingTab.chooseWarehouse', { defaultValue: 'Choose a warehouse' })}
-                    </option>
-                    {(warehousesData?.warehouses || []).map((warehouse: any) => (
-                      <option key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name || warehouse.code || warehouse.id}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-reason">
-                    {t('pickingTab.transferReason', { defaultValue: 'Reason' })}
-                  </Label>
-                  <Input
-                    id="transfer-reason"
-                    value={transferReason}
-                    onChange={(event) => setTransferReason(event.target.value)}
-                    placeholder={t('pickingTab.transferReasonPlaceholder', {
-                      defaultValue: 'e.g. temporary stock outage',
-                    })}
-                    maxLength={500}
-                  />
-                </div>
-              </div>
-              <Button
-                onClick={() => void submitTransfer()}
-                disabled={
-                  isTransferring ||
-                  !targetWarehouseId ||
-                  targetWarehouseId === orderLevelAssignment.warehouse_id ||
-                  transferReason.trim().length < 3
-                }
-              >
-                {isTransferring
-                  ? t('pickingTab.transferring', { defaultValue: 'Updating…' })
-                  : t('pickingTab.transfer', { defaultValue: 'Transfer fulfillment' })}
-              </Button>
-            </div>
-          )}
+        {canTransfer && transferableAssignments.length > 0 && (
+          <div className="mb-5 space-y-3">
+            {transferableAssignments.map((assignment) => (
+              <TransferPanel
+                key={assignment.id}
+                orderId={orderId}
+                assignment={assignment}
+                warehouses={warehousesData?.warehouses || []}
+                onComplete={() => void refetch()}
+              />
+            ))}
+          </div>
+        )}
         <div className="space-y-4">
           {order.items?.map((item: any, idx: number) => {
             const itemAssignment =
-              assignments.find((a) => a.order_item_id === item.id) || orderLevelAssignment
+              assignments.find((assignment) => assignment.order_item_id === item.id) ||
+              assignments.find((assignment) => !assignment.order_item_id)
             const warehouseLabel =
               itemAssignment?.warehouse_name ||
               itemAssignment?.warehouse_code ||

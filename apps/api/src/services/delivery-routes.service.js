@@ -11,6 +11,7 @@ import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 import { getLatestLocationsForDrivers } from './driver-location.service.js'
 import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { getDeliveryZoneJoinSql } from '../lib/delivery-zone-join.js'
+import { resolveDestinationFromOrderRow } from '../lib/delivery-coordinates.js'
 import {
   isPlannedRouteEligibleStatus,
   isDispatchEligibleStatus,
@@ -71,8 +72,21 @@ async function nextRouteNumber(supplierId, client) {
 function mapStopRow(row) {
   const addr = row.address_json && typeof row.address_json === 'object' ? row.address_json : {}
   const area = row.delivery_area || [addr.city, addr.region].filter(Boolean).join(', ') || null
-  const destLat = row.destination_latitude ?? null
-  const destLng = row.destination_longitude ?? null
+  const destination = resolveDestinationFromOrderRow({
+    delivery_location_snapshot: row.delivery_location_snapshot,
+    branch_delivery_latitude: row.branch_delivery_latitude,
+    branch_delivery_longitude: row.branch_delivery_longitude,
+    branch_delivery_location_label: row.branch_delivery_location_label,
+    branch_name: row.branch_name,
+    branch_address: row.branch_address,
+    restaurant_delivery_latitude: row.restaurant_delivery_latitude,
+    restaurant_delivery_longitude: row.restaurant_delivery_longitude,
+    restaurant_delivery_location_label: row.restaurant_delivery_location_label,
+    restaurant_address: row.address_json,
+    restaurant_name: row.restaurant_name,
+  })
+  const destLat = destination?.latitude ?? null
+  const destLng = destination?.longitude ?? null
   return {
     id: row.id,
     routeId: row.route_id,
@@ -94,6 +108,8 @@ function mapStopRow(row) {
     destinationCoordinatesAvailable: destLat != null && destLng != null,
     destinationLatitude: destLat,
     destinationLongitude: destLng,
+    destinationLabel: destination?.label ?? area,
+    destinationAddress: destination?.address ?? null,
   }
 }
 
@@ -151,8 +167,15 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
       r.name AS restaurant_name,
       r.address_json,
       o.total_amount,
-      COALESCE(b.delivery_latitude, r.delivery_latitude) AS destination_latitude,
-      COALESCE(b.delivery_longitude, r.delivery_longitude) AS destination_longitude,
+      o.delivery_location_snapshot,
+      b.name AS branch_name,
+      b.address AS branch_address,
+      b.delivery_latitude AS branch_delivery_latitude,
+      b.delivery_longitude AS branch_delivery_longitude,
+      b.delivery_location_label AS branch_delivery_location_label,
+      r.delivery_latitude AS restaurant_delivery_latitude,
+      r.delivery_longitude AS restaurant_delivery_longitude,
+      r.delivery_location_label AS restaurant_delivery_location_label,
       COALESCE(dz.name, r.address_json->>'city', 'Unassigned area') AS delivery_area,
       (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id) AS item_count,
       da.status AS assignment_status
@@ -162,10 +185,10 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
     LEFT JOIN branch b ON b.id = o.branch_id
     LEFT JOIN LATERAL (
       SELECT da2.status FROM driver_assignments da2
-      WHERE da2.order_id = rs.order_id AND da2.status NOT IN ('reassigned')
+      WHERE da2.order_id = rs.order_id AND da2.status NOT IN ('reassigned', 'superseded')
       ORDER BY da2.created_at DESC LIMIT 1
     ) da ON true
-    LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
+    LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id AND owa.status <> 'superseded'
     ${deliveryZoneJoin}
     WHERE rs.route_id = ANY($1::uuid[])
     ORDER BY rs.route_id, rs.sequence_number ASC
@@ -341,7 +364,7 @@ async function syncDriverAssignment(
 ) {
   const { rows: pendingWh } = await client.query(
     `SELECT id FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')
      ORDER BY assigned_at DESC NULLS LAST`,
     [orderId]
   )
@@ -354,7 +377,7 @@ async function syncDriverAssignment(
       SELECT da.id, da.driver_id, da.status
       FROM driver_assignments da
       WHERE da.order_id = $1 AND da.supplier_id = $2
-        AND da.status NOT IN ('reassigned', 'delivered')
+        AND da.status NOT IN ('reassigned', 'delivered', 'superseded')
         AND (
           ($3::uuid IS NULL AND da.warehouse_assignment_id IS NULL)
           OR da.warehouse_assignment_id = $3

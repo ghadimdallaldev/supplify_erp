@@ -86,7 +86,7 @@ async function tenantHasOpenInvoices(tenantId, tenantType, client = null) {
   const db = client ? (sql, params) => client.query(sql, params) : query
   const { rows } = await db(
     `
-    SELECT id, invoice_number, amount_due, currency, due_date
+    SELECT id, invoice_number, amount, currency, due_date
     FROM billing_invoice
     WHERE tenant_id = $1
       AND tenant_type = $2

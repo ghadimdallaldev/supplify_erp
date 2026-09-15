@@ -161,6 +161,7 @@ async function resolveEligibleOrderIds(supplierId, { scheduledDate, warehouseId,
     warehouseClause = ` AND EXISTS (
       SELECT 1 FROM order_warehouse_assignment owa
       WHERE owa.order_id = o.id AND owa.warehouse_id = $${params.length}
+        AND owa.status NOT IN ('failed', 'superseded')
     )`
   }
 
@@ -210,6 +211,7 @@ async function loadOrderItemsForPicking(supplierId, orderId, warehouseId) {
       SELECT owa.warehouse_id
       FROM order_warehouse_assignment owa
       WHERE owa.order_id = oi.order_id
+        AND owa.status NOT IN ('failed', 'superseded')
         AND (owa.order_item_id = oi.id OR owa.order_item_id IS NULL)
       ORDER BY
         CASE WHEN owa.order_item_id = oi.id THEN 0 ELSE 1 END,

@@ -11,14 +11,17 @@ const ORDER_DESTINATION_SQL = `
     o.id AS order_id,
     o.branch_id,
     o.restaurant_id,
+    o.delivery_location_snapshot,
     r.name AS restaurant_name,
     r.delivery_latitude AS restaurant_delivery_latitude,
     r.delivery_longitude AS restaurant_delivery_longitude,
     r.delivery_location_label AS restaurant_delivery_location_label,
+    r.address_json AS restaurant_address,
     b.name AS branch_name,
     b.delivery_latitude AS branch_delivery_latitude,
     b.delivery_longitude AS branch_delivery_longitude,
-    b.delivery_location_label AS branch_delivery_location_label
+    b.delivery_location_label AS branch_delivery_location_label,
+    b.address AS branch_address
   FROM customer_order o
   JOIN restaurant r ON r.id = o.restaurant_id
   LEFT JOIN branch b ON b.id = o.branch_id

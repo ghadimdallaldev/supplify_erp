@@ -40,7 +40,7 @@ export const DRIVER_STATUS_TRANSITIONS = {
 }
 
 const ACTIVE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
-const NON_REASSIGNED_STATUSES = ['reassigned']
+const NON_REASSIGNED_STATUSES = ['reassigned', 'superseded']
 
 export async function assertSupplierOwnsOrder(supplierId, orderId) {
   const { rows } = await query(
@@ -208,7 +208,7 @@ export async function assignDriverToOrder({
   const { rows: openWhAssignments } = await query(
     `SELECT id, warehouse_id
      FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('failed', 'delivered')
+     WHERE order_id = $1 AND status NOT IN ('failed', 'delivered', 'superseded')
      ORDER BY
        CASE WHEN $2::uuid IS NOT NULL AND warehouse_id = $2::uuid THEN 0 ELSE 1 END,
        assigned_at DESC NULLS LAST`,
@@ -516,7 +516,7 @@ async function applyDeliveryStatusUpdate({
       await client.query(
         `UPDATE order_warehouse_assignment
          SET status = 'delivered'
-         WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+         WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')`,
         [orderId]
       )
     }
@@ -733,17 +733,18 @@ export async function submitProofOfDelivery({
   const assignment =
     driverAssignmentId != null
       ? (
-          await query(`SELECT id FROM driver_assignments WHERE id = $1 AND order_id = $2`, [
-            driverAssignmentId,
-            orderId,
-          ])
+          await query(
+            `SELECT id FROM driver_assignments
+             WHERE id = $1 AND order_id = $2 AND supplier_id = $3 AND status <> 'superseded'`,
+            [driverAssignmentId, orderId, supplierId]
+          )
         ).rows[0]
       : (
           await query(
             `SELECT id FROM driver_assignments
-             WHERE order_id = $1 AND status = 'delivered'
+             WHERE order_id = $1 AND supplier_id = $2 AND status = 'delivered'
              ORDER BY delivered_at DESC NULLS LAST LIMIT 1`,
-            [orderId]
+            [orderId, supplierId]
           )
         ).rows[0]
 

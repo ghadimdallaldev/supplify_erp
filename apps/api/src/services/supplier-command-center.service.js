@@ -116,7 +116,7 @@ async function countDeliveriesPendingToday(supplierId) {
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     LEFT JOIN LATERAL (
       SELECT da.status FROM driver_assignments da
-      WHERE da.order_id = o.id AND da.status NOT IN ('reassigned', 'delivered')
+      WHERE da.order_id = o.id AND da.status NOT IN ('reassigned', 'delivered', 'superseded')
       ORDER BY da.created_at DESC LIMIT 1
     ) da ON true
     WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
@@ -318,7 +318,7 @@ async function getDeliveryPreview(supplierId) {
     JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT * FROM driver_assignments da2
-      WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned')
+      WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned', 'superseded')
       ORDER BY da2.created_at DESC LIMIT 1
     ) da ON true
     LEFT JOIN drivers d ON d.id = da.driver_id

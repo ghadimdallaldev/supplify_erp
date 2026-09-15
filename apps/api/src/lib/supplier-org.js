@@ -582,10 +582,15 @@ export async function reactivateOrgBranch(supplierId) {
  * Unlink a Branch Account from its organization. Retains the tenant and history.
  */
 export async function unlinkSupplierFromOrganization(supplierId, { client = null } = {}) {
-  const db = client ? (sql, params) => client.query(sql, params) : query
-  const { rows } = await db(`SELECT is_main_branch, organization_id FROM supplier WHERE id = $1`, [
-    supplierId,
-  ])
+  if (!client)
+    return withTransaction((transactionClient) =>
+      unlinkSupplierFromOrganization(supplierId, { client: transactionClient })
+    )
+  const db = (sql, params) => client.query(sql, params)
+  const { rows } = await db(
+    `SELECT is_main_branch, organization_id FROM supplier WHERE id = $1 FOR UPDATE`,
+    [supplierId]
+  )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
