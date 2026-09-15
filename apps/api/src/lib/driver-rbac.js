@@ -57,7 +57,7 @@ export async function assertDriverAssignmentAccess({
       AND da.driver_id = $2
       AND ($3::uuid IS NULL OR da.order_id = $3)
       AND ($4::uuid IS NULL OR da.id = $4)
-      AND da.status NOT IN ('reassigned')
+      AND da.status NOT IN ('reassigned', 'superseded')
     ORDER BY da.created_at DESC
     LIMIT 1
     `,

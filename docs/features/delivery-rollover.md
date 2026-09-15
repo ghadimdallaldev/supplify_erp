@@ -113,3 +113,7 @@ The job no-ops when `DELIVERY_ROLLOVER_ENABLED=false`.
 | Manual script | `apps/api/scripts/run-delivery-rollover.mjs`         |
 | API           | `apps/api/src/routes/fulfillment.routes.js`          |
 | UI            | `DriverDispatchBoard.tsx`, `DispatchOrderRow.tsx`    |
+
+## Effective delivery date (2026-09-15)
+
+Driver and route surfaces expose scheduledDeliveryDate using this fallback order: assignment scheduled date, route scheduled date, order requested delivery date, assignment creation date, then order creation date. Failed and rescheduled assignments remain visible as non-completed outcomes; superseded attempts are excluded from active boards.

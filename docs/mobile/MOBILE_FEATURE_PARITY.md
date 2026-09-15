@@ -966,3 +966,13 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - Supplier reassignment now has matching Android/iOS warehouse API contracts and web controls; server checks tenant ownership, organization/branch scope, status, stock, service zones, immutable financial snapshots, reason, audit event, and transfer notification.
 - Both mobile repositories were updated and typechecked for the shared order, supplier, warehouse, notification, and permission contracts.
 - Deferred: device-level push delivery and production database migration execution require the deployment environment and credentials.
+
+## 2026-09-15 - Delivery and fulfillment contract hardening
+
+- Branch unlinking now uses guarded transactions and the current billing amount column; linked tenant history is preserved and unlink remains non-destructive.
+- Warehouse transfers are rendered per warehouse/item fulfillment leg. The API keeps supplier, organization, delivery-zone, status, audit, notification, and atomic reservation checks.
+- Delivery destinations resolve in immutable snapshot, branch, restaurant order. Boards, route stops, driver tracking, and driver detail expose the same destination metadata.
+- Driver schedule dates use assignment date, route date, requested delivery date, then assignment/order creation fallback. Android and iOS expose deterministic Today, Upcoming, Previous, Overdue, Delivered, Failed, and Rescheduled labels; failed/rescheduled rows are not completed.
+- Both mobile clients use the driver-detail endpoint, coordinate-first map navigation with real label/address fallback, binary POD upload validation/retry, and required-reason retry/reassign actions.
+- Failed delivery retries create linked warehouse/driver attempts and retain superseded history. Dispute resolutions record one immutable idempotency effect for credit notes, invoice adjustments/refunds, replacements, or no action.
+- Branch/account unlink remains a web/admin workflow; no mobile branch-management surface is required. Android and iOS were updated for the shared delivery, dispute, POD, and retry contracts.

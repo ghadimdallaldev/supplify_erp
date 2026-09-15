@@ -39,7 +39,7 @@ describe('branch-account-billing unlink policy', () => {
         ],
       })
       .mockResolvedValueOnce({
-        rows: [{ id: 'inv-1', invoice_number: 'INV-1', amount_due: 50 }],
+        rows: [{ id: 'inv-1', invoice_number: 'INV-1', amount: 50 }],
       })
       .mockResolvedValueOnce({ rows: [{ remaining: 0 }] })
       .mockResolvedValueOnce({ rows: [{ id: 'main-1' }] })

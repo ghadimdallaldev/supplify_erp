@@ -1,3 +1,4 @@
+import type { DisputeDetailResponse, DisputeResolutionRequest } from '../../../types/disputes'
 import { api } from '../base'
 export const disputesApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -15,7 +16,7 @@ export const disputesApi = api.injectEndpoints({
       query: (params) => ({ url: '/api/disputes/incoming', params: params || {} }),
       providesTags: ['Disputes'],
     }),
-    getDispute: builder.query<Record<string, unknown>, string>({
+    getDispute: builder.query<DisputeDetailResponse, string>({
       query: (id) => `/api/disputes/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'Disputes', id }],
     }),
@@ -32,8 +33,8 @@ export const disputesApi = api.injectEndpoints({
       invalidatesTags: ['Disputes'],
     }),
     resolveDispute: builder.mutation<
-      Record<string, unknown>,
-      { id: string; body: Record<string, unknown> }
+      DisputeDetailResponse,
+      { id: string; body: DisputeResolutionRequest }
     >({
       query: ({ id, body }) => ({ url: `/api/disputes/${id}/resolve`, method: 'POST', body }),
       invalidatesTags: ['Disputes', 'CreditNotes', 'Order'],

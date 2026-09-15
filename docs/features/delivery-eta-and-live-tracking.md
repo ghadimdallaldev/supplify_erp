@@ -267,3 +267,9 @@ UI shows:
 Order creation is **not** blocked when coordinates are missing.
 
 Do not geocode `address_json` in the API for this MVP.
+
+## Destination and driver detail contract (2026-09-15)
+
+All operational delivery surfaces use one precedence rule: delivery_location_snapshot, then branch location, then restaurant location. The resolver returns validated coordinates when present plus a label/address and source. The immutable snapshot remains authoritative after order creation.
+
+GET /api/orders/:id/driver-detail is limited to the supplier/driver assignment owner and returns operational data only: destination, branch, supplier-owned item names/SKUs/quantities, effective scheduled date, assignment/route identifiers, status timestamps, notes, failure reason, and POD availability. Driver clients must use coordinates for map navigation first and may search only a real snapshot/branch/restaurant label or address.

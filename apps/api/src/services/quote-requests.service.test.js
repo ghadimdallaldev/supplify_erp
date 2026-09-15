@@ -310,6 +310,54 @@ describe('quote-requests.service', () => {
     expect(detail.canRespond).toBe(true)
   })
 
+  it('returns the restaurant-created item and quantity in the supplier response form', async () => {
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'qrs-1',
+            quote_request_id: 'qr-1',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'rest-1',
+            restaurant_name: 'Test Rest',
+            status: 'pending',
+            quote_request_status: 'open',
+            quote_request_note: 'Weekly produce',
+            needed_by: '2026-09-20',
+            quote_request_created_at: new Date().toISOString(),
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'item-1',
+            product_id: 'product-1',
+            product_name: 'Restaurant-created tomatoes',
+            product_sku: 'TOM-01',
+            product_unit: 'kg',
+            quantity: '7',
+            unit: 'kg',
+            notes: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const detail = await getSupplierQuoteRequestDetail('supplier-1', 'qrs-1')
+
+    expect(detail.items).toEqual([
+      expect.objectContaining({
+        productId: 'product-1',
+        productName: 'Restaurant-created tomatoes',
+        productSku: 'TOM-01',
+        quantity: 7,
+        unit: 'kg',
+      }),
+    ])
+    expect(detail.canRespond).toBe(true)
+  })
   it('getSupplierQuoteRequestDetail sets canRespond false when quote request is closed', async () => {
     queryMock
       .mockResolvedValueOnce({

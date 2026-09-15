@@ -28,6 +28,7 @@ import {
   useGetDriversQuery,
   useAssignDriverToOrderMutation,
   useReassignDriverOnOrderMutation,
+  useRetryFailedDeliveryMutation,
   useUpdateOrderDeliveryStatusMutation,
   useRolloverAssignmentToTomorrowMutation,
 } from '../../services/api'
@@ -72,12 +73,14 @@ export function DriverDispatchBoard({
   const [podOrder, setPodOrder] = useState<DispatchOrderCard | null>(null)
   const [failOrder, setFailOrder] = useState<DispatchOrderCard | null>(null)
   const [failureReason, setFailureReason] = useState('')
+  const [reassignReason, setReassignReason] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [createRouteOpen, setCreateRouteOpen] = useState(false)
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null)
 
   const [assignDriver, { isLoading: assigning }] = useAssignDriverToOrderMutation()
   const [reassignDriver, { isLoading: reassigning }] = useReassignDriverOnOrderMutation()
+  const [retryFailedDelivery] = useRetryFailedDeliveryMutation()
   const [updateDeliveryStatus, { isLoading: updatingStatus }] =
     useUpdateOrderDeliveryStatusMutation()
   const [rolloverAssignment, { isLoading: rollingOver }] = useRolloverAssignmentToTomorrowMutation()
@@ -90,10 +93,26 @@ export function DriverDispatchBoard({
   const handleAssign = async () => {
     if (!assignOrder || !selectedDriverId) return
     try {
-      await assignDriver({ orderId: assignOrder.id, driver_id: selectedDriverId }).unwrap()
+      if (assignOrder.assignment?.status === 'failed') {
+        const reason = window.prompt('Why is this failed delivery being retried?')?.trim() || ''
+        if (reason.length < 3) {
+          toast.error('A retry reason is required.')
+          return
+        }
+        await retryFailedDelivery({
+          orderId: assignOrder.id,
+          source_driver_assignment_id: assignOrder.assignment.id,
+          driver_id: selectedDriverId,
+          warehouse_id: assignOrder.warehouse_id ?? undefined,
+          reason,
+        }).unwrap()
+      } else {
+        await assignDriver({ orderId: assignOrder.id, driver_id: selectedDriverId }).unwrap()
+      }
       toast.success(t('dispatch.toast.driverAssigned'))
       setAssignOrder(null)
       setSelectedDriverId('')
+      setReassignReason('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || t('dispatch.toast.assignFailed'))
@@ -102,14 +121,20 @@ export function DriverDispatchBoard({
 
   const handleReassign = async () => {
     if (!reassignOrder || !selectedDriverId) return
+    if (reassignReason.trim().length < 3) {
+      toast.error('A reassignment reason is required.')
+      return
+    }
     try {
       await reassignDriver({
         orderId: reassignOrder.id,
         driver_id: selectedDriverId,
+        reason: reassignReason.trim(),
       }).unwrap()
       toast.success(t('dispatch.toast.driverReassigned'))
       setReassignOrder(null)
       setSelectedDriverId('')
+      setReassignReason('')
     } catch (e: unknown) {
       const msg = (e as { data?: { error?: { message?: string } } })?.data?.error?.message
       toast.error(msg || t('dispatch.toast.reassignFailed'))
@@ -351,7 +376,9 @@ export function DriverDispatchBoard({
                     actions={
                       canManage ? (
                         <Button size="sm" variant="default" onClick={() => setAssignOrder(order)}>
-                          {t('dispatch.assignDriver')}
+                          {order.assignment?.status === 'failed'
+                            ? 'Retry delivery'
+                            : t('dispatch.assignDriver')}
                         </Button>
                       ) : undefined
                     }
@@ -390,6 +417,7 @@ export function DriverDispatchBoard({
                           onClick={() => {
                             setReassignOrder(order)
                             setSelectedDriverId('')
+                            setReassignReason('')
                           }}
                         >
                           {t('dispatch.reassign')}
@@ -539,6 +567,7 @@ export function DriverDispatchBoard({
                     ))}
                   </SelectTrigger>
                 </Select>
+
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setAssignOrder(null)}>
                     {t('common:actions.cancel')}
@@ -569,11 +598,22 @@ export function DriverDispatchBoard({
                     ))}
                   </SelectTrigger>
                 </Select>
+                <Label htmlFor="reassign-reason">Reason</Label>
+                <Textarea
+                  id="reassign-reason"
+                  value={reassignReason}
+                  onChange={(e) => setReassignReason(e.target.value)}
+                  rows={3}
+                  placeholder="Why is this delivery being reassigned?"
+                />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setReassignOrder(null)}>
                     {t('common:actions.cancel')}
                   </Button>
-                  <Button onClick={handleReassign} disabled={reassigning || !selectedDriverId}>
+                  <Button
+                    onClick={handleReassign}
+                    disabled={reassigning || !selectedDriverId || reassignReason.trim().length < 3}
+                  >
                     {t('dispatch.reassign')}
                   </Button>
                 </DialogFooter>

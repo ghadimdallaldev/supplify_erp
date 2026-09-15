@@ -25,6 +25,28 @@ describe('delivery-coordinates', () => {
     expect(() => validateDeliveryCoordinates(33.89, 200)).toThrow(/out of range/)
   })
 
+  it('prefers the immutable order snapshot over changed branch and restaurant locations', () => {
+    const dest = resolveDestinationFromOrderRow({
+      delivery_location_snapshot: {
+        id: 'snap-1',
+        label: 'Original gate',
+        latitude: 33.91,
+        longitude: 35.51,
+        address: 'Original address',
+      },
+      branch_delivery_latitude: 33.92,
+      branch_delivery_longitude: 35.52,
+      restaurant_delivery_latitude: 33.1,
+      restaurant_delivery_longitude: 35.1,
+    })
+    expect(dest).toMatchObject({
+      latitude: 33.91,
+      longitude: 35.51,
+      label: 'Original gate',
+      source: 'snapshot',
+      address: 'Original address',
+    })
+  })
   it('prefers branch coordinates over restaurant fallback', () => {
     const dest = resolveDestinationFromOrderRow({
       branch_delivery_latitude: '33.9000000',
@@ -41,6 +63,21 @@ describe('delivery-coordinates', () => {
     expect(dest?.label).toBe('Marina gate')
   })
 
+  it('keeps a branch label/address when branch coordinates are unavailable', () => {
+    const dest = resolveDestinationFromOrderRow({
+      branch_name: 'Side entrance',
+      branch_address: '12 Market Street',
+      restaurant_delivery_latitude: 33.1,
+      restaurant_delivery_longitude: 35.1,
+    })
+    expect(dest).toMatchObject({
+      source: 'branch',
+      label: 'Side entrance',
+      address: '12 Market Street',
+      latitude: null,
+      longitude: null,
+    })
+  })
   it('falls back to restaurant coordinates', () => {
     const dest = resolveDestinationFromOrderRow({
       branch_delivery_latitude: null,

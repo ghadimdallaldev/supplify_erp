@@ -182,3 +182,7 @@ Or use full Docker (`pnpm dev:docker`) for MinIO + `STORAGE_DRIVER=s3` automatic
 - [railway-environments.md](../operations/railway-environments.md) — env-specific storage table
 - [environment-variables.md](../operations/environment-variables.md) — variable reference
 - [docs/guides/usage-metering.md](../guides/USAGE.md) — storage_mb metering on presign
+
+## POD binary upload contract (2026-09-15)
+
+POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Mobile clients upload the returned binary presigned URL with the file's content type, retry transient PUT failures, then submit/confirm the proof. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed.

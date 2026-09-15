@@ -125,3 +125,9 @@ Eligibility checks service zones, existing tenant product/catalog capability, wa
 A warehouse is not a replacement name for a supplier branch. The branch is the sellable supplier tenant; the warehouse is its fulfillment location. warehouse_inventory remains the stock source of truth when warehouse fulfillment is active. No duplicate warehouse-product availability table was added.
 
 Fulfillment transfer is transactional and preserves financial snapshots. It is limited to compatible pending/picking assignments and authorized supplier scope, records a reason/source/version, and rejects incompatible tenant, zone, stock, status, or driver-state changes.
+
+## Per-leg transfer and failed retry (2026-09-15)
+
+Transfers are presented for each pending/picking warehouse assignment, including item-level legs. A transfer never moves unrelated supplier or warehouse lines. The transaction locks the order and assignment, validates supplier organization and delivery-zone eligibility, releases the old reservation, reserves the target stock, and records the transfer reason.
+
+A failed delivery is history, not an active assignment. POST /api/orders/:id/delivery-retry requires a failed driver assignment, target driver, and reason. Pre-dispatch warehouse legs reserve stock again transactionally; dispatched legs do not restore consumed stock. New warehouse/driver attempts link to the superseded records, while active boards hide superseded attempts. Migration 0208_delivery_retry_provenance.sql adds provenance fields, status, and active-assignment uniqueness.

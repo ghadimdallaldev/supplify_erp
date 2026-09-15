@@ -128,7 +128,7 @@ export async function reserveStockForPlacedOrder(
  */
 export async function releaseStockForOrder(client, orderId) {
   const { rows: assignments } = await client.query(
-    `SELECT id FROM order_warehouse_assignment WHERE order_id = $1 LIMIT 1`,
+    `SELECT id FROM order_warehouse_assignment WHERE order_id = $1 AND status <> 'superseded' LIMIT 1`,
     [orderId]
   )
 

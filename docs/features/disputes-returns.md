@@ -66,9 +66,20 @@ Requires auth, `disputes_returns` feature, and appropriate RBAC permissions.
 }
 ```
 
+**Resolve body (refund):**
+
+```json
+{
+  "resolutionType": "refund",
+  "refundAmount": 125.5,
+  "refundReference": "CASH-ADJ-2026-001",
+  "resolutionNotes": "Cash adjustment recorded"
+}
+```
+
 ## Database
 
-Migration: `0072_disputes.sql`
+Migrations: `0072_disputes.sql`, `0209_dispute_resolution_effects.sql`
 
 - `disputes`, `dispute_items`, `dispute_attachments`
 - `disputes.replacement_order_id` — follow-up order when resolved with replacement
@@ -83,3 +94,14 @@ Migration: `0072_disputes.sql`
 | Dispute opened | Supplier   | `dispute_opened`   |
 | Resolved       | Restaurant | `dispute_resolved` |
 | Rejected       | Restaurant | `dispute_rejected` |
+
+## Resolution effects and idempotency (2026-09-15)
+
+Resolution runs in a transaction while locking the dispute row. A dispute can have one immutable dispute_resolution_effects record. Repeating the same request returns the existing result; a different resolution type, amount, or refund reference returns 409.
+
+- credit_note creates one credit note and attempts to apply it to the linked outstanding invoice when parties and balance permit.
+- replacement creates one linked PLACED replacement order and reserves its inventory.
+- refund requires refundAmount and refundReference. It records an auditable invoice adjustment/credit-note effect; it does not claim that an external PSP refund occurred.
+- no_action and reject close the dispute without financial or fulfillment mutation.
+
+The detail response includes resolutionEffect so web, Android, and iOS can show the resulting credit, refund reference, or replacement order.

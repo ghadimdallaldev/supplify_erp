@@ -161,7 +161,7 @@ export async function releaseInventoryForOrder(client, orderId) {
   // Restaurant cancel is blocked after SHIPPED; supplier decline on SHIPPED still hits this path.
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')`,
     [orderId]
   )
 
@@ -184,7 +184,7 @@ export async function releaseInventoryForOrder(client, orderId) {
   await client.query(
     `UPDATE order_warehouse_assignment
      SET status = 'failed'
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')`,
     [orderId]
   )
 }
@@ -192,7 +192,7 @@ export async function releaseInventoryForOrder(client, orderId) {
 export async function commitDispatchInventoryForOrder(client, orderId) {
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('dispatched', 'delivered', 'failed')`,
+     WHERE order_id = $1 AND status NOT IN ('dispatched', 'delivered', 'failed', 'superseded')`,
     [orderId]
   )
 
@@ -384,7 +384,7 @@ export async function reassignOrderWarehouseAssignment(
 export async function releaseInventoryForAssignment(client, orderId, assignmentId) {
   const { rows } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed')
+     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed', 'superseded')
      FOR UPDATE`,
     [assignmentId, orderId]
   )
@@ -414,7 +414,7 @@ export async function releaseInventoryForAssignment(client, orderId, assignmentI
 export async function markWarehouseAssignmentDelivered(client, orderId, assignmentId) {
   const { rows } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed')
+     WHERE id = $1 AND order_id = $2 AND status NOT IN ('delivered', 'failed', 'superseded')
      FOR UPDATE`,
     [assignmentId, orderId]
   )
@@ -446,8 +446,8 @@ export async function markWarehouseAssignmentDelivered(client, orderId, assignme
 export async function allWarehouseAssignmentsTerminal(client, orderId) {
   const { rows } = await client.query(
     `SELECT
-       COUNT(*)::int AS total,
-       COUNT(*) FILTER (WHERE status IN ('delivered', 'failed'))::int AS terminal
+       COUNT(*) FILTER (WHERE status <> 'superseded')::int AS total,
+       COUNT(*) FILTER (WHERE status IN ('delivered', 'failed', 'superseded'))::int AS terminal
      FROM order_warehouse_assignment
      WHERE order_id = $1`,
     [orderId]
@@ -463,7 +463,7 @@ export async function allWarehouseAssignmentsTerminal(client, orderId) {
 export async function allWarehouseAssignmentsDelivered(client, orderId) {
   const { rows } = await client.query(
     `SELECT
-       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status <> 'superseded')::int AS total,
        COUNT(*) FILTER (WHERE status = 'delivered')::int AS delivered
      FROM order_warehouse_assignment
      WHERE order_id = $1`,
@@ -509,7 +509,7 @@ export async function commitDispatchInventoryForAssignment(client, orderId, assi
 export async function releaseInventoryForFailedDelivery(client, orderId) {
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')
      FOR UPDATE`,
     [orderId]
   )
@@ -528,7 +528,7 @@ export async function releaseInventoryForFailedDelivery(client, orderId) {
   await client.query(
     `UPDATE order_warehouse_assignment
      SET status = 'failed'
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed')`,
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')`,
     [orderId]
   )
 }

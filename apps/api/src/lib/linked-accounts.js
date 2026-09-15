@@ -121,15 +121,21 @@ export async function removeLinkedBranchAccount({
   parentTenantType,
   childTenantId,
 }) {
-  const { rowCount } = await query(
-    `
-      DELETE FROM tenant_account_link
-      WHERE parent_tenant_id = $1
-        AND parent_tenant_type = $2
-        AND child_tenant_id = $3
-        AND child_tenant_type = $2
-    `,
-    [parentTenantId, parentTenantType, childTenantId]
-  )
-  return rowCount > 0
+  return withTransaction(async (client) => {
+    const { rows: links } = await client.query(
+      `SELECT parent_tenant_id, child_tenant_id FROM tenant_account_link
+       WHERE parent_tenant_id = $1 AND parent_tenant_type = $2
+         AND child_tenant_id = $3 AND child_tenant_type = $2
+       FOR UPDATE`,
+      [parentTenantId, parentTenantType, childTenantId]
+    )
+    if (!links.length) return false
+    await client.query(
+      `DELETE FROM tenant_account_link
+       WHERE parent_tenant_id = $1 AND parent_tenant_type = $2
+         AND child_tenant_id = $3 AND child_tenant_type = $2`,
+      [parentTenantId, parentTenantType, childTenantId]
+    )
+    return true
+  })
 }

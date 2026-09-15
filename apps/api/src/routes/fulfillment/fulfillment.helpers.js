@@ -121,6 +121,7 @@ async function warehouseFilterClause(req, supplierId, paramIndex = 1, { mode = '
             SELECT 1 FROM order_warehouse_assignment owa
             WHERE owa.id = da.warehouse_assignment_id
               AND owa.warehouse_id = $${paramIndex}
+              AND owa.status NOT IN ('failed', 'superseded')
           )
         )
         OR (
@@ -128,6 +129,7 @@ async function warehouseFilterClause(req, supplierId, paramIndex = 1, { mode = '
           AND EXISTS (
             SELECT 1 FROM order_warehouse_assignment owa
             WHERE owa.order_id = o.id AND owa.warehouse_id = $${paramIndex}
+        AND owa.status NOT IN ('failed', 'superseded')
           )
         )
       )`,
@@ -140,6 +142,7 @@ async function warehouseFilterClause(req, supplierId, paramIndex = 1, { mode = '
     clause: ` AND EXISTS (
       SELECT 1 FROM order_warehouse_assignment owa
       WHERE owa.order_id = o.id AND owa.warehouse_id = $${paramIndex}
+        AND owa.status NOT IN ('failed', 'superseded')
     )`,
     params: [warehouseId],
     warehouseId,
@@ -174,6 +177,7 @@ async function loadStopsForRoutes(routeIds, warehouseId = null) {
     warehouseClause = ` AND EXISTS (
       SELECT 1 FROM order_warehouse_assignment owa
       WHERE owa.order_id = rs.order_id AND owa.warehouse_id = $2
+        AND owa.status NOT IN ('failed', 'superseded')
     )`
     params.push(warehouseId)
   }

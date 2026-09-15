@@ -117,3 +117,7 @@ A supplier organization is a customer-facing consolidation of linked supplier te
 Restaurant users do not select supplier branches or warehouses. A new basket must resolve to one compatible supplier tenant and one warehouse for all lines. Tenant-specific products are retained as separate catalog entries when there is no canonical product identity; no fuzzy SKU/name merging is performed.
 
 Transfers use existing organization/tenant RBAC and the FULFILLMENT_TRANSFER capability. Organization scope does not bypass explicit branch access, and transfers preserve the placed financial snapshots.
+
+## Non-destructive branch unlink (2026-09-15)
+
+Supplier and restaurant linked-account unlinking locks and removes only the tenant_account_link row inside a transaction. It does not delete the child tenant, orders, billing history, or other tenant records. The legacy billing lookup uses the canonical billing_invoice.amount field and returns structured not-found/conflict errors through the existing route handler.

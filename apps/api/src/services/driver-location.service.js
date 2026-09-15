@@ -349,7 +349,7 @@ async function loadAssignmentForTracking(orderId) {
     `SELECT da.*, d.full_name AS driver_name, d.phone AS driver_phone
      FROM driver_assignments da
      JOIN drivers d ON d.id = da.driver_id
-     WHERE da.order_id = $1 AND da.status NOT IN ('reassigned')
+     WHERE da.order_id = $1 AND da.status NOT IN ('reassigned', 'superseded')
      ORDER BY da.created_at DESC
      LIMIT 1`,
     [orderId]

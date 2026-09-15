@@ -254,7 +254,13 @@ export interface DispatchOrderCard {
   has_pod?: boolean
   delivery_area?: string | null
   scheduled_at?: string | null
+  scheduledDeliveryDate?: string | null
   delivery_status?: string | null
+  destinationCoordinatesAvailable?: boolean
+  destinationLatitude?: number | null
+  destinationLongitude?: number | null
+  destinationLabel?: string | null
+  destinationAddress?: unknown
   active_route_id?: string | null
   active_route_number?: string | null
   active_route_status?: string | null
@@ -308,6 +314,10 @@ export interface DeliveryRouteStop {
   assignmentStatus?: string | null
   tracking?: DeliveryTrackingInfo | null
   destinationCoordinatesAvailable?: boolean
+  destinationLatitude?: number | null
+  destinationLongitude?: number | null
+  destinationLabel?: string | null
+  destinationAddress?: unknown
   etaAvailable?: boolean
   etaMinutesMin?: number | null
   etaMinutesMax?: number | null
@@ -338,6 +348,48 @@ export interface DeliveryRouteDetail extends Omit<DeliveryRouteSummary, 'stops'>
   completedAt?: string | null
 }
 
+export interface DriverDeliveryDetail {
+  orderId: string
+  orderReference?: string | null
+  orderStatus: string
+  deliveryStatus?: string | null
+  destination: {
+    coordinatesAvailable?: boolean
+    latitude?: number | null
+    longitude?: number | null
+    label?: string | null
+    address?: unknown
+    addressNotes?: string | null
+    source?: 'snapshot' | 'branch' | 'restaurant' | null
+  } | null
+  restaurantName?: string | null
+  branch?: { id?: string | null; name?: string | null; address?: unknown } | null
+  items: Array<{ id: string; name: string; sku?: string | null; quantity: number }>
+  scheduledDeliveryDate?: string | null
+  deliveryWindow?: string | null
+  assignment?: {
+    id: string
+    driverId?: string | null
+    status: string
+    warehouseAssignmentId?: string | null
+    assignedAt?: string | null
+    pickedUpAt?: string | null
+    deliveredAt?: string | null
+    failedAt?: string | null
+    failureReason?: string | null
+    notes?: string | null
+  } | null
+  route?: {
+    id?: string | null
+    routeNumber?: string | null
+    scheduledDate?: string | null
+    stopId?: string | null
+    sequenceNumber?: number | null
+  } | null
+  notes?: string | null
+  failureReason?: string | null
+  podAvailable: boolean
+}
 export interface OrderFilters {
   status?: string
   supplier?: string

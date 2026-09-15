@@ -233,3 +233,7 @@ This is a build-time file path supplied by EAS, not an API or client-runtime var
 | ------------- | -------------------------------------------------------- |
 | `GET /health` | `{ status, service, env }` — optional detail in dev only |
 | `GET /ready`  | `{ status, service, env }` after DB ping                 |
+
+## Mobile local versus EAS API configuration (2026-09-15)
+
+The preprod EAS profiles point at the hosted preprod API. Local mobile .env files intentionally default to localhost: Android emulators should use 10.0.2.2, iOS simulators can use localhost, and physical devices need a LAN-reachable API URL or the hosted preprod URL. Verify the resolved runtime API URL separately for local development and EAS builds; a successful EAS build does not validate a local device configuration.

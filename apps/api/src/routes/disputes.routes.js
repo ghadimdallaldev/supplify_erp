@@ -74,6 +74,8 @@ const resolveSchema = z.object({
   resolutionNotes: z.string().optional(),
   creditNoteAmount: z.number().positive().optional(),
   creditNoteNotes: z.string().optional(),
+  refundAmount: z.number().positive().optional(),
+  refundReference: z.string().min(1).max(255).optional(),
 })
 
 const rejectSchema = z.object({
@@ -242,7 +244,10 @@ router.post(
     try {
       const body = resolveSchema.parse(req.body)
       const supplierId = await requireSupplierId(req)
-      const data = await resolveDispute(req.params.id, supplierId, body)
+      const data = await resolveDispute(req.params.id, supplierId, {
+        ...body,
+        userId: req.userData?.id,
+      })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

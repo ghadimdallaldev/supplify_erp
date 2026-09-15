@@ -322,6 +322,8 @@ describe('Disputes Service', () => {
 
       await resolveDispute('d-1', 's-1', {
         resolutionType: 'refund',
+        refundAmount: 10,
+        refundReference: 'REF-1',
         resolutionNotes: 'Refund issued externally',
       })
 

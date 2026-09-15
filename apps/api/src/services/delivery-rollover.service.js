@@ -52,8 +52,10 @@ function effectiveDeliveryDateSql(alias = 'da') {
       ORDER BY dr.scheduled_date DESC
       LIMIT 1
     ),
+    o.requested_delivery_date,
     ${alias}.assigned_at::date,
-    ${alias}.created_at::date
+    ${alias}.created_at::date,
+    o.created_at::date
   )`
 }
 

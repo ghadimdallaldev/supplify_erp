@@ -350,7 +350,7 @@ function buildDispatchBaseSelect() {
       LEFT JOIN driver_assignments da
         ON da.order_id = o.id
        AND da.supplier_id = $1
-       AND da.status <> 'reassigned'
+       AND da.status NOT IN ('reassigned', 'superseded')
       LEFT JOIN drivers d ON d.id = da.driver_id
       LEFT JOIN LATERAL (
         SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
@@ -371,7 +371,7 @@ function buildDispatchBaseSelect() {
         SELECT COUNT(*)::int AS warehouse_count
         FROM order_warehouse_assignment owa
         WHERE owa.order_id = o.id
-          AND owa.status NOT IN ('failed')
+          AND owa.status NOT IN ('failed', 'superseded')
       ) owa_sum ON true
       WHERE o.status IN ('PLACED', 'PENDING_APPROVAL', 'ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED')
   `
