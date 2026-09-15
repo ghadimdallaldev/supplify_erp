@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-15 — Fix Railway API deploy: migration 0207 `min(uuid)` (server-only)
+
+**Change:** `0207_ordering_multibranch_hardening.sql` supplier-org backfill used `MIN(supplier_id)` on a UUID column, which Postgres rejects (`function min(uuid) does not exist`). Replaced with `(array_agg(supplier_id))[1]` under the existing single-supplier `HAVING` guard. Unblocks API boot on Development / preprod / production.
+
+**Mobile:** Skipped — migration/startup-only fix; no API contract, payload, or client flow change.
+
+---
+
 ## 2026-09-14 — Route-stop advancement is atomic (server-only)
 
 **Change:** `updateRouteStop` now advances linked driver assignment legs, the `route_stop` row, and optional `delivery_route` completion inside a single DB transaction. `updateDeliveryStatus` accepts an optional shared client so multi-leg updates cannot partially commit. Notifications and dispatch-cache invalidation run only after commit (same post-commit pattern as scheduled orders).
