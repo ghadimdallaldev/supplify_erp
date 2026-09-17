@@ -167,15 +167,23 @@ export function createS3CompatibleProvider(cfg) {
 
     buildPublicUrl,
 
-    async createPresignedUpload({ fileKey, fileType, expiresIn = 300, userId, fileSize }) {
+    async createPresignedUpload({
+      fileKey,
+      fileType,
+      expiresIn = 300,
+      userId,
+      fileSize,
+      useApiUpload = false,
+    }) {
       const publicUrl = buildPublicUrl(fileKey)
       const maxBytes =
         fileSize != null && Number(fileSize) > 0
           ? Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
           : MAX_UPLOAD_BYTES
 
-      // Private buckets (Railway): browser uploads via API to avoid storage endpoint CORS.
-      if (cfg.STORAGE_PUBLIC_READ === false) {
+      // Driver POD uploads use the API token transport so React Native does not
+      // need to reproduce S3's signed transport headers.
+      if (useApiUpload || cfg.STORAGE_PUBLIC_READ === false) {
         if (!userId) {
           throw new Error('userId is required for upload tokens')
         }

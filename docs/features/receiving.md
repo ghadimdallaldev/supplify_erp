@@ -6,7 +6,7 @@ Plan feature key: `receiving_quality` (Silver+ for restaurants).
 
 ## Flow
 
-1. Supplier assigns driver and advances delivery (`assigned` → `picked_up` → `out_for_delivery`) or driver marks **Delivered** on the driver portal — order status becomes **`DELIVERED`** (not `COMPLETED`).
+1. Supplier assigns a driver and advances the exact assignment (`assigned` -> `picked_up` -> `out_for_delivery`). Physical departure is dispatch: `out_for_delivery` atomically promotes the parent `PROCESSING` order to `SHIPPED`. The driver confirms a photo-backed POD with `POST /api/orders/:id/complete-delivery`, which saves the proof and completes that assignment atomically; the order becomes **`DELIVERED`** (not `COMPLETED`) when its delivery legs are complete.
 2. Optional: driver sends GPS pings during active assignment; restaurant may see **sanitized** live tracking on order detail (`RestaurantOrderTrackingPanel`) — see [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md). GPS does **not** auto-complete receiving.
 3. Supplier may also mark **Delivered** from Orders list or order detail (**Mark Delivered**).
 4. Restaurant opens **Receiving** (`/app/receiving`) — pending list includes orders with status `DELIVERED` or legacy `COMPLETED`, without an accepted receiving report.

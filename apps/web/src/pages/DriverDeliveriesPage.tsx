@@ -282,11 +282,11 @@ export function DriverDeliveriesPage() {
     await applyStatus(orderId, status as DriverDeliveryStatus)
   }
 
-  const handlePodSubmitted = async () => {
-    const orderId = podOrderId
+  const handlePodSubmitted = () => {
+    // complete-delivery already advanced the driver assignment atomically.
     setPodOrderId(null)
-    if (!orderId) return
-    await applyStatus(orderId, 'delivered')
+    refetch()
+    refetchRoute()
   }
 
   const hasWork =
@@ -529,15 +529,27 @@ export function DriverDeliveriesPage() {
           onOpenChange={(open) => {
             if (!open) setPodOrderId(null)
           }}
-          onSubmitted={() => {
-            void handlePodSubmitted()
+          completion={{
+            driverAssignmentId: podOrderId ? orderByIdRef.get(podOrderId)?.assignmentId : undefined,
+            warehouseAssignmentId: podOrderId
+              ? orderByIdRef.get(podOrderId)?.warehouseAssignmentId
+              : undefined,
           }}
+          onSubmitted={handlePodSubmitted}
         />
         <ProofOfDeliveryDialog
           open={podStop != null}
           orderId={podStop?.orderId ?? null}
           onOpenChange={(open) => {
             if (!open) setPodStop(null)
+          }}
+          completion={{
+            driverAssignmentId: podStop
+              ? orderByIdRef.get(podStop.orderId)?.assignmentId
+              : undefined,
+            warehouseAssignmentId: podStop
+              ? orderByIdRef.get(podStop.orderId)?.warehouseAssignmentId
+              : undefined,
           }}
           onSubmitted={() => {
             void handleRouteStopPodSubmitted()

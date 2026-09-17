@@ -180,7 +180,7 @@ stateDiagram-v2
 
 **Supplier status whitelist** (`orders/update.js`) — Suppliers may only set: `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `COMPLETED`, `CANCELLED`. Restaurants may only set `CANCELLED`.
 
-**Driver invariant** — an active driver assignment is required before `SHIPPED`, `DELIVERED`, or legacy `COMPLETED`. `COMPLETED` is accepted only from `SHIPPED` and maps to `DELIVERED`.
+**Driver invariant** - an active driver assignment is required before `SHIPPED`, `DELIVERED`, or legacy `COMPLETED`. `out_for_delivery` promotes `PROCESSING` to `SHIPPED` in the same transaction. New client confirmations use `POST /api/orders/:id/complete-delivery`, with the active assignment id, to upsert POD and complete delivery atomically; `COMPLETED` remains accepted only from `SHIPPED` and maps to `DELIVERED`.
 
 **Delivery route eligibility** — `PLACED`, `PENDING_APPROVAL` (legacy), `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED` for planned routes; dispatch on `PROCESSING` / `SHIPPED` (`delivery-route-order-statuses.js`).
 
@@ -188,21 +188,22 @@ stateDiagram-v2
 
 ## Order workflow — key endpoints
 
-| Step              | Method  | Path                                | Notes                              |
-| ----------------- | ------- | ----------------------------------- | ---------------------------------- |
-| List / filter     | `GET`   | `/api/orders`                       | `status`, `supplier`, date range   |
-| Create            | `POST`  | `/api/orders`                       | Enforces `orders_per_day` meter    |
-| Manual create     | `POST`  | `/api/orders/manual`                | Supplier-initiated                 |
-| Detail            | `GET`   | `/api/orders/:id`                   | Includes amendments, dispute links |
-| Update status     | `PATCH` | `/api/orders/:id`                   | Role-gated transitions above       |
-| Remind supplier   | `POST`  | `/api/orders/:id/remind`            | Notification                       |
-| Packing slip      | `GET`   | `/api/orders/:id/packing-slip/pdf`  | PDF export                         |
-| Warehouse assign  | `POST`  | `/api/orders/:id/warehouses`        | Multi-warehouse routing            |
-| Driver assign     | `POST`  | `/api/orders/:id/assign-driver`     | Driver management feature          |
-| Delivery status   | `PATCH` | `/api/orders/:id/delivery-status`   | Driver lifecycle                   |
-| Proof of delivery | `POST`  | `/api/orders/:id/proof-of-delivery` | Photo / signature                  |
-| GPS tracking      | `GET`   | `/api/orders/:id/tracking`          | Live location                      |
-| Calendar          | `GET`   | `/api/orders/calendar`              | `order_calendar` feature           |
+| Step              | Method  | Path                                | Notes                                     |
+| ----------------- | ------- | ----------------------------------- | ----------------------------------------- |
+| List / filter     | `GET`   | `/api/orders`                       | `status`, `supplier`, date range          |
+| Create            | `POST`  | `/api/orders`                       | Enforces `orders_per_day` meter           |
+| Manual create     | `POST`  | `/api/orders/manual`                | Supplier-initiated                        |
+| Detail            | `GET`   | `/api/orders/:id`                   | Includes amendments, dispute links        |
+| Update status     | `PATCH` | `/api/orders/:id`                   | Role-gated transitions above              |
+| Remind supplier   | `POST`  | `/api/orders/:id/remind`            | Notification                              |
+| Packing slip      | `GET`   | `/api/orders/:id/packing-slip/pdf`  | PDF export                                |
+| Warehouse assign  | `POST`  | `/api/orders/:id/warehouses`        | Multi-warehouse routing                   |
+| Driver assign     | `POST`  | `/api/orders/:id/assign-driver`     | Driver management feature                 |
+| Delivery status   | `PATCH` | `/api/orders/:id/delivery-status`   | Assignment lifecycle / compatibility      |
+| Complete delivery | `POST`  | `/api/orders/:id/complete-delivery` | Atomic POD + active assignment completion |
+| Proof of delivery | `POST`  | `/api/orders/:id/proof-of-delivery` | Legacy proof-only compatibility           |
+| GPS tracking      | `GET`   | `/api/orders/:id/tracking`          | Live location                             |
+| Calendar          | `GET`   | `/api/orders/calendar`              | `order_calendar` feature                  |
 
 ---
 

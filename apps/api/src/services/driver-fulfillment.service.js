@@ -479,6 +479,24 @@ async function applyDeliveryStatusUpdate({
   )
   const warehouseId = whRows[0]?.warehouse_id ?? null
 
+  // Going on the road is the physical dispatch event. Driver assignment can
+  // start while the supplier is still processing an order, but a subsequent
+  // Delivered transition is only valid once that order has shipped.
+  if (status === 'out_for_delivery') {
+    const { rows: orders } = await client.query(
+      `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+    const oldStatus = orders[0]?.status
+    if (oldStatus === 'PROCESSING') {
+      await client.query(
+        `UPDATE customer_order SET status = 'SHIPPED', updated_at = now() WHERE id = $1`,
+        [orderId]
+      )
+      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'SHIPPED', oldStatus)
+    }
+  }
+
   if (status === 'delivered') {
     const { rows: orders } = await client.query(
       `SELECT status FROM customer_order WHERE id = $1 FOR UPDATE`,
@@ -728,19 +746,21 @@ export async function submitProofOfDelivery({
   userId,
   latitude = null,
   longitude = null,
+  client = null,
 }) {
   await assertSupplierOwnsOrder(supplierId, orderId)
+  const run = dbQuery(client)
   const assignment =
     driverAssignmentId != null
       ? (
-          await query(
+          await run(
             `SELECT id FROM driver_assignments
              WHERE id = $1 AND order_id = $2 AND supplier_id = $3 AND status <> 'superseded'`,
             [driverAssignmentId, orderId, supplierId]
           )
         ).rows[0]
       : (
-          await query(
+          await run(
             `SELECT id FROM driver_assignments
              WHERE order_id = $1 AND supplier_id = $2 AND status = 'delivered'
              ORDER BY delivered_at DESC NULLS LAST LIMIT 1`,
@@ -758,7 +778,7 @@ export async function submitProofOfDelivery({
   // One POD per order: a driver retrying on a flaky connection must update the
   // existing proof rather than stack up duplicate rows. COALESCE keeps whatever
   // artefacts an earlier partial submission already captured.
-  const { rows } = await query(
+  const { rows } = await run(
     `INSERT INTO proof_of_delivery (
        order_id, driver_assignment_id, delivery_date, delivered_by,
        recipient_name, file_key, signature_file_key,
@@ -794,10 +814,61 @@ export async function submitProofOfDelivery({
     ]
   )
   // has_pod is part of the cached dispatch payload.
-  await invalidateDispatchCacheForSupplier(supplierId)
+  if (!client) {
+    await invalidateDispatchCacheForSupplier(supplierId)
+  }
   return rows[0]
 }
 
+/**
+ * Save the captured proof and complete its exact driver leg in one database
+ * transaction. Repeating a request after a lost response is safe: proof storage
+ * is an upsert and an already-delivered assignment is a status no-op.
+ */
+export async function completeDeliveryWithProof({
+  orderId,
+  supplierId,
+  fileKey,
+  signatureFileKey,
+  notes,
+  recipientName,
+  driverAssignmentId,
+  warehouseAssignmentId = null,
+  userId,
+  latitude = null,
+  longitude = null,
+}) {
+  await assertSupplierOwnsOrder(supplierId, orderId)
+  const effects = []
+  const result = await withTransaction(async (client) => {
+    const proof = await submitProofOfDelivery({
+      orderId,
+      supplierId,
+      fileKey,
+      signatureFileKey,
+      notes,
+      recipientName,
+      driverAssignmentId,
+      userId,
+      latitude,
+      longitude,
+      client,
+    })
+    const assignment = await updateDeliveryStatus({
+      supplierId,
+      orderId,
+      status: 'delivered',
+      driverAssignmentId,
+      warehouseAssignmentId,
+      client,
+      postCommitEffects: effects,
+    })
+    return { proof, assignment }
+  })
+  await runDeliveryPostCommitEffects(effects)
+  await invalidateDispatchCacheForSupplier(supplierId)
+  return result
+}
 export async function confirmProofOfDelivery(orderId, restaurantId, userId) {
   const { rows } = await query(
     `UPDATE proof_of_delivery pod

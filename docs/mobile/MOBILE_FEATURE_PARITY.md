@@ -2,6 +2,17 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-16 - Driver POD reliability repair and compact mobile foundation
+
+- **POD transport:** Android and iOS read the captured image blob before presigning, send its real MIME type and byte count to the authenticated API upload gateway, and no longer depend on an S3 `Content-Length` signature or public storage reachability.
+- **Atomic completion:** both driver apps send the active `driver_assignment_id` (and warehouse leg when present) to `POST /api/orders/:id/complete-delivery`. The service upserts proof and completes that exact leg in one transaction; a lost response is safe to retry.
+- **Recovery and GPS:** a failed upload keeps the photo; a completion failure reuses uploaded media and offers a confirmation-only retry. GPS denial, timeout, or unavailable location is shown as best-effort and never blocks delivery.
+- **Lifecycle:** moving a leg to `out_for_delivery` promotes a `PROCESSING` order to `SHIPPED` in the same transaction, preventing a valid delivery confirmation from failing with "must be shipped first".
+- **Design parity:** Android and iOS are source-equivalent for the POD flow, semantic light-theme tokens, compact grouped operational rows, role tab labels, and lifecycle-domain status badges.
+- **Verification:** targeted API route/service tests, Android and iOS POD utility tests, web typecheck, and Android/iOS typechecks were run.
+
+---
+
 ## 2026-09-15 — Fix Railway API deploy: migration 0207 `min(uuid)` (server-only)
 
 **Change:** `0207_ordering_multibranch_hardening.sql` supplier-org backfill used `MIN(supplier_id)` on a UUID column, which Postgres rejects (`function min(uuid) does not exist`). Replaced with `(array_agg(supplier_id))[1]` under the existing single-supplier `HAVING` guard. Unblocks API boot on Development / preprod / production.
@@ -976,3 +987,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - Both mobile clients use the driver-detail endpoint, coordinate-first map navigation with real label/address fallback, binary POD upload validation/retry, and required-reason retry/reassign actions.
 - Failed delivery retries create linked warehouse/driver attempts and retain superseded history. Dispute resolutions record one immutable idempotency effect for credit notes, invoice adjustments/refunds, replacements, or no action.
 - Branch/account unlink remains a web/admin workflow; no mobile branch-management surface is required. Android and iOS were updated for the shared delivery, dispute, POD, and retry contracts.
+
+## 2026-09-15 - Product/business-logic audit (documentation-only)
+
+- **Scope**: Added `PRODUCT_BUSINESS_LOGIC_AUDIT.md`, a repository-wide shareholder briefing covering actors, product map, end-to-end restaurant/supplier/purchasing/inventory/delivery/finance journeys, state machines, permissions, pricing, notifications, jobs, integrations, existing data, manual work, silos, risks, and the top 30 product opportunities.
+- **Parity decision**: This is an analysis/documentation deliverable only. It changes no API endpoint, authentication/session behavior, RBAC key, type contract, feature flag, notification payload, or mobile workflow.
+- **Mobile repositories**: `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios` were reviewed for parity context and require no code changes for this audit.
+- **Reason**: The audit records the current Android/iOS coverage and web-first boundaries so future product work can use the parity requirements as an explicit input.

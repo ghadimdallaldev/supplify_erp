@@ -12,6 +12,16 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [ ] Was `MOBILE_FEATURE_PARITY.md` updated if something is deferred?
 - [ ] Supplier bulk image import changed? → Web-only; document in parity file (see 2026-06-15 entry).
 
+## 2026-09-16 - POD atomic completion + compact mobile foundation
+
+- [x] POD uploads use the authenticated tokenized API gateway, with actual captured blob MIME/byte validation before presigning.
+- [x] Android and iOS send the active driver assignment and optional warehouse leg to the idempotent atomic completion endpoint.
+- [x] Retry state distinguishes upload from completion; photos are retained and GPS is explicitly best-effort.
+- [x] `out_for_delivery` synchronizes the parent lifecycle from `PROCESSING` to `SHIPPED`.
+- [x] Shared compact semantic theme, operational rows, status domains, and role labels were mirrored in both native repositories.
+- [x] Targeted API tests, POD utility tests, web typecheck, and Android/iOS typechecks were run.
+- [ ] Physical-device validation still required: camera permission, denied GPS, flaky-network retry, invalid/oversized image, repeated confirmation, and final delivery completion on Android and iOS.
+
 ## 2026-09-13 - Native chat push audit
 
 - [x] API notification, Expo payload, device registration, and deep-link contracts synchronized across ERP, Android, and iOS.

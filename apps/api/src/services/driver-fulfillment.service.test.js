@@ -42,13 +42,17 @@ vi.mock('../lib/pod-requirement.js', () => ({
 import { query, withTransaction } from '../lib/db.js'
 import {
   updateDeliveryStatus,
+  completeDeliveryWithProof,
   submitProofOfDelivery,
   assignDriverToOrder,
   reassignDriver,
 } from './driver-fulfillment.service.js'
 import { notifyOrderStatusChange } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
-import { allWarehouseAssignmentsDelivered } from './warehouseInventory.js'
+import {
+  allWarehouseAssignmentsDelivered,
+  syncWarehouseFulfillmentOnOrderStatus,
+} from './warehouseInventory.js'
 
 describe('driver-fulfillment.service', () => {
   beforeEach(() => {
@@ -108,6 +112,66 @@ describe('driver-fulfillment.service', () => {
     expect(invalidateDispatchCacheForSupplier).toHaveBeenCalledWith('sup-1')
   })
 
+  it('saves POD and completes the exact delivery leg in one transaction', async () => {
+    const assignment = {
+      id: 'da-1',
+      order_id: 'order-1',
+      supplier_id: 'sup-1',
+      driver_id: 'drv-1',
+      status: 'out_for_delivery',
+      warehouse_assignment_id: null,
+    }
+    const proof = { id: 'pod-1', order_id: 'order-1', file_key: 'uploads/pod.jpg' }
+
+    // The outer ownership check and the proof-save ownership check both pass.
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
+    const clientQuery = vi.fn()
+    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    clientQuery
+      .mockResolvedValueOnce({ rows: [{ id: assignment.id }] }) // proof assignment scope
+      .mockResolvedValueOnce({ rows: [proof] }) // POD upsert
+      .mockResolvedValueOnce({ rows: [assignment] }) // locked assignment
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // assignment delivered
+      .mockResolvedValueOnce({ rows: [] }) // warehouse lookup
+      .mockResolvedValueOnce({ rows: [{ status: 'SHIPPED' }] }) // parent order lock
+      .mockResolvedValueOnce({ rows: [] }) // parent delivered
+      .mockResolvedValueOnce({ rows: [] }) // warehouse legs
+      .mockResolvedValueOnce({ rows: [{ ...assignment, status: 'delivered', driver_name: 'Ali' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'order-1', restaurant_id: 'rest-1', supplier_name: 'Sup', restaurant_name: 'Rest' },
+        ],
+      })
+
+    const result = await completeDeliveryWithProof({
+      supplierId: 'sup-1',
+      orderId: 'order-1',
+      driverAssignmentId: assignment.id,
+      fileKey: proof.file_key,
+      userId: 'driver-user-1',
+    })
+
+    expect(withTransaction).toHaveBeenCalledTimes(1)
+    expect(result).toEqual(
+      expect.objectContaining({
+        proof,
+        assignment: expect.objectContaining({ status: 'delivered' }),
+      })
+    )
+    const proofUpsert = clientQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('INSERT INTO proof_of_delivery')
+    )
+    const assignmentUpdate = clientQuery.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('UPDATE driver_assignments')
+    )
+    expect(proofUpsert).toBeTruthy()
+    expect(assignmentUpdate).toBeTruthy()
+    expect(clientQuery.mock.calls.indexOf(proofUpsert)).toBeLessThan(
+      clientQuery.mock.calls.indexOf(assignmentUpdate)
+    )
+  })
   it('does not notify when the delivery-status transaction fails', async () => {
     const assignment = {
       id: 'da-1',
@@ -225,6 +289,8 @@ describe('driver-fulfillment.service', () => {
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ status: 'PROCESSING' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [{ ...assignment, status: 'out_for_delivery', driver_name: 'Ali' }],
       })
@@ -246,6 +312,16 @@ describe('driver-fulfillment.service', () => {
     expect(updateCall?.[1]?.[0]).toBe('out_for_delivery')
     expect(updateCall?.[1]?.at(-2)).toBe('da-1')
     expect(updateCall?.[1]?.at(-1)).toBe('assigned')
+    const shippedUpdate = clientQuery.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes("status = 'SHIPPED'")
+    )
+    expect(shippedUpdate).toBeTruthy()
+    expect(syncWarehouseFulfillmentOnOrderStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      'order-1',
+      'SHIPPED',
+      'PROCESSING'
+    )
   })
 
   it('submitProofOfDelivery upserts proof with ON CONFLICT (order_id)', async () => {

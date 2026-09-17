@@ -326,6 +326,27 @@ export const ordersApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
+    completeOrderDelivery: builder.mutation<
+      { proof: unknown; assignment: unknown },
+      {
+        orderId: string
+        recipient_name?: string
+        notes?: string
+        file_key?: string
+        signature_file_key?: string
+        driver_assignment_id?: string
+        warehouse_assignment_id?: string
+        latitude?: number
+        longitude?: number
+      }
+    >({
+      query: ({ orderId, ...body }) => ({
+        url: `/api/orders/${orderId}/complete-delivery`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Fulfillment', 'Order'],
+    }),
     presignOrderProofOfDelivery: builder.mutation<
       PresignedUrlResponse & { url?: string; publicUrl?: string },
       { orderId: string; fileName: string; fileType: string; fileSize?: number }

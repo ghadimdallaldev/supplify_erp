@@ -53,11 +53,12 @@ Supplify runs **supplier-operated last-mile delivery** on existing tables (`driv
 
 ### APIs
 
-| Method | Path                              | Access                                            |
-| ------ | --------------------------------- | ------------------------------------------------- |
-| POST   | `/api/orders/:id/location`        | Driver (linked, assigned) or `FULFILLMENT_MANAGE` |
-| GET    | `/api/orders/:id/tracking`        | Supplier, restaurant (if flag), assigned driver   |
-| PATCH  | `/api/orders/:id/delivery-status` | Canonical status updates                          |
+| Method | Path                                | Access                                            |
+| ------ | ----------------------------------- | ------------------------------------------------- |
+| POST   | `/api/orders/:id/location`          | Driver (linked, assigned) or `FULFILLMENT_MANAGE` |
+| GET    | `/api/orders/:id/tracking`          | Supplier, restaurant (if flag), assigned driver   |
+| PATCH  | `/api/orders/:id/delivery-status`   | Assignment lifecycle and compatibility updates    |
+| POST   | `/api/orders/:id/complete-delivery` | Atomic POD + exact assignment completion          |
 
 Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id/tracking` expose standard `tracking` payload. Legacy `driver_last_seen` / `driverLastSeen` aliases remain one release.
 
@@ -196,32 +197,31 @@ location is being shared when it is not.
 
 ### Proof of delivery
 
-One POD row per order, enforced by a unique index on `proof_of_delivery(order_id)`
-(migration `0200`); the service upserts with `ON CONFLICT (order_id) DO UPDATE` and
-`COALESCE`, so a driver retrying on a flaky connection tops up the existing proof
-instead of stacking duplicates. A POD must carry at least one of a photo
-(`file_key`), a signature (`signature_file_key`) or a `recipient_name` — the web
-dialog disables save until one is present and the API rejects the rest with a 400.
+One POD row per order is enforced by a unique index on `proof_of_delivery(order_id)`
+(migration `0200`). The completion service upserts with `ON CONFLICT (order_id) DO UPDATE`
+and `COALESCE`, so a flaky-network retry enriches the same proof instead of stacking duplicates.
+A POD must carry a photo (`file_key`), a signature (`signature_file_key`) or a recipient name;
+the native driver flow requires a photo as the primary evidence.
 
-**Order of operations when confirming a delivery: submit the proof, then set
-`delivered`.** When the supplier has `pod_required` set, `assertPodPresentWhenRequired`
-makes the API reject `delivered` until a proof row exists, so the reverse order fails every
-time for those suppliers. Proof-first also means a failure on the status step leaves the
-proof on file to retry, rather than an order marked delivered with no proof. Web routes the
-"Delivered" action through `ProofOfDeliveryDialog` (which doubles as the confirmation for an
-irreversible action); mobile routes it through `DeliveryProofScreen`, both via
-`confirmDeliveryWithProof`.
+**Canonical confirmation:** `POST /api/orders/:id/complete-delivery` accepts proof metadata,
+the active `driver_assignment_id`, optional warehouse leg, recipient/notes, and best-effort GPS.
+It upserts the proof and marks that exact assignment `delivered` in one transaction. Retrying
+an interrupted response is idempotent. The older proof-only and delivery-status endpoints stay
+available for compatibility, but new web and mobile confirmation flows use the atomic endpoint.
+
+POD media is presigned to the authenticated `/api/files/upload/:token` gateway. The server
+validates MIME, image bytes, and the 10 MB limit; clients must send the actual captured blob's
+MIME type and size and must not expose the upload token in errors. GPS permission denial,
+timeout, or unavailable location never blocks completion.
 
 POD capture is controlled by `supplier.pod_required` (default `false`). When enabled via
-Supplier Settings → Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),
-`isPodRequiredForSupplier` returns true and `updateDeliveryStatus` rejects `delivered`
-without a POD record. API responses expose `podRequired` (policy) and `hasPod`
-(record exists) separately via `resolveDeliveryPodFlags`.
+Supplier Settings -> Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),
+`isPodRequiredForSupplier` rejects delivery without a proof record. API responses expose
+`podRequired` (policy) and `hasPod` (record exists) separately via `resolveDeliveryPodFlags`.
 
-Driver delivery may only promote `customer_order.status` to `DELIVERED` when the order
-is already `SHIPPED` (idempotent if already `DELIVERED`). Earlier fulfillment statuses
-must ship first.
-
+Moving an assignment from `assigned` or `picked_up` to `out_for_delivery` atomically promotes a
+parent `PROCESSING` order to `SHIPPED`. Delivery can then promote `SHIPPED` to `DELIVERED`
+(idempotent when already delivered), including multi-warehouse legs.
 Dispatch board `warehouse_id` filtering is **leg-scoped** on `GET /api/fulfillment/dispatch`
 (assignment rows use `da.warehouse_assignment_id`); the unassigned bucket remains
 order-level.
