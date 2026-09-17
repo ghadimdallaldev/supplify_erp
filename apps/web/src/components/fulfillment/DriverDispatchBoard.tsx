@@ -179,11 +179,9 @@ export function DriverDispatchBoard({
     await applyStatus(order, next)
   }
 
-  const handlePodSubmitted = async () => {
-    const order = podOrder
+  const handlePodSubmitted = () => {
+    // complete-delivery already saved proof and advanced the exact assignment.
     setPodOrder(null)
-    if (!order) return
-    await applyStatus(order, 'delivered')
   }
 
   const handleFail = async () => {
@@ -626,9 +624,11 @@ export function DriverDispatchBoard({
               onOpenChange={(open) => {
                 if (!open) setPodOrder(null)
               }}
-              onSubmitted={() => {
-                void handlePodSubmitted()
+              completion={{
+                driverAssignmentId: podOrder?.assignment?.id,
+                warehouseAssignmentId: podOrder?.assignment?.warehouse_assignment_id ?? undefined,
               }}
+              onSubmitted={handlePodSubmitted}
             />
 
             <Dialog open={!!failOrder} onOpenChange={(o) => !o && setFailOrder(null)}>

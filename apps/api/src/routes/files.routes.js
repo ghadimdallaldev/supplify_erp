@@ -109,9 +109,9 @@ router.get('/object', optionalAuth, async (req, res) => {
 // Complete PUT upload using signed token from /presign (local disk or private S3 via API)
 async function handleTokenUpload(req, res) {
   setObjectCorsHeaders(req, res)
+  const contentType = req.headers['content-type'] || 'application/octet-stream'
+  const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
   try {
-    const contentType = req.headers['content-type'] || 'application/octet-stream'
-    const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
     const provider = getStorageProvider()
     if (!provider.completeUpload) {
       return res.status(404).json({
@@ -134,7 +134,16 @@ async function handleTokenUpload(req, res) {
       error?.name === 'UPLOAD_KEY_INVALID' ||
       error?.name === 'UPLOAD_TOO_LARGE' ||
       error?.name === 'UPLOAD_INVALID_IMAGE'
-    res.status(invalid ? 400 : 500).json({
+    const status = invalid ? 400 : 500
+    logger.warn({
+      event: 'storage.upload.failed',
+      requestId: req.requestId,
+      status,
+      contentType,
+      bytes: body.length,
+      error: error?.message || 'Upload failed',
+    })
+    res.status(status).json({
       ok: false,
       data: null,
       error: {
