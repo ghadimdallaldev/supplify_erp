@@ -1,0 +1,403 @@
+# Fulfillment, logistics & GPS tracking
+
+> Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
+
+Canonical reference for supplier dispatch, drivers, routes, live GPS, POD, and exceptions.
+
+## Feature flags
+
+| Flag                | Description                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `fulfillment`       | Dispatch board, routes, exceptions (aliases `fulfillment_tools` on plans) |
+| `driver_management` | Driver CRUD and order assignment                                          |
+
+| Plan   | `fulfillment` / `fulfillment_tools` | `driver_management` |
+| ------ | ----------------------------------- | ------------------- |
+| Free   | off                                 | off                 |
+| Silver | on (manual pick/pack/ship)          | **off**             |
+| Gold+  | on                                  | on                  |
+
+## Dispatch flow
+
+Fulfillment → **Driver Dispatch**: Unassigned → assign driver → Picked Up → Out for delivery → Delivered or Failed. Status updates use `PATCH /api/orders/:id/delivery-status` (canonical). Driver delivery sets order status to **`DELIVERED`**; receiving accepts `DELIVERED` or `COMPLETED`. See [receiving.md](./receiving.md).
+
+---
+
+## Current state (GPS & delivery service)
+
+_Last updated after GPS/live tracking (migration 0137)._
+
+## Executive summary
+
+Supplify runs **supplier-operated last-mile delivery** on existing tables (`drivers`, `driver_assignments`, `delivery_route`, `route_stop`, `proof_of_delivery`). Dispatch, driver mobile, routes, POD, and receiving share one **canonical delivery service** (`driver-fulfillment.service.js`).
+
+**Status unification:** Driver delivery sets `customer_order.status = DELIVERED` (not `COMPLETED`). `COMPLETED` remains for post-receiving flows.
+
+**GPS (new):** Drivers send location pings during active assignments; suppliers and restaurants (optional) see latest position on tracking endpoints and UI. No parallel courier/shipment module.
+
+---
+
+## GPS tracking (implemented)
+
+### Database (`0137_driver_location_tracking.sql`)
+
+- `driver_location_ping` — history of pings
+- `driver_latest_location` — upserted latest position per driver
+- `proof_of_delivery.delivery_gps_lat/lng` — written when POD includes coordinates
+
+### Environment
+
+**API:** `GPS_TRACKING_ENABLED`, `GPS_STALE_AFTER_SECONDS` (default 300), `GPS_UPDATE_INTERVAL_SECONDS`, `GPS_MIN_ACCURACY_METERS`, `GPS_LOCATION_RETENTION_DAYS`, `GPS_ALLOW_RESTAURANT_LIVE_TRACKING`, `GPS_RESTAURANT_SHOW_DRIVER_NAME`, `GPS_RESTAURANT_SHOW_DRIVER_PHONE`, `GPS_ALLOW_DRIVER_BACKGROUND_HINT`, `MAP_PROVIDER`, `GOOGLE_MAPS_API_KEY`, `MAPBOX_ACCESS_TOKEN`
+
+**Web:** `VITE_GPS_TRACKING_ENABLED`, `VITE_GPS_UPDATE_INTERVAL_SECONDS`, `VITE_GOOGLE_MAPS_API_KEY`, `VITE_MAP_PROVIDER`, `VITE_MAPBOX_ACCESS_TOKEN`
+
+### APIs
+
+| Method | Path                                | Access                                            |
+| ------ | ----------------------------------- | ------------------------------------------------- |
+| POST   | `/api/orders/:id/location`          | Driver (linked, assigned) or `FULFILLMENT_MANAGE` |
+| GET    | `/api/orders/:id/tracking`          | Supplier, restaurant (if flag), assigned driver   |
+| PATCH  | `/api/orders/:id/delivery-status`   | Assignment lifecycle and compatibility updates    |
+| POST   | `/api/orders/:id/complete-delivery` | Atomic POD + exact assignment completion          |
+
+Dispatch, delivery board, route detail, command center, and `GET /api/orders/:id/tracking` expose standard `tracking` payload. Legacy `driver_last_seen` / `driverLastSeen` aliases remain one release.
+
+### Frontend
+
+- `DriverDeliveriesPage` — `watchPosition`, tracking badge, GPS error state
+- `DeliveryTrackingMap` / `DeliveryTrackingDrawer` — shared supplier map + drawer (30s poll)
+- `FulfillmentTrackingTab` — GPS column, **View tracking** drawer, 30s board poll
+- `DriverDispatchBoard` — GPS label on every card, **View tracking** drawer
+- `SupplierCommandCenterPage` — **GPS today** summary (live / stale / no GPS / failed)
+- `FulfillmentRouteDetailPanel` — per-stop GPS label + link to drawer
+- `OrderDeliveryTrackingPanel` — **supplier order detail only**; uses shared map
+- `orderTimeline` — driver assignment milestones when tracking data present
+
+### Restaurant order tracking (implemented)
+
+- Sanitized `GET /api/orders/:id/tracking` via [`restaurant-tracking-payload.js`](../../apps/api/src/lib/restaurant-tracking-payload.js)
+- [`RestaurantOrderTrackingPanel`](../../apps/web/src/components/orders/RestaurantOrderTrackingPanel.tsx) on restaurant order detail
+- Shared map + labels; 30s poll during active delivery; **Receive order** links to receiving (no auto-receive from GPS)
+
+### Privacy
+
+- Restaurants see live map only after dispatch starts (`picked_up` / `out_for_delivery`), not for planned routes or driver-assigned-but-not-dispatched states
+- Restaurants see latest point only for their order (no history, no route stops, driver phone hidden by default)
+- No email or WhatsApp per GPS ping (driver milestones are in-app only)
+- Driver delivery milestones (`driver_assigned`, `out_for_delivery`, `delivered`, `failed_delivery`) notify restaurant + supplier teams in-app only
+- Driver/supplier GPS polling uses assignment statuses: `assigned`, `picked_up`, `out_for_delivery`
+
+---
+
+## Restaurant delivery location coordinates
+
+Destination GPS for ETA is stored on **`branch`** (per operational location) and **`restaurant`** (tenant fallback). Text `address_json` alone is not used for ETA.
+
+- Migration: `0143_restaurant_delivery_coordinates.sql`
+- Restaurant settings: **Profile → Delivery location** (latitude, longitude, label, notes)
+- APIs: `GET/PATCH /api/restaurants/me/delivery-location`, `PATCH /api/restaurants/branches/:branchId/delivery-location`
+- Tracking: `destinationCoordinatesAvailable`, `destinationLabel`, `etaAvailable`, minute range, and distance on `GET /api/orders/:id/tracking`
+
+See [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md) for ETA formula, env vars, gating rules, and payload visibility.
+
+---
+
+## Planned route assignment before dispatch
+
+Suppliers can **plan** delivery routes before orders are dispatch-ready. This is separate from **active** dispatch.
+
+| Phase       | `delivery_route.status`   | `driver_assignments`                                   | Live GPS / restaurant map  | Driver app                |
+| ----------- | ------------------------- | ------------------------------------------------------ | -------------------------- | ------------------------- |
+| **Planned** | `PLANNED`                 | Created when route is planned (status `assigned`)      | Off                        | No active route           |
+| **Active**  | `IN_PROGRESS`             | Ready stops confirmed; non-ready stops stay `assigned` | On when driver sends pings | Active route + deliveries |
+| **Done**    | `COMPLETED` / `CANCELLED` | Terminal                                               | Off                        | —                         |
+
+### Eligible order statuses
+
+| Action                              | `customer_order.status` values                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Add to **planned** route            | `PLACED`, `PENDING_APPROVAL`, `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED`                                 |
+| **Activate** route (start dispatch) | `PROCESSING`, `SHIPPED` get live dispatch sync; route can start even if all stops are still preparing |
+
+Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → `PROCESSING`; READY_FOR_DELIVERY → `SHIPPED`.
+
+### Supplier UI
+
+- Dispatch board: **Assign to planned route** (multi-select → planned route dialog). Orders appear in **Assigned** with the route driver; badge **Planned route**.
+- Badge (legacy): **Route planned — waiting for order to be ready** only when on a route without a driver assignment record
+- Routes tab: **Activate ready orders** on a `PLANNED` route (starts route; ready stops go live, others wait on route)
+
+### APIs
+
+| Method | Path                                                    | Notes                                                |
+| ------ | ------------------------------------------------------- | ---------------------------------------------------- |
+| POST   | `/api/fulfillment/routes`                               | Creates `PLANNED` route + stops + driver assignments |
+| POST   | `/api/fulfillment/routes/:id/stops`                     | Add orders to existing planned route (+ assignments) |
+| DELETE | `/api/fulfillment/routes/:id/stops/:orderId`            | Remove from planned route                            |
+| PATCH  | `/api/fulfillment/routes/:id` `{ status: IN_PROGRESS }` | Starts route; syncs dispatch-ready stops             |
+
+### Edge cases
+
+- **Cancelled order:** removed from planned routes (`releaseOrderFromPlannedRoutes`)
+- **Non-ready stops on activate:** route still moves to `IN_PROGRESS`; waiting stops keep `assigned` until order reaches `PROCESSING`/`SHIPPED`
+- **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
+- **Dispatch board selection:** checkbox disabled when order is already on a route, or status is not eligible for planning
+- **Un-routing releases the driver:** removing a stop, cancelling a route (via `DELETE`
+  or `PATCH status=CANCELLED`) and `releaseOrderFromPlannedRoutes` all flip the order's
+  still-`assigned` driver leg to `reassigned`. Without this the dispatch board keeps
+  the order in the **Assigned** bucket under a driver who no longer has a route for it.
+  Legs already `picked_up` / `out_for_delivery` are deliberately left alone.
+- **Route date wins over today:** `syncDriverAssignment` stamps
+  `driver_assignments.scheduled_delivery_date` from the route's `scheduled_date`, not
+  `CURRENT_DATE`. A route planned for tomorrow must not be swept up by tonight's
+  [delivery rollover](./delivery-rollover.md) job.
+- **Reassignment:** `reassignDriver` carries `scheduled_delivery_date` onto the new leg
+  (a NULL there drops the order out of the rollover partial index and the driver's
+  today list) and deletes the now-stale stop from the previous driver's live route.
+
+### Dispatch cache invalidation
+
+`GET /api/fulfillment/dispatch` is cached for 45s per supplier under
+`fulfillment:dispatch:v1:<supplierId>:<days>:<warehouseId>`. **Every** mutation that
+changes a bucket, an assignment or `has_pod` must call
+`invalidateDispatchCacheForSupplier` (`apps/api/src/lib/dispatch-cache.js`) — route
+create / add stops / remove stop / update / activate / cancel / build-from-assignments,
+driver assign / status / reassign, POD submit, and both manual and cron rollover.
+Skipping it leaves the board showing an order as unassigned for up to 45 seconds after
+a driver has been routed.
+
+### Supplier delivery board (multi-warehouse legs)
+
+`GET /api/supplier-ops/deliveries/board` returns **one row per non-reassigned driver
+assignment** (`assignmentId`, `warehouseAssignmentId`), not one row per order.
+Unassigned orders still appear once as `deliveryStatus: pending`. Board `stats` count
+delivery legs, so multi-WH orders can contribute multiple rows. Clients must pass
+`driver_assignment_id` (or `warehouse_assignment_id`) when updating status on
+multi-leg orders — omitting them makes the API reject the update as ambiguous.
+
+`deliveryStatus` reports the assignment status faithfully, including `picked_up`. It used
+to be collapsed into `out_for_delivery`, which hid a real state: the driver's primary
+action became "Delivered" for a delivery they had never declared departure on, so one tap
+could deliver it and GPS tracking never started. `stats.outForDelivery` still counts
+`picked_up` and `out_for_delivery` together as in transit, and `stats.pickedUp` breaks the
+former out.
+
+**Trackable statuses.** Only `assigned`, `picked_up` and `out_for_delivery` accept location
+pings. `pending` means _no driver assignment_ (`COALESCE(da.status, 'pending')`) and the
+location endpoint rejects it, so clients must not ping those orders — doing so previously
+failed the whole batch and stopped all location sharing. Clients ping **every** active
+delivery and tolerate per-order failure (`Promise.allSettled`) rather than all-or-nothing.
+
+**Web provider throttle.** `webDriverLocationProvider` throttles uploads to
+`VITE_GPS_UPDATE_INTERVAL_SECONDS` (default 15s) and never overlaps requests;
+`watchPosition` otherwise fires continuously and the API's `GPS_MIN_SEND_INTERVAL_SECONDS`
+drops the excess. It reports `TRACKING_ACTIVE` only after a fix actually reaches the
+server, and surfaces upload failures instead of swallowing them — the UI must never claim
+location is being shared when it is not.
+
+### Proof of delivery
+
+One POD row per order is enforced by a unique index on `proof_of_delivery(order_id)`
+(migration `0200`). The completion service upserts with `ON CONFLICT (order_id) DO UPDATE`
+and `COALESCE`, so a flaky-network retry enriches the same proof instead of stacking duplicates.
+A POD must carry a photo (`file_key`), a signature (`signature_file_key`) or a recipient name;
+the native driver flow requires a photo as the primary evidence.
+
+**Canonical confirmation:** `POST /api/orders/:id/complete-delivery` accepts proof metadata,
+the active `driver_assignment_id`, optional warehouse leg, recipient/notes, and best-effort GPS.
+It upserts the proof and marks that exact assignment `delivered` in one transaction. Retrying
+an interrupted response is idempotent. The older proof-only and delivery-status endpoints stay
+available for compatibility, but new web and mobile confirmation flows use the atomic endpoint.
+
+POD media is presigned to the authenticated `/api/files/upload/:token` gateway. The server
+validates MIME, image bytes, and the 10 MB limit; clients must send the actual captured blob's
+MIME type and size and must not expose the upload token in errors. GPS permission denial,
+timeout, or unavailable location never blocks completion.
+
+POD capture is controlled by `supplier.pod_required` (default `false`). When enabled via
+Supplier Settings -> Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),
+`isPodRequiredForSupplier` rejects delivery without a proof record. API responses expose
+`podRequired` (policy) and `hasPod` (record exists) separately via `resolveDeliveryPodFlags`.
+
+Moving an assignment from `assigned` or `picked_up` to `out_for_delivery` atomically promotes a
+parent `PROCESSING` order to `SHIPPED`. Delivery can then promote `SHIPPED` to `DELIVERED`
+(idempotent when already delivered), including multi-warehouse legs.
+Dispatch board `warehouse_id` filtering is **leg-scoped** on `GET /api/fulfillment/dispatch`
+(assignment rows use `da.warehouse_assignment_id`); the unassigned bucket remains
+order-level.
+
+### Rollback notes
+
+- Revert `createDeliveryRoute` / `addOrdersToPlannedRoute` calling `syncDriverAssignment` restores defer-until-activate assignment behavior
+- Revert `activateRouteDispatch` empty-activated guard to block activation when no stops are dispatch-ready
+- Restaurant live-tracking guard is in `driver-location.service.js` (`picked_up` / `out_for_delivery` only)
+
+---
+
+## Manual and automatic route stop ordering
+
+Drivers and suppliers can **manually order delivery stops** on a route. Suppliers can also **optimize stop order** from the depot using nearest-neighbor heuristics (coordinates required on stops). Stop status changes (`OUT_FOR_DELIVERY` / `DELIVERED` / `FAILED`) sync to `driver_assignments` through `updateRouteStop`.
+
+### Route-stop advancement transaction boundary
+
+`updateRouteStop` is one logical operation: **advance this stop** (and every active driver leg for its order). It runs inside a single `withTransaction`:
+
+1. `SELECT … FOR UPDATE` on `delivery_route` and `route_stop`
+2. Lock and validate every active `driver_assignments` leg for the stop’s order
+3. Apply assignment status updates via `updateDeliveryStatus({ client, postCommitEffects })` (no nested commit)
+4. Update the `route_stop` row
+5. If every stop is terminal and the route is `IN_PROGRESS`, mark the route `COMPLETED` in the same transaction
+
+After commit: run queued notifications / milestones, then invalidate the dispatch cache once. If the transaction rolls back, no success notifications or cache invalidation run. Standalone `PATCH /api/orders/:id/delivery-status` still opens its own transaction and defers the same side effects until after commit.
+
+POD checks for `delivered` use the transaction client so they see the same snapshot as the mutation.
+
+### Data model
+
+- `route_stop.sequence_number` (migration `0006_fulfillment_logistics.sql`) — integer order per route, indexed on `(route_id, sequence_number)`.
+- Standalone deliveries (not on a route) have no sequence; ETA falls back to direct driver → destination.
+
+### Who can reorder
+
+| Actor    | Permission                          | Scope                     |
+| -------- | ----------------------------------- | ------------------------- |
+| Supplier | `FULFILLMENT_MANAGE`                | Routes they own           |
+| Driver   | `DRIVER_DELIVERIES_MANAGE` (linked) | Only their assigned route |
+
+Completed or failed stops stay fixed; active stops can be reordered.
+
+### APIs
+
+| Method | Path                                        | Body / notes                                                            |
+| ------ | ------------------------------------------- | ----------------------------------------------------------------------- |
+| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today                        |
+| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route                                |
+| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)                             |
+| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`                                |
+| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot                       |
+| POST   | `/api/fulfillment/routes/:id/optimize`      | `{ apply?: boolean }` — nearest-neighbor from depot; preview or persist |
+
+Stop payloads include `sequenceNumber`, `isNext`, `isCompleted`, `orderNumber`, and `destinationCoordinatesAvailable`.
+
+### Frontend
+
+- **Driver portal** (`DriverDeliveriesPage` / `DriverRoutePanel`): “Today’s deliveries”, next-stop card, move up/down, set as next.
+- **Supplier fulfillment** (`FulfillmentRouteDetailPanel`): ordered stop list, badges (Next delivery, Completed, On the way, Waiting), reorder controls, **Optimize stop order** button.
+
+### ETA
+
+When an order is on an active route, ETA uses the stop order — see [delivery-eta-and-live-tracking.md](./delivery-eta-and-live-tracking.md). Restaurants see `stopsBefore` and friendly copy only (no route IDs or internal route details).
+
+### Route optimization (v1)
+
+`POST /api/fulfillment/routes/:id/optimize` reorders **PLANNED** stops with coordinates using nearest-neighbor from the route depot. `apply: true` persists `sequence_number` updates.
+
+Service: `route-optimization.service.js`. **Mapbox/Google Directions** (traffic, time windows) is optional future work behind env flags.
+
+### Future
+
+Automatic route optimization (Mapbox/Google Directions, traffic, etc.) can extend the v1 nearest-neighbor endpoint without changing the stop-order model.
+
+---
+
+## Driver-built route from assigned deliveries
+
+When a supplier assigns orders individually (no planned route), drivers can group **standalone** deliveries into their own route.
+
+### When it appears
+
+Driver portal (`/app/driver/deliveries`): if the driver has **2+ active standalone assignments** and **no route today**, a card offers **Build my route**.
+
+### API
+
+| Method | Path                                             | Access                     |
+| ------ | ------------------------------------------------ | -------------------------- |
+| POST   | `/api/fulfillment/routes/build-from-assignments` | `DRIVER_DELIVERIES_MANAGE` |
+
+Optional body: `{ "date": "YYYY-MM-DD" }` (defaults to today).
+
+### Behavior
+
+- Finds the driver’s assigned / picked up / out-for-delivery orders not already on a `PLANNED` or `IN_PROGRESS` route.
+- Requires at least **2** eligible orders.
+- Creates an `IN_PROGRESS` route labeled `{Driver name} — Today's route`, or merges into an existing today route.
+- Repeated calls are idempotent (no duplicate stops).
+- Supplier fulfillment → Routes shows the driver-built route like any other route.
+- Stop reordering and route-aware ETA apply once the route exists.
+
+---
+
+## Map markers and all-deliveries map
+
+Interactive maps use **Leaflet + OpenStreetMap tiles** (no turn-by-turn routing API).
+
+### Single-order maps (`DeliveryTrackingMap`)
+
+| Marker      | Who sees it          | Notes                                      |
+| ----------- | -------------------- | ------------------------------------------ |
+| Driver GPS  | Supplier, restaurant | Green = live, amber = stale, gray = no fix |
+| Destination | **Supplier only**    | Orange pin; label from `destinationLabel`  |
+| Recenter    | Both                 | Fits all visible markers; mobile-friendly  |
+
+**Restaurant privacy:** tracking API does **not** expose destination latitude/longitude. Restaurant maps show the **driver pin only** plus ETA copy.
+
+Supplier tracking drawer, order detail panel, and driver portal use the same map component with destination pins where allowed.
+
+### All active deliveries map (supplier)
+
+**Fulfillment → Delivery Tracking** tab: toggle **Board** / **Map**.
+
+- Includes assignments in `assigned`, `picked_up`, `out_for_delivery`.
+- Each delivery: driver marker (live / stale / no GPS) and destination marker when coordinates exist.
+- Summary counts: live GPS, stale GPS, no GPS, ETA available.
+- Click a marker or list row → existing **View tracking** drawer for that order.
+- Board query: `GET /api/supplier/deliveries/board?status=active_delivery` (includes destination coords for supplier ops only).
+
+---
+
+- No paid turn-by-turn routing API (straight-line ETA only)
+- No Socket.io live map stream (polling on tracking query)
+- GPS coordinates are client-reported (no device attestation or geofence validation)
+- `delivery_wave` / legacy `delivery_exception` tables still unused
+
+### Retention
+
+- Cron `driver_location_retention` (24 h) purges `driver_location_ping` older than `GPS_LOCATION_RETENTION_DAYS`; `driver_latest_location` is retained for ops dashboards
+
+---
+
+## Canonical delivery service
+
+**File:** [`driver-fulfillment.service.js`](../../apps/api/src/services/driver-fulfillment.service.js)
+
+**Legacy shim:** [`driver-delivery.js`](../../apps/api/src/lib/driver-delivery.js) delegates to the service.
+
+**Assignment statuses:** `assigned` → `picked_up` → `out_for_delivery` → `delivered` | `failed` | `rescheduled` | `reassigned`
+
+**Notifications:** `notifyDriverDeliveryMilestone` for assign, out for delivery, delivered, failed; `notifyOrderStatusChange(DELIVERED)` on deliver.
+
+---
+
+## Key files (GPS-related)
+
+| Path                                                                        | Role                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------- |
+| `apps/api/db/migrations/0137_driver_location_tracking.sql`                  | Schema                                   |
+| `apps/api/src/lib/delivery-tracking-payload.js`                             | Standard `tracking` object + stale logic |
+| `apps/api/src/lib/restaurant-tracking-payload.js`                           | Sanitized restaurant tracking response   |
+| `apps/web/src/components/orders/RestaurantOrderTrackingPanel.tsx`           | Restaurant order detail tracking UI      |
+| `apps/api/src/services/driver-location.service.js`                          | Ping ingest + tracking read              |
+| `apps/api/src/routes/orders-driver.routes.js`                               | Location + tracking routes               |
+| `apps/web/src/hooks/useDriverLocationTracking.ts`                           | Browser geolocation                      |
+| `apps/web/src/components/maps/DeliveryTrackingMap.tsx`                      | Interactive map + recenter + markers     |
+| `apps/web/src/components/maps/ActiveDeliveriesMap.tsx`                      | Supplier all-deliveries map view         |
+| `docs/features/drivers-and-gps-tracking.md`                                 | This document                            |
+| [fulfillment-logistics (archived)](../archive/old/fulfillment-logistics.md) | Exceptions, POD, env tables              |
+
+---
+
+## Tests added
+
+- `driver-fulfillment.service.test.js` — delivered → `DELIVERED`
+- `driver-location.service.test.js` — validation, disabled mode, active assignment
+- Updated `supplier-pain-killer.test.js`, `DriverDispatchBoard` tests, `DriverDeliveriesPage.mobile.test.tsx`

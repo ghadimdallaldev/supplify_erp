@@ -8,6 +8,7 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import {
+  useCompleteOrderDeliveryMutation,
   usePresignOrderProofOfDeliveryMutation,
   useSubmitOrderProofOfDeliveryMutation,
 } from '../../services/api'
@@ -17,6 +18,7 @@ type Props = {
   orderId: string | null
   onOpenChange: (open: boolean) => void
   onSubmitted?: () => void
+  completion?: { driverAssignmentId?: string; warehouseAssignmentId?: string }
 }
 
 async function uploadPresignedFile(
@@ -39,7 +41,13 @@ async function uploadPresignedFile(
   return presign.fileKey
 }
 
-export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted }: Props) {
+export function ProofOfDeliveryDialog({
+  open,
+  orderId,
+  onOpenChange,
+  onSubmitted,
+  completion,
+}: Props) {
   const { t } = useTranslation('fulfillment')
   const [recipientName, setRecipientName] = useState('')
   const [notes, setNotes] = useState('')
@@ -54,6 +62,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
 
   const [presignPod] = usePresignOrderProofOfDeliveryMutation()
   const [submitPod, { isLoading: submitting }] = useSubmitOrderProofOfDeliveryMutation()
+  const [completeDelivery, { isLoading: completing }] = useCompleteOrderDeliveryMutation()
 
   const resetForm = useCallback(() => {
     setRecipientName('')
@@ -212,7 +221,7 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
         }
       }
 
-      await submitPod({
+      const payload = {
         orderId,
         recipient_name: recipientName || undefined,
         notes: notes || undefined,
@@ -220,7 +229,16 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
         signature_file_key: signatureFileKey,
         latitude,
         longitude,
-      }).unwrap()
+      }
+      if (completion) {
+        await completeDelivery({
+          ...payload,
+          driver_assignment_id: completion.driverAssignmentId,
+          warehouse_assignment_id: completion.warehouseAssignmentId,
+        }).unwrap()
+      } else {
+        await submitPod(payload).unwrap()
+      }
 
       toast.success(t('pod.toast.saved'))
       onOpenChange(false)
@@ -334,8 +352,12 @@ export function ProofOfDeliveryDialog({ open, orderId, onOpenChange, onSubmitted
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('pod.dialog.skip')}
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={submitting || !hasProof}>
-            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting || completing || !hasProof}
+          >
+            {(submitting || completing) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('pod.dialog.saveProof')}
           </Button>
         </DialogFooter>

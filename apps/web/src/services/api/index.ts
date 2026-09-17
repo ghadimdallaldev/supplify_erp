@@ -120,6 +120,7 @@ export const {
   useSendDriverLocationMutation,
   useGetOrderTrackingQuery,
   useSubmitOrderProofOfDeliveryMutation,
+  useCompleteOrderDeliveryMutation,
   usePresignOrderProofOfDeliveryMutation,
   useGetOrderProofOfDeliveryQuery,
   useConfirmOrderProofOfDeliveryMutation,

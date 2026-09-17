@@ -23,6 +23,7 @@ import {
   updateDeliveryStatus,
   reassignDriver,
   submitProofOfDelivery,
+  completeDeliveryWithProof,
   confirmProofOfDelivery,
   getProofOfDelivery,
 } from '../services/driver-fulfillment.service.js'
@@ -111,6 +112,24 @@ const podSchema = z
     (b) => Boolean(b.file_key || b.signature_file_key || b.recipient_name?.trim()),
     // An empty POD is not proof of anything — require a photo, a signature or a recipient.
     { message: 'Provide a delivery photo, a signature, or a recipient name' }
+  )
+
+const completeDeliverySchema = z
+  .object({
+    file_key: z.string().optional().nullable(),
+    signature_file_key: z.string().optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+    recipient_name: z.string().max(255).optional().nullable(),
+    driver_assignment_id: z.string().uuid().optional().nullable(),
+    warehouse_assignment_id: z.string().uuid().optional().nullable(),
+    latitude: z.number().min(-90).max(90).optional().nullable(),
+    longitude: z.number().min(-180).max(180).optional().nullable(),
+  })
+  .refine(
+    (body) => Boolean(body.file_key || body.signature_file_key || body.recipient_name?.trim()),
+    {
+      message: 'Provide a delivery photo, a signature, or a recipient name',
+    }
   )
 
 const podPresignSchema = z.object({
@@ -443,6 +462,7 @@ router.post(
         fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
         fileType: body.fileType,
         userId: req.userData.id,
+        useApiUpload: true,
       })
       res.json({
         ok: true,
@@ -558,6 +578,79 @@ router.post(
         ok: false,
         data: null,
         error: { name: 'INTERNAL_ERROR', message: 'Failed to submit proof of delivery' },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+
+router.post(
+  '/:id/complete-delivery',
+  ...supplierFulfillmentGate,
+  requireAnyPermission('FULFILLMENT_MANAGE', 'DRIVER_DELIVERIES_MANAGE'),
+  async (req, res) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      if (!supplierId) throw new ForbiddenError('Supplier not found')
+      const body = completeDeliverySchema.parse(req.body)
+      const perms = req.tenantContext?.permissions ?? []
+      if (isDriverOnlyPermissions(perms)) {
+        if (!body.driver_assignment_id) {
+          throw new ValidationError(
+            'driver_assignment_id is required to complete a driver delivery'
+          )
+        }
+        await assertDriverAssignmentAccess({
+          userId: req.userData.id,
+          supplierId,
+          orderId: req.params.id,
+          assignmentId: body.driver_assignment_id,
+          permissions: perms,
+        })
+      }
+      const data = await completeDeliveryWithProof({
+        orderId: req.params.id,
+        supplierId,
+        fileKey: body.file_key,
+        signatureFileKey: body.signature_file_key,
+        notes: body.notes,
+        recipientName: body.recipient_name,
+        driverAssignmentId: body.driver_assignment_id,
+        warehouseAssignmentId: body.warehouse_assignment_id,
+        userId: req.userData?.id,
+        latitude: body.latitude,
+        longitude: body.longitude,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      const status =
+        error instanceof ValidationError || error.name === 'ZodError'
+          ? 400
+          : error instanceof ForbiddenError
+            ? 403
+            : error instanceof NotFoundError
+              ? 404
+              : 500
+      logger.error({
+        event: 'delivery.completion.failed',
+        requestId: req.requestId,
+        orderId: req.params.id,
+        error: error?.message || 'Unknown error',
+      })
+      res.status(status).json({
+        ok: false,
+        data: null,
+        error: {
+          name:
+            status === 400
+              ? 'VALIDATION_ERROR'
+              : status === 403
+                ? 'FORBIDDEN'
+                : status === 404
+                  ? 'NOT_FOUND'
+                  : 'INTERNAL_ERROR',
+          message: status === 500 ? 'Failed to complete delivery' : error.message,
+        },
         requestId: req.requestId,
       })
     }
