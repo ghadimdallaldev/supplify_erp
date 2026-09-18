@@ -7,9 +7,11 @@ export interface PresignedUrlRequest {
 
 export interface PresignedUrlResponse {
   presignedUrl: string
+  url?: string
   fileKey: string
   fileName: string
   fileType: string
+  publicUrl?: string
 }
 
 export interface AttachFileRequest {

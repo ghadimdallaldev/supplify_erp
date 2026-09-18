@@ -56,7 +56,7 @@ describe('ProductImageImportDialog', () => {
     mockJobQueryData = undefined
     mockPresign.mockReturnValue({
       unwrap: async () => ({
-        presignedUrl: 'https://upload.test/put',
+        presignedUrl: 'https://api.test/api/files/upload-import/token',
         fileKey: 'imports/supplier-1/session/products.zip',
       }),
     })

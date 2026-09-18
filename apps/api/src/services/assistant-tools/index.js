@@ -15,6 +15,7 @@ import { listSupplierStockDisplay } from '../supplier-stock.service.js'
 import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
+import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
 
 const ROW_CAP = 15
 
@@ -173,8 +174,7 @@ const TOOLS = {
           ? 'o.restaurant_id = $1'
           : `EXISTS (
               SELECT 1 FROM order_item oi_s
-              JOIN product p_s ON p_s.id = oi_s.product_id
-              WHERE oi_s.order_id = o.id AND (oi_s.supplier_id = $1 OR p_s.supplier_id = $1)
+              WHERE oi_s.order_id = o.id AND oi_s.supplier_id = $1
             )`
       if (status) {
         params.push(status)
@@ -185,12 +185,16 @@ const TOOLS = {
         where += ` AND (
           o.id::text ILIKE $${params.length}
           OR COALESCE(r.name, '') ILIKE $${params.length}
-          OR EXISTS (
+          ${
+            ctx.tenantType === 'SUPPLIER'
+              ? ''
+              : `OR EXISTS (
             SELECT 1 FROM order_item oi_q
             JOIN product p_q ON p_q.id = oi_q.product_id
             JOIN supplier s_q ON s_q.id = COALESCE(oi_q.supplier_id, p_q.supplier_id)
             WHERE oi_q.order_id = o.id AND s_q.name ILIKE $${params.length}
-          )
+          )`
+          }
         )`
       }
       params.push(ROW_CAP)
@@ -200,18 +204,22 @@ const TOOLS = {
           o.id,
           'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS "orderNumber",
           o.status,
-          o.total_amount AS "totalAmount",
+          ${ctx.tenantType === 'SUPPLIER' ? '(SELECT COALESCE(SUM(oi_total.line_total), 0) FROM order_item oi_total WHERE oi_total.order_id = o.id AND oi_total.supplier_id = $1)' : 'o.total_amount'} AS "totalAmount",
           o.currency,
           COALESCE(o.placed_at, o.created_at) AS "placedAt",
           r.name AS "restaurantName",
-          (
+          ${
+            ctx.tenantType === 'SUPPLIER'
+              ? '(SELECT s_current.name FROM supplier s_current WHERE s_current.id = $1)'
+              : `(
             SELECT s2.name
             FROM order_item oi2
             JOIN product p2 ON p2.id = oi2.product_id
             JOIN supplier s2 ON s2.id = COALESCE(oi2.supplier_id, p2.supplier_id)
             WHERE oi2.order_id = o.id
             LIMIT 1
-          ) AS "supplierName"
+          )`
+          } AS "supplierName"
         FROM customer_order o
         JOIN restaurant r ON r.id = o.restaurant_id
         WHERE ${where}
@@ -249,8 +257,7 @@ const TOOLS = {
           ? 'o.restaurant_id = $1'
           : `EXISTS (
               SELECT 1 FROM order_item oi_s
-              JOIN product p_s ON p_s.id = oi_s.product_id
-              WHERE oi_s.order_id = o.id AND (oi_s.supplier_id = $1 OR p_s.supplier_id = $1)
+              WHERE oi_s.order_id = o.id AND oi_s.supplier_id = $1
             )`
       const { rows } = await query(
         `
@@ -258,7 +265,7 @@ const TOOLS = {
           o.id,
           'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS "orderNumber",
           o.status,
-          o.total_amount AS "totalAmount",
+          ${ctx.tenantType === 'SUPPLIER' ? '(SELECT COALESCE(SUM(oi_total.line_total), 0) FROM order_item oi_total WHERE oi_total.order_id = o.id AND oi_total.supplier_id = $1)' : 'o.total_amount'} AS "totalAmount",
           o.currency,
           COALESCE(o.placed_at, o.created_at) AS "placedAt",
           r.name AS "restaurantName"
@@ -274,16 +281,20 @@ const TOOLS = {
         [ctx.tenantId, uuidMatch ? uuidMatch[0] : null, short.slice(0, 8)]
       )
       if (!rows[0]) return { error: 'Order not found' }
+      const itemParams = [rows[0].id]
+      const itemTenantFilter = ctx.tenantType === 'SUPPLIER' ? ' AND oi.supplier_id = $2' : ''
+      if (ctx.tenantType === 'SUPPLIER') itemParams.push(ctx.tenantId)
+      itemParams.push(ROW_CAP)
       const { rows: items } = await query(
         `
         SELECT p.name AS "productName", oi.quantity, p.unit AS unit, oi.line_total AS "lineTotal"
         FROM order_item oi
         JOIN product p ON p.id = oi.product_id
-        WHERE oi.order_id = $1
+        WHERE oi.order_id = $1${itemTenantFilter}
         ORDER BY p.name
-        LIMIT $2
+        LIMIT $${itemParams.length}
         `,
-        [rows[0].id, ROW_CAP]
+        itemParams
       )
       return { order: rows[0], items }
     },
@@ -312,6 +323,14 @@ const TOOLS = {
       const orderId = String(args.orderId || '')
       if (!orderId) return { error: 'orderId required' }
       try {
+        if (ctx.driverId && isDriverOnlyPermissions(ctx.permissions)) {
+          await assertDriverAssignmentAccess({
+            userId: ctx.userId,
+            supplierId: ctx.tenantId,
+            orderId,
+            permissions: ctx.permissions,
+          })
+        }
         const tracking = await getOrderTracking({
           orderId,
           supplierId: ctx.tenantType === 'SUPPLIER' ? ctx.tenantId : undefined,

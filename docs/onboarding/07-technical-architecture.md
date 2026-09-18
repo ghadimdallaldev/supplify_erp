@@ -335,7 +335,7 @@ Secrets shown as `<set-in-vault>` — never commit real values.
 | `STORAGE_BUCKET`              | no       | `supplify`              |
 | `STORAGE_ACCESS_KEY_ID`       | s3       | `minioadmin` (dev)      |
 | `STORAGE_SECRET_ACCESS_KEY`   | s3       | `<set-in-vault>`        |
-| `STORAGE_PUBLIC_READ`         | no       | `true`                  |
+| `STORAGE_PUBLIC_READ`         | no       | `false`                 |
 | `STORAGE_S3_FORCE_PATH_STYLE` | no       | `true` for MinIO        |
 
 ### Crons & ops

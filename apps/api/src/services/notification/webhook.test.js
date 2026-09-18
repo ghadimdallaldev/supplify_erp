@@ -5,14 +5,19 @@ vi.mock('../../lib/logger.js', () => ({
 }))
 
 const queryMock = vi.fn()
+const fetchPinnedPublicMock = vi.fn()
 vi.mock('../../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
+}))
+vi.mock('../../lib/pinned-fetch.js', () => ({
+  fetchPinnedPublic: (...args) => fetchPinnedPublicMock(...args),
 }))
 
 describe('notification/webhook', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryMock.mockResolvedValue({ rows: [] })
+    fetchPinnedPublicMock.mockReset()
   })
 
   afterEach(() => {
@@ -67,8 +72,7 @@ describe('notification/webhook', () => {
       }
       return { rows: [] }
     })
-    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 })
-    vi.stubGlobal('fetch', fetchSpy)
+    fetchPinnedPublicMock.mockResolvedValue({ status: 200, body: Buffer.alloc(0) })
 
     const { dispatchNotificationWebhook } = await import('./webhook.js')
     const result = await dispatchNotificationWebhook({
@@ -78,8 +82,8 @@ describe('notification/webhook', () => {
     })
 
     expect(result.delivered).toBe(true)
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    const [url, options] = fetchSpy.mock.calls[0]
+    expect(fetchPinnedPublicMock).toHaveBeenCalledTimes(1)
+    const [url, options] = fetchPinnedPublicMock.mock.calls[0]
     expect(url).toBe('https://hook.test/x')
     expect(options.headers['X-Supplify-Signature']).toMatch(/^sha256=/)
     const payload = JSON.parse(options.body)
@@ -95,7 +99,7 @@ describe('notification/webhook', () => {
       }
       return { rows: [] }
     })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    fetchPinnedPublicMock.mockResolvedValue({ status: 500, body: Buffer.alloc(0) })
 
     const { dispatchNotificationWebhook } = await import('./webhook.js')
     const result = await dispatchNotificationWebhook({

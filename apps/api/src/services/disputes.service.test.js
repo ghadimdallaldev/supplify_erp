@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createDispute, resolveDispute, rejectDispute } from './disputes.service.js'
+import { assertCleanUploadOwnership } from './storage/upload-security.service.js'
 
 const queryMock = vi.fn()
 const withTransactionMock = vi.fn()
@@ -30,11 +31,16 @@ vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
+vi.mock('./storage/upload-security.service.js', () => ({
+  assertCleanUploadOwnership: vi.fn().mockResolvedValue({}),
+}))
+
 describe('Disputes Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryMock.mockReset()
     withTransactionMock.mockReset()
+    vi.mocked(assertCleanUploadOwnership).mockReset().mockResolvedValue({})
     createReplacementOrderFromDisputeMock.mockReset()
     createReplacementOrderFromDisputeMock.mockResolvedValue('replacement-order-1')
   })
@@ -172,6 +178,53 @@ describe('Disputes Service', () => {
           description: 'Missing items',
         })
       ).rejects.toMatchObject({ name: 'ConflictError' })
+    })
+
+    it('requires every supplied attachment to be a clean upload owned by the restaurant tenant', async () => {
+      const disputeRow = {
+        id: 'd-1',
+        order_id: 'order-1',
+        restaurant_id: 'r-1',
+        supplier_id: 's-1',
+        type: 'damaged_goods',
+        status: 'open',
+        description: 'Damaged items',
+        disputed_amount: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+        order_status: 'DELIVERED',
+      }
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', restaurant_id: 'r-1', status: 'DELIVERED' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 's-1' }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] })
+        .mockResolvedValueOnce({ rows: [disputeRow] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+      withTransactionMock.mockImplementation(async (handler) =>
+        handler({ query: vi.fn().mockResolvedValue({ rows: [disputeRow] }) })
+      )
+
+      await createDispute({
+        restaurantId: 'r-1',
+        userId: 'u-1',
+        orderId: 'order-1',
+        supplierId: 's-1',
+        type: 'damaged_goods',
+        description: 'Damaged items',
+        attachmentKeys: [{ fileKey: 'uploads/u-1/evidence.jpg', fileName: 'evidence.jpg' }],
+      })
+
+      expect(assertCleanUploadOwnership).toHaveBeenCalledWith('uploads/u-1/evidence.jpg', {
+        userId: 'u-1',
+        tenantId: 'r-1',
+        tenantType: 'RESTAURANT',
+      })
     })
   })
 

@@ -9,7 +9,7 @@ Supplify does **not** store uploaded file bytes in PostgreSQL. The database keep
 | Filesystem or object store | Image/PDF bytes                                              |
 | PostgreSQL                 | `publicUrl`, `file_key`, `file_url`, `file_size_bytes`, etc. |
 
-**Single pipeline:** `POST /api/files/presign` → browser `PUT` (presigned S3 URL or API upload token) → feature API saves the reference.
+**Single pipeline:** `POST /api/files/presign` → authenticated gateway `PUT` → private quarantine spool → ClamAV → magic-byte validation → private storage → feature API saves the reference. The API retains the legacy `presignedUrl` and `url` response field names; they now point to the API gateway, never directly to S3.
 
 Implementation: [`apps/api/src/services/storage/storage.service.js`](../../apps/api/src/services/storage/storage.service.js), routes in [`apps/api/src/routes/files.routes.js`](../../apps/api/src/routes/files.routes.js).
 
@@ -23,13 +23,19 @@ flowchart LR
   subgraph api [API]
     Presign["POST /api/files/presign"]
     Provider[storage.service.js]
+    Gateway[Authenticated upload gateway]
+    Quarantine[0700 quarantine spool]
+    Scanner[ClamAV]
   end
   subgraph backends [Backends]
     Local["local: STORAGE_LOCAL_PATH"]
     S3["s3: STORAGE_BUCKET"]
   end
   UI --> Presign
-  Presign --> Provider
+  Presign --> Gateway
+  Gateway --> Quarantine
+  Quarantine --> Scanner
+  Scanner --> Provider
   Provider --> Local
   Provider --> S3
 ```
@@ -52,9 +58,9 @@ Typical for **Railway dev** ([`deploy/railway/development/api.env`](../../deploy
 
 **On disk:** `{STORAGE_LOCAL_PATH}/uploads/{userId}/...` (the `uploads/` prefix is part of the key).
 
-**Public URL:** `{STORAGE_PUBLIC_URL}/uploads/{userId}/...` — the path segment `/uploads/` appears twice (static mount + key prefix). That is expected.
+**URL:** `{API_PUBLIC_URL}/api/files/object?key=...&exp=...&sig=...`; the API authorizes and streams the object. Production does not expose the local upload directory as a public static mount.
 
-**Reads:** [`apps/api/src/server.js`](../../apps/api/src/server.js) serves `express.static(STORAGE_LOCAL_PATH)` at `/uploads`.
+**Reads:** [`GET /api/files/object`](../../apps/api/src/routes/files.routes.js) authorizes the signed/object request and performs scan-on-read for legacy objects.
 
 **Writes:** API returns a tokenized URL `PUT /api/files/upload/:token`; [`localStorageProvider.js`](../../apps/api/src/services/storage/localStorageProvider.js) writes the file after verifying the token.
 
@@ -74,15 +80,11 @@ Typical for **Railway dev** ([`deploy/railway/development/api.env`](../../deploy
 
 **Object key:** same `uploads/{userId}/{timestamp}-{safeFileName}` as local.
 
-**Public URL (public bucket):** `{STORAGE_PUBLIC_URL}/{bucket}/{fileKey}` when `STORAGE_PUBLIC_READ=true` (MinIO dev).
-
-**Public URL (private bucket — Railway default):** `{API_PUBLIC_URL}/api/files/object?key=...` when `STORAGE_PUBLIC_READ=false`. The API streams objects via [`GET /api/files/object`](../../apps/api/src/routes/files.routes.js).
+**URL:** `{API_PUBLIC_URL}/api/files/object?key=...&exp=...&sig=...`. `STORAGE_PUBLIC_READ=false` is the default and is required in hosted environments. The API streams objects through the authorization and exact-version scan gate.
 
 **Railway Buckets:** Use variable references `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` (also mapped to `STORAGE_*` in [`env.js`](../../apps/api/src/config/env.js)). Set `STORAGE_PUBLIC_READ=false`. Virtual-hosted URLs are used automatically (`STORAGE_S3_FORCE_PATH_STYLE=false` for `storage.railway.app` / `storageapi.dev` endpoints).
 
-**Writes (public bucket):** Browser PUTs directly to the S3 presigned URL.
-
-**Writes (private bucket, e.g. Railway):** Presign returns `PUT {API_PUBLIC_URL}/api/files/upload/:token`; the API verifies the token and `PutObject`s to the bucket (avoids storage-endpoint CORS). Same token flow as the local driver.
+**Writes:** All clients use `PUT {API_PUBLIC_URL}/api/files/upload/:token` (or `/upload-import/:token` for a ZIP). The API verifies the authenticated user, tenant, content type, byte limit, one-time database session, malware verdict, and SHA-256 before promoting the object. S3 credentials and bucket names never reach clients.
 
 **Local Docker:** Root `docker-compose.yml` sets `S3_ENDPOINT=http://minio:9000`; API auto-selects `s3` when an endpoint is set. Run `pnpm storage:ensure-buckets` from the API package to create buckets.
 
@@ -96,15 +98,24 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
    - Max size: **10 MB**
    - Filename sanitization
    - Plan **storage_mb** quota ([`storage-upload.js`](../../apps/api/src/lib/storage-upload.js)) when `fileSize` is provided (skipped for `ADMIN`)
-3. API returns `presignedUrl`, `publicUrl`, `fileKey`.
-4. Client: `fetch(presignedUrl, { method: 'PUT', body: file, headers: { 'Content-Type': fileType } })`.
-5. Feature persists the reference:
+3. API creates a short-lived, single-use database session and returns `presignedUrl`, `url`, `publicUrl`, `fileKey`; both upload URL fields are gateway URLs.
+4. Client sends an authenticated `PUT` with the exact `Content-Type`. Web includes credentials; mobile includes the bearer and active-tenant tokens.
+5. Gateway spools bytes in a private `0700` directory, scans them with ClamAV before parsing or optimization, validates magic signatures/CSV text, then writes private storage.
+6. Feature persists the reference:
    - **Chat** → `message_attachment.file_url` ([`ChatPage`](../../apps/web/src/pages/ChatPage.tsx))
    - **Products** → `POST /api/files/product/:productId/attach`
    - **Logos / onboarding / settings** → tenant/org logo URL ([`LogoUpload.tsx`](../../apps/web/src/components/LogoUpload.tsx))
    - **Disputes** → `dispute_attachments.file_key`
 
-**Ownership:** attach endpoints require `fileKey` under `uploads/{userId}/` ([`sanitize-upload.js`](../../apps/api/src/lib/sanitize-upload.js)).
+**Ownership:** attach/import/POD/dispute-attachment endpoints require a completed, clean database session owned by the authenticated user and tenant; prefix checks remain defense in depth.
+
+### Security controls
+
+- Normal uploads are capped at 10 MiB. ZIP uploads have a hard 100 MiB cap, plus entry-count, aggregate expansion, path-depth, per-entry, and extraction-time limits.
+- A session can be claimed once. Replays with a different SHA-256 are rejected, while an identical completed retry is idempotent. Destination keys are unique to prevent an upload session from overwriting another session's object.
+- Hosted startup fails closed if ClamAV is unavailable, bypass is enabled, scanner configuration is missing, S3 public-access verification is unsupported, or a bucket ACL/policy/public-access-block check is unsafe.
+- Legacy objects are scanned on their first authorized API read under a PostgreSQL advisory lock. A clean verdict is accepted only for the exact SHA-256/ETag/version returned by storage.
+- Logs redact upload tokens, signed object parameters, file keys, URLs, storage endpoints, bucket names, and authorization values.
 
 ## Features that use this pipeline
 
@@ -122,7 +133,7 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
 
 ZIP-based catalog image import uses **two** storage interactions:
 
-1. **Client upload (presign)** — `POST /api/supplier/products/images/import/presign` returns a presigned PUT URL for the ZIP and optional mapping CSV. Object keys live under `imports/{supplierId}/{jobId}/{fileName}` (not the usual `uploads/{userId}/` prefix). ZIP presign allows up to `IMPORT_ZIP_MAX_BYTES` (default 2 GB); CSV uses the standard 10 MB cap. On local/private S3, large ZIP PUTs use **`PUT /api/files/upload-import/:token`** instead of `/upload/:token`.
+1. **Client upload (presign)** — `POST /api/supplier/products/images/import/presign` returns an authenticated gateway PUT URL for the ZIP and optional mapping CSV. Object keys live under `imports/{supplierId}/{jobId}/{fileName}` (not the usual `uploads/{userId}/` prefix). ZIP uploads are hard-capped at 100 MiB; CSV uses the standard 10 MiB cap. ZIP bytes are scanned before `yauzl` inspection.
 
 2. **Server-side `putObject`** — During job processing, the API reads each matched image from the ZIP, optimizes it, and writes main + thumbnail via [`putObject`](../../apps/api/src/services/storage/storage.service.js) to `uploads/{supplierId}/products/{productId}/main.webp` and `thumb.webp`. Storage quota is checked per image at this stage. The source ZIP is deleted with `deleteObject` when the job completes.
 
@@ -159,7 +170,7 @@ See [Railway Storage Buckets](https://docs.railway.com/storage-buckets).
 2. Set in API secrets (see [`deploy/railway/preprod/secrets.env.example`](../../deploy/railway/preprod/secrets.env.example)):
    - `STORAGE_DRIVER=s3`
    - `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, keys, `STORAGE_PUBLIC_URL`
-3. For private buckets, set `STORAGE_PUBLIC_READ=false` and serve via signed URLs in a future hardening pass (prod validation warns on public read).
+3. Set `STORAGE_PUBLIC_READ=false`, verify the bucket ACL/policy/public-access-block state, and serve through the signed API object route. Hosted startup rejects public reads or unverifiable privacy.
 
 ### Local native dev
 
@@ -183,6 +194,6 @@ Or use full Docker (`pnpm dev:docker`) for MinIO + `STORAGE_DRIVER=s3` automatic
 - [environment-variables.md](../operations/environment-variables.md) — variable reference
 - [docs/guides/usage-metering.md](../guides/USAGE.md) — storage_mb metering on presign
 
-## POD binary upload contract (2026-09-15)
+## POD binary upload contract (2026-09-18)
 
-POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Mobile clients upload the returned binary presigned URL with the file's content type, retry transient PUT failures, then submit/confirm the proof. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed.
+POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Web, Android, and iOS upload through the authenticated API gateway; ClamAV rejection asks for a replacement photo, while scanner outages keep the selected photo for retry. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed.

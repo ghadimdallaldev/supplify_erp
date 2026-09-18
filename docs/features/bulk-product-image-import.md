@@ -79,7 +79,7 @@ sequenceDiagram
   participant DB as PostgreSQL
 
   UI->>API: POST .../presign (zip and optional csv)
-  API-->>UI: presignedUrl, fileKey
+  API-->>UI: gatewayUrl, fileKey
   UI->>Store: PUT ZIP (and CSV)
   UI->>API: POST .../preview
   API->>Store: Read ZIP, match SKUs
@@ -97,8 +97,8 @@ sequenceDiagram
   Worker->>DB: status completed + result_json
 ```
 
-1. **Presign** — Client requests upload URLs for ZIP (`purpose: zip`, up to `IMPORT_ZIP_MAX_BYTES`) and optional mapping CSV (`purpose: csv`). Keys: `imports/{supplierId}/{jobId}/{fileName}`.
-2. **Upload** — Browser PUTs files to presigned URLs. Large ZIPs on local/private S3 use `PUT /api/files/upload-import/:token` (body limit `IMPORT_ZIP_MAX_BYTES`); standard uploads use `/api/files/upload/:token` (10 MB). See [storage-uploads.md](../operations/storage-uploads.md).
+1. **Presign** — Client requests authenticated gateway upload URLs for ZIP (`purpose: zip`, hard-capped at `IMPORT_ZIP_MAX_BYTES`) and optional mapping CSV (`purpose: csv`). Keys: `imports/{supplierId}/{jobId}/{fileName}`.
+2. **Upload** — Browser PUTs files to `PUT /api/files/upload-import/:token` or `PUT /api/files/upload/:token`. The API spools privately, runs ClamAV before ZIP/CSV parsing, validates bytes, and only then promotes to private storage. See [storage-uploads.md](../operations/storage-uploads.md).
 3. **Preview** — Server lists safe image entries in the ZIP, matches to supplier products, returns counts and sample rows (preview lists capped at **200** rows).
 4. **Confirm** — Client starts import with preview payload; API creates a job and enqueues background processing.
 5. **Process** — Worker acquires a Postgres advisory lock, processes matches in **batches of 50** inside transactions, updates progress after each batch.
@@ -130,13 +130,13 @@ sequenceDiagram
 
 ## Performance considerations
 
-| Setting                  | Default             | Purpose                                       |
-| ------------------------ | ------------------- | --------------------------------------------- |
-| `IMPORT_ZIP_MAX_BYTES`   | `2147483648` (2 GB) | Max ZIP size at presign                       |
-| `IMPORT_IMAGE_MAX_BYTES` | `10485760` (10 MB)  | Max uncompressed image per file               |
-| Batch size               | `50`                | DB transaction batch during job processing    |
-| Preview row cap          | `200`               | Max detail rows returned per preview category |
-| URL fetch timeout        | `15s`               | Remote image download limit                   |
+| Setting                  | Default               | Purpose                                       |
+| ------------------------ | --------------------- | --------------------------------------------- |
+| `IMPORT_ZIP_MAX_BYTES`   | `104857600` (100 MiB) | Hard max ZIP size at presign                  |
+| `IMPORT_IMAGE_MAX_BYTES` | `10485760` (10 MB)    | Max uncompressed image per file               |
+| Batch size               | `50`                  | DB transaction batch during job processing    |
+| Preview row cap          | `200`                 | Max detail rows returned per preview category |
+| URL fetch timeout        | `15s`                 | Remote image download limit                   |
 
 **Operational notes:**
 
@@ -158,6 +158,8 @@ sequenceDiagram
 - [ ] Cancel stops a in-progress job; completed rows before cancel are kept.
 - [ ] Second concurrent import for same supplier returns conflict while a job is active.
 - [ ] ZIP over `IMPORT_ZIP_MAX_BYTES` rejected at presign.
+- [ ] ZIP entry count, aggregate expansion, path depth, per-entry size, and extraction duration stay within safety limits.
+- [ ] Scanner rejection does not create an import job; scanner outage keeps the selected file available for retry.
 - [ ] Individual images over `IMPORT_IMAGE_MAX_BYTES` fail that row only.
 - [ ] Only `.jpg`, `.jpeg`, `.png`, `.webp` entries processed; unsafe ZIP paths ignored.
 - [ ] **URL via CSV:** Product bulk upload with `image_url` column fetches public HTTP(S) images; private URLs rejected.

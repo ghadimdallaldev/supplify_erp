@@ -5,6 +5,7 @@ import {
   resolveUploadKeyFromPublicUrl,
   neutralizeCsvField,
   escapeCsvField,
+  assertUploadFileBytes,
 } from './sanitize-upload.js'
 
 describe('sanitize-upload', () => {
@@ -38,5 +39,15 @@ describe('sanitize-upload', () => {
     expect(neutralizeCsvField('normal')).toBe('normal')
     expect(escapeCsvField('=evil')).toBe("'=evil")
     expect(escapeCsvField('a,b')).toBe('"a,b"')
+  })
+
+  it('checks file signatures before accepting uploaded bytes', () => {
+    expect(() =>
+      assertUploadFileBytes(Buffer.from([0xff, 0xd8, 0xff, 0x00]), 'image/jpeg')
+    ).not.toThrow()
+    expect(() => assertUploadFileBytes(Buffer.from('not-a-pdf'), 'application/pdf')).toThrow(
+      /content/i
+    )
+    expect(() => assertUploadFileBytes(Buffer.from([0, 1, 2]), 'text/csv')).toThrow(/safe text/i)
   })
 })

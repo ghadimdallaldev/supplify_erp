@@ -25,10 +25,10 @@ import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
 import { Plus, Upload, Image, FileQuestion, Heart, Package, Loader2 } from 'lucide-react'
-import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { toast } from 'sonner'
+import { uploadFileThroughGateway } from '../utils/fileUpload'
 import { canUseSupplierDeals } from '../lib/planFeatureGates'
 import { PermissionGate } from '../components/PermissionGate'
 import { RequirePermission } from '../components/RequirePermission'
@@ -88,7 +88,6 @@ export function ProductsPage() {
   const [productForm, setProductForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM)
   const [newTag, setNewTag] = useState('')
   const { addItem } = useCartActions()
-  const { user } = useAppSelector((state) => state.auth)
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
@@ -290,16 +289,9 @@ export function ProductsPage() {
             fileName,
             fileSize: productImage.size,
           }).unwrap()
-          const uploadUrl =
-            presignedResponse.presignedUrl || (presignedResponse as { url?: string }).url
-          if (!uploadUrl) throw new Error('Missing upload URL from server')
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: productImage,
-            headers: { 'Content-Type': productImage.type },
-          })
-          if (!uploadResponse.ok) throw new Error('Failed to upload image')
-          imageUrl = presignedResponse.publicUrl || uploadUrl.split('?')[0]
+          await uploadFileThroughGateway(presignedResponse, productImage, productImage.type)
+          imageUrl = presignedResponse.publicUrl
+          if (!imageUrl) throw new Error('Upload succeeded but no private file URL was returned')
         } catch (error: any) {
           toast.error(error?.data?.error?.message || t('toast.imageUploadFailed'))
           return

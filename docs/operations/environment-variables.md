@@ -49,10 +49,23 @@ Set secrets only in Railway — never commit real values.
 | `STORAGE_SECRET_ACCESS_KEY`                                                  | API     | s3             | secret                                                  |                                                                                                                                                                              |
 | `STORAGE_REGION`                                                             | API     | s3             | `auto`                                                  |                                                                                                                                                                              |
 | `STORAGE_PUBLIC_READ`                                                        | API     | s3             | `true`/`false`                                          | `false` for Railway Buckets (use API `/api/files/object`)                                                                                                                    |
+| `STORAGE_QUARANTINE_PATH`                                                    | API     | all            | `uploads/.quarantine`                                   | Private `0700` spool used before malware scanning; use a persistent/private path in hosted deployments                                                                       |
 | `STORAGE_S3_FORCE_PATH_STYLE`                                                | API     | s3             | `true`/`false`                                          | Auto `false` for Railway endpoints; `true` for MinIO                                                                                                                         |
 | Railway `ENDPOINT`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION` | API     | bucket service | —                                                       | Auto-map to `STORAGE_*` when unset                                                                                                                                           |
-| `IMPORT_ZIP_MAX_BYTES`                                                       | API     | optional       | `2147483648` (2 GB)                                     | Max ZIP size for bulk product image import presign                                                                                                                           |
+| `IMPORT_ZIP_MAX_BYTES`                                                       | API     | optional       | `104857600` (100 MiB)                                   | Hard maximum ZIP size for bulk product image import presign                                                                                                                  |
 | `IMPORT_IMAGE_MAX_BYTES`                                                     | API     | optional       | `10485760` (10 MB)                                      | Max size per image entry inside a ZIP or URL fetch during import                                                                                                             |
+
+### Upload malware scanning
+
+| Variable                                  | Used by | Required in   | Example           | Notes                                                                |
+| ----------------------------------------- | ------- | ------------- | ----------------- | -------------------------------------------------------------------- |
+| `MALWARE_SCAN_BYPASS`                     | API     | dev only      | `false`           | Development-only escape hatch; hosted validation rejects `true`.     |
+| `MALWARE_SCAN_HOST` / `MALWARE_SCAN_PORT` | API     | preprod, prod | `clamav` / `3310` | Private ClamAV service address; no public port exposure is required. |
+| `MALWARE_SCAN_TIMEOUT_MS`                 | API     | all           | `15000`           | Scanner health and per-file scan timeout.                            |
+| `MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS`    | API     | hosted        | `72`              | Maximum accepted age when ClamAV reports a signature date.           |
+| `MALWARE_SCAN_REQUIRE_SIGNATURE_DATE`     | API     | hosted        | `true`            | Fail readiness if the scanner cannot report signature freshness.     |
+
+ClamAV must be ready before hosted API traffic is accepted. Docker Compose provides a private `clamav` service. On Railway, deploy the same image as a private service in each environment and set `MALWARE_SCAN_HOST` to that service's private DNS name; never publish port 3310 publicly. See [`deploy/railway/clamav/README.md`](../../deploy/railway/clamav/README.md).
 
 See [../operations/storage-uploads.md](../operations/storage-uploads.md) for where file bytes are stored, the presign → PUT flow, bulk image import dual path, and Railway volume / R2 setup.
 

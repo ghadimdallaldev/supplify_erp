@@ -36,7 +36,7 @@
 
 1. **Secrets:** Production env vars via a secrets manager; never commit `.env`.
 2. **Database:** Run `pnpm db:migrate`; backups; `DATABASE_SSL=true`; pool/timeouts as needed.
-3. **Security:** Strong `SESSION_SECRET`, Keycloak client secret, HTTPS, CORS review, Redis sessions in production.
+3. **Security:** Strong `SESSION_SECRET`, Keycloak client secret, HTTPS, CORS review, Redis sessions in production. Confirm `STORAGE_PUBLIC_READ=false`, private bucket ACL/policy/public-access-block settings, and a ready private ClamAV service. Hosted startup must fail closed when scanner or storage privacy verification is unavailable.
 4. **Logging:** `LOG_LEVEL`, JSON logs in prod, redaction; `X-Request-ID` for tracing.
 5. **Monitoring:** APM, log aggregation, Sentry (or equivalent), `/health`.
 6. **Performance:** Redis cache, CDN for static assets, indexes (see Part 3), connection pooling.

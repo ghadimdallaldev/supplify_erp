@@ -171,7 +171,10 @@ describe('Suppliers Routes', () => {
 
   describe('GET /api/suppliers/:id', () => {
     it('should return supplier details', async () => {
-      // Mock: restaurant lookup (for RESTAURANT role), then supplier query
+      // Keep this fixture focused on the supplier detail query; no restaurant
+      // scope is needed for the response shape being asserted.
+      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
+      vi.mocked(getRestaurantIdForRequest).mockResolvedValueOnce(null)
       db.query.mockResolvedValueOnce({
         rows: [
           {

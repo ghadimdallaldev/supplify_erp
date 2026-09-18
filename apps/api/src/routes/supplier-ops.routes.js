@@ -12,11 +12,7 @@ import {
   requireAnyPermission,
   getRequestTenant,
 } from '../lib/rbac.js'
-import {
-  getLinkedDriverId,
-  isDriverOnlyPermissions,
-  assertDriverAssignmentAccess,
-} from '../lib/driver-rbac.js'
+import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { config } from '../config/env.js'
@@ -29,11 +25,11 @@ import {
 } from '../lib/sanitize-upload.js'
 import { ValidationError, ConflictError } from '../middlewares/errorHandler.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
+import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
-  createReorderReminderDraft,
   sendReorderReminderDraft,
 } from '../services/supplier-reorder-intelligence.service.js'
 import {
@@ -766,12 +762,11 @@ router.post(
         fileSize: sizeBytes > 0 ? sizeBytes : maxBytes,
         fileType: body.fileType,
         userId: req.userData.id,
+        tenantId: supplierId,
+        tenantType: 'SUPPLIER',
       })
 
-      const uploadUrl =
-        body.purpose === 'zip' && presignedUrl.includes('/api/files/upload/')
-          ? presignedUrl.replace('/api/files/upload/', '/api/files/upload-import/')
-          : presignedUrl
+      const uploadUrl = presignedUrl
 
       res.json({
         ok: true,
@@ -792,6 +787,13 @@ router.post(
     try {
       const supplierId = await resolveSupplier(req)
       const body = imageImportPreviewSchema.parse(req.body)
+      for (const fileKey of [body.zipFileKey, body.mappingFileKey].filter(Boolean)) {
+        await assertCleanUploadOwnership(fileKey, {
+          userId: req.userData.id,
+          tenantId: supplierId,
+          tenantType: 'SUPPLIER',
+        })
+      }
       assertImportFileKeyOwnedBySupplier(body.zipFileKey, supplierId)
       if (body.mappingFileKey) {
         assertImportFileKeyOwnedBySupplier(body.mappingFileKey, supplierId)
@@ -824,6 +826,13 @@ router.post(
         })
         .parse(req.body)
 
+      for (const fileKey of [body.zipFileKey, body.mappingFileKey].filter(Boolean)) {
+        await assertCleanUploadOwnership(fileKey, {
+          userId: req.userData.id,
+          tenantId: supplierId,
+          tenantType: 'SUPPLIER',
+        })
+      }
       assertImportFileKeyOwnedBySupplier(body.zipFileKey, supplierId)
       if (body.mappingFileKey) {
         assertImportFileKeyOwnedBySupplier(body.mappingFileKey, supplierId)

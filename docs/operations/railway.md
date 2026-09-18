@@ -120,8 +120,14 @@ STORAGE_BUCKET=supplify
 STORAGE_ACCESS_KEY_ID=
 STORAGE_SECRET_ACCESS_KEY=
 STORAGE_REGION=auto
-STORAGE_PUBLIC_READ=true
+STORAGE_PUBLIC_READ=false
+MALWARE_SCAN_BYPASS=false
+MALWARE_SCAN_HOST=clamav
+MALWARE_SCAN_PORT=3310
+MALWARE_SCAN_REQUIRE_SIGNATURE_DATE=true
 ```
+
+All upload PUTs go through the authenticated API gateway and ClamAV quarantine pipeline. Deploy ClamAV as a private service in the same Railway environment; never publish port 3310. See [the ClamAV service runbook](../../deploy/railway/clamav/README.md).
 
 ### Migrations
 

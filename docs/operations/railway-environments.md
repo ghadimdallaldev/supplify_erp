@@ -226,13 +226,13 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ## L. Storage per environment
 
-Full upload pipeline (presign, keys, local vs S3): [../operations/STORAGE_UPLOADS.md](../operations/STORAGE_UPLOADS.md).
+Full upload pipeline (authenticated gateway, quarantine scanning, keys, local vs S3): [../operations/storage-uploads.md](../operations/storage-uploads.md).
 
 | env     | Driver | Notes                                                                     |
 | ------- | ------ | ------------------------------------------------------------------------- |
 | dev     | `s3`   | Railway **Bucket** (see secrets.env.example); `STORAGE_PUBLIC_READ=false` |
-| preprod | `s3`   | R2/MinIO; separate bucket                                                 |
-| prod    | `s3`   | Required; `STORAGE_DRIVER=local` fails startup validation                 |
+| preprod | `s3`   | R2/MinIO; separate private bucket plus private ClamAV service             |
+| prod    | `s3`   | Required; separate private bucket plus private ClamAV service             |
 
 **Railway dev storage:** add a **Bucket** service per environment and wire credentials to the API (variable references). Files persist in the bucket; the API serves reads via `/api/files/object` when the bucket is private.
 
@@ -271,6 +271,8 @@ API blocks `PAYMENTS_MODE=mock` in prod/preprod, and blocks **stub + live** at s
 - [ ] `ALLOW_DB_RESET=false`, `SEED_DEMO_DATA=false`
 - [ ] `PAYMENTS_MODE=live` only when provider ready; `PAYMENTS_WEBHOOK_SECRET` set
 - [ ] `STORAGE_DRIVER=s3`, production bucket
+- [ ] `STORAGE_PUBLIC_READ=false`; bucket ACL, policy, and public-access-block checks pass
+- [ ] Private ClamAV service is ready; `MALWARE_SCAN_BYPASS=false`; API startup is fail-closed
 - [ ] Keycloak prod realm/client only
 - [ ] `REDIS_URL` set on API (Redis plugin per environment); `/health` shows `redis.connected: true`
 - [ ] `GET /health` returns `{ status, service, env }` without secrets

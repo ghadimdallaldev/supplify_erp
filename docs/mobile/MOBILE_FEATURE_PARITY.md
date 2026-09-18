@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-18 - Authenticated upload gateway and malware-scan parity
+
+- **API contract:** File presign responses retain `presignedUrl` and `url`, but both now point to authenticated API gateway PUT endpoints. Direct S3/browser PUTs and bucket fields are no longer part of the client contract.
+- **Security boundary:** Uploads are single-use database sessions, scanned in private quarantine by ClamAV, checked against magic signatures, and promoted only after a clean verdict. POD, product, chat, logo, import, and dispute attachments use the same boundary.
+- **Mobile:** Android and iOS send bearer and active-tenant tokens on gateway PUTs. Malware responses clear the rejected POD key and prompt a replacement; scanner-unavailable responses retain the selected photo and allow retry.
+- **Verification:** Android/iOS POD helper tests and typechecks pass.
+
 ## 2026-09-16 - Driver POD reliability repair and compact mobile foundation
 
 - **POD transport:** Android and iOS read the captured image blob before presigning, send its real MIME type and byte count to the authenticated API upload gateway, and no longer depend on an S3 `Content-Length` signature or public storage reachability.

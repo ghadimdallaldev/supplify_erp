@@ -93,7 +93,14 @@ export const suppliersApi = api.injectEndpoints({
       ],
     }),
     getPresignedUrl: builder.mutation<
-      { presignedUrl: string; fileKey: string; fileName: string; fileType: string },
+      {
+        presignedUrl: string
+        url?: string
+        publicUrl?: string
+        fileKey: string
+        fileName: string
+        fileType: string
+      },
       { fileName: string; fileType: string; fileSize?: number }
     >({
       query: (body) => ({

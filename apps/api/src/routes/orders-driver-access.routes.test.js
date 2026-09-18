@@ -36,6 +36,10 @@ vi.mock('../services/storage/storage.service.js', () => ({
   createPresignedUpload: (...args) => createPresignedUploadMock(...args),
 }))
 
+vi.mock('../services/storage/upload-security.service.js', () => ({
+  assertCleanUploadOwnership: vi.fn().mockResolvedValue({}),
+}))
+
 vi.mock('../lib/storage-upload.js', () => ({
   meterStorageFromRequest: vi.fn().mockResolvedValue({ ok: true }),
 }))

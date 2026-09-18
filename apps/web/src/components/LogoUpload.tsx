@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { uploadFileThroughGateway } from '../utils/fileUpload'
 
 interface LogoUploadProps {
   currentLogo?: string | null
@@ -72,23 +73,13 @@ export function LogoUpload({
     setIsUploading(true)
     let fileUrl: string
     try {
-      const { presignedUrl, publicUrl } = await getPresignedUrl({
+      const { presignedUrl, publicUrl, fileKey } = await getPresignedUrl({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
       })
 
-      const uploadResponse = await fetch(presignedUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload image to storage')
-      }
+      await uploadFileThroughGateway({ presignedUrl, fileKey }, file, file.type)
 
       if (!publicUrl) {
         throw new Error('Upload succeeded but no public URL was returned')

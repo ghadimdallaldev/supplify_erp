@@ -2,15 +2,14 @@ import {
   S3Client,
   HeadBucketCommand,
   CreateBucketCommand,
-  PutBucketPolicyCommand,
+  GetBucketAclCommand,
+  GetPublicAccessBlockCommand,
+  GetBucketPolicyCommand,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { logger } from '../../lib/logger.js'
-import { createUploadToken, verifyUploadToken } from './upload-token.js'
-import { MAX_UPLOAD_BYTES } from '../../lib/sanitize-upload.js'
 import { appendObjectAccessSignature } from '../../lib/object-download-auth.js'
 
 function createS3Client(cfg, endpoint) {
@@ -32,29 +31,11 @@ function createS3Client(cfg, endpoint) {
 export function createS3CompatibleProvider(cfg) {
   /** @type {S3Client | null} */
   let internalClient = null
-  /** @type {S3Client | null} */
-  let presignClient = null
-
   function getInternalClient() {
     if (!internalClient) {
       internalClient = createS3Client(cfg, cfg.STORAGE_ENDPOINT)
     }
     return internalClient
-  }
-
-  function getPresignClient() {
-    // Private buckets (e.g. Railway): presign against the S3 API endpoint, not the browser proxy base.
-    const presignEndpoint =
-      cfg.STORAGE_PUBLIC_READ === false
-        ? cfg.STORAGE_ENDPOINT
-        : cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT
-    if (presignEndpoint === cfg.STORAGE_ENDPOINT) {
-      return getInternalClient()
-    }
-    if (!presignClient) {
-      presignClient = createS3Client(cfg, presignEndpoint)
-    }
-    return presignClient
   }
 
   function getConfiguredBuckets() {
@@ -72,28 +53,9 @@ export function createS3CompatibleProvider(cfg) {
 
   function buildPublicUrl(fileKey) {
     const key = String(fileKey || '').replace(/^\/+/, '')
-    if (cfg.STORAGE_PUBLIC_READ === false) {
-      const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
-      const baseUrl = `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
-      return appendObjectAccessSignature(baseUrl, key)
-    }
-    const base = String(cfg.STORAGE_PUBLIC_URL || cfg.STORAGE_ENDPOINT || '').replace(/\/$/, '')
-    const bucket = cfg.STORAGE_BUCKET
-    return `${base}/${bucket}/${key}`
-  }
-
-  function publicReadPolicy(bucket) {
-    return JSON.stringify({
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Principal: { AWS: ['*'] },
-          Action: ['s3:GetObject'],
-          Resource: [`arn:aws:s3:::${bucket}/*`],
-        },
-      ],
-    })
+    const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
+    const baseUrl = `${apiBase}/api/files/object?key=${encodeURIComponent(key)}`
+    return appendObjectAccessSignature(baseUrl, key)
   }
 
   async function ensureBucketExists(s3, bucket) {
@@ -107,23 +69,7 @@ export function createS3CompatibleProvider(cfg) {
     }
 
     await s3.send(new CreateBucketCommand({ Bucket: bucket }))
-    logger.info('Created object storage bucket', { bucket })
-
-    if (cfg.STORAGE_PUBLIC_READ !== false) {
-      try {
-        await s3.send(
-          new PutBucketPolicyCommand({
-            Bucket: bucket,
-            Policy: publicReadPolicy(bucket),
-          })
-        )
-      } catch (policyErr) {
-        logger.warn('Could not set public read policy on bucket', {
-          bucket,
-          message: policyErr?.message,
-        })
-      }
-    }
+    logger.info('Created object storage bucket', { objectClass: 'private-upload-storage' })
 
     return { bucket, created: true }
   }
@@ -165,105 +111,65 @@ export function createS3CompatibleProvider(cfg) {
       }
     },
 
-    buildPublicUrl,
-
-    async createPresignedUpload({
-      fileKey,
-      fileType,
-      expiresIn = 300,
-      userId,
-      fileSize,
-      useApiUpload = false,
-    }) {
-      const publicUrl = buildPublicUrl(fileKey)
-      const maxBytes =
-        fileSize != null && Number(fileSize) > 0
-          ? Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
-          : MAX_UPLOAD_BYTES
-
-      // Driver POD uploads use the API token transport so React Native does not
-      // need to reproduce S3's signed transport headers.
-      if (useApiUpload || cfg.STORAGE_PUBLIC_READ === false) {
-        if (!userId) {
-          throw new Error('userId is required for upload tokens')
-        }
-        const expiresAt = Date.now() + expiresIn * 1000
-        const token = createUploadToken({
-          secret: cfg.SESSION_SECRET,
-          fileKey,
-          contentType: fileType,
-          expiresAt,
-          userId,
-          maxBytes,
-        })
-        const apiBase = String(cfg.API_PUBLIC_URL || '').replace(/\/$/, '')
-        return {
-          presignedUrl: `${apiBase}/api/files/upload/${token}`,
-          publicUrl,
-          fileKey,
-          bucket: cfg.STORAGE_BUCKET,
-          method: 'PUT',
-        }
-      }
-
-      const s3 = getPresignClient()
-      const putParams = {
-        Bucket: cfg.STORAGE_BUCKET,
-        Key: fileKey,
-        ContentType: fileType,
-      }
-      if (fileSize != null && Number(fileSize) > 0) {
-        putParams.ContentLength = Math.min(Math.floor(Number(fileSize)), MAX_UPLOAD_BYTES)
-      }
-      const command = new PutObjectCommand(putParams)
-      const presignOptions = { expiresIn }
-      if (putParams.ContentLength != null) {
-        presignOptions.signableHeaders = new Set(['content-type', 'content-length'])
-        presignOptions.unhoistableHeaders = new Set(['content-length'])
-      }
-      const presignedUrl = await getSignedUrl(s3, command, presignOptions)
-      return {
-        presignedUrl,
-        publicUrl,
-        fileKey,
-        bucket: cfg.STORAGE_BUCKET,
-        method: 'PUT',
-      }
-    },
-
-    async completeUpload(token, body, contentType) {
-      const payload = verifyUploadToken(cfg.SESSION_SECRET, token)
-      if (!payload) {
-        throw Object.assign(new Error('Invalid or expired upload token'), {
-          name: 'UPLOAD_TOKEN_INVALID',
-        })
-      }
-      if (payload.contentType !== contentType) {
-        throw Object.assign(new Error('Content-Type mismatch'), { name: 'UPLOAD_CONTENT_TYPE' })
-      }
-      const bodyLen = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
-      const maxAllowed = payload.maxBytes ?? MAX_UPLOAD_BYTES
-      if (bodyLen > maxAllowed) {
-        throw Object.assign(new Error('Upload exceeds allowed size'), { name: 'UPLOAD_TOO_LARGE' })
-      }
-      // TODO: integrate async malware scanning (e.g. ClamAV) before marking upload complete.
-      const safeKey = String(payload.fileKey).replace(/^\/+/, '')
-      if (safeKey.includes('..')) {
-        throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
-      }
-
+    async checkPrivateAccess() {
       const s3 = getInternalClient()
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: cfg.STORAGE_BUCKET,
-          Key: safeKey,
-          Body: body,
-          ContentType: contentType,
-        })
-      )
-      logger.info('S3 storage upload complete', { fileKey: safeKey, bytes: body.length })
-      return { fileKey: safeKey }
+      const bucketResults = []
+      for (const bucket of getConfiguredBuckets()) {
+        try {
+          const acl = await s3.send(new GetBucketAclCommand({ Bucket: bucket }))
+          const grants = acl?.Grants || []
+          const publicGrant = grants.some((grant) =>
+            [
+              'http://acs.amazonaws.com/groups/global/AllUsers',
+              'http://acs.amazonaws.com/groups/global/AuthenticatedUsers',
+            ].includes(grant?.Grantee?.URI)
+          )
+          let publicPolicy = false
+          try {
+            const policy = await s3.send(new GetBucketPolicyCommand({ Bucket: bucket }))
+            publicPolicy = /"principal"\s*:\s*\*|"aws"\s*:\s*\[?\s*"\*"/i.test(policy?.Policy || '')
+          } catch (error) {
+            if (
+              !['NoSuchBucketPolicy', 'NoSuchBucketPolicyConfiguration', 'NotImplemented'].includes(
+                error?.name
+              )
+            ) {
+              throw error
+            }
+          }
+          let blockPublic = true
+          try {
+            const block = await s3.send(new GetPublicAccessBlockCommand({ Bucket: bucket }))
+            blockPublic = Boolean(
+              block?.PublicAccessBlockConfiguration?.BlockPublicAcls &&
+                block?.PublicAccessBlockConfiguration?.IgnorePublicAcls &&
+                block?.PublicAccessBlockConfiguration?.BlockPublicPolicy &&
+                block?.PublicAccessBlockConfiguration?.RestrictPublicBuckets
+            )
+          } catch (error) {
+            if (error?.name !== 'NotImplemented') throw error
+            blockPublic = false
+          }
+          bucketResults.push({
+            bucket,
+            supported: true,
+            private: !publicGrant && !publicPolicy && blockPublic,
+          })
+        } catch (error) {
+          if (error?.name === 'NotImplemented') {
+            bucketResults.push({ bucket, supported: false, private: false })
+            continue
+          }
+          throw error
+        }
+      }
+      return {
+        supported: bucketResults.every((result) => result.supported),
+        private: bucketResults.every((result) => result.private),
+      }
     },
+
+    buildPublicUrl,
 
     async getObjectStream(fileKey) {
       const key = String(fileKey || '').replace(/^\/+/, '')
@@ -281,6 +187,8 @@ export function createS3CompatibleProvider(cfg) {
         body: response.Body,
         contentType: response.ContentType || 'application/octet-stream',
         contentLength: response.ContentLength,
+        etag: response.ETag || null,
+        versionId: response.VersionId || null,
       }
     },
 
@@ -294,7 +202,7 @@ export function createS3CompatibleProvider(cfg) {
         throw Object.assign(new Error('Invalid file key'), { name: 'UPLOAD_KEY_INVALID' })
       }
       const s3 = getInternalClient()
-      await s3.send(
+      const result = await s3.send(
         new PutObjectCommand({
           Bucket: cfg.STORAGE_BUCKET,
           Key: safeKey,
@@ -303,8 +211,8 @@ export function createS3CompatibleProvider(cfg) {
         })
       )
       const bytes = Buffer.isBuffer(body) ? body.length : Buffer.byteLength(body || '')
-      logger.info('S3 storage putObject', { fileKey: safeKey, contentType, bytes })
-      return { fileKey: safeKey }
+      logger.info('S3 storage putObject', { objectClass: 'server-object', contentType, bytes })
+      return { fileKey: safeKey, etag: result.ETag || null, versionId: result.VersionId || null }
     },
 
     /**
@@ -323,7 +231,7 @@ export function createS3CompatibleProvider(cfg) {
           Key: safeKey,
         })
       )
-      logger.info('S3 storage deleteObject', { fileKey: safeKey })
+      logger.info('S3 storage deleteObject', { objectClass: 'server-object' })
       return { fileKey: safeKey }
     },
   }

@@ -1,5 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
+const { fetchPinnedPublicMock } = vi.hoisted(() => ({ fetchPinnedPublicMock: vi.fn() }))
+
+vi.mock('../lib/pinned-fetch.js', () => ({
+  fetchPinnedPublic: (...args) => fetchPinnedPublicMock(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn(), warn: vi.fn() },
 }))
@@ -74,12 +80,11 @@ describe('whatsapp.service', () => {
   })
 
   it('sends via Meta Cloud API when fully configured', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: true,
+    fetchPinnedPublicMock.mockResolvedValue({
       status: 200,
-      json: async () => ({ messages: [{ id: 'wamid.TEST123' }] }),
+      headers: {},
+      body: Buffer.from(JSON.stringify({ messages: [{ id: 'wamid.TEST123' }] })),
     })
-    vi.stubGlobal('fetch', fetchSpy)
 
     const { sendWhatsAppMessage } = await loadService({
       WHATSAPP_ENABLED: 'true',
@@ -96,8 +101,8 @@ describe('whatsapp.service', () => {
 
     expect(result.sent).toBe(true)
     expect(result.messageId).toBe('wamid.TEST123')
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    const [url, options] = fetchSpy.mock.calls[0]
+    expect(fetchPinnedPublicMock).toHaveBeenCalledTimes(1)
+    const [url, options] = fetchPinnedPublicMock.mock.calls[0]
     expect(url).toBe('https://graph.facebook.com/v21.0/100000000000000/messages')
     expect(options.headers.Authorization).toBe('Bearer token-123')
     const body = JSON.parse(options.body)
@@ -108,12 +113,11 @@ describe('whatsapp.service', () => {
   })
 
   it('returns PROVIDER_ERROR on a non-OK API response', async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({
-      ok: false,
+    fetchPinnedPublicMock.mockResolvedValue({
       status: 401,
-      json: async () => ({ error: { message: 'Invalid OAuth access token' } }),
+      headers: {},
+      body: Buffer.from(JSON.stringify({ error: { message: 'Invalid OAuth access token' } })),
     })
-    vi.stubGlobal('fetch', fetchSpy)
 
     const { sendWhatsAppMessage } = await loadService({
       WHATSAPP_ENABLED: 'true',
@@ -129,8 +133,7 @@ describe('whatsapp.service', () => {
   })
 
   it('returns PROVIDER_ERROR when fetch throws', async () => {
-    const fetchSpy = vi.fn().mockRejectedValue(new Error('network down'))
-    vi.stubGlobal('fetch', fetchSpy)
+    fetchPinnedPublicMock.mockRejectedValue(new Error('network down'))
 
     const { sendWhatsAppMessage } = await loadService({
       WHATSAPP_ENABLED: 'true',
