@@ -3,8 +3,8 @@ import sharp from 'sharp'
 
 const MAX_FILENAME_LENGTH = 200
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-/** Default max ZIP size for bulk product image import (2GB). */
-const MAX_IMPORT_ZIP_BYTES = 2147483648
+/** Hard ceiling for bulk ZIP uploads. */
+const MAX_IMPORT_ZIP_BYTES = 100 * 1024 * 1024
 
 /** MIME type to allowed file extensions (lowercase, with dot). */
 const MIME_TO_EXTENSIONS = {
@@ -71,6 +71,64 @@ export async function assertImageUploadBytes(buffer, contentType) {
       name: 'UPLOAD_INVALID_IMAGE',
     })
   }
+}
+
+/** Normalize a request Content-Type before comparing it with a session. */
+export function normalizeUploadMime(contentType) {
+  return String(contentType || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase()
+}
+
+/** Validate bytes before any parser, optimizer, archive inspection, or persistence. */
+export function assertUploadFileBytes(buffer, contentType) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw Object.assign(new Error('Invalid or empty file data'), { name: 'UPLOAD_INVALID_FILE' })
+  }
+
+  const mime = normalizeUploadMime(contentType)
+  const has = (...bytes) => bytes.every((byte, index) => buffer[index] === byte)
+  const rejectMismatch = () => {
+    throw Object.assign(new Error('File content does not match declared type'), {
+      name: 'UPLOAD_INVALID_FILE',
+    })
+  }
+
+  if (mime === 'image/jpeg' && !has(0xff, 0xd8, 0xff)) rejectMismatch()
+  if (
+    mime === 'image/png' &&
+    !buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  ) {
+    rejectMismatch()
+  }
+  if (
+    mime === 'image/webp' &&
+    (!has(0x52, 0x49, 0x46, 0x46) || buffer.subarray(8, 12).toString('ascii') !== 'WEBP')
+  ) {
+    rejectMismatch()
+  }
+  if (mime === 'application/pdf' && buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+    rejectMismatch()
+  }
+  if (mime === 'application/zip' || mime === 'application/x-zip-compressed') {
+    const zipMagic =
+      buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) ||
+      buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x05, 0x06])) ||
+      buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x07, 0x08]))
+    if (!zipMagic) rejectMismatch()
+  }
+  if (mime === 'text/csv' || mime === 'application/csv') {
+    const text = buffer.toString('utf8')
+    const hasUnsafeControl = [...text].some((character) => {
+      const code = character.charCodeAt(0)
+      return (code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31)
+    })
+    if (text.includes('\uFFFD') || hasUnsafeControl) {
+      throw Object.assign(new Error('CSV must be valid safe text'), { name: 'UPLOAD_INVALID_FILE' })
+    }
+  }
+  return true
 }
 
 export { MAX_UPLOAD_BYTES, MAX_IMPORT_ZIP_BYTES, IMPORT_ALLOWED_MIMES }

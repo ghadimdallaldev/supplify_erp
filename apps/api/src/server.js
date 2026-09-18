@@ -80,7 +80,15 @@ import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.
 import { registerCronJobs } from './lib/register-cron-jobs.js'
 import { startCronsAfterMigrations } from './lib/start-crons-after-migrations.js'
 import path from 'node:path'
-import { ensureStorageReady, checkStorageHealth } from './services/storage/storage.service.js'
+import {
+  ensureStorageReady,
+  checkStorageHealth,
+  getStorageProvider,
+} from './services/storage/storage.service.js'
+import {
+  checkClamAvHealth,
+  isHostedSecurityEnvironment,
+} from './services/storage/malware-scanner.js'
 import { pool, closePool, warmupPool, startPoolKeepalive, stopPoolKeepalive } from './lib/db.js'
 import { getKeycloakConfig } from './lib/auth.js'
 import { requestTimingMiddleware } from './middlewares/request-timing.js'
@@ -141,16 +149,38 @@ async function runStartupSchemaTasks() {
 
   try {
     const storageResults = await ensureStorageReady()
+    const scannerHealth = await checkClamAvHealth()
+    if (isHostedSecurityEnvironment() && !scannerHealth.ok) {
+      throw new Error('Malware scanner is not ready; hosted startup is fail-closed')
+    }
+    if (isHostedSecurityEnvironment() && config.STORAGE_DRIVER === 's3') {
+      const storageProvider = getStorageProvider()
+      if (typeof storageProvider.checkPrivateAccess !== 'function') {
+        throw new Error(
+          'S3 private-access verification is unsupported; hosted startup is fail-closed'
+        )
+      }
+      const privateAccess = await storageProvider.checkPrivateAccess()
+      if (!privateAccess.supported || !privateAccess.private) {
+        throw new Error('Object storage is not verified private; hosted startup is fail-closed')
+      }
+    }
     logger.info('Storage ready', {
       driver: config.STORAGE_DRIVER,
-      results: storageResults,
+      results: Array.isArray(storageResults)
+        ? storageResults.map((result) => ({
+            driver: result?.driver || config.STORAGE_DRIVER,
+            created: result?.created === true,
+          }))
+        : undefined,
+      malwareScanner: { ok: scannerHealth.ok, signatureFresh: scannerHealth.signatureFresh },
     })
   } catch (error) {
-    logger.error('Storage setup failed — uploads may not work', {
+    logger.error('Storage security readiness failed', {
       error: error.message,
       driver: config.STORAGE_DRIVER,
-      bucket: config.STORAGE_BUCKET,
     })
+    if (isHostedSecurityEnvironment()) process.exit(1)
   }
 }
 
@@ -274,6 +304,12 @@ const staffLinkLimiter = config.RATE_LIMIT_ENABLED
 const publicLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(isProduction ? 60 : 200, rateLimitMessage, { storePrefix: 'rl:public' })
   : noopLimiter
+const whatsappIngressLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 60 : 200, rateLimitMessage, {
+      storePrefix: 'rl:whatsapp-ingress',
+      keyGenerator: (req) => `ip:${req.ip}`,
+    })
+  : noopLimiter
 const chatSendLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(300, 'Too many messages sent, please try again later.', {
       storePrefix: 'rl:chat',
@@ -295,6 +331,7 @@ const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
 // Meta WhatsApp webhooks — raw body required for X-Hub-Signature-256 verification.
 app.use(
   '/webhooks/whatsapp',
+  whatsappIngressLimiter,
   express.raw({ type: 'application/json', limit: '1mb' }),
   whatsappWebhookRoutes
 )
@@ -365,8 +402,7 @@ app.use((req, res, next) => {
 })
 
 const mountLocalUploadsStatic =
-  config.STORAGE_DRIVER === 'local' &&
-  (config.NODE_ENV !== 'production' || config.STORAGE_PUBLIC_READ)
+  config.STORAGE_DRIVER === 'local' && config.STORAGE_PUBLIC_READ === true
 if (mountLocalUploadsStatic) {
   const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
   app.use('/uploads', express.static(uploadsDir, { maxAge: '1y', immutable: true }))

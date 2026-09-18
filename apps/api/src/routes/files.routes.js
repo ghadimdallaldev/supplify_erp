@@ -1,10 +1,13 @@
 import express from 'express'
+import rateLimit from 'express-rate-limit'
+import { createHash } from 'node:crypto'
 import {
   requireAuth,
   requireRole,
   resolveTenantContext,
   optionalAuth,
   getSupplierIdForRequest,
+  getRequestTenant,
 } from '../lib/rbac.js'
 import { verifyObjectAccess } from '../lib/object-download-auth.js'
 import { filesUploadGuard } from '../lib/route-permissions.js'
@@ -23,21 +26,51 @@ function setObjectCorsHeaders(req, res) {
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import {
   sanitizeUploadFileName,
-  assertUploadKeyOwnedByUser,
   assertFileExtensionMatchesMime,
-  assertImageUploadBytes,
   MAX_UPLOAD_BYTES,
   MAX_IMPORT_ZIP_BYTES,
 } from '../lib/sanitize-upload.js'
 import {
   createPresignedUpload,
   buildObjectPublicUrl,
-  getStorageDriver,
-  getStorageProvider,
   getObjectStream,
 } from '../services/storage/storage.service.js'
+import {
+  completeUploadSession,
+  assertCleanUploadOwnership,
+  ensureObjectCleanForRead,
+} from '../services/storage/upload-security.service.js'
+import { createRateLimitStore } from '../lib/rate-limit-store.js'
 
 const router = express.Router()
+
+function uploadRateKey(req) {
+  const session = req.params?.token
+    ? createHash('sha256').update(String(req.params.token)).digest('hex').slice(0, 16)
+    : 'presign'
+  return [
+    req.userData?.id || 'anonymous',
+    req.tenantContext?.tenantId || 'no-tenant',
+    session,
+    req.ip,
+  ].join(':')
+}
+
+function createUploadLimiter(prefix, max) {
+  if (!config.RATE_LIMIT_ENABLED) return (_req, _res, next) => next()
+  const store = createRateLimitStore(prefix)
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: uploadRateKey,
+    ...(store ? { store } : {}),
+  })
+}
+
+const uploadTransferLimiter = createUploadLimiter('rl:file-upload', 30)
+const uploadPresignLimiter = createUploadLimiter('rl:file-presign', 60)
 
 /** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
 router.get('/object', optionalAuth, async (req, res) => {
@@ -72,10 +105,12 @@ router.get('/object', optionalAuth, async (req, res) => {
       })
     }
 
-    const { body, contentType, contentLength } = await getObjectStream(key)
+    const object = await getObjectStream(key)
+    const cleanObject = await ensureObjectCleanForRead(key, object)
+    const { body, contentType, contentLength } = cleanObject
     if (contentType) res.setHeader('Content-Type', contentType)
     if (contentLength != null) res.setHeader('Content-Length', String(contentLength))
-    res.setHeader('Cache-Control', 'public, max-age=86400')
+    res.setHeader('Cache-Control', 'private, no-store')
 
     if (body && typeof body.pipe === 'function') {
       body.pipe(res)
@@ -93,13 +128,27 @@ router.get('/object', optionalAuth, async (req, res) => {
       error?.name === 'NoSuchKey' ||
       error?.Code === 'NoSuchKey' ||
       error?.name === 'UPLOAD_KEY_INVALID'
-    logger.warn('File object serve error', { message: error?.message })
-    return res.status(notFound ? 404 : 500).json({
+    const scanUnavailable = error?.name === 'MALWARE_SCAN_UNAVAILABLE'
+    const infected = error?.name === 'UPLOAD_MALWARE_DETECTED'
+    logger.warn('File object serve error', { error: error?.name || 'FILE_READ_FAILED' })
+    return res.status(notFound ? 404 : scanUnavailable ? 503 : infected ? 422 : 500).json({
       ok: false,
       data: null,
       error: {
-        name: notFound ? 'NOT_FOUND' : 'INTERNAL_ERROR',
-        message: notFound ? 'File not found' : 'Failed to load file',
+        name: notFound
+          ? 'NOT_FOUND'
+          : scanUnavailable
+            ? 'MALWARE_SCAN_UNAVAILABLE'
+            : infected
+              ? 'UPLOAD_MALWARE_DETECTED'
+              : 'INTERNAL_ERROR',
+        message: notFound
+          ? 'File not found'
+          : scanUnavailable
+            ? 'File security scanning is temporarily unavailable'
+            : infected
+              ? 'File failed security scanning'
+              : 'Failed to load file',
       },
       requestId: req.requestId,
     })
@@ -112,20 +161,15 @@ async function handleTokenUpload(req, res) {
   const contentType = req.headers['content-type'] || 'application/octet-stream'
   const body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
   try {
-    const provider = getStorageProvider()
-    if (!provider.completeUpload) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Direct upload not available for this storage driver',
-        },
-        requestId: req.requestId,
-      })
-    }
-    await assertImageUploadBytes(body, contentType)
-    await provider.completeUpload(req.params.token, body, contentType)
+    const tenant = await getRequestTenant(req)
+    await completeUploadSession({
+      token: req.params.token,
+      userId: req.userData.id,
+      tenantId: tenant?.tenantId || null,
+      tenantType: tenant?.tenantType || null,
+      body,
+      contentType,
+    })
     res.status(204).end()
   } catch (error) {
     const invalid =
@@ -133,33 +177,58 @@ async function handleTokenUpload(req, res) {
       error?.name === 'UPLOAD_CONTENT_TYPE' ||
       error?.name === 'UPLOAD_KEY_INVALID' ||
       error?.name === 'UPLOAD_TOO_LARGE' ||
-      error?.name === 'UPLOAD_INVALID_IMAGE'
-    const status = invalid ? 400 : 500
+      error?.name === 'UPLOAD_INVALID_IMAGE' ||
+      error?.name === 'UPLOAD_INVALID_FILE' ||
+      error?.name === 'UPLOAD_REPLAY_CONFLICT'
+    const forbidden = error?.name === 'UPLOAD_SESSION_FORBIDDEN'
+    const unavailable = error?.name === 'MALWARE_SCAN_UNAVAILABLE'
+    const infected = error?.name === 'UPLOAD_MALWARE_DETECTED'
+    const status = forbidden ? 403 : unavailable ? 503 : infected ? 422 : invalid ? 400 : 500
     logger.warn({
       event: 'storage.upload.failed',
       requestId: req.requestId,
       status,
       contentType,
       bytes: body.length,
-      error: error?.message || 'Upload failed',
+      error: error?.name || 'UPLOAD_FAILED',
     })
     res.status(status).json({
       ok: false,
       data: null,
       error: {
-        name: invalid ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
-        message: error?.message || 'Upload failed',
+        name: forbidden
+          ? 'FORBIDDEN'
+          : unavailable
+            ? 'MALWARE_SCAN_UNAVAILABLE'
+            : infected
+              ? 'UPLOAD_MALWARE_DETECTED'
+              : invalid
+                ? 'VALIDATION_ERROR'
+                : 'INTERNAL_ERROR',
+        message: unavailable
+          ? 'Upload security scanning is temporarily unavailable'
+          : infected
+            ? 'Upload failed security scanning'
+            : error?.message || 'Upload failed',
       },
       requestId: req.requestId,
     })
   }
 }
 
-router.put('/upload/:token', express.raw({ type: '*/*', limit: '10mb' }), handleTokenUpload)
+router.put(
+  '/upload/:token',
+  requireAuth,
+  uploadTransferLimiter,
+  express.raw({ type: '*/*', limit: MAX_UPLOAD_BYTES }),
+  handleTokenUpload
+)
 
 /** Large import archives (ZIP) — token maxBytes enforced in completeUpload. */
 router.put(
   '/upload-import/:token',
+  requireAuth,
+  uploadTransferLimiter,
   express.raw({ type: '*/*', limit: MAX_IMPORT_ZIP_BYTES }),
   handleTokenUpload
 )
@@ -168,6 +237,7 @@ router.put(
 router.post(
   '/presign',
   requireAuth,
+  uploadPresignLimiter,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
   resolveTenantContext,
   filesUploadGuard,
@@ -202,7 +272,10 @@ router.post(
       }
 
       // Validate file size (10MB max)
-      if (fileSize && fileSize > 10 * 1024 * 1024) {
+      if (
+        fileSize != null &&
+        (!Number.isSafeInteger(Number(fileSize)) || Number(fileSize) > MAX_UPLOAD_BYTES)
+      ) {
         return res.status(400).json({
           ok: false,
           data: null,
@@ -253,17 +326,19 @@ router.post(
       }
 
       const fileKey = `uploads/${req.userData.id}/${Date.now()}-${safeFileName}`
-      const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
+      const tenant = await getRequestTenant(req)
+      const { presignedUrl, publicUrl } = await createPresignedUpload({
         fileKey,
         fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
         fileType,
         userId: req.userData.id,
+        tenantId: tenant?.tenantId || null,
+        tenantType: tenant?.tenantType || null,
       })
 
       logger.info('Presigned URL generated', {
         fileName,
         fileType,
-        bucket,
         actor: req.userData.id,
       })
 
@@ -276,7 +351,6 @@ router.post(
           fileKey,
           fileName,
           fileType,
-          bucket,
           storageMetered: sizeBytes > 0,
         },
         error: null,
@@ -284,18 +358,18 @@ router.post(
       })
     } catch (error) {
       logger.error('Generate presigned URL error:', error)
-      const isBucket =
+      const isStorageUnavailable =
         error?.name === 'NoSuchBucket' ||
         error?.Code === 'NoSuchBucket' ||
-        /bucket/i.test(error?.message || '')
-      res.status(isBucket ? 503 : 500).json({
+        error?.name === 'STORAGE_UNAVAILABLE'
+      res.status(isStorageUnavailable ? 503 : 500).json({
         ok: false,
         data: null,
         error: {
-          name: isBucket ? 'STORAGE_UNAVAILABLE' : 'INTERNAL_ERROR',
-          message: isBucket
-            ? `Storage bucket "${config.STORAGE_BUCKET}" is missing. Check STORAGE_* settings or run storage init.`
-            : 'Failed to generate presigned URL',
+          name: isStorageUnavailable ? 'STORAGE_UNAVAILABLE' : 'INTERNAL_ERROR',
+          message: isStorageUnavailable
+            ? 'File storage is temporarily unavailable'
+            : 'Failed to generate upload session',
         },
         requestId: req.requestId,
       })
@@ -327,19 +401,12 @@ router.post(
         })
       }
 
-      try {
-        assertUploadKeyOwnedByUser(fileKey, req.userData.id)
-      } catch {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Invalid file key',
-          },
-          requestId: req.requestId,
-        })
-      }
+      const tenant = await getRequestTenant(req)
+      await assertCleanUploadOwnership(fileKey, {
+        userId: req.userData.id,
+        tenantId: tenant?.tenantId || null,
+        tenantType: tenant?.tenantType || null,
+      })
 
       const { rows: products } = await query(
         `

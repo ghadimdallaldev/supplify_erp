@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
@@ -147,6 +148,8 @@ export const config = {
     process.env.STORAGE_DRIVER ||
     (process.env.S3_ENDPOINT || process.env.STORAGE_ENDPOINT ? 's3' : 'local'),
   STORAGE_LOCAL_PATH: process.env.STORAGE_LOCAL_PATH || 'uploads',
+  STORAGE_QUARANTINE_PATH:
+    process.env.STORAGE_QUARANTINE_PATH || path.join(os.tmpdir(), 'supplify-quarantine'),
   STORAGE_PUBLIC_URL:
     process.env.STORAGE_PUBLIC_URL ||
     process.env.S3_PUBLIC_URL ||
@@ -188,7 +191,7 @@ export const config = {
       ? process.env.STORAGE_PUBLIC_READ !== 'false'
       : process.env.S3_PUBLIC_READ != null
         ? process.env.S3_PUBLIC_READ !== 'false'
-        : true,
+        : false,
   STORAGE_S3_FORCE_PATH_STYLE: envBool(
     process.env.STORAGE_S3_FORCE_PATH_STYLE,
     !/storage\.railway\.app|storageapi\.dev/i.test(
@@ -236,6 +239,18 @@ export const config = {
   WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION || 'v21.0',
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET || '',
+  MALWARE_SCAN_BYPASS: envBool(process.env.MALWARE_SCAN_BYPASS, APP_ENV === 'dev'),
+  MALWARE_SCAN_HOST: process.env.MALWARE_SCAN_HOST || (APP_ENV === 'dev' ? 'clamav' : ''),
+  MALWARE_SCAN_PORT: envInt(process.env.MALWARE_SCAN_PORT, 3310),
+  MALWARE_SCAN_TIMEOUT_MS: envInt(process.env.MALWARE_SCAN_TIMEOUT_MS, 15_000),
+  MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS: envInt(
+    process.env.MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS,
+    72
+  ),
+  MALWARE_SCAN_REQUIRE_SIGNATURE_DATE: envBool(
+    process.env.MALWARE_SCAN_REQUIRE_SIGNATURE_DATE,
+    false
+  ),
   PAYMENTS_MODE,
   PAYMENTS_PROVIDER: process.env.PAYMENTS_PROVIDER || '',
   PAYMENTS_API_BASE_URL: process.env.PAYMENTS_API_BASE_URL || '',
@@ -363,10 +378,16 @@ export const config = {
   AI_REQUEST_TIMEOUT_MS: envInt(process.env.AI_REQUEST_TIMEOUT_MS, 30000),
   AI_MAX_RETRIES: envInt(process.env.AI_MAX_RETRIES, 1),
   AI_MAX_REQUESTS_PER_TENANT_PER_DAY: envInt(process.env.AI_MAX_REQUESTS_PER_TENANT_PER_DAY, 50),
-  /** Max size for bulk product image import ZIP uploads (default 2GB). */
-  IMPORT_ZIP_MAX_BYTES: envInt(process.env.IMPORT_ZIP_MAX_BYTES, 2147483648),
+  /** Max size for bulk product image import ZIP uploads; hard-capped at 100 MiB. */
+  IMPORT_ZIP_MAX_BYTES: Math.min(
+    envInt(process.env.IMPORT_ZIP_MAX_BYTES, 100 * 1024 * 1024),
+    100 * 1024 * 1024
+  ),
   /** Max size per image extracted during bulk product image import (default 10MB). */
-  IMPORT_IMAGE_MAX_BYTES: envInt(process.env.IMPORT_IMAGE_MAX_BYTES, 10 * 1024 * 1024),
+  IMPORT_IMAGE_MAX_BYTES: Math.min(
+    envInt(process.env.IMPORT_IMAGE_MAX_BYTES, 10 * 1024 * 1024),
+    10 * 1024 * 1024
+  ),
   /** Row count above which product CSV import runs as a background job (default 200). */
   PRODUCT_IMPORT_ASYNC_THRESHOLD: envInt(process.env.PRODUCT_IMPORT_ASYNC_THRESHOLD, 200),
 }

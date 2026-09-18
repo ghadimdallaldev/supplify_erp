@@ -9,6 +9,7 @@ import {
   NO_REPLACEMENT_LINES_MESSAGE,
 } from '../lib/dispute-replacement-order.js'
 import { applyCreditToInvoice } from './invoice.service.js'
+import { assertCleanUploadOwnership } from './storage/upload-security.service.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
 
@@ -271,6 +272,11 @@ export async function createDispute({
     }
 
     for (const att of attachmentKeys) {
+      await assertCleanUploadOwnership(att.fileKey, {
+        userId,
+        tenantId: restaurantId,
+        tenantType: 'RESTAURANT',
+      })
       await client.query(
         `
         INSERT INTO dispute_attachments (dispute_id, file_key, file_name, uploaded_by)
@@ -356,8 +362,11 @@ export async function getDispute(disputeId, scope) {
 }
 
 export async function addDisputeAttachment(disputeId, restaurantId, userId, { fileKey, fileName }) {
-  const { assertUploadKeyOwnedByUser } = await import('../lib/sanitize-upload.js')
-  assertUploadKeyOwnedByUser(fileKey, userId)
+  await assertCleanUploadOwnership(fileKey, {
+    userId,
+    tenantId: restaurantId,
+    tenantType: 'RESTAURANT',
+  })
 
   const { rows } = await query(
     `SELECT id, status FROM disputes WHERE id = $1 AND restaurant_id = $2`,

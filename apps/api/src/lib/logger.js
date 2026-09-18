@@ -40,15 +40,36 @@ const SENSITIVE_KEYS = new Set(
     'smtp_pass',
     'payments_secret_key',
     'payments_webhook_secret',
+    'filekey',
+    'file_key',
+    'fileurl',
+    'file_url',
+    'presignedurl',
+    'presigned_url',
+    'uploadurl',
+    'upload_url',
+    'storagekey',
+    'storage_key',
+    'bucket',
+    'storage_endpoint',
+    'storage_provider',
   ].map((k) => k.toLowerCase())
 )
 
 const REDACTED = '[REDACTED]'
 
+function redactString(value) {
+  return String(value)
+    .replace(/(\/api\/files\/upload(?:-import)?\/)[^\s/?]+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:token|sig|exp|x-amz-[^=]+)=)[^&\s]+/gi, '$1[REDACTED]')
+    .replace(/s3:\/\/[^\s]+/gi, 's3://[REDACTED]')
+}
+
 /**
  * Redact sensitive keys from an object (recursive).
  */
 function redactObject(obj) {
+  if (typeof obj === 'string') return redactString(obj)
   if (obj === null || typeof obj !== 'object') return obj
   if (obj instanceof Error) return redactError(obj)
   if (Array.isArray(obj)) return obj.map((item) => redactObject(item))
@@ -65,7 +86,7 @@ function redactObject(obj) {
     ) {
       out[key] = redactObject(value)
     } else {
-      out[key] = value
+      out[key] = typeof value === 'string' ? redactString(value) : value
     }
   }
   return out
@@ -74,7 +95,7 @@ function redactObject(obj) {
 function redactError(err) {
   if (!err) return err
   const safe = {
-    message: err.message,
+    message: redactString(err.message),
     name: err.name,
     code: err.code,
   }
@@ -115,6 +136,16 @@ const PINO_REDACT_PATHS = [
   'refresh_token',
   'id_token',
   'client_secret',
+  'fileKey',
+  'file_key',
+  'fileUrl',
+  'file_url',
+  'presignedUrl',
+  'presigned_url',
+  'uploadUrl',
+  'upload_url',
+  'bucket',
+  'storageEndpoint',
 ]
 
 const pinoConfig = {
@@ -159,13 +190,13 @@ function mergeBindings(first, second) {
     } else if (second && typeof second === 'object') {
       Object.assign(base, second)
     }
-    return [ctx ? { ...ctx, ...base } : base, undefined]
+    return [ctx ? redactObject({ ...ctx, ...base }) : redactObject(base), undefined]
   }
   if (first instanceof Error) {
     const err = redactError(first)
     return [ctx ? { ...ctx, err } : { err }, second]
   }
-  const merged = ctx ? { ...ctx, ...first } : first
+  const merged = redactObject(ctx ? { ...ctx, ...first } : first)
   if (second instanceof Error) {
     merged.err = redactError(second)
     return [merged, undefined]

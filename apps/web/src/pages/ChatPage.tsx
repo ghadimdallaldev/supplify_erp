@@ -23,6 +23,7 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { Plus, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
+import { uploadFileThroughGateway } from '../utils/fileUpload'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useChatRealtime } from '../hooks/useChatRealtime'
 import { ChatConversationList } from '../components/chat/ChatConversationList'
@@ -396,16 +397,9 @@ export function ChatPage() {
           fileType: file.type,
           fileSize: file.size,
         }).unwrap()
-        const uploadUrl =
-          presignedResponse.presignedUrl || (presignedResponse as { url?: string }).url
-        if (!uploadUrl) throw new Error('Missing upload URL from server')
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
-        })
-        if (!uploadResponse.ok) throw new Error('Failed to upload file')
-        const fileUrl = presignedResponse.publicUrl || uploadUrl.split('?')[0]
+        await uploadFileThroughGateway(presignedResponse, file, file.type)
+        const fileUrl = presignedResponse.publicUrl
+        if (!fileUrl) throw new Error('Upload succeeded but no private file URL was returned')
         attachments.push({
           fileUrl,
           fileType: file.type,

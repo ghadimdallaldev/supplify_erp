@@ -21,6 +21,7 @@ export interface ImageImportPresignRequest {
 
 export interface ImageImportPresignResponse {
   presignedUrl: string
+  url?: string
   fileKey: string
   publicUrl?: string
 }

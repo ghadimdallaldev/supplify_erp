@@ -1,6 +1,7 @@
 import { config } from '../../config/env.js'
 import { createLocalStorageProvider } from './localStorageProvider.js'
 import { createS3CompatibleProvider } from './s3CompatibleProvider.js'
+import { createGatewayUpload } from './upload-security.service.js'
 
 /** @type {import('./types.js').StorageProvider | null} */
 let provider = null
@@ -31,7 +32,7 @@ export async function checkStorageHealth() {
 }
 
 export async function createPresignedUpload(options) {
-  return getStorageProvider().createPresignedUpload(options)
+  return createGatewayUpload(options)
 }
 
 export function buildObjectPublicUrl(fileKey) {

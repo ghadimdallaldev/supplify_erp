@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
-import { assertPublicHttpUrl } from '../../lib/ssrf-guard.js'
+import { fetchPinnedPublic } from '../../lib/pinned-fetch.js'
 
 const WEBHOOK_TIMEOUT_MS = 5000
 
@@ -124,41 +124,17 @@ export async function dispatchNotificationWebhook({ tenantId, tenantType, notifi
     sentAt: new Date().toISOString(),
   }
 
-  // Re-check at send time: rows stored before this guard existed, and DNS for a
-  // once-public host can be repointed at an internal address later.
-  try {
-    assertPublicHttpUrl(webhook.url, { protocols: ['https:'], label: 'Webhook URL' })
-  } catch (error) {
-    await logWebhookDelivery({
-      tenantId,
-      tenantType,
-      url: webhook.url,
-      eventCategory: event.category,
-      status: 'failed',
-      errorMessage: 'BLOCKED_URL',
-    })
-    logger.warn({
-      msg: 'Blocked notification webhook to non-public URL',
-      tenantId,
-      tenantType,
-      reason: error.message,
-    })
-    return { delivered: false, reason: 'BLOCKED_URL' }
-  }
-
   const { body, headers } = buildWebhookRequest(event, webhook.secret)
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS)
 
   try {
-    const response = await fetch(webhook.url, {
+    const response = await fetchPinnedPublic(webhook.url, {
       method: 'POST',
       headers,
       body,
-      signal: controller.signal,
-      // Following redirects would let a public URL bounce the request to an
-      // internal address, defeating the check above.
-      redirect: 'manual',
+      timeoutMs: WEBHOOK_TIMEOUT_MS,
+      maxResponseBytes: 64 * 1024,
+      protocols: ['https:'],
+      label: 'Webhook URL',
     })
     if (response.status >= 300 && response.status < 400) {
       await logWebhookDelivery({
@@ -172,7 +148,7 @@ export async function dispatchNotificationWebhook({ tenantId, tenantType, notifi
       })
       return { delivered: false, reason: 'REDIRECT_NOT_ALLOWED', httpStatus: response.status }
     }
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       await logWebhookDelivery({
         tenantId,
         tenantType,
@@ -200,10 +176,19 @@ export async function dispatchNotificationWebhook({ tenantId, tenantType, notifi
       url: webhook.url,
       eventCategory: event.category,
       status: 'failed',
-      errorMessage: error.name === 'AbortError' ? 'timeout' : error.message,
+      errorMessage: error.code === 'OUTBOUND_FETCH_BLOCKED' ? 'BLOCKED_URL' : error.message,
     })
-    return { delivered: false, reason: 'REQUEST_ERROR' }
-  } finally {
-    clearTimeout(timeout)
+    if (error.code === 'OUTBOUND_FETCH_BLOCKED') {
+      logger.warn({
+        msg: 'Blocked notification webhook to non-public URL',
+        tenantId,
+        tenantType,
+      })
+      return { delivered: false, reason: 'BLOCKED_URL' }
+    }
+    return {
+      delivered: false,
+      reason: error.code === 'OUTBOUND_FETCH_TIMEOUT' ? 'TIMEOUT' : 'REQUEST_ERROR',
+    }
   }
 }
