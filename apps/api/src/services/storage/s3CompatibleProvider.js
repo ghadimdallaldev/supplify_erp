@@ -25,6 +25,46 @@ function createS3Client(cfg, endpoint) {
   })
 }
 
+export function isRailwayStorageEndpoint(endpoint) {
+  try {
+    const hostname = new URL(String(endpoint || '')).hostname.toLowerCase()
+    return (
+      hostname === 'storageapi.dev' ||
+      hostname.endsWith('.storageapi.dev') ||
+      hostname === 'storage.railway.app' ||
+      hostname.endsWith('.storage.railway.app')
+    )
+  } catch {
+    return false
+  }
+}
+
+export function hasPrivateAccessProof({
+  endpoint,
+  storagePublicRead,
+  publicGrant,
+  publicPolicy,
+  publicAccessBlockConfiguration,
+}) {
+  if (storagePublicRead !== false || publicGrant || publicPolicy) return false
+
+  const blockPublic = Boolean(
+    publicAccessBlockConfiguration?.BlockPublicAcls &&
+      publicAccessBlockConfiguration?.IgnorePublicAcls &&
+      publicAccessBlockConfiguration?.BlockPublicPolicy &&
+      publicAccessBlockConfiguration?.RestrictPublicBuckets
+  )
+  if (blockPublic) return true
+
+  // Railway Buckets are private-only and expose an empty public-access-block
+  // configuration because public buckets/policies are not supported.
+  return (
+    isRailwayStorageEndpoint(endpoint) &&
+    publicAccessBlockConfiguration &&
+    Object.keys(publicAccessBlockConfiguration).length === 0
+  )
+}
+
 /**
  * @param {import('../../config/env.js').config} cfg
  */
@@ -137,23 +177,23 @@ export function createS3CompatibleProvider(cfg) {
               throw error
             }
           }
-          let blockPublic = true
+          let publicAccessBlockConfiguration = null
           try {
             const block = await s3.send(new GetPublicAccessBlockCommand({ Bucket: bucket }))
-            blockPublic = Boolean(
-              block?.PublicAccessBlockConfiguration?.BlockPublicAcls &&
-                block?.PublicAccessBlockConfiguration?.IgnorePublicAcls &&
-                block?.PublicAccessBlockConfiguration?.BlockPublicPolicy &&
-                block?.PublicAccessBlockConfiguration?.RestrictPublicBuckets
-            )
+            publicAccessBlockConfiguration = block?.PublicAccessBlockConfiguration || null
           } catch (error) {
             if (error?.name !== 'NotImplemented') throw error
-            blockPublic = false
           }
           bucketResults.push({
             bucket,
             supported: true,
-            private: !publicGrant && !publicPolicy && blockPublic,
+            private: hasPrivateAccessProof({
+              endpoint: cfg.STORAGE_ENDPOINT,
+              storagePublicRead: cfg.STORAGE_PUBLIC_READ,
+              publicGrant,
+              publicPolicy,
+              publicAccessBlockConfiguration,
+            }),
           })
         } catch (error) {
           if (error?.name === 'NotImplemented') {

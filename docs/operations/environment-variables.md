@@ -57,13 +57,13 @@ Set secrets only in Railway — never commit real values.
 
 ### Upload malware scanning
 
-| Variable                                  | Used by | Required in   | Example           | Notes                                                                |
-| ----------------------------------------- | ------- | ------------- | ----------------- | -------------------------------------------------------------------- |
-| `MALWARE_SCAN_BYPASS`                     | API     | dev only      | `false`           | Development-only escape hatch; hosted validation rejects `true`.     |
-| `MALWARE_SCAN_HOST` / `MALWARE_SCAN_PORT` | API     | preprod, prod | `clamav` / `3310` | Private ClamAV service address; no public port exposure is required. |
-| `MALWARE_SCAN_TIMEOUT_MS`                 | API     | all           | `15000`           | Scanner health and per-file scan timeout.                            |
-| `MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS`    | API     | hosted        | `72`              | Maximum accepted age when ClamAV reports a signature date.           |
-| `MALWARE_SCAN_REQUIRE_SIGNATURE_DATE`     | API     | hosted        | `true`            | Fail readiness if the scanner cannot report signature freshness.     |
+| Variable                                  | Used by | Required in   | Example           | Notes                                                                                                                                                                                  |
+| ----------------------------------------- | ------- | ------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MALWARE_SCAN_BYPASS`                     | API     | dev only      | `false`           | Development-only escape hatch; hosted validation rejects `true`.                                                                                                                       |
+| `MALWARE_SCAN_HOST` / `MALWARE_SCAN_PORT` | API     | preprod, prod | `clamav` / `3310` | Private ClamAV service address; use the environment's private service name (for example `clamav-prod` in production when names are project-wide); no public port exposure is required. |
+| `MALWARE_SCAN_TIMEOUT_MS`                 | API     | all           | `15000`           | Scanner health and per-file scan timeout.                                                                                                                                              |
+| `MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS`    | API     | hosted        | `72`              | Maximum accepted age when ClamAV reports a signature date.                                                                                                                             |
+| `MALWARE_SCAN_REQUIRE_SIGNATURE_DATE`     | API     | hosted        | `true`            | Fail readiness if the scanner cannot report signature freshness.                                                                                                                       |
 
 ClamAV must be ready before hosted API traffic is accepted. Docker Compose provides a private `clamav` service. On Railway, deploy the same image as a private service in each environment and set `MALWARE_SCAN_HOST` to that service's private DNS name; never publish port 3310 publicly. See [`deploy/railway/clamav/README.md`](../../deploy/railway/clamav/README.md).
 

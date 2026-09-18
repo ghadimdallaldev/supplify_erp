@@ -2,6 +2,11 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-18 - Railway private-storage readiness compatibility
+
+- **API-only:** Railway Storage buckets are private-only but return an empty public-access-block configuration. The API now accepts that provider-specific proof only for Railway endpoints with `STORAGE_PUBLIC_READ=false` and no public ACL/policy; generic S3 verification remains strict.
+- **Mobile:** Skipped — no client contract, auth, RBAC, notification, or mobile feature change.
+
 ## 2026-09-18 - Authenticated upload gateway and malware-scan parity
 
 - **API contract:** File presign responses retain `presignedUrl` and `url`, but both now point to authenticated API gateway PUT endpoints. Direct S3/browser PUTs and bucket fields are no longer part of the client contract.

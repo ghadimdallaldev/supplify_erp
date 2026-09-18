@@ -113,7 +113,7 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
 
 - Normal uploads are capped at 10 MiB. ZIP uploads have a hard 100 MiB cap, plus entry-count, aggregate expansion, path-depth, per-entry, and extraction-time limits.
 - A session can be claimed once. Replays with a different SHA-256 are rejected, while an identical completed retry is idempotent. Destination keys are unique to prevent an upload session from overwriting another session's object.
-- Hosted startup fails closed if ClamAV is unavailable, bypass is enabled, scanner configuration is missing, S3 public-access verification is unsupported, or a bucket ACL/policy/public-access-block check is unsafe.
+- Hosted startup fails closed if ClamAV is unavailable, bypass is enabled, scanner configuration is missing, S3 public-access verification is unsupported, or a bucket ACL/policy/public-access-block check is unsafe. Railway Storage is a documented private-only provider; its empty public-access-block response is accepted only for `storageapi.dev` / `storage.railway.app` endpoints when `STORAGE_PUBLIC_READ=false` and no public ACL or policy is reported. Generic S3 still requires all four public-access-block flags.
 - Legacy objects are scanned on their first authorized API read under a PostgreSQL advisory lock. A clean verdict is accepted only for the exact SHA-256/ETag/version returned by storage.
 - Logs redact upload tokens, signed object parameters, file keys, URLs, storage endpoints, bucket names, and authorization values.
 
