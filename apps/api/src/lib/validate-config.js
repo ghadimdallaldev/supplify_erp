@@ -173,11 +173,28 @@ export function validateProductionConfig() {
     ) {
       issues.push('STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY must not use defaults')
     }
-    if (config.STORAGE_PUBLIC_READ !== false && config.STORAGE_PUBLIC_READ !== 'false') {
-      logger.warn(
-        'STORAGE_PUBLIC_READ is enabled — set STORAGE_PUBLIC_READ=false for private uploads in production'
-      )
-    }
+  }
+  if (config.STORAGE_PUBLIC_READ === true || config.STORAGE_PUBLIC_READ === 'true') {
+    issues.push('STORAGE_PUBLIC_READ must be false; public object reads are disabled')
+  }
+
+  if (config.MALWARE_SCAN_BYPASS === true) {
+    issues.push('MALWARE_SCAN_BYPASS must be false in hosted production')
+  }
+  if (config.MALWARE_SCAN_HOST !== undefined && !String(config.MALWARE_SCAN_HOST || '').trim()) {
+    issues.push('MALWARE_SCAN_HOST is required in hosted production')
+  }
+  if (
+    config.MALWARE_SCAN_PORT !== undefined &&
+    (!Number.isInteger(config.MALWARE_SCAN_PORT) || config.MALWARE_SCAN_PORT < 1)
+  ) {
+    issues.push('MALWARE_SCAN_PORT must be a valid port')
+  }
+  if (
+    config.IMPORT_ZIP_MAX_BYTES !== undefined &&
+    config.IMPORT_ZIP_MAX_BYTES > 100 * 1024 * 1024
+  ) {
+    issues.push('IMPORT_ZIP_MAX_BYTES must not exceed 100 MiB')
   }
 
   if (config.APP_ENV === 'preprod') {

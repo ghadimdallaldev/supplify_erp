@@ -1,4 +1,5 @@
 import { config } from '../config/env.js'
+import { fetchPinnedPublic } from '../lib/pinned-fetch.js'
 import { logger } from '../lib/logger.js'
 import { formatE164 } from '../lib/whatsapp.js'
 import { logWhatsAppDelivery } from './whatsapp/whatsapp-delivery-log.js'
@@ -104,7 +105,7 @@ export async function sendWhatsAppMessage({
   const url = `https://graph.facebook.com/${apiVersion}/${config.WHATSAPP_PHONE_NUMBER_ID}/messages`
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchPinnedPublic(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
@@ -118,11 +119,15 @@ export async function sendWhatsAppMessage({
         type: 'text',
         text: { preview_url: false, body: String(message) },
       }),
+      timeoutMs: 15_000,
+      maxResponseBytes: 256 * 1024,
+      protocols: ['https:'],
+      label: 'WhatsApp API URL',
     })
 
-    const data = await response.json().catch(() => ({}))
+    const data = JSON.parse(response.body.toString('utf8') || '{}')
 
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       const reason = data?.error?.message || `HTTP_${response.status}`
       logger.error('WhatsApp send failed', {
         status: response.status,

@@ -13,6 +13,7 @@ import {
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
+import { FileUploadError, uploadFileThroughGateway } from '../../utils/fileUpload'
 import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { formatNumber } from '../../utils/format'
@@ -62,15 +63,11 @@ function SummaryCard({
   )
 }
 
-async function uploadToPresignedUrl(presignedUrl: string, file: File) {
-  const response = await fetch(presignedUrl, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': file.type || 'application/octet-stream' },
-  })
-  if (!response.ok) {
-    throw new Error('Failed to upload file')
-  }
+async function uploadToPresignedUrl(
+  presign: { presignedUrl?: string; url?: string; fileKey: string },
+  file: File
+) {
+  await uploadFileThroughGateway(presign, file, file.type)
 }
 
 function PreviewDetailSection({
@@ -226,7 +223,7 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
 
     const uploadUrl = presigned.presignedUrl || (presigned as { url?: string }).url
     if (!uploadUrl) throw new Error('Missing upload URL from server')
-    await uploadToPresignedUrl(uploadUrl, file)
+    await uploadToPresignedUrl(presigned, file)
     return presigned.fileKey
   }
 
@@ -259,8 +256,11 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || error?.message || t('toast.zipUploadFailed'))
-      setZipFile(null)
       setZipFileKey(null)
+      if (!(error instanceof FileUploadError && error.code === 'MALWARE_SCAN_UNAVAILABLE')) {
+        setZipFile(null)
+      }
+      event.target.value = ''
     } finally {
       setUploading(false)
     }
@@ -293,8 +293,11 @@ export function ProductImageImportDialog({ open, onOpenChange }: ProductImageImp
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || error?.message || t('toast.mappingUploadFailed'))
-      setMappingFile(null)
       setMappingFileKey(null)
+      if (!(error instanceof FileUploadError && error.code === 'MALWARE_SCAN_UNAVAILABLE')) {
+        setMappingFile(null)
+      }
+      event.target.value = ''
     } finally {
       setUploading(false)
     }

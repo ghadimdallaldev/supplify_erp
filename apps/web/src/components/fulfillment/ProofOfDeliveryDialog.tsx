@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
+import { FileUploadError, uploadFileThroughGateway } from '../../utils/fileUpload'
 import {
   useCompleteOrderDeliveryMutation,
   usePresignOrderProofOfDeliveryMutation,
@@ -30,15 +31,7 @@ async function uploadPresignedFile(
   file: Blob,
   fileType: string
 ) {
-  const uploadUrl = presign.presignedUrl || presign.url
-  if (!uploadUrl) throw new Error('No upload URL returned')
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': fileType },
-  })
-  if (!response.ok) throw new Error('Failed to upload file')
-  return presign.fileKey
+  return uploadFileThroughGateway(presign, file, fileType)
 }
 
 export function ProofOfDeliveryDialog({
@@ -245,7 +238,12 @@ export function ProofOfDeliveryDialog({
       onSubmitted?.()
     } catch (error: unknown) {
       const msg = (error as { data?: { error?: { message?: string } } })?.data?.error?.message
-      toast.error(msg || t('pod.toast.saveFailed'))
+      if (error instanceof FileUploadError && error.code === 'UPLOAD_MALWARE_DETECTED') {
+        setPhotoFile(null)
+        setPhotoPreview(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      toast.error(msg || (error instanceof Error ? error.message : t('pod.toast.saveFailed')))
     }
   }
 

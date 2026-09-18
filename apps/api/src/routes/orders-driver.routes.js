@@ -43,6 +43,7 @@ import {
   MAX_UPLOAD_BYTES,
 } from '../lib/sanitize-upload.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
+import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getDriverDeliveryDetail } from '../services/driver-delivery-detail.service.js'
 import { retryFailedDelivery } from '../services/delivery-retry.service.js'
 
@@ -457,11 +458,14 @@ router.post(
         })
       }
       const fileKey = `uploads/${req.userData.id}/pod/${req.params.id}/${Date.now()}-${safeFileName}`
-      const { presignedUrl, publicUrl, bucket } = await createPresignedUpload({
+      const tenant = await getRequestTenant(req)
+      const { presignedUrl, publicUrl } = await createPresignedUpload({
         fileKey,
         fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
         fileType: body.fileType,
         userId: req.userData.id,
+        tenantId: tenant?.tenantId || supplierId,
+        tenantType: tenant?.tenantType || 'SUPPLIER',
         useApiUpload: true,
       })
       res.json({
@@ -473,7 +477,6 @@ router.post(
           fileKey,
           fileName: body.fileName,
           fileType: body.fileType,
-          bucket,
           storageMetered: sizeBytes > 0,
         },
         error: null,
@@ -527,6 +530,14 @@ router.post(
         })
       }
       const body = podSchema.parse(req.body)
+      const tenant = await getRequestTenant(req)
+      for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        await assertCleanUploadOwnership(key, {
+          userId: req.userData.id,
+          tenantId: tenant?.tenantId || supplierId,
+          tenantType: tenant?.tenantType || 'SUPPLIER',
+        })
+      }
       const proof = await submitProofOfDelivery({
         orderId: req.params.id,
         supplierId,
@@ -546,7 +557,11 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
-      if (error instanceof ValidationError || error.name === 'ZodError') {
+      if (
+        error instanceof ValidationError ||
+        error.name === 'ZodError' ||
+        error.name === 'UPLOAD_NOT_CLEAN'
+      ) {
         return res.status(400).json({
           ok: false,
           data: null,
@@ -608,6 +623,14 @@ router.post(
           permissions: perms,
         })
       }
+      const tenant = await getRequestTenant(req)
+      for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        await assertCleanUploadOwnership(key, {
+          userId: req.userData.id,
+          tenantId: tenant?.tenantId || supplierId,
+          tenantType: tenant?.tenantType || 'SUPPLIER',
+        })
+      }
       const data = await completeDeliveryWithProof({
         orderId: req.params.id,
         supplierId,
@@ -624,7 +647,9 @@ router.post(
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (error) {
       const status =
-        error instanceof ValidationError || error.name === 'ZodError'
+        error instanceof ValidationError ||
+        error.name === 'ZodError' ||
+        error.name === 'UPLOAD_NOT_CLEAN'
           ? 400
           : error instanceof ForbiddenError
             ? 403
