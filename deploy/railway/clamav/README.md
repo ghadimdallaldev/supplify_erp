@@ -1,6 +1,6 @@
 # Railway private ClamAV service
 
-The API fails closed in preprod and production unless ClamAV is reachable and ready. Create one private ClamAV service per Railway environment using image `clamav/clamav:1.4.3_base`.
+The API fails closed in preprod and production unless ClamAV is reachable and ready. Create one private ClamAV service per Railway environment using image `clamav/clamav:1.4.3_base`. Railway service names are project-wide; when preprod and production share one project, use `clamav` for preprod and `clamav-prod` for production, and set each API's `MALWARE_SCAN_HOST` to the matching private service name.
 
 Configure the service with at least 1 GiB memory and 1 vCPU. Do not add a public TCP port. The API and ClamAV service must share the same Railway private network; use the service's private DNS name for `MALWARE_SCAN_HOST` and port `3310`.
 
