@@ -1006,3 +1006,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: This is an analysis/documentation deliverable only. It changes no API endpoint, authentication/session behavior, RBAC key, type contract, feature flag, notification payload, or mobile workflow.
 - **Mobile repositories**: `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios` were reviewed for parity context and require no code changes for this audit.
 - **Reason**: The audit records the current Android/iOS coverage and web-first boundaries so future product work can use the parity requirements as an explicit input.
+
+## 2026-09-21 - Supplier product categories and email links
+
+- **Supplier product categories**: `product_category` now supports supplier-owned categories and the catalog category contract includes `supplier_id`. Android and iOS now include the matching `ProductCategory` type plus category list/create/delete React Query clients; their existing supplier catalog screen continues to direct full catalog management to the web workspace.
+- **Email links**: Server-side email HTML now converts app-relative `href` values into absolute `WEB_ORIGIN` URLs. This changes no mobile API, auth, notification payload, or deep-link contract.
+- **Parity decision**: Web has the native category-management UI. Android and iOS have synchronized API/types so a native product-creation flow can use supplier categories when it is introduced; current mobile catalog management remains web-linked by design.

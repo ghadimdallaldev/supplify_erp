@@ -100,3 +100,4 @@ Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/suppl
 - [x] Organization catalog views preserve tenant-specific product identity; no fuzzy deduplication.
 - [x] API focused routing, location, stock, catalog, and idempotency tests pass.
 - [x] Mobile typechecks run for Android and iOS.
+- [x] 2026-09-21 — Supplier product category contract (category `supplier_id` plus list/create/delete clients) synchronized in Android and iOS; full catalog management remains web-linked in the current mobile product screen.

@@ -103,6 +103,19 @@ Bulk catalog upload with preview and partial-import support. Accepts **`.csv`** 
 
 Service: `product-import.service.js` (delegates image fetch to `importImageFromUrl` in `product-image-import.service.js`).
 
+## Supplier product categories
+
+Suppliers can manage their catalog categories from **Products → Manage categories**. They may create, rename, deactivate, or delete only categories owned by their supplier account; the shared platform categories remain available and read-only. Product create/update accepts `category_id` only when it references a shared category or one owned by the product supplier.
+
+| Method | Endpoint                               | Permission       | Purpose                                                 |
+| ------ | -------------------------------------- | ---------------- | ------------------------------------------------------- |
+| GET    | `/api/products/categories`             | `CATALOG_VIEW`   | Shared categories plus the active supplier’s categories |
+| POST   | `/api/products/categories`             | `CATALOG_EDIT`   | Create a supplier-owned category                        |
+| PATCH  | `/api/products/categories/:categoryId` | `CATALOG_EDIT`   | Update a supplier-owned category                        |
+| DELETE | `/api/products/categories/:categoryId` | `CATALOG_MANAGE` | Delete a supplier-owned category                        |
+
+Database migration `0211_supplier_product_categories.sql` adds `product_category.supplier_id`; existing categories stay shared (`NULL`).
+
 ## Bulk product image import (ZIP)
 
 Background ZIP import with preview, progress polling, and failure reports. URL-based images use the product CSV import path instead — see [bulk-product-image-import.md](./bulk-product-image-import.md).

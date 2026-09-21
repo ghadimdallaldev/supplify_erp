@@ -38,6 +38,11 @@ describe('email template registry', () => {
     expect(rendered.html).toContain('https://app.supplify.test/app')
   })
 
+  it('adds a default app link when a non-OTP template has no CTA', async () => {
+    const { renderTemplate } = await import('./registry.js')
+    const rendered = renderTemplate('auth.password_changed', {})
+    expect(rendered.html).toContain('href="https://app.supplify.test/app"')
+  })
   it('renders OTP with code hero', async () => {
     const { renderTemplate } = await import('./registry.js')
     const rendered = renderTemplate('auth.email_otp_login', { code: '123456' })

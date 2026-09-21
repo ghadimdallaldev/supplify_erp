@@ -4,6 +4,7 @@
     "supplierDescription": "Manage your product catalog",
     "restaurantDescription": "Browse and search products from suppliers",
     "addProduct": "Add Product",
+    "manageCategories": "Manage categories",
     "bulkUpload": "Bulk Upload",
     "importImages": "Import Product Images",
     "requestBestPrice": "Request best price",
@@ -121,6 +122,21 @@
     "cancel": "Cancel",
     "creating": "Creating...",
     "createProduct": "Create Product"
+  },
+  "categories": {
+    "title": "Manage product categories",
+    "description": "Create categories for your catalog. Shared platform categories are available but cannot be changed here.",
+    "name": "Category name",
+    "descriptionLabel": "Description (optional)",
+    "add": "Add category",
+    "creating": "Adding…",
+    "created": "Category created",
+    "createFailed": "Unable to create category",
+    "deleted": "Category deleted",
+    "deleteFailed": "Unable to delete category",
+    "delete": "Delete {{name}}",
+    "nameRequired": "Enter a category name",
+    "empty": "No categories available yet"
   },
   "bulkUpload": {
     "title": "Bulk Upload Products",

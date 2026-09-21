@@ -163,6 +163,7 @@ const productCreateSchema = z.object({
   description_ar: z.string().max(1000).optional(),
   brand: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
+  category_id: z.string().uuid().nullable().optional(),
   image_url: z.string().url().optional(),
   image_thumb_url: z.string().url().optional(),
   unit: z.string().max(20).optional(),
@@ -170,6 +171,16 @@ const productCreateSchema = z.object({
 
 const productUpdateSchema = productCreateSchema.partial()
 
+const categoryCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).optional(),
+})
+
+const categoryUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  is_active: z.boolean().optional(),
+})
 const productListSchema = z.object({
   q: z.string().optional(),
   category: z.string().optional(), // Support both old category and category_id
@@ -227,6 +238,7 @@ router.get('/categories', async (req, res) => {
         `
         SELECT
           pc.id,
+          pc.supplier_id,
           pc.name,
           pc.slug,
           pc.description,
@@ -236,8 +248,9 @@ router.get('/categories', async (req, res) => {
         LEFT JOIN product p ON p.category_id = pc.id
           AND ($1::uuid IS NULL OR p.supplier_id = $1)
         WHERE pc.is_active = true
+          AND (pc.supplier_id IS NULL OR pc.supplier_id = $1)
         GROUP BY pc.id
-        HAVING ($1::uuid IS NULL OR COUNT(p.id) > 0)
+        HAVING ($1::uuid IS NOT NULL OR COUNT(p.id) > 0)
         ORDER BY product_count DESC, pc.display_order, pc.name
         `,
         [supplierId],
@@ -254,6 +267,156 @@ router.get('/categories', async (req, res) => {
   }
 })
 
+function categorySlug(name) {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90)
+}
+
+async function assertCategoryAvailable(categoryId, supplierId) {
+  if (!categoryId) return null
+  const { rows } = await query(
+    `SELECT id, name
+     FROM product_category
+     WHERE id = $1
+       AND is_active = true
+       AND (supplier_id IS NULL OR supplier_id = $2)`,
+    [categoryId, supplierId]
+  )
+  if (!rows[0]) throw new ValidationError('Category is not available for this supplier')
+  return rows[0]
+}
+
+// Supplier category management. Shared platform categories intentionally remain read-only.
+router.post('/categories', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const category = categoryCreateSchema.parse(req.body)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    const { rows } = await query(
+      `INSERT INTO product_category (supplier_id, name, slug, description)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (supplier_id, lower(name)) DO NOTHING
+       RETURNING id, supplier_id, name, slug, description, display_order, is_active`,
+      [
+        supplierId,
+        category.name,
+        categorySlug(category.name) || 'category',
+        category.description || null,
+      ]
+    )
+    if (!rows[0]) throw new ValidationError('A category with this name already exists')
+    await invalidateCatalogMetaCache(supplierId)
+    return res
+      .status(201)
+      .json({ ok: true, data: { category: rows[0] }, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status = error instanceof z.ZodError || error instanceof ValidationError ? 400 : 500
+    logger.error('Create supplier product category failed', { error: error.message })
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to create category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const categoryId = z.string().uuid().parse(req.params.categoryId)
+    const updates = categoryUpdateSchema.parse(req.body)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    if (!Object.keys(updates).length) throw new ValidationError('No fields to update')
+    const fields = []
+    const values = []
+    let index = 1
+    if (updates.name !== undefined) {
+      fields.push(`name = $${index++}`, `slug = $${index++}`)
+      values.push(updates.name, categorySlug(updates.name) || 'category')
+    }
+    if (updates.description !== undefined) {
+      fields.push(`description = $${index++}`)
+      values.push(updates.description)
+    }
+    if (updates.is_active !== undefined) {
+      fields.push(`is_active = $${index++}`)
+      values.push(updates.is_active)
+    }
+    values.push(categoryId, supplierId)
+    const { rows } = await query(
+      `UPDATE product_category
+       SET ${fields.join(', ')}, updated_at = now()
+       WHERE id = $${index++} AND supplier_id = $${index}
+       RETURNING id, supplier_id, name, slug, description, display_order, is_active`,
+      values
+    )
+    if (!rows[0]) throw new NotFoundError('Supplier category not found')
+    await invalidateCatalogMetaCache(supplierId)
+    return res.json({
+      ok: true,
+      data: { category: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    const status =
+      error instanceof z.ZodError || error instanceof ValidationError
+        ? 400
+        : error instanceof NotFoundError
+          ? 404
+          : 500
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 404 ? 'NOT_FOUND' : status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to update category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.delete('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const categoryId = z.string().uuid().parse(req.params.categoryId)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    const { rows } = await query(
+      'DELETE FROM product_category WHERE id = $1 AND supplier_id = $2 RETURNING id',
+      [categoryId, supplierId]
+    )
+    if (!rows[0]) throw new NotFoundError('Supplier category not found')
+    await invalidateCatalogMetaCache(supplierId)
+    return res.json({ ok: true, data: { id: categoryId }, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status =
+      error instanceof z.ZodError || error instanceof ValidationError
+        ? 400
+        : error instanceof NotFoundError
+          ? 404
+          : 500
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 404 ? 'NOT_FOUND' : status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to delete category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
 // Get available tags (from all products; no-op when product.tags column does not exist)
 router.get('/tags', async (req, res) => {
   try {
@@ -1068,6 +1231,8 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       throw new ValidationError('supplier_id is required')
     }
 
+    const selectedCategory = await assertCategoryAvailable(productData.category_id, supplierId)
+
     // Use transaction to create product, price, and inventory together
     await query('BEGIN')
 
@@ -1094,8 +1259,8 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         productData.description || null,
         productData.description_ar || null,
         productData.brand || null,
-        productData.category || null,
-        req.body.category_id || null,
+        selectedCategory?.name || productData.category || null,
+        productData.category_id || null,
         productData.image_url || null,
         productData.unit || null,
       ]
@@ -1227,6 +1392,11 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       }
     }
 
+    const selectedCategory =
+      updateData.category_id !== undefined
+        ? await assertCategoryAvailable(updateData.category_id, product.supplier_id)
+        : null
+
     const imageSizeBytes =
       req.body.image_size_bytes != null ? Math.max(0, Number(req.body.image_size_bytes) || 0) : 0
     if (
@@ -1277,10 +1447,15 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     }
 
     // Handle category_id separately
-    if (req.body.category_id !== undefined) {
+    if (updateData.category_id !== undefined) {
       updateFields.push(`category_id = $${paramIndex}`)
-      updateValues.push(req.body.category_id || null)
+      updateValues.push(updateData.category_id || null)
       paramIndex++
+      if (selectedCategory && updateData.category === undefined) {
+        updateFields.push(`category = $${paramIndex}`)
+        updateValues.push(selectedCategory.name)
+        paramIndex++
+      }
     }
 
     const {

@@ -148,6 +148,31 @@ describe('Products Routes', () => {
     })
   })
 
+  describe('POST /api/products/categories', () => {
+    it('creates a category owned by the active supplier', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            supplier_id: 'supplier-1',
+            name: 'Fresh herbs',
+            slug: 'fresh-herbs',
+          },
+        ],
+      })
+
+      const response = await request(app)
+        .post('/api/products/categories')
+        .send({ name: 'Fresh herbs' })
+        .expect(201)
+
+      expect(response.body.data.category.name).toBe('Fresh herbs')
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining('supplier_id'),
+        expect.arrayContaining(['supplier-1', 'Fresh herbs'])
+      )
+    })
+  })
   describe('GET /api/products', () => {
     it('should return list of products', async () => {
       db.query
