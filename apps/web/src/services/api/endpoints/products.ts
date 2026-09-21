@@ -19,6 +19,7 @@ export const productsApi = api.injectEndpoints({
       {
         categories: Array<{
           id: string
+          supplier_id?: string | null
           name: string
           slug: string
           description?: string
@@ -31,6 +32,28 @@ export const productsApi = api.injectEndpoints({
       query: () => '/api/products/categories',
       providesTags: ['Product'],
       keepUnusedDataFor: 300,
+    }),
+    createProductCategory: builder.mutation<
+      { category: { id: string; name: string; description?: string } },
+      { name: string; description?: string }
+    >({
+      query: (body) => ({ url: '/api/products/categories', method: 'POST', body }),
+      invalidatesTags: ['Product'],
+    }),
+    updateProductCategory: builder.mutation<
+      { category: { id: string; name: string; description?: string } },
+      { id: string; name?: string; description?: string | null; is_active?: boolean }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/products/categories/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Product'],
+    }),
+    deleteProductCategory: builder.mutation<{ id: string }, string>({
+      query: (id) => ({ url: `/api/products/categories/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Product'],
     }),
     getProductTags: builder.query<{ tags: string[] }, void>({
       query: () => '/api/products/tags',

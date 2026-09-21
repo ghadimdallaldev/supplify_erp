@@ -35,7 +35,9 @@ function standardTemplate({
   const bodyMessage =
     otpCode && message ? message.replace(/\{\{\s*code\s*\}\}/gi, '').trim() || message : message
   const body = data.bodyHtml || textToBodyHtml(bodyMessage)
-  const resolvedCtaUrl = buildAppUrl(data.ctaUrl || data.inviteUrl || data.loginUrl || ctaUrl)
+  const resolvedCtaUrl = buildAppUrl(
+    data.ctaUrl || data.inviteUrl || data.loginUrl || ctaUrl || '/app'
+  )
   const detailRows = details || data.details || []
   const detailStripHtml = renderDetailStrip(detailRows)
   const codeBlockHtml = otpCode
@@ -52,7 +54,7 @@ function standardTemplate({
     bodyHtml: body,
     bodyText: otpCode ? [bodyMessage, String(otpCode)].filter(Boolean).join('\n\n') : message,
     ctaUrl: showCta ? resolvedCtaUrl : undefined,
-    ctaLabel: showCta ? data.ctaLabel || ctaLabel : undefined,
+    ctaLabel: showCta ? data.ctaLabel || ctaLabel || t('emails.cta.openSupplify', lng) : undefined,
     tenantName: data.tenantName || tenantName,
     previewText: previewText || data.previewText,
     code: otpCode,
