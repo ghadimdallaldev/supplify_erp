@@ -24,7 +24,12 @@ export function getFoodCostFillPercent(
   targetFoodCostPct: number | null | undefined
 ) {
   if (foodCostPct == null || !Number.isFinite(foodCostPct)) return 0
-  const target = Number(targetFoodCostPct) || 30
+  const target = Number(targetFoodCostPct)
+  // With no target, scale against the full 0-100% range. Falling back to a
+  // notional 30% target made the bar imply a benchmark that does not exist.
+  if (!Number.isFinite(target) || target <= 0) {
+    return Math.min(100, Math.round(foodCostPct))
+  }
   const cap = Math.max(target * 1.5, target, 1)
   return Math.min(100, Math.round((foodCostPct / cap) * 100))
 }

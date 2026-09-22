@@ -25,15 +25,20 @@ import {
   listPriceChangeAlerts,
   listCheaperBuyOptions,
 } from '../services/restaurant-price-intelligence.service.js'
+import {
+  listFoodCostWarnings,
+  listWeakMarginMenuItems,
+} from '../services/restaurant-margin-intelligence.service.js'
 
 const router = express.Router()
 
-router.use(
-  requireAuth,
-  resolveTenantContext,
-  requireRole(['RESTAURANT', 'ADMIN']),
-  requirePermission('CATALOG_VIEW')
-)
+// Permissions are applied per route, not router-wide: purchase-price surfaces
+// need CATALOG_VIEW, while portion cost and margin need the narrower
+// RECIPES_VIEW_COSTS, which Purchaser and Viewer deliberately lack.
+router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
+
+const canSeePurchasePrices = requirePermission('CATALOG_VIEW')
+const canSeeRecipeCosts = requirePermission('RECIPES_VIEW_COSTS')
 
 /** Never trust a client-supplied restaurant id; derive it from the session. */
 async function restaurantScope(req) {
@@ -45,6 +50,7 @@ async function restaurantScope(req) {
 // Price history is included from Growth upward.
 router.get(
   '/price-history/:productId',
+  canSeePurchasePrices,
   requireIntelligenceTier('basic'),
   async (req, res, next) => {
     try {
@@ -61,33 +67,81 @@ router.get(
 )
 
 // Price-change and cheaper-buy alerts are Intelligence tier and above.
-router.get('/price-changes', requireIntelligenceTier('advanced'), async (req, res, next) => {
-  try {
-    const restaurantId = await restaurantScope(req)
-    const data = await listPriceChangeAlerts(restaurantId, {
-      days: req.query.days,
-      minChangePct: req.query.minChangePct,
-      direction: req.query.direction,
-      limit: req.query.limit,
-    })
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+router.get(
+  '/price-changes',
+  canSeePurchasePrices,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listPriceChangeAlerts(restaurantId, {
+        days: req.query.days,
+        minChangePct: req.query.minChangePct,
+        direction: req.query.direction,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
 
-router.get('/cheaper-buys', requireIntelligenceTier('advanced'), async (req, res, next) => {
-  try {
-    const restaurantId = await restaurantScope(req)
-    const data = await listCheaperBuyOptions(restaurantId, {
-      days: req.query.days,
-      minChangePct: req.query.minChangePct,
-      limit: req.query.limit,
-    })
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+router.get(
+  '/cheaper-buys',
+  canSeePurchasePrices,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listCheaperBuyOptions(restaurantId, {
+        days: req.query.days,
+        minChangePct: req.query.minChangePct,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
+
+// Food-cost and menu-margin warnings expose portion cost, so they require
+// RECIPES_VIEW_COSTS rather than CATALOG_VIEW.
+router.get(
+  '/food-cost-warnings',
+  canSeeRecipeCosts,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listFoodCostWarnings(restaurantId, {
+        limit: req.query.limit,
+        minOveragePct: req.query.minOveragePct,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/menu-profitability',
+  canSeeRecipeCosts,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listWeakMarginMenuItems(restaurantId, {
+        limit: req.query.limit,
+        maxMarginPct: req.query.maxMarginPct,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 
 export { router as restaurantIntelligenceRoutes }

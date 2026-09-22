@@ -483,7 +483,8 @@ export async function getRecipeCostingDashboard(restaurantId, dbQuery = query) {
 
   const { rows: lowestMargin } = await dbQuery(
     `
-    SELECT id, name, gross_margin_pct, food_cost_pct, selling_price, cost_per_portion
+    SELECT id, name, gross_margin_pct, food_cost_pct, selling_price, cost_per_portion,
+           target_food_cost_pct, calc_status
     FROM recipes
     WHERE restaurant_id = $1 AND is_active = true AND gross_margin_pct IS NOT NULL
     ORDER BY gross_margin_pct ASC
@@ -541,6 +542,10 @@ export async function getRecipeCostingDashboard(restaurantId, dbQuery = query) {
       foodCostPct: r.food_cost_pct != null ? Number(r.food_cost_pct) : null,
       sellingPrice: r.selling_price != null ? Number(r.selling_price) : null,
       costPerPortion: r.cost_per_portion != null ? Number(r.cost_per_portion) : null,
+      // The UI previously hardcoded a 30% target and a WARNING status here.
+      // Send the real per-recipe values; both are legitimately nullable.
+      targetFoodCostPct: r.target_food_cost_pct != null ? Number(r.target_food_cost_pct) : null,
+      calcStatus: r.calc_status,
     })),
     recentPriceChanges: recentEvents.map((e) => ({
       id: e.id,

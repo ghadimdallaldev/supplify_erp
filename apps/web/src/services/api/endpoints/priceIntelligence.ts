@@ -4,6 +4,10 @@ import type {
   PriceChangeAlertResponse,
   ProductPriceHistory,
 } from '../../../types/priceIntelligence'
+import type {
+  FoodCostWarningResponse,
+  MenuProfitabilityResponse,
+} from '../../../types/marginIntelligence'
 
 export type PriceHistoryParams = {
   productId: string
@@ -22,6 +26,16 @@ export type CheaperBuyParams = {
   days?: number
   minChangePct?: number
   limit?: number
+}
+
+export type FoodCostWarningParams = {
+  limit?: number
+  minOveragePct?: number
+}
+
+export type MenuProfitabilityParams = {
+  limit?: number
+  maxMarginPct?: number
 }
 
 export const priceIntelligenceApi = api.injectEndpoints({
@@ -47,6 +61,21 @@ export const priceIntelligenceApi = api.injectEndpoints({
       }),
       providesTags: [{ type: 'PriceIntelligence', id: 'CHEAPER' }],
     }),
+    getFoodCostWarnings: builder.query<FoodCostWarningResponse, FoodCostWarningParams | void>({
+      query: (params) => ({
+        url: '/api/restaurant-intelligence/food-cost-warnings',
+        params: params || {},
+      }),
+      // Recalculating a recipe changes these, so share the recipe-costing tag.
+      providesTags: [{ type: 'PriceIntelligence', id: 'FOOD_COST' }, 'RecipeCosting'],
+    }),
+    getMenuProfitability: builder.query<MenuProfitabilityResponse, MenuProfitabilityParams | void>({
+      query: (params) => ({
+        url: '/api/restaurant-intelligence/menu-profitability',
+        params: params || {},
+      }),
+      providesTags: [{ type: 'PriceIntelligence', id: 'MENU_MARGIN' }, 'RecipeCosting'],
+    }),
   }),
 })
 
@@ -54,4 +83,6 @@ export const {
   useGetProductPriceHistoryQuery,
   useGetPriceChangeAlertsQuery,
   useGetCheaperBuyOptionsQuery,
+  useGetFoodCostWarningsQuery,
+  useGetMenuProfitabilityQuery,
 } = priceIntelligenceApi

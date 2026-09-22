@@ -10,9 +10,13 @@ const mockListPriceChangeAlerts = vi.fn()
 const mockListCheaperBuyOptions = vi.fn()
 const mockGetIntelligenceTierForTenant = vi.fn()
 const mockGetRestaurantIdForRequest = vi.fn()
+const mockListFoodCostWarnings = vi.fn()
+const mockListWeakMarginMenuItems = vi.fn()
 
 /** Permission middleware records what it was asked to enforce. */
 const requiredPermissions = []
+/** Permissions the simulated caller holds; the mock actually enforces them. */
+let grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, _res, next) => {
@@ -24,7 +28,14 @@ vi.mock('../lib/rbac.js', () => ({
   requireRole: () => (_req, _res, next) => next(),
   requirePermission: (permission) => {
     requiredPermissions.push(permission)
-    return (_req, _res, next) => next()
+    return (_req, res, next) => {
+      if (grantedPermissions.has(permission)) return next()
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: `Missing ${permission}` },
+      })
+    }
   },
   getRestaurantIdForRequest: (...args) => mockGetRestaurantIdForRequest(...args),
 }))
@@ -59,6 +70,11 @@ vi.mock('../services/restaurant-price-intelligence.service.js', () => ({
   listCheaperBuyOptions: (...args) => mockListCheaperBuyOptions(...args),
 }))
 
+vi.mock('../services/restaurant-margin-intelligence.service.js', () => ({
+  listFoodCostWarnings: (...args) => mockListFoodCostWarnings(...args),
+  listWeakMarginMenuItems: (...args) => mockListWeakMarginMenuItems(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -87,6 +103,9 @@ describe('restaurant intelligence routes', () => {
     mockGetProductPriceHistory.mockResolvedValue({ productId: 'p1', events: [] })
     mockListPriceChangeAlerts.mockResolvedValue({ alerts: [] })
     mockListCheaperBuyOptions.mockResolvedValue({ options: [] })
+    mockListFoodCostWarnings.mockResolvedValue({ warnings: [], coverage: {} })
+    mockListWeakMarginMenuItems.mockResolvedValue({ items: [] })
+    grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
     app = buildApp()
   })
 
@@ -162,6 +181,52 @@ describe('restaurant intelligence routes', () => {
 
     expect(res.body.ok).toBe(false)
     expect(mockListPriceChangeAlerts).not.toHaveBeenCalled()
+  })
+
+  describe('margin surfaces require the narrower recipe-cost permission', () => {
+    const MARGIN_PATHS = ['/food-cost-warnings', '/menu-profitability']
+
+    it('registers RECIPES_VIEW_COSTS, not only CATALOG_VIEW', () => {
+      expect(requiredPermissions).toContain('RECIPES_VIEW_COSTS')
+      expect(requiredPermissions).toContain('CATALOG_VIEW')
+    })
+
+    it.each(MARGIN_PATHS)('%s is refused without RECIPES_VIEW_COSTS', async (path) => {
+      // Purchaser and Viewer hold CATALOG_VIEW but must not see portion cost.
+      grantedPermissions = new Set(['CATALOG_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('scale'))
+
+      await request(app).get(`/api/restaurant-intelligence${path}`).expect(403)
+
+      expect(mockListFoodCostWarnings).not.toHaveBeenCalled()
+      expect(mockListWeakMarginMenuItems).not.toHaveBeenCalled()
+    })
+
+    it('price surfaces stay available to a caller with only CATALOG_VIEW', async () => {
+      grantedPermissions = new Set(['CATALOG_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app).get('/api/restaurant-intelligence/price-changes').expect(200)
+    })
+
+    it.each(MARGIN_PATHS)('%s is refused below the advanced tier', async (path) => {
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('basic'))
+
+      await request(app).get(`/api/restaurant-intelligence${path}`).expect(403)
+
+      expect(mockListFoodCostWarnings).not.toHaveBeenCalled()
+      expect(mockListWeakMarginMenuItems).not.toHaveBeenCalled()
+    })
+
+    it('serves both surfaces on the advanced tier, scoped to the session tenant', async () => {
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app).get('/api/restaurant-intelligence/food-cost-warnings').expect(200)
+      await request(app).get('/api/restaurant-intelligence/menu-profitability').expect(200)
+
+      expect(mockListFoodCostWarnings.mock.calls[0][0]).toBe('restaurant-1')
+      expect(mockListWeakMarginMenuItems.mock.calls[0][0]).toBe('restaurant-1')
+    })
   })
 
   it('passes client filters through for the service to clamp', async () => {

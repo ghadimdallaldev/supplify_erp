@@ -1029,3 +1029,11 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** These are read-only analytical surfaces with dense tabular output, and the mobile clients have no purchasing-analytics section to host them. Android and iOS already fail closed on the `intelligence` entitlement through the shared `isEntitlementEnabled` helper, so neither client exposes an entry point the API would refuse.
 - **Contract impact on mobile**: none. No existing endpoint, enum, status value, permission key, notification payload, or deep link changed. `CATALOG_VIEW` is an existing permission; `intelligence` is an existing entitlement key.
 - **Revisit when**: a mobile purchasing-insights surface is scheduled. The endpoints are tenant-scoped and tier-gated already, so a future mobile client needs only the API client and types.
+
+## 2026-09-22 - Food-cost and menu-margin warnings (web-only)
+
+- **Change**: new `GET /api/restaurant-intelligence/food-cost-warnings` and `/menu-profitability`, a tier-gated `FoodCostWarningsCard` on the recipe costing dashboard, and a correctness fix to `FoodCostBar` / the dashboard's lowest-margin card.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither mobile client has a recipe-costing surface at all — recipes, costing, and margin are web-only by existing design — so there is nothing to port these onto.
+- **Contract impact on mobile**: none for mobile clients. The `/api/recipe-costing/dashboard` payload gained two fields on `lowestMarginRecipes` (`targetFoodCostPct`, `calcStatus`); that endpoint has no mobile consumer, and the change is additive.
+- **Permission note**: these endpoints require `RECIPES_VIEW_COSTS`, which is narrower than `CATALOG_VIEW`. No new permission key was introduced.
+- **Revisit when**: recipe costing is scheduled for mobile. The endpoints are already tenant-scoped, tier-gated, and permission-gated.

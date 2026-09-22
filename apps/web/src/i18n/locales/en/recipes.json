@@ -191,7 +191,8 @@
   "foodCostBar": {
     "target": "target {{pct}}%",
     "ariaKnown": "Food cost {{pct}}%",
-    "ariaUnknown": "Food cost unknown"
+    "ariaUnknown": "Food cost unknown",
+    "noTarget": "No target set"
   },
   "empty": {
     "loadErrorTitle": "Could not load recipes",
@@ -206,5 +207,14 @@
     "saveFailed": "Failed to save recipe",
     "duplicated": "Recipe duplicated",
     "recalculated": "Cost recalculated"
+  },
+  "foodCostWarnings": {
+    "title": "Food cost warnings",
+    "description": "Recipes above their own food-cost target, with the ingredient price change behind each one.",
+    "empty": "No recipe is above its food-cost target.",
+    "overBy": "{{pct}} pts over",
+    "actualVsTarget": "Food cost {{actual}}% vs target {{target}}%",
+    "drivenBy": "Latest driver: {{ingredient}} ({{pct}}% cost change)",
+    "coverage": "{{withoutTarget}} recipes have no target set and {{missingCostData}} cannot be costed yet, so they are not judged here."
   }
 }
