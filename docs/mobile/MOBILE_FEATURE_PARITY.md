@@ -1044,3 +1044,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **No mobile code change required.** Mobile reads `smart_reorder` only through `isEntitlementEnabled`, which is a truthiness check — `suggestions_only` is truthy, so reorder-assistance screens behave exactly as before. Neither client renders forecast output or calls the forecast endpoints.
 - **Behavioural note for mobile**: a Growth tenant's `/reorder-forecasts` response is an empty list with `smartReorder.capabilities.forecast = false`, which is the same shape the endpoint already returned for plans without the capability. No client-side handling changes.
 - **Contract impact**: none. No endpoint, enum, permission key, payload, or deep link changed; `smart_reorder` is an existing entitlement key with an existing basic tier.
+
+## 2026-09-22 - Mobile assistant entry points aligned to ai_assistant
+
+- **Gap found during handover review**: the navigators gated `AssistantScreen` on the new `ai_assistant` key, but four **entry points** still gated on `ai_platform` — the Restaurant dashboard row, the Supplier dashboard row, and two rows in Settings. After the key split `ai_platform` covers only Smart Reorder LLM assistance and no longer implies the assistant.
+- **Why it mattered**: the two keys happen to move together on the stock plans, but an admin tenant override can set them independently. With `ai_platform` on and `ai_assistant` off, mobile showed an Assistant row that navigates to a screen the navigator blocks — a control that does nothing. With the reverse, an entitled tenant saw no entry point at all.
+- **Fix**: all four entry points now gate on `ai_assistant`, matching the navigators and the API's `/api/assistant` gate. No remaining `ai_platform` reference in either mobile client.
+- **Verified**: `npx tsc --noEmit` clean and `jest` 22 suites / 87 tests passing in both `supplify-mobile` and `supplify-mobile-ios`.
