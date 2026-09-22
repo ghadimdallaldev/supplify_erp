@@ -34,6 +34,8 @@ export const RESTAURANT_FEATURE_KEYS = [
   'order_calendar',
   'reports',
   'smart_reorder',
+  'intelligence',
+  'ai_assistant',
   'ai_platform',
   'multi_branch',
   'disputes_returns',
@@ -48,6 +50,8 @@ export const SUPPLIER_FEATURE_KEYS = [
   'order_calendar',
   'reports',
   'smart_reorder',
+  'intelligence',
+  'ai_assistant',
   'warehouses',
   'multi_warehouse',
   'fulfillment',
@@ -84,7 +88,9 @@ export const FEATURE_KEY_LABELS: Record<string, string> = {
   order_calendar: 'Order calendar',
   reports: 'Reports',
   smart_reorder: 'Smart reorder',
-  ai_platform: 'AI assistant + reorder LLM',
+  intelligence: 'Operational intelligence',
+  ai_assistant: 'Supplify AI Assistant',
+  ai_platform: 'LLM support for smart reorder',
   multi_branch: 'Multi-branch',
   disputes_returns: 'Disputes & returns',
   advanced_roles: 'Advanced roles',
@@ -136,6 +142,11 @@ export function formatPlanFeatureCell(
     return { enabled, caption: enabled ? 'LLM assist' : undefined }
   }
 
+  if (featureKey === 'ai_assistant') {
+    const enabled =
+      typeof rawVal === 'boolean' ? rawVal : rawVal !== 'false' && rawVal != null && rawVal !== ''
+    return { enabled, caption: enabled ? 'Read-only assistant' : undefined }
+  }
   if (featureKey === 'quick_lists') {
     if (rawVal === false || rawVal == null || rawVal === '' || rawVal === 'basic_manual_only') {
       return { enabled: false }
@@ -175,6 +186,7 @@ export const PLAN_TIER_BLURBS = {
   trial: 'Time-limited trial',
   growth: 'For growing ops',
   scale: 'For multi-site volume',
+  intelligence: 'For data-informed operations',
 } as const
 
 export type PlanTierKind = keyof typeof PLAN_TIER_BLURBS
@@ -196,7 +208,8 @@ export function getPlanTierKind(
   if (/\bscale\b/.test(hay) || /\bplatinum\b/.test(hay)) return 'scale'
 
   if (code === 'silver') return 'growth'
-  if (code === 'gold' || code === 'platinum') return 'scale'
+  if (code === 'gold') return 'intelligence'
+  if (code === 'platinum') return 'scale'
   return null
 }
 
@@ -204,7 +217,7 @@ export function getPlanTierKind(
 export const PLAN_SUBTITLES: Record<string, string> = {
   free: PLAN_TIER_BLURBS.trial,
   silver: PLAN_TIER_BLURBS.growth,
-  gold: PLAN_TIER_BLURBS.scale,
+  gold: PLAN_TIER_BLURBS.intelligence,
   platinum: PLAN_TIER_BLURBS.scale,
 }
 
@@ -218,12 +231,12 @@ export function formatPlanDisplayName(
   const name = (planName || '').trim()
   if (['Bronze', 'Silver', 'Gold', 'Platinum'].includes(name)) {
     if (code === 'silver') return 'Growth'
-    if (code === 'gold') return 'Scale'
+    if (code === 'gold') return 'Intelligence'
     if (code === 'platinum') return 'Scale'
   }
   if (name) return name
   if (code === 'silver') return 'Growth'
-  if (code === 'gold') return 'Scale'
+  if (code === 'gold') return 'Intelligence'
   if (code === 'platinum') return 'Scale'
   return 'Plan'
 }

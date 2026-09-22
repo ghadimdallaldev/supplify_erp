@@ -166,6 +166,17 @@ router.use(
   requireRestaurantOrgContext,
   orgStructureGuard
 )
+// Cross-branch purchasing is deliberately not a launch capability. Keep the
+// historical endpoints explicit and fail-closed so old deep links cannot submit
+// one order on behalf of another branch.
+router.use('/central-purchasing', (req, res) => {
+  res.status(410).json({
+    ok: false,
+    data: null,
+    error: { name: 'GONE', message: 'Central purchasing is not available' },
+    requestId: req.requestId,
+  })
+})
 
 router.get('/', async (req, res) => {
   try {

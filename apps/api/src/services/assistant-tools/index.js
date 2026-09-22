@@ -33,7 +33,8 @@ const ROW_CAP = 15
  */
 
 function can(ctx, permissionKey) {
-  if (ctx.isAdmin && !ctx.isImpersonating) return true
+  if (ctx.isAdmin && !ctx.isImpersonating)
+    return hasPermission(ctx.permissions || [], P.ADMIN_ACCESS)
   if (rolesIncludeOwner(ctx.roles)) return true
   return hasPermission(ctx.permissions || [], permissionKey)
 }

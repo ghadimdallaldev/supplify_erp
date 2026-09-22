@@ -83,6 +83,13 @@ Operational features for restaurant inventory expiry, supplier shortage/substitu
 
 ---
 
+## Current operational-intelligence policy (2026-09-22)
+
+- Restaurant Growth has deterministic usage, lead-time, low-stock, and expiry signals.
+- Restaurant Intelligence adds deterministic seasonal, recipe-cost-impact, waste, and reorder analysis; it does not include conversational AI or LLM reorder calls.
+- Restaurant Scale adds the separately entitled Supplify Assistant and LLM-assisted Smart Reorder when the environment and quota allow it.
+- Expired and near-expiry stock remains an alert/action signal and is never turned into an automatic reorder recommendation.
+
 ## Feature 4b: Deterministic reorder forecasts (Restaurant Growth / Scale)
 
 See [ai-smart-reorder.md](./ai-smart-reorder.md) for full spec. Public plan names: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).

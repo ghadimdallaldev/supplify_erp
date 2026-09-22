@@ -39,7 +39,14 @@ describe('receiving-line-validation', () => {
 
   it('enriches lines with server-side ordered quantities', () => {
     const enriched = validateAndEnrichReceivingLines(orderItems, [
-      { orderItemId: 'oi-1', received_quantity: 8, quality_status: 'ACCEPTED' },
+      {
+        orderItemId: 'oi-1',
+        productId: 'untrusted-product',
+        unit: 'case',
+        actualUnitPrice: 999,
+        received_quantity: 8,
+        quality_status: 'ACCEPTED',
+      },
       { orderItemId: 'oi-2', received_quantity: 4, quality_status: 'DAMAGED' },
     ])
 
@@ -47,6 +54,9 @@ describe('receiving-line-validation', () => {
     expect(enriched[0].ordered_quantity).toBe(10)
     expect(enriched[1].ordered_quantity).toBe(4)
     expect(enriched[0].productId).toBe('p-1')
+    expect(enriched[0].unit).toBe('kg')
+    expect(enriched[0].expected_unit_price).toBe(5)
+    expect(enriched[0].actual_unit_price).toBe(5)
   })
 
   it('sums billable accepted quantity excluding rejected lines', () => {

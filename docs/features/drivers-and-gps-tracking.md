@@ -401,3 +401,12 @@ Supplier tracking drawer, order detail panel, and driver portal use the same map
 - `driver-fulfillment.service.test.js` — delivered → `DELIVERED`
 - `driver-location.service.test.js` — validation, disabled mode, active assignment
 - Updated `supplier-pain-killer.test.js`, `DriverDispatchBoard` tests, `DriverDeliveriesPage.mobile.test.tsx`
+
+---
+
+## Fulfillment integrity update (2026-09-22)
+
+- Active driver assignments are database-unique per order/warehouse leg; the migration resolves historical duplicates before creating partial unique indexes.
+- A driver can enter `out_for_delivery` only from an active `PROCESSING` or `SHIPPED` order, and the transition promotes processing orders to shipped atomically.
+- Delivery routes and route stops now reject skipped/reverse terminal transitions, so planning, dispatch, transit, completion, failure, and cancellation have reproducible state changes.
+- Drivers use guided delivery tools and status actions; conversational assistant access is intentionally denied.

@@ -260,7 +260,7 @@ describe('Subscriptions Routes', () => {
       })
       expect(res.body.data.plans[1]).toMatchObject({
         code: 'gold',
-        display_name: 'Restaurant Scale',
+        display_name: 'Restaurant Intelligence',
         annual_savings: 298,
         current_plan: true,
       })
@@ -349,16 +349,16 @@ describe('Subscriptions Routes', () => {
         tenantType: 'RESTAURANT',
         tenantId: 'rest-1',
         plan: {
-          id: 'plan-gold',
+          id: 'plan-platinum',
           name: 'Restaurant Scale',
-          code: 'gold',
+          code: 'platinum',
           tenant_type: 'RESTAURANT',
-          price_monthly: 149,
+          price_monthly: 349,
           price_yearly: null,
         },
         features: { multi_branch: true, reports: true },
-        limits: { orders_per_day: 50, branches: 3 },
-        baseLimits: { orders_per_day: 50, branches: 3 },
+        limits: { orders_per_day: 50, branches: -1 },
+        baseLimits: { orders_per_day: 50, branches: -1 },
         overrides: [],
         usage: { orders_per_day: 2 },
         usageWindowMeta: {},
@@ -366,8 +366,8 @@ describe('Subscriptions Routes', () => {
 
       const res = await request(app).get('/api/subscriptions/entitlements').expect(200)
 
-      expect(res.body.data.entitlements.plan.code).toBe('gold')
-      expect(res.body.data.entitlements.limits.branches).toBe(3)
+      expect(res.body.data.entitlements.plan.code).toBe('platinum')
+      expect(res.body.data.entitlements.limits.branches).toBe(-1)
       expect(res.body.data.entitlements.features.multi_branch).toBe(true)
     })
 

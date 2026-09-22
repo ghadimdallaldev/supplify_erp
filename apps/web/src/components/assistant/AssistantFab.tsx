@@ -46,7 +46,7 @@ export function AssistantFab() {
   const planHasAi =
     user?.role === 'ADMIN' && !isImpersonating
       ? true
-      : featureEnabled(entitlements?.features?.ai_platform)
+      : featureEnabled(entitlements?.features?.ai_assistant)
 
   useEffect(() => {
     void ensureNamespace('assistant')
@@ -56,7 +56,8 @@ export function AssistantFab() {
     skip: !user || !open,
   })
 
-  // Show FAB when plan has ai_platform (or admin). Env-disabled still shows panel with unavailable.
+  // The conversational assistant is a Scale entitlement. The API keeps its own
+  // authoritative gate; the UI only avoids rendering an unavailable entry point.
   if (!user || !planHasAi) return null
 
   return (

@@ -622,6 +622,18 @@ export async function removeOrderFromPlannedRoute({ supplierId, routeId, orderId
   return getDeliveryRoute(supplierId, routeId)
 }
 
+const ROUTE_STATUS_TRANSITIONS = {
+  PLANNED: new Set(['IN_PROGRESS', 'CANCELLED']),
+  IN_PROGRESS: new Set(['CANCELLED']),
+}
+
+const STOP_STATUS_TRANSITIONS = {
+  PLANNED: new Set(['IN_TRANSIT', 'FAILED']),
+  IN_TRANSIT: new Set(['COMPLETED', 'FAILED']),
+  COMPLETED: new Set(),
+  FAILED: new Set(),
+}
+
 export async function updateDeliveryRoute(supplierId, routeId, patch) {
   const existing = await getDeliveryRoute(supplierId, routeId)
   if (existing.status === 'CANCELLED') {
@@ -629,6 +641,18 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
   }
   if (existing.status === 'COMPLETED') {
     throw new ValidationError('Cannot update a completed route')
+  }
+
+  if (patch.status !== undefined && patch.status !== existing.status) {
+    const allowed = ROUTE_STATUS_TRANSITIONS[existing.status]
+    if (!allowed?.has(patch.status)) {
+      throw new ValidationError(
+        `Cannot transition route from ${existing.status} to ${patch.status}; completion follows terminal stops`
+      )
+    }
+  }
+  if (patch.status === 'CANCELLED') {
+    return cancelDeliveryRoute(supplierId, routeId)
   }
 
   const fields = []
@@ -891,6 +915,16 @@ export async function updateRouteStop(
     if (!stopRows.length) throw new NotFoundError('Stop not found')
     const stopRow = stopRows[0]
     const orderId = stopRow.order_id
+    if (dbStatus && routeRow.status !== 'IN_PROGRESS') {
+      throw new ValidationError('Start the route before updating its stops')
+    }
+
+    if (dbStatus && dbStatus !== stopRow.status) {
+      const allowed = STOP_STATUS_TRANSITIONS[stopRow.status]
+      if (!allowed?.has(dbStatus)) {
+        throw new ValidationError(`Cannot transition stop from ${stopRow.status} to ${dbStatus}`)
+      }
+    }
 
     if (dbStatus) {
       const assignmentStatus = STOP_TO_ASSIGNMENT[status]

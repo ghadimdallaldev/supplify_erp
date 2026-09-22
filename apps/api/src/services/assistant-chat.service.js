@@ -1,14 +1,7 @@
 import { query } from '../lib/db.js'
 import { getAiProvider } from '../lib/ai/index.js'
-import {
-  isAiEnvEnabled,
-  isAiPlatformEnabledForTenant,
-} from '../lib/ai-platform.js'
-import {
-  reserveAiUsage,
-  refundReservedAiUsage,
-  getAiUsageSummary,
-} from '../lib/subscription.js'
+import { isAiEnvEnabled, isAiAssistantEnabledForTenant } from '../lib/ai-platform.js'
+import { reserveAiUsage, refundReservedAiUsage, getAiUsageSummary } from '../lib/subscription.js'
 import { NotFoundError, ValidationError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { logger } from '../lib/logger.js'
 import { resolveAvailableTools, executeAssistantTool } from './assistant-tools/index.js'
@@ -77,8 +70,8 @@ export async function resolveAssistantEnabled(ctx) {
   }
 
   if (ctx.isAdmin && !ctx.isImpersonating) {
-    if (!hasPermission(ctx.permissions, P.ADMIN_ACCESS) && ctx.permissions.length) {
-      // Admin context may use ADMIN_ACCESS via role; allow if admin user
+    if (!hasPermission(ctx.permissions, P.ADMIN_ACCESS)) {
+      return { enabled: false, reason: 'admin_permission_required', quota: null }
     }
     return {
       enabled: true,
@@ -91,7 +84,7 @@ export async function resolveAssistantEnabled(ctx) {
     return { enabled: false, reason: 'no_tenant', quota: null }
   }
 
-  const platformOn = await isAiPlatformEnabledForTenant(ctx.tenantId, ctx.tenantType)
+  const platformOn = await isAiAssistantEnabledForTenant(ctx.tenantId, ctx.tenantType)
   if (!platformOn) {
     return { enabled: false, reason: 'feature_disabled', quota: null }
   }
@@ -245,10 +238,15 @@ export async function sendAssistantMessage(req, { conversationId = null, message
   if (meterTenant && meterType) {
     usage = await reserveAiUsage(meterTenant, meterType, 1)
     if (!usage.allowed) {
-      await insertMessage(convId, 'assistant', 'AI quota exhausted. Please try again after the reset.', {
-        quotaLimited: true,
-        resetAt: usage.resetAt || null,
-      })
+      await insertMessage(
+        convId,
+        'assistant',
+        'AI quota exhausted. Please try again after the reset.',
+        {
+          quotaLimited: true,
+          resetAt: usage.resetAt || null,
+        }
+      )
       return {
         conversationId: convId,
         reply:
@@ -288,8 +286,7 @@ export async function sendAssistantMessage(req, { conversationId = null, message
       latencyMs: result.latencyMs,
     })
 
-    const quota =
-      meterTenant && meterType ? await getAiUsageSummary(meterTenant, meterType) : null
+    const quota = meterTenant && meterType ? await getAiUsageSummary(meterTenant, meterType) : null
 
     return {
       conversationId: convId,

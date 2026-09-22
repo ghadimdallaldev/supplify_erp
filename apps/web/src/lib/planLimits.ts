@@ -40,20 +40,17 @@ export function resolveEntitlementFeature(
   key: string
 ): unknown {
   if (!entitlements) return undefined
-  const fromFeatures = entitlements.features?.[key]
-  const fromPlan = entitlements.planFeatures?.[key]
-  if (featureEnabled(fromFeatures)) return fromFeatures
-  if (featureEnabled(fromPlan)) return fromPlan
-  if (fromFeatures !== undefined && fromFeatures !== null) return fromFeatures
-  return fromPlan
+  if (Object.prototype.hasOwnProperty.call(entitlements.features || {}, key)) {
+    return entitlements.features?.[key]
+  }
+  return entitlements.planFeatures?.[key]
 }
 
 export function isEntitlementFeatureEnabled(
   entitlements: Entitlements | null | undefined,
   key: string
 ): boolean {
-  if (featureEnabled(entitlements?.features?.[key])) return true
-  return featureEnabled(entitlements?.planFeatures?.[key])
+  return featureEnabled(resolveEntitlementFeature(entitlements, key))
 }
 
 /** Plan allows multi-branch on Scale-capable plans. */

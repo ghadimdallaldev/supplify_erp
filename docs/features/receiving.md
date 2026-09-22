@@ -16,6 +16,8 @@ Plan feature key: `receiving_quality` (Silver+ for restaurants).
 8. Suppliers are notified of receiving completion (`RECEIVED_*` status) and of any automatically opened dispute.
 9. **Receiving history** tab lists past reports (not orders without a report).
 
+**Line-item authority:** the server resolves product identity, unit, and expected/actual unit pricing from the persisted order item. Web and mobile may submit received quantity, quality, notes, and lot data, but cannot override ordered product or financial facts.
+
 Deep link: `/app/receiving?order={orderId}` opens the receive dialog when the order is in the pending list.
 
 ## API

@@ -864,7 +864,7 @@ describe('delivery-routes.service', () => {
       expect(result.status).toBe('IN_PROGRESS')
     })
 
-    it('rejects invalid assignment transitions before mutating the stop', async () => {
+    it('rejects invalid route-stop transitions before mutating the stop', async () => {
       const { updateRouteStop } = await import('./delivery-routes.service.js')
 
       listActiveDriverAssignmentsMock.mockResolvedValueOnce([
@@ -884,7 +884,7 @@ describe('delivery-routes.service', () => {
 
       await expect(
         updateRouteStop('s1', routeId, stopId, { status: 'DELIVERED', userId: 'u1' })
-      ).rejects.toThrow(/Cannot transition from assigned to delivered/)
+      ).rejects.toThrow(/Cannot transition stop from PLANNED to COMPLETED/)
 
       expect(updateDeliveryStatusMock).not.toHaveBeenCalled()
       expect(committedOps).toHaveLength(0)

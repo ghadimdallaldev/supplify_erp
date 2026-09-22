@@ -135,7 +135,7 @@ flowchart TB
 | ------------ | ------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **API**      | `apps/api`                                                          | 554 HTTP routes, RBAC, subscriptions, business logic, cron     |
 | **Web**      | `apps/web`                                                          | 80 frontend routes (`apps/web/src/App.tsx`), React SPA         |
-| **Database** | `apps/api/db/migrations`                                            | 203 SQL migrations, schema evolution since `0000`              |
+| **Database** | `apps/api/db/migrations`                                            | 215 SQL migrations, schema evolution since `0000`              |
 | **Tests**    | `apps/api/**/*.test.js`, `apps/web/**/*.test.{ts,tsx}`, `tests/e2e` | 213 API test files, 309 web test files (per bootstrap metrics) |
 
 ### Technology stack
@@ -146,13 +146,14 @@ The monorepo uses **pnpm workspaces** with a Node.js/Express API and a Vite-powe
 
 Public self-serve plans are **tenant-specific**. Canonical commercial doc: [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
 
-| Tenant     | Public name       | Internal code | Monthly (USD) | Positioning                                           |
-| ---------- | ----------------- | ------------- | ------------: | ----------------------------------------------------- |
-| Restaurant | Restaurant Growth | `silver`      |           $49 | Single-branch purchasing & ops                        |
-| Restaurant | Restaurant Scale  | `gold`        |          $149 | Multi-branch (3) + advanced ops / AI                  |
-| Supplier   | Supplier Growth   | `gold`        |          $149 | 50 active customer locations / month                  |
-| Supplier   | Supplier Scale    | `platinum`    |          $349 | 200 active customer locations + multi-warehouse depth |
-| Both       | 30-day Free Trial | `free`        |            $0 | Time-limited; trial target plan features              |
+| Tenant     | Public name             | Internal code | Monthly (USD) | Positioning                                           |
+| ---------- | ----------------------- | ------------- | ------------: | ----------------------------------------------------- |
+| Restaurant | Restaurant Growth       | `silver`      |           $49 | Single-branch purchasing & ops                        |
+| Restaurant | Restaurant Intelligence | `gold`        |          $149 | Deterministic operations intelligence                 |
+| Restaurant | Restaurant Scale        | `platinum`    |          $349 | Multi-branch insight + read-only AI assistant         |
+| Supplier   | Supplier Growth         | `gold`        |          $149 | 50 active customer locations / month                  |
+| Supplier   | Supplier Scale          | `platinum`    |          $349 | 200 active customer locations + multi-warehouse depth |
+| Both       | 30-day Free Trial       | `free`        |            $0 | Time-limited; trial target plan features              |
 
 Custom / `enterprise` rows are **hidden from self-serve**. Legacy `bronze` input maps to `silver`.
 
@@ -187,7 +188,7 @@ These figures are generated from repository artifacts and should be re-verified 
 | ---------------------------- | ----: | -------------------------------------------------- |
 | **API routes**               |   554 | `docs/audits/route-inventory.json` (`count` field) |
 | **Frontend routes**          |    80 | `apps/web/src/App.tsx` route definitions           |
-| **SQL migrations**           |   203 | `apps/api/db/migrations/*.sql`                     |
+| **SQL migrations**           |   215 | `apps/api/db/migrations/*.sql`                     |
 | **API test files**           |   213 | `apps/api/**/*.test.js`                            |
 | **Web test files**           |   309 | `apps/web/**/*.test.{ts,tsx,jsx}`                  |
 | **Plan tiers (active)**      |     4 | `free`, `silver`, `gold`, `platinum`               |
@@ -262,7 +263,7 @@ The **supplier growth program** (migration `0169`) turns suppliers into acquisit
 
 ### For operations
 
-A **single PostgreSQL schema** with 203 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
+A **single PostgreSQL schema** with 215 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
 
 ### For engineering
 

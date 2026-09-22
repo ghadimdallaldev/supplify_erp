@@ -111,19 +111,44 @@ describe('BranchContext multi_branch gating', () => {
     expect(screen.getAllByTestId('account-count').at(-1)?.textContent).toBe('2')
   })
 
-  it('enables org scope for Platinum (central_purchasing string on planFeatures)', () => {
+  it('does not let raw planFeatures re-enable a disabled multi_branch', () => {
+    // `features` is the resolved map: an admin override or global kill-switch
+    // that turns multi_branch off must not be undone by the plan JSON.
     mockEntitlements.mockReturnValue(
       baseEntitlements({
         plan: {
           id: 'p1',
-          name: 'Platinum',
+          name: 'Restaurant Scale',
           code: 'platinum',
           tenant_type: 'RESTAURANT',
           price_monthly: 349,
           price_yearly: null,
         },
         features: { multi_branch: false },
-        planFeatures: { multi_branch: 'central_purchasing' },
+        planFeatures: { multi_branch: true },
+      })
+    )
+    renderWithProviders(
+      <BranchProvider>
+        <OrgScopeProbe />
+      </BranchProvider>
+    )
+    expect(screen.getAllByTestId('org-scope').at(-1)?.textContent).toBe('false')
+  })
+
+  it('enables org scope for Restaurant Scale from planFeatures when unresolved', () => {
+    mockEntitlements.mockReturnValue(
+      baseEntitlements({
+        plan: {
+          id: 'p1',
+          name: 'Restaurant Scale',
+          code: 'platinum',
+          tenant_type: 'RESTAURANT',
+          price_monthly: 349,
+          price_yearly: null,
+        },
+        features: {},
+        planFeatures: { multi_branch: true },
       })
     )
     renderWithProviders(

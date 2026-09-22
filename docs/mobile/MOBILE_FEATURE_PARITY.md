@@ -1012,3 +1012,13 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Supplier product categories**: `product_category` now supports supplier-owned categories and the catalog category contract includes `supplier_id`. Android and iOS now include the matching `ProductCategory` type plus category list/create/delete React Query clients; their existing supplier catalog screen continues to direct full catalog management to the web workspace.
 - **Email links**: Server-side email HTML now converts app-relative `href` values into absolute `WEB_ORIGIN` URLs. This changes no mobile API, auth, notification payload, or deep-link contract.
 - **Parity decision**: Web has the native category-management UI. Android and iOS have synchronized API/types so a native product-creation flow can use supplier categories when it is introduced; current mobile catalog management remains web-linked by design.
+
+## 2026-09-22 - Final intelligence entitlement and fulfillment integrity
+
+- Android (`supplify-mobile`) and iOS (`supplify-mobile-ios`) now resolve explicitly false, empty, and zero feature values as disabled, matching API entitlement semantics.
+- Restaurant and supplier Assistant screens use the new `ai_assistant` entitlement. It remains unavailable for Restaurant Growth, Restaurant Intelligence, and Supplier Growth by default.
+- Driver Assistant routes and entry points were removed from both mobile clients. Drivers retain guided delivery, proof-of-delivery, route, and status tools.
+- Receiving, inventory, invoice, route, and driver API changes remain contract-compatible with existing mobile flows; authoritative server validation supplies the corrected outcomes.
+- The shared code changes are in the two sibling repositories; no new mobile environment variable is required.
+- **Correction applied the same day**: the first pass of `isEntitlementEnabled` treated any non-empty string as enabled, so the plan values `'false'` and `'disabled'` would have read as **on** for mobile, and numeric values were not handled. Both repos now mirror the API's `evaluatePlanFeatureValue` exactly (absent = disabled, `'false'`/`'disabled'`/`''` = disabled, otherwise truthy). Parity tests added in `src/hooks/useEntitlements.test.ts` in both repos; `npx tsc --noEmit` passes in both.
+- **Intelligence tier**: `intelligence` is a tiered value (`basic` / `advanced` / `scale`), not a boolean. Mobile reads it through the same `isEntitlementEnabled` helper, so a missing key fails closed. No mobile surface consumes the tier yet — deterministic intelligence screens are still web-only and will be logged here when added.

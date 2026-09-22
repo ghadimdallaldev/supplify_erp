@@ -2,6 +2,14 @@
 
 Conversational, **read-only** chatbot for restaurant, supplier, driver, and platform-admin users. Separate from human B2B Chat (`/app/chat`) and from Smart Reorder’s `explain` / `ask` / `ai-recommend` endpoints.
 
+## Current entitlement policy (2026-09-22)
+
+- The released conversational assistant is read-only and available only to Restaurant Scale, Supplier Scale, and platform admins with `ADMIN_ACCESS`.
+- Tenant access requires `ai_assistant`; it is not granted by `ai_platform`. The latter remains the LLM gate for Smart Reorder.
+- Drivers are denied assistant endpoints and use the existing guided delivery screens and status actions instead.
+- Android and iOS gate restaurant and supplier assistant screens on `ai_assistant`; driver navigation intentionally has no assistant entry.
+- The tool table below describes permitted read-only data domains. Driver-only tools are not exposed while the driver conversational surface is disabled.
+
 ## Behaviour
 
 Users ask natural-language questions (e.g. “how many tomato kilos do we still have?”). The API:
@@ -14,42 +22,42 @@ Users ask natural-language questions (e.g. “how many tomato kilos do we still 
 
 **Have vs need**
 
-| Question | Tool / source |
-| --- | --- |
+| Question                   | Tool / source                                                      |
+| -------------------------- | ------------------------------------------------------------------ |
 | How much do we still have? | `get_inventory` → `restaurant_inventory.quantity` + `product.unit` |
-| How much do we need? | `get_reorder_need` → `getReorderAssistance` suggested buy qty |
-| Recipes | Costing / ingredients only — not stock need |
+| How much do we need?       | `get_reorder_need` → `getReorderAssistance` suggested buy qty      |
+| Recipes                    | Costing / ingredients only — not stock need                        |
 
 ## API
 
 Mounted at `/api/assistant` (send rate limiter).
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/capabilities` | `{ enabled, quotaRemaining, tools[] }` |
-| GET | `/conversations` | Current user + tenant only |
-| POST | `/conversations` | Optional `{ title }` |
-| GET | `/conversations/:id/messages` | User/assistant messages |
-| POST | `/messages` | `{ conversationId?, message }` → `{ conversationId, reply, sources[], usedLlm, quota }` |
+| Method | Path                          | Notes                                                                                   |
+| ------ | ----------------------------- | --------------------------------------------------------------------------------------- |
+| GET    | `/capabilities`               | `{ enabled, quotaRemaining, tools[] }`                                                  |
+| GET    | `/conversations`              | Current user + tenant only                                                              |
+| POST   | `/conversations`              | Optional `{ title }`                                                                    |
+| GET    | `/conversations/:id/messages` | User/assistant messages                                                                 |
+| POST   | `/messages`                   | `{ conversationId?, message }` → `{ conversationId, reply, sources[], usedLlm, quota }` |
 
 Middleware: `requireAuth` → `resolveTenantContext` → `resolveAdminContext` (admins). Domain permissions are enforced **inside each tool**.
 
 ## Tools
 
-| Tool | Who | Gates |
-| --- | --- | --- |
-| `get_inventory` | Restaurant | `INVENTORY_VIEW`, `inventory_management` |
-| `get_reorder_need` | Restaurant | `INVENTORY_VIEW`, `smart_reorder` |
-| `get_orders` / `get_order` | Restaurant, supplier | `ORDERS_VIEW` |
-| `get_deliveries` | Restaurant, supplier, driver | `ORDERS_VIEW` or `DRIVER_DELIVERIES_VIEW` |
-| `get_invoices` | Restaurant, supplier | `INVOICES_VIEW`, `finance_invoices` |
-| `get_recipes` | Restaurant | `RECIPES_VIEW`, `recipe_costing` (costs need `RECIPES_VIEW_COSTS`) |
-| `get_waste` | Restaurant | `waste_tracking` + `reports` |
-| `get_reports` | Restaurant, supplier | `ORDERS_VIEW`, `reports` |
-| `get_fulfillment_board` | Supplier | `FULFILLMENT_VIEW`, `fulfillment_tools` |
-| `get_warehouse_stock` | Supplier | `INVENTORY_VIEW`, `inventory_management` |
-| `get_my_stops` | Driver | `DRIVER_DELIVERIES_VIEW` + linked driver profile |
-| `get_admin_overview` | Admin (not impersonating) | `ADMIN_ACCESS` |
+| Tool                       | Who                          | Gates                                                              |
+| -------------------------- | ---------------------------- | ------------------------------------------------------------------ |
+| `get_inventory`            | Restaurant                   | `INVENTORY_VIEW`, `inventory_management`                           |
+| `get_reorder_need`         | Restaurant                   | `INVENTORY_VIEW`, `smart_reorder`                                  |
+| `get_orders` / `get_order` | Restaurant, supplier         | `ORDERS_VIEW`                                                      |
+| `get_deliveries`           | Restaurant, supplier, driver | `ORDERS_VIEW` or `DRIVER_DELIVERIES_VIEW`                          |
+| `get_invoices`             | Restaurant, supplier         | `INVOICES_VIEW`, `finance_invoices`                                |
+| `get_recipes`              | Restaurant                   | `RECIPES_VIEW`, `recipe_costing` (costs need `RECIPES_VIEW_COSTS`) |
+| `get_waste`                | Restaurant                   | `waste_tracking` + `reports`                                       |
+| `get_reports`              | Restaurant, supplier         | `ORDERS_VIEW`, `reports`                                           |
+| `get_fulfillment_board`    | Supplier                     | `FULFILLMENT_VIEW`, `fulfillment_tools`                            |
+| `get_warehouse_stock`      | Supplier                     | `INVENTORY_VIEW`, `inventory_management`                           |
+| `get_my_stops`             | Driver                       | `DRIVER_DELIVERIES_VIEW` + linked driver profile                   |
+| `get_admin_overview`       | Admin (not impersonating)    | `ADMIN_ACCESS`                                                     |
 
 ## Storage
 

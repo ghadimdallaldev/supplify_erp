@@ -21,7 +21,7 @@ vi.mock('../../hooks/useImpersonation', () => ({
 
 vi.mock('../../services/api', () => ({
   useGetEntitlementsQuery: () => ({
-    data: { features: { ai_platform: true } },
+    data: { features: { ai_assistant: true } },
   }),
   useGetAssistantCapabilitiesQuery: () => ({
     data: { enabled: true, tools: ['get_inventory'], quotaRemaining: 5 },
@@ -49,7 +49,7 @@ function renderWithAuth(role = 'RESTAURANT') {
 }
 
 describe('AssistantFab', () => {
-  it('renders FAB when ai_platform is enabled', () => {
+  it('renders FAB when ai_assistant is enabled', () => {
     renderWithAuth()
     expect(screen.getByTestId('assistant-fab')).toBeInTheDocument()
   })

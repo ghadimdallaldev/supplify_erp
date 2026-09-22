@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => {
     buildRoute: vi.fn(noop),
     presignPod: vi.fn(noop),
     submitPod: vi.fn(noop),
+    completeDelivery: vi.fn(noop),
     refetch: vi.fn(),
     refetchRoute: vi.fn(),
     boardState: { deliveryStatus: 'assigned' as string },
@@ -84,6 +85,7 @@ vi.mock('../services/api', () => {
     useSendDriverLocationMutation: () => mocks.stableTuple(mocks.sendLocation),
     usePresignOrderProofOfDeliveryMutation: () => mocks.stableTuple(mocks.presignPod),
     useSubmitOrderProofOfDeliveryMutation: () => mocks.stableTuple(mocks.submitPod),
+    useCompleteOrderDeliveryMutation: () => mocks.stableTuple(mocks.completeDelivery),
   }
 })
 

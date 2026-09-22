@@ -7,7 +7,7 @@ import {
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
@@ -526,57 +526,61 @@ router.post(
         await checkProductOwnership(productId, supplierId)
       }
 
-      // Start transaction
-      await query('BEGIN')
+      // Get current inventory
+      const { rows: inventory } = await query('SELECT * FROM inventory WHERE product_id = $1', [
+        productId,
+      ])
 
-      try {
-        // Get current inventory
-        const { rows: inventory } = await query('SELECT * FROM inventory WHERE product_id = $1', [
+      if (inventory.length === 0) {
+        throw new NotFoundError('Inventory not found for this product')
+      }
+
+      if (!supplierId) {
+        const { rows: productRows } = await query(`SELECT supplier_id FROM product WHERE id = $1`, [
           productId,
         ])
-
-        if (inventory.length === 0) {
-          throw new NotFoundError('Inventory not found for this product')
-        }
-
-        if (!supplierId) {
-          const { rows: productRows } = await query(
-            `SELECT supplier_id FROM product WHERE id = $1`,
-            [productId]
-          )
-          supplierId = productRows[0]?.supplier_id || null
-        }
-
-        const currentQty = parseFloat(inventory[0].available_qty)
-        const adjustment =
-          adjustmentData.adjustmentType === 'IN'
-            ? adjustmentData.quantity
-            : -adjustmentData.quantity
-        const newQty = Math.max(0, currentQty + adjustment)
-
-        // Update inventory
-        const { rows: updatedInventory } = await query(
-          `
-        UPDATE inventory 
-        SET available_qty = $1, updated_at = now()
-        WHERE product_id = $2
-        RETURNING *
-      `,
-          [newQty, productId]
+        supplierId = productRows[0]?.supplier_id || null
+      }
+      if (adjustmentData.warehouseId && supplierId) {
+        const supplierColumn = await getWarehouseSupplierColumn()
+        const { rows: warehouseRows } = await query(
+          `SELECT id FROM warehouse WHERE id = $1 AND ${supplierColumn} = $2`,
+          [adjustmentData.warehouseId, supplierId]
         )
+        if (!warehouseRows.length) {
+          throw new ValidationError('Warehouse not found for this supplier')
+        }
+      }
+
+      const currentQty = Number(inventory[0].available_qty)
+
+      // Stock move, warehouse mirror, and the audit row are one business action:
+      // a failure after the quantity change would leave stock moved with no
+      // adjustment record and a stale mirror. The conditional UPDATE also keeps
+      // the decrement safe under concurrency instead of clamping at zero.
+      const { updatedInventory, adjustmentRecord } = await withTransaction(async (client) => {
+        const { rows: updatedRows } = await client.query(
+          `UPDATE inventory
+             SET available_qty = available_qty + CASE WHEN $1 = 'IN' THEN $2 ELSE -$2 END,
+                 updated_at = now()
+             WHERE product_id = $3
+               AND ($1 = 'IN' OR available_qty >= $2)
+             RETURNING *`,
+          [adjustmentData.adjustmentType, adjustmentData.quantity, productId]
+        )
+        if (!updatedRows.length) throw new ValidationError('Insufficient available inventory')
 
         if (supplierId) {
-          await syncWarehouseMirrorFromLegacy(query, {
+          await syncWarehouseMirrorFromLegacy(client, {
             supplierId,
             productId,
-            availableQty: newQty,
-            reservedQty: updatedInventory[0]?.reserved_qty || 0,
+            availableQty: Number(updatedRows[0].available_qty),
+            reservedQty: updatedRows[0]?.reserved_qty || 0,
             warehouseId: adjustmentData.warehouseId || null,
           })
         }
 
-        // Create adjustment record
-        const { rows: adjustmentRecord } = await query(
+        const { rows: adjustmentRows } = await client.query(
           `
         INSERT INTO inventory_adjustment (
           product_id, warehouse_id, adjustment_type, quantity, reason, notes, actor_sub
@@ -594,67 +598,66 @@ router.post(
           ]
         )
 
-        // Check and create low stock alert
-        const { rows: settings } = await query(
-          'SELECT low_stock_threshold FROM product_inventory_settings WHERE product_id = $1',
-          [productId]
-        )
+        return { updatedInventory: updatedRows, adjustmentRecord: adjustmentRows }
+      })
 
-        const threshold = settings[0]?.low_stock_threshold ?? DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD
-        if (computeSupplierStockFlags(newQty, threshold).isLowStock) {
-          await query(
-            `
+      const newQty = Number(updatedInventory[0].available_qty)
+
+      // Check and create low stock alert
+      const { rows: settings } = await query(
+        'SELECT low_stock_threshold FROM product_inventory_settings WHERE product_id = $1',
+        [productId]
+      )
+
+      const threshold = settings[0]?.low_stock_threshold ?? DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD
+      if (computeSupplierStockFlags(newQty, threshold).isLowStock) {
+        await query(
+          `
           INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
           VALUES ($1, $2, 'LOW_STOCK', $3, $4)
           ON CONFLICT DO NOTHING
         `,
-            [productId, adjustmentData.warehouseId || null, threshold, newQty]
-          )
-          const { rows: productNameRow } = await query('SELECT name FROM product WHERE id = $1', [
-            productId,
-          ])
-          const productName = productNameRow[0]?.name || null
-          notifySupplierLowStock({
-            productId,
-            warehouseId: adjustmentData.warehouseId || null,
-            productName,
-            threshold,
-            currentValue: newQty,
-          }).catch((err) => logger.warn('Low-stock notification failed', { err: err.message }))
-        }
-
-        if (newQty <= 0 && currentQty > 0) {
-          const { rows: pRow } = await query('SELECT name FROM product WHERE id = $1', [productId])
-          notifyOutOfStock({
-            productId,
-            warehouseId: adjustmentData.warehouseId || null,
-            productName: pRow[0]?.name || null,
-          }).catch((err) => logger.warn('Out-of-stock notification failed', { err: err.message }))
-        }
-
-        await query('COMMIT')
-
-        logger.info('Inventory adjustment created', {
+          [productId, adjustmentData.warehouseId || null, threshold, newQty]
+        )
+        const { rows: productNameRow } = await query('SELECT name FROM product WHERE id = $1', [
           productId,
-          adjustmentType: adjustmentData.adjustmentType,
-          quantity: adjustmentData.quantity,
-          newQty,
-          actor: req.userData.id,
-        })
-
-        res.status(201).json({
-          ok: true,
-          data: {
-            inventory: updatedInventory[0],
-            adjustment: adjustmentRecord[0],
-          },
-          error: null,
-          requestId: req.requestId,
-        })
-      } catch (error) {
-        await query('ROLLBACK')
-        throw error
+        ])
+        const productName = productNameRow[0]?.name || null
+        notifySupplierLowStock({
+          productId,
+          warehouseId: adjustmentData.warehouseId || null,
+          productName,
+          threshold,
+          currentValue: newQty,
+        }).catch((err) => logger.warn('Low-stock notification failed', { err: err.message }))
       }
+
+      if (newQty <= 0 && currentQty > 0) {
+        const { rows: pRow } = await query('SELECT name FROM product WHERE id = $1', [productId])
+        notifyOutOfStock({
+          productId,
+          warehouseId: adjustmentData.warehouseId || null,
+          productName: pRow[0]?.name || null,
+        }).catch((err) => logger.warn('Out-of-stock notification failed', { err: err.message }))
+      }
+
+      logger.info('Inventory adjustment created', {
+        productId,
+        adjustmentType: adjustmentData.adjustmentType,
+        quantity: adjustmentData.quantity,
+        newQty,
+        actor: req.userData.id,
+      })
+
+      res.status(201).json({
+        ok: true,
+        data: {
+          inventory: updatedInventory[0],
+          adjustment: adjustmentRecord[0],
+        },
+        error: null,
+        requestId: req.requestId,
+      })
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -664,6 +667,17 @@ router.post(
             name: 'VALIDATION_ERROR',
             message: 'Invalid adjustment data',
             details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        return res.status(error instanceof NotFoundError ? 404 : 400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: error instanceof NotFoundError ? 'NOT_FOUND' : 'VALIDATION_ERROR',
+            message: error.message,
           },
           requestId: req.requestId,
         })

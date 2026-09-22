@@ -65,7 +65,8 @@ The admin console has its own shell (see `docs/ui/ADMIN_SHELL_REVAMP.md`):
 Shows the active tenant-specific commercial catalog:
 
 - Restaurant Growth (`silver`, RESTAURANT, $49/mo, $490/yr)
-- Restaurant Scale (`gold`, RESTAURANT, $149/mo, $1,490/yr)
+- Restaurant Intelligence (`gold`, RESTAURANT, $149/mo, $1,490/yr)
+- Restaurant Scale (`platinum`, RESTAURANT, $349/mo, $3,490/yr)
 - Supplier Growth (`gold`, SUPPLIER, $149/mo, $1,490/yr)
 - Supplier Scale (`platinum`, SUPPLIER, $349/mo, $3,490/yr)
 

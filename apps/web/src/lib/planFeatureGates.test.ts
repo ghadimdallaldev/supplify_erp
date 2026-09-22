@@ -13,9 +13,19 @@ function ent(partial: Partial<Entitlements>): Entitlements {
 }
 
 describe('planFeatureGates', () => {
-  it('enables reports from planFeatures when features map is off', () => {
+  it('honours an explicitly disabled feature over the raw plan JSON', () => {
+    // `features` is the resolved map (tenant override > global flag > plan JSON).
+    // Letting `planFeatures` win re-enabled features an admin had switched off.
     const e = ent({
       features: { reports: false },
+      planFeatures: { reports: true },
+    })
+    expect(canUseGlobalReports(e)).toBe(false)
+  })
+
+  it('falls back to planFeatures only when the resolved map omits the key', () => {
+    const e = ent({
+      features: {},
       planFeatures: { reports: true },
     })
     expect(canUseGlobalReports(e)).toBe(true)
@@ -29,12 +39,20 @@ describe('planFeatureGates', () => {
     expect(canUseFinanceInvoices(e)).toBe(true)
   })
 
-  it('enables supplier_deals from planFeatures', () => {
+  it('enables supplier_deals from planFeatures when the resolved map omits it', () => {
+    const e = ent({
+      features: {},
+      planFeatures: { supplier_deals: true },
+    })
+    expect(canUseSupplierDeals(e)).toBe(true)
+  })
+
+  it('keeps supplier_deals off when the resolved map disables it', () => {
     const e = ent({
       features: { supplier_deals: false },
       planFeatures: { supplier_deals: true },
     })
-    expect(canUseSupplierDeals(e)).toBe(true)
+    expect(canUseSupplierDeals(e)).toBe(false)
   })
 
   it('gates fulfillment when fulfillment_tools tier string is enabled', () => {

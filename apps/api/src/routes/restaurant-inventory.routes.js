@@ -499,12 +499,17 @@ router.post(
         }
 
         const balanceBefore = Number(inventory[0].quantity)
-        const balanceAfter = Math.max(0, balanceBefore - adjustmentData.quantity)
+        if (adjustmentData.quantity > balanceBefore) {
+          throw new ValidationError(
+            `Adjustment quantity (${adjustmentData.quantity}) exceeds available stock (${balanceBefore})`
+          )
+        }
+        const balanceAfter = balanceBefore - adjustmentData.quantity
         const lowStockThreshold = Number(inventory[0].low_stock_threshold || 0)
 
         // Calculate unit cost and total cost if provided
-        const unitCost = adjustmentData.unitCost || null
-        const totalCost = unitCost ? unitCost * adjustmentData.quantity : null
+        const unitCost = adjustmentData.unitCost ?? null
+        const totalCost = unitCost != null ? unitCost * adjustmentData.quantity : null
 
         // Create adjustment record
         const {
@@ -752,36 +757,17 @@ router.post(
       }
 
       await withTransaction(async (client) => {
-        // Get or create inventory
-        const { rows: inventory } = await client.query(
-          `
-        SELECT quantity FROM restaurant_inventory
-        WHERE restaurant_id = $1 AND product_id = $2
-      `,
-          [restaurantId, productId]
+        const { rows: balances } = await client.query(
+          `INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
+           VALUES ($1, $2, $3, now())
+           ON CONFLICT (restaurant_id, product_id) DO UPDATE
+             SET quantity = restaurant_inventory.quantity + EXCLUDED.quantity,
+                 updated_at = now()
+           RETURNING quantity - $3::numeric AS "balanceBefore", quantity AS "balanceAfter"`,
+          [restaurantId, productId, quantity]
         )
-
-        const balanceBefore = inventory.length > 0 ? Number(inventory[0].quantity) : 0
-        const balanceAfter = balanceBefore + quantity
-
-        if (inventory.length > 0) {
-          await client.query(
-            `
-          UPDATE restaurant_inventory
-          SET quantity = $1, updated_at = now()
-          WHERE restaurant_id = $2 AND product_id = $3
-        `,
-            [balanceAfter, restaurantId, productId]
-          )
-        } else {
-          await client.query(
-            `
-          INSERT INTO restaurant_inventory (restaurant_id, product_id, quantity, updated_at)
-          VALUES ($1, $2, $3, now())
-        `,
-            [restaurantId, productId, quantity]
-          )
-        }
+        const balanceBefore = Number(balances[0]?.balanceBefore ?? 0)
+        const balanceAfter = Number(balances[0]?.balanceAfter ?? quantity)
 
         // Log movement
         await client.query(
@@ -1213,13 +1199,13 @@ router.get(
         COALESCE(SUM(ia.total_cost), 
           SUM(ia.unit_cost * ia.quantity)) as total_waste_cost,
         COALESCE(
-          (SUM(CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.total_cost ELSE 0 END) +
-           SUM(ia.unit_cost * CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.quantity ELSE 0 END)),
+          SUM(CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.total_cost END),
+          SUM(CASE WHEN ia.adjustment_type = 'WASTAGE' THEN ia.unit_cost * ia.quantity END),
           0
         ) as wastage_cost,
         COALESCE(
-          (SUM(CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.total_cost ELSE 0 END) +
-           SUM(ia.unit_cost * CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.quantity ELSE 0 END)),
+          SUM(CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.total_cost END),
+          SUM(CASE WHEN ia.adjustment_type = 'SPOILAGE' THEN ia.unit_cost * ia.quantity END),
           0
         ) as spoilage_cost,
         -- Average waste per incident

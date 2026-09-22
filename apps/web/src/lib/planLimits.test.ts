@@ -108,13 +108,13 @@ describe('quick list scheduling', () => {
     expect(isQuickListSchedulingEnabled(ent)).toBe(false)
   })
 
-  it('enables scheduling when planFeatures has full_schedule but features is false', () => {
+  it('honors an explicit disabled entitlement over a planFeatures fallback', () => {
     const ent = {
       ...baseEntitlements({}, {}),
       features: { quick_lists: false },
       planFeatures: { quick_lists: 'full_schedule' },
     } as Entitlements
-    expect(isQuickListSchedulingEnabled(ent)).toBe(true)
+    expect(isQuickListSchedulingEnabled(ent)).toBe(false)
   })
 
   it('allows one scheduled list on Free', () => {
@@ -202,13 +202,13 @@ describe('featureEnabled / evaluatePlanFeatureValue', () => {
     expect(featureEnabled('disabled')).toBe(false)
   })
 
-  it('isEntitlementFeatureEnabled uses planFeatures when features is false', () => {
+  it('isEntitlementFeatureEnabled honors features when explicitly false', () => {
     const ent = {
       plan: { name: 'Platinum', code: 'platinum' },
       features: { multi_branch: false },
       planFeatures: { multi_branch: 'central_purchasing' },
     } as Entitlements
-    expect(isEntitlementFeatureEnabled(ent, 'multi_branch')).toBe(true)
+    expect(isEntitlementFeatureEnabled(ent, 'multi_branch')).toBe(false)
   })
 })
 
@@ -284,7 +284,7 @@ describe('multi_branch feature gates', () => {
 })
 
 describe('supplier warehouse and multi_warehouse strings', () => {
-  it('enables warehouses for tier string on planFeatures', () => {
+  it('honors a disabled warehouses entitlement over planFeatures', () => {
     const ent = {
       plan: { name: 'Silver', code: 'silver' },
       features: { warehouses: false },
@@ -292,7 +292,7 @@ describe('supplier warehouse and multi_warehouse strings', () => {
       limits: { warehouses: 1 },
       usage: { warehouses: 0 },
     } as Entitlements
-    expect(warehousesFeatureEnabled(ent)).toBe(true)
+    expect(warehousesFeatureEnabled(ent)).toBe(false)
   })
 
   it('enables multi_warehouse for Gold tier string', () => {

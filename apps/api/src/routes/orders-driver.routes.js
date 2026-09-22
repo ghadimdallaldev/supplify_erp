@@ -328,6 +328,14 @@ router.patch(
           requestId: req.requestId,
         })
       }
+      if (error instanceof ForbiddenError) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: error.message || 'Forbidden' },
+          requestId: req.requestId,
+        })
+      }
       logger.error('Update delivery status error:', error)
       res.status(500).json({
         ok: false,

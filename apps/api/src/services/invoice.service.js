@@ -325,6 +325,21 @@ export async function createInvoiceFromReceiving(
 
 export async function createInvoiceManual(client, { invoiceData, supplierId, orderItems, userId }) {
   if (invoiceData.order_id) {
+    const { rows: orders } = await client.query(
+      `SELECT restaurant_id FROM customer_order WHERE id = $1 FOR KEY SHARE`,
+      [invoiceData.order_id]
+    )
+    if (!orders.length || orders[0].restaurant_id !== invoiceData.restaurant_id) {
+      throw new ValidationError('Invoice restaurant must match the selected order')
+    }
+    const { rows: supplierItems } = await client.query(
+      `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+      [invoiceData.order_id, supplierId]
+    )
+    if (!supplierItems.length || !orderItems.length) {
+      throw new ValidationError('The selected order has no invoiceable items for this supplier')
+    }
+
     await assertNoDuplicateInvoice(client, {
       orderId: invoiceData.order_id,
       supplierId,

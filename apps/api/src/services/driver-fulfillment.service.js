@@ -196,7 +196,7 @@ export async function assignDriverToOrder({
   warehouseAssignmentId = null,
   assignAllWarehouseLegs = false,
 }) {
-  const order = await assertSupplierOwnsOrder(supplierId, orderId)
+  await assertSupplierOwnsOrder(supplierId, orderId)
 
   const { rows: drivers } = await query(
     `SELECT id, warehouse_id FROM drivers
@@ -232,6 +232,15 @@ export async function assignDriverToOrder({
   }
 
   const created = await withTransaction(async (client) => {
+    const { rows: lockedOrders } = await client.query(
+      `SELECT id, status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    )
+    if (!lockedOrders.length) {
+      throw new NotFoundError('Order not found')
+    }
+    const lockedOrder = lockedOrders[0]
+
     const results = []
     for (const whAssignmentId of targetWhAssignmentIds) {
       if (whAssignmentId) {
@@ -250,7 +259,7 @@ export async function assignDriverToOrder({
           continue
         }
       } else {
-        const current = await getActiveDriverAssignment(orderId)
+        const current = await getActiveDriverAssignment(orderId, null, { client, forUpdate: true })
         if (current) throw new ValidationError('Order already has an active driver assignment')
       }
 
@@ -269,12 +278,12 @@ export async function assignDriverToOrder({
       throw new ValidationError('All warehouse legs already have active driver assignments')
     }
 
-    if (['PLACED', 'ACKNOWLEDGED'].includes(order.status)) {
+    if (['PLACED', 'ACKNOWLEDGED'].includes(lockedOrder.status)) {
       await client.query(
         `UPDATE customer_order SET status = 'PROCESSING', updated_at = now() WHERE id = $1`,
         [orderId]
       )
-      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'PROCESSING', order.status)
+      await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'PROCESSING', lockedOrder.status)
     }
 
     return results
@@ -488,6 +497,11 @@ async function applyDeliveryStatusUpdate({
       [orderId]
     )
     const oldStatus = orders[0]?.status
+    if (!['PROCESSING', 'SHIPPED'].includes(oldStatus)) {
+      throw new ValidationError(
+        `Cannot dispatch order from ${oldStatus ?? 'unknown'}; order must be processing or shipped`
+      )
+    }
     if (oldStatus === 'PROCESSING') {
       await client.query(
         `UPDATE customer_order SET status = 'SHIPPED', updated_at = now() WHERE id = $1`,

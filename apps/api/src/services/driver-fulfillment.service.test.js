@@ -540,6 +540,9 @@ describe('driver-fulfillment.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 'order-1', status: 'PLACED' }],
+      })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [{ id: 'da-a', order_id: 'order-1', warehouse_assignment_id: 'wh-a' }],

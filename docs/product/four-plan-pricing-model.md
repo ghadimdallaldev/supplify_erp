@@ -2,12 +2,15 @@
 
 Supplify's public commercial model is now:
 
-| Tenant type | Public plan       | Internal code | Monthly | Annual | Primary scale metric                         |
-| ----------- | ----------------- | ------------- | ------: | -----: | -------------------------------------------- |
-| Restaurant  | Restaurant Growth | `silver`      |     $49 |   $490 | 1 active branch                              |
-| Restaurant  | Restaurant Scale  | `gold`        |    $149 | $1,490 | 3 active branches                            |
-| Supplier    | Supplier Growth   | `gold`        |    $149 | $1,490 | 50 active ordering customer locations/month  |
-| Supplier    | Supplier Scale    | `platinum`    |    $349 | $3,490 | 200 active ordering customer locations/month |
+| Tenant type | Public plan             | Internal code | Monthly | Annual | Primary scale metric                         |
+| ----------- | ----------------------- | ------------- | ------: | -----: | -------------------------------------------- |
+| Restaurant  | Restaurant Growth       | `silver`      |     $49 |   $490 | 1 active branch                              |
+| Restaurant  | Restaurant Intelligence | `gold`        |    $149 | $1,490 | 3 active branches                            |
+| Restaurant  | Restaurant Scale        | `platinum`    |    $349 | $3,490 | Multi-branch operations                      |
+| Supplier    | Supplier Growth         | `gold`        |    $149 | $1,490 | 50 active ordering customer locations/month  |
+| Supplier    | Supplier Scale          | `platinum`    |    $349 | $3,490 | 200 active ordering customer locations/month |
+
+The 2026-09-22 entitlement release changes names and feature access only. It does **not** modify checkout, subscription, invoice, fee, or stored price amounts.
 
 The internal codes are deliberately preserved for compatibility with existing subscriptions, feature gates, tier comparisons, audit logs, and billing history. Hidden rows remain in the catalog for legacy/custom handling, but self-serve APIs hide inactive rows and hide the internal `free` row except for tenants currently using a trial.
 
@@ -44,7 +47,7 @@ Self-serve plan APIs return only plans for the current tenant type. Restaurants 
 
 ## Feature And Limit Matrix Summary
 
-Restaurant Growth includes core purchasing, receiving, inventory, finance, supplier deals, basic reports, recipe costing, waste tracking, and AI reorder assistance for one active branch. Restaurant Scale adds multi-location controls, advanced reporting/roles/audit capabilities, integrations where implemented, and higher AI/storage/user limits.
+Restaurant Growth includes core purchasing, receiving, inventory, finance, supplier deals, basic reports, recipe costing, waste tracking, and deterministic reorder assistance for one active branch. Restaurant Intelligence adds deterministic seasonality, cost-impact, waste, expiry, and reorder operational intelligence without conversational AI. Restaurant Scale adds multi-location controls, advanced reporting/roles/audit capabilities, integrations where implemented, and the read-only Supplify Assistant plus its separately gated reorder LLM support.
 
 Supplier Growth includes catalog, customer pricing, incoming order management, fulfillment, basic delivery, finance, disputes, promotions, customer growth, reports, supplier reorder intelligence, and 50 active customer locations/month. Supplier Scale adds multi-location/warehouse fulfillment, route/driver depth, advanced customer intelligence, advanced reports/roles/audit capabilities, integrations where implemented, and 200 active customer locations/month.
 
@@ -64,15 +67,15 @@ Admin plan management should treat restaurant and supplier catalogs separately, 
 
 The migration strategy preserves existing internal codes instead of renaming every subscription row. Public mappings are tenant-aware:
 
-| Legacy/internal code | Restaurant public handling                                  | Supplier public handling                                               |
-| -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `free`               | 30-day trial targeting Restaurant Growth by default         | 30-day trial targeting Supplier Growth by default                      |
-| `silver`             | Restaurant Growth                                           | Supplier Growth compatibility / manual review                          |
-| `gold`               | Restaurant Scale                                            | Supplier Growth by default unless usage requires Supplier Scale review |
-| `platinum`           | Restaurant Custom or Scale with preserved overrides/add-ons | Supplier Scale                                                         |
-| `enterprise`         | Hidden custom/admin handling                                | Hidden custom/admin handling                                           |
+| Legacy/internal code | Restaurant public handling                                                                                                                        | Supplier public handling                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `free`               | 30-day trial targeting Restaurant Growth by default                                                                                               | 30-day trial targeting Supplier Growth by default                      |
+| `silver`             | Restaurant Growth                                                                                                                                 | Supplier Growth compatibility / manual review                          |
+| `gold`               | Restaurant Intelligence                                                                                                                           | Supplier Growth by default unless usage requires Supplier Scale review |
+| `platinum`           | New Restaurant Scale; pre-release active subscriptions move to inactive Restaurant Custom with IDs, dates, overrides, and audit history preserved | Supplier Scale                                                         |
+| `enterprise`         | Hidden custom/admin handling                                                                                                                      | Hidden custom/admin handling                                           |
 
-Migration preview data must show tenant ID, tenant type, current plan, proposed public plan, current usage, target limits, required overrides, preserved active add-ons, preserved active tenant overrides, and conflicts requiring manual review. Active Supplier Silver subscriptions are remapped to Supplier Growth and active Restaurant Platinum subscriptions are remapped to Restaurant Scale with `subscription_change_log` history while preserving subscription IDs and billing dates. Do not log tenant-confidential business details in migration previews.
+Migration `0212_final_intelligence_subscription_matrix.sql` leaves historical Custom and Enterprise records safe and remaps existing active Restaurant Platinum subscriptions to inactive Restaurant Custom with `subscription_change_log` history. It preserves subscription IDs, billing dates, overrides, and amounts. Do not log tenant-confidential business details in migration previews.
 
 ## Launch Recommendation
 
@@ -94,7 +97,9 @@ Supplier `drivers` are a separate plan limit and count active rows in `drivers` 
 
 ## AI allowances
 
-Paid plan LLM calls use the daily `ai_requests_per_day` meter. Restaurant Growth receives 30/day, Restaurant Scale 150/day, Supplier Growth 50/day, and Supplier Scale 300/day.
+Growth and Restaurant Intelligence use deterministic operational intelligence and do not expose conversational AI or reorder LLM calls. Restaurant Scale and Supplier Scale may use LLM functionality only when both `ai_assistant`/`ai_platform` as applicable, the environment, provider credentials, and quota permit it. Existing meter fields and historical subscription limits are not rewritten by this release.
+
+The conversational assistant is an additional Scale entitlement (`ai_assistant`); it is not inferred from `ai_platform`.
 
 Trial subscriptions use a separate total-pool meter, `ai_trial_requests_total`, instead of the normal daily allowance. Restaurant trials receive 50 genuine LLM calls total; supplier trials receive 100 total. Heuristic forecasts, deterministic calculations, cached responses, and failed provider calls that produce no usable AI output are not counted as successful AI usage. When allowance is exhausted, API responses must identify fallback output as heuristic/rule-based and include reset or trial-expiry metadata rather than labeling fallback output as AI.
 

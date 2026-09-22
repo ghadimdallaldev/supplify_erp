@@ -16,6 +16,23 @@ export function hookRecipeCostingAfterReceiving(restaurantId, items = []) {
   void (async () => {
     try {
       if (!restaurantId || !items.length) return
+      const previousPriceByProduct = new Map()
+      for (const item of items) {
+        if (!item.productId || previousPriceByProduct.has(item.productId)) continue
+        const unitPrice = Number(item.unitPrice)
+        if (!Number.isFinite(unitPrice)) continue
+        const { rows: cached } = await query(
+          `SELECT unit_price FROM restaurant_ingredient_costs
+           WHERE restaurant_id = $1 AND product_id = $2
+             AND cost_source = 'LAST_RECEIVED'
+           ORDER BY effective_at DESC LIMIT 1`,
+          [restaurantId, item.productId]
+        )
+        previousPriceByProduct.set(
+          item.productId,
+          cached[0]?.unit_price != null ? Number(cached[0].unit_price) : null
+        )
+      }
       await upsertIngredientCostsFromReceiving(restaurantId, items)
       const seen = new Set()
       for (const item of items) {
@@ -23,16 +40,7 @@ export function hookRecipeCostingAfterReceiving(restaurantId, items = []) {
         seen.add(item.productId)
         const unitPrice = Number(item.unitPrice)
         if (Number.isFinite(unitPrice)) {
-          const { rows: cached } = await query(
-            `
-            SELECT unit_price FROM restaurant_ingredient_costs
-            WHERE restaurant_id = $1 AND product_id = $2
-              AND cost_source = 'LAST_RECEIVED'
-            ORDER BY effective_at DESC LIMIT 1
-            `,
-            [restaurantId, item.productId]
-          )
-          const oldPrice = cached[0]?.unit_price != null ? Number(cached[0].unit_price) : null
+          const oldPrice = previousPriceByProduct.get(item.productId) ?? null
           if (oldPrice == null || Math.abs(oldPrice - unitPrice) > 0.0001) {
             await recordSupplierPriceEvent({
               restaurantId,

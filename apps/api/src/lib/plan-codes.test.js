@@ -13,17 +13,19 @@ describe('plan-codes', () => {
     expect(formatPlanDisplayName('FREE')).toBe('30-day Free Trial')
   })
 
-  it('maps legacy internal tier labels to Growth/Scale labels', () => {
+  it('maps legacy internal tier labels to the launch plan labels', () => {
     expect(formatPlanDisplayName('silver')).toBe('Growth')
     expect(normalizePlanCode('bronze')).toBe('silver')
     expect(formatPlanDisplayName('bronze', 'Bronze')).toBe('Growth')
-    expect(formatPlanDisplayName('gold', 'Gold')).toBe('Scale')
+    expect(formatPlanDisplayName('gold', 'Gold')).toBe('Intelligence')
     expect(formatPlanDisplayName('platinum', 'Platinum')).toBe('Scale')
   })
 
   it('formats tenant-specific public plan names for preserved internal codes', () => {
     expect(formatTenantPlanDisplayName('silver', 'RESTAURANT', 'Silver')).toBe('Restaurant Growth')
-    expect(formatTenantPlanDisplayName('gold', 'RESTAURANT', 'Gold')).toBe('Restaurant Scale')
+    expect(formatTenantPlanDisplayName('gold', 'RESTAURANT', 'Gold')).toBe(
+      'Restaurant Intelligence'
+    )
     expect(formatTenantPlanDisplayName('gold', 'SUPPLIER', 'Gold')).toBe('Supplier Growth')
     expect(formatTenantPlanDisplayName('platinum', 'SUPPLIER', 'Platinum')).toBe('Supplier Scale')
     expect(defaultPaidPlanCodeForTenant('RESTAURANT')).toBe('silver')

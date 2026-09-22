@@ -41,7 +41,7 @@ describe('recipe-recalc-queue background locks', () => {
     expect(scanSql).toContain('sub.tenant_id = d.restaurant_id')
     expect(scanSql).toContain("sub.tenant_type = 'RESTAURANT'")
     expect(scanSql).toContain('sub.account_locked_at IS NULL')
-    expect(result).toEqual({ processed: 0, errors: 0, skippedLocked: 0 })
+    expect(result).toEqual({ processed: 0, errors: 0, skippedLocked: 0, parkedFailures: 0 })
   })
 
   it('keeps dirty rows queued when a restaurant locks after scan', async () => {
@@ -64,7 +64,7 @@ describe('recipe-recalc-queue background locks', () => {
       tenantId: 'rest-locked',
       tenantType: 'RESTAURANT',
     })
-    expect(result).toEqual({ processed: 0, errors: 0, skippedLocked: 1 })
+    expect(result).toEqual({ processed: 0, errors: 0, skippedLocked: 1, parkedFailures: 0 })
     expect(mockPersistRecipeCalculation).not.toHaveBeenCalled()
     expect(mockQuery).toHaveBeenCalledTimes(1)
   })
@@ -83,7 +83,7 @@ describe('recipe-recalc-queue background locks', () => {
     const { processRecipeRecalcQueue } = await import('./recipe-recalc-queue.service.js')
     const result = await processRecipeRecalcQueue()
 
-    expect(result).toEqual({ processed: 1, errors: 0, skippedLocked: 0 })
+    expect(result).toEqual({ processed: 1, errors: 0, skippedLocked: 0, parkedFailures: 0 })
     expect(mockCalculateRecipeCost).toHaveBeenCalledOnce()
     expect(mockPersistRecipeCalculation).toHaveBeenCalledOnce()
     expect(
@@ -91,5 +91,46 @@ describe('recipe-recalc-queue background locks', () => {
         String(call[0]).includes('DELETE FROM recipe_recalc_dirty')
       )
     ).toBe(true)
+  })
+
+  it('skips parked rows so an unfixable scope cannot starve the batch', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] })
+
+    const { processRecipeRecalcQueue } = await import('./recipe-recalc-queue.service.js')
+    await processRecipeRecalcQueue()
+
+    expect(String(mockQuery.mock.calls[0][0])).toContain('d.failed_at IS NULL')
+  })
+
+  it('spends a retry budget instead of dropping or re-running a failing scope forever', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'dirty-1', restaurant_id: 'rest-1', recipe_id: 'recipe-1', reason: 'price_change' },
+        ],
+      })
+      // recalculateRecipe's recipe lookup throws.
+      .mockRejectedValueOnce(new Error('boom'))
+      // The retry-budget UPDATE reports the row is now parked.
+      .mockResolvedValueOnce({ rows: [{ attempts: 5, failed_at: '2026-09-22T00:00:00Z' }] })
+
+    const { processRecipeRecalcQueue } = await import('./recipe-recalc-queue.service.js')
+    const result = await processRecipeRecalcQueue()
+
+    expect(result).toEqual({ processed: 0, errors: 1, skippedLocked: 0, parkedFailures: 1 })
+
+    const budgetCall = mockQuery.mock.calls.find((call) =>
+      String(call[0]).includes('SET attempts = attempts + 1')
+    )
+    expect(budgetCall).toBeDefined()
+    expect(budgetCall[1][0]).toBe('dirty-1')
+    expect(budgetCall[1][1]).toBe('boom')
+
+    // The failing row must never be deleted; that was the silent data loss.
+    expect(
+      mockQuery.mock.calls.some((call) =>
+        String(call[0]).includes('DELETE FROM recipe_recalc_dirty')
+      )
+    ).toBe(false)
   })
 })

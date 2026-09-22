@@ -4,13 +4,15 @@ Supplify's current public commercial model is the four-plan model described in [
 
 ## Public Plans
 
-| Tenant type | Public plan       | Internal code | Monthly | Annual | Primary scale metric                         |
-| ----------- | ----------------- | ------------- | ------: | -----: | -------------------------------------------- |
-| Restaurant  | Restaurant Growth | `silver`      |     $49 |   $490 | 1 active branch                              |
-| Restaurant  | Restaurant Scale  | `gold`        |    $149 | $1,490 | 3 active branches                            |
-| Supplier    | Supplier Growth   | `gold`        |    $149 | $1,490 | 50 active ordering customer locations/month  |
-| Supplier    | Supplier Scale    | `platinum`    |    $349 | $3,490 | 200 active ordering customer locations/month |
+| Tenant type | Public plan             | Internal code | Monthly | Annual | Primary scale metric                         |
+| ----------- | ----------------------- | ------------- | ------: | -----: | -------------------------------------------- |
+| Restaurant  | Restaurant Growth       | `silver`      |     $49 |   $490 | 1 active branch                              |
+| Restaurant  | Restaurant Intelligence | `gold`        |    $149 | $1,490 | 3 active branches                            |
+| Restaurant  | Restaurant Scale        | `platinum`    |    $349 | $3,490 | Multi-branch operations                      |
+| Supplier    | Supplier Growth         | `gold`        |    $149 | $1,490 | 50 active ordering customer locations/month  |
+| Supplier    | Supplier Scale          | `platinum`    |    $349 | $3,490 | 200 active ordering customer locations/month |
 
+This entitlement-only release does not change amounts, fees, checkout, invoice, or payment behavior. See the canonical matrix and compatibility notes in [four-plan-pricing-model.md](./four-plan-pricing-model.md).
 Internal codes are preserved for compatibility. Public UI and product copy should use tenant-specific names, not legacy tier labels.
 
 ## Trial

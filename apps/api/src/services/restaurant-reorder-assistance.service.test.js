@@ -161,4 +161,65 @@ describe('restaurant-reorder-assistance.service', () => {
     const result = await getReorderAssistance('r1')
     expect(result.suggestions.find((s) => s.productId === 'p1')).toBeUndefined()
   })
+
+  it('keeps expiry items in the suppression-filtered suggestion list', async () => {
+    // Regression: expiry lots were briefly returned in a separate `expiryAlerts`
+    // field, which skipped suppression entirely (a snoozed expiry alert came
+    // straight back) and dropped them from the panel that reads `suggestions`.
+    const queryMock = vi.fn(async (sql) => {
+      const s = String(sql)
+      if (s.includes('reorder_suggestion_suppression')) {
+        return {
+          rows: [
+            {
+              scope_type: 'product',
+              scope_id: 'p-suppressed',
+              action: 'snooze',
+              snooze_until: null,
+            },
+          ],
+        }
+      }
+      return { rows: [] }
+    })
+
+    vi.doMock('../lib/db.js', () => ({ query: queryMock }))
+    vi.doMock('./reorder-cadence.service.js', () => ({
+      listRestaurantReminders: vi.fn(async () => []),
+    }))
+    vi.doMock('./inventory-expiry.service.js', () => ({
+      listExpiryLots: vi.fn(async () => ({
+        lots: [
+          {
+            id: 'lot-1',
+            productId: 'p-visible',
+            productName: 'Yoghurt',
+            status: 'expiring_soon',
+            quantity: 4,
+            expiryDate: '2026-10-01',
+          },
+          {
+            id: 'lot-2',
+            productId: 'p-suppressed',
+            productName: 'Cream',
+            status: 'expired',
+            quantity: 2,
+            expiryDate: '2026-09-01',
+          },
+        ],
+      })),
+    }))
+    vi.doMock('./reorder-forecast-cache.service.js', () => ({
+      refreshIfStale: vi.fn(async () => ({ refreshed: false })),
+      getCachedForecasts: vi.fn(async () => []),
+    }))
+
+    const { getReorderAssistance } = await import('./restaurant-reorder-assistance.service.js')
+    const result = await getReorderAssistance('r1')
+
+    expect(result.suggestions.find((s) => s.productId === 'p-visible')).toBeDefined()
+    expect(result.suggestions.find((s) => s.productId === 'p-suppressed')).toBeUndefined()
+    // No parallel un-suppressed channel for the same data.
+    expect(result.expiryAlerts).toBeUndefined()
+  })
 })

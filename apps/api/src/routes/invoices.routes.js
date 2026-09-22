@@ -263,6 +263,14 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
     let orderItems = []
     if (invoiceData.order_id) {
+      const { rows: orders } = await query(
+        `SELECT restaurant_id FROM customer_order WHERE id = $1`,
+        [invoiceData.order_id]
+      )
+      if (!orders.length || orders[0].restaurant_id !== invoiceData.restaurant_id) {
+        throw new ValidationError('Invoice restaurant must match the selected order')
+      }
+
       const { rows: items } = await query(
         `
         SELECT oi.*, p.name as product_name, p.sku
@@ -273,6 +281,9 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         [invoiceData.order_id, supplierId]
       )
       orderItems = items
+      if (!items.length) {
+        throw new ValidationError('The selected order has no invoiceable items for this supplier')
+      }
     }
 
     const invoice = await withTransaction((client) =>

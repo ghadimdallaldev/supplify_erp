@@ -8,6 +8,7 @@ import {
   rolesIncludeOwner,
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
+import { hasPermission } from '../lib/permissions.js'
 import {
   getAssistantCapabilities,
   buildAssistantContext,
@@ -41,7 +42,7 @@ function assistantAccessGuard(req, res, next) {
 }
 
 const assistantFeatureGate = requireFeature(
-  'ai_platform',
+  'ai_assistant',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -54,6 +55,32 @@ router.use((req, res, next) => {
   }
   return next()
 })
+router.use((req, res, next) => {
+  if (req.userData?.role !== 'ADMIN' && !req.adminContext) return next()
+  if (hasPermission(req.adminContext?.permissions || [], 'ADMIN_ACCESS')) return next()
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: {
+      name: 'FORBIDDEN',
+      message: 'Administrator access is required to use the assistant',
+    },
+    requestId: req.requestId,
+  })
+})
+router.use((req, res, next) => {
+  if (req.userData?.role !== 'DRIVER') return next()
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: {
+      name: 'FORBIDDEN',
+      message: 'Drivers use guided delivery tools instead of the conversational assistant',
+    },
+    requestId: req.requestId,
+  })
+})
+
 router.use((req, res, next) => {
   if (req.userData?.role === 'ADMIN' || req.adminContext) return next()
   return assistantFeatureGate(req, res, next)

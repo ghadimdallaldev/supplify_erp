@@ -36,6 +36,8 @@ const API_RESTAURANT_FEATURES = [
   'waitlist_auto_promo',
   'supplier_deals',
   'ai_platform',
+  'intelligence',
+  'ai_assistant',
 ] as const
 
 const API_RESTAURANT_LIMITS = [
@@ -66,12 +68,17 @@ describe('planComparison', () => {
     expect(getPlanSubtitle('silver')).toBe('For growing ops')
     expect(getPlanSubtitle('gold', 'Supplier Growth')).toBe('For growing ops')
     expect(getPlanSubtitle('platinum', 'Supplier Scale')).toBe('For multi-site volume')
-    expect(getPlanSubtitle('gold', 'Restaurant Scale')).toBe('For multi-site volume')
+    expect(getPlanSubtitle('gold', 'Restaurant Intelligence')).toBe('For data-informed operations')
+    expect(getPlanSubtitle('platinum', 'Restaurant Scale')).toBe('For multi-site volume')
   })
 
   it('formats free as a 30-day trial, not a permanent free plan', () => {
     expect(formatPlanDisplayName('free')).toBe('30-day Free Trial')
     expect(formatPlanDisplayName('free', 'Free')).toBe('30-day Free Trial')
+  })
+
+  it('formats gold as Intelligence when a legacy display name is supplied', () => {
+    expect(formatPlanDisplayName('gold', 'Gold')).toBe('Intelligence')
   })
 
   it('surfaces active customer locations as the primary supplier scale meter', () => {

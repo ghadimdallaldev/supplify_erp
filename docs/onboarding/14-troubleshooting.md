@@ -378,7 +378,7 @@ redis-cli -u $REDIS_URL ping
 - Partial failed migration
 - Skipped migration file
 - Wrong Postgres port (`5432` vs `5433` docker)
-- 175 migrations not all applied
+- 215 migrations not all applied
 
 ### Diagnose
 

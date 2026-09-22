@@ -72,7 +72,10 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 ## Canonical feature keys
 
-**RESTAURANT** (27 keys): chat, order_calendar, reports, smart_reorder, **ai_platform**, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals, **recipe_costing**, **fulfillment_tools**, supplier_deals_redeem
+**RESTAURANT** (29 keys): chat, order_calendar, reports, smart_reorder, multi_branch, receiving_quality, disputes_returns, finance_invoices, quick_lists, inventory_management, recipe_costing, waste_tracking, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, supplier_reviews, push_notifications, order_amendments, tenant_audit_log, waitlist_auto_promo, supplier_deals, supplier_deals_redeem, fulfillment_tools, **intelligence**, **ai_assistant**, **ai_platform**
+
+**Current entitlement split (2026-09-22):** `intelligence` gates deterministic operational intelligence. `ai_assistant` gates the read-only conversational assistant and is enabled only for Restaurant Scale and Supplier Scale by default.
+`ai_platform` gates only Smart Reorder LLM assistance; it does not grant the assistant. Both keys still require the normal environment, provider, quota, and override checks.
 
 `ai_platform` enables genuine LLM for **Supplify Assistant** (`/api/assistant`) and Smart Reorder **explain / ask / ai-recommend** when `AI_ENABLED`, provider credentials, and AI quota are available. Forecast and heuristic paths never consume quota. Growth/Scale defaults come from tenant-specific plan feature JSON; the internal trial/free row follows `trial_target_plan_id` and the trial AI pool. Display name: **AI platform (assistant + reorder LLM)**.
 
@@ -84,7 +87,7 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 **Removed:** `approvals_budgets` (not shown in admin UI)
 
-**SUPPLIER** (26 keys): chat, order_calendar, reports, multi_branch, warehouses, multi_warehouse, fulfillment_tools, fulfillment, driver_management, disputes_returns, quick_lists, inventory_management, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, promotions, push_notifications, order_amendments, tenant_audit_log, **smart_reorder**, **ai_platform**, **finance_invoices**, **supplier_growth**
+**SUPPLIER** (29 keys): chat, order_calendar, reports, smart_reorder, ai_platform, multi_branch, warehouses, multi_warehouse, fulfillment_tools, fulfillment, driver_management, disputes_returns, finance_invoices, quick_lists, inventory_management, advanced_roles, notifications, api_integrations, support_sla, custom_branding, feature_flags_access, promotions, push_notifications, order_amendments, tenant_audit_log, supplier_growth, **intelligence**, **ai_assistant**
 
 `smart_reorder` — reorder-assistance and AI features for supplier inventory.
 

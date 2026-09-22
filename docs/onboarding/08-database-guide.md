@@ -1,6 +1,6 @@
 ﻿# 08 â€” Database Guide
 
-Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`apps/api/db/migrations/`). Schema changes are forward-only; **196 migrations** exist as of migration `0196_public_catalog_product_indexes.sql`. Application code uses the `pg` pool (`apps/api/src/lib/db.js`) with optional statement timeouts and Railway-oriented pool keepalive.
+Supplify uses **PostgreSQL 16** with a **numbered SQL migration** pipeline (`apps/api/db/migrations/`). Schema changes are forward-only; **215 migrations** exist as of migration `0196_public_catalog_product_indexes.sql`. Application code uses the `pg` pool (`apps/api/src/lib/db.js`) with optional statement timeouts and Railway-oriented pool keepalive.
 
 ---
 
@@ -300,7 +300,7 @@ Use `EXPLAIN ANALYZE` on slow list endpoints; check `SLOW_REQUEST_MS` logs for s
 
 | Claim                     | Source                                                                        |
 | ------------------------- | ----------------------------------------------------------------------------- |
-| 196 migrations            | `apps/api/db/migrations/*.sql`                                                |
+| 215 migrations            | `apps/api/db/migrations/*.sql`                                                |
 | Initial schema            | `0001_init.sql`                                                               |
 | `order_status` extensions | `0028`, `0069`, `0110`                                                        |
 | Invoice schema            | `0009_finance_billing.sql`                                                    |

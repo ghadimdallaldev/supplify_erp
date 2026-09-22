@@ -4,7 +4,11 @@ import request from 'supertest'
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, _res, next) => {
-    req.userData = req.userData || { id: 'user-1', role: 'RESTAURANT', preferred_locale: 'en' }
+    req.userData = req.userData || {
+      id: 'user-1',
+      role: req.get('x-test-role') || 'RESTAURANT',
+      preferred_locale: 'en',
+    }
     req.requestId = 'test-req'
     next()
   },
@@ -60,7 +64,10 @@ vi.mock('../services/assistant-chat.service.js', () => ({
 }))
 
 import { assistantRoutes } from './assistant.routes.js'
-import { sendAssistantMessage } from '../services/assistant-chat.service.js'
+import {
+  getAssistantCapabilities,
+  sendAssistantMessage,
+} from '../services/assistant-chat.service.js'
 
 describe('assistant routes', () => {
   let app
@@ -85,6 +92,10 @@ describe('assistant routes', () => {
     expect(res.body.data.tools).toContain('get_inventory')
   })
 
+  it('does not expose conversational assistant endpoints to drivers', async () => {
+    await request(app).get('/api/assistant/capabilities').set('x-test-role', 'DRIVER').expect(403)
+    expect(getAssistantCapabilities).not.toHaveBeenCalled()
+  })
   it('POST /messages validates body and returns reply', async () => {
     const res = await request(app)
       .post('/api/assistant/messages')

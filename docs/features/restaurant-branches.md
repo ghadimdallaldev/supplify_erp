@@ -11,15 +11,15 @@
 
 ## Lifecycle (current)
 
-| Action                             | Status                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------- |
-| Create new Branch Account          | `POST /api/restaurant-org/branches` (transactional roles + limit lock)          |
-| Invite existing standalone account | `branch_account_link_invitations` + public accept                               |
-| Deactivate / reactivate            | Soft `is_branch_active`; blocked by open orders, invoices, staff, CP drafts     |
-| Unlink                             | Detaches org link; billing policy (block OPEN invoices; review prepaid/credits) |
-| Switch                             | Cookie + `userCanAccessTenant` (includes restaurant org roles)                  |
-| Consolidated reporting             | `GET /api/restaurant-org/reports/overview`                                      |
-| Central purchasing                 | Foundation drafts only (`/api/restaurant-org/central-purchasing/*`)             |
+| Action                             | Status                                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Create new Branch Account          | `POST /api/restaurant-org/branches` (transactional roles + limit lock)                              |
+| Invite existing standalone account | `branch_account_link_invitations` + public accept                                                   |
+| Deactivate / reactivate            | Soft `is_branch_active`; blocked by open orders, invoices, staff, CP drafts                         |
+| Unlink                             | Detaches org link; billing policy (block OPEN invoices; review prepaid/credits)                     |
+| Switch                             | Cookie + `userCanAccessTenant` (includes restaurant org roles)                                      |
+| Consolidated reporting             | `GET /api/restaurant-org/reports/overview`                                                          |
+| Central purchasing                 | Explicitly out of scope; all `/api/restaurant-org/central-purchasing/*` endpoints return `410 GONE` |
 
 ## Org-level roles
 

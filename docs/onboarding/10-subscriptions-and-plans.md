@@ -2,21 +2,22 @@
 
 > **Commercial source of truth:** Public plan names, prices, primary scale metrics, add-ons, trial behavior, and AI allowances live in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). This guide focuses on **enforcement architecture** (entitlements, middleware, Free Trial mechanics). Do not quote Silver/Gold/Platinum as customer-facing names.
 
-Supplify monetization is **plan-driven**: every restaurant and supplier workspace has a `subscription` row joined to `subscription_plan` (limits + features JSON). Public self-serve plans are tenant-specific **Growth** and **Scale** tiers plus a **30-day Free Trial**. Internal DB codes remain `free`, `silver`, `gold`, `platinum` for compatibility (`apps/api/src/lib/plan-codes.js`). Hidden `enterprise` / custom rows stay admin-only.
+Supplify monetization is **plan-driven**: every restaurant and supplier workspace has a `subscription` row joined to `subscription_plan` (limits + features JSON). Public self-serve plans are Restaurant Growth, Restaurant Intelligence, Restaurant Scale, Supplier Growth, Supplier Scale, plus a **30-day Free Trial**. Internal DB codes remain `free`, `silver`, `gold`, `platinum` for compatibility (`apps/api/src/lib/plan-codes.js`). Hidden `enterprise` / custom rows stay admin-only.
 
 ---
 
 ## Plan catalog summary (public)
 
-| Tenant type | Public plan       | Internal code | Monthly / yearly | Primary scale metric                                    |
-| ----------- | ----------------- | ------------- | ---------------- | ------------------------------------------------------- |
-| Restaurant  | Restaurant Growth | `silver`      | $49 / $490       | 1 active branch                                         |
-| Restaurant  | Restaurant Scale  | `gold`        | $149 / $1,490    | 3 active branches                                       |
-| Supplier    | Supplier Growth   | `gold`        | $149 / $1,490    | 50 active customer locations / month                    |
-| Supplier    | Supplier Scale    | `platinum`    | $349 / $3,490    | 200 active customer locations / month                   |
-| Both        | 30-day Free Trial | `free`        | $0               | Trial target plan features + Free/trial limit + AI pool |
+| Tenant type | Public plan             | Internal code | Monthly / yearly | Primary scale metric                                    |
+| ----------- | ----------------------- | ------------- | ---------------- | ------------------------------------------------------- |
+| Restaurant  | Restaurant Growth       | `silver`      | $49 / $490       | 1 active branch                                         |
+| Restaurant  | Restaurant Intelligence | `gold`        | $149 / $1,490    | Deterministic operational intelligence                  |
+| Restaurant  | Restaurant Scale        | `platinum`    | $349 / $3,490    | Multi-branch insight and read-only assistant            |
+| Supplier    | Supplier Growth         | `gold`        | $149 / $1,490    | 50 active customer locations / month                    |
+| Supplier    | Supplier Scale          | `platinum`    | $349 / $3,490    | 200 active customer locations / month                   |
+| Both        | 30-day Free Trial       | `free`        | $0               | Trial target plan features + Free/trial limit + AI pool |
 
-Prices and JSON limits/features are stored on `subscription_plan`. Migration `0190_four_plan_pricing_model.sql` aligns the catalog; older `0117`/`0119`/`0120` rows are historical context only.
+Prices and JSON limits/features are stored on `subscription_plan`. Migration `0212_final_intelligence_subscription_matrix.sql` aligns the entitlement matrix without modifying payment or stored amounts; older catalog migrations are historical context only.
 
 ---
 

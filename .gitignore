@@ -132,3 +132,6 @@ backups-preprod/
 /.gradle-user-home/
 *.jks
 *.keystore
+
+# Playwright MCP scratch output (console/page dumps from browser tooling)
+.playwright-mcp/
