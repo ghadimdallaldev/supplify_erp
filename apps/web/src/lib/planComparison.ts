@@ -127,6 +127,9 @@ export function formatPlanFeatureCell(
     if (rawVal === false || rawVal == null || rawVal === '' || rawVal === 'disabled') {
       return { enabled: false }
     }
+    if (rawVal === 'suggestions_only') {
+      return { enabled: true, caption: 'Reorder suggestions' }
+    }
     if (rawVal === 'full_90day_trends' || rawVal === true) {
       return { enabled: true, caption: '90-day forecasting' }
     }

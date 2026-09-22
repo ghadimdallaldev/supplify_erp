@@ -292,6 +292,32 @@ export async function listTenantFeatureOverrides(tenantId, tenantType) {
 /**
  * Effective feature map for admin UI (plan + global + tenant overrides).
  */
+/**
+ * Resolved value of one feature key, preserving tier strings.
+ *
+ * `isFeatureEnabledForTenant` answers only yes/no, and
+ * `getEffectiveFeaturesForTenant` returns an ARRAY of descriptor objects — code
+ * that reached for `.features[key]` on it silently read undefined. Use this
+ * when a tiered value (smart_reorder, quick_lists, intelligence, ...) is needed
+ * rather than a boolean.
+ *
+ * @param {string} tenantId
+ * @param {string} tenantType
+ * @param {string} featureKey
+ * @returns {Promise<unknown>} tier string, true, or false
+ */
+export async function getResolvedFeatureValue(tenantId, tenantType, featureKey) {
+  if (!tenantId || !tenantType) return false
+  const { getTenantSubscription } = await import('./subscription.js')
+  const { resolveEffectivePlanFeatures } = await import(
+    './subscription/free-trial-plan-features.js'
+  )
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  const planFeatures = await resolveEffectivePlanFeatures(subscription)
+  const { features } = await resolveAllFeaturesForTenant(tenantId, tenantType, planFeatures)
+  return features?.[featureKey] ?? false
+}
+
 export async function getEffectiveFeaturesForTenant(tenantId, tenantType) {
   const { getTenantSubscription } = await import('./subscription.js')
   const { resolveEffectivePlanFeatures } = await import(

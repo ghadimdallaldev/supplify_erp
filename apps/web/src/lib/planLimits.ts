@@ -59,6 +59,23 @@ export function multiBranchEnabled(entitlements: Entitlements | null | undefined
 }
 
 /**
+ * Does the plan's `smart_reorder` value include statistical forecasting?
+ *
+ * Mirrors resolveSmartReorderCapabilities().capabilities.forecast in
+ * apps/api/src/lib/smart-reorder-tier.js. Growth resolves to the `basic` tier
+ * (`suggestions_only`) — assistance without forecasting — while Intelligence
+ * and Scale carry `ai_forecast_seasonality`.
+ *
+ * Callers must not re-list the tier strings inline; that duplication is how the
+ * UI and the API drift apart.
+ */
+export function smartReorderHasForecast(featureValue: unknown): boolean {
+  if (!featureEnabled(featureValue)) return false
+  const raw = typeof featureValue === 'string' ? featureValue.trim().toLowerCase() : featureValue
+  return raw === 'ai_forecast_seasonality' || raw === 'full_90day_trends' || raw === true
+}
+
+/**
  * Operational intelligence tier. Mirrors apps/api/src/lib/intelligence-tier.js.
  *
  * The API is authoritative — this only decides what the UI offers, so it never

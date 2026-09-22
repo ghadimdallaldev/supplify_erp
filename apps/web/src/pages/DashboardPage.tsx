@@ -23,7 +23,7 @@ import { formatDate } from '../i18n/formatters'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
-import { featureEnabled } from '../lib/planLimits'
+import { featureEnabled, smartReorderHasForecast } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import {
   getRestaurantDashboardLayout,
@@ -120,10 +120,7 @@ export function DashboardPage() {
   const smartReorderFeatureValue = entitlementsData?.entitlements?.features?.smart_reorder
   const smartReorderEnabled = featureEnabled(smartReorderFeatureValue)
   // Provider-backed forecast capability; use the same gate as POST .../ai-recommend.
-  const smartReorderAiRecommendEligible =
-    smartReorderFeatureValue === true ||
-    smartReorderFeatureValue === 'full_90day_trends' ||
-    smartReorderFeatureValue === 'ai_forecast_seasonality'
+  const smartReorderAiRecommendEligible = smartReorderHasForecast(smartReorderFeatureValue)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled || !showRestaurantSection('showReorderAlerts'),
   })

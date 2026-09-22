@@ -27,3 +27,31 @@ describe('smart-reorder-tier', () => {
     expect(forecastModelTierForFeature('ai_forecast_seasonality')).toBe('platinum')
   })
 })
+
+describe('matrix alignment (migration 0215)', () => {
+  it('maps the Growth value to assistance without forecasting', () => {
+    // Growth is "basic reorder suggestions" in the launch matrix. Forecasting,
+    // stockout prediction and smart quantities start at Intelligence.
+    const caps = resolveSmartReorderCapabilities('suggestions_only')
+    expect(caps.enabled).toBe(true)
+    expect(caps.tier).toBe('basic')
+    expect(caps.capabilities).toEqual({
+      assistance: true,
+      forecast: false,
+      forecast90d: false,
+      seasonality: false,
+      trendAdjustment: false,
+    })
+  })
+
+  it('keeps forecasting on the Intelligence and Scale value', () => {
+    const caps = resolveSmartReorderCapabilities('ai_forecast_seasonality')
+    expect(caps.capabilities.forecast).toBe(true)
+    expect(caps.capabilities.seasonality).toBe(true)
+  })
+
+  it('does not persist a forecast model tier for the Growth value', () => {
+    expect(forecastModelTierForFeature('suggestions_only')).toBeNull()
+    expect(forecastModelTierForFeature('ai_forecast_seasonality')).toBe('platinum')
+  })
+})

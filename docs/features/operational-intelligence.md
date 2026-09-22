@@ -80,6 +80,28 @@ Both read values the recipe cost engine already persists (`cost_per_portion`, `f
 
 The dashboard's "highest cost" / "lowest margin" cards ship with `recipe_costing` and stay available on Growth. These endpoints are the Intelligence-tier addition on top: threshold-driven rather than a fixed top-5, attributed to the specific price event, and coverage-aware. `FoodCostWarningsCard` renders on the same dashboard, gated on the advanced tier, so there is one cost-and-margin surface rather than two competing pages.
 
+## Forecasting tier alignment (migration 0215)
+
+`smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.
+
+| Plan                             | `smart_reorder`           | Capability             |
+| -------------------------------- | ------------------------- | ---------------------- |
+| Restaurant Growth (`silver`)     | `suggestions_only`        | assistance only        |
+| Restaurant Intelligence (`gold`) | `ai_forecast_seasonality` | forecast + seasonality |
+| Restaurant Scale (`platinum`)    | `ai_forecast_seasonality` | forecast + seasonality |
+| Supplier Growth (`gold`)         | `suggestions_only`        | assistance only        |
+| Supplier Scale (`platinum`)      | `ai_forecast_seasonality` | forecast + seasonality |
+
+`suggestions_only` falls through `resolveSmartReorderCapabilities()` to the existing `basic` tier, so no resolver change was needed. It is named for the capability rather than a time window deliberately: the legacy `limited_7day_history` label implied a history cap that no code enforces, and arbitrary day-window restrictions are not how these plans are differentiated.
+
+Web reads this through `smartReorderHasForecast()` in `planLimits.ts` rather than re-listing tier strings inline, which is how the UI and API drifted apart before.
+
+### Cron bug fixed alongside
+
+`refreshAllDirtyForecasts` gated on `isFeatureEnabledForTenant('smart_reorder')` — a boolean check that `suggestions_only` also passes — and then `refreshRestaurantForecasts` looked the value up via `getEffectiveFeaturesForTenant(...).features?.smart_reorder`. That helper returns an **array** of descriptor objects, so the value was always `undefined`, `forecastModelTierForFeature(undefined)` returned `null`, and **every scheduled refresh bailed out as `feature_disabled`** — the job had never produced a forecast. Forecasts were only ever computed lazily by `refreshIfStale` on the request path.
+
+Both are fixed: the new `getResolvedFeatureValue(tenantId, tenantType, key)` in `feature-flags.js` returns the resolved tiered value (overrides and global flags applied, tier string preserved), and the cron now judges the forecast **capability** rather than feature truthiness. The job result gained `skippedNoForecastTier` so the skip is observable.
+
 ## Supplify AI Assistant
 
 `ai_assistant` gates `/api/assistant`; `ai_platform` separately gates LLM-enhanced Smart Reorder endpoints. Both also require `AI_ENABLED`, configured provider credentials, quota, and the tool's own authorization. The assistant only receives allowlisted read-only tools, resolves every tool call in the active tenant context, and refuses mutations. Platform admins additionally require `ADMIN_ACCESS`; driver users have no assistant navigation.

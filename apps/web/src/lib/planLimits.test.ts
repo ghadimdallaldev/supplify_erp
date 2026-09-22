@@ -19,6 +19,7 @@ import {
   warehousesFeatureEnabled,
   getIntelligenceTier,
   meetsIntelligenceTier,
+  smartReorderHasForecast,
 } from './planLimits'
 import type { Entitlements } from '../types'
 
@@ -369,5 +370,25 @@ describe('intelligence tier', () => {
       planFeatures: { intelligence: 'scale' },
     } as unknown as Entitlements
     expect(getIntelligenceTier(ent)).toBe('none')
+  })
+})
+
+describe('smartReorderHasForecast', () => {
+  it('excludes the Growth suggestions-only value', () => {
+    // Matrix alignment: forecasting starts at Intelligence.
+    expect(smartReorderHasForecast('suggestions_only')).toBe(false)
+  })
+
+  it('includes the forecast-capable values', () => {
+    expect(smartReorderHasForecast('ai_forecast_seasonality')).toBe(true)
+    expect(smartReorderHasForecast('full_90day_trends')).toBe(true)
+    expect(smartReorderHasForecast(true)).toBe(true)
+  })
+
+  it('fails closed for disabled and absent values', () => {
+    expect(smartReorderHasForecast(false)).toBe(false)
+    expect(smartReorderHasForecast(undefined)).toBe(false)
+    expect(smartReorderHasForecast('disabled')).toBe(false)
+    expect(smartReorderHasForecast('')).toBe(false)
   })
 })

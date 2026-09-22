@@ -1037,3 +1037,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Contract impact on mobile**: none for mobile clients. The `/api/recipe-costing/dashboard` payload gained two fields on `lowestMarginRecipes` (`targetFoodCostPct`, `calcStatus`); that endpoint has no mobile consumer, and the change is additive.
 - **Permission note**: these endpoints require `RECIPES_VIEW_COSTS`, which is narrower than `CATALOG_VIEW`. No new permission key was introduced.
 - **Revisit when**: recipe costing is scheduled for mobile. The endpoints are already tenant-scoped, tier-gated, and permission-gated.
+
+## 2026-09-22 - Smart reorder tier alignment (API + web)
+
+- **Change**: migration `0215` sets `smart_reorder` to `suggestions_only` on Restaurant Growth and Supplier Growth; forecasting stays on Intelligence and both Scale plans. Fixes a cron gate that had never produced a forecast.
+- **Parity decision**: **No mobile code change required.** Mobile reads `smart_reorder` only through `isEntitlementEnabled`, which is a truthiness check — `suggestions_only` is truthy, so reorder-assistance screens behave exactly as before. Neither client renders forecast output or calls the forecast endpoints.
+- **Behavioural note for mobile**: a Growth tenant's `/reorder-forecasts` response is an empty list with `smartReorder.capabilities.forecast = false`, which is the same shape the endpoint already returned for plans without the capability. No client-side handling changes.
+- **Contract impact**: none. No endpoint, enum, permission key, payload, or deep link changed; `smart_reorder` is an existing entitlement key with an existing basic tier.
