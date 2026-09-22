@@ -607,18 +607,30 @@ export async function listPriceImpacts(
     [restaurantId, limit, offset]
   )
 
-  const result = []
-  for (const event of events) {
-    const { rows: impacts } = await dbQuery(
+  // One query for every event's impacts rather than one per event: the CSV
+  // export calls this with limit 500, which was 501 round trips.
+  const impactsByEvent = new Map()
+  if (events.length) {
+    const { rows: allImpacts } = await dbQuery(
       `
       SELECT rpi.*, r.name AS recipe_name
       FROM recipe_price_impacts rpi
       JOIN recipes r ON r.id = rpi.recipe_id
-      WHERE rpi.price_event_id = $1
-      ORDER BY r.name
+      WHERE rpi.price_event_id = ANY($1::uuid[])
+      ORDER BY rpi.price_event_id, r.name
       `,
-      [event.id]
+      [events.map((e) => e.id)]
     )
+    for (const impact of allImpacts) {
+      const bucket = impactsByEvent.get(impact.price_event_id)
+      if (bucket) bucket.push(impact)
+      else impactsByEvent.set(impact.price_event_id, [impact])
+    }
+  }
+
+  const result = []
+  for (const event of events) {
+    const impacts = impactsByEvent.get(event.id) ?? []
     result.push({
       event: {
         id: event.id,

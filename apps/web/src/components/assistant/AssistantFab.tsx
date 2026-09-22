@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { ensureNamespace } from '../../i18n'
-import { featureEnabled } from '../../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { useAppSelector } from '../../hooks/redux'
 import { useImpersonation } from '../../hooks/useImpersonation'
 import {
@@ -43,10 +43,13 @@ export function AssistantFab() {
   const { data: entitlements } = useGetEntitlementsQuery(undefined, {
     skip: !user || (user.role === 'ADMIN' && !isImpersonating),
   })
+  // The payload is `{ entitlements: {...} }`. Reading `entitlements.features`
+  // directly always yielded undefined, so this gate was permanently false for
+  // every non-admin user and the assistant entry point never rendered.
   const planHasAi =
     user?.role === 'ADMIN' && !isImpersonating
       ? true
-      : featureEnabled(entitlements?.features?.ai_assistant)
+      : isEntitlementFeatureEnabled(entitlements?.entitlements, 'ai_assistant')
 
   useEffect(() => {
     void ensureNamespace('assistant')

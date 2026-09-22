@@ -58,6 +58,38 @@ export function multiBranchEnabled(entitlements: Entitlements | null | undefined
   return isEntitlementFeatureEnabled(entitlements, 'multi_branch')
 }
 
+/**
+ * Operational intelligence tier. Mirrors apps/api/src/lib/intelligence-tier.js.
+ *
+ * The API is authoritative — this only decides what the UI offers, so it never
+ * shows an entry point the backend would refuse. A bare enabled value resolves
+ * to `basic`, never `scale`.
+ */
+export const INTELLIGENCE_TIER_ORDER = ['none', 'basic', 'advanced', 'scale'] as const
+
+export type IntelligenceTier = (typeof INTELLIGENCE_TIER_ORDER)[number]
+
+export function getIntelligenceTier(
+  entitlements: Entitlements | null | undefined
+): IntelligenceTier {
+  const value = resolveEntitlementFeature(entitlements, 'intelligence')
+  if (!featureEnabled(value)) return 'none'
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : value
+  if (raw === 'scale') return 'scale'
+  if (raw === 'advanced') return 'advanced'
+  return 'basic'
+}
+
+export function meetsIntelligenceTier(
+  entitlements: Entitlements | null | undefined,
+  minTier: IntelligenceTier
+): boolean {
+  return (
+    INTELLIGENCE_TIER_ORDER.indexOf(getIntelligenceTier(entitlements)) >=
+    INTELLIGENCE_TIER_ORDER.indexOf(minTier)
+  )
+}
+
 export type BranchAddGate = {
   canAdd: boolean
   reason:

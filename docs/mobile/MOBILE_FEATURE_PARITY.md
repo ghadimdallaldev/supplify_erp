@@ -1022,3 +1022,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - The shared code changes are in the two sibling repositories; no new mobile environment variable is required.
 - **Correction applied the same day**: the first pass of `isEntitlementEnabled` treated any non-empty string as enabled, so the plan values `'false'` and `'disabled'` would have read as **on** for mobile, and numeric values were not handled. Both repos now mirror the API's `evaluatePlanFeatureValue` exactly (absent = disabled, `'false'`/`'disabled'`/`''` = disabled, otherwise truthy). Parity tests added in `src/hooks/useEntitlements.test.ts` in both repos; `npx tsc --noEmit` passes in both.
 - **Intelligence tier**: `intelligence` is a tiered value (`basic` / `advanced` / `scale`), not a boolean. Mobile reads it through the same `isEntitlementEnabled` helper, so a missing key fails closed. No mobile surface consumes the tier yet — deterministic intelligence screens are still web-only and will be logged here when added.
+
+## 2026-09-22 - Restaurant price intelligence (web-only)
+
+- **Change**: new `GET /api/restaurant-intelligence/price-history/:productId`, `/price-changes`, and `/cheaper-buys`, plus the `/app/price-intelligence` web page and its sidebar entry.
+- **Parity decision**: **Skipped on mobile, intentionally.** These are read-only analytical surfaces with dense tabular output, and the mobile clients have no purchasing-analytics section to host them. Android and iOS already fail closed on the `intelligence` entitlement through the shared `isEntitlementEnabled` helper, so neither client exposes an entry point the API would refuse.
+- **Contract impact on mobile**: none. No existing endpoint, enum, status value, permission key, notification payload, or deep link changed. `CATALOG_VIEW` is an existing permission; `intelligence` is an existing entitlement key.
+- **Revisit when**: a mobile purchasing-insights surface is scheduled. The endpoints are tenant-scoped and tier-gated already, so a future mobile client needs only the API client and types.

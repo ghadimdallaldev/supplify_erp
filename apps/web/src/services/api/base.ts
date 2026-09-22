@@ -293,6 +293,7 @@ export const api = createApi({
     'RecipeImpact',
     'SupplierLoyaltyProgram',
     'SupplierGrowth',
+    'PriceIntelligence',
   ],
   keepUnusedDataFor: 120,
   refetchOnFocus: false,

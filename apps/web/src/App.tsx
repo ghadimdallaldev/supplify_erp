@@ -106,6 +106,10 @@ const RecipePriceImpactPage = lazyNamedPage(
   () => import('./pages/recipes/RecipePriceImpactPage'),
   'RecipePriceImpactPage'
 )
+const PriceIntelligencePage = lazyNamedPage(
+  () => import('./pages/PriceIntelligencePage'),
+  'PriceIntelligencePage'
+)
 const SupplierCustomerGrowthPage = lazyNamedPage(
   () => import('./pages/SupplierCustomerGrowthPage'),
   'SupplierCustomerGrowthPage'
@@ -773,6 +777,14 @@ const router = createBrowserRouter([
             element: (
               <LazyPage>
                 <RecipePriceImpactPage />
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/price-intelligence',
+            element: (
+              <LazyPage>
+                <PriceIntelligencePage />
               </LazyPage>
             ),
           },

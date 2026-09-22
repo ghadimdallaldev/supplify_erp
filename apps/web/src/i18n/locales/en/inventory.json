@@ -303,5 +303,54 @@
     "addToOrderingListFailed": "Could not add to list",
     "createdListAndAddedItem": "Created list and added item",
     "createOrderingListFailed": "Could not create list"
+  },
+  "priceIntelligence": {
+    "title": "Price intelligence",
+    "description": "What you actually paid, drawn from receiving, invoices, catalog and contract changes.",
+    "loadErrorTitle": "Could not load price intelligence",
+    "loadErrorDesc": "Something went wrong reading your price data. Try again.",
+    "retry": "Try again",
+    "upgradeTitle": "Available on Restaurant Intelligence",
+    "upgradeDesc": "Price-change and cheaper-buy alerts are part of the Intelligence plan. Price history is included in your current plan.",
+    "viewPlans": "View plans",
+    "windowLabel": "Window",
+    "days30": "Last 30 days",
+    "days90": "Last 90 days",
+    "days180": "Last 180 days",
+    "changes": {
+      "title": "Price increases",
+      "description": "Supplier price movements above the noise threshold, largest first.",
+      "empty": "No meaningful price changes in this window.",
+      "product": "Product",
+      "supplier": "Supplier",
+      "was": "Was",
+      "now": "Now",
+      "change": "Change",
+      "detected": "Detected",
+      "source": "Source",
+      "severityHigh": "Large increase",
+      "severityMedium": "Increase"
+    },
+    "cheaper": {
+      "title": "Cheaper options",
+      "description": "Only from an agreed contract price or a substitute the supplier approved. Nothing is inferred across suppliers.",
+      "empty": "No cheaper authorised option found for the products that went up.",
+      "currentlyPaying": "Currently paying",
+      "alternative": "Cheaper option",
+      "saving": "Saving per unit",
+      "contractPrice": "Contract price",
+      "supplierSubstitute": "Approved substitute"
+    },
+    "history": {
+      "title": "Price history",
+      "description": "Every observed price change for one product.",
+      "empty": "No price observations recorded for this product yet.",
+      "current": "Current",
+      "lowest": "Lowest",
+      "highest": "Highest",
+      "average": "Average",
+      "observations": "Observations",
+      "changeOverWindow": "Change over window"
+    }
   }
 }

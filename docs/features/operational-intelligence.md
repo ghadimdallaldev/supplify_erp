@@ -35,6 +35,29 @@ Existing routes continue to enforce their domain feature and RBAC checks; the ti
 
 Restaurant intelligence composes existing, reproducible calculations: `reorder_forecast`, stock/expiry signals, receiving history, recipe cost snapshots, `supplier_price_events`, recipe price impacts, and waste movements. Supplier intelligence composes the command center, reorder cadence and at-risk customers, warehouse/legacy stock display, receivables, delivery state, and fulfillment exceptions. Results must name their source and never fabricate a prediction, price, supplier, or quantity.
 
+## Price intelligence (implemented)
+
+`apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:
+
+| Endpoint                        | Tier     | Returns                                                                                                        |
+| ------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET /price-history/:productId` | basic    | Observed price timeline for one product plus a window summary (current, low, high, average, change, direction) |
+| `GET /price-changes`            | advanced | Price movements above a noise threshold (default 5%), largest first, with `medium`/`high` severity             |
+| `GET /cheaper-buys`             | advanced | Products whose price rose that have a cheaper **authorised** alternative                                       |
+
+All three read `supplier_price_events`, written by the receiving/catalog/contract hooks in `recipe-purchasing-hooks.service.js`. The window and page size are clamped server-side; `direction` is validated against an allowlist rather than interpolated. `changePct` is recomputed from `old_price`/`new_price` instead of trusting the stored column, which is null on first observation.
+
+Web surface: `/app/price-intelligence` (`PriceIntelligencePage`), sidebar entry gated on the advanced tier. Price history has no standalone page yet; it is consumed per product.
+
+### Cheaper-buy sources, and what is deliberately not inferred
+
+A cheaper option is only ever reported from two explicit sources:
+
+1. **Contract price** — the restaurant's own active `restaurant_pricing` row for that product is below the last observed price.
+2. **Supplier substitute** — a `product_substitute` row the supplier itself declared, priced with the same validity rule as `getDefaultCatalogPrice`.
+
+**Deferred: cross-supplier "the same product is cheaper elsewhere".** `product.sku` is unique per `(supplier_id, sku)` and there is no GTIN, barcode, or shared catalog identity column, so equating two suppliers' catalog rows would be a guess about the physical goods. Implementing this needs a shared product-identity model first (a platform-level product key, or verified GTIN on `product`). Until that exists the feature stays out rather than inventing alternatives.
+
 ## Supplify AI Assistant
 
 `ai_assistant` gates `/api/assistant`; `ai_platform` separately gates LLM-enhanced Smart Reorder endpoints. Both also require `AI_ENABLED`, configured provider credentials, quota, and the tool's own authorization. The assistant only receives allowlisted read-only tools, resolves every tool call in the active tenant context, and refuses mutations. Platform admins additionally require `ADMIN_ACCESS`; driver users have no assistant navigation.

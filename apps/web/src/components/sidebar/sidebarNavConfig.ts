@@ -19,6 +19,7 @@ import {
   Scale,
   Tag,
   Percent,
+  TrendingUp,
   Radar,
   FileQuestion,
   UtensilsCrossed,
@@ -97,6 +98,7 @@ export type BuildSidebarSectionsInput = {
   fulfillmentEnabled: boolean
   quickListsEnabled: boolean
   recipeCostingEnabled: boolean
+  priceIntelligenceEnabled: boolean
   disputesEnabled: boolean
   promotionsEnabled: boolean
   supplierGrowthEnabled: boolean
@@ -120,6 +122,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
     fulfillmentEnabled,
     quickListsEnabled,
     recipeCostingEnabled,
+    priceIntelligenceEnabled,
     disputesEnabled,
     promotionsEnabled,
     supplierGrowthEnabled,
@@ -223,6 +226,17 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
               icon: Percent,
               permission: 'PROMOTIONS_VIEW',
               testId: 'nav-deals',
+            },
+          ]
+        : []),
+      ...(priceIntelligenceEnabled
+        ? [
+            {
+              nameKey: 'priceIntelligence',
+              href: '/app/price-intelligence',
+              icon: TrendingUp,
+              permission: 'CATALOG_VIEW',
+              testId: 'nav-price-intelligence',
             },
           ]
         : []),

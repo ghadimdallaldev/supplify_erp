@@ -17,6 +17,8 @@ import {
   getBranchAddGate,
   canAddWarehouses,
   warehousesFeatureEnabled,
+  getIntelligenceTier,
+  meetsIntelligenceTier,
 } from './planLimits'
 import type { Entitlements } from '../types'
 
@@ -325,5 +327,47 @@ describe('supplier warehouse free tier', () => {
     } as Entitlements
     expect(canAddWarehouses(ent, 0)).toBe(true)
     expect(canAddWarehouses(ent, 1)).toBe(false)
+  })
+})
+
+describe('intelligence tier', () => {
+  const entWith = (value: unknown) =>
+    ({
+      plan: { name: 'X', code: 'gold' },
+      features: { intelligence: value },
+    }) as unknown as Entitlements
+
+  it('maps the launch plan values onto tiers', () => {
+    expect(getIntelligenceTier(entWith('basic'))).toBe('basic')
+    expect(getIntelligenceTier(entWith('advanced'))).toBe('advanced')
+    expect(getIntelligenceTier(entWith('scale'))).toBe('scale')
+  })
+
+  it('fails closed for absent and explicitly disabled values', () => {
+    expect(getIntelligenceTier(null)).toBe('none')
+    expect(getIntelligenceTier(entWith(undefined))).toBe('none')
+    expect(getIntelligenceTier(entWith(false))).toBe('none')
+    expect(getIntelligenceTier(entWith('false'))).toBe('none')
+    expect(getIntelligenceTier(entWith('disabled'))).toBe('none')
+  })
+
+  it('treats a bare enabled value as the entry tier, not scale', () => {
+    expect(getIntelligenceTier(entWith(true))).toBe('basic')
+  })
+
+  it('compares tiers by rank', () => {
+    expect(meetsIntelligenceTier(entWith('scale'), 'advanced')).toBe(true)
+    expect(meetsIntelligenceTier(entWith('advanced'), 'advanced')).toBe(true)
+    expect(meetsIntelligenceTier(entWith('basic'), 'advanced')).toBe(false)
+    expect(meetsIntelligenceTier(entWith(false), 'basic')).toBe(false)
+  })
+
+  it('does not let raw planFeatures re-enable a disabled tier', () => {
+    const ent = {
+      plan: { name: 'X', code: 'gold' },
+      features: { intelligence: false },
+      planFeatures: { intelligence: 'scale' },
+    } as unknown as Entitlements
+    expect(getIntelligenceTier(ent)).toBe('none')
   })
 })
