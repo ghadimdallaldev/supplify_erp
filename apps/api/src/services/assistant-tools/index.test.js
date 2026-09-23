@@ -8,7 +8,10 @@ vi.mock('../../lib/feature-flags.js', () => ({
   isFeatureEnabledForTenant: vi.fn(async () => true),
 }))
 
-vi.mock('../restaurant-price-intelligence.service.js', () => ({ getProductPriceHistory: vi.fn() }))
+vi.mock('../restaurant-price-intelligence.service.js', () => ({
+  getProductPriceHistory: vi.fn(),
+  listPriceChangeAlerts: vi.fn(),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -69,9 +72,13 @@ vi.mock('../../lib/subscription.js', () => ({
 }))
 
 import { query } from '../../lib/db.js'
-import { getProductPriceHistory } from '../restaurant-price-intelligence.service.js'
+import {
+  getProductPriceHistory,
+  listPriceChangeAlerts,
+} from '../restaurant-price-intelligence.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
+import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -115,6 +122,22 @@ describe('assistant tools', () => {
     expect(getProductPriceHistory).toHaveBeenCalledWith('rest-1', 'p1', { days: 30, limit: 15 })
     expect(result.summary.observations).toBe(1)
   })
+  it('runs price changes for advanced intelligence', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'advanced' })
+    listPriceChangeAlerts.mockResolvedValue({ alerts: [{ id: 'a1' }] })
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.CATALOG_VIEW] }),
+      'get_price_changes',
+      { days: 45 }
+    )
+    expect(listPriceChangeAlerts).toHaveBeenCalledWith('rest-1', {
+      days: 45,
+      minChangePct: undefined,
+      direction: undefined,
+    })
+    expect(result.alerts).toHaveLength(1)
+  })
+
   it('rejects fulfillment board for restaurant', async () => {
     await expect(
       executeAssistantTool(restaurantCtx(), 'get_fulfillment_board', {})

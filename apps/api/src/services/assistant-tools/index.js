@@ -16,7 +16,10 @@ import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
-import { getProductPriceHistory } from '../restaurant-price-intelligence.service.js'
+import {
+  getProductPriceHistory,
+  listPriceChangeAlerts,
+} from '../restaurant-price-intelligence.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -464,6 +467,33 @@ const TOOLS = {
       const days = Math.min(Math.max(Number(args.days) || 180, 1), 730)
       const result = await getProductPriceHistory(ctx.tenantId, productId, { days, limit: ROW_CAP })
       return { ...result, events: cap(result.events) }
+    },
+  },
+  get_price_changes: {
+    definition: {
+      name: 'get_price_changes',
+      description: 'Meaningful observed restaurant purchase-price changes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number' },
+          minChangePct: { type: 'number' },
+          direction: { type: 'string', enum: ['up', 'down', 'any'] },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.CATALOG_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 30, 1), 365)
+      const result = await listPriceChangeAlerts(ctx.tenantId, {
+        days,
+        minChangePct: args.minChangePct,
+        direction: args.direction,
+      })
+      return { ...result, alerts: cap(result.alerts) }
     },
   },
   get_waste: {

@@ -188,6 +188,10 @@ Both are fixed: the new `getResolvedFeatureValue(tenantId, tenantType, key)` in 
 
 The existing assistant now exposes get_price_history for an explicit restaurant product ID. It reuses the deterministic price-history service, is bounded to 15 observations, and requires the assistant entitlement/quota, CATALOG_VIEW, and Basic-or-higher effective Intelligence. It cannot issue SQL or escape the active tenant.
 
+## Assistant price-change tool (implemented)
+
+The assistant exposes get_price_changes for meaningful observed restaurant purchase-price changes. It reuses the deterministic price-change alert service, limits the requested window to 365 days, and requires the assistant entitlement/quota, CATALOG_VIEW, and Advanced-or-higher effective Intelligence. Direction and percentage filters are passed to the existing service; the assistant cannot issue SQL, write data, or escape the active tenant.
+
 ## Scope boundaries
 
 Restaurant Scale enables multi-branch insight, not centralized purchasing. `/api/restaurant-org/central-purchasing/*` deliberately returns `410 Gone` until a separately designed, authorized cross-branch workflow exists. Inventory remains restaurant-scoped; cross-branch stock transfers and central buying are not inferred from plan entitlement.

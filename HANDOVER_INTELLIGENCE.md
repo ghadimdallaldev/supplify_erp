@@ -183,7 +183,7 @@ User decision: do not introduce central purchasing or a purchasing budget. The l
 
 ### Phase 4 — Restaurant Scale AI Assistant
 
-Reuse the existing assistant infrastructure in `apps/api/src/services/assistant-tools/`. `get_price_history` implemented 2026-09-24; reuses deterministic price history with CATALOG_VIEW, effective Basic Intelligence, assistant quota, and tenant scope. Add read-only tools for price history, price changes, waste, recipe profitability, supplier reliability, over-ordering, invoice anomalies, budget, branch comparison, transfer suggestions. Tools must pass the same tenant/org/branch/RBAC/entitlement/quota checks as normal API calls. No unrestricted DB access for the LLM.
+Reuse the existing assistant infrastructure in `apps/api/src/services/assistant-tools/`. `get_price_history` implemented 2026-09-24; reuses deterministic price history with CATALOG_VIEW, effective Basic Intelligence, assistant quota, and tenant scope. `get_price_changes` implemented 2026-09-24; reuses deterministic price-change alerts with CATALOG_VIEW, effective Advanced Intelligence, assistant quota, tenant scope, and bounded day range. Add read-only tools for waste, recipe profitability, supplier reliability, over-ordering, invoice anomalies, branch comparison, transfer suggestions. Budget is explicitly excluded by product decision. Tools must pass the same tenant/org/branch/RBAC/entitlement/quota checks as normal API calls. No unrestricted DB access for the LLM.
 
 ### Phase 5 — Supplier Scale
 
