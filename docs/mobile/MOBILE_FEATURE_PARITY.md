@@ -1113,3 +1113,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Change**: Scale read-only monthly branch trend endpoint with no arbitrary date-span cap.
 - **Parity decision**: **Skipped on mobile, intentionally.** No native organization analytics surface exists.
+
+## 2026-09-24 - Assistant price history
+
+- **Change**: server-side assistant tool only; no mobile API contract, navigation, or visible native surface changed.
+- **Parity decision**: **Skipped on mobile, intentionally.** The existing native assistant remains the same conversation contract; tool selection is server-side.

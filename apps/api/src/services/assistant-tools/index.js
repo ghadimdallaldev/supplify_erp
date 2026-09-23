@@ -16,6 +16,11 @@ import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
+import { getProductPriceHistory } from '../restaurant-price-intelligence.service.js'
+import {
+  getIntelligenceTierForTenant,
+  INTELLIGENCE_TIER_ORDER,
+} from '../../lib/intelligence-tier.js'
 
 const ROW_CAP = 15
 
@@ -44,6 +49,10 @@ async function featureOn(ctx, key) {
   return isFeatureEnabledForTenant(ctx.tenantId, ctx.tenantType, key)
 }
 
+async function intelligenceAtLeast(ctx, minimum) {
+  const resolved = await getIntelligenceTierForTenant(ctx.tenantId, ctx.tenantType)
+  return INTELLIGENCE_TIER_ORDER.indexOf(resolved.tier) >= INTELLIGENCE_TIER_ORDER.indexOf(minimum)
+}
 function cap(rows) {
   return Array.isArray(rows) ? rows.slice(0, ROW_CAP) : rows
 }
@@ -432,6 +441,31 @@ const TOOLS = {
     },
   },
 
+  get_price_history: {
+    definition: {
+      name: 'get_price_history',
+      description: 'Observed purchase-price history for one restaurant catalog product.',
+      parameters: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string', description: 'Restaurant catalog product ID' },
+          days: { type: 'number', description: 'Lookback days, default 180' },
+        },
+        required: ['productId'],
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.CATALOG_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'basic')),
+    run: async (ctx, args) => {
+      const productId = String(args.productId || '').trim()
+      if (!productId) return { productId: null, events: [], summary: null }
+      const days = Math.min(Math.max(Number(args.days) || 180, 1), 730)
+      const result = await getProductPriceHistory(ctx.tenantId, productId, { days, limit: ROW_CAP })
+      return { ...result, events: cap(result.events) }
+    },
+  },
   get_waste: {
     definition: {
       name: 'get_waste',

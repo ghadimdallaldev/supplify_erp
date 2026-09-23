@@ -184,6 +184,10 @@ Both are fixed: the new `getResolvedFeatureValue(tenantId, tenantType, key)` in 
 
 `ai_assistant` gates `/api/assistant`; `ai_platform` separately gates LLM-enhanced Smart Reorder endpoints. Both also require `AI_ENABLED`, configured provider credentials, quota, and the tool's own authorization. The assistant only receives allowlisted read-only tools, resolves every tool call in the active tenant context, and refuses mutations. Platform admins additionally require `ADMIN_ACCESS`; driver users have no assistant navigation.
 
+## Assistant price history tool (implemented)
+
+The existing assistant now exposes get_price_history for an explicit restaurant product ID. It reuses the deterministic price-history service, is bounded to 15 observations, and requires the assistant entitlement/quota, CATALOG_VIEW, and Basic-or-higher effective Intelligence. It cannot issue SQL or escape the active tenant.
+
 ## Scope boundaries
 
 Restaurant Scale enables multi-branch insight, not centralized purchasing. `/api/restaurant-org/central-purchasing/*` deliberately returns `410 Gone` until a separately designed, authorized cross-branch workflow exists. Inventory remains restaurant-scoped; cross-branch stock transfers and central buying are not inferred from plan entitlement.

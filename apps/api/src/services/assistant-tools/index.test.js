@@ -8,6 +8,12 @@ vi.mock('../../lib/feature-flags.js', () => ({
   isFeatureEnabledForTenant: vi.fn(async () => true),
 }))
 
+vi.mock('../restaurant-price-intelligence.service.js', () => ({ getProductPriceHistory: vi.fn() }))
+vi.mock('../../lib/intelligence-tier.js', () => ({
+  getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
+  INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
+}))
+
 vi.mock('../restaurant-reorder-assistance.service.js', () => ({
   getReorderAssistance: vi.fn(),
 }))
@@ -63,6 +69,7 @@ vi.mock('../../lib/subscription.js', () => ({
 }))
 
 import { query } from '../../lib/db.js'
+import { getProductPriceHistory } from '../restaurant-price-intelligence.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 
@@ -93,6 +100,21 @@ describe('assistant tools', () => {
     expect(names).not.toContain('get_admin_overview')
   })
 
+  it('offers and runs price history only with catalog permission and intelligence', async () => {
+    getProductPriceHistory.mockResolvedValue({
+      productId: 'p1',
+      events: [{ id: 'event-1' }],
+      summary: { observations: 1 },
+    })
+    const ctx = restaurantCtx({ permissions: [P.CATALOG_VIEW] })
+    expect((await resolveAvailableTools(ctx)).names).toContain('get_price_history')
+    const result = await executeAssistantTool(ctx, 'get_price_history', {
+      productId: 'p1',
+      days: 30,
+    })
+    expect(getProductPriceHistory).toHaveBeenCalledWith('rest-1', 'p1', { days: 30, limit: 15 })
+    expect(result.summary.observations).toBe(1)
+  })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(
       executeAssistantTool(restaurantCtx(), 'get_fulfillment_board', {})
