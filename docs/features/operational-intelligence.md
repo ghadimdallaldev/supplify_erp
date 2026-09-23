@@ -148,6 +148,12 @@ It does not refresh, calculate, aggregate quantities across different product un
 
 A signal exists only where at least two authorized Branch Accounts bought the exact same catalog product from the same supplier at different stored unit prices in the selected reporting window. It reports the observed range and branch count; it does not match different products, infer equivalent packs or contract terms, choose a supplier, recommend a purchase, create a cart/order, or enable central purchasing.
 
+## Stock-transfer suggestions (implemented)
+
+`GET /api/restaurant-org/reports/stock-transfer-suggestions` is a Scale, read-only review surface. It requires `multi_branch`, forecast-capable `smart_reorder`, `INVENTORY_VIEW`, and Scale intelligence. It suggests an exact shared product only when a destination has a fresh high/urgent reorder forecast and an authorized source has a recorded low-stock threshold with stock above it.
+
+It does not reserve, move, adjust, or rebuild inventory; create a transfer/order/cart; infer interchangeable products; or override either Branch Account's policies. The displayed quantity is bounded by the source's recorded surplus and the destination's stored forecast quantity.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

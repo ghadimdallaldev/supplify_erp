@@ -9,6 +9,7 @@ import {
   useGetRestaurantOrgBranchComparisonQuery,
   useGetRestaurantOrgBranchDemandForecastQuery,
   useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
+  useGetRestaurantOrgStockTransferSuggestionsQuery,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -64,6 +65,10 @@ export function RestaurantOrgOverviewPage() {
     can('CATALOG_VIEW') &&
     can('ORDERS_VIEW')
 
+  const { data: transferSuggestions } = useGetRestaurantOrgStockTransferSuggestionsQuery(
+    undefined,
+    { skip: !isEffectiveRestaurant || !canViewBranchDemandForecast }
+  )
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
   })
@@ -158,6 +163,24 @@ export function RestaurantOrgOverviewPage() {
         </div>
       ) : null}
 
+      {transferSuggestions?.data?.suggestions?.length ? (
+        <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
+          <h2 className="font-semibold">Stock-transfer suggestions</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Review-only: no stock is reserved or moved.
+          </p>
+          <ul className="mt-3 space-y-1 text-sm">
+            {transferSuggestions.data.suggestions.slice(0, 6).map((s) => (
+              <li
+                key={`${s.sourceBranchAccountName}-${s.destinationBranchAccountName}-${s.productId}`}
+              >
+                {s.productName}: {s.suggestedQty} {s.productUnit} from {s.sourceBranchAccountName}{' '}
+                to {s.destinationBranchAccountName} · {s.urgency}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {purchasingInsights?.data?.signals?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Cross-branch purchase price ranges</h2>

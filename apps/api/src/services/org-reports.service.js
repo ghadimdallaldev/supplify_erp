@@ -452,6 +452,69 @@ export async function restaurantOrgCrossBranchPurchasingInsights(
     meta,
   }
 }
+/** Recommendation-only transfer hints using an exact shared product identity.
+ * They never reserve, move, or adjust inventory. */
+export async function restaurantOrgStockTransferSuggestions(
+  userId,
+  organizationId,
+  queryParams = {}
+) {
+  const requested = parseRequestedBranchIds(queryParams)
+  const branchIds = await resolveAuthorizedRestaurantBranchIds(userId, organizationId, requested)
+  const meta = { branchAccountIds: branchIds, maxSuggestions: 20, source: 'fresh_reorder_forecast' }
+  if (!branchIds.length) return { data: { suggestions: [] }, meta }
+  const { rows } = await query(
+    `
+    WITH recipients AS (
+      SELECT rf.restaurant_id AS destination_restaurant_id, rf.product_id,
+        rf.forecast_reorder_qty, rf.urgency, p.name AS product_name, p.unit AS product_unit
+      FROM reorder_forecast rf
+      JOIN product p ON p.id = rf.product_id
+      WHERE rf.restaurant_id = ANY($1::uuid[]) AND rf.branch_id IS NULL
+        AND rf.stale_after > now() AND rf.urgency IN ('URGENT','HIGH')
+        AND rf.forecast_reorder_qty IS NOT NULL AND rf.forecast_reorder_qty > 0
+    ), ranked AS (
+      SELECT r.destination_restaurant_id, dest.name AS destination_branch_account_name,
+        donor.id AS source_restaurant_id, donor.name AS source_branch_account_name,
+        r.product_id, r.product_name, r.product_unit, r.urgency,
+        di.quantity - di.low_stock_threshold AS source_surplus_qty,
+        r.forecast_reorder_qty,
+        LEAST(di.quantity - di.low_stock_threshold, r.forecast_reorder_qty) AS suggested_qty,
+        ROW_NUMBER() OVER (
+          PARTITION BY r.destination_restaurant_id, r.product_id
+          ORDER BY (di.quantity - di.low_stock_threshold) DESC, donor.name ASC
+        ) AS donor_rank
+      FROM recipients r
+      JOIN restaurant dest ON dest.id = r.destination_restaurant_id
+      JOIN restaurant_inventory di ON di.product_id = r.product_id
+      JOIN restaurant donor ON donor.id = di.restaurant_id
+      WHERE di.restaurant_id = ANY($1::uuid[]) AND di.restaurant_id <> r.destination_restaurant_id
+        AND di.low_stock_threshold IS NOT NULL AND di.quantity > di.low_stock_threshold
+    )
+    SELECT * FROM ranked WHERE donor_rank = 1 AND suggested_qty > 0
+    ORDER BY CASE urgency WHEN 'URGENT' THEN 1 ELSE 2 END, suggested_qty DESC
+    LIMIT $2`,
+    [branchIds, meta.maxSuggestions]
+  )
+  return {
+    data: {
+      suggestions: rows.map((r) => ({
+        sourceBranchAccountId: r.source_restaurant_id,
+        sourceBranchAccountName: r.source_branch_account_name,
+        destinationBranchAccountId: r.destination_restaurant_id,
+        destinationBranchAccountName: r.destination_branch_account_name,
+        productId: r.product_id,
+        productName: r.product_name,
+        productUnit: r.product_unit,
+        urgency: r.urgency,
+        sourceSurplusQty: Number(r.source_surplus_qty),
+        destinationForecastQty: Number(r.forecast_reorder_qty),
+        suggestedQty: Number(r.suggested_qty),
+      })),
+    },
+    meta,
+  }
+}
 export async function supplierOrgConsolidatedOverview(userId, organizationId, queryParams = {}) {
   const params = parseReportQuery(queryParams)
   const { limit, offset } = parsePagination(queryParams)

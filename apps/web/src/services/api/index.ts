@@ -322,6 +322,7 @@ export const {
   useGetRestaurantOrgBranchComparisonQuery,
   useGetRestaurantOrgBranchDemandForecastQuery,
   useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
+  useGetRestaurantOrgStockTransferSuggestionsQuery,
   useGetCentralPurchasingDraftsQuery,
   useCreateCentralPurchasingDraftMutation,
   useUpdateCentralPurchasingDraftMutation,

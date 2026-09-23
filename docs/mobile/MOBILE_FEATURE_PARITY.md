@@ -1102,3 +1102,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: Scale read-only organization-page comparison of exact same-product/same-supplier order-line price ranges across authorized Branch Accounts. It creates no purchase, cart, transfer, notification, budget, or central-purchasing capability.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization-level purchase-price comparison surface. Adding an unreachable query/type would not provide a visible mobile capability.
 - **Revisit when**: a native organization purchasing-insights surface is scheduled; add the endpoint type/query, `CATALOG_VIEW`/`ORDERS_VIEW`/Scale gates, and visible UI to both clients together.
+
+## 2026-09-23 - Stock-transfer suggestions (web-only)
+
+- **Change**: Scale read-only transfer hints based on exact product identity, fresh destination forecasts, and explicit source surplus; no transfer mutation exists.
+- **Parity decision**: **Skipped on mobile, intentionally.** Native clients have no organization-level inventory review surface or transfer workflow.
+- **Revisit when**: a native review-only organization inventory surface is scheduled; add the type/query, gates, and visible UI to both clients together.

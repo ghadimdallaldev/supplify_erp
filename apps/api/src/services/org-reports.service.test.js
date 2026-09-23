@@ -11,6 +11,7 @@ const {
   restaurantOrgBranchComparison,
   restaurantOrgBranchDemandForecast,
   restaurantOrgCrossBranchPurchasingInsights,
+  restaurantOrgStockTransferSuggestions,
 } = await import('./org-reports.service.js')
 
 describe('restaurantOrgBranchComparison', () => {
@@ -143,6 +144,37 @@ describe('restaurantOrgCrossBranchPurchasingInsights', () => {
       minUnitPrice: 5,
       maxUnitPrice: 6,
       priceSpreadPct: 20,
+    })
+  })
+})
+
+describe('restaurantOrgStockTransferSuggestions', () => {
+  it('returns recommendation-only exact-product surplus-to-forecast facts', async () => {
+    queryMock.mockReset()
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          source_restaurant_id: 'source',
+          source_branch_account_name: 'Main',
+          destination_restaurant_id: 'destination',
+          destination_branch_account_name: 'North',
+          product_id: 'product-1',
+          product_name: 'Tomatoes',
+          product_unit: 'kg',
+          urgency: 'HIGH',
+          source_surplus_qty: '12',
+          forecast_reorder_qty: '8',
+          suggested_qty: '8',
+        },
+      ],
+    })
+    const result = await restaurantOrgStockTransferSuggestions('user-1', 'org-1')
+    expect(queryMock.mock.calls[0][0]).toContain('di.low_stock_threshold IS NOT NULL')
+    expect(queryMock.mock.calls[0][0]).toContain("rf.urgency IN ('URGENT','HIGH')")
+    expect(result.data.suggestions[0]).toMatchObject({
+      sourceBranchAccountId: 'source',
+      destinationBranchAccountId: 'destination',
+      suggestedQty: 8,
     })
   })
 })

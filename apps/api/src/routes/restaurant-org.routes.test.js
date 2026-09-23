@@ -98,6 +98,9 @@ vi.mock('../services/org-reports.service.js', () => ({
     },
     meta: {},
   }),
+  restaurantOrgStockTransferSuggestions: vi
+    .fn()
+    .mockResolvedValue({ data: { suggestions: [] }, meta: {} }),
   restaurantOrgCrossBranchPurchasingInsights: vi.fn().mockResolvedValue({
     data: {
       signals: [],
@@ -156,6 +159,7 @@ import {
   restaurantOrgBranchComparison,
   restaurantOrgBranchDemandForecast,
   restaurantOrgCrossBranchPurchasingInsights,
+  restaurantOrgStockTransferSuggestions,
   restaurantOrgConsolidatedOverview,
 } from '../services/org-reports.service.js'
 
@@ -274,6 +278,11 @@ describe('restaurant-org.routes', () => {
       .expect(200)
     expect(restaurantOrgCrossBranchPurchasingInsights).toHaveBeenCalledWith('user-1', 'org-1', {})
     expect(res.body.data.coverage.comparableOnly).toBe('same_product_and_supplier')
+  })
+
+  it('GET /reports/stock-transfer-suggestions returns suggestions only', async () => {
+    await request(app).get('/api/restaurant-org/reports/stock-transfer-suggestions').expect(200)
+    expect(restaurantOrgStockTransferSuggestions).toHaveBeenCalledWith('user-1', 'org-1', {})
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

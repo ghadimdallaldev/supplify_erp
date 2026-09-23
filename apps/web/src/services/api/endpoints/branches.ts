@@ -464,6 +464,25 @@ export const branchesApi = api.injectEndpoints({
       query: () => '/api/restaurant-org/reports/purchasing-insights',
       providesTags: ['RestaurantOrg'],
     }),
+    getRestaurantOrgStockTransferSuggestions: builder.query<
+      {
+        data: {
+          suggestions: Array<{
+            sourceBranchAccountName: string
+            destinationBranchAccountName: string
+            productId: string
+            productName: string
+            productUnit: string
+            urgency: string
+            suggestedQty: number
+          }>
+        }
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/stock-transfer-suggestions',
+      providesTags: ['RestaurantOrg'],
+    }),
     getCentralPurchasingDrafts: builder.query<
       { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
       void

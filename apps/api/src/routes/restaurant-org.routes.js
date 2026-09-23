@@ -51,6 +51,7 @@ import {
   restaurantOrgBranchComparison,
   restaurantOrgBranchDemandForecast,
   restaurantOrgCrossBranchPurchasingInsights,
+  restaurantOrgStockTransferSuggestions,
 } from '../services/org-reports.service.js'
 import {
   assertCentralPurchasingEnabled,
@@ -1201,6 +1202,39 @@ router.get(
         error: {
           name: error.code || 'INTERNAL_ERROR',
           message: error.message || 'Failed to load cross-branch purchasing insights',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+router.get(
+  '/reports/stock-transfer-suggestions',
+  multiBranchFeature,
+  requireFeature(
+    'smart_reorder',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('INVENTORY_VIEW'),
+  requireSmartReorderForecast,
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgStockTransferSuggestions(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/stock-transfer-suggestions error:', error)
+      res.status(error.statusCode || error.status || 500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load stock-transfer suggestions',
         },
         requestId: req.requestId,
       })
