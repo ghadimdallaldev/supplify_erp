@@ -6,6 +6,10 @@ vi.mock('../../lib/db.js', () => ({
 
 vi.mock('../../lib/feature-flags.js', () => ({
   isFeatureEnabledForTenant: vi.fn(async () => true),
+  getResolvedFeatureValue: vi.fn(async () => 'forecast'),
+}))
+vi.mock('../../lib/smart-reorder-tier.js', () => ({
+  hasSmartReorderCapability: vi.fn(() => true),
 }))
 
 vi.mock('../restaurant-price-intelligence.service.js', () => ({
@@ -25,7 +29,10 @@ vi.mock('../restaurant-over-ordering-intelligence.service.js', () => ({
 vi.mock('../restaurant-invoice-anomaly-intelligence.service.js', () => ({
   listInvoiceAnomalies: vi.fn(),
 }))
-vi.mock('../org-reports.service.js', () => ({ restaurantOrgBranchComparison: vi.fn() }))
+vi.mock('../org-reports.service.js', () => ({
+  restaurantOrgBranchComparison: vi.fn(),
+  restaurantOrgStockTransferSuggestions: vi.fn(),
+}))
 vi.mock('../../lib/restaurant-org.js', () => ({
   getUserRestaurantOrgMembership: vi.fn(async () => null),
 }))
@@ -98,7 +105,10 @@ import { listSupplierReliability } from '../restaurant-supplier-reliability.serv
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
-import { restaurantOrgBranchComparison } from '../org-reports.service.js'
+import {
+  restaurantOrgBranchComparison,
+  restaurantOrgStockTransferSuggestions,
+} from '../org-reports.service.js'
 import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
@@ -254,6 +264,24 @@ describe('assistant tools', () => {
       to: '2026-09-30',
     })
     expect(result.data.branches).toHaveLength(1)
+  })
+  it('runs transfer suggestions with multi-branch and forecast gates', async () => {
+    getUserRestaurantOrgMembership.mockResolvedValue({ organization_id: 'org-1' })
+    query.mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    restaurantOrgStockTransferSuggestions.mockResolvedValue({
+      data: { suggestions: [{ productId: 'p1' }] },
+      meta: {},
+    })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.INVENTORY_VIEW] }),
+      'get_transfer_suggestions',
+      {}
+    )
+
+    expect(restaurantOrgStockTransferSuggestions).toHaveBeenCalledWith('user-1', 'org-1')
+    expect(result.data.suggestions).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(

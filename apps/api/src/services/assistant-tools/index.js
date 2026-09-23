@@ -2,7 +2,8 @@ import { query } from '../../lib/db.js'
 import { hasPermission } from '../../lib/permissions.js'
 import { rolesIncludeOwner } from '../../lib/tenant-roles.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
-import { isFeatureEnabledForTenant } from '../../lib/feature-flags.js'
+import { isFeatureEnabledForTenant, getResolvedFeatureValue } from '../../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../../lib/smart-reorder-tier.js'
 import { getReorderAssistance } from '../restaurant-reorder-assistance.service.js'
 import { getOrderTracking } from '../driver-location.service.js'
 import { getRestaurantPayables } from '../restaurant-payables.service.js'
@@ -25,7 +26,10 @@ import { listSupplierReliability } from '../restaurant-supplier-reliability.serv
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
-import { restaurantOrgBranchComparison } from '../org-reports.service.js'
+import {
+  restaurantOrgBranchComparison,
+  restaurantOrgStockTransferSuggestions,
+} from '../org-reports.service.js'
 import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import {
   getIntelligenceTierForTenant,
@@ -92,6 +96,17 @@ async function organizationFeatureOn(ctx, featureKey) {
   const org = await getRestaurantOrgScope(ctx)
   if (!org) return false
   return isFeatureEnabledForTenant(org.primaryRestaurantId, 'RESTAURANT', featureKey)
+}
+
+async function organizationHasForecast(ctx) {
+  const org = await getRestaurantOrgScope(ctx)
+  if (!org) return false
+  const featureValue = await getResolvedFeatureValue(
+    org.primaryRestaurantId,
+    'RESTAURANT',
+    'smart_reorder'
+  )
+  return hasSmartReorderCapability(featureValue, 'forecast')
 }
 
 /** @type {Record<string, { definition: import('../../lib/ai/provider.js').AiToolDefinition, available: (ctx: AssistantToolContext) => Promise<boolean>, run: (ctx: AssistantToolContext, args: Record<string, unknown>) => Promise<unknown> }>} */
@@ -687,6 +702,26 @@ const TOOLS = {
         ...result,
         data: { ...result.data, branches: cap(result.data?.branches) },
       }
+    },
+  },
+  get_transfer_suggestions: {
+    definition: {
+      name: 'get_transfer_suggestions',
+      description:
+        'Read-only cross-branch stock-transfer suggestions from fresh forecasts and observed surplus.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      (await organizationFeatureOn(ctx, 'multi_branch')) &&
+      (await organizationHasForecast(ctx)) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx) => {
+      const org = await getRestaurantOrgScope(ctx)
+      if (!org) throw new Error('Restaurant organization access is required')
+      const result = await restaurantOrgStockTransferSuggestions(ctx.userId, org.organizationId)
+      return { ...result, data: { ...result.data, suggestions: cap(result.data?.suggestions) } }
     },
   },
   get_waste: {
