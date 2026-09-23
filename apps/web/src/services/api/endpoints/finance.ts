@@ -1,4 +1,24 @@
 import { api } from '../base'
+export type SupplierDemandForecastResponse = {
+  observationDays: number
+  recentDays: number
+  horizonDays: number
+  coverage: {
+    productsWithCompletedSales: number
+    productsWithSufficientHistory: number
+  }
+  forecasts: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    soldQuantity30: number
+    soldQuantity90: number
+    saleDays90: number
+    orderCount90: number
+    forecastDailyDemand: number
+    projectedDemandQty: number
+  }>
+}
 export type SupplierSlowMovingInventoryResponse = {
   windowDays: number
   coverage: {
@@ -150,6 +170,10 @@ export const financeApi = api.injectEndpoints({
     getSupplierCommandCenter: builder.query<any, void>({
       query: () => '/api/supplier/command-center',
       providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
+    }),
+    getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
+      query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
     }),
     getSupplierSlowMovingInventory: builder.query<SupplierSlowMovingInventoryResponse, void>({
       query: () => '/api/supplier/slow-moving-inventory',

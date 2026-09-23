@@ -2,11 +2,20 @@ import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { listSupplierSlowMovingInventory, getRequestTenant, gates } = vi.hoisted(() => ({
-  listSupplierSlowMovingInventory: vi.fn(),
-  getRequestTenant: vi.fn(),
-  gates: { inventory: true, tier: 'scale', permissions: new Set(['WAREHOUSES_VIEW']), order: [] },
-}))
+const { listSupplierSlowMovingInventory, listSupplierDemandForecast, getRequestTenant, gates } =
+  vi.hoisted(() => ({
+    listSupplierSlowMovingInventory: vi.fn(),
+    listSupplierDemandForecast: vi.fn(),
+    getRequestTenant: vi.fn(),
+    gates: {
+      inventory: true,
+      smartReorder: true,
+      forecast: true,
+      tier: 'scale',
+      permissions: new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW']),
+      order: [],
+    },
+  }))
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, _res, next) => {
@@ -38,10 +47,22 @@ vi.mock('../lib/subscription.js', () => ({
     if (feature === 'inventory_management' && !gates.inventory) {
       return res.status(403).json({ ok: false })
     }
+    if (feature === 'smart_reorder' && !gates.smartReorder) {
+      return res.status(403).json({ ok: false })
+    }
     return next()
   },
 }))
 
+vi.mock('../lib/feature-flags.js', () => ({
+  getResolvedFeatureValue: vi.fn().mockResolvedValue('ai_forecast_seasonality'),
+}))
+vi.mock('../lib/smart-reorder-tier.js', () => ({
+  hasSmartReorderCapability: vi.fn(() => {
+    gates.order.push('capability:forecast')
+    return gates.forecast
+  }),
+}))
 vi.mock('../lib/intelligence-tier.js', () => ({
   requireIntelligenceTier: (tier) => (_req, res, next) => {
     gates.order.push(`tier:${tier}`)
@@ -54,6 +75,7 @@ vi.mock('../lib/tenant-resolve.js', () => ({ requireSupplierId: vi.fn() }))
 vi.mock('../services/supplier-slow-moving-intelligence.service.js', () => ({
   listSupplierSlowMovingInventory,
 }))
+vi.mock('../services/supplier-demand-forecast.service.js', () => ({ listSupplierDemandForecast }))
 
 const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
 
@@ -63,21 +85,20 @@ function buildApp() {
   return app
 }
 
-describe('supplier slow-moving inventory route', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    gates.inventory = true
-    gates.tier = 'scale'
-    gates.permissions = new Set(['WAREHOUSES_VIEW'])
-    gates.order = []
-    getRequestTenant.mockResolvedValue({ tenantId: 'supplier-1', tenantType: 'SUPPLIER' })
-    listSupplierSlowMovingInventory.mockResolvedValue({
-      products: [],
-      coverage: {},
-      windowDays: 90,
-    })
-  })
+beforeEach(() => {
+  vi.clearAllMocks()
+  gates.inventory = true
+  gates.smartReorder = true
+  gates.forecast = true
+  gates.tier = 'scale'
+  gates.permissions = new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW'])
+  gates.order = []
+  getRequestTenant.mockResolvedValue({ tenantId: 'supplier-1', tenantType: 'SUPPLIER' })
+  listSupplierSlowMovingInventory.mockResolvedValue({ products: [], coverage: {}, windowDays: 90 })
+  listSupplierDemandForecast.mockResolvedValue({ forecasts: [], coverage: {}, horizonDays: 14 })
+})
 
+describe('supplier slow-moving inventory route', () => {
   it('requires warehouse visibility, inventory management, and Supplier Scale in authorization order', async () => {
     const res = await request(buildApp())
       .get('/api/supplier/slow-moving-inventory?days=120&limit=5')
@@ -108,12 +129,46 @@ describe('supplier slow-moving inventory route', () => {
     await request(buildApp()).get('/api/supplier/slow-moving-inventory').expect(403)
     expect(listSupplierSlowMovingInventory).not.toHaveBeenCalled()
   })
+})
+
+describe('supplier demand forecast route', () => {
+  it('requires order visibility, forecasting capability, and Supplier Scale in authorization order', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/demand-forecast?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { forecasts: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke the forecast service without a forecast capability or Scale intelligence', async () => {
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/demand-forecast').expect(403)
+    expect(listSupplierDemandForecast).not.toHaveBeenCalled()
+
+    gates.forecast = true
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/demand-forecast').expect(403)
+    expect(listSupplierDemandForecast).not.toHaveBeenCalled()
+  })
 
   it('uses the session supplier rather than a requested supplier id', async () => {
     await request(buildApp())
-      .get('/api/supplier/slow-moving-inventory?supplierId=other-supplier')
+      .get('/api/supplier/demand-forecast?supplierId=other-supplier')
       .expect(200)
 
-    expect(listSupplierSlowMovingInventory.mock.calls[0][0]).toBe('supplier-1')
+    expect(listSupplierDemandForecast.mock.calls[0][0]).toBe('supplier-1')
   })
 })

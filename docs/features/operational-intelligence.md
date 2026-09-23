@@ -45,6 +45,14 @@ The response keeps coverage explicit: stocked products, products with enough rep
 
 This is a review signal, not an inventory policy. It does not infer a target stock level, forecast demand, create or change a deal, alter stock, reserve inventory, notify customers, or create purchasing/budget/central-purchasing behaviour.
 
+## Supplier demand forecast (implemented)
+
+`GET /api/supplier/demand-forecast` is a Supplier Scale, read-only Command Center forecast of outbound product demand. It requires `ORDERS_VIEW`, the existing `smart_reorder` forecast capability (not Growth’s `suggestions_only` capability), and the effective `scale` intelligence tier. The supplier identity is always resolved from the authenticated tenant context.
+
+It reads completed, non-cancelled supplier order lines only. Each forecast uses 90 days of recorded sales, with a 60/40 blend of the 30-day and 90-day daily rates when the product sold in the recent period; otherwise it uses the 90-day rate. A product must have positive completed sales on at least seven distinct days before it is forecast. The response reports the 14-day projection by default (configurable to 1–90 days), its observed rates, and explicit coverage counts so missing history is never represented as zero demand.
+
+It does not read or alter stock, claim a stockout, create a replenishment suggestion, create an order/deal/notification, infer customer intent, or introduce purchasing-budget or central-purchasing behavior. Stockout prediction remains a separate future unit because it requires combining this demand signal with authoritative stock and replenishment facts.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

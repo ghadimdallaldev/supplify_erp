@@ -15,6 +15,8 @@ import {
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../lib/smart-reorder-tier.js'
 import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { config } from '../config/env.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
@@ -29,6 +31,7 @@ import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
 import { listSupplierSlowMovingInventory } from '../services/supplier-slow-moving-intelligence.service.js'
+import { listSupplierDemandForecast } from '../services/supplier-demand-forecast.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -260,12 +263,52 @@ const smartReorderGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+async function requireSupplierForecastCapability(req, res, next) {
+  try {
+    const featureValue = await getResolvedFeatureValue(
+      req.tenantContext?.tenantId,
+      req.tenantContext?.tenantType,
+      'smart_reorder'
+    )
+    if (!hasSmartReorderCapability(featureValue, 'forecast')) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FEATURE_NOT_AVAILABLE', message: 'Forecasting capability is required' },
+        requestId: req.requestId,
+      })
+    }
+    return next()
+  } catch (err) {
+    return next(err)
+  }
+}
+
 const inventoryManagementGate = requireFeature(
   'inventory_management',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
 
+router.get(
+  '/demand-forecast',
+  requirePermission('ORDERS_VIEW'),
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierDemandForecast(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/slow-moving-inventory',
   requirePermission('WAREHOUSES_VIEW'),

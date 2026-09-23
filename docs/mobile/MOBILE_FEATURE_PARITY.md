@@ -1165,3 +1165,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has the supplier Command Center / warehouse analytics review surface needed to make this result useful. Adding an unreachable endpoint client and type would not provide user-visible parity.
 - **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
 - **Revisit when**: native supplier command-center or warehouse analytics is scheduled; add the endpoint query/type and visible review surface to Android and iOS together.
+
+## 2026-09-24 - Supplier demand forecast (web-only)
+
+- **Change**: `GET /api/supplier/demand-forecast` and a read-only Supplier Command Center panel project observed completed-order demand for products with sufficient sales history. They require `ORDERS_VIEW`, forecast-capable `smart_reorder`, and Supplier Scale intelligence; no stock, order, deal, notification, budget, or purchase is changed.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has a supplier Command Center or supplier sales-forecast review surface. A query/type with no visible native entry point would not provide parity.
+- **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
+- **Revisit when**: native supplier sales/operations analytics is scheduled; implement the endpoint type/query and visible review UI on Android and iOS together.

@@ -35,6 +35,7 @@ import {
 } from '../components/supplier/ReorderReminderReviewDialog'
 import { SupplierFollowUpPanel } from '../components/supplier/SupplierFollowUpPanel'
 import { SupplierSlowMovingInventoryPanel } from '../components/supplier/SupplierSlowMovingInventoryPanel'
+import { SupplierDemandForecastPanel } from '../components/supplier/SupplierDemandForecastPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -667,6 +668,8 @@ export function SupplierCommandCenterPage() {
         {layout.showReorder && <SupplierFollowUpPanel className="mb-4" />}
 
         {layout.showLowStockPreview && <SupplierSlowMovingInventoryPanel />}
+
+        {layout.showReorder && <SupplierDemandForecastPanel />}
 
         {layout.showReorder && (
           <section

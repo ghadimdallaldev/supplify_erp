@@ -78,6 +78,14 @@
       "emptyTitle": "No slow-moving stock found",
       "emptyDescription": "Products need repeated completed-order history before this review can report a result."
     },
+    "demandForecast": {
+      "title": "Demand forecast",
+      "description": "Recorded completed-order demand projected for the next {{horizon}} days from the last {{observation}} days.",
+      "loading": "Calculating recorded demand…",
+      "item": "{{quantity}} projected over {{horizon}} days ({{daily}} per day)",
+      "emptyTitle": "Not enough sales history",
+      "emptyDescription": "Products need completed sales on at least seven days before this forecast reports a result."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",
