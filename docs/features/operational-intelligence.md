@@ -200,6 +200,10 @@ The assistant exposes get_waste_intelligence for deterministic repeat-waste and 
 
 The assistant exposes get_supplier_reliability for observed receiving, delivery, and dispute facts by supplier. It reuses the deterministic supplier-reliability service, limits the requested window to 730 days and returned suppliers to 15, and requires the assistant entitlement/quota, receiving_quality, RECEIVING_VIEW, and Advanced-or-higher effective Intelligence. It cannot issue SQL, write data, or escape the active tenant.
 
+## Assistant recipe-profitability tool (implemented)
+
+The assistant exposes get_recipe_profitability for persisted menu-item cost and margin facts below the requested display threshold. It reuses the deterministic margin-intelligence service, caps results at 15, and requires the assistant entitlement/quota, recipe_costing, RECIPES_VIEW_COSTS, and Advanced-or-higher effective Intelligence. Its threshold is the existing filter, not an invented restaurant target; it cannot issue SQL, write data, or escape the active tenant.
+
 ## Scope boundaries
 
 Restaurant Scale enables multi-branch insight, not centralized purchasing. `/api/restaurant-org/central-purchasing/*` deliberately returns `410 Gone` until a separately designed, authorized cross-branch workflow exists. Inventory remains restaurant-scoped; cross-branch stock transfers and central buying are not inferred from plan entitlement.

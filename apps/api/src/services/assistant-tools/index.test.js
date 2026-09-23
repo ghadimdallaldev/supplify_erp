@@ -16,6 +16,9 @@ vi.mock('../restaurant-waste-intelligence.service.js', () => ({ getWasteIntellig
 vi.mock('../restaurant-supplier-reliability.service.js', () => ({
   listSupplierReliability: vi.fn(),
 }))
+vi.mock('../restaurant-margin-intelligence.service.js', () => ({
+  listWeakMarginMenuItems: vi.fn(),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -82,6 +85,7 @@ import {
 } from '../restaurant-price-intelligence.service.js'
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
+import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -169,6 +173,22 @@ describe('assistant tools', () => {
 
     expect(listSupplierReliability).toHaveBeenCalledWith('rest-1', { days: 120 })
     expect(result.suppliers).toHaveLength(1)
+  })
+  it('runs recipe profitability with cost and advanced-intelligence gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'advanced' })
+    listWeakMarginMenuItems.mockResolvedValue({ items: [{ recipeId: 'r1' }] })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.RECIPES_VIEW_COSTS] }),
+      'get_recipe_profitability',
+      { maxMarginPct: 55 }
+    )
+
+    expect(listWeakMarginMenuItems).toHaveBeenCalledWith('rest-1', {
+      maxMarginPct: 55,
+      limit: 15,
+    })
+    expect(result.items).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(

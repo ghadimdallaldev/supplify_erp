@@ -22,6 +22,7 @@ import {
 } from '../restaurant-price-intelligence.service.js'
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
+import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -540,6 +541,34 @@ const TOOLS = {
       const days = Math.min(Math.max(Number(args.days) || 90, 7), 730)
       const result = await listSupplierReliability(ctx.tenantId, { days })
       return { ...result, suppliers: cap(result.suppliers) }
+    },
+  },
+  get_recipe_profitability: {
+    definition: {
+      name: 'get_recipe_profitability',
+      description:
+        'Computed menu-item profitability facts below a selected gross-margin threshold.',
+      parameters: {
+        type: 'object',
+        properties: {
+          maxMarginPct: {
+            type: 'number',
+            description: 'Gross-margin display threshold, default 60',
+          },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.RECIPES_VIEW_COSTS) &&
+      (await featureOn(ctx, 'recipe_costing')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const result = await listWeakMarginMenuItems(ctx.tenantId, {
+        maxMarginPct: args.maxMarginPct,
+        limit: ROW_CAP,
+      })
+      return { ...result, items: cap(result.items) }
     },
   },
   get_waste: {
