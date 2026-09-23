@@ -22,6 +22,9 @@ vi.mock('../restaurant-margin-intelligence.service.js', () => ({
 vi.mock('../restaurant-over-ordering-intelligence.service.js', () => ({
   listOverOrderingIntelligence: vi.fn(),
 }))
+vi.mock('../restaurant-invoice-anomaly-intelligence.service.js', () => ({
+  listInvoiceAnomalies: vi.fn(),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -90,6 +93,7 @@ import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.j
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
+import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -206,6 +210,23 @@ describe('assistant tools', () => {
 
     expect(listOverOrderingIntelligence).toHaveBeenCalledWith('rest-1', { days: 120, limit: 15 })
     expect(result.products).toHaveLength(1)
+  })
+  it('runs invoice anomalies with source and advanced-intelligence gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'advanced' })
+    listInvoiceAnomalies.mockResolvedValue({ summary: {}, invoices: [{ invoiceId: 'i1' }] })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.INVOICES_VIEW] }),
+      'get_invoice_anomalies',
+      { days: 120, minChangePct: 8 }
+    )
+
+    expect(listInvoiceAnomalies).toHaveBeenCalledWith('rest-1', {
+      days: 120,
+      minChangePct: 8,
+      limit: 15,
+    })
+    expect(result.invoices).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(

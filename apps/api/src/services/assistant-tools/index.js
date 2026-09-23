@@ -24,6 +24,7 @@ import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.j
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
+import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -595,6 +596,34 @@ const TOOLS = {
       const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
       const result = await listOverOrderingIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
       return { ...result, products: cap(result.products) }
+    },
+  },
+  get_invoice_anomalies: {
+    definition: {
+      name: 'get_invoice_anomalies',
+      description:
+        'Factual invoice-line differences from order, contract, and prior invoice records.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+          minChangePct: { type: 'number', description: 'Minimum prior-price movement percentage' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVOICES_VIEW) &&
+      (await featureOn(ctx, 'finance_invoices')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 7), 365)
+      const result = await listInvoiceAnomalies(ctx.tenantId, {
+        days,
+        minChangePct: args.minChangePct,
+        limit: ROW_CAP,
+      })
+      return { ...result, invoices: cap(result.invoices) }
     },
   },
   get_waste: {
