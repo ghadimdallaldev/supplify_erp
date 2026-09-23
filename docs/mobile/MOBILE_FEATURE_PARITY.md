@@ -1058,3 +1058,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS currently provide inventory adjustment and waste logging only; neither has the web Waste & spoilage analytics surface or consumes this new endpoint. Adding an unseen client/query/type would not make a native feature available.
 - **Contract impact on mobile**: none for existing mobile calls, types, permissions, notifications, deep links, or entitlement handling. waste_tracking, INVENTORY_VIEW, and intelligence are existing gates; the native apps already fail closed on missing intelligence entitlement.
 - **Revisit when**: a native waste analytics/operational-intelligence surface is scheduled. That work should add this endpoint's types/query and render the data on both clients together.
+
+## 2026-09-23 - Restaurant supplier reliability (web-only)
+
+- **Change**: GET /api/restaurant-intelligence/supplier-reliability combines existing order completion, receiving fill/quality, scheduled driver-assignment timing, and dispute records into an advanced-tier read-only card on the web Receiving page.
+- **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS support receiving and waste entry but have no supplier-performance or receiving-analytics screen where this comparative multi-supplier information could be surfaced. Adding an unreachable query and types would not create a native capability.
+- **Contract impact on mobile**: none for existing mobile calls, types, permissions, notification payloads, deep links, or entitlement behavior. The existing receiving_quality, RECEIVING_VIEW, and intelligence gates are unchanged.
+- **Revisit when**: a native receiving analytics or purchasing-insights surface is scheduled. That work should add this endpoint's types/query and user interface to both mobile clients together.

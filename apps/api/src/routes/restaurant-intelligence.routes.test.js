@@ -13,6 +13,7 @@ const mockGetRestaurantIdForRequest = vi.fn()
 const mockListFoodCostWarnings = vi.fn()
 const mockListWeakMarginMenuItems = vi.fn()
 const mockGetWasteIntelligence = vi.fn()
+const mockListSupplierReliability = vi.fn()
 
 /** Permission middleware records what it was asked to enforce. */
 const requiredPermissions = []
@@ -84,6 +85,10 @@ vi.mock('../services/restaurant-waste-intelligence.service.js', () => ({
   getWasteIntelligence: (...args) => mockGetWasteIntelligence(...args),
 }))
 
+vi.mock('../services/restaurant-supplier-reliability.service.js', () => ({
+  listSupplierReliability: (...args) => mockListSupplierReliability(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -115,6 +120,7 @@ describe('restaurant intelligence routes', () => {
     mockListFoodCostWarnings.mockResolvedValue({ warnings: [], coverage: {} })
     mockListWeakMarginMenuItems.mockResolvedValue({ items: [] })
     mockGetWasteIntelligence.mockResolvedValue({ summary: {}, hotspots: [] })
+    mockListSupplierReliability.mockResolvedValue({ suppliers: [] })
     grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
     app = buildApp()
   })
@@ -266,6 +272,32 @@ describe('restaurant intelligence routes', () => {
         days: '90',
         limit: '50',
       })
+    })
+  })
+  describe('supplier reliability', () => {
+    it('requires RECEIVING_VIEW and the advanced tier', async () => {
+      expect(requiredPermissions).toContain('RECEIVING_VIEW')
+      grantedPermissions = new Set(['CATALOG_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app).get('/api/restaurant-intelligence/supplier-reliability').expect(403)
+      expect(mockListSupplierReliability).not.toHaveBeenCalled()
+
+      grantedPermissions = new Set(['RECEIVING_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('basic'))
+      await request(app).get('/api/restaurant-intelligence/supplier-reliability').expect(403)
+      expect(mockListSupplierReliability).not.toHaveBeenCalled()
+    })
+
+    it('serves only the session restaurant', async () => {
+      grantedPermissions = new Set(['RECEIVING_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app)
+        .get('/api/restaurant-intelligence/supplier-reliability?days=180&restaurantId=other')
+        .expect(200)
+
+      expect(mockListSupplierReliability).toHaveBeenCalledWith('restaurant-1', { days: '180' })
     })
   })
   it('passes client filters through for the service to clamp', async () => {

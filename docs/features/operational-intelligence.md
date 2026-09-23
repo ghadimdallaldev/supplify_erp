@@ -91,6 +91,22 @@ It reads only real inventory_adjustment rows of type WASTAGE and SPOILAGE, compa
 
 There is no platform "high waste" amount or estimated cost. Movements without a recorded cost are retained in coverage counts but excluded from cost comparisons, so the UI cannot treat incomplete cost data as a zero-cost or healthy result. The existing /api/restaurant-inventory/waste-analytics report remains the descriptive waste report; the Intelligence card appears on that same Waste & spoilage tab as its comparison/pattern layer.
 
+## Supplier reliability (implemented)
+
+GET /api/restaurant-intelligence/supplier-reliability is an advanced Restaurant Intelligence surface. It requires
+eceiving_quality, RECEIVING_VIEW, and the dvanced intelligence tier; the tier does not bypass the existing receiving domain gate or permission.
+
+It composes already-recorded facts for each supplier over a 7–730 day window (default 90 days):
+
+- **Order completion** from restaurant orders containing that supplier's items.
+- **Fill rate and quality** from
+  eceiving_report; fill rate is weighted by actual ordered/received quantities, and quality stays null when no report was scored.
+- **Delivery timing** from completed driver_assignments, compared with their operational scheduled delivery date. Deliveries without a schedule are counted as missing timing coverage, not late.
+- **Disputes** from the restaurant's supplier-linked dispute records, including unresolved disputes.
+
+The service returns the source measurements and only emits objective exceptions: a short receipt, a delivery recorded after its schedule, or an unresolved dispute. It intentionally has no composite reliability score, no arbitrary acceptable-quality target, and no claimed timing rate when scheduled delivery data is absent. The
+eports/restaurant/receiving-quality endpoint remains the descriptive receiving-quality report; the advanced card appears on the existing Receiving page.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

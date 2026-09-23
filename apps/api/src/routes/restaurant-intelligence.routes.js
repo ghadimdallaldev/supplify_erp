@@ -31,6 +31,7 @@ import {
   listWeakMarginMenuItems,
 } from '../services/restaurant-margin-intelligence.service.js'
 import { getWasteIntelligence } from '../services/restaurant-waste-intelligence.service.js'
+import { listSupplierReliability } from '../services/restaurant-supplier-reliability.service.js'
 
 const router = express.Router()
 
@@ -42,6 +43,12 @@ router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN'
 const canSeePurchasePrices = requirePermission('CATALOG_VIEW')
 const canSeeRecipeCosts = requirePermission('RECIPES_VIEW_COSTS')
 const canViewInventory = requirePermission('INVENTORY_VIEW')
+const canViewReceiving = requirePermission('RECEIVING_VIEW')
+const receivingQualityFeature = requireFeature(
+  'receiving_quality',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 const wasteTrackingFeature = requireFeature(
   'waste_tracking',
   (req) => req.tenantContext?.tenantId,
@@ -167,6 +174,25 @@ router.get(
         days: req.query.days,
         limit: req.query.limit,
       })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+// The existing receiving-quality feature remains a domain gate. This advanced
+// surface adds only deterministic supplier reliability facts and requires the
+// same receiving permission as the source data.
+router.get(
+  '/supplier-reliability',
+  receivingQualityFeature,
+  canViewReceiving,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listSupplierReliability(restaurantId, { days: req.query.days })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

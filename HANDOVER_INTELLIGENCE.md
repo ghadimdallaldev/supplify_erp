@@ -153,14 +153,14 @@ Three separate bugs were **entitlement reads against the wrong object shape**, i
 
 ## Continuation status — 2026-09-23
 
-Waste intelligence is complete in the commit containing this handover update. It adds GET /api/restaurant-intelligence/waste-intelligence, gated by the existing waste_tracking domain feature, INVENTORY_VIEW, and advanced intelligence tier. It reports only logged movements and never assigns a cost where none was recorded; mobile remains intentionally web-only because both native clients only provide waste logging, not a waste analytics surface. Full API/web/lint/typecheck and both mobile typecheck/Jest verification passed.
+Waste intelligence and supplier reliability are complete in the commits containing this handover update. Supplier reliability adds GET /api/restaurant-intelligence/supplier-reliability, gated by the existing receiving_quality domain feature, RECEIVING_VIEW, and advanced intelligence tier. It composes existing receiving, delivery, order, and dispute facts without inventing composite scores or treating missing coverage as zero; it is surfaced in the web Receiving page. Mobile remains intentionally web-only because both native clients provide receiving and waste entry, but no receiving analytics surface. Full web/lint/typecheck and both mobile typecheck/Jest verification passed. The full API suite retains its documented intermittent supplier-pain-killer timeout, while the new focused tests and that flaky file in isolation pass.
 
-**Resume with:** Phase 2 supplier reliability. Inspect receiving, order completion, dispute, and delivery services first; do not create a parallel implementation if existing reporting already supplies the required signals.
+**Resume with:** Phase 2 over-ordering detection. Inspect purchasing, receiving, usage, stock, and waste services first; do not create a parallel implementation if existing reporting already supplies the required signals.
 
 ### Phase 2 — Restaurant Intelligence (advanced tier)
 
 - [x] Waste intelligence — implemented 2026-09-23; tenant-scoped period comparison and repeat/rising-cost signals from real `WASTAGE`/`SPOILAGE` adjustments. Reuses the existing Waste & spoilage surface rather than creating a second dashboard.
-- [ ] Supplier reliability — fill rate, delivery timing, receiving quality, order completion, dispute/receiving data.
+- [x] Supplier reliability — implemented 2026-09-23; tenant-scoped supplier facts for fill rate, receiving quality, completed orders, delivery timing, and dispute state. Reuses established receiving, delivery, order, and dispute records, keeps data coverage explicit, and surfaces only factual exceptions.
 - [ ] Over-ordering detection — compare purchasing vs receiving vs usage vs stock vs waste. Flag meaningful patterns only.
 - [ ] Invoice / price anomaly detection — invoice vs order snapshot, invoice vs contract price, duplicates, abnormal movement. Keep it practical; not a fraud platform.
 - [ ] Purchasing budget — configurable budget, spend, remaining, % used, projected overspend; notify near/over threshold. Needs a migration.
