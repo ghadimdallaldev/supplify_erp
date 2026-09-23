@@ -154,6 +154,10 @@ A signal exists only where at least two authorized Branch Accounts bought the ex
 
 It does not reserve, move, adjust, or rebuild inventory; create a transfer/order/cart; infer interchangeable products; or override either Branch Account's policies. The displayed quantity is bounded by the source's recorded surplus and the destination's stored forecast quantity.
 
+## Advanced analytics (implemented)
+
+GET /api/restaurant-org/reports/advanced-analytics provides Scale read-only monthly order/spend trends for authorized Branch Accounts. It requires multi_branch, ORDERS_VIEW, and Scale intelligence. It validates dates but imposes no arbitrary maximum date span; it does not create or change operational data.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

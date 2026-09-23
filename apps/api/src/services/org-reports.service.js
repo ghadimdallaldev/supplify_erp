@@ -515,6 +515,44 @@ export async function restaurantOrgStockTransferSuggestions(
     meta,
   }
 }
+/** Monthly authorized-Branch-Account order trends with no arbitrary date-span cap. */
+export async function restaurantOrgAdvancedAnalytics(userId, organizationId, queryParams = {}) {
+  const requested = parseRequestedBranchIds(queryParams)
+  const branchIds = await resolveAuthorizedRestaurantBranchIds(userId, organizationId, requested)
+  const from = queryParams.from ? new Date(queryParams.from) : new Date('2000-01-01T00:00:00.000Z')
+  const to = queryParams.to ? new Date(queryParams.to) : new Date()
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to)
+    throw new ValidationError('Valid from and to dates are required')
+  if (!branchIds.length)
+    return { data: { months: [] }, meta: { branchAccountIds: [], unrestrictedDateRange: true } }
+  const { rows } = await query(
+    `
+    SELECT date_trunc('month', co.placed_at)::date AS month, r.id AS branch_account_id, r.name AS branch_account_name,
+      COUNT(*)::int AS order_count, COALESCE(SUM(co.total_amount),0)::numeric AS spend
+    FROM customer_order co JOIN restaurant r ON r.id=co.restaurant_id
+    WHERE co.restaurant_id = ANY($1::uuid[]) AND co.placed_at >= $2 AND co.placed_at <= $3
+      AND co.status NOT IN ('DRAFT','CANCELLED','PENDING_APPROVAL')
+    GROUP BY 1, r.id, r.name ORDER BY month ASC, r.name ASC`,
+    [branchIds, from, to]
+  )
+  return {
+    data: {
+      months: rows.map((r) => ({
+        month: r.month,
+        branchAccountId: r.branch_account_id,
+        branchAccountName: r.branch_account_name,
+        orderCount: Number(r.order_count),
+        spend: Number(r.spend),
+      })),
+    },
+    meta: {
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      branchAccountIds: branchIds,
+      unrestrictedDateRange: true,
+    },
+  }
+}
 export async function supplierOrgConsolidatedOverview(userId, organizationId, queryParams = {}) {
   const params = parseReportQuery(queryParams)
   const { limit, offset } = parsePagination(queryParams)

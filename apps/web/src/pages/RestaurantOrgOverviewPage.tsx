@@ -10,6 +10,7 @@ import {
   useGetRestaurantOrgBranchDemandForecastQuery,
   useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
   useGetRestaurantOrgStockTransferSuggestionsQuery,
+  useGetRestaurantOrgAdvancedAnalyticsQuery,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -69,6 +70,9 @@ export function RestaurantOrgOverviewPage() {
     undefined,
     { skip: !isEffectiveRestaurant || !canViewBranchDemandForecast }
   )
+  const { data: advancedAnalytics } = useGetRestaurantOrgAdvancedAnalyticsQuery(undefined, {
+    skip: !isEffectiveRestaurant || !canViewPurchasingInsights,
+  })
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
   })
@@ -163,6 +167,22 @@ export function RestaurantOrgOverviewPage() {
         </div>
       ) : null}
 
+      {advancedAnalytics?.data?.months?.length ? (
+        <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
+          <h2 className="font-semibold">Advanced branch analytics</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Monthly stored order trends; the API accepts any valid historical date range.
+          </p>
+          <ul className="mt-3 space-y-1 text-sm">
+            {advancedAnalytics.data.months.slice(-6).map((row) => (
+              <li key={`${row.month}-${row.branchAccountId}`}>
+                {row.month}: {row.branchAccountName} · {row.orderCount} orders ·{' '}
+                {formatMoney(row.spend)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {transferSuggestions?.data?.suggestions?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Stock-transfer suggestions</h2>

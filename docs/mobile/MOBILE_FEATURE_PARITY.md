@@ -1108,3 +1108,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: Scale read-only transfer hints based on exact product identity, fresh destination forecasts, and explicit source surplus; no transfer mutation exists.
 - **Parity decision**: **Skipped on mobile, intentionally.** Native clients have no organization-level inventory review surface or transfer workflow.
 - **Revisit when**: a native review-only organization inventory surface is scheduled; add the type/query, gates, and visible UI to both clients together.
+
+## 2026-09-23 - Advanced branch analytics (web-only)
+
+- **Change**: Scale read-only monthly branch trend endpoint with no arbitrary date-span cap.
+- **Parity decision**: **Skipped on mobile, intentionally.** No native organization analytics surface exists.

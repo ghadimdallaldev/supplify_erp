@@ -12,6 +12,7 @@ const {
   restaurantOrgBranchDemandForecast,
   restaurantOrgCrossBranchPurchasingInsights,
   restaurantOrgStockTransferSuggestions,
+  restaurantOrgAdvancedAnalytics,
 } = await import('./org-reports.service.js')
 
 describe('restaurantOrgBranchComparison', () => {
@@ -176,5 +177,29 @@ describe('restaurantOrgStockTransferSuggestions', () => {
       destinationBranchAccountId: 'destination',
       suggestedQty: 8,
     })
+  })
+})
+
+describe('restaurantOrgAdvancedAnalytics', () => {
+  it('accepts an uncapped historical range', async () => {
+    queryMock.mockReset()
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          month: '2001-01-01',
+          branch_account_id: 'branch-1',
+          branch_account_name: 'North',
+          order_count: '2',
+          spend: '10',
+        },
+      ],
+    })
+    const result = await restaurantOrgAdvancedAnalytics('user-1', 'org-1', {
+      from: '2001-01-01',
+      to: '2026-01-01',
+    })
+    expect(result.meta.unrestrictedDateRange).toBe(true)
+    expect(queryMock.mock.calls[0][1][1]).toBeInstanceOf(Date)
+    expect(result.data.months[0].spend).toBe(10)
   })
 })
