@@ -126,6 +126,12 @@ Receiving lines in a non-matching product unit are counted as coverage gaps and 
 
 It reports only stored, line-level comparisons: billed quantity above the linked order line, billed unit price above the order snapshot, billed unit price above an active contract valid on the invoice date, and invoice-price movement above the existing 5% price-noise threshold. The database already enforces one linked invoice per `(order_id, supplier_id)`; that protection is reported as enforcement rather than turned into a speculative risk score. It does not call a difference fraud, infer missing contract terms, alter an invoice, or create disputes. The web card appears on the existing Restaurant Invoices page.
 
+## Weekly intelligence summary (implemented)
+
+`GET /api/restaurant-intelligence/weekly-summary` is an advanced, read-only review of the existing deterministic services. Because it includes inventory, receiving, invoice, and forecast records, it requires the existing `waste_tracking`, `receiving_quality`, `finance_invoices`, and `smart_reorder` domain features plus `INVENTORY_VIEW`, `RECEIVING_VIEW`, and `INVOICES_VIEW` permissions. The web summary card is shown only under those same gates.
+
+It does not recalculate, score, or automate anything. It aggregates the already-flagged waste hotspots, supplier exceptions, over-ordering products, invoice anomalies, and current non-stale high/urgent stockout forecasts. Its response preserves each source's evidence window: waste and invoice review use the requested weekly period, supplier reliability uses at least 28 days, and over-ordering uses at least 90 days so repeated patterns remain evidence-based.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

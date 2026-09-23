@@ -34,6 +34,7 @@ import { getWasteIntelligence } from '../services/restaurant-waste-intelligence.
 import { listSupplierReliability } from '../services/restaurant-supplier-reliability.service.js'
 import { listOverOrderingIntelligence } from '../services/restaurant-over-ordering-intelligence.service.js'
 import { listInvoiceAnomalies } from '../services/restaurant-invoice-anomaly-intelligence.service.js'
+import { getWeeklyIntelligenceSummary } from '../services/restaurant-weekly-intelligence-summary.service.js'
 
 const router = express.Router()
 
@@ -54,6 +55,11 @@ const receivingQualityFeature = requireFeature(
 )
 const financeInvoicesFeature = requireFeature(
   'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+const smartReorderFeature = requireFeature(
+  'smart_reorder',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -252,4 +258,27 @@ router.get(
   }
 )
 
+// This summary contains source records from inventory, receiving, invoices,
+// and forecasts. Require every corresponding domain gate and read permission;
+// a summary must not become a way around a narrower source authorization.
+router.get(
+  '/weekly-summary',
+  wasteTrackingFeature,
+  receivingQualityFeature,
+  financeInvoicesFeature,
+  smartReorderFeature,
+  canViewInventory,
+  canViewReceiving,
+  canViewInvoices,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await getWeeklyIntelligenceSummary(restaurantId, { days: req.query.days })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 export { router as restaurantIntelligenceRoutes }

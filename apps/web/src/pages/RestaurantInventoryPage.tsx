@@ -9,6 +9,7 @@ import { usePermissions } from '../hooks/usePermissions'
 import { featureEnabled, meetsIntelligenceTier } from '../lib/planLimits'
 import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
 import { OverOrderingIntelligenceCard } from '../components/inventory/OverOrderingIntelligenceCard'
+import { WeeklyIntelligenceSummaryCard } from '../components/inventory/WeeklyIntelligenceSummaryCard'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
@@ -51,6 +52,9 @@ export function RestaurantInventoryPage() {
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
   )
+  const financeInvoicesEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.finance_invoices
+  )
   const receivingQualityEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.receiving_quality
   )
@@ -59,6 +63,14 @@ export function RestaurantInventoryPage() {
     wasteTrackingEnabled &&
     receivingQualityEnabled &&
     can('RECEIVING_VIEW')
+  const canSeeWeeklyIntelligence =
+    hasAdvancedIntelligence &&
+    smartReorderEnabled &&
+    wasteTrackingEnabled &&
+    receivingQualityEnabled &&
+    financeInvoicesEnabled &&
+    can('RECEIVING_VIEW') &&
+    can('INVOICES_VIEW')
 
   const navigateToWaste = (productId: string) => {
     setWastePreselectProductId(productId)
@@ -88,6 +100,8 @@ export function RestaurantInventoryPage() {
             </>
           }
         />
+
+        {canSeeWeeklyIntelligence ? <WeeklyIntelligenceSummaryCard /> : null}
 
         {smartReorderEnabled && (
           <div id="reorder-assistance">

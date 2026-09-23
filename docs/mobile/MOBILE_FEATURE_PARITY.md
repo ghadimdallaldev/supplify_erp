@@ -1078,3 +1078,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: a read-only advanced invoice comparison endpoint and web Invoice-page card.
 - **Parity decision**: **Skipped on mobile, intentionally.** Native clients have no invoice analytics or finance-review surface. Adding an unreachable query/type would not create a mobile capability.
 - **Revisit when**: native invoice analytics is scheduled; add the query, type, and visible UI to both clients together.
+
+## 2026-09-23 - Weekly intelligence summary (web-only)
+
+- **Change**: a read-only advanced summary endpoint aggregates already-authorized waste, supplier, over-ordering, invoice, and non-stale stockout facts for the web Restaurant Inventory page.
+- **Parity decision**: **Skipped on mobile, intentionally.** Both clients lack a cross-domain intelligence-review surface. The existing mobile flows retain their source features; adding an unreachable aggregation query would not provide usable parity.
+- **Revisit when**: a native operational-intelligence review screen is scheduled; implement the query, types, gates, and visible summary in both clients together.
