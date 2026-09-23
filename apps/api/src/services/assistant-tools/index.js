@@ -23,6 +23,7 @@ import {
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
+import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -569,6 +570,31 @@ const TOOLS = {
         limit: ROW_CAP,
       })
       return { ...result, items: cap(result.items) }
+    },
+  },
+  get_over_ordering: {
+    definition: {
+      name: 'get_over_ordering',
+      description:
+        'Coverage-aware signals of restaurant stock purchased faster than observed depletion.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await featureOn(ctx, 'waste_tracking')) &&
+      (await featureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listOverOrderingIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, products: cap(result.products) }
     },
   },
   get_waste: {

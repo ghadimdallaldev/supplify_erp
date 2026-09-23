@@ -19,6 +19,9 @@ vi.mock('../restaurant-supplier-reliability.service.js', () => ({
 vi.mock('../restaurant-margin-intelligence.service.js', () => ({
   listWeakMarginMenuItems: vi.fn(),
 }))
+vi.mock('../restaurant-over-ordering-intelligence.service.js', () => ({
+  listOverOrderingIntelligence: vi.fn(),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -86,6 +89,7 @@ import {
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
+import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -189,6 +193,19 @@ describe('assistant tools', () => {
       limit: 15,
     })
     expect(result.items).toHaveLength(1)
+  })
+  it('runs over-ordering with both source permissions and advanced intelligence', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'advanced' })
+    listOverOrderingIntelligence.mockResolvedValue({ summary: {}, products: [{ productId: 'p1' }] })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.INVENTORY_VIEW, P.RECEIVING_VIEW] }),
+      'get_over_ordering',
+      { days: 120 }
+    )
+
+    expect(listOverOrderingIntelligence).toHaveBeenCalledWith('rest-1', { days: 120, limit: 15 })
+    expect(result.products).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(
