@@ -20,6 +20,7 @@ import {
   getProductPriceHistory,
   listPriceChangeAlerts,
 } from '../restaurant-price-intelligence.service.js'
+import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -494,6 +495,28 @@ const TOOLS = {
         direction: args.direction,
       })
       return { ...result, alerts: cap(result.alerts) }
+    },
+  },
+  get_waste_intelligence: {
+    definition: {
+      name: 'get_waste_intelligence',
+      description: 'Repeated or rising restaurant waste and spoilage signals.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 30' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      (await featureOn(ctx, 'waste_tracking')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 30, 7), 365)
+      const result = await getWasteIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, hotspots: cap(result.hotspots) }
     },
   },
   get_waste: {
