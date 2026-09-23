@@ -82,30 +82,43 @@ The dashboard's "highest cost" / "lowest margin" cards ship with `recipe_costing
 
 ## Waste intelligence (implemented)
 
-GET /api/restaurant-intelligence/waste-intelligence is an advanced Restaurant Intelligence surface. It requires waste_tracking, INVENTORY_VIEW, and the dvanced intelligence tier; entitlement remains additive to the existing inventory permission and waste domain gate.
+`GET /api/restaurant-intelligence/waste-intelligence` is an advanced Restaurant Intelligence surface. It requires `waste_tracking`, `INVENTORY_VIEW`, and the `advanced` intelligence tier; entitlement remains additive to the existing inventory permission and waste domain gate.
 
-It reads only real inventory_adjustment rows of type WASTAGE and SPOILAGE, comparing the requested period (7–365 days; default 30) with the immediately preceding period of equal length. It returns period totals and only lists a product when either:
+It reads only real `inventory_adjustment` rows of type `WASTAGE` and `SPOILAGE`, comparing the requested period (7–365 days; default 30) with the immediately preceding period of equal length. It returns period totals and only lists a product when either:
 
 - it has at least two logged waste incidents in the current window; or
 - its recorded waste cost rose against a non-zero recorded cost in the prior window.
 
-There is no platform "high waste" amount or estimated cost. Movements without a recorded cost are retained in coverage counts but excluded from cost comparisons, so the UI cannot treat incomplete cost data as a zero-cost or healthy result. The existing /api/restaurant-inventory/waste-analytics report remains the descriptive waste report; the Intelligence card appears on that same Waste & spoilage tab as its comparison/pattern layer.
+There is no platform "high waste" amount or estimated cost. Movements without a recorded cost are retained in coverage counts but excluded from cost comparisons, so the UI cannot treat incomplete cost data as a zero-cost or healthy result. The existing `/api/restaurant-inventory/waste-analytics` report remains the descriptive waste report; the Intelligence card appears on that same Waste & spoilage tab as its comparison/pattern layer.
 
 ## Supplier reliability (implemented)
 
-GET /api/restaurant-intelligence/supplier-reliability is an advanced Restaurant Intelligence surface. It requires
-eceiving_quality, RECEIVING_VIEW, and the dvanced intelligence tier; the tier does not bypass the existing receiving domain gate or permission.
+`GET /api/restaurant-intelligence/supplier-reliability` is an advanced Restaurant Intelligence surface. It requires `receiving_quality`, `RECEIVING_VIEW`, and the `advanced` intelligence tier; the tier does not bypass the existing receiving domain gate or permission.
 
 It composes already-recorded facts for each supplier over a 7–730 day window (default 90 days):
 
 - **Order completion** from restaurant orders containing that supplier's items.
-- **Fill rate and quality** from
-  eceiving_report; fill rate is weighted by actual ordered/received quantities, and quality stays null when no report was scored.
-- **Delivery timing** from completed driver_assignments, compared with their operational scheduled delivery date. Deliveries without a schedule are counted as missing timing coverage, not late.
+- **Fill rate and quality** from `receiving_report`; fill rate is weighted by actual ordered/received quantities, and quality stays null when no report was scored.
+- **Delivery timing** from completed `driver_assignments`, compared with their operational scheduled delivery date. Deliveries without a schedule are counted as missing timing coverage, not late.
 - **Disputes** from the restaurant's supplier-linked dispute records, including unresolved disputes.
 
-The service returns the source measurements and only emits objective exceptions: a short receipt, a delivery recorded after its schedule, or an unresolved dispute. It intentionally has no composite reliability score, no arbitrary acceptable-quality target, and no claimed timing rate when scheduled delivery data is absent. The
-eports/restaurant/receiving-quality endpoint remains the descriptive receiving-quality report; the advanced card appears on the existing Receiving page.
+The service returns the source measurements and only emits objective exceptions: a short receipt, a delivery recorded after its schedule, or an unresolved dispute. It intentionally has no composite reliability score, no arbitrary acceptable-quality target, and no claimed timing rate when scheduled delivery data is absent. The `/reports/restaurant/receiving-quality` endpoint remains the descriptive receiving-quality report; the advanced card appears on the existing Receiving page.
+
+## Over-ordering detection (implemented)
+
+`GET /api/restaurant-intelligence/over-ordering` is an advanced Restaurant Intelligence review surface. It requires `waste_tracking`, `receiving_quality`, `INVENTORY_VIEW`, `RECEIVING_VIEW`, and the `advanced` intelligence tier. Both domain gates and both source-read permissions remain in front of entitlement because the calculation reads their underlying records.
+
+The service compares, per product over a 30–365 day window (default 90), already-recorded:
+
+- purchase quantities and repeated order count from `customer_order`/`order_item`;
+- received quantities from `receiving_report`/`receiving_line_item`;
+- actual usage (`SUBTRACT`) from `inventory_movement_log`;
+- logged `WASTAGE`/`SPOILAGE` quantities from `inventory_adjustment`; and
+- current restaurant stock from `restaurant_inventory`.
+
+A product is a review signal only with at least two qualifying orders, observed usage, comparable receipt units, at least 45 days of current stock cover, and receipts at least 1.5× its observed usage plus waste. A high waste share (at least 25% of observed depletion) is an additional contextual signal only when that excess-stock condition already holds. This does **not** claim that waste was caused by ordering, set an arbitrary restaurant stock maximum, or create orders.
+
+Receiving lines in a non-matching product unit are counted as coverage gaps and exclude that product from comparison rather than being coerced to zero or guessed at. The advanced card appears on the existing Restaurant Inventory page, next to the existing Smart Reorder panel; it is a review layer and does not duplicate or alter low-stock/reorder assistance.
 
 ## Forecasting tier alignment (migration 0215)
 

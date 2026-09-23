@@ -5,8 +5,10 @@ import { Button } from '../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Plus, Upload, Package, Trash2, History, Calendar, BarChart3 } from 'lucide-react'
 import { useGetEntitlementsQuery } from '../services/api'
+import { usePermissions } from '../hooks/usePermissions'
 import { featureEnabled, meetsIntelligenceTier } from '../lib/planLimits'
 import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
+import { OverOrderingIntelligenceCard } from '../components/inventory/OverOrderingIntelligenceCard'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
@@ -26,6 +28,7 @@ const RESTAURANT_INVENTORY_TABS = ['inventory', 'waste', 'history', 'expiry', 't
 export function RestaurantInventoryPage() {
   const { t } = useTranslation('inventory')
   const [searchParams] = useSearchParams()
+  const { can } = usePermissions()
 
   useEffect(() => {
     void ensureNamespace('inventory')
@@ -48,6 +51,14 @@ export function RestaurantInventoryPage() {
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
   )
+  const receivingQualityEnabled = featureEnabled(
+    entitlementsData?.entitlements?.features?.receiving_quality
+  )
+  const canSeeOverOrdering =
+    hasAdvancedIntelligence &&
+    wasteTrackingEnabled &&
+    receivingQualityEnabled &&
+    can('RECEIVING_VIEW')
 
   const navigateToWaste = (productId: string) => {
     setWastePreselectProductId(productId)
@@ -83,6 +94,8 @@ export function RestaurantInventoryPage() {
             <ReorderAssistancePanel />
           </div>
         )}
+
+        {canSeeOverOrdering ? <OverOrderingIntelligenceCard /> : null}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">

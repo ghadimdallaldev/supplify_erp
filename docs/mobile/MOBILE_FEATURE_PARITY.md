@@ -1065,3 +1065,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS support receiving and waste entry but have no supplier-performance or receiving-analytics screen where this comparative multi-supplier information could be surfaced. Adding an unreachable query and types would not create a native capability.
 - **Contract impact on mobile**: none for existing mobile calls, types, permissions, notification payloads, deep links, or entitlement behavior. The existing receiving_quality, RECEIVING_VIEW, and intelligence gates are unchanged.
 - **Revisit when**: a native receiving analytics or purchasing-insights surface is scheduled. That work should add this endpoint's types/query and user interface to both mobile clients together.
+
+## 2026-09-23 - Restaurant over-ordering detection (web-only)
+
+- **Change**: `GET /api/restaurant-intelligence/over-ordering` compares a restaurant's existing purchase, receiving, usage, stock, and waste records to identify only supported excess-stock review patterns. It is rendered as a read-only card on the web Restaurant Inventory page.
+- **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS support inventory and waste entry but have no inventory-analytics or purchasing-insights surface for a multi-source review card. Adding an unreachable API query and type would not create a native capability.
+- **Contract impact on mobile**: none for existing calls, types, permissions, notifications, deep links, or entitlement handling. `waste_tracking`, `receiving_quality`, `INVENTORY_VIEW`, `RECEIVING_VIEW`, and `intelligence` are existing gates.
+- **Revisit when**: a native inventory analytics or purchasing-insights surface is scheduled. Implement the API type/query and visible UI in both clients together.

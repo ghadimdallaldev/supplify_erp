@@ -32,6 +32,7 @@ import {
 } from '../services/restaurant-margin-intelligence.service.js'
 import { getWasteIntelligence } from '../services/restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../services/restaurant-supplier-reliability.service.js'
+import { listOverOrderingIntelligence } from '../services/restaurant-over-ordering-intelligence.service.js'
 
 const router = express.Router()
 
@@ -193,6 +194,30 @@ router.get(
     try {
       const restaurantId = await restaurantScope(req)
       const data = await listSupplierReliability(restaurantId, { days: req.query.days })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+// Over-ordering compares both receiving and waste source records with stock,
+// purchasing, and usage. Keep both existing domain gates and source-read
+// permissions in front of the advanced entitlement so it cannot widen access.
+router.get(
+  '/over-ordering',
+  wasteTrackingFeature,
+  receivingQualityFeature,
+  canViewInventory,
+  canViewReceiving,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listOverOrderingIntelligence(restaurantId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

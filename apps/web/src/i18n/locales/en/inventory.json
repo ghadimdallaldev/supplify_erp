@@ -363,5 +363,20 @@
     "costRising": "Cost rising {{pct}}",
     "missingCostCoverage": "{{count}} incident is excluded from cost comparisons because no cost was recorded.",
     "missingCostCoverage_plural": "{{count}} incidents are excluded from cost comparisons because no cost was recorded."
+  },
+  "overOrdering": {
+    "title": "Over-ordering review",
+    "description": "Flags only products with comparable purchasing, receiving, usage, stock, and waste data from the last {{days}} days.",
+    "empty": "No product currently has a supported excess-stock pattern.",
+    "stockCoverage": "{{days}} days of stock cover",
+    "ordered": "Ordered",
+    "received": "Received",
+    "used": "Used",
+    "waste": "Waste",
+    "signals": {
+      "excess_stock_coverage": "High stock cover after repeated receipts",
+      "waste_with_excess_stock": "Waste is high while stock cover remains high"
+    },
+    "unitCoverage": "Some products have receiving lines in a different unit and are excluded from the comparison."
   }
 }

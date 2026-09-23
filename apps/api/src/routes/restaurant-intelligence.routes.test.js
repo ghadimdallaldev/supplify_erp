@@ -14,6 +14,7 @@ const mockListFoodCostWarnings = vi.fn()
 const mockListWeakMarginMenuItems = vi.fn()
 const mockGetWasteIntelligence = vi.fn()
 const mockListSupplierReliability = vi.fn()
+const mockListOverOrderingIntelligence = vi.fn()
 
 /** Permission middleware records what it was asked to enforce. */
 const requiredPermissions = []
@@ -89,6 +90,10 @@ vi.mock('../services/restaurant-supplier-reliability.service.js', () => ({
   listSupplierReliability: (...args) => mockListSupplierReliability(...args),
 }))
 
+vi.mock('../services/restaurant-over-ordering-intelligence.service.js', () => ({
+  listOverOrderingIntelligence: (...args) => mockListOverOrderingIntelligence(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -121,6 +126,7 @@ describe('restaurant intelligence routes', () => {
     mockListWeakMarginMenuItems.mockResolvedValue({ items: [] })
     mockGetWasteIntelligence.mockResolvedValue({ summary: {}, hotspots: [] })
     mockListSupplierReliability.mockResolvedValue({ suppliers: [] })
+    mockListOverOrderingIntelligence.mockResolvedValue({ products: [] })
     grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
     app = buildApp()
   })
@@ -300,6 +306,37 @@ describe('restaurant intelligence routes', () => {
       expect(mockListSupplierReliability).toHaveBeenCalledWith('restaurant-1', { days: '180' })
     })
   })
+  describe('over-ordering intelligence', () => {
+    it('requires both inventory and receiving read permissions before the advanced tier', async () => {
+      expect(requiredPermissions).toContain('INVENTORY_VIEW')
+      expect(requiredPermissions).toContain('RECEIVING_VIEW')
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      grantedPermissions = new Set(['INVENTORY_VIEW'])
+      await request(app).get('/api/restaurant-intelligence/over-ordering').expect(403)
+      expect(mockListOverOrderingIntelligence).not.toHaveBeenCalled()
+
+      grantedPermissions = new Set(['INVENTORY_VIEW', 'RECEIVING_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('basic'))
+      await request(app).get('/api/restaurant-intelligence/over-ordering').expect(403)
+      expect(mockListOverOrderingIntelligence).not.toHaveBeenCalled()
+    })
+
+    it('uses only the session restaurant and passes window controls to the service', async () => {
+      grantedPermissions = new Set(['INVENTORY_VIEW', 'RECEIVING_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app)
+        .get('/api/restaurant-intelligence/over-ordering?days=120&limit=5&restaurantId=other')
+        .expect(200)
+
+      expect(mockListOverOrderingIntelligence).toHaveBeenCalledWith('restaurant-1', {
+        days: '120',
+        limit: '5',
+      })
+    })
+  })
+
   it('passes client filters through for the service to clamp', async () => {
     mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
 
