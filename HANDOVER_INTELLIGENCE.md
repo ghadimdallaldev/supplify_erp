@@ -151,9 +151,15 @@ Three separate bugs were **entitlement reads against the wrong object shape**, i
 
 ## What remains
 
+## Continuation status — 2026-09-23
+
+Waste intelligence is complete in the commit containing this handover update. It adds GET /api/restaurant-intelligence/waste-intelligence, gated by the existing waste_tracking domain feature, INVENTORY_VIEW, and advanced intelligence tier. It reports only logged movements and never assigns a cost where none was recorded; mobile remains intentionally web-only because both native clients only provide waste logging, not a waste analytics surface. Full API/web/lint/typecheck and both mobile typecheck/Jest verification passed.
+
+**Resume with:** Phase 2 supplier reliability. Inspect receiving, order completion, dispute, and delivery services first; do not create a parallel implementation if existing reporting already supplies the required signals.
+
 ### Phase 2 — Restaurant Intelligence (advanced tier)
 
-- [ ] Waste intelligence — use real wastage/spoilage/inventory movements. Note `restaurant-inventory.routes.js` already has a waste-cost aggregation query.
+- [x] Waste intelligence — implemented 2026-09-23; tenant-scoped period comparison and repeat/rising-cost signals from real `WASTAGE`/`SPOILAGE` adjustments. Reuses the existing Waste & spoilage surface rather than creating a second dashboard.
 - [ ] Supplier reliability — fill rate, delivery timing, receiving quality, order completion, dispute/receiving data.
 - [ ] Over-ordering detection — compare purchasing vs receiving vs usage vs stock vs waste. Flag meaningful patterns only.
 - [ ] Invoice / price anomaly detection — invoice vs order snapshot, invoice vs contract price, duplicates, abnormal movement. Keep it practical; not a fraud platform.

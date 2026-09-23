@@ -21,6 +21,7 @@ import {
 import { formatCurrency, formatNumber } from '../../utils/format'
 import { toast } from 'sonner'
 import { AlertTriangle, Loader2, Recycle, TrendingDown } from 'lucide-react'
+import { WasteIntelligenceCard } from './WasteIntelligenceCard'
 
 const WASTE_CATEGORIES = [
   { value: 'OVER_PRODUCTION', label: 'Over-production' },
@@ -46,12 +47,14 @@ type Props = {
   inventory: InventoryItem[]
   preselectedProductId?: string | null
   onPreselectConsumed?: () => void
+  showIntelligence?: boolean
 }
 
 export function RestaurantWastePanel({
   inventory,
   preselectedProductId,
   onPreselectConsumed,
+  showIntelligence = false,
 }: Props) {
   const { t } = useTranslation('inventory')
   const [period, setPeriod] = useState(30)
@@ -207,6 +210,8 @@ export function RestaurantWastePanel({
           </CardContent>
         </Card>
       </div>
+
+      {showIntelligence ? <WasteIntelligenceCard days={period} /> : null}
 
       <Card>
         <CardHeader>

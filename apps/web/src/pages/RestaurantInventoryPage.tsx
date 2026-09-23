@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Plus, Upload, Package, Trash2, History, Calendar, BarChart3 } from 'lucide-react'
 import { useGetEntitlementsQuery } from '../services/api'
-import { featureEnabled } from '../lib/planLimits'
+import { featureEnabled, meetsIntelligenceTier } from '../lib/planLimits'
 import { ReorderAssistancePanel } from '../components/inventory/ReorderAssistancePanel'
 import { RequirePermission } from '../components/RequirePermission'
 import { PageHeader } from '../components/ui/page-header'
@@ -44,6 +44,7 @@ export function RestaurantInventoryPage() {
   const wasteTrackingEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.waste_tracking
   )
+  const hasAdvancedIntelligence = meetsIntelligenceTier(entitlementsData?.entitlements, 'advanced')
   const smartReorderEnabled = featureEnabled(
     entitlementsData?.entitlements?.features?.smart_reorder
   )
@@ -133,6 +134,7 @@ export function RestaurantInventoryPage() {
                 <LazyWasteTab
                   preselectedProductId={wastePreselectProductId}
                   onPreselectConsumed={() => setWastePreselectProductId(null)}
+                  showIntelligence={hasAdvancedIntelligence}
                 />
               </LazyTabMount>
             </TabsContent>

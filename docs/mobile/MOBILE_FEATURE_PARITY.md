@@ -1051,3 +1051,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Why it mattered**: the two keys happen to move together on the stock plans, but an admin tenant override can set them independently. With `ai_platform` on and `ai_assistant` off, mobile showed an Assistant row that navigates to a screen the navigator blocks — a control that does nothing. With the reverse, an entitled tenant saw no entry point at all.
 - **Fix**: all four entry points now gate on `ai_assistant`, matching the navigators and the API's `/api/assistant` gate. No remaining `ai_platform` reference in either mobile client.
 - **Verified**: `npx tsc --noEmit` clean and `jest` 22 suites / 87 tests passing in both `supplify-mobile` and `supplify-mobile-ios`.
+
+## 2026-09-23 - Restaurant waste intelligence (web-only)
+
+- **Change**: GET /api/restaurant-intelligence/waste-intelligence adds a read-only, advanced-tier comparison of logged WASTAGE/SPOILAGE movements with the preceding equal-length period, plus repeat/rising-cost product signals. The web Waste & spoilage tab now renders this as an additive card; the existing waste logging and descriptive report are unchanged.
+- **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS currently provide inventory adjustment and waste logging only; neither has the web Waste & spoilage analytics surface or consumes this new endpoint. Adding an unseen client/query/type would not make a native feature available.
+- **Contract impact on mobile**: none for existing mobile calls, types, permissions, notifications, deep links, or entitlement handling. waste_tracking, INVENTORY_VIEW, and intelligence are existing gates; the native apps already fail closed on missing intelligence entitlement.
+- **Revisit when**: a native waste analytics/operational-intelligence surface is scheduled. That work should add this endpoint's types/query and render the data on both clients together.

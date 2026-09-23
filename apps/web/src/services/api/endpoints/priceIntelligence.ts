@@ -8,6 +8,7 @@ import type {
   FoodCostWarningResponse,
   MenuProfitabilityResponse,
 } from '../../../types/marginIntelligence'
+import type { WasteIntelligenceResponse } from '../../../types/wasteIntelligence'
 
 export type PriceHistoryParams = {
   productId: string
@@ -69,6 +70,16 @@ export const priceIntelligenceApi = api.injectEndpoints({
       // Recalculating a recipe changes these, so share the recipe-costing tag.
       providesTags: [{ type: 'PriceIntelligence', id: 'FOOD_COST' }, 'RecipeCosting'],
     }),
+    getWasteIntelligence: builder.query<
+      WasteIntelligenceResponse,
+      { days?: number; limit?: number } | void
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-intelligence/waste-intelligence',
+        params: params || {},
+      }),
+      providesTags: [{ type: 'PriceIntelligence', id: 'WASTE' }, 'RestaurantWaste'],
+    }),
     getMenuProfitability: builder.query<MenuProfitabilityResponse, MenuProfitabilityParams | void>({
       query: (params) => ({
         url: '/api/restaurant-intelligence/menu-profitability',
@@ -84,5 +95,6 @@ export const {
   useGetPriceChangeAlertsQuery,
   useGetCheaperBuyOptionsQuery,
   useGetFoodCostWarningsQuery,
+  useGetWasteIntelligenceQuery,
   useGetMenuProfitabilityQuery,
 } = priceIntelligenceApi

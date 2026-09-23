@@ -19,6 +19,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
+import { requireFeature } from '../lib/subscription.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import {
   getProductPriceHistory,
@@ -29,6 +30,7 @@ import {
   listFoodCostWarnings,
   listWeakMarginMenuItems,
 } from '../services/restaurant-margin-intelligence.service.js'
+import { getWasteIntelligence } from '../services/restaurant-waste-intelligence.service.js'
 
 const router = express.Router()
 
@@ -39,6 +41,12 @@ router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN'
 
 const canSeePurchasePrices = requirePermission('CATALOG_VIEW')
 const canSeeRecipeCosts = requirePermission('RECIPES_VIEW_COSTS')
+const canViewInventory = requirePermission('INVENTORY_VIEW')
+const wasteTrackingFeature = requireFeature(
+  'waste_tracking',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 /** Never trust a client-supplied restaurant id; derive it from the session. */
 async function restaurantScope(req) {
@@ -136,6 +144,28 @@ router.get(
       const data = await listWeakMarginMenuItems(restaurantId, {
         limit: req.query.limit,
         maxMarginPct: req.query.maxMarginPct,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+// Waste tracking remains its own domain feature. Intelligence adds comparison
+// and repeat-pattern signals on top, but never lets an entitled caller bypass
+// the waste or inventory permissions that protect the source records.
+router.get(
+  '/waste-intelligence',
+  wasteTrackingFeature,
+  canViewInventory,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await getWasteIntelligence(restaurantId, {
+        days: req.query.days,
+        limit: req.query.limit,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {

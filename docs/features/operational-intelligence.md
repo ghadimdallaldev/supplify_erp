@@ -80,6 +80,17 @@ Both read values the recipe cost engine already persists (`cost_per_portion`, `f
 
 The dashboard's "highest cost" / "lowest margin" cards ship with `recipe_costing` and stay available on Growth. These endpoints are the Intelligence-tier addition on top: threshold-driven rather than a fixed top-5, attributed to the specific price event, and coverage-aware. `FoodCostWarningsCard` renders on the same dashboard, gated on the advanced tier, so there is one cost-and-margin surface rather than two competing pages.
 
+## Waste intelligence (implemented)
+
+GET /api/restaurant-intelligence/waste-intelligence is an advanced Restaurant Intelligence surface. It requires waste_tracking, INVENTORY_VIEW, and the dvanced intelligence tier; entitlement remains additive to the existing inventory permission and waste domain gate.
+
+It reads only real inventory_adjustment rows of type WASTAGE and SPOILAGE, comparing the requested period (7–365 days; default 30) with the immediately preceding period of equal length. It returns period totals and only lists a product when either:
+
+- it has at least two logged waste incidents in the current window; or
+- its recorded waste cost rose against a non-zero recorded cost in the prior window.
+
+There is no platform "high waste" amount or estimated cost. Movements without a recorded cost are retained in coverage counts but excluded from cost comparisons, so the UI cannot treat incomplete cost data as a zero-cost or healthy result. The existing /api/restaurant-inventory/waste-analytics report remains the descriptive waste report; the Intelligence card appears on that same Waste & spoilage tab as its comparison/pattern layer.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

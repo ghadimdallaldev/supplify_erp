@@ -352,5 +352,16 @@
       "observations": "Observations",
       "changeOverWindow": "Change over window"
     }
+  },
+  "wasteIntelligence": {
+    "title": "Waste intelligence",
+    "description": "Repeat and period-over-period waste signals from the last {{days}} days.",
+    "currentCost": "Current waste cost",
+    "changeFromPrevious": "vs. previous period",
+    "empty": "No repeated or rising waste pattern in this period.",
+    "repeated": "{{count}} waste incidents",
+    "costRising": "Cost rising {{pct}}",
+    "missingCostCoverage": "{{count}} incident is excluded from cost comparisons because no cost was recorded.",
+    "missingCostCoverage_plural": "{{count}} incidents are excluded from cost comparisons because no cost was recorded."
   }
 }

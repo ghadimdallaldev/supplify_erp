@@ -352,5 +352,16 @@
       "observations": "عدد الأرصاد",
       "changeOverWindow": "التغيّر خلال الفترة"
     }
+  },
+  "wasteIntelligence": {
+    "title": "ذكاء الهدر",
+    "description": "إشارات الهدر المتكرر والمقارنة بالفترة السابقة خلال آخر {{days}} يوماً.",
+    "currentCost": "تكلفة الهدر الحالية",
+    "changeFromPrevious": "مقارنة بالفترة السابقة",
+    "empty": "لا يوجد نمط هدر متكرر أو متزايد في هذه الفترة.",
+    "repeated": "{{count}} حوادث هدر",
+    "costRising": "التكلفة ترتفع {{pct}}",
+    "missingCostCoverage": "تم استبعاد {{count}} حادثة من مقارنات التكلفة لعدم تسجيل تكلفة لها.",
+    "missingCostCoverage_plural": "تم استبعاد {{count}} حوادث من مقارنات التكلفة لعدم تسجيل تكلفة لها."
   }
 }

@@ -12,6 +12,7 @@ const mockGetIntelligenceTierForTenant = vi.fn()
 const mockGetRestaurantIdForRequest = vi.fn()
 const mockListFoodCostWarnings = vi.fn()
 const mockListWeakMarginMenuItems = vi.fn()
+const mockGetWasteIntelligence = vi.fn()
 
 /** Permission middleware records what it was asked to enforce. */
 const requiredPermissions = []
@@ -64,6 +65,10 @@ vi.mock('../lib/intelligence-tier.js', async (importOriginal) => {
   }
 })
 
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: () => (_req, _res, next) => next(),
+}))
+
 vi.mock('../services/restaurant-price-intelligence.service.js', () => ({
   getProductPriceHistory: (...args) => mockGetProductPriceHistory(...args),
   listPriceChangeAlerts: (...args) => mockListPriceChangeAlerts(...args),
@@ -73,6 +78,10 @@ vi.mock('../services/restaurant-price-intelligence.service.js', () => ({
 vi.mock('../services/restaurant-margin-intelligence.service.js', () => ({
   listFoodCostWarnings: (...args) => mockListFoodCostWarnings(...args),
   listWeakMarginMenuItems: (...args) => mockListWeakMarginMenuItems(...args),
+}))
+
+vi.mock('../services/restaurant-waste-intelligence.service.js', () => ({
+  getWasteIntelligence: (...args) => mockGetWasteIntelligence(...args),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -105,6 +114,7 @@ describe('restaurant intelligence routes', () => {
     mockListCheaperBuyOptions.mockResolvedValue({ options: [] })
     mockListFoodCostWarnings.mockResolvedValue({ warnings: [], coverage: {} })
     mockListWeakMarginMenuItems.mockResolvedValue({ items: [] })
+    mockGetWasteIntelligence.mockResolvedValue({ summary: {}, hotspots: [] })
     grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
     app = buildApp()
   })
@@ -229,6 +239,35 @@ describe('restaurant intelligence routes', () => {
     })
   })
 
+  describe('waste intelligence', () => {
+    it('requires INVENTORY_VIEW and the advanced tier', async () => {
+      expect(requiredPermissions).toContain('INVENTORY_VIEW')
+      grantedPermissions = new Set(['CATALOG_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app).get('/api/restaurant-intelligence/waste-intelligence').expect(403)
+      expect(mockGetWasteIntelligence).not.toHaveBeenCalled()
+
+      grantedPermissions = new Set(['INVENTORY_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('basic'))
+      await request(app).get('/api/restaurant-intelligence/waste-intelligence').expect(403)
+      expect(mockGetWasteIntelligence).not.toHaveBeenCalled()
+    })
+
+    it('serves the session restaurant on the advanced tier', async () => {
+      grantedPermissions = new Set(['INVENTORY_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+
+      await request(app)
+        .get('/api/restaurant-intelligence/waste-intelligence?days=90&limit=50&restaurantId=other')
+        .expect(200)
+
+      expect(mockGetWasteIntelligence).toHaveBeenCalledWith('restaurant-1', {
+        days: '90',
+        limit: '50',
+      })
+    })
+  })
   it('passes client filters through for the service to clamp', async () => {
     mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
 
