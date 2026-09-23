@@ -157,7 +157,11 @@ Waste intelligence, supplier reliability, over-ordering detection, and invoice a
 
 Full API and web suites, typecheck, and lint pass; lint reports the established 1,713 warnings and no errors. Both mobile repositories pass typecheck and Jest (22 suites / 87 tests each). The full web suite still logs the pre-existing jsdom navigation warning from `AdminShell.test.tsx`, but exits successfully.
 
-**Resume with:** Phase 2 purchasing budget. Inspect existing order, invoice, budget, notification, and feature-flag services first. A configurable budget needs a new migration; do not assume there are no live tenants or make any migration/data decision that depends on that assumption.
+**Resume with:** Purchasing budget is blocked pending a product decision. Preflight found that the legacy `approvals_budgets` product was intentionally removed in migration `0114`; current API validation rejects the feature key and the web client marks it removed. Decide whether to revive a distinct purchasing-budget feature despite that removal, and provide the live-tenant migration/default/backfill policy before any new budget schema or notification thresholds are introduced.
+
+### Purchasing budget preflight — 2026-09-23
+
+This next item is intentionally paused for a product decision. Legacy `budget_periods` and `budget_allocations` were created by `0069_approvals_budgets.sql`, then the approvals/budgets product was removed: `0114_remove_approvals_budgets_feature.sql` deletes its flags and strips it from plans, current API plan validation rejects `approvals_budgets`, and the web client lists it as removed. Do not revive that legacy feature implicitly. If a new purchasing budget is wanted, decide its relationship to the removed product and provide a live-tenant-safe migration/default/backfill policy before adding schema, thresholds, or notifications.
 
 ### Phase 2 — Restaurant Intelligence (advanced tier)
 
