@@ -13,6 +13,9 @@ vi.mock('../restaurant-price-intelligence.service.js', () => ({
   listPriceChangeAlerts: vi.fn(),
 }))
 vi.mock('../restaurant-waste-intelligence.service.js', () => ({ getWasteIntelligence: vi.fn() }))
+vi.mock('../restaurant-supplier-reliability.service.js', () => ({
+  listSupplierReliability: vi.fn(),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -78,6 +81,7 @@ import {
   listPriceChangeAlerts,
 } from '../restaurant-price-intelligence.service.js'
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
+import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -152,6 +156,19 @@ describe('assistant tools', () => {
 
     expect(getWasteIntelligence).toHaveBeenCalledWith('rest-1', { days: 90, limit: 15 })
     expect(result.hotspots).toHaveLength(1)
+  })
+  it('runs supplier reliability with source and advanced-intelligence gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'advanced' })
+    listSupplierReliability.mockResolvedValue({ suppliers: [{ supplierId: 's1' }] })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.RECEIVING_VIEW] }),
+      'get_supplier_reliability',
+      { days: 120 }
+    )
+
+    expect(listSupplierReliability).toHaveBeenCalledWith('rest-1', { days: 120 })
+    expect(result.suppliers).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(

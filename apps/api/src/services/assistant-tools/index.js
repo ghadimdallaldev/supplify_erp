@@ -21,6 +21,7 @@ import {
   listPriceChangeAlerts,
 } from '../restaurant-price-intelligence.service.js'
 import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
+import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -517,6 +518,28 @@ const TOOLS = {
       const days = Math.min(Math.max(Number(args.days) || 30, 7), 365)
       const result = await getWasteIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
       return { ...result, hotspots: cap(result.hotspots) }
+    },
+  },
+  get_supplier_reliability: {
+    definition: {
+      name: 'get_supplier_reliability',
+      description: 'Observed receiving, delivery, and dispute reliability facts by supplier.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await featureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 7), 730)
+      const result = await listSupplierReliability(ctx.tenantId, { days })
+      return { ...result, suppliers: cap(result.suppliers) }
     },
   },
   get_waste: {
