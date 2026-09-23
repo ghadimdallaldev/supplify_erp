@@ -8,6 +8,7 @@ import {
   useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantOrgBranchComparisonQuery,
   useGetRestaurantOrgBranchDemandForecastQuery,
+  useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -57,6 +58,11 @@ export function RestaurantOrgOverviewPage() {
     meetsIntelligenceTier(entitlements, 'scale') &&
     smartReorderHasForecast(entitlements?.features?.smart_reorder) &&
     can('INVENTORY_VIEW')
+  const canViewPurchasingInsights =
+    multiBranch &&
+    meetsIntelligenceTier(entitlements, 'scale') &&
+    can('CATALOG_VIEW') &&
+    can('ORDERS_VIEW')
 
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
@@ -70,6 +76,12 @@ export function RestaurantOrgOverviewPage() {
   const { data: demandForecast } = useGetRestaurantOrgBranchDemandForecastQuery(undefined, {
     skip: !isEffectiveRestaurant || !canViewBranchDemandForecast,
   })
+  const { data: purchasingInsights } = useGetRestaurantOrgCrossBranchPurchasingInsightsQuery(
+    undefined,
+    {
+      skip: !isEffectiveRestaurant || !canViewPurchasingInsights,
+    }
+  )
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchRestaurantOrgBranchContextMutation()
 
@@ -146,6 +158,32 @@ export function RestaurantOrgOverviewPage() {
         </div>
       ) : null}
 
+      {purchasingInsights?.data?.signals?.length ? (
+        <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
+          <h2 className="font-semibold">Cross-branch purchase price ranges</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Latest stored order-line prices for the same catalog product and supplier. This is a
+            comparison only; it does not create or recommend purchases.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {purchasingInsights.data.signals.slice(0, 6).map((signal) => (
+              <li
+                key={`${signal.productId}-${signal.supplierId}`}
+                className="rounded border border-[var(--app-border)] p-3"
+              >
+                <p className="font-medium">
+                  {signal.productName} · {signal.supplierName ?? 'Supplier'}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatMoney(signal.minUnitPrice)}–{formatMoney(signal.maxUnitPrice)} per{' '}
+                  {signal.productUnit} across {signal.branchCount} Branch Accounts ·{' '}
+                  {signal.priceSpreadPct.toFixed(1)}% range
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {demandForecast?.data?.branches?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Branch demand forecasts</h2>

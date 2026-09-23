@@ -98,6 +98,16 @@ vi.mock('../services/org-reports.service.js', () => ({
     },
     meta: {},
   }),
+  restaurantOrgCrossBranchPurchasingInsights: vi.fn().mockResolvedValue({
+    data: {
+      signals: [],
+      coverage: {
+        source: 'latest_order_line_price_snapshots',
+        comparableOnly: 'same_product_and_supplier',
+      },
+    },
+    meta: {},
+  }),
   restaurantOrgBranchDemandForecast: vi.fn().mockResolvedValue({
     data: {
       branches: [],
@@ -145,6 +155,7 @@ import { getResolvedFeatureValue } from '../lib/feature-flags.js'
 import {
   restaurantOrgBranchComparison,
   restaurantOrgBranchDemandForecast,
+  restaurantOrgCrossBranchPurchasingInsights,
   restaurantOrgConsolidatedOverview,
 } from '../services/org-reports.service.js'
 
@@ -255,6 +266,14 @@ describe('restaurant-org.routes', () => {
     const res = await request(app).get('/api/restaurant-org/reports/demand-forecast').expect(403)
     expect(res.body.error.name).toBe('FEATURE_NOT_AVAILABLE')
     expect(restaurantOrgBranchDemandForecast).not.toHaveBeenCalled()
+  })
+
+  it('GET /reports/purchasing-insights returns read-only comparable price facts', async () => {
+    const res = await request(app)
+      .get('/api/restaurant-org/reports/purchasing-insights')
+      .expect(200)
+    expect(restaurantOrgCrossBranchPurchasingInsights).toHaveBeenCalledWith('user-1', 'org-1', {})
+    expect(res.body.data.coverage.comparableOnly).toBe('same_product_and_supplier')
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

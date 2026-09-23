@@ -442,6 +442,28 @@ export const branchesApi = api.injectEndpoints({
       query: () => '/api/restaurant-org/reports/demand-forecast',
       providesTags: ['RestaurantOrg'],
     }),
+    getRestaurantOrgCrossBranchPurchasingInsights: builder.query<
+      {
+        data: {
+          signals: Array<{
+            productId: string
+            productName: string
+            productUnit: string
+            supplierId: string
+            supplierName: string | null
+            branchCount: number
+            minUnitPrice: number
+            maxUnitPrice: number
+            priceSpreadPct: number
+          }>
+          coverage: { source: string; comparableOnly: string }
+        }
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/purchasing-insights',
+      providesTags: ['RestaurantOrg'],
+    }),
     getCentralPurchasingDrafts: builder.query<
       { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
       void

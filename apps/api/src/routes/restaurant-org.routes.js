@@ -50,6 +50,7 @@ import {
   restaurantOrgConsolidatedOverview,
   restaurantOrgBranchComparison,
   restaurantOrgBranchDemandForecast,
+  restaurantOrgCrossBranchPurchasingInsights,
 } from '../services/org-reports.service.js'
 import {
   assertCentralPurchasingEnabled,
@@ -1172,6 +1173,34 @@ router.get(
         error: {
           name: error.code || 'INTERNAL_ERROR',
           message: error.message || 'Failed to load branch demand forecasts',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+router.get(
+  '/reports/purchasing-insights',
+  multiBranchFeature,
+  requirePermission('CATALOG_VIEW'),
+  requirePermission('ORDERS_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgCrossBranchPurchasingInsights(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/purchasing-insights error:', error)
+      res.status(error.statusCode || error.status || 500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load cross-branch purchasing insights',
         },
         requestId: req.requestId,
       })

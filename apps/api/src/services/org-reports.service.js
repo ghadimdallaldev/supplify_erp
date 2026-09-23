@@ -336,6 +336,122 @@ export async function restaurantOrgBranchDemandForecast(userId, organizationId, 
     meta,
   }
 }
+/**
+ * Factual cross-Branch-Account purchase-price ranges. A row is comparable only
+ * when it is the same catalog product from the same supplier; no product
+ * matching, preferred supplier, or procurement action is inferred.
+ */
+export async function restaurantOrgCrossBranchPurchasingInsights(
+  userId,
+  organizationId,
+  queryParams = {}
+) {
+  const params = parseReportQuery(queryParams)
+  const requested = parseRequestedBranchIds(queryParams)
+  const branchIds = await resolveAuthorizedRestaurantBranchIds(userId, organizationId, requested)
+  const meta = {
+    from: params.from.toISOString().slice(0, 10),
+    to: params.to.toISOString().slice(0, 10),
+    branchAccountIds: branchIds,
+    maxSignals: 20,
+  }
+  if (!branchIds.length) {
+    return {
+      data: {
+        signals: [],
+        coverage: {
+          source: 'latest_order_line_price_snapshots',
+          comparableOnly: 'same_product_and_supplier',
+        },
+      },
+      meta,
+    }
+  }
+
+  const { rows } = await query(
+    `
+    WITH recent_lines AS (
+      SELECT
+        co.restaurant_id,
+        r.name AS branch_account_name,
+        oi.product_id,
+        p.name AS product_name,
+        p.unit AS product_unit,
+        oi.supplier_id,
+        s.name AS supplier_name,
+        oi.unit_price,
+        co.placed_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY co.restaurant_id, oi.product_id, oi.supplier_id
+          ORDER BY co.placed_at DESC, oi.id DESC
+        ) AS branch_price_rank
+      FROM customer_order co
+      JOIN order_item oi ON oi.order_id = co.id
+      JOIN restaurant r ON r.id = co.restaurant_id
+      JOIN product p ON p.id = oi.product_id
+      LEFT JOIN supplier s ON s.id = oi.supplier_id
+      WHERE co.restaurant_id = ANY($1::uuid[])
+        AND co.placed_at >= $2
+        AND co.placed_at <= $3
+        AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+        AND oi.unit_price IS NOT NULL
+        AND oi.unit_price > 0
+    ), latest_branch_prices AS (
+      SELECT * FROM recent_lines WHERE branch_price_rank = 1
+    ), comparable AS (
+      SELECT
+        product_id,
+        product_name,
+        product_unit,
+        supplier_id,
+        supplier_name,
+        COUNT(*)::int AS branch_count,
+        MIN(unit_price)::numeric AS min_unit_price,
+        MAX(unit_price)::numeric AS max_unit_price,
+        MAX(placed_at) AS latest_purchase_at,
+        jsonb_agg(
+          jsonb_build_object(
+            'branchAccountName', branch_account_name,
+            'unitPrice', unit_price,
+            'purchasedAt', placed_at
+          ) ORDER BY unit_price ASC, branch_account_name ASC
+        ) AS branch_prices
+      FROM latest_branch_prices
+      GROUP BY product_id, product_name, product_unit, supplier_id, supplier_name
+      HAVING COUNT(*) >= 2 AND MIN(unit_price) <> MAX(unit_price)
+    )
+    SELECT *,
+      ((max_unit_price - min_unit_price) / NULLIF(min_unit_price, 0) * 100)::numeric AS price_spread_pct
+    FROM comparable
+    ORDER BY price_spread_pct DESC, latest_purchase_at DESC
+    LIMIT $4
+    `,
+    [branchIds, params.from, params.to, meta.maxSignals]
+  )
+
+  return {
+    data: {
+      signals: rows.map((row) => ({
+        productId: row.product_id,
+        productName: row.product_name,
+        productUnit: row.product_unit,
+        supplierId: row.supplier_id,
+        supplierName: row.supplier_name ?? null,
+        branchCount: Number(row.branch_count),
+        minUnitPrice: Number(row.min_unit_price),
+        maxUnitPrice: Number(row.max_unit_price),
+        priceSpreadPct: Number(row.price_spread_pct),
+        latestPurchaseAt: row.latest_purchase_at,
+        branchPrices: row.branch_prices || [],
+      })),
+      coverage: {
+        source: 'latest_order_line_price_snapshots',
+        comparableOnly: 'same_product_and_supplier',
+      },
+    },
+    meta,
+  }
+}
 export async function supplierOrgConsolidatedOverview(userId, organizationId, queryParams = {}) {
   const params = parseReportQuery(queryParams)
   const { limit, offset } = parsePagination(queryParams)

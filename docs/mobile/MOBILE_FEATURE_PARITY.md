@@ -1096,3 +1096,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: Scale read-only organization-page view of fresh cached demand forecasts for authorized Branch Accounts; it adds no forecast refresh, order, transfer, notification, or mobile contract.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization-level forecasting/comparison surface. Adding an unreachable query and type would not provide a user-visible native capability.
 - **Revisit when**: a native organization forecasting surface is scheduled; add the endpoint type/query, Scale and smart-reorder forecast-capability gates, and visible UI to both clients together.
+
+## 2026-09-23 - Cross-branch purchasing insights (web-only)
+
+- **Change**: Scale read-only organization-page comparison of exact same-product/same-supplier order-line price ranges across authorized Branch Accounts. It creates no purchase, cart, transfer, notification, budget, or central-purchasing capability.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization-level purchase-price comparison surface. Adding an unreachable query/type would not provide a visible mobile capability.
+- **Revisit when**: a native organization purchasing-insights surface is scheduled; add the endpoint type/query, `CATALOG_VIEW`/`ORDERS_VIEW`/Scale gates, and visible UI to both clients together.

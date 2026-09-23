@@ -142,6 +142,12 @@ Restaurant Scale adds a read-only authorized-branch comparison at GET /api/resta
 
 It does not refresh, calculate, aggregate quantities across different product units, suggest a transfer, or create an order. It returns only fresh restaurant-wide cache rows for authorized Branch Accounts, ranked within each account by stored urgency and confidence. Stale rows and the separate legacy intra-tenant `branch` forecasts are excluded, so scope is never presented as cross-account data.
 
+## Cross-branch purchasing insights (implemented)
+
+`GET /api/restaurant-org/reports/purchasing-insights` is a Scale, read-only Branch-Account comparison of the latest stored order-line unit prices. It requires `multi_branch`, `CATALOG_VIEW`, `ORDERS_VIEW`, and Scale intelligence.
+
+A signal exists only where at least two authorized Branch Accounts bought the exact same catalog product from the same supplier at different stored unit prices in the selected reporting window. It reports the observed range and branch count; it does not match different products, infer equivalent packs or contract terms, choose a supplier, recommend a purchase, create a cart/order, or enable central purchasing.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

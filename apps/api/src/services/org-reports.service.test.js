@@ -7,9 +7,11 @@ vi.mock('../lib/restaurant-org.js', () => ({
 }))
 vi.mock('../lib/supplier-org.js', () => ({ listOrgBranchesForUser: vi.fn() }))
 
-const { restaurantOrgBranchComparison, restaurantOrgBranchDemandForecast } = await import(
-  './org-reports.service.js'
-)
+const {
+  restaurantOrgBranchComparison,
+  restaurantOrgBranchDemandForecast,
+  restaurantOrgCrossBranchPurchasingInsights,
+} = await import('./org-reports.service.js')
 
 describe('restaurantOrgBranchComparison', () => {
   it('returns tenant-scoped stored branch facts and marks food cost unavailable', async () => {
@@ -99,6 +101,48 @@ describe('restaurantOrgBranchDemandForecast', () => {
     expect(result.data.coverage).toEqual({
       scope: 'restaurant_account_aggregate_only',
       source: 'cached_reorder_forecast',
+    })
+  })
+})
+
+describe('restaurantOrgCrossBranchPurchasingInsights', () => {
+  it('reports only factual same-product/supplier price ranges', async () => {
+    queryMock.mockReset()
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          product_id: 'product-1',
+          product_name: 'Tomatoes',
+          product_unit: 'kg',
+          supplier_id: 'supplier-1',
+          supplier_name: 'Fresh Co',
+          branch_count: '2',
+          min_unit_price: '5',
+          max_unit_price: '6',
+          price_spread_pct: '20',
+          latest_purchase_at: '2026-09-23T10:00:00.000Z',
+          branch_prices: [{ branchAccountName: 'Main', unitPrice: 5 }],
+        },
+      ],
+    })
+
+    const result = await restaurantOrgCrossBranchPurchasingInsights('user-1', 'org-1', {
+      from: '2026-09-01',
+      to: '2026-09-23',
+    })
+
+    expect(queryMock.mock.calls[0][1][0]).toEqual(['branch-1'])
+    expect(queryMock.mock.calls[0][0]).toContain('co.restaurant_id = ANY($1::uuid[])')
+    expect(queryMock.mock.calls[0][0]).toContain(
+      'HAVING COUNT(*) >= 2 AND MIN(unit_price) <> MAX(unit_price)'
+    )
+    expect(result.data.signals[0]).toMatchObject({
+      productId: 'product-1',
+      supplierId: 'supplier-1',
+      branchCount: 2,
+      minUnitPrice: 5,
+      maxUnitPrice: 6,
+      priceSpreadPct: 20,
     })
   })
 })
