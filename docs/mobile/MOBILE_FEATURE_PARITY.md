@@ -1089,3 +1089,4 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Change**: Scale read-only comparison of authorized restaurant branch facts on the organization page.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization comparison surface.
+- **Revisit when**: a native organization comparison surface is scheduled; implement the query, types, source-feature/permission gates, and visible UI on both clients together.

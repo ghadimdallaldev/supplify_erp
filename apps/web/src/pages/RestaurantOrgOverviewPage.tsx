@@ -10,7 +10,7 @@ import {
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
-import { multiBranchEnabled } from '../lib/planLimits'
+import { featureEnabled, meetsIntelligenceTier, multiBranchEnabled } from '../lib/planLimits'
 import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 import { PageHeader } from '../components/ui/page-header'
@@ -38,6 +38,14 @@ export function RestaurantOrgOverviewPage() {
   const canManageOrg = can('SETTINGS_MANAGE')
   const { entitlements } = useEntitlements()
   const multiBranch = multiBranchEnabled(entitlements)
+  const canViewBranchComparison =
+    multiBranch &&
+    meetsIntelligenceTier(entitlements, 'scale') &&
+    featureEnabled(entitlements?.features?.waste_tracking) &&
+    featureEnabled(entitlements?.features?.receiving_quality) &&
+    can('ORDERS_VIEW') &&
+    can('INVENTORY_VIEW') &&
+    can('RECEIVING_VIEW')
 
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
@@ -46,7 +54,7 @@ export function RestaurantOrgOverviewPage() {
     skip: !isEffectiveRestaurant || !multiBranch,
   })
   const { data: comparison } = useGetRestaurantOrgBranchComparisonQuery(undefined, {
-    skip: !isEffectiveRestaurant || !multiBranch,
+    skip: !isEffectiveRestaurant || !canViewBranchComparison,
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchRestaurantOrgBranchContextMutation()

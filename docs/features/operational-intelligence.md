@@ -134,7 +134,7 @@ It does not recalculate, score, or automate anything. It aggregates the already-
 
 ## Multi-branch comparison (implemented)
 
-Restaurant Scale adds a read-only authorized-branch comparison at GET /api/restaurant-org/reports/comparison. It is gated by multi_branch, Scale intelligence, waste/receiving source features, and inventory/receiving permissions. It compares stored branch-account purchasing trends, inventory availability, waste, and receiving quality/fill rate. Food-cost comparison is deliberately unavailable: branch accounts do not share a comparable recipe/menu identity model.
+Restaurant Scale adds a read-only authorized-branch comparison at GET /api/restaurant-org/reports/comparison. It is gated by multi_branch, Scale intelligence, waste/receiving source features, and ORDERS_VIEW, INVENTORY_VIEW, and RECEIVING_VIEW permissions. It compares stored branch-account purchasing trends, inventory availability, waste, and receiving quality/fill rate. Food-cost comparison is deliberately unavailable: branch accounts do not share a comparable recipe/menu identity model.
 
 ## Forecasting tier alignment (migration 0215)
 

@@ -21,6 +21,10 @@ vi.mock('../lib/subscription.js', () => ({
   requireFeature: () => (req, res, next) => next(),
 }))
 
+vi.mock('../lib/intelligence-tier.js', () => ({
+  requireIntelligenceTier: () => (req, res, next) => next(),
+}))
+
 vi.mock('../lib/plan-enforcement.js', () => ({
   checkLinkedAccountLimit: vi.fn().mockResolvedValue({ allowed: true }),
   createAuditLog: vi.fn(),
@@ -89,6 +93,13 @@ vi.mock('../services/org-reports.service.js', () => ({
     },
     meta: {},
   }),
+  restaurantOrgBranchComparison: vi.fn().mockResolvedValue({
+    data: {
+      branches: [],
+      coverage: { foodCost: { available: false, reason: 'no_shared_recipe_identity_model' } },
+    },
+    meta: {},
+  }),
 }))
 
 vi.mock('../services/central-purchasing.service.js', () => ({
@@ -118,7 +129,10 @@ vi.mock('../lib/impersonation.js', () => ({
 
 import restaurantOrgRoutes from './restaurant-org.routes.js'
 import * as restaurantOrg from '../lib/restaurant-org.js'
-import { restaurantOrgConsolidatedOverview } from '../services/org-reports.service.js'
+import {
+  restaurantOrgBranchComparison,
+  restaurantOrgConsolidatedOverview,
+} from '../services/org-reports.service.js'
 
 describe('restaurant-org.routes', () => {
   let app
@@ -207,6 +221,12 @@ describe('restaurant-org.routes', () => {
     const res = await request(app).get('/api/restaurant-org/reports/overview').expect(200)
     expect(restaurantOrgConsolidatedOverview).toHaveBeenCalled()
     expect(res.body.data.kpis.order_count).toBe(4)
+  })
+
+  it('GET /reports/comparison returns the authorized branch comparison', async () => {
+    const res = await request(app).get('/api/restaurant-org/reports/comparison').expect(200)
+    expect(restaurantOrgBranchComparison).toHaveBeenCalledWith('user-1', 'org-1', {})
+    expect(res.body.data.coverage.foodCost.available).toBe(false)
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

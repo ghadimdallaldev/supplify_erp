@@ -175,7 +175,7 @@ User decision: do not introduce central purchasing or a purchasing budget. The l
 
 ### Phase 3 — Restaurant Scale (`crossLocation`)
 
-- [x] Multi-branch comparison — implemented 2026-09-23; authorized read-only branch spend/trends, inventory, waste, and receiving facts. Food cost is explicitly unavailable without a shared recipe/menu identity model.
+- [x] Multi-branch comparison — implemented and gate-corrected 2026-09-23; authorized read-only branch spend/trends, inventory, waste, and receiving facts. Requires multi_branch, Scale intelligence, waste/receiving source features, and ORDERS_VIEW, INVENTORY_VIEW, and RECEIVING_VIEW. Food cost is explicitly unavailable without a shared recipe/menu identity model. Full API/web/typecheck/lint/Android/iOS verification passed; next start at multi-branch demand forecasting.
 - [ ] Multi-branch demand forecasting — reuse branch-aware forecasting
 - [ ] Cross-branch purchasing insights
 - [ ] Stock-transfer **suggestions only** — recommendation-only, no inventory rebuild, no central purchasing

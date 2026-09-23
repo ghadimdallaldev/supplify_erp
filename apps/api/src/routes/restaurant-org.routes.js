@@ -1103,6 +1103,7 @@ router.get(
     (req) => req.restaurantOrgContext?.primaryRestaurantId,
     () => 'RESTAURANT'
   ),
+  requirePermission('ORDERS_VIEW'),
   requirePermission('INVENTORY_VIEW'),
   requirePermission('RECEIVING_VIEW'),
   requireIntelligenceTier('scale'),
