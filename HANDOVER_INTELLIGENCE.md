@@ -153,18 +153,18 @@ Three separate bugs were **entitlement reads against the wrong object shape**, i
 
 ## Continuation status — 2026-09-23
 
-Waste intelligence, supplier reliability, and over-ordering detection are complete in the commits containing this handover update. Over-ordering adds `GET /api/restaurant-intelligence/over-ordering`, gated by the existing `waste_tracking` and `receiving_quality` domain features, `INVENTORY_VIEW`, `RECEIVING_VIEW`, and the advanced intelligence tier. It compares only recorded purchase, receipt, usage, stock, and waste facts, requires comparable units and sufficient repeated evidence, and appears on the web Restaurant Inventory page. Mobile remains intentionally web-only because both native clients have inventory/waste entry but no inventory analytics surface.
+Waste intelligence, supplier reliability, over-ordering detection, and invoice anomaly detection are complete in the commits containing this handover update. Invoice anomaly detection adds `GET /api/restaurant-intelligence/invoice-anomalies`, gated by `finance_invoices`, `INVOICES_VIEW`, and the advanced intelligence tier. It compares invoice-line facts with linked order snapshots, active contract prices, and prior invoice prices; duplicate protection remains enforced by the existing unique order/supplier index. It deliberately has no fraud score, automatic dispute, or mutation, and appears on the web Invoices page. Mobile remains intentionally web-only because neither native client has an invoice analytics surface.
 
-Full web, typecheck, lint, and both mobile typecheck/Jest verification pass. The API full suite retains the documented intermittent supplier-pain-killer timeout and this run also timed out in an unrelated feature-gates hook; both files pass in isolation. The first concurrent web run had a pre-existing i18n teardown timer after all tests passed; the standalone rerun passes.
+Full API and web suites, typecheck, and lint pass; lint reports the established 1,713 warnings and no errors. Both mobile repositories pass typecheck and Jest (22 suites / 87 tests each). The full web suite still logs the pre-existing jsdom navigation warning from `AdminShell.test.tsx`, but exits successfully.
 
-**Resume with:** Phase 2 invoice / price anomaly detection. Inspect invoice, order snapshot, contract-pricing, and existing price-intelligence services first; keep it practical and do not create a fraud platform.
+**Resume with:** Phase 2 purchasing budget. Inspect existing order, invoice, budget, notification, and feature-flag services first. A configurable budget needs a new migration; do not assume there are no live tenants or make any migration/data decision that depends on that assumption.
 
 ### Phase 2 — Restaurant Intelligence (advanced tier)
 
 - [x] Waste intelligence — implemented 2026-09-23; tenant-scoped period comparison and repeat/rising-cost signals from real `WASTAGE`/`SPOILAGE` adjustments. Reuses the existing Waste & spoilage surface rather than creating a second dashboard.
 - [x] Supplier reliability — implemented 2026-09-23; tenant-scoped supplier facts for fill rate, receiving quality, completed orders, delivery timing, and dispute state. Reuses established receiving, delivery, order, and dispute records, keeps data coverage explicit, and surfaces only factual exceptions.
 - [x] Over-ordering detection — implemented 2026-09-23; tenant-scoped, coverage-aware comparison of purchase, receipt, usage, stock, and logged waste facts. Flags only repeated, comparable patterns with excess stock cover; it neither invents a stock policy nor creates orders.
-- [ ] Invoice / price anomaly detection — invoice vs order snapshot, invoice vs contract price, duplicates, abnormal movement. Keep it practical; not a fraud platform.
+- [x] Invoice / price anomaly detection — implemented 2026-09-23; tenant-scoped, line-level comparison with linked order snapshots, active contract prices, and prior invoice prices. Duplicate protection is explicitly reported from the existing unique index. It surfaces factual review signals only; it does not score fraud or create disputes.
 - [ ] Purchasing budget — configurable budget, spend, remaining, % used, projected overspend; notify near/over threshold. Needs a migration.
 - [ ] Stockout prediction + smart reorder quantities — largely exist in `reorder-forecast*` services; verify they are now correctly tier-gated after `0215`.
 - [ ] Weekly intelligence summary — aggregate the deterministic signals. LLM may explain/prioritise; facts must come from the services.

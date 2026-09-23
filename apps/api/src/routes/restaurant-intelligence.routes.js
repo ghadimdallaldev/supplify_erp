@@ -33,6 +33,7 @@ import {
 import { getWasteIntelligence } from '../services/restaurant-waste-intelligence.service.js'
 import { listSupplierReliability } from '../services/restaurant-supplier-reliability.service.js'
 import { listOverOrderingIntelligence } from '../services/restaurant-over-ordering-intelligence.service.js'
+import { listInvoiceAnomalies } from '../services/restaurant-invoice-anomaly-intelligence.service.js'
 
 const router = express.Router()
 
@@ -45,8 +46,14 @@ const canSeePurchasePrices = requirePermission('CATALOG_VIEW')
 const canSeeRecipeCosts = requirePermission('RECIPES_VIEW_COSTS')
 const canViewInventory = requirePermission('INVENTORY_VIEW')
 const canViewReceiving = requirePermission('RECEIVING_VIEW')
+const canViewInvoices = requirePermission('INVOICES_VIEW')
 const receivingQualityFeature = requireFeature(
   'receiving_quality',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+const financeInvoicesFeature = requireFeature(
+  'finance_invoices',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -217,6 +224,26 @@ router.get(
       const data = await listOverOrderingIntelligence(restaurantId, {
         days: req.query.days,
         limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.get(
+  '/invoice-anomalies',
+  financeInvoicesFeature,
+  canViewInvoices,
+  requireIntelligenceTier('advanced'),
+  async (req, res, next) => {
+    try {
+      const restaurantId = await restaurantScope(req)
+      const data = await listInvoiceAnomalies(restaurantId, {
+        days: req.query.days,
+        limit: req.query.limit,
+        minChangePct: req.query.minChangePct,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {

@@ -34,6 +34,7 @@ import { RestaurantPayablesPanel } from '../components/restaurant/RestaurantPaya
 import { InvoiceCreditNotesCard } from '../components/invoices/InvoiceCreditNotesCard'
 import { InvoiceStatsCards } from '../components/invoices/InvoiceStatsCards'
 import { InvoiceListPanel } from '../components/invoices/InvoiceListPanel'
+import { InvoiceAnomaliesCard } from '../components/invoices/InvoiceAnomaliesCard'
 import { SupplierStatementPanel } from '../components/invoices/SupplierStatementPanel'
 import {
   LazyInvoiceDetailDialog,
@@ -445,6 +446,8 @@ export function InvoicesPage() {
         {disputesEnabled && tenantCreditNotes.length > 0 && (
           <InvoiceCreditNotesCard tenantCreditNotes={tenantCreditNotes} />
         )}
+
+        {isRestaurant && financeInvoicesEnabled && <InvoiceAnomaliesCard />}
 
         <InvoiceStatsCards
           stats={stats}

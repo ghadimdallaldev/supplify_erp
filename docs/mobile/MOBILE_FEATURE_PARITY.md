@@ -1072,3 +1072,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Android and iOS support inventory and waste entry but have no inventory-analytics or purchasing-insights surface for a multi-source review card. Adding an unreachable API query and type would not create a native capability.
 - **Contract impact on mobile**: none for existing calls, types, permissions, notifications, deep links, or entitlement handling. `waste_tracking`, `receiving_quality`, `INVENTORY_VIEW`, `RECEIVING_VIEW`, and `intelligence` are existing gates.
 - **Revisit when**: a native inventory analytics or purchasing-insights surface is scheduled. Implement the API type/query and visible UI in both clients together.
+
+## 2026-09-23 - Invoice anomaly checks (web-only)
+
+- **Change**: a read-only advanced invoice comparison endpoint and web Invoice-page card.
+- **Parity decision**: **Skipped on mobile, intentionally.** Native clients have no invoice analytics or finance-review surface. Adding an unreachable query/type would not create a mobile capability.
+- **Revisit when**: native invoice analytics is scheduled; add the query, type, and visible UI to both clients together.

@@ -15,6 +15,7 @@ const mockListWeakMarginMenuItems = vi.fn()
 const mockGetWasteIntelligence = vi.fn()
 const mockListSupplierReliability = vi.fn()
 const mockListOverOrderingIntelligence = vi.fn()
+const mockListInvoiceAnomalies = vi.fn()
 
 /** Permission middleware records what it was asked to enforce. */
 const requiredPermissions = []
@@ -94,6 +95,10 @@ vi.mock('../services/restaurant-over-ordering-intelligence.service.js', () => ({
   listOverOrderingIntelligence: (...args) => mockListOverOrderingIntelligence(...args),
 }))
 
+vi.mock('../services/restaurant-invoice-anomaly-intelligence.service.js', () => ({
+  listInvoiceAnomalies: (...args) => mockListInvoiceAnomalies(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -127,6 +132,7 @@ describe('restaurant intelligence routes', () => {
     mockGetWasteIntelligence.mockResolvedValue({ summary: {}, hotspots: [] })
     mockListSupplierReliability.mockResolvedValue({ suppliers: [] })
     mockListOverOrderingIntelligence.mockResolvedValue({ products: [] })
+    mockListInvoiceAnomalies.mockResolvedValue({ invoices: [] })
     grantedPermissions = new Set(['CATALOG_VIEW', 'RECIPES_VIEW_COSTS'])
     app = buildApp()
   })
@@ -334,6 +340,30 @@ describe('restaurant intelligence routes', () => {
         days: '120',
         limit: '5',
       })
+    })
+  })
+
+  describe('invoice anomalies', () => {
+    it('requires INVOICES_VIEW and the advanced tier', async () => {
+      expect(requiredPermissions).toContain('INVOICES_VIEW')
+      grantedPermissions = new Set(['CATALOG_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+      await request(app).get('/api/restaurant-intelligence/invoice-anomalies').expect(403)
+      expect(mockListInvoiceAnomalies).not.toHaveBeenCalled()
+      grantedPermissions = new Set(['INVOICES_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('basic'))
+      await request(app).get('/api/restaurant-intelligence/invoice-anomalies').expect(403)
+    })
+    it('scopes invoice anomalies to the session restaurant', async () => {
+      grantedPermissions = new Set(['INVOICES_VIEW'])
+      mockGetIntelligenceTierForTenant.mockResolvedValue(tierOf('advanced'))
+      await request(app)
+        .get('/api/restaurant-intelligence/invoice-anomalies?days=60&restaurantId=other')
+        .expect(200)
+      expect(mockListInvoiceAnomalies).toHaveBeenCalledWith(
+        'restaurant-1',
+        expect.objectContaining({ days: '60' })
+      )
     })
   })
 

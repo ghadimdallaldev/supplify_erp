@@ -11,6 +11,7 @@ import type {
 import type { WasteIntelligenceResponse } from '../../../types/wasteIntelligence'
 import type { SupplierReliabilityResponse } from '../../../types/supplierReliability'
 import type { OverOrderingIntelligenceResponse } from '../../../types/overOrderingIntelligence'
+import type { InvoiceAnomalyResponse } from '../../../types/invoiceAnomalyIntelligence'
 
 export type PriceHistoryParams = {
   productId: string
@@ -104,6 +105,16 @@ export const priceIntelligenceApi = api.injectEndpoints({
         'RestaurantWaste',
       ],
     }),
+    getInvoiceAnomalies: builder.query<
+      InvoiceAnomalyResponse,
+      { days?: number; limit?: number; minChangePct?: number } | void
+    >({
+      query: (params) => ({
+        url: '/api/restaurant-intelligence/invoice-anomalies',
+        params: params || {},
+      }),
+      providesTags: [{ type: 'PriceIntelligence', id: 'INVOICE_ANOMALIES' }],
+    }),
     getMenuProfitability: builder.query<MenuProfitabilityResponse, MenuProfitabilityParams | void>({
       query: (params) => ({
         url: '/api/restaurant-intelligence/menu-profitability',
@@ -122,5 +133,6 @@ export const {
   useGetWasteIntelligenceQuery,
   useGetSupplierReliabilityQuery,
   useGetOverOrderingIntelligenceQuery,
+  useGetInvoiceAnomaliesQuery,
   useGetMenuProfitabilityQuery,
 } = priceIntelligenceApi

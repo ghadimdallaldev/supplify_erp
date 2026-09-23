@@ -120,6 +120,12 @@ A product is a review signal only with at least two qualifying orders, observed 
 
 Receiving lines in a non-matching product unit are counted as coverage gaps and exclude that product from comparison rather than being coerced to zero or guessed at. The advanced card appears on the existing Restaurant Inventory page, next to the existing Smart Reorder panel; it is a review layer and does not duplicate or alter low-stock/reorder assistance.
 
+## Invoice and price anomaly detection (implemented)
+
+`GET /api/restaurant-intelligence/invoice-anomalies` is an advanced, read-only Restaurant Intelligence surface. It requires `finance_invoices`, `INVOICES_VIEW`, and the `advanced` intelligence tier.
+
+It reports only stored, line-level comparisons: billed quantity above the linked order line, billed unit price above the order snapshot, billed unit price above an active contract valid on the invoice date, and invoice-price movement above the existing 5% price-noise threshold. The database already enforces one linked invoice per `(order_id, supplier_id)`; that protection is reported as enforcement rather than turned into a speculative risk score. It does not call a difference fraud, infer missing contract terms, alter an invoice, or create disputes. The web card appears on the existing Restaurant Invoices page.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

@@ -202,5 +202,17 @@
       "STRIPE": "Stripe",
       "OTHER": "Other"
     }
+  },
+  "anomalies": {
+    "title": "Invoice checks",
+    "description": "Recorded invoice, order, contract, and prior-price differences that need review.",
+    "empty": "No supported invoice anomalies in this period.",
+    "signals": {
+      "quantity_exceeds_order": "Billed quantity exceeds order",
+      "price_above_order_snapshot": "Price exceeds order snapshot",
+      "price_above_active_contract": "Price exceeds active contract",
+      "price_movement_above_threshold": "Price movement needs review",
+      "duplicate_linked_invoice": "Duplicate linked invoice"
+    }
   }
 }
