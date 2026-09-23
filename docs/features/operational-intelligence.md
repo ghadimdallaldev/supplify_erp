@@ -212,6 +212,10 @@ The assistant exposes get_over_ordering for existing coverage-aware excess-stock
 
 The assistant exposes get_invoice_anomalies for factual invoice-line differences from order snapshots, active contract prices, and prior invoice prices. It reuses the deterministic invoice-anomaly service, limits the requested window to 365 days and returned invoices to 15, and requires the assistant entitlement/quota, finance_invoices, INVOICES_VIEW, and Advanced-or-higher effective Intelligence. It does not score fraud, create disputes, issue SQL, write data, or escape the active tenant.
 
+## Assistant branch-comparison tool (implemented)
+
+The assistant exposes get_branch_comparison for authorized cross-branch purchasing, inventory, waste, and receiving facts. It reuses the org comparison service and resolves the caller's existing organization membership; the service intersects any branch scope with authorized active branches. It requires the assistant entitlement/quota, multi_branch, waste_tracking, receiving_quality, ORDERS_VIEW, INVENTORY_VIEW, RECEIVING_VIEW, and Scale Intelligence. Food cost remains unavailable without a shared recipe/menu identity model; the tool cannot create purchases or transfers, issue SQL, write data, or escape the organization scope.
+
 ## Scope boundaries
 
 Restaurant Scale enables multi-branch insight, not centralized purchasing. `/api/restaurant-org/central-purchasing/*` deliberately returns `410 Gone` until a separately designed, authorized cross-branch workflow exists. Inventory remains restaurant-scoped; cross-branch stock transfers and central buying are not inferred from plan entitlement.

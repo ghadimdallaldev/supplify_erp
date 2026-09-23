@@ -25,6 +25,10 @@ vi.mock('../restaurant-over-ordering-intelligence.service.js', () => ({
 vi.mock('../restaurant-invoice-anomaly-intelligence.service.js', () => ({
   listInvoiceAnomalies: vi.fn(),
 }))
+vi.mock('../org-reports.service.js', () => ({ restaurantOrgBranchComparison: vi.fn() }))
+vi.mock('../../lib/restaurant-org.js', () => ({
+  getUserRestaurantOrgMembership: vi.fn(async () => null),
+}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -94,6 +98,8 @@ import { listSupplierReliability } from '../restaurant-supplier-reliability.serv
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
+import { restaurantOrgBranchComparison } from '../org-reports.service.js'
+import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -227,6 +233,27 @@ describe('assistant tools', () => {
       limit: 15,
     })
     expect(result.invoices).toHaveLength(1)
+  })
+  it('runs branch comparison with matching org source gates and scale intelligence', async () => {
+    getUserRestaurantOrgMembership.mockResolvedValue({ organization_id: 'org-1' })
+    query.mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    restaurantOrgBranchComparison.mockResolvedValue({
+      data: { branches: [{ branchAccountId: 'branch-1' }] },
+      meta: {},
+    })
+
+    const result = await executeAssistantTool(
+      restaurantCtx({ permissions: [P.ORDERS_VIEW, P.INVENTORY_VIEW, P.RECEIVING_VIEW] }),
+      'get_branch_comparison',
+      { from: '2026-09-01', to: '2026-09-30' }
+    )
+
+    expect(restaurantOrgBranchComparison).toHaveBeenCalledWith('user-1', 'org-1', {
+      from: '2026-09-01',
+      to: '2026-09-30',
+    })
+    expect(result.data.branches).toHaveLength(1)
   })
   it('rejects fulfillment board for restaurant', async () => {
     await expect(

@@ -25,6 +25,8 @@ import { listSupplierReliability } from '../restaurant-supplier-reliability.serv
 import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
 import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
 import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
+import { restaurantOrgBranchComparison } from '../org-reports.service.js'
+import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -63,6 +65,33 @@ async function intelligenceAtLeast(ctx, minimum) {
 }
 function cap(rows) {
   return Array.isArray(rows) ? rows.slice(0, ROW_CAP) : rows
+}
+
+async function getRestaurantOrgScope(ctx) {
+  if (ctx.restaurantOrgScopeResolved) return ctx.restaurantOrgScope
+  ctx.restaurantOrgScopeResolved = true
+  ctx.restaurantOrgScope = null
+
+  if (ctx.tenantType !== 'RESTAURANT' || !ctx.userId) return null
+  const membership = await getUserRestaurantOrgMembership(ctx.userId)
+  const organizationId = membership?.organization_id
+  if (!organizationId) return null
+
+  const { rows: mainRows } = await query(
+    `SELECT id FROM restaurant WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+    [organizationId]
+  )
+  const primaryRestaurantId = mainRows[0]?.id
+  if (!primaryRestaurantId) return null
+
+  ctx.restaurantOrgScope = { organizationId, primaryRestaurantId }
+  return ctx.restaurantOrgScope
+}
+
+async function organizationFeatureOn(ctx, featureKey) {
+  const org = await getRestaurantOrgScope(ctx)
+  if (!org) return false
+  return isFeatureEnabledForTenant(org.primaryRestaurantId, 'RESTAURANT', featureKey)
 }
 
 /** @type {Record<string, { definition: import('../../lib/ai/provider.js').AiToolDefinition, available: (ctx: AssistantToolContext) => Promise<boolean>, run: (ctx: AssistantToolContext, args: Record<string, unknown>) => Promise<unknown> }>} */
@@ -624,6 +653,40 @@ const TOOLS = {
         limit: ROW_CAP,
       })
       return { ...result, invoices: cap(result.invoices) }
+    },
+  },
+  get_branch_comparison: {
+    definition: {
+      name: 'get_branch_comparison',
+      description: 'Authorized cross-branch purchasing, inventory, waste, and receiving facts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'Start date (YYYY-MM-DD)' },
+          to: { type: 'string', description: 'End date (YYYY-MM-DD)' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.ORDERS_VIEW) &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await organizationFeatureOn(ctx, 'multi_branch')) &&
+      (await organizationFeatureOn(ctx, 'waste_tracking')) &&
+      (await organizationFeatureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const org = await getRestaurantOrgScope(ctx)
+      if (!org) throw new Error('Restaurant organization access is required')
+      const result = await restaurantOrgBranchComparison(ctx.userId, org.organizationId, {
+        from: args.from,
+        to: args.to,
+      })
+      return {
+        ...result,
+        data: { ...result.data, branches: cap(result.data?.branches) },
+      }
     },
   },
   get_waste: {
