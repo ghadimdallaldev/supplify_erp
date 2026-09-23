@@ -15,6 +15,7 @@ import {
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
+import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { config } from '../config/env.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { writeAuditLog } from '../lib/audit.js'
@@ -27,6 +28,7 @@ import { ValidationError, ConflictError } from '../middlewares/errorHandler.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
+import { listSupplierSlowMovingInventory } from '../services/supplier-slow-moving-intelligence.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -256,6 +258,31 @@ const smartReorderGate = requireFeature(
   'smart_reorder',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
+)
+
+const inventoryManagementGate = requireFeature(
+  'inventory_management',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/slow-moving-inventory',
+  requirePermission('WAREHOUSES_VIEW'),
+  inventoryManagementGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierSlowMovingInventory(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
 )
 
 router.get(

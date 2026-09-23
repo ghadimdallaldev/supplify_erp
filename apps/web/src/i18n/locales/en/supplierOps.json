@@ -70,6 +70,14 @@
       "left": "{{name}} — {{qty}} left",
       "viewAll": "View all"
     },
+    "slowMoving": {
+      "title": "Slow-moving inventory",
+      "description": "Recorded stock cover based on completed supplier orders; review before taking action.",
+      "loading": "Checking recorded stock cover…",
+      "coverage": "~{{days}} days of stock cover from {{sold}} sold in the last {{window}} days",
+      "emptyTitle": "No slow-moving stock found",
+      "emptyDescription": "Products need repeated completed-order history before this review can report a result."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",

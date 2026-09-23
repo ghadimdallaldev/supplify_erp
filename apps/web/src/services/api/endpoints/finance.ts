@@ -1,4 +1,22 @@
 import { api } from '../base'
+export type SupplierSlowMovingInventoryResponse = {
+  windowDays: number
+  coverage: {
+    stockedProducts: number
+    productsWithSalesHistory: number
+    slowMovingProducts: number
+  }
+  products: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    availableQty: number
+    soldQuantity: number
+    orderCount: number
+    stockCoverDays: number
+  }>
+}
+
 export type SupplierStatementSummary = {
   openingBalance: number
   totalCharges: number
@@ -132,6 +150,10 @@ export const financeApi = api.injectEndpoints({
     getSupplierCommandCenter: builder.query<any, void>({
       query: () => '/api/supplier/command-center',
       providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
+    }),
+    getSupplierSlowMovingInventory: builder.query<SupplierSlowMovingInventoryResponse, void>({
+      query: () => '/api/supplier/slow-moving-inventory',
+      providesTags: ['SupplierOps'],
     }),
     getSupplierReorderIntelligence: builder.query<any, { graceDays?: number } | void>({
       query: (arg) => {

@@ -35,6 +35,16 @@ Existing routes continue to enforce their domain feature and RBAC checks; the ti
 
 Restaurant intelligence composes existing, reproducible calculations: `reorder_forecast`, stock/expiry signals, receiving history, recipe cost snapshots, `supplier_price_events`, recipe price impacts, and waste movements. Supplier intelligence composes the command center, reorder cadence and at-risk customers, warehouse/legacy stock display, receivables, delivery state, and fulfillment exceptions. Results must name their source and never fabricate a prediction, price, supplier, or quantity.
 
+## Supplier slow-moving inventory (implemented)
+
+`GET /api/supplier/slow-moving-inventory` is a Supplier Scale, read-only command-center review. It requires `WAREHOUSES_VIEW`, `inventory_management`, and the effective `scale` intelligence tier. The route derives the supplier from the authenticated tenant context; query parameters cannot select another supplier.
+
+It reuses `listSupplierStockDisplay`, so availability remains authoritative for both active warehouse inventory and the legacy inventory compatibility path. It then compares only completed, non-cancelled supplier order lines in the selected 30–365 day observation window (default 90 days). A product is reported only when it has recorded sales in at least two orders and its current recorded stock covers at least that same observation window at the observed daily sales rate.
+
+The response keeps coverage explicit: stocked products, products with enough repeated sales history, and qualifying slow-moving products. Products with no or one completed order are omitted rather than being called slow-moving. The web Supplier Command Center renders the review only for a Warehouse View user whose resolved entitlements enable inventory management and Supplier Scale; the API remains authoritative.
+
+This is a review signal, not an inventory policy. It does not infer a target stock level, forecast demand, create or change a deal, alter stock, reserve inventory, notify customers, or create purchasing/budget/central-purchasing behaviour.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

@@ -1158,3 +1158,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Change**: server-side assistant tool only; no mobile API contract, navigation, or visible native surface changed.
 - **Parity decision**: **Skipped on mobile, intentionally.** The existing native assistant remains the same conversation contract; tool selection is server-side.
+
+## 2026-09-24 - Supplier slow-moving inventory (web-only)
+
+- **Change**: `GET /api/supplier/slow-moving-inventory` and a read-only Supplier Command Center panel report only recorded stock cover for repeatedly sold supplier products. The API requires `WAREHOUSES_VIEW`, `inventory_management`, and Supplier Scale intelligence; it does not mutate inventory or create orders, deals, budgets, or purchases.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has the supplier Command Center / warehouse analytics review surface needed to make this result useful. Adding an unreachable endpoint client and type would not provide user-visible parity.
+- **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
+- **Revisit when**: native supplier command-center or warehouse analytics is scheduled; add the endpoint query/type and visible review surface to Android and iOS together.

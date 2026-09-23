@@ -34,6 +34,7 @@ import {
   type ReminderDraft,
 } from '../components/supplier/ReorderReminderReviewDialog'
 import { SupplierFollowUpPanel } from '../components/supplier/SupplierFollowUpPanel'
+import { SupplierSlowMovingInventoryPanel } from '../components/supplier/SupplierSlowMovingInventoryPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -664,6 +665,8 @@ export function SupplierCommandCenterPage() {
         )}
 
         {layout.showReorder && <SupplierFollowUpPanel className="mb-4" />}
+
+        {layout.showLowStockPreview && <SupplierSlowMovingInventoryPanel />}
 
         {layout.showReorder && (
           <section

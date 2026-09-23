@@ -11,6 +11,7 @@ const mockCommandCenter = vi.fn()
 const mockAtRisk = vi.fn()
 const mockEntitlements = vi.fn()
 const mockCreateDraft = vi.fn()
+const mockSlowMoving = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -33,6 +34,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierAtRiskOrdersQuery: (...args: unknown[]) => mockAtRisk(...args),
     useGetEntitlementsQuery: (...args: unknown[]) => mockEntitlements(...args),
     useGetSupplierRunSheetQuery: (...args: unknown[]) => mockRunSheet(...args),
+    useGetSupplierSlowMovingInventoryQuery: (...args: unknown[]) => mockSlowMoving(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -54,6 +56,10 @@ describe('supplier pain-killer UI', () => {
     mockDrivers.mockReturnValue({ data: { drivers: [] } })
     mockEntitlements.mockReturnValue({ data: { entitlements: { features: {} } } })
     mockAtRisk.mockReturnValue({ data: { orders: [] } })
+    mockSlowMoving.mockReturnValue({
+      data: { products: [], coverage: {}, windowDays: 90 },
+      isLoading: false,
+    })
     mockCommandCenter.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -120,6 +126,30 @@ describe('supplier pain-killer UI', () => {
     expect(screen.getByTestId('qa-deals').closest('a')).toHaveAttribute('href', '/app/promotions')
   })
 
+  it('shows recorded slow-moving stock only to an entitled warehouse user', () => {
+    mockEntitlements.mockReturnValue({
+      data: {
+        entitlements: { features: { intelligence: 'scale', inventory_management: true } },
+      },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<SupplierCommandCenterPage />)
+
+    expect(screen.getByTestId('supplier-slow-moving-inventory')).toBeInTheDocument()
+    expect(mockSlowMoving).toHaveBeenCalledWith(undefined, { skip: false })
+  })
   it('SupplierRunSheetPage renders KPIs, priorities, and delivery areas from unwrapped API data', () => {
     mockRunSheet.mockReturnValue({
       data: {

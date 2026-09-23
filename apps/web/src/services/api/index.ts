@@ -256,6 +256,7 @@ export const {
   useSendInvoiceReminderMutation,
   useRemindOverdueInvoicesMutation,
   useGetSupplierCommandCenterQuery,
+  useGetSupplierSlowMovingInventoryQuery,
   useGetSupplierRunSheetQuery,
   useGetSupplierReorderIntelligenceQuery,
   useGetSupplierReorderAssistanceQuery,

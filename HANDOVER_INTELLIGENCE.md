@@ -189,6 +189,8 @@ Reuse the existing assistant infrastructure in `apps/api/src/services/assistant-
 
 Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity alerts, demand forecasting, stockout prediction, overstock/slow-moving, suggested deals (human-approved), margin warnings (only if cost data exists), delivery/fulfillment intelligence, warehouse performance, multi-warehouse forecasting, weekly summary. Reuse `supplier-command-center`, `supplier-reorder-intelligence`, `supplier-receivables`, `supplier-deliveries`.
 
+- [x] Supplier slow-moving inventory — implemented 2026-09-24. `GET /api/supplier/slow-moving-inventory` reuses the authoritative warehouse/legacy stock display and completed supplier order history to report only repeatedly sold products whose current recorded stock covers at least the same 30–365 day observation window (default 90 days). It requires `WAREHOUSES_VIEW`, `inventory_management`, and Supplier Scale intelligence; it is surfaced as a read-only Supplier Command Center panel. Coverage is explicit; there is no target stock policy, demand forecast, deal, notification, stock/order mutation, purchasing budget, or central purchasing. Full API/web/typecheck/lint/Android/iOS verification passed. Next start at supplier demand forecasting only after confirming the existing forecast/reorder services do not already cover it.
+
 ### Phase 6 — Supplier Scale AI Assistant
 
 Same pattern: deterministic services calculate, assistant reads and explains.
