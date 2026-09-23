@@ -153,11 +153,11 @@ Three separate bugs were **entitlement reads against the wrong object shape**, i
 
 ## Continuation status — 2026-09-23
 
-Waste intelligence, supplier reliability, over-ordering detection, and invoice anomaly detection are complete in the commits containing this handover update. Invoice anomaly detection adds `GET /api/restaurant-intelligence/invoice-anomalies`, gated by `finance_invoices`, `INVOICES_VIEW`, and the advanced intelligence tier. It compares invoice-line facts with linked order snapshots, active contract prices, and prior invoice prices; duplicate protection remains enforced by the existing unique order/supplier index. It deliberately has no fraud score, automatic dispute, or mutation, and appears on the web Invoices page. Mobile remains intentionally web-only because neither native client has an invoice analytics surface.
+Waste intelligence, supplier reliability, over-ordering detection, and invoice anomaly detection are complete in the commits containing this handover update. Stockout prediction and smart reorder quantities were also verified as existing, correctly tier-gated capabilities: `reorder-forecast*` produces deterministic quantities from recorded inventory/usage/lead-time facts, `0215` leaves Growth on `suggestions_only`, and forecast capability begins at Restaurant Intelligence. Invoice anomaly detection adds `GET /api/restaurant-intelligence/invoice-anomalies`, gated by `finance_invoices`, `INVOICES_VIEW`, and the advanced intelligence tier. It compares invoice-line facts with linked order snapshots, active contract prices, and prior invoice prices; duplicate protection remains enforced by the existing unique order/supplier index. It deliberately has no fraud score, automatic dispute, or mutation, and appears on the web Invoices page. Mobile remains intentionally web-only for invoice intelligence because neither native client has an invoice analytics surface.
 
 Full API and web suites, typecheck, and lint pass; lint reports the established 1,713 warnings and no errors. Both mobile repositories pass typecheck and Jest (22 suites / 87 tests each). The full web suite still logs the pre-existing jsdom navigation warning from `AdminShell.test.tsx`, but exits successfully.
 
-**Resume with:** Phase 2 stockout prediction and smart reorder quantities. These largely exist in the `reorder-forecast*` services; verify the existing behavior and its feature/tier gates after migration `0215` before adding anything new.
+**Resume with:** Phase 2 weekly intelligence summary. Aggregate the existing deterministic facts from waste, supplier reliability, over-ordering, invoice anomalies, and the verified reorder forecast services; an LLM may explain or prioritise but must not create facts.
 
 ### Purchasing budget decision — 2026-09-23
 
@@ -170,7 +170,7 @@ User decision: do not introduce central purchasing or a purchasing budget. The l
 - [x] Over-ordering detection — implemented 2026-09-23; tenant-scoped, coverage-aware comparison of purchase, receipt, usage, stock, and logged waste facts. Flags only repeated, comparable patterns with excess stock cover; it neither invents a stock policy nor creates orders.
 - [x] Invoice / price anomaly detection — implemented 2026-09-23; tenant-scoped, line-level comparison with linked order snapshots, active contract prices, and prior invoice prices. Duplicate protection is explicitly reported from the existing unique index. It surfaces factual review signals only; it does not score fraud or create disputes.
 - [x] Purchasing budget — declined by product decision 2026-09-23. Do not revive the removed approvals/budgets product or introduce central purchasing, budget schema, thresholds, notifications, or automatic procurement.
-- [ ] Stockout prediction + smart reorder quantities — largely exist in `reorder-forecast*` services; verify they are now correctly tier-gated after `0215`.
+- [x] Stockout prediction + smart reorder quantities — verified 2026-09-23; already implemented in `reorder-forecast*` and the existing Reorder Assistance panel. `0215` correctly keeps Growth on deterministic assistance only and grants forecast/stockout quantities to Intelligence and Scale. No duplicate service, endpoint, UI, or mobile contract was added.
 - [ ] Weekly intelligence summary — aggregate the deterministic signals. LLM may explain/prioritise; facts must come from the services.
 
 ### Phase 3 — Restaurant Scale (`crossLocation`)
