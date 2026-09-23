@@ -138,6 +138,90 @@ export async function restaurantOrgConsolidatedOverview(userId, organizationId, 
   }
 }
 
+/** Read-only comparison of stored, branch-account facts. Food cost is excluded:
+ * separate restaurant tenants do not have a shared recipe/menu identity. */
+export async function restaurantOrgBranchComparison(userId, organizationId, queryParams = {}) {
+  const params = parseReportQuery(queryParams)
+  const requested = parseRequestedBranchIds(queryParams)
+  const branchIds = await resolveAuthorizedRestaurantBranchIds(userId, organizationId, requested)
+  if (!branchIds.length)
+    return {
+      data: {
+        branches: [],
+        coverage: { foodCost: { available: false, reason: 'no_shared_recipe_identity_model' } },
+      },
+      meta: {
+        from: params.from.toISOString().slice(0, 10),
+        to: params.to.toISOString().slice(0, 10),
+        branchAccountIds: [],
+      },
+    }
+  const durationMs = params.to.getTime() - params.from.getTime()
+  const previousFrom = new Date(params.from.getTime() - durationMs)
+  const { rows } = await query(
+    `
+    WITH orders AS (
+      SELECT restaurant_id,
+        COUNT(*) FILTER (WHERE placed_at >= $2 AND placed_at <= $3)::int AS order_count,
+        COALESCE(SUM(total_amount) FILTER (WHERE placed_at >= $2 AND placed_at <= $3), 0)::numeric AS spend,
+        COALESCE(SUM(total_amount) FILTER (WHERE placed_at >= $4 AND placed_at < $2), 0)::numeric AS previous_spend
+      FROM customer_order WHERE restaurant_id = ANY($1::uuid[]) AND status NOT IN ('DRAFT','CANCELLED','PENDING_APPROVAL') GROUP BY restaurant_id
+    ), inventory AS (
+      SELECT restaurant_id, COUNT(*)::int AS tracked_products,
+        COUNT(*) FILTER (WHERE quantity <= 0)::int AS out_of_stock_products,
+        COUNT(*) FILTER (WHERE quantity > 0 AND quantity <= COALESCE(low_stock_threshold, 0))::int AS low_stock_products
+      FROM restaurant_inventory WHERE restaurant_id = ANY($1::uuid[]) GROUP BY restaurant_id
+    ), waste AS (
+      SELECT restaurant_id, COUNT(*)::int AS incidents, COALESCE(SUM(COALESCE(total_cost, unit_cost * quantity)),0)::numeric AS cost
+      FROM inventory_adjustment WHERE restaurant_id = ANY($1::uuid[]) AND adjustment_type IN ('WASTAGE','SPOILAGE') AND created_at >= $2 AND created_at <= $3 GROUP BY restaurant_id
+    ), receiving AS (
+      SELECT restaurant_id, COUNT(*)::int AS reports,
+        AVG(quality_score) FILTER (WHERE quality_score IS NOT NULL) AS average_quality_score,
+        CASE WHEN SUM(total_items_ordered) > 0 THEN SUM(total_items_received) / SUM(total_items_ordered) * 100 ELSE NULL END AS fill_rate_pct
+      FROM receiving_report WHERE restaurant_id = ANY($1::uuid[]) AND received_at >= $2 AND received_at <= $3 GROUP BY restaurant_id
+    )
+    SELECT r.id AS branch_account_id, r.name AS branch_account_name, r.is_main_branch,
+      COALESCE(o.order_count,0) AS order_count, COALESCE(o.spend,0) AS spend, COALESCE(o.previous_spend,0) AS previous_spend,
+      COALESCE(i.tracked_products,0) AS tracked_products, COALESCE(i.out_of_stock_products,0) AS out_of_stock_products, COALESCE(i.low_stock_products,0) AS low_stock_products,
+      COALESCE(w.incidents,0) AS waste_incidents, COALESCE(w.cost,0) AS waste_cost,
+      COALESCE(rc.reports,0) AS receiving_reports, rc.average_quality_score, rc.fill_rate_pct
+    FROM restaurant r LEFT JOIN orders o ON o.restaurant_id=r.id LEFT JOIN inventory i ON i.restaurant_id=r.id LEFT JOIN waste w ON w.restaurant_id=r.id LEFT JOIN receiving rc ON rc.restaurant_id=r.id
+    WHERE r.id = ANY($1::uuid[]) ORDER BY spend DESC, r.name ASC`,
+    [branchIds, params.from, params.to, previousFrom]
+  )
+  return {
+    data: {
+      branches: rows.map((r) => ({
+        branchAccountId: r.branch_account_id,
+        branchAccountName: r.branch_account_name,
+        isMainBranch: r.is_main_branch,
+        purchasing: {
+          orderCount: Number(r.order_count),
+          spend: Number(r.spend),
+          previousSpend: Number(r.previous_spend),
+        },
+        inventory: {
+          trackedProducts: Number(r.tracked_products),
+          outOfStockProducts: Number(r.out_of_stock_products),
+          lowStockProducts: Number(r.low_stock_products),
+        },
+        waste: { incidents: Number(r.waste_incidents), cost: Number(r.waste_cost) },
+        supplierPerformance: {
+          receivingReports: Number(r.receiving_reports),
+          averageQualityScore:
+            r.average_quality_score == null ? null : Number(r.average_quality_score),
+          fillRatePct: r.fill_rate_pct == null ? null : Number(r.fill_rate_pct),
+        },
+      })),
+      coverage: { foodCost: { available: false, reason: 'no_shared_recipe_identity_model' } },
+    },
+    meta: {
+      from: params.from.toISOString().slice(0, 10),
+      to: params.to.toISOString().slice(0, 10),
+      branchAccountIds: branchIds,
+    },
+  }
+}
 export async function supplierOrgConsolidatedOverview(userId, organizationId, queryParams = {}) {
   const params = parseReportQuery(queryParams)
   const { limit, offset } = parsePagination(queryParams)

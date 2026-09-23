@@ -1084,3 +1084,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: a read-only advanced summary endpoint aggregates already-authorized waste, supplier, over-ordering, invoice, and non-stale stockout facts for the web Restaurant Inventory page.
 - **Parity decision**: **Skipped on mobile, intentionally.** Both clients lack a cross-domain intelligence-review surface. The existing mobile flows retain their source features; adding an unreachable aggregation query would not provide usable parity.
 - **Revisit when**: a native operational-intelligence review screen is scheduled; implement the query, types, gates, and visible summary in both clients together.
+
+## 2026-09-23 - Multi-branch comparison (web-only)
+
+- **Change**: Scale read-only comparison of authorized restaurant branch facts on the organization page.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization comparison surface.

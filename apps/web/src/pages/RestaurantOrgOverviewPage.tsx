@@ -6,6 +6,7 @@ import {
   useGetRestaurantOrgQuery,
   useGetRestaurantOrgReportsOverviewQuery,
   useSwitchRestaurantOrgBranchContextMutation,
+  useGetRestaurantOrgBranchComparisonQuery,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -42,6 +43,9 @@ export function RestaurantOrgOverviewPage() {
     skip: !isEffectiveRestaurant,
   })
   const { data: reports } = useGetRestaurantOrgReportsOverviewQuery(undefined, {
+    skip: !isEffectiveRestaurant || !multiBranch,
+  })
+  const { data: comparison } = useGetRestaurantOrgBranchComparisonQuery(undefined, {
     skip: !isEffectiveRestaurant || !multiBranch,
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
@@ -117,6 +121,31 @@ export function RestaurantOrgOverviewPage() {
             <p className="text-xs text-[var(--text-muted)]">Active Branch Accounts</p>
             <p className="text-2xl font-semibold mt-1">{kpis.active_branch_accounts}</p>
           </div>
+        </div>
+      ) : null}
+
+      {comparison?.data?.coverage?.foodCost?.available === false ? (
+        <p className="mb-4 text-xs text-[var(--text-muted)]">
+          Food-cost comparison is unavailable because branch accounts do not share a comparable
+          recipe/menu identity.
+        </p>
+      ) : null}
+      {comparison?.data?.branches?.length ? (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          {comparison.data.branches.map((branch) => (
+            <div
+              key={String(branch.branchAccountId)}
+              className="rounded-lg border border-[var(--app-border)] p-4 text-sm"
+            >
+              <p className="font-medium">{String(branch.branchAccountName)}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Spend {formatMoney(Number(branch.purchasing?.spend || 0))} ·{' '}
+                {Number(branch.purchasing?.orderCount || 0)} orders ·{' '}
+                {Number(branch.inventory?.outOfStockProducts || 0)} out of stock ·{' '}
+                {Number(branch.waste?.incidents || 0)} waste incidents
+              </p>
+            </div>
+          ))}
         </div>
       ) : null}
 

@@ -132,6 +132,10 @@ It reports only stored, line-level comparisons: billed quantity above the linked
 
 It does not recalculate, score, or automate anything. It aggregates the already-flagged waste hotspots, supplier exceptions, over-ordering products, invoice anomalies, and current non-stale high/urgent stockout forecasts. Its response preserves each source's evidence window: waste and invoice review use the requested weekly period, supplier reliability uses at least 28 days, and over-ordering uses at least 90 days so repeated patterns remain evidence-based.
 
+## Multi-branch comparison (implemented)
+
+Restaurant Scale adds a read-only authorized-branch comparison at GET /api/restaurant-org/reports/comparison. It is gated by multi_branch, Scale intelligence, waste/receiving source features, and inventory/receiving permissions. It compares stored branch-account purchasing trends, inventory availability, waste, and receiving quality/fill rate. Food-cost comparison is deliberately unavailable: branch accounts do not share a comparable recipe/menu identity model.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

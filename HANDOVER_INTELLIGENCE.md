@@ -157,7 +157,7 @@ Waste intelligence, supplier reliability, over-ordering detection, invoice anoma
 
 Full API and web suites, typecheck, and lint pass; lint reports the established 1,713 warnings and no errors. Both mobile repositories pass typecheck and Jest (22 suites / 87 tests each). The full web suite still logs the pre-existing jsdom navigation warning from `AdminShell.test.tsx`, but exits successfully. One initial API run hit an unrelated randomized upload-token assertion when an opaque token happened to contain `s3`; its isolated test and the full-suite rerun pass.
 
-**Resume with:** Phase 3 multi-branch comparison. Inspect existing restaurant-org, branch, reporting, inventory, and forecast services first. Use read-only comparison of stored branch facts; do not introduce central purchasing, pooled budgets, or cross-branch mutations.
+**Resume with:** Phase 3 multi-branch demand forecasting. Reuse existing branch-aware forecasting; do not introduce central purchasing or cross-branch mutations.
 
 ### Purchasing budget decision — 2026-09-23
 
@@ -175,7 +175,7 @@ User decision: do not introduce central purchasing or a purchasing budget. The l
 
 ### Phase 3 — Restaurant Scale (`crossLocation`)
 
-- [ ] Multi-branch comparison (spend, food cost, waste, inventory, supplier performance, purchasing trends)
+- [x] Multi-branch comparison — implemented 2026-09-23; authorized read-only branch spend/trends, inventory, waste, and receiving facts. Food cost is explicitly unavailable without a shared recipe/menu identity model.
 - [ ] Multi-branch demand forecasting — reuse branch-aware forecasting
 - [ ] Cross-branch purchasing insights
 - [ ] Stock-transfer **suggestions only** — recommendation-only, no inventory rebuild, no central purchasing

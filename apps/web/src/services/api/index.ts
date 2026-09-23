@@ -319,6 +319,7 @@ export const {
   useCancelRestaurantOrgLinkInvitationMutation,
   useResendRestaurantOrgLinkInvitationMutation,
   useGetRestaurantOrgReportsOverviewQuery,
+  useGetRestaurantOrgBranchComparisonQuery,
   useGetCentralPurchasingDraftsQuery,
   useCreateCentralPurchasingDraftMutation,
   useUpdateCentralPurchasingDraftMutation,

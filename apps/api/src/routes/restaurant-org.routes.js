@@ -4,9 +4,11 @@ import {
   requireRole,
   resolveTenantContext,
   getRestaurantIdForRequest,
+  requirePermission,
 } from '../lib/rbac.js'
 import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
+import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
@@ -42,7 +44,10 @@ import {
   applyOrgBillingOnUnlink,
   recordBranchAccountLinkHistory,
 } from '../lib/branch-account-billing.js'
-import { restaurantOrgConsolidatedOverview } from '../services/org-reports.service.js'
+import {
+  restaurantOrgConsolidatedOverview,
+  restaurantOrgBranchComparison,
+} from '../services/org-reports.service.js'
 import {
   assertCentralPurchasingEnabled,
   listCentralPurchasingBranchAccounts,
@@ -1085,6 +1090,44 @@ router.get('/reports/overview', async (req, res) => {
   }
 })
 
+router.get(
+  '/reports/comparison',
+  multiBranchFeature,
+  requireFeature(
+    'waste_tracking',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requireFeature(
+    'receiving_quality',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('INVENTORY_VIEW'),
+  requirePermission('RECEIVING_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgBranchComparison(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/comparison error:', error)
+      res.status(error.statusCode || error.status || 500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load branch comparison',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 /**
  * Central purchasing foundation (Restaurant Scale only).
  * Drafts are per destination Branch Account — no organization-owned orders.

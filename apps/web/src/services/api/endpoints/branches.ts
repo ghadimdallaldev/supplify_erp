@@ -400,6 +400,18 @@ export const branchesApi = api.injectEndpoints({
       providesTags: ['RestaurantOrg'],
       keepUnusedDataFor: 60,
     }),
+    getRestaurantOrgBranchComparison: builder.query<
+      {
+        data: {
+          branches: Array<Record<string, any>>
+          coverage: { foodCost: { available: boolean; reason: string } }
+        }
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/comparison',
+      providesTags: ['RestaurantOrg'],
+    }),
     getCentralPurchasingDrafts: builder.query<
       { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
       void
