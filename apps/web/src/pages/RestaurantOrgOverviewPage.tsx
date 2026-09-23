@@ -7,10 +7,16 @@ import {
   useGetRestaurantOrgReportsOverviewQuery,
   useSwitchRestaurantOrgBranchContextMutation,
   useGetRestaurantOrgBranchComparisonQuery,
+  useGetRestaurantOrgBranchDemandForecastQuery,
 } from '../services/api'
 import { useEntitlements } from '../hooks/useEntitlements'
 import { useImpersonation } from '../hooks/useImpersonation'
-import { featureEnabled, meetsIntelligenceTier, multiBranchEnabled } from '../lib/planLimits'
+import {
+  featureEnabled,
+  meetsIntelligenceTier,
+  multiBranchEnabled,
+  smartReorderHasForecast,
+} from '../lib/planLimits'
 import { usePermissions } from '../hooks/usePermissions'
 import { RestaurantAddBranchModal } from '../components/org/RestaurantAddBranchModal'
 import { PageHeader } from '../components/ui/page-header'
@@ -46,6 +52,11 @@ export function RestaurantOrgOverviewPage() {
     can('ORDERS_VIEW') &&
     can('INVENTORY_VIEW') &&
     can('RECEIVING_VIEW')
+  const canViewBranchDemandForecast =
+    multiBranch &&
+    meetsIntelligenceTier(entitlements, 'scale') &&
+    smartReorderHasForecast(entitlements?.features?.smart_reorder) &&
+    can('INVENTORY_VIEW')
 
   const { data, isLoading } = useGetRestaurantOrgQuery(undefined, {
     skip: !isEffectiveRestaurant,
@@ -55,6 +66,9 @@ export function RestaurantOrgOverviewPage() {
   })
   const { data: comparison } = useGetRestaurantOrgBranchComparisonQuery(undefined, {
     skip: !isEffectiveRestaurant || !canViewBranchComparison,
+  })
+  const { data: demandForecast } = useGetRestaurantOrgBranchDemandForecastQuery(undefined, {
+    skip: !isEffectiveRestaurant || !canViewBranchDemandForecast,
   })
   const [addBranchOpen, setAddBranchOpen] = useState(false)
   const [switchBranch] = useSwitchRestaurantOrgBranchContextMutation()
@@ -132,6 +146,43 @@ export function RestaurantOrgOverviewPage() {
         </div>
       ) : null}
 
+      {demandForecast?.data?.branches?.length ? (
+        <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
+          <h2 className="font-semibold">Branch demand forecasts</h2>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Current cached restaurant-account forecasts only. Stale and legacy intra-tenant branch
+            forecasts are excluded.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {demandForecast.data.branches.map((branch) => (
+              <div
+                key={branch.branchAccountId}
+                className="rounded border border-[var(--app-border)] p-3 text-sm"
+              >
+                <p className="font-medium">{branch.branchAccountName}</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {branch.coverage.freshForecasts} current forecasts ·{' '}
+                  {branch.coverage.highOrUrgentForecasts} high or urgent
+                </p>
+                {branch.forecasts.length ? (
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {branch.forecasts.slice(0, 3).map((forecast) => (
+                      <li key={forecast.productId}>
+                        {forecast.productName}: {forecast.forecastDailyUsage ?? '—'}{' '}
+                        {forecast.productUnit}/day · {forecast.urgency}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-xs text-[var(--text-muted)]">
+                    No current forecast cache.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {comparison?.data?.coverage?.foodCost?.available === false ? (
         <p className="mb-4 text-xs text-[var(--text-muted)]">
           Food-cost comparison is unavailable because branch accounts do not share a comparable

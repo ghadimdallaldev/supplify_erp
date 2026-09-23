@@ -1090,3 +1090,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: Scale read-only comparison of authorized restaurant branch facts on the organization page.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization comparison surface.
 - **Revisit when**: a native organization comparison surface is scheduled; implement the query, types, source-feature/permission gates, and visible UI on both clients together.
+
+## 2026-09-23 - Multi-branch demand forecasting (web-only)
+
+- **Change**: Scale read-only organization-page view of fresh cached demand forecasts for authorized Branch Accounts; it adds no forecast refresh, order, transfer, notification, or mobile contract.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has an organization-level forecasting/comparison surface. Adding an unreachable query and type would not provide a user-visible native capability.
+- **Revisit when**: a native organization forecasting surface is scheduled; add the endpoint type/query, Scale and smart-reorder forecast-capability gates, and visible UI to both clients together.

@@ -25,6 +25,11 @@ vi.mock('../lib/intelligence-tier.js', () => ({
   requireIntelligenceTier: () => (req, res, next) => next(),
 }))
 
+vi.mock('../lib/feature-flags.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getResolvedFeatureValue: vi.fn().mockResolvedValue('ai_forecast_seasonality'),
+}))
+
 vi.mock('../lib/plan-enforcement.js', () => ({
   checkLinkedAccountLimit: vi.fn().mockResolvedValue({ allowed: true }),
   createAuditLog: vi.fn(),
@@ -93,6 +98,13 @@ vi.mock('../services/org-reports.service.js', () => ({
     },
     meta: {},
   }),
+  restaurantOrgBranchDemandForecast: vi.fn().mockResolvedValue({
+    data: {
+      branches: [],
+      coverage: { scope: 'restaurant_account_aggregate_only', source: 'cached_reorder_forecast' },
+    },
+    meta: {},
+  }),
   restaurantOrgBranchComparison: vi.fn().mockResolvedValue({
     data: {
       branches: [],
@@ -129,8 +141,10 @@ vi.mock('../lib/impersonation.js', () => ({
 
 import restaurantOrgRoutes from './restaurant-org.routes.js'
 import * as restaurantOrg from '../lib/restaurant-org.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
 import {
   restaurantOrgBranchComparison,
+  restaurantOrgBranchDemandForecast,
   restaurantOrgConsolidatedOverview,
 } from '../services/org-reports.service.js'
 
@@ -139,6 +153,7 @@ describe('restaurant-org.routes', () => {
 
   beforeEach(() => {
     clearAllMocks()
+    getResolvedFeatureValue.mockResolvedValue('ai_forecast_seasonality')
     queryMock.mockReset()
     queryMock.mockImplementation(async (sql) => {
       const text = typeof sql === 'string' ? sql : ''
@@ -227,6 +242,19 @@ describe('restaurant-org.routes', () => {
     const res = await request(app).get('/api/restaurant-org/reports/comparison').expect(200)
     expect(restaurantOrgBranchComparison).toHaveBeenCalledWith('user-1', 'org-1', {})
     expect(res.body.data.coverage.foodCost.available).toBe(false)
+  })
+
+  it('GET /reports/demand-forecast returns cached branch-account forecasts', async () => {
+    const res = await request(app).get('/api/restaurant-org/reports/demand-forecast').expect(200)
+    expect(restaurantOrgBranchDemandForecast).toHaveBeenCalledWith('user-1', 'org-1', {})
+    expect(res.body.data.coverage.scope).toBe('restaurant_account_aggregate_only')
+  })
+
+  it('GET /reports/demand-forecast rejects a non-forecast smart-reorder capability', async () => {
+    getResolvedFeatureValue.mockResolvedValueOnce('suggestions_only')
+    const res = await request(app).get('/api/restaurant-org/reports/demand-forecast').expect(403)
+    expect(res.body.error.name).toBe('FEATURE_NOT_AVAILABLE')
+    expect(restaurantOrgBranchDemandForecast).not.toHaveBeenCalled()
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

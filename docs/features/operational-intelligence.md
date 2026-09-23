@@ -136,6 +136,12 @@ It does not recalculate, score, or automate anything. It aggregates the already-
 
 Restaurant Scale adds a read-only authorized-branch comparison at GET /api/restaurant-org/reports/comparison. It is gated by multi_branch, Scale intelligence, waste/receiving source features, and ORDERS_VIEW, INVENTORY_VIEW, and RECEIVING_VIEW permissions. It compares stored branch-account purchasing trends, inventory availability, waste, and receiving quality/fill rate. Food-cost comparison is deliberately unavailable: branch accounts do not share a comparable recipe/menu identity model.
 
+## Multi-branch demand forecasting (implemented)
+
+`GET /api/restaurant-org/reports/demand-forecast` is the Scale, read-only Branch-Account view of the existing deterministic `reorder_forecast` cache. It requires `multi_branch`, `smart_reorder` with forecast capability (not Growth’s suggestions-only value), `INVENTORY_VIEW`, and Scale intelligence.
+
+It does not refresh, calculate, aggregate quantities across different product units, suggest a transfer, or create an order. It returns only fresh restaurant-wide cache rows for authorized Branch Accounts, ranked within each account by stored urgency and confidence. Stale rows and the separate legacy intra-tenant `branch` forecasts are excluded, so scope is never presented as cross-account data.
+
 ## Forecasting tier alignment (migration 0215)
 
 `smart_reorder` now matches the matrix. Growth is "basic reorder suggestions"; demand forecasting, stockout prediction, and smart reorder quantities start at Intelligence.

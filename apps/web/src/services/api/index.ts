@@ -320,6 +320,7 @@ export const {
   useResendRestaurantOrgLinkInvitationMutation,
   useGetRestaurantOrgReportsOverviewQuery,
   useGetRestaurantOrgBranchComparisonQuery,
+  useGetRestaurantOrgBranchDemandForecastQuery,
   useGetCentralPurchasingDraftsQuery,
   useCreateCentralPurchasingDraftMutation,
   useUpdateCentralPurchasingDraftMutation,

@@ -412,6 +412,36 @@ export const branchesApi = api.injectEndpoints({
       query: () => '/api/restaurant-org/reports/comparison',
       providesTags: ['RestaurantOrg'],
     }),
+    getRestaurantOrgBranchDemandForecast: builder.query<
+      {
+        data: {
+          branches: Array<{
+            branchAccountId: string
+            branchAccountName: string
+            coverage: {
+              freshForecasts: number
+              highOrUrgentForecasts: number
+              latestComputedAt: string | null
+            }
+            forecasts: Array<{
+              productId: string
+              productName: string
+              productUnit: string
+              forecastDailyUsage: number | null
+              forecastReorderQty: number | null
+              reorderByDate: string | null
+              confidence: number
+              urgency: string
+            }>
+          }>
+          coverage: { scope: string; source: string }
+        }
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/demand-forecast',
+      providesTags: ['RestaurantOrg'],
+    }),
     getCentralPurchasingDrafts: builder.query<
       { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
       void

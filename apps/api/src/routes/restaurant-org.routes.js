@@ -8,6 +8,8 @@ import {
 } from '../lib/rbac.js'
 import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../lib/smart-reorder-tier.js'
 import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -47,6 +49,7 @@ import {
 import {
   restaurantOrgConsolidatedOverview,
   restaurantOrgBranchComparison,
+  restaurantOrgBranchDemandForecast,
 } from '../services/org-reports.service.js'
 import {
   assertCentralPurchasingEnabled,
@@ -65,6 +68,19 @@ const multiBranchFeature = requireFeature(
   () => 'RESTAURANT'
 )
 
+async function requireSmartReorderForecast(req, res, next) {
+  const restaurantId = req.restaurantOrgContext?.primaryRestaurantId
+  const featureValue = await getResolvedFeatureValue(restaurantId, 'RESTAURANT', 'smart_reorder')
+  if (!hasSmartReorderCapability(featureValue, 'forecast')) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FEATURE_NOT_AVAILABLE', message: 'Forecasting capability is required' },
+      requestId: req.requestId,
+    })
+  }
+  next()
+}
 async function requireRestaurantOrgContext(req, res, next) {
   if (req.userData?.role !== 'RESTAURANT' && req.userData?.role !== 'ADMIN') {
     return res.status(403).json({
@@ -1123,6 +1139,39 @@ router.get(
         error: {
           name: error.code || 'INTERNAL_ERROR',
           message: error.message || 'Failed to load branch comparison',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
+router.get(
+  '/reports/demand-forecast',
+  multiBranchFeature,
+  requireFeature(
+    'smart_reorder',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('INVENTORY_VIEW'),
+  requireSmartReorderForecast,
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgBranchDemandForecast(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/demand-forecast error:', error)
+      res.status(error.statusCode || error.status || 500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load branch demand forecasts',
         },
         requestId: req.requestId,
       })

@@ -222,6 +222,120 @@ export async function restaurantOrgBranchComparison(userId, organizationId, quer
     },
   }
 }
+/**
+ * Read-only Branch-Account view of the existing deterministic forecast cache.
+ * Only restaurant-wide cache rows are comparable here; legacy intra-tenant
+ * branch rows are deliberately excluded.
+ */
+export async function restaurantOrgBranchDemandForecast(userId, organizationId, queryParams = {}) {
+  const requested = parseRequestedBranchIds(queryParams)
+  const branchIds = await resolveAuthorizedRestaurantBranchIds(userId, organizationId, requested)
+  const meta = { branchAccountIds: branchIds, forecastsPerBranch: 8, staleForecastsExcluded: true }
+  if (!branchIds.length) {
+    return {
+      data: {
+        branches: [],
+        coverage: { scope: 'restaurant_account_aggregate_only', source: 'cached_reorder_forecast' },
+      },
+      meta,
+    }
+  }
+
+  const { rows } = await query(
+    `
+    WITH fresh_forecasts AS (
+      SELECT
+        rf.restaurant_id,
+        rf.product_id,
+        p.name AS product_name,
+        p.unit AS product_unit,
+        rf.forecast_daily_usage,
+        rf.forecast_reorder_qty,
+        rf.reorder_by_date,
+        rf.confidence,
+        rf.urgency,
+        rf.computed_at,
+        COUNT(*) OVER (PARTITION BY rf.restaurant_id)::int AS forecast_count,
+        COUNT(*) FILTER (WHERE rf.urgency IN ('URGENT', 'HIGH')) OVER (PARTITION BY rf.restaurant_id)::int AS high_or_urgent_count,
+        MAX(rf.computed_at) OVER (PARTITION BY rf.restaurant_id) AS latest_computed_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY rf.restaurant_id
+          ORDER BY CASE rf.urgency WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END,
+                   rf.confidence DESC,
+                   p.name ASC
+        ) AS forecast_rank
+      FROM reorder_forecast rf
+      JOIN product p ON p.id = rf.product_id
+      WHERE rf.restaurant_id = ANY($1::uuid[])
+        AND rf.branch_id IS NULL
+        AND rf.stale_after > now()
+    )
+    SELECT
+      r.id AS branch_account_id,
+      r.name AS branch_account_name,
+      r.is_main_branch,
+      f.product_id,
+      f.product_name,
+      f.product_unit,
+      f.forecast_daily_usage,
+      f.forecast_reorder_qty,
+      f.reorder_by_date,
+      f.confidence,
+      f.urgency,
+      f.computed_at,
+      f.forecast_count,
+      f.high_or_urgent_count,
+      f.latest_computed_at
+    FROM restaurant r
+    LEFT JOIN fresh_forecasts f
+      ON f.restaurant_id = r.id
+     AND f.forecast_rank <= $2
+    WHERE r.id = ANY($1::uuid[])
+    ORDER BY r.name ASC, f.forecast_rank ASC
+    `,
+    [branchIds, meta.forecastsPerBranch]
+  )
+
+  const branches = new Map()
+  for (const row of rows) {
+    const id = row.branch_account_id
+    if (!branches.has(id)) {
+      branches.set(id, {
+        branchAccountId: id,
+        branchAccountName: row.branch_account_name,
+        isMainBranch: row.is_main_branch,
+        coverage: {
+          freshForecasts: Number(row.forecast_count || 0),
+          highOrUrgentForecasts: Number(row.high_or_urgent_count || 0),
+          latestComputedAt: row.latest_computed_at || null,
+        },
+        forecasts: [],
+      })
+    }
+    if (!row.product_id) continue
+    branches.get(id).forecasts.push({
+      productId: row.product_id,
+      productName: row.product_name,
+      productUnit: row.product_unit,
+      forecastDailyUsage:
+        row.forecast_daily_usage == null ? null : Number(row.forecast_daily_usage),
+      forecastReorderQty:
+        row.forecast_reorder_qty == null ? null : Number(row.forecast_reorder_qty),
+      reorderByDate: row.reorder_by_date,
+      confidence: Number(row.confidence),
+      urgency: row.urgency,
+      computedAt: row.computed_at,
+    })
+  }
+
+  return {
+    data: {
+      branches: [...branches.values()],
+      coverage: { scope: 'restaurant_account_aggregate_only', source: 'cached_reorder_forecast' },
+    },
+    meta,
+  }
+}
 export async function supplierOrgConsolidatedOverview(userId, organizationId, queryParams = {}) {
   const params = parseReportQuery(queryParams)
   const { limit, offset } = parsePagination(queryParams)
