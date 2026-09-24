@@ -87,6 +87,12 @@ The current catalog and order data records supplier selling prices only. `restau
 
 No margin endpoint, UI, mobile contract, or cost schema was added. An owned supplier-cost capture workflow and historical provenance need a product decision before a reliable margin warning can be considered.
 
+## Supplier delivery and fulfillment intelligence (verified existing)
+
+The existing tenant-resolved delivery board provides per-area and per-status delivery facts, with `FULFILLMENT_VIEW` or `DRIVER_DELIVERIES_VIEW` and the `fulfillment` feature gate. The Supplier Command Center already shows daily delivery previews, GPS coverage, and fulfillment-exception alerts; the run sheet combines deliveries with picking, shortages, receivables, and recorded reorder risk.
+
+This verification adds no new intelligence calculation or automation. The existing web Command Center links to the fulfillment board and run sheet; no API or mobile contract changed.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

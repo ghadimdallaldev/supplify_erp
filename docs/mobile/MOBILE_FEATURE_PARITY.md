@@ -1198,3 +1198,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: no API, entitlement, navigation, or UI change. Inspection confirmed that supplier-owned cost-of-goods data and cost history do not exist; supplier selling prices and restaurant purchase costs cannot support a truthful supplier-margin calculation.
 - **Parity decision**: **No mobile work.** No client contract or feature was introduced.
 - **Revisit when**: an owned supplier-cost capture workflow and historical provenance have a product decision; assess web and both native clients together at that time.
+
+## 2026-09-24 - Supplier delivery and fulfillment intelligence (verified existing)
+
+- **Change**: verification only. The established delivery board, Supplier Command Center previews, and run sheet already provide the relevant supplier delivery and fulfillment facts.
+- **Parity decision**: **No mobile work.** No API, entitlement, notification, or navigation contract changed.
+- **Revisit when**: native supplier fulfillment operations are expanded; evaluate the existing delivery-board and run-sheet contracts for visible Android and iOS parity together.

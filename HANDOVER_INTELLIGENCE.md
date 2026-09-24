@@ -200,6 +200,8 @@ Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity ale
 
 - [x] Supplier margin warnings — deferred 2026-09-24 after verification. Supplier catalog and order records hold selling prices, while `restaurant_ingredient_costs` and receiving values are each restaurant's purchase costs; neither is supplier cost of goods or a supplier-owned cost history. Deriving margin from either would be false. No schema was added because an owned cost-entry workflow and historical provenance are a product decision. No endpoint, UI, mobile contract, budget, or central purchasing was added. Next start at supplier delivery/fulfillment intelligence only after confirming the existing deliveries, run-sheet, and Command Center services do not already cover it.
 
+- [x] Supplier delivery / fulfillment intelligence — verified existing 2026-09-24. The tenant-resolved delivery board is gated by `FULFILLMENT_VIEW` or `DRIVER_DELIVERIES_VIEW` plus `fulfillment`, the Command Center already exposes daily delivery, GPS, and fulfillment-exception previews, and the run sheet aggregates deliveries, pick queue, shortages, receivables, and factual risks. The web surfaces link to the existing fulfillment board and run sheet. No duplicate service, endpoint, UI, mobile contract, automatic action, budget, or central purchasing was added. Next start at supplier warehouse performance only after confirming existing warehouse, stock, and Command Center coverage.
+
 ### Phase 6 — Supplier Scale AI Assistant
 
 Same pattern: deterministic services calculate, assistant reads and explains.
