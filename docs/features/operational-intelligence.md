@@ -61,6 +61,14 @@ It composes the supplier demand forecast with the authoritative warehouse/legacy
 
 This is a review signal, not a replenishment policy. It does not infer a target stock level or lead time, create a purchase/order/deal/notification, alter or reserve stock, create a budget, or enable central purchasing.
 
+## Supplier cross-sell opportunities (implemented)
+
+`GET /api/supplier/cross-sell-opportunities` is a Supplier Scale, read-only Supplier Command Center review. It requires `ORDERS_VIEW` and the effective `scale` intelligence tier; the supplier identity always comes from authenticated tenant context.
+
+It examines a bounded 30–365 day window (default 180) of completed, non-cancelled supplier order lines. An opportunity identifies a restaurant that ordered one exact supplier product but did not order a candidate product in that window, where other recorded supplier orders paired those exact products at least twice. The result shows the restaurant, both exact catalog products, and the observed pairing count; it does not imply need, suitability, product equivalence, availability, or customer intent.
+
+This is a human review signal only. It does not create or send a deal, message, price, order, notification, budget, or central-purchasing workflow.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

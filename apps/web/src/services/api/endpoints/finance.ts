@@ -19,6 +19,17 @@ export type SupplierDemandForecastResponse = {
     projectedDemandQty: number
   }>
 }
+export type SupplierCrossSellOpportunitiesResponse = {
+  observationDays: number
+  minPairedOrders: number
+  opportunities: Array<{
+    restaurantId: string
+    restaurantName: string
+    anchorProduct: { productId: string; productName: string; sku: string | null }
+    candidateProduct: { productId: string; productName: string; sku: string | null }
+    pairedOrderCount: number
+  }>
+}
 export type SupplierStockoutRiskResponse = {
   horizonDays: number
   coverage: {
@@ -192,6 +203,10 @@ export const financeApi = api.injectEndpoints({
     }),
     getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
       query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierCrossSellOpportunities: builder.query<SupplierCrossSellOpportunitiesResponse, void>({
+      query: () => '/api/supplier/cross-sell-opportunities',
       providesTags: ['SupplierOps'],
     }),
     getSupplierStockoutRisks: builder.query<SupplierStockoutRiskResponse, void>({

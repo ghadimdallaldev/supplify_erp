@@ -1179,3 +1179,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has the supplier Command Center / supplier inventory-demand review surface. Adding an endpoint client and type without a visible native capability would not provide parity.
 - **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
 - **Revisit when**: native supplier operations analytics is scheduled; implement the endpoint type/query, both source permission and entitlement gates, and visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier cross-sell opportunities (web-only)
+
+- **Change**: `GET /api/supplier/cross-sell-opportunities` and a read-only Supplier Command Center panel identify exact supplier product pairs repeatedly found in completed orders, for customers that have not ordered the candidate product in the observation window. The API requires `ORDERS_VIEW` and Supplier Scale intelligence; it creates no deal, message, price, order, notification, budget, or purchase action.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has a Supplier Command Center customer/product analytics review surface. An endpoint client and type with no visible native entry point would not provide parity.
+- **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
+- **Revisit when**: native supplier customer/product analytics is scheduled; implement the endpoint type/query, order permission and Scale gate, and visible review UI on Android and iOS together.

@@ -33,6 +33,7 @@ import { getSupplierCommandCenter } from '../services/supplier-command-center.se
 import { listSupplierSlowMovingInventory } from '../services/supplier-slow-moving-intelligence.service.js'
 import { listSupplierDemandForecast } from '../services/supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelligence.service.js'
+import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-sell-intelligence.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -291,6 +292,23 @@ const inventoryManagementGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+router.get(
+  '/cross-sell-opportunities',
+  requirePermission('ORDERS_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierCrossSellOpportunities(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/stockout-risks',
   requirePermission('ORDERS_VIEW'),

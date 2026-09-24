@@ -14,6 +14,7 @@ const mockCreateDraft = vi.fn()
 const mockSlowMoving = vi.fn()
 const mockDemandForecast = vi.fn()
 const mockStockoutRisks = vi.fn()
+const mockCrossSell = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -39,6 +40,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierSlowMovingInventoryQuery: (...args: unknown[]) => mockSlowMoving(...args),
     useGetSupplierDemandForecastQuery: (...args: unknown[]) => mockDemandForecast(...args),
     useGetSupplierStockoutRisksQuery: (...args: unknown[]) => mockStockoutRisks(...args),
+    useGetSupplierCrossSellOpportunitiesQuery: (...args: unknown[]) => mockCrossSell(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -70,6 +72,10 @@ describe('supplier pain-killer UI', () => {
     })
     mockStockoutRisks.mockReturnValue({
       data: { risks: [], coverage: {}, horizonDays: 14 },
+      isLoading: false,
+    })
+    mockCrossSell.mockReturnValue({
+      data: { opportunities: [], observationDays: 180 },
       isLoading: false,
     })
     mockCommandCenter.mockReturnValue({
@@ -187,6 +193,28 @@ describe('supplier pain-killer UI', () => {
 
     expect(screen.getByTestId('supplier-demand-forecast')).toBeInTheDocument()
     expect(mockDemandForecast).toHaveBeenCalledWith(undefined, { skip: false })
+  })
+  it('shows supplier cross-sell opportunities only to an entitled Scale orders user', () => {
+    mockEntitlements.mockReturnValue({
+      data: { entitlements: { features: { intelligence: 'scale' } } },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<SupplierCommandCenterPage />)
+
+    expect(screen.getByTestId('supplier-cross-sell-opportunities')).toBeInTheDocument()
+    expect(mockCrossSell).toHaveBeenCalledWith(undefined, { skip: false })
   })
   it('shows supplier stockout risks only to an entitled Scale orders and warehouse user', () => {
     mockEntitlements.mockReturnValue({

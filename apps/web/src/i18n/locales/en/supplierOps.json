@@ -94,6 +94,14 @@
       "emptyTitle": "No projected stockout risks",
       "emptyDescription": "No recorded-stock shortfall was found among products with enough completed sales history."
     },
+    "crossSell": {
+      "title": "Cross-sell opportunities",
+      "description": "Products customers have not ordered that were repeatedly bought with their recent products in the last {{days}} days; review before acting.",
+      "loading": "Checking recorded product-pair history…",
+      "item": "{{anchor}} was ordered with {{candidate}} in {{orders}} recorded orders",
+      "emptyTitle": "No cross-sell opportunities found",
+      "emptyDescription": "Repeated completed-order product pairs are needed before this review can report an opportunity."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",
