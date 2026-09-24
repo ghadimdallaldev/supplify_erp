@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant weekly intelligence summary (implemented)
+
+The existing Assistant registry exposes `get_supplier_weekly_intelligence_summary`, which reuses the deterministic supplier weekly summary. It is Supplier-scoped and requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `inventory_management`, `warehouses`, `fulfillment`, `multi_warehouse`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its period is bounded to 7–31 days.
+
+It composes existing evidence only; it cannot score, set targets, route, alter inventory, create orders, notifications, budgets, or central purchasing.
+
 ## Supplier Assistant multi-warehouse demand forecast (implemented)
 
 The existing Assistant registry exposes `get_supplier_warehouse_demand_forecast`, which reuses the deterministic per-warehouse demand-forecast service. It is Supplier-scoped and requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, `multi_warehouse`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its horizon is bounded to 1–90 days and results are capped at 15.

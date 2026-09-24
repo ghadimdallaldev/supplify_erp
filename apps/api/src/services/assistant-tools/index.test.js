@@ -107,6 +107,9 @@ vi.mock('../supplier-warehouse-performance-intelligence.service.js', () => ({
 vi.mock('../supplier-warehouse-demand-forecast.service.js', () => ({
   listSupplierWarehouseDemandForecast: vi.fn(),
 }))
+vi.mock('../supplier-weekly-intelligence-summary.service.js', () => ({
+  getSupplierWeeklyIntelligenceSummary: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -142,6 +145,7 @@ import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intel
 import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
 import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
+import { getSupplierWeeklyIntelligenceSummary } from '../supplier-weekly-intelligence-summary.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -582,5 +586,23 @@ describe('supplier warehouse-demand-forecast Assistant tool', () => {
       limit: 15,
     })
     expect(result.forecasts).toHaveLength(15)
+  })
+})
+
+describe('supplier weekly-summary Assistant tool', () => {
+  it('reuses bounded composed evidence with every source gate at Supplier Scale', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    getSupplierWeeklyIntelligenceSummary.mockResolvedValue({ summary: {} })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW, P.WAREHOUSES_VIEW, P.FULFILLMENT_VIEW],
+      }),
+      'get_supplier_weekly_intelligence_summary',
+      { days: 999 }
+    )
+    expect(getSupplierWeeklyIntelligenceSummary).toHaveBeenCalledWith('supplier-1', { days: 31 })
+    expect(result).toEqual({ summary: {} })
   })
 })

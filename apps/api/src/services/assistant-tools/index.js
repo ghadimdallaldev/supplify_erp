@@ -21,6 +21,7 @@ import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intel
 import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
 import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
+import { getSupplierWeeklyIntelligenceSummary } from '../supplier-weekly-intelligence-summary.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -1027,6 +1028,45 @@ const TOOLS = {
         limit: ROW_CAP,
       })
       return { ...result, forecasts: cap(result.forecasts) }
+    },
+  },
+  get_supplier_weekly_intelligence_summary: {
+    definition: {
+      name: 'get_supplier_weekly_intelligence_summary',
+      description: 'Recorded supplier weekly intelligence summary; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Summary period in days, default 7' } },
+      },
+    },
+    available: async (ctx) => {
+      if (
+        ctx.tenantType !== 'SUPPLIER' ||
+        !can(ctx, P.ORDERS_VIEW) ||
+        !can(ctx, P.WAREHOUSES_VIEW) ||
+        !can(ctx, P.FULFILLMENT_VIEW)
+      )
+        return false
+      if (
+        !(await featureOn(ctx, 'inventory_management')) ||
+        !(await featureOn(ctx, 'warehouses')) ||
+        !(await featureOn(ctx, 'fulfillment')) ||
+        !(await featureOn(ctx, 'multi_warehouse'))
+      )
+        return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 7, 7), 31)
+      return getSupplierWeeklyIntelligenceSummary(ctx.tenantId, { days })
     },
   },
   get_supplier_slow_moving_inventory: {
