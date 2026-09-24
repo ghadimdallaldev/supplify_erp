@@ -32,6 +32,7 @@ import { assertCleanUploadOwnership } from '../services/storage/upload-security.
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
 import { listSupplierSlowMovingInventory } from '../services/supplier-slow-moving-intelligence.service.js'
 import { listSupplierDemandForecast } from '../services/supplier-demand-forecast.service.js'
+import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelligence.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -290,6 +291,26 @@ const inventoryManagementGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+router.get(
+  '/stockout-risks',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierStockoutRisks(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/demand-forecast',
   requirePermission('ORDERS_VIEW'),

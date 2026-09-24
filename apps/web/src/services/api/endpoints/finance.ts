@@ -19,6 +19,25 @@ export type SupplierDemandForecastResponse = {
     projectedDemandQty: number
   }>
 }
+export type SupplierStockoutRiskResponse = {
+  horizonDays: number
+  coverage: {
+    productsWithCompletedSales: number
+    productsWithSufficientHistory: number
+    forecastedProductsWithRecordedStock: number
+  }
+  risks: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    forecastDailyDemand: number
+    projectedDemandQty: number
+    availableQty: number
+    shortfallQty: number
+    daysUntilStockout: number | null
+    currentlyOutOfStock: boolean
+  }>
+}
 export type SupplierSlowMovingInventoryResponse = {
   windowDays: number
   coverage: {
@@ -173,6 +192,10 @@ export const financeApi = api.injectEndpoints({
     }),
     getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
       query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierStockoutRisks: builder.query<SupplierStockoutRiskResponse, void>({
+      query: () => '/api/supplier/stockout-risks',
       providesTags: ['SupplierOps'],
     }),
     getSupplierSlowMovingInventory: builder.query<SupplierSlowMovingInventoryResponse, void>({

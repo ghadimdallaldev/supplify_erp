@@ -36,6 +36,7 @@ import {
 import { SupplierFollowUpPanel } from '../components/supplier/SupplierFollowUpPanel'
 import { SupplierSlowMovingInventoryPanel } from '../components/supplier/SupplierSlowMovingInventoryPanel'
 import { SupplierDemandForecastPanel } from '../components/supplier/SupplierDemandForecastPanel'
+import { SupplierStockoutRiskPanel } from '../components/supplier/SupplierStockoutRiskPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -670,6 +671,8 @@ export function SupplierCommandCenterPage() {
         {layout.showLowStockPreview && <SupplierSlowMovingInventoryPanel />}
 
         {layout.showReorder && <SupplierDemandForecastPanel />}
+
+        {layout.showLowStockPreview && <SupplierStockoutRiskPanel />}
 
         {layout.showReorder && (
           <section

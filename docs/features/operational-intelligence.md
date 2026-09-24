@@ -51,7 +51,15 @@ This is a review signal, not an inventory policy. It does not infer a target sto
 
 It reads completed, non-cancelled supplier order lines only. Each forecast uses 90 days of recorded sales, with a 60/40 blend of the 30-day and 90-day daily rates when the product sold in the recent period; otherwise it uses the 90-day rate. A product must have positive completed sales on at least seven distinct days before it is forecast. The response reports the 14-day projection by default (configurable to 1–90 days), its observed rates, and explicit coverage counts so missing history is never represented as zero demand.
 
-It does not read or alter stock, claim a stockout, create a replenishment suggestion, create an order/deal/notification, infer customer intent, or introduce purchasing-budget or central-purchasing behavior. Stockout prediction remains a separate future unit because it requires combining this demand signal with authoritative stock and replenishment facts.
+It does not read or alter stock, claim a stockout, create a replenishment suggestion, create an order/deal/notification, infer customer intent, or introduce purchasing-budget or central-purchasing behavior. The following stockout review composes this demand signal with authoritative stock; it deliberately does not infer replenishment facts.
+
+## Supplier projected stockout risks (implemented)
+
+`GET /api/supplier/stockout-risks` is a Supplier Scale, read-only Supplier Command Center review. It requires both `ORDERS_VIEW` and `WAREHOUSES_VIEW`, the existing forecast-capable `smart_reorder` entitlement, and the effective `scale` intelligence tier. The supplier is always resolved from authenticated tenant context.
+
+It composes the supplier demand forecast with the authoritative warehouse/legacy stock display for the same supplier. It reports only products where the recorded demand projection over the selected 1–90 day horizon (14 by default) exceeds available stock. The stock display retains its established fail-closed semantics: when a product has no warehouse/legacy stock row, availability is zero. Coverage separately reports the products with sufficient completed-sales history and how many forecasted products have a recorded stock row.
+
+This is a review signal, not a replenishment policy. It does not infer a target stock level or lead time, create a purchase/order/deal/notification, alter or reserve stock, create a budget, or enable central purchasing.
 
 ## Price intelligence (implemented)
 

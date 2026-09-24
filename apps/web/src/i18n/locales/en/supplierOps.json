@@ -86,6 +86,14 @@
       "emptyTitle": "Not enough sales history",
       "emptyDescription": "Products need completed sales on at least seven days before this forecast reports a result."
     },
+    "stockoutRisks": {
+      "title": "Projected stockout risks",
+      "description": "Recorded stock that may fall short of recorded demand over the next {{horizon}} days; review before acting.",
+      "loading": "Checking recorded stock against demand…",
+      "item": "{{available}} recorded available; projected shortfall {{shortfall}} over {{horizon}} days",
+      "emptyTitle": "No projected stockout risks",
+      "emptyDescription": "No recorded-stock shortfall was found among products with enough completed sales history."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",

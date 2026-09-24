@@ -2,20 +2,26 @@ import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { listSupplierSlowMovingInventory, listSupplierDemandForecast, getRequestTenant, gates } =
-  vi.hoisted(() => ({
-    listSupplierSlowMovingInventory: vi.fn(),
-    listSupplierDemandForecast: vi.fn(),
-    getRequestTenant: vi.fn(),
-    gates: {
-      inventory: true,
-      smartReorder: true,
-      forecast: true,
-      tier: 'scale',
-      permissions: new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW']),
-      order: [],
-    },
-  }))
+const {
+  listSupplierSlowMovingInventory,
+  listSupplierDemandForecast,
+  listSupplierStockoutRisks,
+  getRequestTenant,
+  gates,
+} = vi.hoisted(() => ({
+  listSupplierSlowMovingInventory: vi.fn(),
+  listSupplierDemandForecast: vi.fn(),
+  listSupplierStockoutRisks: vi.fn(),
+  getRequestTenant: vi.fn(),
+  gates: {
+    inventory: true,
+    smartReorder: true,
+    forecast: true,
+    tier: 'scale',
+    permissions: new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW']),
+    order: [],
+  },
+}))
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, _res, next) => {
@@ -76,6 +82,9 @@ vi.mock('../services/supplier-slow-moving-intelligence.service.js', () => ({
   listSupplierSlowMovingInventory,
 }))
 vi.mock('../services/supplier-demand-forecast.service.js', () => ({ listSupplierDemandForecast }))
+vi.mock('../services/supplier-stockout-intelligence.service.js', () => ({
+  listSupplierStockoutRisks,
+}))
 
 const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
 
@@ -96,6 +105,7 @@ beforeEach(() => {
   getRequestTenant.mockResolvedValue({ tenantId: 'supplier-1', tenantType: 'SUPPLIER' })
   listSupplierSlowMovingInventory.mockResolvedValue({ products: [], coverage: {}, windowDays: 90 })
   listSupplierDemandForecast.mockResolvedValue({ forecasts: [], coverage: {}, horizonDays: 14 })
+  listSupplierStockoutRisks.mockResolvedValue({ risks: [], coverage: {}, horizonDays: 14 })
 })
 
 describe('supplier slow-moving inventory route', () => {
@@ -131,6 +141,40 @@ describe('supplier slow-moving inventory route', () => {
   })
 })
 
+describe('supplier stockout risk route', () => {
+  it('requires both source permissions, forecast capability, and Supplier Scale in authorization order', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/stockout-risks?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { risks: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierStockoutRisks).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke stockout analysis without warehouse visibility or forecast capability', async () => {
+    gates.permissions = new Set(['ORDERS_VIEW'])
+    await request(buildApp()).get('/api/supplier/stockout-risks').expect(403)
+    expect(listSupplierStockoutRisks).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['ORDERS_VIEW', 'WAREHOUSES_VIEW'])
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/stockout-risks').expect(403)
+    expect(listSupplierStockoutRisks).not.toHaveBeenCalled()
+  })
+})
 describe('supplier demand forecast route', () => {
   it('requires order visibility, forecasting capability, and Supplier Scale in authorization order', async () => {
     const res = await request(buildApp())

@@ -13,6 +13,7 @@ const mockEntitlements = vi.fn()
 const mockCreateDraft = vi.fn()
 const mockSlowMoving = vi.fn()
 const mockDemandForecast = vi.fn()
+const mockStockoutRisks = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -37,6 +38,7 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierRunSheetQuery: (...args: unknown[]) => mockRunSheet(...args),
     useGetSupplierSlowMovingInventoryQuery: (...args: unknown[]) => mockSlowMoving(...args),
     useGetSupplierDemandForecastQuery: (...args: unknown[]) => mockDemandForecast(...args),
+    useGetSupplierStockoutRisksQuery: (...args: unknown[]) => mockStockoutRisks(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -64,6 +66,10 @@ describe('supplier pain-killer UI', () => {
     })
     mockDemandForecast.mockReturnValue({
       data: { forecasts: [], coverage: {}, horizonDays: 14, observationDays: 90 },
+      isLoading: false,
+    })
+    mockStockoutRisks.mockReturnValue({
+      data: { risks: [], coverage: {}, horizonDays: 14 },
       isLoading: false,
     })
     mockCommandCenter.mockReturnValue({
@@ -182,6 +188,33 @@ describe('supplier pain-killer UI', () => {
     expect(screen.getByTestId('supplier-demand-forecast')).toBeInTheDocument()
     expect(mockDemandForecast).toHaveBeenCalledWith(undefined, { skip: false })
   })
+  it('shows supplier stockout risks only to an entitled Scale orders and warehouse user', () => {
+    mockEntitlements.mockReturnValue({
+      data: {
+        entitlements: {
+          features: { intelligence: 'scale', smart_reorder: 'ai_forecast_seasonality' },
+        },
+      },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<SupplierCommandCenterPage />)
+
+    expect(screen.getByTestId('supplier-stockout-risks')).toBeInTheDocument()
+    expect(mockStockoutRisks).toHaveBeenCalledWith(undefined, { skip: false })
+  })
+
   it('SupplierRunSheetPage renders KPIs, priorities, and delivery areas from unwrapped API data', () => {
     mockRunSheet.mockReturnValue({
       data: {

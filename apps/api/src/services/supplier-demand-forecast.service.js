@@ -10,7 +10,7 @@ const MAX_LIMIT = 100
 
 export async function listSupplierDemandForecast(
   supplierId,
-  { horizonDays = DEFAULT_HORIZON_DAYS, limit = DEFAULT_LIMIT } = {}
+  { horizonDays = DEFAULT_HORIZON_DAYS, limit = DEFAULT_LIMIT, includeAll = false } = {}
 ) {
   const parsedHorizon = Number.parseInt(horizonDays, 10)
   const effectiveHorizonDays = Math.min(
@@ -79,6 +79,6 @@ export async function listSupplierDemandForecast(
       productsWithCompletedSales: rows.length,
       productsWithSufficientHistory: forecastable.length,
     },
-    forecasts: forecasts.slice(0, effectiveLimit),
+    forecasts: includeAll ? forecasts : forecasts.slice(0, effectiveLimit),
   }
 }
