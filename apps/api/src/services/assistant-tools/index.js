@@ -15,6 +15,7 @@ import { listDeliveryRoutes, getDriverActiveRoute } from '../delivery-routes.ser
 import { listSupplierStockDisplay } from '../supplier-stock.service.js'
 import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
 import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
+import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -846,6 +847,38 @@ const TOOLS = {
     },
   },
 
+  get_supplier_demand_forecast: {
+    definition: {
+      name: 'get_supplier_demand_forecast',
+      description: 'Recorded supplier product-demand forecast; review only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          horizonDays: { type: 'number', description: 'Forecast horizon in days, default 14' },
+        },
+      },
+    },
+    available: async (ctx) => {
+      if (ctx.tenantType !== 'SUPPLIER' || !can(ctx, P.ORDERS_VIEW)) return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const horizonDays = Math.min(Math.max(Number(args.horizonDays) || 14, 1), 90)
+      const result = await listSupplierDemandForecast(ctx.tenantId, {
+        horizonDays,
+        limit: ROW_CAP,
+      })
+      return { ...result, forecasts: cap(result.forecasts) }
+    },
+  },
   get_supplier_slow_moving_inventory: {
     definition: {
       name: 'get_supplier_slow_moving_inventory',

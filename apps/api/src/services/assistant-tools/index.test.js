@@ -89,6 +89,9 @@ vi.mock('../supplier-command-center.service.js', () => ({
 vi.mock('../supplier-slow-moving-intelligence.service.js', () => ({
   listSupplierSlowMovingInventory: vi.fn(),
 }))
+vi.mock('../supplier-demand-forecast.service.js', () => ({
+  listSupplierDemandForecast: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -117,6 +120,7 @@ import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
 import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
+import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -356,5 +360,44 @@ describe('supplier slow-moving Assistant tool', () => {
       limit: 15,
     })
     expect(result.products).toHaveLength(15)
+  })
+})
+
+describe('supplier demand-forecast Assistant tool', () => {
+  it('reuses the forecast service with Supplier Scale and a bounded horizon', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierDemandForecast.mockResolvedValue({
+      forecasts: Array.from({ length: 20 }, (_, i) => ({ productId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW],
+      }),
+      'get_supplier_demand_forecast',
+      { horizonDays: 999 }
+    )
+    expect(listSupplierDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: 90,
+      limit: 15,
+    })
+    expect(result.forecasts).toHaveLength(15)
+  })
+
+  it('is not discoverable without the source permission or Supplier Scale tier', async () => {
+    const withoutPermission = await resolveAvailableTools(
+      restaurantCtx({ tenantId: 'supplier-1', tenantType: 'SUPPLIER', permissions: [] })
+    )
+    expect(withoutPermission.names).not.toContain('get_supplier_demand_forecast')
+
+    const belowScale = await resolveAvailableTools(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW],
+      })
+    )
+    expect(belowScale.names).not.toContain('get_supplier_demand_forecast')
   })
 })

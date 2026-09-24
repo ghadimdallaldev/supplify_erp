@@ -213,6 +213,7 @@ Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity ale
 Same pattern: deterministic services calculate, assistant reads and explains.
 
 - [x] Supplier Assistant slow-moving inventory — implemented 2026-09-24. `get_supplier_slow_moving_inventory` reuses the deterministic supplier slow-moving service through the existing Assistant registry. It is Supplier-scoped, requires `WAREHOUSES_VIEW`, `inventory_management`, Assistant quota, and Supplier Scale; days are bounded 30–365 and results capped at 15. It is read-only and never creates a deal/order/notification/budget, changes stock, or enables central purchasing. Full API/web/typecheck/lint/Android/iOS verification passed. Next start at remaining Supplier Assistant tools.
+- [x] Supplier Assistant demand forecast — implemented 2026-09-24. `get_supplier_demand_forecast` reuses the deterministic supplier demand-forecast service through the existing Assistant registry. It is Supplier-scoped, requires `ORDERS_VIEW`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale; horizon is bounded 1–90 days and results capped at 15. It is read-only and never creates a deal/order/notification/budget, changes stock, or enables central purchasing. Full API/web/typecheck/lint/Android/iOS verification passed. Next start at remaining Supplier Assistant tools.
 
 ### Final phase — full production audit
 
