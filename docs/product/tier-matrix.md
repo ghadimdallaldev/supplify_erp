@@ -135,24 +135,25 @@ Values from live `subscription_plan.features`. **On** = enabled (`evaluatePlanFe
 
 ---
 
-## 5b. Branch & warehouse add-ons (Gold / Platinum)
+## 5b. Branch, warehouse, and customer-capacity add-ons (Scale)
 
 Branches are **org location accounts** (each branch is nearly a full account). Warehouses are **supplier fulfillment locations** under the org, not separate accounts. Branch entitlements use the **parent org main-branch subscription** (`resolveOrgBillingTenantId`); branch rows may still have a pending Free subscription row for activation only.
 
 **Effective limit** = plan included limit (+ tenant/plan limit overrides, increase-only) + **active add-on quantity**.
 
-| Add-on key                 | Tenant     | Gold (USD/mo per unit) | Platinum (USD/mo per unit) |
-| -------------------------- | ---------- | ---------------------- | -------------------------- |
-| `restaurant_extra_branch`  | Restaurant | $39                    | $49                        |
-| `supplier_extra_branch`    | Supplier   | $49                    | $69                        |
-| `supplier_extra_warehouse` | Supplier   | $19                    | $25                        |
+| Add-on key                              | Tenant   | Scale code | USD/mo per unit |
+| --------------------------------------- | -------- | ---------- | --------------: |
+| `supplier_extra_branch`                 | Supplier | `platinum` |             $49 |
+| `supplier_extra_warehouse`              | Supplier | `platinum` |             $19 |
+| `supplier_active_customer_locations_50` | Supplier | `platinum` |             $75 |
 
 **Rules**
 
-- **Silver / Free Trial:** cannot purchase add-ons; upgrade to Gold (branches) or Silver+ (first warehouse).
-- **Enterprise:** custom limits; self-serve add-ons disabled.
-- **Hard cap:** more than **6 total branch accounts** Ã¢â€ â€™ contact sales for Enterprise (even if add-ons would allow more).
-- **Grandfathering:** existing branches/warehouses are never deleted; tenants over the new included limit stay readable but cannot create more until upgrade or admin-granted add-ons.
+- **Supplier Free Trial / Growth:** cannot purchase location or customer-capacity add-ons; upgrade to Supplier Scale.
+- **Restaurants:** no active plan exposes a new branch add-on. Restaurant Scale has an unlimited catalog branch allowance, subject to the six-account contact-sales safeguard. Already-active historical `restaurant_extra_branch` rows remain effective for grandfathering.
+- **Custom / Enterprise:** custom limits; self-serve add-ons disabled.
+- **Hard cap:** more than **6 total branch accounts** → contact sales for a custom agreement (even if add-ons would otherwise allow more).
+- **Grandfathering:** existing branches/warehouses are never deleted; tenants over a new included limit stay readable but cannot create more until upgrade or an admin-granted add-on.
 
 Storage: `tenant_subscription_addon` (admin PUT `/api/admin-dashboard/tenants/:tenantType/:id/subscription-addons/:addonKey`). No automated billing yet.
 

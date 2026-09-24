@@ -30,14 +30,15 @@ The metric is exposed in entitlements and subscription usage. It does not silent
 
 Admin-provisioned recurring add-ons are included in checkout, renewal, invoice metadata, billing status totals, and effective limits.
 
-| Plan             | Add-on                                  | Internal key                            | Monthly |
-| ---------------- | --------------------------------------- | --------------------------------------- | ------: |
-| Restaurant Scale | Additional branch                       | `restaurant_extra_branch`               |     $39 |
-| Supplier Scale   | Additional 50 active customer locations | `supplier_active_customer_locations_50` |     $75 |
-| Supplier Scale   | Additional supplier branch              | `supplier_extra_branch`                 |     $49 |
-| Supplier Scale   | Additional warehouse                    | `supplier_extra_warehouse`              |     $19 |
+| Plan           | Add-on                                  | Internal key                            | Monthly |
+| -------------- | --------------------------------------- | --------------------------------------- | ------: |
+| Supplier Scale | Additional 50 active customer locations | `supplier_active_customer_locations_50` |     $75 |
+| Supplier Scale | Additional supplier branch              | `supplier_extra_branch`                 |     $49 |
+| Supplier Scale | Additional warehouse                    | `supplier_extra_warehouse`              |     $19 |
 
 Annual add-ons use the same two-months-free convention as the base plan: `monthly * 10`.
+
+Restaurant Scale has an unlimited catalog branch allowance, subject to the existing six-account contact-sales safeguard, so no active Restaurant plan can be provisioned a new `restaurant_extra_branch` add-on. Already-active historical rows remain effective for grandfathering.
 
 ## Plan Source Of Truth
 

@@ -1,5 +1,5 @@
 import { evaluatePlanFeatureValue } from './feature-flags.js'
-import { PLAN_TIER_ORDER, normalizePlanCode } from './plan-codes.js'
+import { normalizePlanCode } from './plan-codes.js'
 import {
   RESTAURANT_FEATURE_KEYS,
   SUPPLIER_FEATURE_KEYS,
@@ -7,7 +7,24 @@ import {
 } from './feature-keys.js'
 import { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from './limit-resolution.js'
 
-const ACTIVE_TIERS = PLAN_TIER_ORDER
+const ACTIVE_TIERS_BY_TENANT = Object.freeze({
+  RESTAURANT: Object.freeze(['free', 'silver', 'gold', 'platinum']),
+  SUPPLIER: Object.freeze(['free', 'gold', 'platinum']),
+})
+
+const EXPECTED_INTELLIGENCE_BY_TENANT = Object.freeze({
+  RESTAURANT: Object.freeze({
+    free: Object.freeze({ intelligence: 'basic', ai: false }),
+    silver: Object.freeze({ intelligence: 'basic', ai: false }),
+    gold: Object.freeze({ intelligence: 'advanced', ai: false }),
+    platinum: Object.freeze({ intelligence: 'scale', ai: true }),
+  }),
+  SUPPLIER: Object.freeze({
+    free: Object.freeze({ intelligence: 'basic', ai: false }),
+    gold: Object.freeze({ intelligence: 'basic', ai: false }),
+    platinum: Object.freeze({ intelligence: 'scale', ai: true }),
+  }),
+})
 
 /** @typedef {{ code: string, tenant_type: string, limits?: Record<string, unknown>, features?: Record<string, unknown> }} PlanRow */
 
@@ -40,6 +57,8 @@ export function verifyTenantTypeMatrix(plans, tenantType) {
   const featureKeys = tenantType === 'RESTAURANT' ? RESTAURANT_FEATURE_KEYS : SUPPLIER_FEATURE_KEYS
   const limitKeys = tenantType === 'RESTAURANT' ? RESTAURANT_LIMIT_KEYS : SUPPLIER_LIMIT_KEYS
   const knownExtra = new Set(KNOWN_EXTRA_FEATURE_KEYS)
+  const activeTiers = ACTIVE_TIERS_BY_TENANT[tenantType]
+  const expectedIntelligence = EXPECTED_INTELLIGENCE_BY_TENANT[tenantType]
 
   const failures = []
   const warnings = []
@@ -48,7 +67,7 @@ export function verifyTenantTypeMatrix(plans, tenantType) {
     plans.filter((p) => p.tenant_type === tenantType).map((p) => [normalizePlanCode(p.code), p])
   )
 
-  for (const tier of ACTIVE_TIERS) {
+  for (const tier of activeTiers) {
     const plan = byCode[tier]
     if (!plan) {
       failures.push(`${tenantType}/${tier}: no active subscription_plan row`)
@@ -68,6 +87,19 @@ export function verifyTenantTypeMatrix(plans, tenantType) {
       }
     }
 
+    const expected = expectedIntelligence[tier]
+    if (features.intelligence !== expected.intelligence) {
+      failures.push(
+        `${tenantType}/${tier}: intelligence must be "${expected.intelligence}" (found ${JSON.stringify(features.intelligence)})`
+      )
+    }
+    for (const key of ['ai_assistant', 'ai_platform']) {
+      if (features[key] !== expected.ai) {
+        failures.push(
+          `${tenantType}/${tier}: ${key} must be ${expected.ai} (found ${JSON.stringify(features[key])})`
+        )
+      }
+    }
     const extraLimits = findExtraKeys(limits, limitKeys)
     const extraFeatures = findExtraKeys(features, featureKeys, knownExtra)
     for (const k of extraLimits) {
@@ -78,9 +110,9 @@ export function verifyTenantTypeMatrix(plans, tenantType) {
     }
   }
 
-  for (let i = 0; i < ACTIVE_TIERS.length - 1; i++) {
-    const lowerTier = ACTIVE_TIERS[i]
-    const higherTier = ACTIVE_TIERS[i + 1]
+  for (let i = 0; i < activeTiers.length - 1; i++) {
+    const lowerTier = activeTiers[i]
+    const higherTier = activeTiers[i + 1]
     const lower = byCode[lowerTier]
     const higher = byCode[higherTier]
     if (!lower || !higher) continue

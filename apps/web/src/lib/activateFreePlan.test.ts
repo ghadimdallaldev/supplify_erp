@@ -92,7 +92,7 @@ describe('activateFreePlan', () => {
     it('defaults trial target to the first public paid plan', async () => {
       const result = await activateFreePlanFromPlans(dispatch, [
         { id: 'free-id', code: 'free', name: 'Free', price_per_month: 0 },
-        { id: 'target-id', code: 'gold', name: 'Restaurant Scale' },
+        { id: 'target-id', code: 'gold', name: 'Restaurant Intelligence' },
       ])
       expect(result).toEqual({ ok: true })
       expect(checkoutInitiateMock).toHaveBeenCalledWith(

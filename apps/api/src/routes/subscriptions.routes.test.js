@@ -209,7 +209,10 @@ describe('Subscriptions Routes', () => {
 
   describe('GET /api/subscriptions/plans', () => {
     it('returns tenant-specific public plan names and DB-derived annual savings', async () => {
-      mockGetTenantSubscription.mockResolvedValueOnce({ plan_id: 'plan-scale', plan_code: 'gold' })
+      mockGetTenantSubscription.mockResolvedValueOnce({
+        plan_id: 'plan-intelligence',
+        plan_code: 'gold',
+      })
       const dbModule = await import('../lib/db.js')
       vi.mocked(dbModule.query).mockImplementation((sql) => {
         if (String(sql).includes('FROM subscription_plan')) {
@@ -230,7 +233,7 @@ describe('Subscriptions Routes', () => {
                 trial_days: 0,
               },
               {
-                id: 'plan-scale',
+                id: 'plan-intelligence',
                 code: 'gold',
                 name: 'Gold',
                 description: 'Legacy name from an old catalog row',

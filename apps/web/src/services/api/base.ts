@@ -2,6 +2,10 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import { resolveUpgradeUrl } from '../../lib/externallyControlledFeatures'
 import { getApiBase } from '../../lib/env'
 import { refreshAuthSession, stopAuthSessionRefresh } from '../../lib/authSessionRefresh'
+import {
+  sanitizeMonetizationPlanLabel,
+  sanitizeMonetizationRecommendedPlans,
+} from '../../lib/monetizationPlanLabels'
 
 const API_URL = getApiBase()
 
@@ -36,20 +40,6 @@ function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: s
   stopAuthSessionRefresh()
   const suffix = isSessionExpiredAuthError(error) ? '?expired=true' : ''
   window.location.href = `/login${suffix}`
-}
-
-function sanitizePlanLabel(value: unknown): string {
-  const raw = String(value || '').trim()
-  const key = raw.toLowerCase()
-  if (key === 'silver' || key === 'bronze') return 'Growth'
-  if (key === 'gold' || key === 'platinum') return 'Scale'
-  if (key === 'free' || key === 'free trial') return '30-day Free Trial'
-  return raw
-}
-
-function sanitizeRecommendedPlans(value: unknown): string[] {
-  const source = Array.isArray(value) ? value : ['Scale']
-  return source.map(sanitizePlanLabel).filter(Boolean)
 }
 
 // Custom baseQuery to unwrap API response envelope
@@ -171,8 +161,18 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
             /* @vite-ignore */ '../../features/monetization/monetizationSlice'
           )
           const details = (respErr as { details?: Record<string, unknown> }).details || {}
-          const userRole = (api.getState() as { auth?: { user?: { role?: string } } })?.auth?.user
-            ?.role
+          const authUser = (
+            api.getState() as {
+              auth?: {
+                user?: { role?: string; workspace?: { tenantType?: 'RESTAURANT' | 'SUPPLIER' } }
+              }
+            }
+          )?.auth?.user
+          const userRole = authUser?.role
+          const tenantType =
+            (details.tenantType as string | undefined) ??
+            authUser?.workspace?.tenantType ??
+            (userRole === 'RESTAURANT' || userRole === 'SUPPLIER' ? userRole : undefined)
           const isLimit =
             respErr.name === 'LIMIT_EXCEEDED' || respErr.name === 'BRANCH_LIMIT_REACHED'
           const normalizedUpgradeUrl = resolveUpgradeUrl(
@@ -189,20 +189,26 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
                     limitValue: Number(details.limitValue ?? details.limit ?? 0),
                     currentUsage: Number(details.currentUsage ?? details.current ?? 0),
                     currentPlan: details.currentPlan
-                      ? sanitizePlanLabel(details.currentPlan)
+                      ? sanitizeMonetizationPlanLabel(details.currentPlan, tenantType)
                       : null,
-                    recommendedPlans: sanitizeRecommendedPlans(details.recommendedPlans),
+                    recommendedPlans: sanitizeMonetizationRecommendedPlans(
+                      details.recommendedPlans,
+                      tenantType
+                    ),
                     upgradeUrl: normalizedUpgradeUrl,
                   }
                 : {
                     ...details,
                     currentPlan: details.currentPlan
-                      ? sanitizePlanLabel(details.currentPlan)
+                      ? sanitizeMonetizationPlanLabel(details.currentPlan, tenantType)
                       : null,
                     requiredPlan: details.requiredPlan
-                      ? sanitizePlanLabel(details.requiredPlan)
+                      ? sanitizeMonetizationPlanLabel(details.requiredPlan, tenantType)
                       : null,
-                    recommendedPlans: sanitizeRecommendedPlans(details.recommendedPlans),
+                    recommendedPlans: sanitizeMonetizationRecommendedPlans(
+                      details.recommendedPlans,
+                      tenantType
+                    ),
                     upgradeUrl: normalizedUpgradeUrl,
                   }) as
                 | import('../../features/monetization/monetizationSlice').LimitExceededPayload

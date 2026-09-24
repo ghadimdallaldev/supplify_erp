@@ -82,88 +82,129 @@ describe('plan-enforcement', () => {
     })
   })
 
-  describe('checkBranchLimit — Gold restaurant', () => {
+  describe('checkBranchLimit — Restaurant Intelligence', () => {
     beforeEach(() => {
       vi.mocked(getTenantSubscription).mockResolvedValue(
-        mockSubscription('gold', 'Gold', { branches: 2 })
+        mockSubscription('gold', 'Restaurant Intelligence', { branches: 1 })
       )
-      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(2))
+      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(1))
     })
 
-    it('blocks 3rd branch without add-on', async () => {
+    it('blocks a second branch and requires Scale when there is no grandfathered add-on', async () => {
       vi.mocked(query)
         .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
-        .mockResolvedValueOnce({ rows: [{ count: 2 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] })
 
       const result = await checkBranchLimit('rest-main')
       expect(result.allowed).toBe(false)
-      expect(result.current).toBe(2)
-      expect(result.includedLimit).toBe(2)
-      expect(result.action).toBe('ADDON_OR_UPGRADE')
+      expect(result.current).toBe(1)
+      expect(result.includedLimit).toBe(1)
+      expect(result.action).toBe('UPGRADE_PLAN')
     })
 
-    it('allows 3rd branch with one add-on', async () => {
+    it('honors an already-active legacy branch add-on without offering a new one', async () => {
       vi.mocked(getAddonQuantity).mockResolvedValue(1)
       vi.mocked(query)
         .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
-        .mockResolvedValueOnce({ rows: [{ count: 2 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] })
 
       const result = await checkBranchLimit('rest-main')
       expect(result.allowed).toBe(true)
-      expect(result.effectiveLimit).toBe(3)
+      expect(result.effectiveLimit).toBe(2)
     })
   })
 
-  describe('checkBranchLimit — Platinum restaurant', () => {
+  describe('checkBranchLimit — Restaurant Scale', () => {
     beforeEach(() => {
       vi.mocked(getTenantSubscription).mockResolvedValue(
-        mockSubscription('platinum', 'Platinum', { branches: 3 })
+        mockSubscription('platinum', 'Restaurant Scale', { branches: -1 })
       )
-      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(3))
+      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(null))
     })
 
-    it('blocks 4th branch without add-on', async () => {
+    it('allows branches below the contact-sales safeguard without an add-on', async () => {
       vi.mocked(query)
         .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
-        .mockResolvedValueOnce({ rows: [{ count: 3 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 5 }] })
+
+      const result = await checkBranchLimit('rest-main')
+      expect(result.allowed).toBe(true)
+      expect(result.effectiveLimit).toBe(null)
+    })
+
+    it('uses the six-account contact-sales safeguard', async () => {
+      vi.mocked(query)
+        .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+        .mockResolvedValueOnce({ rows: [{ count: 6 }] })
 
       const result = await checkBranchLimit('rest-main')
       expect(result.allowed).toBe(false)
-      expect(result.action).toBe('ADDON_OR_UPGRADE')
+      expect(result.action).toBe('CONTACT_ENTERPRISE')
     })
   })
 
-  describe('checkLinkedAccountLimit — Supplier Gold', () => {
+  describe('checkLinkedAccountLimit — Supplier Growth', () => {
     beforeEach(() => {
       vi.mocked(getTenantSubscription).mockResolvedValue(
-        mockSubscription('gold', 'Gold', { branches: 2, warehouses: 3 })
+        mockSubscription('gold', 'Supplier Growth', { branches: 1, warehouses: 1 })
       )
       vi.mocked(resolveEffectiveLimit).mockImplementation(({ limitKey }) => {
-        if (limitKey === 'branches') return Promise.resolve(mockResolvedLimit(2))
-        return Promise.resolve(mockResolvedLimit(3))
+        if (limitKey === 'branches') return Promise.resolve(mockResolvedLimit(1))
+        return Promise.resolve(mockResolvedLimit(1))
       })
     })
 
-    it('blocks 3rd supplier branch without add-on', async () => {
+    it('blocks a second supplier branch without an add-on', async () => {
       vi.mocked(query)
         .mockResolvedValueOnce({ rows: [{ organization_id: 'org-s' }] })
-        .mockResolvedValueOnce({ rows: [{ count: 2 }] })
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] })
 
       const result = await checkLinkedAccountLimit('sup-main', 'SUPPLIER')
       expect(result.allowed).toBe(false)
-      expect(result.includedLimit).toBe(2)
+      expect(result.includedLimit).toBe(1)
+      expect(result.action).toBe('UPGRADE_PLAN')
     })
   })
 
-  describe('checkWarehouseLimit — Supplier Gold', () => {
+  describe('checkWarehouseLimit — Supplier Growth', () => {
     beforeEach(() => {
       vi.mocked(getTenantSubscription).mockResolvedValue(
-        mockSubscription('gold', 'Gold', { warehouses: 3 })
+        mockSubscription('gold', 'Supplier Growth', { warehouses: 1 })
+      )
+      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(1))
+    })
+
+    it('blocks a second warehouse and requires Supplier Scale', async () => {
+      vi.mocked(query)
+        .mockResolvedValueOnce({ rows: [{ organization_id: null }] })
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] })
+
+      const result = await checkWarehouseLimit('sup-1')
+      expect(result.allowed).toBe(false)
+      expect(result.action).toBe('UPGRADE_PLAN')
+    })
+
+    it('honors an already-active legacy warehouse add-on', async () => {
+      vi.mocked(getAddonQuantity).mockResolvedValue(1)
+      vi.mocked(query)
+        .mockResolvedValueOnce({ rows: [{ organization_id: null }] })
+        .mockResolvedValueOnce({ rows: [{ count: 1 }] })
+
+      const result = await checkWarehouseLimit('sup-1')
+      expect(result.allowed).toBe(true)
+      expect(result.effectiveLimit).toBe(2)
+    })
+  })
+
+  describe('checkWarehouseLimit — Supplier Scale', () => {
+    beforeEach(() => {
+      vi.mocked(getTenantSubscription).mockResolvedValue(
+        mockSubscription('platinum', 'Supplier Scale', { warehouses: 3 })
       )
       vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(3))
     })
 
-    it('blocks 4th warehouse without add-on', async () => {
+    it('offers an add-on when the included three warehouses are used', async () => {
       vi.mocked(query)
         .mockResolvedValueOnce({ rows: [{ organization_id: null }] })
         .mockResolvedValueOnce({ rows: [{ count: 3 }] })
@@ -171,35 +212,6 @@ describe('plan-enforcement', () => {
       const result = await checkWarehouseLimit('sup-1')
       expect(result.allowed).toBe(false)
       expect(result.action).toBe('ADDON_OR_UPGRADE')
-    })
-
-    it('allows 4th warehouse with add-on', async () => {
-      vi.mocked(getAddonQuantity).mockResolvedValue(1)
-      vi.mocked(query)
-        .mockResolvedValueOnce({ rows: [{ organization_id: null }] })
-        .mockResolvedValueOnce({ rows: [{ count: 3 }] })
-
-      const result = await checkWarehouseLimit('sup-1')
-      expect(result.allowed).toBe(true)
-      expect(result.effectiveLimit).toBe(4)
-    })
-  })
-
-  describe('checkWarehouseLimit — Supplier Platinum', () => {
-    beforeEach(() => {
-      vi.mocked(getTenantSubscription).mockResolvedValue(
-        mockSubscription('platinum', 'Platinum', { warehouses: 5 })
-      )
-      vi.mocked(resolveEffectiveLimit).mockResolvedValue(mockResolvedLimit(5))
-    })
-
-    it('blocks 6th warehouse without add-on', async () => {
-      vi.mocked(query)
-        .mockResolvedValueOnce({ rows: [{ organization_id: null }] })
-        .mockResolvedValueOnce({ rows: [{ count: 5 }] })
-
-      const result = await checkWarehouseLimit('sup-1')
-      expect(result.allowed).toBe(false)
     })
   })
 

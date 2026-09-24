@@ -250,6 +250,41 @@ describe('Admin Dashboard Routes', () => {
       expect(res.body.ok).toBe(true)
       expect(res.body.data.cancelled).toBe(true)
     })
+
+    it('rejects a positive restaurant_extra_branch quantity for Restaurant Scale', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'platinum', name: 'Restaurant Scale' },
+      })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/RESTAURANT/rest-1/subscription-addons/restaurant_extra_branch'
+        )
+        .send({ quantity: 1, reason: 'Grant extra branch' })
+        .expect(400)
+
+      expect(res.body.ok).toBe(false)
+      expect(res.body.error.message).toMatch(/not available/)
+      // No DB write attempted
+      expect(query).not.toHaveBeenCalled()
+    })
+
+    it('allows setting restaurant_extra_branch to zero for historical cleanup', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'platinum', name: 'Restaurant Scale' },
+      })
+      query.mockResolvedValueOnce({ rowCount: 1, rows: [] })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/RESTAURANT/rest-1/subscription-addons/restaurant_extra_branch'
+        )
+        .send({ quantity: 0, reason: 'Remove legacy add-on' })
+        .expect(200)
+
+      expect(res.body.ok).toBe(true)
+      expect(res.body.data.cancelled).toBe(true)
+    })
   })
 
   describe('POST /subscriptions/:id/preview-change', () => {

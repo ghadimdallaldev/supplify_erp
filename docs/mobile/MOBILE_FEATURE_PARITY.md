@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-25 — Admin UI add-on gate (AdminLimitsTab) + final verification block
+
+**Change:** `AdminLimitsTab.tsx` now hides the addon grant/update editor entirely for Restaurant tenants with no historical `restaurant_extra_branch` row, and restricts it to removal-only (quantity forced to zero, controls disabled) for tenants with an existing historical row. `getAdminAddonOptionKeys` is an exported pure helper. Two new API route tests confirm the backend rejects positive quantities for Restaurant plans and accepts zero for cleanup. Final full verification block: API 334 / 1977 ✓, web 137 / 537 ✓, typecheck ✓, lint 0 errors ✓, build ✓.
+
+**Mobile:** Skipped — this is an admin-only UI change to a web-only admin dashboard. No API contract, auth, RBAC, notification, plan feature key, or mobile-facing type was changed. Both Android (22 / 87) and iOS (22 / 87) typechecks and Jest suites pass unmodified.
+
+---
+
 ## 2026-09-18 - Railway private-storage readiness compatibility
 
 - **API-only:** Railway Storage buckets are private-only but return an empty public-access-block configuration. The API now accepts that provider-specific proof only for Railway endpoints with `STORAGE_PUBLIC_READ=false` and no public ACL/policy; generic S3 verification remains strict.
@@ -1280,3 +1288,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Change**: removed the unreachable web page and unused web/API client hooks; the server path remains an explicit `410 Gone`.
 - **Parity decision**: **No mobile work.** Neither native client exposed central purchasing, and no supported endpoint, permission, feature, navigation, or notification contract changed.
+
+## 2026-09-25 - Final tier and feature-flag verification remediation
+
+- **API/web correction:** removed stale Restaurant `gold = Scale` labels and fixtures, made monetization labels tenant-aware, disabled new Restaurant extra-branch add-ons because Scale already has an unlimited catalog branch allowance, and made the database tier verifier enforce the tenant-specific launch ladders and exact AI entitlements.
+- **Feature-flag reflection:** the API persists and resolves global/tenant overrides before returning entitlements. Web tests prove resolved `false` values cannot be re-enabled by raw plan JSON. Android and iOS already read that resolved feature map through `useEntitlements`; Assistant navigation, dashboard, and settings entry points all use `ai_assistant` rather than plan-code checks.
+- **Mobile implementation:** no native source change was required. The API contract, feature keys, permission keys, and payload shapes are unchanged; the add-on correction is admin-only. Focused Android and iOS entitlement tests pass, and both full native verification blocks are included in the final pre-merge gate.
+- **Deliberately unchanged:** no central purchasing or purchasing budget was introduced. The web plan-comparison “Operational intelligence” row remains unchanged pending the explicit product-owner decision.

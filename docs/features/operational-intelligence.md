@@ -31,6 +31,15 @@ The guard is **additive**: entitlement is not authorization. Routes keep their o
 
 Existing routes continue to enforce their domain feature and RBAC checks; the tier is not a bypass for inventory, finance, recipe, fulfillment, or reporting permissions.
 
+## Admin UI add-on gate (2026-09-25)
+
+The Admin Limits tab enforces at the UI layer that no new `restaurant_extra_branch` add-on can be created or increased for a Restaurant tenant:
+
+- `getAdminAddonOptionKeys(tenantType, activeAddons)` — the exported helper returns `[]` for a Restaurant with no historical row, `['restaurant_extra_branch']` for one with an existing row, and `['supplier_extra_branch', 'supplier_extra_warehouse']` for a Supplier.
+- `showAddonEditor` is `true` only for Suppliers or for a Restaurant that has selected a historical row to remove. The entire grant/update form (type selector, quantity controls, reason field, submit button) is hidden otherwise.
+- When a Restaurant historical row is being removed, all quantity controls are disabled (the quantity is forced to zero by `editAddonRow`) and only a "Remove Add-on" submit path is available.
+- The API remains the authoritative enforcement point: `PUT /api/admin-dashboard/tenants/:tenantType/:id/subscription-addons/:addonKey` with `quantity > 0` and a Restaurant plan code returns `400` because `isAddonKeyCompatibleWithPlan('restaurant_extra_branch', planCode)` returns `false` for all active Restaurant plans. Quantity zero is accepted for historical cleanup.
+
 ## Deterministic sources
 
 Restaurant intelligence composes existing, reproducible calculations: `reorder_forecast`, stock/expiry signals, receiving history, recipe cost snapshots, `supplier_price_events`, recipe price impacts, and waste movements. Supplier intelligence composes the command center, reorder cadence and at-risk customers, warehouse/legacy stock display, receivables, delivery state, and fulfillment exceptions. Results must name their source and never fabricate a prediction, price, supplier, or quantity.
@@ -361,3 +370,15 @@ Supplier product creation now uses one pinned database transaction for the produ
 ## Production audit: central purchasing removal (implemented)
 
 Central purchasing is not a launch capability. The un-routed web page, unused generated client endpoints, and dormant server draft workflow have been removed. `/api/restaurant-org/central-purchasing/*` remains explicitly `410 Gone`, with a route test, so old links fail closed. Historical migrations and branch-deactivation safeguards remain: removing those would require a separate data-retention decision that cannot assume there are no existing tenants or drafts.
+
+## Final pre-merge verification remediation (2026-09-25)
+
+The final tier guard now verifies tenant-specific launch ladders rather than assuming both tenant types have the same active legacy rows. Restaurant Free/Growth resolve to Basic intelligence with no AI, Restaurant Intelligence resolves to Advanced with no AI, and Restaurant Scale resolves to Scale with `ai_assistant` and `ai_platform`. Supplier Free/Growth resolve to Basic with no AI; Supplier Scale alone receives Scale intelligence and both AI entitlements. The live verifier checks these exact values in addition to canonical keys and monotonic limits/features.
+
+The stale Restaurant `gold = Scale` assumptions in admin labels, sponsorship labels, upgrade fixtures, trial-target fixtures, and monetization error normalization were removed. Monetization labels now use tenant type because internal `gold` means Restaurant Intelligence but Supplier Growth. New Restaurant extra-branch add-ons are disabled for every active plan: Restaurant Scale already has an unlimited catalog branch allowance (subject to the existing six-account contact-sales safeguard), while Restaurant Intelligence cannot receive the stale Gold-era add-on path. Already-active historical add-on rows remain part of effective-limit calculation for grandfathering.
+
+Admin feature flags were verified against an isolated PostgreSQL database: global and tenant overrides persist, tenant override > global override > plan precedence is enforced, and clear/inherit restores the next source. Web gates honor the resolved feature map over raw plan JSON. Android and iOS already consume the resolved API feature map and gate Assistant navigation on `ai_assistant`; their focused entitlement tests pass.
+
+Migrations were verified without touching any existing environment. A disposable PostgreSQL 17 cluster applied all 216 migrations from scratch. A separate pre-0212 database applied through 0211, received a synthetic legacy Restaurant Custom subscription plus global and tenant feature-flag canaries, and then applied 0212–0215. The subscription remained present, both current and pending plan references moved to the inactive `custom` compatibility row, the previous `platinum` code and change log were retained, and both overrides survived unchanged. The final migration files contain no `DROP`, `TRUNCATE`, or `DELETE FROM` operations.
+
+No central purchasing or purchasing budget was added. The plan-comparison “Operational intelligence” row was deliberately left unchanged pending the product-owner decision already recorded in the handover.

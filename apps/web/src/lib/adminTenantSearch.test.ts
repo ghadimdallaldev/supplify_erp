@@ -94,8 +94,9 @@ describe('filterAdminLimitKeys', () => {
 describe('formatPlanCodeLabel', () => {
   it('labels known tiers', () => {
     expect(formatPlanCodeLabel('free')).toBe('30-day Free Trial')
-    expect(formatPlanCodeLabel('gold')).toBe('Growth / Scale')
+    expect(formatPlanCodeLabel('gold')).toBe('Restaurant Intelligence / Supplier Growth')
     expect(formatPlanCodeLabel('gold', 'SUPPLIER')).toBe('Supplier Growth')
-    expect(formatPlanCodeLabel('gold', 'RESTAURANT')).toBe('Restaurant Scale')
+    expect(formatPlanCodeLabel('gold', 'RESTAURANT')).toBe('Restaurant Intelligence')
+    expect(formatPlanCodeLabel('platinum', 'RESTAURANT')).toBe('Restaurant Scale')
   })
 })

@@ -224,10 +224,10 @@ describe('checkoutSubscription free plan', () => {
         rows: [
           {
             id: 'plan-scale',
-            code: 'gold',
+            code: 'platinum',
             name: 'Restaurant Scale',
-            price_per_month: 149,
-            price_per_year: 1490,
+            price_per_month: 349,
+            price_per_year: 3490,
           },
         ],
       })
@@ -253,7 +253,7 @@ describe('checkoutSubscription free plan', () => {
     })
 
     expect(result?.trialTargetPlan).toEqual(
-      expect.objectContaining({ id: 'plan-scale', code: 'gold', name: 'Restaurant Scale' })
+      expect.objectContaining({ id: 'plan-scale', code: 'platinum', name: 'Restaurant Scale' })
     )
     const targetLookup = mockQuery.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('code NOT IN')

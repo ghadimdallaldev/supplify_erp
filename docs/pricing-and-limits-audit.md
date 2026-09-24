@@ -65,14 +65,15 @@ Unlimited commercial meters continue to use the existing `-1` convention. Techni
 
 ## 5. Add-ons
 
-| Tenant/plan      | Add-on                                  | Key                                     | Monthly | Annual | Limit impact                             |
-| ---------------- | --------------------------------------- | --------------------------------------- | ------: | -----: | ---------------------------------------- |
-| Restaurant Scale | Additional branch                       | `restaurant_extra_branch`               |     $39 |   $390 | +1 branch each                           |
-| Supplier Scale   | Additional 50 active customer locations | `supplier_active_customer_locations_50` |     $75 |   $750 | +50 active customer locations/month each |
-| Supplier Scale   | Additional supplier branch              | `supplier_extra_branch`                 |     $49 |   $490 | +1 branch each                           |
-| Supplier Scale   | Additional warehouse                    | `supplier_extra_warehouse`              |     $19 |   $190 | +1 warehouse each                        |
+| Tenant/plan    | Add-on                                  | Key                                     | Monthly | Annual | Limit impact                             |
+| -------------- | --------------------------------------- | --------------------------------------- | ------: | -----: | ---------------------------------------- |
+| Supplier Scale | Additional 50 active customer locations | `supplier_active_customer_locations_50` |     $75 |   $750 | +50 active customer locations/month each |
+| Supplier Scale | Additional supplier branch              | `supplier_extra_branch`                 |     $49 |   $490 | +1 branch each                           |
+| Supplier Scale | Additional warehouse                    | `supplier_extra_warehouse`              |     $19 |   $190 | +1 warehouse each                        |
 
 Add-ons are admin-provisioned only. Active add-ons are included in entitlement limits, billing status recurring totals, checkout invoices, and renewal invoices. Removal/cancellation is represented by addon status/end date; self-service purchase UI is intentionally not exposed.
+
+Restaurant Scale has an unlimited catalog branch allowance, subject to the existing six-account contact-sales safeguard. New `restaurant_extra_branch` add-ons are therefore disabled for all active Restaurant plans; already-active historical rows remain effective for grandfathering.
 
 ## 6. Active Customer Location Metric
 

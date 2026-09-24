@@ -5,8 +5,9 @@ type TenantTypeLike = 'RESTAURANT' | 'SUPPLIER' | string | null | undefined
 export const PLAN_CODE_LABELS: Record<string, string> = {
   free: '30-day Free Trial',
   silver: 'Growth',
-  gold: 'Growth / Scale',
-  platinum: 'Scale / Custom',
+  gold: 'Restaurant Intelligence / Supplier Growth',
+  platinum: 'Scale',
+  custom: 'Restaurant Custom',
   enterprise: 'Custom',
 }
 
@@ -21,8 +22,9 @@ export function formatPlanCodeLabel(
   if (key === 'free') return '30-day Free Trial'
   if (type === 'RESTAURANT') {
     if (key === 'silver') return 'Restaurant Growth'
-    if (key === 'gold') return 'Restaurant Scale'
-    if (key === 'platinum') return 'Restaurant Custom'
+    if (key === 'gold') return 'Restaurant Intelligence'
+    if (key === 'platinum') return 'Restaurant Scale'
+    if (key === 'custom') return 'Restaurant Custom'
   }
   if (type === 'SUPPLIER') {
     if (key === 'silver') return 'Supplier Legacy Growth'

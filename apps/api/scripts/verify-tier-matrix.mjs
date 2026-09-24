@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 /**
  * CI / local guard: every canonical feature/limit key must be present on each
- * active tier (free/silver/gold/platinum) per tenant type; limits and features
+ * active launch tier (tenant-specific); limits and features
  * must be monotonic up the ladder. Extra DB keys are warnings only.
  */
 import 'dotenv/config'
 import { pool } from '../src/lib/db.js'
-import {
-  verifyTierMatrix,
-  formatTierMatrixReport,
-} from '../src/lib/tier-matrix-verify.js'
+import { verifyTierMatrix, formatTierMatrixReport } from '../src/lib/tier-matrix-verify.js'
 
 let rows
 try {

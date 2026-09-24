@@ -9,9 +9,13 @@ vi.mock('./cache.js', () => ({
   deleteCache: vi.fn().mockResolvedValue(undefined),
   deleteCacheByPrefix: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock('./subscription.js', () => ({
+  invalidateEntitlementsCache: vi.fn().mockResolvedValue(undefined),
+}))
 
 describe('feature-flags', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mockQuery.mockReset()
   })
 
@@ -134,7 +138,64 @@ describe('feature-flags', () => {
 
       await setGlobalFeatureOverride('reports', 'on')
 
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT (feature_key)'), [
+        'reports',
+        'Reports & analytics',
+        true,
+      ])
       expect(deleteCacheByPrefix).toHaveBeenCalledWith('ff:')
+    })
+  })
+  describe('tenant override persistence', () => {
+    it('upserts the override and invalidates both feature and entitlement caches', async () => {
+      const { setTenantFeatureOverride } = await import('./feature-flags.js')
+      const { deleteCache } = await import('./cache.js')
+      const { invalidateEntitlementsCache } = await import('./subscription.js')
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            feature_key: 'reports',
+            is_enabled: false,
+            reason: 'maintenance',
+            created_by: 'admin-1',
+            updated_at: new Date(),
+          },
+        ],
+      })
+
+      const result = await setTenantFeatureOverride(
+        'tenant-1',
+        'RESTAURANT',
+        'reports',
+        false,
+        'maintenance',
+        'admin-1'
+      )
+
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [
+        'tenant-1',
+        'RESTAURANT',
+        'reports',
+        false,
+        'maintenance',
+        'admin-1',
+      ])
+      expect(result.enabled).toBe(false)
+      expect(deleteCache).toHaveBeenCalledWith('ff:all:tenant-1:RESTAURANT')
+      expect(deleteCache).toHaveBeenCalledWith('ff:tenant-1:RESTAURANT:reports')
+      expect(invalidateEntitlementsCache).toHaveBeenCalledWith('tenant-1', 'RESTAURANT')
+    })
+
+    it('deletes the persisted override and invalidates caches', async () => {
+      const { clearTenantFeatureOverride } = await import('./feature-flags.js')
+      mockQuery.mockResolvedValueOnce({ rows: [] })
+
+      await clearTenantFeatureOverride('tenant-1', 'SUPPLIER', 'ai_assistant')
+
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM feature_flag_override'),
+        ['tenant-1', 'SUPPLIER', 'ai_assistant']
+      )
     })
   })
 })

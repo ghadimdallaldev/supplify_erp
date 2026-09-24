@@ -20,11 +20,13 @@ describe('subscription-addons', () => {
     )
   })
 
-  it('only Growth and Scale plans can purchase location add-ons', () => {
-    expect(canPurchaseLocationAddons('gold')).toBe(true)
-    expect(canPurchaseLocationAddons('platinum')).toBe(true)
-    expect(canPurchaseLocationAddons('silver')).toBe(false)
-    expect(canPurchaseLocationAddons('free')).toBe(false)
+  it('only compatible Supplier Scale plans can purchase location add-ons', () => {
+    expect(canPurchaseLocationAddons('gold', 'RESTAURANT', 'branches')).toBe(false)
+    expect(canPurchaseLocationAddons('platinum', 'RESTAURANT', 'branches')).toBe(false)
+    expect(canPurchaseLocationAddons('gold', 'SUPPLIER', 'branches')).toBe(false)
+    expect(canPurchaseLocationAddons('platinum', 'SUPPLIER', 'warehouses')).toBe(true)
+    expect(canPurchaseLocationAddons('silver', 'RESTAURANT', 'branches')).toBe(false)
+    expect(canPurchaseLocationAddons('free', 'RESTAURANT', 'branches')).toBe(false)
   })
 
   it('computes effective limit with add-ons', () => {
@@ -33,7 +35,7 @@ describe('subscription-addons', () => {
   })
 
   it('returns default unit prices by tier', () => {
-    expect(defaultAddonUnitPrice('restaurant_extra_branch', 'gold')).toBe(39)
+    expect(defaultAddonUnitPrice('restaurant_extra_branch', 'gold')).toBe(null)
     expect(defaultAddonUnitPrice('restaurant_extra_branch', 'platinum')).toBe(null)
     expect(defaultAddonUnitPrice('supplier_extra_warehouse', 'gold')).toBe(null)
     expect(defaultAddonUnitPrice('supplier_extra_warehouse', 'platinum')).toBe(19)
@@ -41,7 +43,8 @@ describe('subscription-addons', () => {
   })
 
   it('validates add-on compatibility by plan code', () => {
-    expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'gold')).toBe(true)
+    expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'gold')).toBe(false)
+    expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'platinum')).toBe(false)
     expect(isAddonKeyCompatibleWithPlan('restaurant_extra_branch', 'silver')).toBe(false)
     expect(isAddonKeyCompatibleWithPlan('supplier_extra_branch', 'platinum')).toBe(true)
     expect(isAddonKeyCompatibleWithPlan('supplier_extra_branch', 'gold')).toBe(false)

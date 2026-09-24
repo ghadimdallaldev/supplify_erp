@@ -28,9 +28,11 @@ describe('adminLimitLabels', () => {
 
   it('formats plan codes with four-plan names', () => {
     expect(formatPlanCodeLabel('free')).toBe('30-day Free Trial')
-    expect(formatPlanCodeLabel('GOLD')).toBe('Growth / Scale')
+    expect(formatPlanCodeLabel('GOLD')).toBe('Restaurant Intelligence / Supplier Growth')
     expect(formatPlanCodeLabel('gold', 'SUPPLIER')).toBe('Supplier Growth')
-    expect(formatPlanCodeLabel('gold', 'RESTAURANT')).toBe('Restaurant Scale')
+    expect(formatPlanCodeLabel('gold', 'RESTAURANT')).toBe('Restaurant Intelligence')
+    expect(formatPlanCodeLabel('platinum', 'RESTAURANT')).toBe('Restaurant Scale')
+    expect(formatPlanCodeLabel('custom', 'RESTAURANT')).toBe('Restaurant Custom')
     expect(formatPlanCodeLabel(null)).toBe('-')
     expect(formatPlanCodeLabel('custom-plan')).toBe('custom-plan')
   })

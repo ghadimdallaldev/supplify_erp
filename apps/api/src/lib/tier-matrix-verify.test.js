@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RESTAURANT_FEATURE_KEYS } from './feature-keys.js'
-import { RESTAURANT_LIMIT_KEYS } from './limit-resolution.js'
+import { RESTAURANT_FEATURE_KEYS, SUPPLIER_FEATURE_KEYS } from './feature-keys.js'
+import { RESTAURANT_LIMIT_KEYS, SUPPLIER_LIMIT_KEYS } from './limit-resolution.js'
 import { normalizeLimitForMonotonicCompare, verifyTenantTypeMatrix } from './tier-matrix-verify.js'
 
 function plan(code, limits, features) {
@@ -10,7 +10,33 @@ function plan(code, limits, features) {
 function fullRestaurantPlan(code, limitOverrides = {}, featureOverrides = {}) {
   const limits = Object.fromEntries(RESTAURANT_LIMIT_KEYS.map((k) => [k, 1]))
   const features = Object.fromEntries(RESTAURANT_FEATURE_KEYS.map((k) => [k, false]))
-  return plan(code, { ...limits, ...limitOverrides }, { ...features, ...featureOverrides })
+  const expected = {
+    free: { intelligence: 'basic', ai_assistant: false, ai_platform: false },
+    silver: { intelligence: 'basic', ai_assistant: false, ai_platform: false },
+    gold: { intelligence: 'advanced', ai_assistant: false, ai_platform: false },
+    platinum: { intelligence: 'scale', ai_assistant: true, ai_platform: true },
+  }[code]
+  return plan(
+    code,
+    { ...limits, ...limitOverrides },
+    { ...features, ...expected, ...featureOverrides }
+  )
+}
+
+function fullSupplierPlan(code, limitOverrides = {}, featureOverrides = {}) {
+  const limits = Object.fromEntries(SUPPLIER_LIMIT_KEYS.map((k) => [k, 1]))
+  const features = Object.fromEntries(SUPPLIER_FEATURE_KEYS.map((k) => [k, false]))
+  const expected = {
+    free: { intelligence: 'basic', ai_assistant: false, ai_platform: false },
+    gold: { intelligence: 'basic', ai_assistant: false, ai_platform: false },
+    platinum: { intelligence: 'scale', ai_assistant: true, ai_platform: true },
+  }[code]
+  return {
+    code,
+    tenant_type: 'SUPPLIER',
+    limits: { ...limits, ...limitOverrides },
+    features: { ...features, ...expected, ...featureOverrides },
+  }
 }
 
 describe('tier-matrix-verify', () => {
@@ -53,5 +79,19 @@ describe('tier-matrix-verify', () => {
     ]
     const { failures } = verifyTenantTypeMatrix(plans, 'RESTAURANT')
     expect(failures).toEqual([])
+  })
+  it('uses the final Supplier ladder without requiring a legacy Silver row', () => {
+    const plans = [fullSupplierPlan('free'), fullSupplierPlan('gold'), fullSupplierPlan('platinum')]
+    expect(verifyTenantTypeMatrix(plans, 'SUPPLIER').failures).toEqual([])
+  })
+
+  it('fails when conversational AI is enabled below Scale', () => {
+    const plans = [
+      fullSupplierPlan('free'),
+      fullSupplierPlan('gold', {}, { ai_assistant: true }),
+      fullSupplierPlan('platinum'),
+    ]
+    const { failures } = verifyTenantTypeMatrix(plans, 'SUPPLIER')
+    expect(failures).toContain('SUPPLIER/gold: ai_assistant must be false (found true)')
   })
 })
