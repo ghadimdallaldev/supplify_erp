@@ -14,6 +14,7 @@ import * as reports from '../reports.service.js'
 import { listDeliveryRoutes, getDriverActiveRoute } from '../delivery-routes.service.js'
 import { listSupplierStockDisplay } from '../supplier-stock.service.js'
 import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
+import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -842,6 +843,27 @@ const TOOLS = {
             }
           : null,
       }
+    },
+  },
+
+  get_supplier_slow_moving_inventory: {
+    definition: {
+      name: 'get_supplier_slow_moving_inventory',
+      description: 'Recorded supplier stock cover for repeatedly sold products; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Lookback days, default 90' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.WAREHOUSES_VIEW) &&
+      (await featureOn(ctx, 'inventory_management')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listSupplierSlowMovingInventory(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, products: cap(result.products) }
     },
   },
 

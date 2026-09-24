@@ -1222,3 +1222,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: read-only Supplier Command Center aggregation of existing supplier review signals; it uses the union of source permissions, features, forecast capability, and Supplier Scale.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the Supplier Command Center cross-signal review surface.
 - **Revisit when**: native supplier operations intelligence is scheduled; add the summary query, all gates, and a visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier Assistant slow-moving inventory
+
+- **Change**: existing Assistant conversation tool now reads the Supplier Scale slow-moving inventory review under its matching source gates and quota.
+- **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
+- **Revisit when**: native Assistant tool invocation is scheduled; carry the same Supplier Scale, warehouse permission, inventory feature, quota, and bounded-output semantics to Android and iOS.

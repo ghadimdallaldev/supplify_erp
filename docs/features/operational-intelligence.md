@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant slow-moving inventory (implemented)
+
+The existing Assistant registry exposes `get_supplier_slow_moving_inventory`, which reuses the deterministic supplier slow-moving service. It is Supplier-scoped and requires `WAREHOUSES_VIEW`, `inventory_management`, Assistant quota, and Supplier Scale. Its day range is 30–365 and results are capped at 15.
+
+It returns review facts only; it cannot create deals, orders, notifications, budgets, central purchasing, or inventory mutations.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

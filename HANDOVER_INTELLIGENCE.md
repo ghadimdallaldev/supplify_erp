@@ -212,6 +212,8 @@ Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity ale
 
 Same pattern: deterministic services calculate, assistant reads and explains.
 
+- [x] Supplier Assistant slow-moving inventory — implemented 2026-09-24. `get_supplier_slow_moving_inventory` reuses the deterministic supplier slow-moving service through the existing Assistant registry. It is Supplier-scoped, requires `WAREHOUSES_VIEW`, `inventory_management`, Assistant quota, and Supplier Scale; days are bounded 30–365 and results capped at 15. It is read-only and never creates a deal/order/notification/budget, changes stock, or enables central purchasing. Full API/web/typecheck/lint/Android/iOS verification passed. Next start at remaining Supplier Assistant tools.
+
 ### Final phase — full production audit
 
 Required before the work is complete. Restaurant, supplier, and driver journeys end to end; web/mobile/API contract parity; impossible state transitions; race conditions and transaction boundaries; N+1 and unbounded queries; notification toggles that actually control behaviour; migrations vs live schema; no fake/non-functional UI controls.

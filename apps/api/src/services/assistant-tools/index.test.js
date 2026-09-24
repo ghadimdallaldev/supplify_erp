@@ -86,6 +86,9 @@ vi.mock('../supplier-stock.service.js', () => ({
 vi.mock('../supplier-command-center.service.js', () => ({
   getSupplierCommandCenter: vi.fn(),
 }))
+vi.mock('../supplier-slow-moving-intelligence.service.js', () => ({
+  listSupplierSlowMovingInventory: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -113,6 +116,7 @@ import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
+import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -330,5 +334,27 @@ describe('assistant tools', () => {
       })
     )
     expect(withDriver.names).toContain('get_my_stops')
+  })
+})
+describe('supplier slow-moving Assistant tool', () => {
+  it('uses the supplier-scoped service only with warehouse, inventory, and Scale access', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierSlowMovingInventory.mockResolvedValue({
+      products: Array.from({ length: 20 }, (_, i) => ({ productId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.WAREHOUSES_VIEW],
+      }),
+      'get_supplier_slow_moving_inventory',
+      { days: 999 }
+    )
+    expect(listSupplierSlowMovingInventory).toHaveBeenCalledWith('supplier-1', {
+      days: 365,
+      limit: 15,
+    })
+    expect(result.products).toHaveLength(15)
   })
 })
