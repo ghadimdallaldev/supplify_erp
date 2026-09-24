@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant projected stockout risks (implemented)
+
+The existing Assistant registry exposes `get_supplier_stockout_risks`, which reuses the deterministic supplier stockout-risk service. It is Supplier-scoped and requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its horizon is bounded to 1–90 days and results are capped at 15.
+
+It returns recorded-demand and recorded-stock review facts only; it cannot infer replenishment, create deals, orders, notifications, budgets, central purchasing, or inventory mutations.
+
 ## Supplier Assistant demand forecast (implemented)
 
 The existing Assistant registry exposes `get_supplier_demand_forecast`, which reuses the deterministic supplier demand-forecast service. It is Supplier-scoped and requires `ORDERS_VIEW`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its horizon is bounded to 1–90 days and results are capped at 15.

@@ -92,6 +92,9 @@ vi.mock('../supplier-slow-moving-intelligence.service.js', () => ({
 vi.mock('../supplier-demand-forecast.service.js', () => ({
   listSupplierDemandForecast: vi.fn(),
 }))
+vi.mock('../supplier-stockout-intelligence.service.js', () => ({
+  listSupplierStockoutRisks: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -102,6 +105,7 @@ vi.mock('../../lib/subscription.js', () => ({
 }))
 
 import { query } from '../../lib/db.js'
+import { getResolvedFeatureValue } from '../../lib/feature-flags.js'
 import {
   getProductPriceHistory,
   listPriceChangeAlerts,
@@ -121,6 +125,7 @@ import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
 import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
 import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
+import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -399,5 +404,60 @@ describe('supplier demand-forecast Assistant tool', () => {
       })
     )
     expect(belowScale.names).not.toContain('get_supplier_demand_forecast')
+  })
+})
+
+describe('supplier stockout-risk Assistant tool', () => {
+  it('reuses the stockout service with Supplier Scale and a bounded horizon', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierStockoutRisks.mockResolvedValue({
+      risks: Array.from({ length: 20 }, (_, i) => ({ productId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW, P.WAREHOUSES_VIEW],
+      }),
+      'get_supplier_stockout_risks',
+      { horizonDays: 999 }
+    )
+    expect(listSupplierStockoutRisks).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: 90,
+      limit: 15,
+    })
+    expect(result.risks).toHaveLength(15)
+  })
+
+  it('is not discoverable without both source permissions, forecast capability, and Supplier Scale', async () => {
+    const withoutWarehousePermission = await resolveAvailableTools(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW],
+      })
+    )
+    expect(withoutWarehousePermission.names).not.toContain('get_supplier_stockout_risks')
+
+    getResolvedFeatureValue
+      .mockResolvedValueOnce('suggestions_only')
+      .mockResolvedValueOnce('suggestions_only')
+    const withoutForecastCapability = await resolveAvailableTools(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW, P.WAREHOUSES_VIEW],
+      })
+    )
+    expect(withoutForecastCapability.names).not.toContain('get_supplier_stockout_risks')
+
+    const belowScale = await resolveAvailableTools(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW, P.WAREHOUSES_VIEW],
+      })
+    )
+    expect(belowScale.names).not.toContain('get_supplier_stockout_risks')
   })
 })
