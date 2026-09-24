@@ -101,6 +101,9 @@ vi.mock('../supplier-cross-sell-intelligence.service.js', () => ({
 vi.mock('../supplier-suggested-deals-intelligence.service.js', () => ({
   listSupplierSuggestedDealCandidates: vi.fn(),
 }))
+vi.mock('../supplier-warehouse-performance-intelligence.service.js', () => ({
+  listSupplierWarehousePerformance: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -134,6 +137,7 @@ import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.
 import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
 import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
 import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
+import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -528,5 +532,28 @@ describe('supplier suggested-deals Assistant tool', () => {
       limit: 15,
     })
     expect(result.candidates).toHaveLength(15)
+  })
+})
+
+describe('supplier warehouse-performance Assistant tool', () => {
+  it('reads bounded warehouse facts only with matching Supplier Scale gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierWarehousePerformance.mockResolvedValue({
+      warehouses: Array.from({ length: 20 }, (_, i) => ({ warehouseId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.WAREHOUSES_VIEW, P.FULFILLMENT_VIEW],
+      }),
+      'get_supplier_warehouse_performance',
+      { days: 999 }
+    )
+    expect(listSupplierWarehousePerformance).toHaveBeenCalledWith('supplier-1', {
+      days: 365,
+      limit: 15,
+    })
+    expect(result.warehouses).toHaveLength(15)
   })
 })

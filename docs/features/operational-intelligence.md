@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant warehouse performance (implemented)
+
+The existing Assistant registry exposes `get_supplier_warehouse_performance`, which reuses the deterministic warehouse-performance service. It is Supplier-scoped and requires `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `warehouses`, `fulfillment`, Assistant quota, and Supplier Scale. Its day range is 1–365 and results are capped at 15.
+
+It returns recorded warehouse thresholds and assignment states only; it cannot set targets, route, reserve, transfer, create orders, notifications, budgets, or central purchasing.
+
 ## Supplier Assistant suggested deal reviews (implemented)
 
 The existing Assistant registry exposes `get_supplier_suggested_deals`, which reuses the deterministic suggested-deal review service. It is Supplier-scoped and requires `WAREHOUSES_VIEW`, `PROMOTIONS_MANAGE`, `inventory_management`, `promotions`, Assistant quota, and Supplier Scale. Its observation window is bounded to 30–365 days and results are capped at 15.
