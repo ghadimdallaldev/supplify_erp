@@ -18,6 +18,7 @@ import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelli
 import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
 import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
+import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -939,6 +940,31 @@ const TOOLS = {
         limit: ROW_CAP,
       })
       return { ...result, opportunities: cap(result.opportunities) }
+    },
+  },
+  get_supplier_suggested_deals: {
+    definition: {
+      name: 'get_supplier_suggested_deals',
+      description: 'Recorded supplier deal-review candidates; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Observation days, default 90' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.WAREHOUSES_VIEW) &&
+      can(ctx, P.PROMOTIONS_MANAGE) &&
+      (await featureOn(ctx, 'inventory_management')) &&
+      (await featureOn(ctx, 'promotions')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listSupplierSuggestedDealCandidates(ctx.tenantId, {
+        days,
+        limit: ROW_CAP,
+      })
+      return { ...result, candidates: cap(result.candidates) }
     },
   },
   get_supplier_slow_moving_inventory: {

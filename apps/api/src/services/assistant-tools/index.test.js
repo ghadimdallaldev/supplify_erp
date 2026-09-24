@@ -98,6 +98,9 @@ vi.mock('../supplier-stockout-intelligence.service.js', () => ({
 vi.mock('../supplier-cross-sell-intelligence.service.js', () => ({
   listSupplierCrossSellOpportunities: vi.fn(),
 }))
+vi.mock('../supplier-suggested-deals-intelligence.service.js', () => ({
+  listSupplierSuggestedDealCandidates: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -130,6 +133,7 @@ import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelli
 import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
 import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
+import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -501,5 +505,28 @@ describe('supplier cross-sell Assistant tool', () => {
       })
     )
     expect(belowScale.names).not.toContain('get_supplier_cross_sell_opportunities')
+  })
+})
+
+describe('supplier suggested-deals Assistant tool', () => {
+  it('reads bounded deal-review candidates only with the matching Supplier Scale gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierSuggestedDealCandidates.mockResolvedValue({
+      candidates: Array.from({ length: 20 }, (_, i) => ({ productId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.WAREHOUSES_VIEW, P.PROMOTIONS_MANAGE],
+      }),
+      'get_supplier_suggested_deals',
+      { days: 999 }
+    )
+    expect(listSupplierSuggestedDealCandidates).toHaveBeenCalledWith('supplier-1', {
+      days: 365,
+      limit: 15,
+    })
+    expect(result.candidates).toHaveLength(15)
   })
 })

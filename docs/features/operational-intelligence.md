@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant suggested deal reviews (implemented)
+
+The existing Assistant registry exposes `get_supplier_suggested_deals`, which reuses the deterministic suggested-deal review service. It is Supplier-scoped and requires `WAREHOUSES_VIEW`, `PROMOTIONS_MANAGE`, `inventory_management`, `promotions`, Assistant quota, and Supplier Scale. Its observation window is bounded to 30–365 days and results are capped at 15.
+
+It returns evidence only and cannot set a discount, create, submit, or publish a deal, message a restaurant, alter stock, create orders, notifications, budgets, or central purchasing.
+
 ## Supplier Assistant cross-sell opportunities (implemented)
 
 The existing Assistant registry exposes `get_supplier_cross_sell_opportunities`, which reuses the deterministic supplier cross-sell service. It is Supplier-scoped and requires `ORDERS_VIEW`, Assistant quota, and Supplier Scale. Its observation window is bounded to 30–365 days and results are capped at 15.
