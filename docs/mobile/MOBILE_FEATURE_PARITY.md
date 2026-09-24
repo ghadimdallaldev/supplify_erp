@@ -1210,3 +1210,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: a read-only Supplier Command Center review of active warehouse inventory thresholds and recorded assignment states. It requires warehouse/fulfillment permissions, both source features, and Supplier Scale; it performs no warehouse action.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the Supplier Command Center warehouse-performance review surface. An endpoint type without a visible, permission-aware operational review would not provide parity.
 - **Revisit when**: native supplier warehouse and fulfillment operations are scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier multi-warehouse demand forecast (web-only)
+
+- **Change**: read-only Supplier Command Center forecasts by warehouse/product from delivered exact-item assignment history; gated by order/warehouse permissions, multi-warehouse, forecast capability, and Supplier Scale.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has a Supplier Command Center multi-warehouse review surface.
+- **Revisit when**: native supplier warehouse operations are scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.

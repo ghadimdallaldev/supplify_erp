@@ -36,6 +36,7 @@ import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelli
 import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-sell-intelligence.service.js'
 import { listSupplierSuggestedDealCandidates } from '../services/supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../services/supplier-warehouse-performance-intelligence.service.js'
+import { listSupplierWarehouseDemandForecast } from '../services/supplier-warehouse-demand-forecast.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -305,6 +306,33 @@ const warehousesGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+const multiWarehouseGate = requireFeature(
+  'multi_warehouse',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/warehouse-demand-forecast',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  multiWarehouseGate,
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierWarehouseDemandForecast(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/warehouse-performance',
   requirePermission('WAREHOUSES_VIEW'),

@@ -259,6 +259,7 @@ export const {
   useGetSupplierSlowMovingInventoryQuery,
   useGetSupplierDemandForecastQuery,
   useGetSupplierCrossSellOpportunitiesQuery,
+  useGetSupplierWarehouseDemandForecastQuery,
   useGetSupplierWarehousePerformanceQuery,
   useGetSupplierSuggestedDealCandidatesQuery,
   useGetSupplierStockoutRisksQuery,

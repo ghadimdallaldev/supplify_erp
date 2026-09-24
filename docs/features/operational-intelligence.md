@@ -99,6 +99,12 @@ This verification adds no new intelligence calculation or automation. The existi
 
 It does not infer a target or performance score, choose routing, reserve or transfer stock, create an order or notification, create a budget, or enable central purchasing. The results are evidence for a human warehouse/fulfillment review only.
 
+## Supplier multi-warehouse demand forecast (implemented)
+
+`GET /api/supplier/warehouse-demand-forecast` is a Supplier Scale, read-only Command Center review. It requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, `multi_warehouse`, and forecast-capable `smart_reorder`. It forecasts each warehouse/product from only delivered assignments that identify the exact order item, so a multi-warehouse order is not duplicated across warehouses.
+
+It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does not infer stock targets, change routing or inventory, create orders/notifications/budgets, or enable central purchasing.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

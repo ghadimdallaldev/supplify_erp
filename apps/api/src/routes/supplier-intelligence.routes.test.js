@@ -9,6 +9,7 @@ const {
   listSupplierCrossSellOpportunities,
   listSupplierSuggestedDealCandidates,
   listSupplierWarehousePerformance,
+  listSupplierWarehouseDemandForecast,
   getRequestTenant,
   gates,
 } = vi.hoisted(() => ({
@@ -18,10 +19,12 @@ const {
   listSupplierCrossSellOpportunities: vi.fn(),
   listSupplierSuggestedDealCandidates: vi.fn(),
   listSupplierWarehousePerformance: vi.fn(),
+  listSupplierWarehouseDemandForecast: vi.fn(),
   getRequestTenant: vi.fn(),
   gates: {
     inventory: true,
     warehouses: true,
+    multiWarehouse: true,
     smartReorder: true,
     forecast: true,
     tier: 'scale',
@@ -57,6 +60,9 @@ vi.mock('../lib/rbac.js', () => ({
 vi.mock('../lib/subscription.js', () => ({
   requireFeature: (feature) => (_req, res, next) => {
     gates.order.push(`feature:${feature}`)
+    if (feature === 'multi_warehouse' && !gates.multiWarehouse) {
+      return res.status(403).json({ ok: false })
+    }
     if (feature === 'warehouses' && !gates.warehouses) {
       return res.status(403).json({ ok: false })
     }
@@ -104,6 +110,9 @@ vi.mock('../services/supplier-suggested-deals-intelligence.service.js', () => ({
 vi.mock('../services/supplier-warehouse-performance-intelligence.service.js', () => ({
   listSupplierWarehousePerformance,
 }))
+vi.mock('../services/supplier-warehouse-demand-forecast.service.js', () => ({
+  listSupplierWarehouseDemandForecast,
+}))
 
 const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
 
@@ -117,6 +126,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   gates.inventory = true
   gates.warehouses = true
+  gates.multiWarehouse = true
   gates.smartReorder = true
   gates.forecast = true
   gates.tier = 'scale'
@@ -136,6 +146,11 @@ beforeEach(() => {
     warehouses: [],
     coverage: {},
     windowDays: 30,
+  })
+  listSupplierWarehouseDemandForecast.mockResolvedValue({
+    forecasts: [],
+    coverage: {},
+    horizonDays: 14,
   })
 })
 
@@ -358,5 +373,40 @@ describe('supplier warehouse performance route', () => {
     gates.tier = 'basic'
     await request(buildApp()).get('/api/supplier/warehouse-performance').expect(403)
     expect(listSupplierWarehousePerformance).not.toHaveBeenCalled()
+  })
+})
+describe('supplier warehouse demand forecast route', () => {
+  it('requires order and warehouse visibility, multi-warehouse forecasting capability, and Supplier Scale', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/warehouse-demand-forecast?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { forecasts: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'feature:multi_warehouse',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierWarehouseDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke warehouse forecasting without the feature or forecast capability', async () => {
+    gates.multiWarehouse = false
+    await request(buildApp()).get('/api/supplier/warehouse-demand-forecast').expect(403)
+    expect(listSupplierWarehouseDemandForecast).not.toHaveBeenCalled()
+
+    gates.multiWarehouse = true
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/warehouse-demand-forecast').expect(403)
+    expect(listSupplierWarehouseDemandForecast).not.toHaveBeenCalled()
   })
 })

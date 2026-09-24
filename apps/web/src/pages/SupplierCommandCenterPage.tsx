@@ -40,6 +40,7 @@ import { SupplierStockoutRiskPanel } from '../components/supplier/SupplierStocko
 import { SupplierCrossSellPanel } from '../components/supplier/SupplierCrossSellPanel'
 import { SupplierSuggestedDealsPanel } from '../components/supplier/SupplierSuggestedDealsPanel'
 import { SupplierWarehousePerformancePanel } from '../components/supplier/SupplierWarehousePerformancePanel'
+import { SupplierWarehouseDemandForecastPanel } from '../components/supplier/SupplierWarehouseDemandForecastPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -678,6 +679,8 @@ export function SupplierCommandCenterPage() {
         {layout.showLowStockPreview && <SupplierStockoutRiskPanel />}
 
         {layout.showLowStockPreview && <SupplierWarehousePerformancePanel />}
+
+        {layout.showLowStockPreview && <SupplierWarehouseDemandForecastPanel />}
 
         {layout.showReorder && <SupplierCrossSellPanel />}
 

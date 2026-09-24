@@ -19,6 +19,30 @@ export type SupplierDemandForecastResponse = {
     projectedDemandQty: number
   }>
 }
+export type SupplierWarehouseDemandForecastResponse = {
+  observationDays: number
+  recentDays: number
+  horizonDays: number
+  coverage: {
+    warehouseProductRowsWithDeliveredHistory: number
+    warehouseProductRowsWithSufficientHistory: number
+    warehousesWithSufficientHistory: number
+  }
+  forecasts: Array<{
+    warehouseId: string
+    warehouseName: string
+    warehouseCode: string | null
+    productId: string
+    productName: string
+    sku: string | null
+    soldQuantity30: number
+    soldQuantity90: number
+    saleDays90: number
+    orderCount90: number
+    forecastDailyDemand: number
+    projectedDemandQty: number
+  }>
+}
 export type SupplierWarehousePerformanceResponse = {
   windowDays: number
   coverage: {
@@ -240,6 +264,13 @@ export const financeApi = api.injectEndpoints({
     }),
     getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
       query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierWarehouseDemandForecast: builder.query<
+      SupplierWarehouseDemandForecastResponse,
+      void
+    >({
+      query: () => '/api/supplier/warehouse-demand-forecast',
       providesTags: ['SupplierOps'],
     }),
     getSupplierWarehousePerformance: builder.query<SupplierWarehousePerformanceResponse, void>({

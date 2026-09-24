@@ -111,6 +111,14 @@
       "emptyTitle": "No deal reviews suggested",
       "emptyDescription": "No eligible slow-moving products without an active or pending product deal were found."
     },
+    "warehouseForecast": {
+      "title": "Warehouse demand forecast",
+      "description": "Recorded delivered warehouse-item demand projected for the next {{horizon}} days; review before acting.",
+      "loading": "Calculating recorded warehouse demand…",
+      "item": "{{quantity}} projected over {{horizon}} days",
+      "emptyTitle": "Not enough delivered warehouse history",
+      "emptyDescription": "Warehouse products need delivered sales on at least seven days before this forecast reports a result."
+    },
     "warehousePerformance": {
       "title": "Warehouse performance",
       "description": "Recorded stock thresholds and assignment states from the last {{days}} days; review before acting.",

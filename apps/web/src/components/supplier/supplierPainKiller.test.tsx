@@ -17,6 +17,7 @@ const mockStockoutRisks = vi.fn()
 const mockCrossSell = vi.fn()
 const mockSuggestedDeals = vi.fn()
 const mockWarehousePerformance = vi.fn()
+const mockWarehouseForecast = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -46,6 +47,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierSuggestedDealCandidatesQuery: (...args: unknown[]) => mockSuggestedDeals(...args),
     useGetSupplierWarehousePerformanceQuery: (...args: unknown[]) =>
       mockWarehousePerformance(...args),
+    useGetSupplierWarehouseDemandForecastQuery: (...args: unknown[]) =>
+      mockWarehouseForecast(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -89,6 +92,10 @@ describe('supplier pain-killer UI', () => {
     })
     mockWarehousePerformance.mockReturnValue({
       data: { warehouses: [], coverage: {}, windowDays: 30 },
+      isLoading: false,
+    })
+    mockWarehouseForecast.mockReturnValue({
+      data: { forecasts: [], coverage: {}, horizonDays: 14 },
       isLoading: false,
     })
     mockCommandCenter.mockReturnValue({
@@ -236,6 +243,34 @@ describe('supplier pain-killer UI', () => {
     renderWithProviders(<SupplierCommandCenterPage />)
     expect(screen.getByTestId('supplier-suggested-deals')).toBeInTheDocument()
     expect(mockSuggestedDeals).toHaveBeenCalledWith(undefined, { skip: false })
+  })
+  it('shows warehouse forecasting only to an entitled Scale multi-warehouse forecast user', () => {
+    mockEntitlements.mockReturnValue({
+      data: {
+        entitlements: {
+          features: {
+            intelligence: 'scale',
+            multi_warehouse: true,
+            smart_reorder: 'ai_forecast_seasonality',
+          },
+        },
+      },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+    renderWithProviders(<SupplierCommandCenterPage />)
+    expect(screen.getByTestId('supplier-warehouse-demand-forecast')).toBeInTheDocument()
+    expect(mockWarehouseForecast).toHaveBeenCalledWith(undefined, { skip: false })
   })
   it('shows warehouse performance only to an entitled Scale warehouse fulfillment user', () => {
     mockEntitlements.mockReturnValue({
