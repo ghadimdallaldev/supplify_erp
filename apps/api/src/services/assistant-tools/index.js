@@ -20,6 +20,7 @@ import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.ser
 import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
 import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
+import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -988,6 +989,44 @@ const TOOLS = {
       const days = Math.min(Math.max(Number(args.days) || 30, 1), 365)
       const result = await listSupplierWarehousePerformance(ctx.tenantId, { days, limit: ROW_CAP })
       return { ...result, warehouses: cap(result.warehouses) }
+    },
+  },
+  get_supplier_warehouse_demand_forecast: {
+    definition: {
+      name: 'get_supplier_warehouse_demand_forecast',
+      description: 'Recorded supplier warehouse product-demand forecast; review only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          horizonDays: { type: 'number', description: 'Forecast horizon in days, default 14' },
+        },
+      },
+    },
+    available: async (ctx) => {
+      if (
+        ctx.tenantType !== 'SUPPLIER' ||
+        !can(ctx, P.ORDERS_VIEW) ||
+        !can(ctx, P.WAREHOUSES_VIEW) ||
+        !(await featureOn(ctx, 'multi_warehouse'))
+      )
+        return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const horizonDays = Math.min(Math.max(Number(args.horizonDays) || 14, 1), 90)
+      const result = await listSupplierWarehouseDemandForecast(ctx.tenantId, {
+        horizonDays,
+        limit: ROW_CAP,
+      })
+      return { ...result, forecasts: cap(result.forecasts) }
     },
   },
   get_supplier_slow_moving_inventory: {

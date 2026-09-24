@@ -104,6 +104,9 @@ vi.mock('../supplier-suggested-deals-intelligence.service.js', () => ({
 vi.mock('../supplier-warehouse-performance-intelligence.service.js', () => ({
   listSupplierWarehousePerformance: vi.fn(),
 }))
+vi.mock('../supplier-warehouse-demand-forecast.service.js', () => ({
+  listSupplierWarehouseDemandForecast: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -138,6 +141,7 @@ import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.ser
 import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
 import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
+import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -555,5 +559,28 @@ describe('supplier warehouse-performance Assistant tool', () => {
       limit: 15,
     })
     expect(result.warehouses).toHaveLength(15)
+  })
+})
+
+describe('supplier warehouse-demand-forecast Assistant tool', () => {
+  it('reads bounded warehouse forecasts only with matching Supplier Scale gates', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierWarehouseDemandForecast.mockResolvedValue({
+      forecasts: Array.from({ length: 20 }, (_, i) => ({ warehouseId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW, P.WAREHOUSES_VIEW],
+      }),
+      'get_supplier_warehouse_demand_forecast',
+      { horizonDays: 999 }
+    )
+    expect(listSupplierWarehouseDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: 90,
+      limit: 15,
+    })
+    expect(result.forecasts).toHaveLength(15)
   })
 })

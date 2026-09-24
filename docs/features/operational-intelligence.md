@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant multi-warehouse demand forecast (implemented)
+
+The existing Assistant registry exposes `get_supplier_warehouse_demand_forecast`, which reuses the deterministic per-warehouse demand-forecast service. It is Supplier-scoped and requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, `multi_warehouse`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its horizon is bounded to 1–90 days and results are capped at 15.
+
+It returns recorded delivered-assignment demand facts only; it cannot set stock targets, route, reserve, transfer, create orders, notifications, budgets, or central purchasing.
+
 ## Supplier Assistant warehouse performance (implemented)
 
 The existing Assistant registry exposes `get_supplier_warehouse_performance`, which reuses the deterministic warehouse-performance service. It is Supplier-scoped and requires `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `warehouses`, `fulfillment`, Assistant quota, and Supplier Scale. Its day range is 1–365 and results are capped at 15.

@@ -1258,3 +1258,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: existing Assistant conversation tool now reads Supplier Scale warehouse performance under its matching source gates and quota.
 - **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
 - **Revisit when**: native Assistant tool invocation is scheduled; carry the same Supplier Scale, warehouse/fulfillment permissions, feature gates, quota, and bounded-output semantics to Android and iOS.
+
+## 2026-09-24 - Supplier Assistant multi-warehouse demand forecast
+
+- **Change**: existing Assistant conversation tool now reads Supplier Scale multi-warehouse demand forecasts under matching source gates and quota.
+- **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
+- **Revisit when**: native Assistant tool invocation is scheduled; carry the same Supplier Scale, orders/warehouse permissions, feature gates, forecast capability, quota, and bounded-output semantics to Android and iOS.
