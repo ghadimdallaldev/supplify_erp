@@ -18,6 +18,7 @@ const mockCrossSell = vi.fn()
 const mockSuggestedDeals = vi.fn()
 const mockWarehousePerformance = vi.fn()
 const mockWarehouseForecast = vi.fn()
+const mockWeeklySummary = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -49,6 +50,8 @@ vi.mock('../../services/api', async (importOriginal) => {
       mockWarehousePerformance(...args),
     useGetSupplierWarehouseDemandForecastQuery: (...args: unknown[]) =>
       mockWarehouseForecast(...args),
+    useGetSupplierWeeklyIntelligenceSummaryQuery: (...args: unknown[]) =>
+      mockWeeklySummary(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -96,6 +99,19 @@ describe('supplier pain-killer UI', () => {
     })
     mockWarehouseForecast.mockReturnValue({
       data: { forecasts: [], coverage: {}, horizonDays: 14 },
+      isLoading: false,
+    })
+    mockWeeklySummary.mockReturnValue({
+      data: {
+        summary: {
+          slowMovingProducts: 0,
+          stockoutRisks: 0,
+          crossSellOpportunities: 0,
+          warehousesWithLowStock: 0,
+          warehouseForecasts: 0,
+        },
+        periodDays: 7,
+      },
       isLoading: false,
     })
     mockCommandCenter.mockReturnValue({
@@ -243,6 +259,37 @@ describe('supplier pain-killer UI', () => {
     renderWithProviders(<SupplierCommandCenterPage />)
     expect(screen.getByTestId('supplier-suggested-deals')).toBeInTheDocument()
     expect(mockSuggestedDeals).toHaveBeenCalledWith(undefined, { skip: false })
+  })
+  it('shows the weekly summary only to users entitled to every supplier source', () => {
+    mockEntitlements.mockReturnValue({
+      data: {
+        entitlements: {
+          features: {
+            intelligence: 'scale',
+            inventory_management: true,
+            warehouses: true,
+            fulfillment: true,
+            multi_warehouse: true,
+            smart_reorder: 'ai_forecast_seasonality',
+          },
+        },
+      },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+    renderWithProviders(<SupplierCommandCenterPage />)
+    expect(screen.getByTestId('supplier-weekly-intelligence-summary')).toBeInTheDocument()
+    expect(mockWeeklySummary).toHaveBeenCalledWith(undefined, { skip: false })
   })
   it('shows warehouse forecasting only to an entitled Scale multi-warehouse forecast user', () => {
     mockEntitlements.mockReturnValue({

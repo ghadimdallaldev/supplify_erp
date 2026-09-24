@@ -37,6 +37,7 @@ import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-s
 import { listSupplierSuggestedDealCandidates } from '../services/supplier-suggested-deals-intelligence.service.js'
 import { listSupplierWarehousePerformance } from '../services/supplier-warehouse-performance-intelligence.service.js'
 import { listSupplierWarehouseDemandForecast } from '../services/supplier-warehouse-demand-forecast.service.js'
+import { getSupplierWeeklyIntelligenceSummary } from '../services/supplier-weekly-intelligence-summary.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -312,6 +313,28 @@ const multiWarehouseGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+router.get(
+  '/weekly-intelligence-summary',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('FULFILLMENT_VIEW'),
+  inventoryManagementGate,
+  warehousesGate,
+  fulfillmentGate,
+  multiWarehouseGate,
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await getSupplierWeeklyIntelligenceSummary(supplierId, { days: req.query.days })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/warehouse-demand-forecast',
   requirePermission('ORDERS_VIEW'),

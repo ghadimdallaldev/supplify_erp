@@ -105,6 +105,12 @@ It does not infer a target or performance score, choose routing, reserve or tran
 
 It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does not infer stock targets, change routing or inventory, create orders/notifications/budgets, or enable central purchasing.
 
+## Supplier weekly intelligence summary (implemented)
+
+`GET /api/supplier/weekly-intelligence-summary` is a read-only Supplier Scale Command Center aggregation of existing slow-moving inventory, stockout risk, cross-sell, warehouse-performance, and warehouse-forecast evidence. It requires every source gate: `ORDERS_VIEW`, `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `inventory_management`, `warehouses`, `fulfillment`, `multi_warehouse`, and forecast-capable `smart_reorder`.
+
+The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

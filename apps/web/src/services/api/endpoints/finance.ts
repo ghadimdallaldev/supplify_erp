@@ -1,4 +1,14 @@
 import { api } from '../base'
+export type SupplierWeeklyIntelligenceSummaryResponse = {
+  periodDays: number
+  summary: {
+    slowMovingProducts: number
+    stockoutRisks: number
+    crossSellOpportunities: number
+    warehousesWithLowStock: number
+    warehouseForecasts: number
+  }
+}
 export type SupplierDemandForecastResponse = {
   observationDays: number
   recentDays: number
@@ -262,6 +272,10 @@ export const financeApi = api.injectEndpoints({
       query: () => '/api/supplier/command-center',
       providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
     }),
+    getSupplierWeeklyIntelligenceSummary: builder.query<
+      SupplierWeeklyIntelligenceSummaryResponse,
+      void
+    >({ query: () => '/api/supplier/weekly-intelligence-summary', providesTags: ['SupplierOps'] }),
     getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
       query: () => '/api/supplier/demand-forecast',
       providesTags: ['SupplierOps'],

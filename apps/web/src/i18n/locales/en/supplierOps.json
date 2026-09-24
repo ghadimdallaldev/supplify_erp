@@ -111,6 +111,11 @@
       "emptyTitle": "No deal reviews suggested",
       "emptyDescription": "No eligible slow-moving products without an active or pending product deal were found."
     },
+    "weeklySummary": {
+      "title": "Weekly intelligence review",
+      "description": "Recorded supplier review signals; no action is taken automatically.",
+      "counts": "{{slow}} slow-moving, {{stockout}} stockout risks, {{cross}} cross-sell, {{warehouses}} low-stock warehouses, {{forecast}} warehouse forecasts"
+    },
     "warehouseForecast": {
       "title": "Warehouse demand forecast",
       "description": "Recorded delivered warehouse-item demand projected for the next {{horizon}} days; review before acting.",

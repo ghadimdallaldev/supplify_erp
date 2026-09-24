@@ -10,6 +10,7 @@ const {
   listSupplierSuggestedDealCandidates,
   listSupplierWarehousePerformance,
   listSupplierWarehouseDemandForecast,
+  getSupplierWeeklyIntelligenceSummary,
   getRequestTenant,
   gates,
 } = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const {
   listSupplierSuggestedDealCandidates: vi.fn(),
   listSupplierWarehousePerformance: vi.fn(),
   listSupplierWarehouseDemandForecast: vi.fn(),
+  getSupplierWeeklyIntelligenceSummary: vi.fn(),
   getRequestTenant: vi.fn(),
   gates: {
     inventory: true,
@@ -113,6 +115,9 @@ vi.mock('../services/supplier-warehouse-performance-intelligence.service.js', ()
 vi.mock('../services/supplier-warehouse-demand-forecast.service.js', () => ({
   listSupplierWarehouseDemandForecast,
 }))
+vi.mock('../services/supplier-weekly-intelligence-summary.service.js', () => ({
+  getSupplierWeeklyIntelligenceSummary,
+}))
 
 const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
 
@@ -151,6 +156,11 @@ beforeEach(() => {
     forecasts: [],
     coverage: {},
     horizonDays: 14,
+  })
+  getSupplierWeeklyIntelligenceSummary.mockResolvedValue({
+    summary: {},
+    sections: {},
+    periodDays: 7,
   })
 })
 
@@ -408,5 +418,30 @@ describe('supplier warehouse demand forecast route', () => {
     gates.forecast = false
     await request(buildApp()).get('/api/supplier/warehouse-demand-forecast').expect(403)
     expect(listSupplierWarehouseDemandForecast).not.toHaveBeenCalled()
+  })
+})
+describe('supplier weekly intelligence summary route', () => {
+  it('requires every source permission, feature, forecast capability, and Supplier Scale', async () => {
+    gates.permissions = new Set(['ORDERS_VIEW', 'WAREHOUSES_VIEW', 'FULFILLMENT_VIEW'])
+    const res = await request(buildApp())
+      .get('/api/supplier/weekly-intelligence-summary?days=14')
+      .expect(200)
+    expect(res.body).toMatchObject({ ok: true, data: { summary: {} } })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'permission:FULFILLMENT_VIEW',
+      'feature:inventory_management',
+      'feature:warehouses',
+      'feature:fulfillment',
+      'feature:multi_warehouse',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(getSupplierWeeklyIntelligenceSummary).toHaveBeenCalledWith('supplier-1', { days: '14' })
   })
 })

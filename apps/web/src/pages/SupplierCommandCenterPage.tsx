@@ -41,6 +41,7 @@ import { SupplierCrossSellPanel } from '../components/supplier/SupplierCrossSell
 import { SupplierSuggestedDealsPanel } from '../components/supplier/SupplierSuggestedDealsPanel'
 import { SupplierWarehousePerformancePanel } from '../components/supplier/SupplierWarehousePerformancePanel'
 import { SupplierWarehouseDemandForecastPanel } from '../components/supplier/SupplierWarehouseDemandForecastPanel'
+import { SupplierWeeklyIntelligenceSummaryPanel } from '../components/supplier/SupplierWeeklyIntelligenceSummaryPanel'
 import { usePermissions } from '../hooks/usePermissions'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
 import { getCommandCenterLayout } from '../lib/workspaceRoleProfile'
@@ -681,6 +682,8 @@ export function SupplierCommandCenterPage() {
         {layout.showLowStockPreview && <SupplierWarehousePerformancePanel />}
 
         {layout.showLowStockPreview && <SupplierWarehouseDemandForecastPanel />}
+
+        {layout.showLowStockPreview && <SupplierWeeklyIntelligenceSummaryPanel />}
 
         {layout.showReorder && <SupplierCrossSellPanel />}
 

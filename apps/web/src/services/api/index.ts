@@ -257,6 +257,7 @@ export const {
   useRemindOverdueInvoicesMutation,
   useGetSupplierCommandCenterQuery,
   useGetSupplierSlowMovingInventoryQuery,
+  useGetSupplierWeeklyIntelligenceSummaryQuery,
   useGetSupplierDemandForecastQuery,
   useGetSupplierCrossSellOpportunitiesQuery,
   useGetSupplierWarehouseDemandForecastQuery,

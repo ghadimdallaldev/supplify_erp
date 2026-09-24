@@ -1216,3 +1216,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: read-only Supplier Command Center forecasts by warehouse/product from delivered exact-item assignment history; gated by order/warehouse permissions, multi-warehouse, forecast capability, and Supplier Scale.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has a Supplier Command Center multi-warehouse review surface.
 - **Revisit when**: native supplier warehouse operations are scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier weekly intelligence summary (web-only)
+
+- **Change**: read-only Supplier Command Center aggregation of existing supplier review signals; it uses the union of source permissions, features, forecast capability, and Supplier Scale.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the Supplier Command Center cross-signal review surface.
+- **Revisit when**: native supplier operations intelligence is scheduled; add the summary query, all gates, and a visible review UI on Android and iOS together.
