@@ -1192,3 +1192,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: a read-only Supplier Command Center review of slow-moving products not already targeted by active or pending product deals; it requires warehouse/promotions permissions, both source features, and Supplier Scale. It does not create or publish deals.
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the supplier Command Center / promotions-review surface. A client without visible review and human approval would not provide parity.
 - **Revisit when**: native supplier operations and promotions review is scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier margin warnings (deferred)
+
+- **Change**: no API, entitlement, navigation, or UI change. Inspection confirmed that supplier-owned cost-of-goods data and cost history do not exist; supplier selling prices and restaurant purchase costs cannot support a truthful supplier-margin calculation.
+- **Parity decision**: **No mobile work.** No client contract or feature was introduced.
+- **Revisit when**: an owned supplier-cost capture workflow and historical provenance have a product decision; assess web and both native clients together at that time.

@@ -81,6 +81,12 @@ The panel prepares an editable reminder draft and can optionally open a chat con
 
 It returns evidence only: recorded stock cover, completed-order sales, and an existing-deal exclusion. It does not infer a discount, create, submit, or publish a deal, message a restaurant, change stock, create a budget, or enable central purchasing. The supplier must use the existing promotions workflow for a human-reviewed deal.
 
+## Supplier margin warnings (deferred)
+
+The current catalog and order data records supplier selling prices only. `restaurant_ingredient_costs` and receiving values are restaurant purchase costs, not supplier cost of goods, and there is no supplier-owned cost entry or historical cost source. A supplier margin calculation would therefore be fabricated.
+
+No margin endpoint, UI, mobile contract, or cost schema was added. An owned supplier-cost capture workflow and historical provenance need a product decision before a reliable margin warning can be considered.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:
