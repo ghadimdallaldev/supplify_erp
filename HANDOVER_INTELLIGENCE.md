@@ -228,6 +228,8 @@ Same pattern: deterministic services calculate, assistant reads and explains.
 
 - [x] Central purchasing dead-code removal — audit remediation 2026-09-24. Removed the un-routed web page, unused client endpoints/hooks, and dormant server draft workflow; the explicit /api/restaurant-org/central-purchasing/\* 410 guard remains and is route-tested. Historical migrations and deactivation safeguards remain because removing legacy data guards would depend on a live-tenant/data-retention decision. Full API/web/typecheck/lint/Android/iOS verification passed.
 
+- [x] Final production audit — concluded 2026-09-25. Restaurant, supplier, and driver contract/state paths were checked against their focused tests and the full verification suite. Intelligence routes remain session-scoped with source permissions/features ahead of tier gates; Assistant tools retain those source gates. Driver transitions lock the assignment and order rows and detect concurrent status changes; inventory deductions use a conditional update; the only raw BEGIN/COMMIT calls are in the pinned shared transaction helper. Notification categories are enforced by preferences and have a regression test. The final-intelligence migration static guard passed. `pnpm verify:tier-matrix` was read-only and skipped cleanly because PostgreSQL is unavailable; no migration or tenant data operation was attempted. Legacy central-purchasing migrations and deactivation safeguards remain deliberately deferred because deleting data guards requires a live-tenant/data-retention decision.
+
 Required before the work is complete. Restaurant, supplier, and driver journeys end to end; web/mobile/API contract parity; impossible state transitions; race conditions and transaction boundaries; N+1 and unbounded queries; notification toggles that actually control behaviour; migrations vs live schema; no fake/non-functional UI controls.
 
 ## Mobile parity — hard requirement
@@ -252,8 +254,7 @@ cd C:/myProjects/supplify-mobile-ios  && npx tsc --noEmit && npx jest --runInBan
 ## Known issues carried forward
 
 - **Low / CI hygiene:** `apps/api/src/services/supplier-pain-killer.test.js > previewProductImport` fails intermittently in the _full_ suite but passes in isolation. Pre-existing test-isolation flake, not a product bug. Do not chase it mid-feature; fix it as its own task if you want CI green deterministically.
-- **Launch blocker, product decision needed:** the plan-comparison UI advertises "Operational intelligence" on Intelligence and Scale, but most Phase 2–6 features behind it do not exist yet. Either land the phases first or remove that row until they exist. Do not ship a tier that is not built.
-- `apps/web/src/pages/CentralPurchasingPage.tsx` is dead code — never imported — and its four RTK endpoints in `endpoints/branches.ts` hit the deliberately-`410` route. Safe to delete as cleanup.
+- **Plan-comparison copy — product decision retained:** the Phase 2–6 intelligence features recorded in this handover now exist. The "Operational intelligence" row was deliberately not changed; alter or remove it only with product-owner direction.
 
 ## Testing conventions in this codebase (learned the hard way)
 
