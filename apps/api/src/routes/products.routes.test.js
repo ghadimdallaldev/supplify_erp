@@ -368,7 +368,6 @@ describe('Products Routes', () => {
     it('should create a new product', async () => {
       __resetProductTagsColumnCache() // ensure productHasTagsColumn runs (info_schema query)
       db.query
-        .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({ rows: [] }) // productHasTagsColumn() when uncached - no tags column
         .mockResolvedValueOnce({
           rows: [
@@ -381,7 +380,6 @@ describe('Products Routes', () => {
             },
           ],
         }) // INSERT product
-        .mockResolvedValueOnce({}) // COMMIT
 
       const { checkLimit, incrementUsage } = await import('../lib/subscription.js')
       vi.mocked(checkLimit).mockResolvedValueOnce({
@@ -405,6 +403,7 @@ describe('Products Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.product.name).toBe('New Product')
+      expect(db.withTransaction).toHaveBeenCalledTimes(1)
     })
 
     it('should validate required fields', async () => {

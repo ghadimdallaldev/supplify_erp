@@ -10,7 +10,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
@@ -1233,44 +1233,41 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
     const selectedCategory = await assertCategoryAvailable(productData.category_id, supplierId)
 
-    // Use transaction to create product, price, and inventory together
-    await query('BEGIN')
+    const hasTags = await productHasTagsColumn()
+    const tagsArray =
+      hasTags && req.body.tags
+        ? Array.isArray(req.body.tags)
+          ? req.body.tags
+          : req.body.tags
+              .split(',')
+              .map((t) => t.trim())
+              .filter((t) => t)
+        : []
 
-    try {
-      const hasTags = await productHasTagsColumn()
-      const tagsArray =
-        hasTags && req.body.tags
-          ? Array.isArray(req.body.tags)
-            ? req.body.tags
-            : req.body.tags
-                .split(',')
-                .map((t) => t.trim())
-                .filter((t) => t)
-          : []
+    let insertCols =
+      'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
+    let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
+    let insertValues = [
+      supplierId,
+      productData.sku,
+      productData.name,
+      productData.name_ar || null,
+      productData.description || null,
+      productData.description_ar || null,
+      productData.brand || null,
+      selectedCategory?.name || productData.category || null,
+      productData.category_id || null,
+      productData.image_url || null,
+      productData.unit || null,
+    ]
+    if (hasTags) {
+      insertCols += ', tags'
+      insertPlaceholders += ', $12::jsonb'
+      insertValues.push(JSON.stringify(tagsArray))
+    }
 
-      let insertCols =
-        'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
-      let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
-      let insertValues = [
-        supplierId,
-        productData.sku,
-        productData.name,
-        productData.name_ar || null,
-        productData.description || null,
-        productData.description_ar || null,
-        productData.brand || null,
-        selectedCategory?.name || productData.category || null,
-        productData.category_id || null,
-        productData.image_url || null,
-        productData.unit || null,
-      ]
-      if (hasTags) {
-        insertCols += ', tags'
-        insertPlaceholders += ', $12::jsonb'
-        insertValues.push(JSON.stringify(tagsArray))
-      }
-
-      const { rows } = await query(
+    const product = await withTransaction(async (client) => {
+      const { rows } = await client.query(
         `INSERT INTO product (${insertCols}) VALUES (${insertPlaceholders}) RETURNING *`,
         insertValues
       )
@@ -1279,7 +1276,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create price if provided
       if (req.body.price !== undefined && req.body.price !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO price (product_id, amount, currency, valid_from)
           VALUES ($1, $2, 'USD', now())
@@ -1290,7 +1287,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create inventory if initial stock provided
       if (req.body.initialStock !== undefined && req.body.initialStock !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO inventory (product_id, warehouse_id, available_qty, reserved_qty, on_order_qty)
           VALUES ($1, $2, $3, 0, 0)
@@ -1299,39 +1296,36 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
         )
       }
 
-      await query('COMMIT')
+      return product
+    })
 
-      // Track usage for supplier
-      if (req.userData.role === 'SUPPLIER' && supplierId) {
-        await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
-      }
-
-      logger.info('Product created with price and inventory', {
-        productId: product.id,
-        sku: product.sku,
-        actor: req.userData.id,
-      })
-
-      await writeAuditLog(req, {
-        action_type: 'product.created',
-        tenant_type: 'SUPPLIER',
-        tenant_id: supplierId,
-        target_id: product.id,
-        payload_json: { resource_type: 'product', sku: product.sku },
-      })
-
-      await invalidateCatalogMetaCache(supplierId)
-
-      res.status(201).json({
-        ok: true,
-        data: { product },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      await query('ROLLBACK')
-      throw error
+    // Track usage for supplier
+    if (req.userData.role === 'SUPPLIER' && supplierId) {
+      await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
     }
+
+    logger.info('Product created with price and inventory', {
+      productId: product.id,
+      sku: product.sku,
+      actor: req.userData.id,
+    })
+
+    await writeAuditLog(req, {
+      action_type: 'product.created',
+      tenant_type: 'SUPPLIER',
+      tenant_id: supplierId,
+      target_id: product.id,
+      payload_json: { resource_type: 'product', sku: product.sku },
+    })
+
+    await invalidateCatalogMetaCache(supplierId)
+
+    res.status(201).json({
+      ok: true,
+      data: { product },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({

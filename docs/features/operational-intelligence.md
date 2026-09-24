@@ -353,3 +353,7 @@ Restaurant Scale enables multi-branch insight, not centralized purchasing. `/api
 The food-cost bar no longer invents a target. `FoodCostBar` previously defaulted `targetFoodCostPct` to `30`, displayed "Target: 30%", and coloured recipes as over target against a benchmark the restaurant had never set; the recipe costing dashboard also passed a literal `30` and a literal `WARNING` status for its lowest-margin rows. The dashboard now sends the real per-recipe `targetFoodCostPct` and `calc_status`, and the bar renders "no target set" instead of a fabricated one.
 
 Receiving uses the ordered line's product, unit, and unit price rather than client-supplied values. Recipe receiving hooks capture the prior received cost before upsert so genuine price changes produce a price event. Failed recipe recalculations remain queued for retry. Inventory deductions reject insufficient stock instead of silently clamping quantity.
+
+## Production audit: atomic supplier product creation (implemented)
+
+Supplier product creation now uses one pinned database transaction for the product, optional price, and optional initial inventory row. A failure rolls back every write; post-commit usage, audit, and cache effects remain outside the transaction.

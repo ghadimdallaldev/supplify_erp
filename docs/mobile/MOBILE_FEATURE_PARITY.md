@@ -1270,3 +1270,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: existing Assistant conversation tool now reads Supplier Scale composed weekly intelligence under every source gate and quota.
 - **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
 - **Revisit when**: native Assistant tool invocation is scheduled; carry all source gates, quota, and bounded summary semantics to Android and iOS.
+
+## 2026-09-24 - Atomic supplier product creation
+
+- **Change**: server-side transaction correction for supplier product, price, and inventory writes.
+- **Parity decision**: **No mobile contract work.** Endpoint, request/response, permissions, navigation, and notification contracts are unchanged.
