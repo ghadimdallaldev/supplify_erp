@@ -111,6 +111,14 @@
       "emptyTitle": "No deal reviews suggested",
       "emptyDescription": "No eligible slow-moving products without an active or pending product deal were found."
     },
+    "warehousePerformance": {
+      "title": "Warehouse performance",
+      "description": "Recorded stock thresholds and assignment states from the last {{days}} days; review before acting.",
+      "loading": "Loading recorded warehouse facts…",
+      "item": "{{assignments}} assignments: {{delivered}} delivered, {{active}} active, {{failed}} failed; {{lowStock}} low-stock products",
+      "emptyTitle": "No active warehouses found",
+      "emptyDescription": "No active supplier warehouses were available for this review."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",

@@ -35,6 +35,7 @@ import { listSupplierDemandForecast } from '../services/supplier-demand-forecast
 import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelligence.service.js'
 import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-sell-intelligence.service.js'
 import { listSupplierSuggestedDealCandidates } from '../services/supplier-suggested-deals-intelligence.service.js'
+import { listSupplierWarehousePerformance } from '../services/supplier-warehouse-performance-intelligence.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -298,6 +299,32 @@ const inventoryManagementGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+const warehousesGate = requireFeature(
+  'warehouses',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/warehouse-performance',
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('FULFILLMENT_VIEW'),
+  warehousesGate,
+  fulfillmentGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierWarehousePerformance(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/suggested-deals',
   requirePermission('WAREHOUSES_VIEW'),

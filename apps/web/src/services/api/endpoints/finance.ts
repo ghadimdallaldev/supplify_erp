@@ -19,6 +19,26 @@ export type SupplierDemandForecastResponse = {
     projectedDemandQty: number
   }>
 }
+export type SupplierWarehousePerformanceResponse = {
+  windowDays: number
+  coverage: {
+    activeWarehouses: number
+    warehousesWithAssignments: number
+    warehousesWithLowStock: number
+  }
+  warehouses: Array<{
+    warehouseId: string
+    warehouseName: string
+    warehouseCode: string | null
+    stockedProducts: number
+    lowStockProducts: number
+    availableQuantity: number
+    assignmentCount: number
+    deliveredCount: number
+    failedCount: number
+    activeCount: number
+  }>
+}
 export type SupplierSuggestedDealCandidatesResponse = {
   windowDays: number
   coverage: {
@@ -220,6 +240,10 @@ export const financeApi = api.injectEndpoints({
     }),
     getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
       query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierWarehousePerformance: builder.query<SupplierWarehousePerformanceResponse, void>({
+      query: () => '/api/supplier/warehouse-performance',
       providesTags: ['SupplierOps'],
     }),
     getSupplierSuggestedDealCandidates: builder.query<

@@ -93,6 +93,12 @@ The existing tenant-resolved delivery board provides per-area and per-status del
 
 This verification adds no new intelligence calculation or automation. The existing web Command Center links to the fulfillment board and run sheet; no API or mobile contract changed.
 
+## Supplier warehouse performance (implemented)
+
+`GET /api/supplier/warehouse-performance` is a Supplier Scale, read-only Command Center review. It requires `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `warehouses`, `fulfillment`, and Scale intelligence. It returns active warehouses with recorded available quantity, products at their configured reorder threshold, and the selected window's assignment, delivered, failed, and active counts.
+
+It does not infer a target or performance score, choose routing, reserve or transfer stock, create an order or notification, create a budget, or enable central purchasing. The results are evidence for a human warehouse/fulfillment review only.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

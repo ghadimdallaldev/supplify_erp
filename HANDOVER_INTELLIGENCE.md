@@ -202,6 +202,8 @@ Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity ale
 
 - [x] Supplier delivery / fulfillment intelligence — verified existing 2026-09-24. The tenant-resolved delivery board is gated by `FULFILLMENT_VIEW` or `DRIVER_DELIVERIES_VIEW` plus `fulfillment`, the Command Center already exposes daily delivery, GPS, and fulfillment-exception previews, and the run sheet aggregates deliveries, pick queue, shortages, receivables, and factual risks. The web surfaces link to the existing fulfillment board and run sheet. No duplicate service, endpoint, UI, mobile contract, automatic action, budget, or central purchasing was added. Next start at supplier warehouse performance only after confirming existing warehouse, stock, and Command Center coverage.
 
+- [x] Supplier warehouse performance — implemented 2026-09-24. `GET /api/supplier/warehouse-performance` is a Supplier Scale/read-only aggregate of active warehouse inventory thresholds and assignment states over a bounded 1–365 day window (default 30). It requires `WAREHOUSES_VIEW`, `FULFILLMENT_VIEW`, `warehouses`, `fulfillment`, and Scale intelligence, and is surfaced on the Supplier Command Center. It reports recorded quantities and status counts only; it never creates a target, score, routing decision, reservation, transfer, order, notification, budget, or central purchasing action. Full API/web/typecheck/lint/Android/iOS verification passed. Next start at multi-warehouse forecasting only after confirming existing forecast data does not already provide a warehouse-specific view.
+
 ### Phase 6 — Supplier Scale AI Assistant
 
 Same pattern: deterministic services calculate, assistant reads and explains.

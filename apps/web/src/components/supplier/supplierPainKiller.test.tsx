@@ -16,6 +16,7 @@ const mockDemandForecast = vi.fn()
 const mockStockoutRisks = vi.fn()
 const mockCrossSell = vi.fn()
 const mockSuggestedDeals = vi.fn()
+const mockWarehousePerformance = vi.fn()
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
@@ -43,6 +44,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierStockoutRisksQuery: (...args: unknown[]) => mockStockoutRisks(...args),
     useGetSupplierCrossSellOpportunitiesQuery: (...args: unknown[]) => mockCrossSell(...args),
     useGetSupplierSuggestedDealCandidatesQuery: (...args: unknown[]) => mockSuggestedDeals(...args),
+    useGetSupplierWarehousePerformanceQuery: (...args: unknown[]) =>
+      mockWarehousePerformance(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
@@ -82,6 +85,10 @@ describe('supplier pain-killer UI', () => {
     })
     mockSuggestedDeals.mockReturnValue({
       data: { candidates: [], coverage: {}, windowDays: 90 },
+      isLoading: false,
+    })
+    mockWarehousePerformance.mockReturnValue({
+      data: { warehouses: [], coverage: {}, windowDays: 30 },
       isLoading: false,
     })
     mockCommandCenter.mockReturnValue({
@@ -229,6 +236,32 @@ describe('supplier pain-killer UI', () => {
     renderWithProviders(<SupplierCommandCenterPage />)
     expect(screen.getByTestId('supplier-suggested-deals')).toBeInTheDocument()
     expect(mockSuggestedDeals).toHaveBeenCalledWith(undefined, { skip: false })
+  })
+  it('shows warehouse performance only to an entitled Scale warehouse fulfillment user', () => {
+    mockEntitlements.mockReturnValue({
+      data: {
+        entitlements: {
+          features: { intelligence: 'scale', warehouses: true, fulfillment: true },
+        },
+      },
+    })
+    mockCommandCenter.mockReturnValue({
+      data: {
+        kpis: {},
+        todaysPriorities: [],
+        needsAttention: [],
+        previews: { deliveries: [], receivables: {}, reorderOpportunities: [], lowStock: [] },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<SupplierCommandCenterPage />)
+
+    expect(screen.getByTestId('supplier-warehouse-performance')).toBeInTheDocument()
+    expect(mockWarehousePerformance).toHaveBeenCalledWith(undefined, { skip: false })
   })
   it('shows supplier cross-sell opportunities only to an entitled Scale orders user', () => {
     mockEntitlements.mockReturnValue({

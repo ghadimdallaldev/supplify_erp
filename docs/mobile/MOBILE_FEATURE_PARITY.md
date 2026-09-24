@@ -1204,3 +1204,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: verification only. The established delivery board, Supplier Command Center previews, and run sheet already provide the relevant supplier delivery and fulfillment facts.
 - **Parity decision**: **No mobile work.** No API, entitlement, notification, or navigation contract changed.
 - **Revisit when**: native supplier fulfillment operations are expanded; evaluate the existing delivery-board and run-sheet contracts for visible Android and iOS parity together.
+
+## 2026-09-24 - Supplier warehouse performance (web-only)
+
+- **Change**: a read-only Supplier Command Center review of active warehouse inventory thresholds and recorded assignment states. It requires warehouse/fulfillment permissions, both source features, and Supplier Scale; it performs no warehouse action.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the Supplier Command Center warehouse-performance review surface. An endpoint type without a visible, permission-aware operational review would not provide parity.
+- **Revisit when**: native supplier warehouse and fulfillment operations are scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.
