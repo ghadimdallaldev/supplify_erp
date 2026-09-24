@@ -226,6 +226,8 @@ Same pattern: deterministic services calculate, assistant reads and explains.
 
 - [x] Atomic supplier product creation — audit remediation 2026-09-24. Replaced pooled BEGIN/COMMIT calls with a pinned withTransaction client for product, optional price, and optional initial inventory writes; the route test asserts the transaction helper. Full API/web/typecheck/lint/Android/iOS verification passed.
 
+- [x] Central purchasing dead-code removal — audit remediation 2026-09-24. Removed the un-routed web page, unused client endpoints/hooks, and dormant server draft workflow; the explicit /api/restaurant-org/central-purchasing/\* 410 guard remains and is route-tested. Historical migrations and deactivation safeguards remain because removing legacy data guards would depend on a live-tenant/data-retention decision. Full API/web/typecheck/lint/Android/iOS verification passed.
+
 Required before the work is complete. Restaurant, supplier, and driver journeys end to end; web/mobile/API contract parity; impossible state transitions; race conditions and transaction boundaries; N+1 and unbounded queries; notification toggles that actually control behaviour; migrations vs live schema; no fake/non-functional UI controls.
 
 ## Mobile parity — hard requirement

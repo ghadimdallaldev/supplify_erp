@@ -357,3 +357,7 @@ Receiving uses the ordered line's product, unit, and unit price rather than clie
 ## Production audit: atomic supplier product creation (implemented)
 
 Supplier product creation now uses one pinned database transaction for the product, optional price, and optional initial inventory row. A failure rolls back every write; post-commit usage, audit, and cache effects remain outside the transaction.
+
+## Production audit: central purchasing removal (implemented)
+
+Central purchasing is not a launch capability. The un-routed web page, unused generated client endpoints, and dormant server draft workflow have been removed. `/api/restaurant-org/central-purchasing/*` remains explicitly `410 Gone`, with a route test, so old links fail closed. Historical migrations and branch-deactivation safeguards remain: removing those would require a separate data-retention decision that cannot assume there are no existing tenants or drafts.

@@ -128,15 +128,6 @@ vi.mock('../services/org-reports.service.js', () => ({
   }),
 }))
 
-vi.mock('../services/central-purchasing.service.js', () => ({
-  assertCentralPurchasingEnabled: vi.fn().mockResolvedValue(true),
-  listCentralPurchasingBranchAccounts: vi.fn().mockResolvedValue([]),
-  getOrCreateCentralPurchasingDraft: vi.fn(),
-  listCentralPurchasingDrafts: vi.fn().mockResolvedValue([]),
-  updateCentralPurchasingDraftLines: vi.fn(),
-  submitCentralPurchasingDrafts: vi.fn(),
-}))
-
 vi.mock('../lib/permissions.js', () => ({
   invalidateUserPermissionCache: vi.fn(),
 }))
@@ -205,6 +196,10 @@ describe('restaurant-org.routes', () => {
     const res = await request(app).get('/api/restaurant-org').expect(200)
     expect(res.body.data.organization.id).toBe('org-1')
     expect(res.body.data.branches).toHaveLength(2)
+  })
+  it('keeps central purchasing permanently unavailable', async () => {
+    const res = await request(app).get('/api/restaurant-org/central-purchasing/drafts').expect(410)
+    expect(res.body.error.name).toBe('GONE')
   })
 
   it('GET /branches lists Branch Accounts', async () => {

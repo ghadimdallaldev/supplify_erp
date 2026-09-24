@@ -1275,3 +1275,8 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 
 - **Change**: server-side transaction correction for supplier product, price, and inventory writes.
 - **Parity decision**: **No mobile contract work.** Endpoint, request/response, permissions, navigation, and notification contracts are unchanged.
+
+## 2026-09-24 - Central purchasing dead-code removal
+
+- **Change**: removed the unreachable web page and unused web/API client hooks; the server path remains an explicit `410 Gone`.
+- **Parity decision**: **No mobile work.** Neither native client exposed central purchasing, and no supported endpoint, permission, feature, navigation, or notification contract changed.

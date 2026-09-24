@@ -332,10 +332,7 @@ export const {
   useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
   useGetRestaurantOrgStockTransferSuggestionsQuery,
   useGetRestaurantOrgAdvancedAnalyticsQuery,
-  useGetCentralPurchasingDraftsQuery,
-  useCreateCentralPurchasingDraftMutation,
-  useUpdateCentralPurchasingDraftMutation,
-  useSubmitCentralPurchasingDraftsMutation,
+
   useGetRestaurantMemberInviteRolesQuery,
   useGetRestaurantBranchInviteRolesQuery,
   useGetRestaurantMemberInvitationsQuery,

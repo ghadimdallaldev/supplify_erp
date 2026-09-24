@@ -501,51 +501,6 @@ export const branchesApi = api.injectEndpoints({
       query: () => '/api/restaurant-org/reports/advanced-analytics',
       providesTags: ['RestaurantOrg'],
     }),
-    getCentralPurchasingDrafts: builder.query<
-      { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
-      void
-    >({
-      query: () => '/api/restaurant-org/central-purchasing/drafts',
-      providesTags: ['RestaurantOrg'],
-    }),
-    createCentralPurchasingDraft: builder.mutation<
-      { draft: Record<string, unknown> },
-      { destination_restaurant_id: string }
-    >({
-      query: (body) => ({
-        url: '/api/restaurant-org/central-purchasing/drafts',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['RestaurantOrg'],
-    }),
-    updateCentralPurchasingDraft: builder.mutation<
-      { draft: Record<string, unknown> },
-      { draftId: string; line_items: Array<Record<string, unknown>> }
-    >({
-      query: ({ draftId, line_items }) => ({
-        url: `/api/restaurant-org/central-purchasing/drafts/${draftId}`,
-        method: 'PATCH',
-        body: { line_items },
-      }),
-      invalidatesTags: ['RestaurantOrg'],
-    }),
-    submitCentralPurchasingDrafts: builder.mutation<
-      {
-        results: Array<Record<string, unknown>>
-        summary: { total: number; succeeded: number; failed: number }
-        partialFailure?: boolean
-        foundationOnly?: boolean
-      },
-      { destination_restaurant_ids: string[] }
-    >({
-      query: (body) => ({
-        url: '/api/restaurant-org/central-purchasing/submit',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['RestaurantOrg', 'Order'],
-    }),
     getRestaurantMemberInviteRoles: builder.query<
       { roles: Array<{ id: string; name: string; description?: string }> },
       void
