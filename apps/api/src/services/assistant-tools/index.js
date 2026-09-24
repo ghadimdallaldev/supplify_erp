@@ -17,6 +17,7 @@ import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
 import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
 import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
+import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -916,6 +917,28 @@ const TOOLS = {
         limit: ROW_CAP,
       })
       return { ...result, risks: cap(result.risks) }
+    },
+  },
+  get_supplier_cross_sell_opportunities: {
+    definition: {
+      name: 'get_supplier_cross_sell_opportunities',
+      description: 'Recorded supplier product-pair cross-sell evidence; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Observation days, default 180' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.ORDERS_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 180, 30), 365)
+      const result = await listSupplierCrossSellOpportunities(ctx.tenantId, {
+        days,
+        limit: ROW_CAP,
+      })
+      return { ...result, opportunities: cap(result.opportunities) }
     },
   },
   get_supplier_slow_moving_inventory: {

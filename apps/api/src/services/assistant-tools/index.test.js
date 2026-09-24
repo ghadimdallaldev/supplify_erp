@@ -95,6 +95,9 @@ vi.mock('../supplier-demand-forecast.service.js', () => ({
 vi.mock('../supplier-stockout-intelligence.service.js', () => ({
   listSupplierStockoutRisks: vi.fn(),
 }))
+vi.mock('../supplier-cross-sell-intelligence.service.js', () => ({
+  listSupplierCrossSellOpportunities: vi.fn(),
+}))
 
 vi.mock('../../lib/admin-overview-metrics.js', () => ({
   buildAdminOverviewMetrics: vi.fn(),
@@ -126,6 +129,7 @@ import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
 import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
 import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
+import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
 
 function restaurantCtx(overrides = {}) {
   return {
@@ -459,5 +463,43 @@ describe('supplier stockout-risk Assistant tool', () => {
       })
     )
     expect(belowScale.names).not.toContain('get_supplier_stockout_risks')
+  })
+})
+
+describe('supplier cross-sell Assistant tool', () => {
+  it('reuses the exact-product-pair service with Supplier Scale and bounded days', async () => {
+    getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
+    listSupplierCrossSellOpportunities.mockResolvedValue({
+      opportunities: Array.from({ length: 20 }, (_, i) => ({ restaurantId: String(i) })),
+    })
+    const result = await executeAssistantTool(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW],
+      }),
+      'get_supplier_cross_sell_opportunities',
+      { days: 999 }
+    )
+    expect(listSupplierCrossSellOpportunities).toHaveBeenCalledWith('supplier-1', {
+      days: 365,
+      limit: 15,
+    })
+    expect(result.opportunities).toHaveLength(15)
+  })
+
+  it('is not discoverable without ORDERS_VIEW or Supplier Scale', async () => {
+    const withoutPermission = await resolveAvailableTools(
+      restaurantCtx({ tenantId: 'supplier-1', tenantType: 'SUPPLIER', permissions: [] })
+    )
+    expect(withoutPermission.names).not.toContain('get_supplier_cross_sell_opportunities')
+    const belowScale = await resolveAvailableTools(
+      restaurantCtx({
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: [P.ORDERS_VIEW],
+      })
+    )
+    expect(belowScale.names).not.toContain('get_supplier_cross_sell_opportunities')
   })
 })

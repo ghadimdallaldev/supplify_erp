@@ -1240,3 +1240,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Change**: existing Assistant conversation tool now reads the Supplier Scale projected-stockout review under its matching source gates and quota.
 - **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
 - **Revisit when**: native Assistant tool invocation is scheduled; carry the same Supplier Scale, orders and warehouse permissions, forecast-capable smart-reorder, quota, and bounded-output semantics to Android and iOS.
+
+## 2026-09-24 - Supplier Assistant cross-sell opportunities
+
+- **Change**: existing Assistant conversation tool now reads Supplier Scale exact-product cross-sell evidence under its matching source gate and quota.
+- **Parity decision**: **No mobile contract work.** Native clients do not expose this Assistant tool registry; no endpoint, notification, permission, or navigation contract changed.
+- **Revisit when**: native Assistant tool invocation is scheduled; carry the same Supplier Scale, orders permission, quota, and bounded-output semantics to Android and iOS.

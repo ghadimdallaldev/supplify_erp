@@ -111,6 +111,12 @@ It uses recorded 30/90-day sales weighting and a seven-sale-day minimum. It does
 
 The summary only bounds and presents source highlights. It does not recalculate a source, create a composite score or target, or change stock, routing, transfers, orders, notifications, budgets, or central purchasing.
 
+## Supplier Assistant cross-sell opportunities (implemented)
+
+The existing Assistant registry exposes `get_supplier_cross_sell_opportunities`, which reuses the deterministic supplier cross-sell service. It is Supplier-scoped and requires `ORDERS_VIEW`, Assistant quota, and Supplier Scale. Its observation window is bounded to 30–365 days and results are capped at 15.
+
+It returns exact-product-pair evidence only; it cannot infer customer intent, create deals, messages, orders, notifications, budgets, central purchasing, or inventory mutations.
+
 ## Supplier Assistant projected stockout risks (implemented)
 
 The existing Assistant registry exposes `get_supplier_stockout_risks`, which reuses the deterministic supplier stockout-risk service. It is Supplier-scoped and requires `ORDERS_VIEW`, `WAREHOUSES_VIEW`, forecast-capable `smart_reorder`, Assistant quota, and Supplier Scale. Its horizon is bounded to 1–90 days and results are capped at 15.
