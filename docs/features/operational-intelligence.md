@@ -69,6 +69,12 @@ It examines a bounded 30–365 day window (default 180) of completed, non-cancel
 
 This is a human review signal only. It does not create or send a deal, message, price, order, notification, budget, or central-purchasing workflow.
 
+## Supplier sales opportunities, reorder, and churn (existing; verified)
+
+The existing supplier Command Center and `SupplierFollowUpPanel` already surface sales opportunities from `getReorderIntelligence`, `getSupplierReorderAssistance`, and `listSupplierAtRisk`. They identify restaurants past their observed reorder cadence, show a customer’s own frequently ordered products, and classify an extended cadence gap as a churn risk. The operations routes require `smart_reorder` and either `ORDERS_MANAGE` or `PROMOTIONS_MANAGE`; supplier identity is session-derived.
+
+The panel prepares an editable reminder draft and can optionally open a chat conversation. It does not automatically contact a restaurant, promise a sale, create a deal/order, change a price, or add budget or central-purchasing behavior. No duplicate service, endpoint, UI, or mobile contract was added during the 2026-09-24 verification.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:
