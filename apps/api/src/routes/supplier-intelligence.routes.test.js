@@ -7,6 +7,7 @@ const {
   listSupplierDemandForecast,
   listSupplierStockoutRisks,
   listSupplierCrossSellOpportunities,
+  listSupplierSuggestedDealCandidates,
   getRequestTenant,
   gates,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   listSupplierDemandForecast: vi.fn(),
   listSupplierStockoutRisks: vi.fn(),
   listSupplierCrossSellOpportunities: vi.fn(),
+  listSupplierSuggestedDealCandidates: vi.fn(),
   getRequestTenant: vi.fn(),
   gates: {
     inventory: true,
@@ -90,6 +92,9 @@ vi.mock('../services/supplier-stockout-intelligence.service.js', () => ({
 vi.mock('../services/supplier-cross-sell-intelligence.service.js', () => ({
   listSupplierCrossSellOpportunities,
 }))
+vi.mock('../services/supplier-suggested-deals-intelligence.service.js', () => ({
+  listSupplierSuggestedDealCandidates,
+}))
 
 const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
 
@@ -112,6 +117,11 @@ beforeEach(() => {
   listSupplierDemandForecast.mockResolvedValue({ forecasts: [], coverage: {}, horizonDays: 14 })
   listSupplierStockoutRisks.mockResolvedValue({ risks: [], coverage: {}, horizonDays: 14 })
   listSupplierCrossSellOpportunities.mockResolvedValue({ opportunities: [], observationDays: 180 })
+  listSupplierSuggestedDealCandidates.mockResolvedValue({
+    candidates: [],
+    coverage: {},
+    windowDays: 90,
+  })
 })
 
 describe('supplier slow-moving inventory route', () => {
@@ -147,6 +157,45 @@ describe('supplier slow-moving inventory route', () => {
   })
 })
 
+describe('supplier suggested deals route', () => {
+  it('requires warehouse and promotions permissions, both source features, and Supplier Scale in authorization order', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'PROMOTIONS_MANAGE', 'ORDERS_VIEW'])
+    const res = await request(buildApp())
+      .get('/api/supplier/suggested-deals?days=120&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({
+      ok: true,
+      data: { candidates: [] },
+      requestId: 'test-request',
+    })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:WAREHOUSES_VIEW',
+      'permission:PROMOTIONS_MANAGE',
+      'feature:inventory_management',
+      'feature:promotions',
+      'tier:scale',
+    ])
+    expect(listSupplierSuggestedDealCandidates).toHaveBeenCalledWith('supplier-1', {
+      days: '120',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke suggested-deal analysis without promotions permission or Scale intelligence', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW'])
+    await request(buildApp()).get('/api/supplier/suggested-deals').expect(403)
+    expect(listSupplierSuggestedDealCandidates).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'PROMOTIONS_MANAGE', 'ORDERS_VIEW'])
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/suggested-deals').expect(403)
+    expect(listSupplierSuggestedDealCandidates).not.toHaveBeenCalled()
+  })
+})
 describe('supplier cross-sell route', () => {
   it('requires order visibility and Supplier Scale before reading cross-sell evidence', async () => {
     const res = await request(buildApp())

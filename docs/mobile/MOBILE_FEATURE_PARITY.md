@@ -1186,3 +1186,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Parity decision**: **Skipped on mobile, intentionally.** Neither native app has a Supplier Command Center customer/product analytics review surface. An endpoint client and type with no visible native entry point would not provide parity.
 - **Contract impact on mobile**: none for existing native calls, types, navigation, notification payloads, or entitlement behavior.
 - **Revisit when**: native supplier customer/product analytics is scheduled; implement the endpoint type/query, order permission and Scale gate, and visible review UI on Android and iOS together.
+
+## 2026-09-24 - Supplier suggested deal reviews (web-only)
+
+- **Change**: a read-only Supplier Command Center review of slow-moving products not already targeted by active or pending product deals; it requires warehouse/promotions permissions, both source features, and Supplier Scale. It does not create or publish deals.
+- **Parity decision**: **Skipped on mobile, intentionally.** Neither native client has the supplier Command Center / promotions-review surface. A client without visible review and human approval would not provide parity.
+- **Revisit when**: native supplier operations and promotions review is scheduled; add the endpoint type/query, all gates, and visible review UI on Android and iOS together.

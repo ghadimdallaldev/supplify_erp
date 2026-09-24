@@ -196,6 +196,8 @@ Customer reorder prediction, churn/inactivity, cross-sell, sales-opportunity ale
 
 - [x] Supplier sales opportunities / reorder / churn — verified existing 2026-09-24. The established Command Center, `getReorderIntelligence`, `getSupplierReorderAssistance`, and cadence-at-risk flow already surface restaurants past observed reorder cadence, customer-specific frequent products, and a churn-risk label for an extended gap. `/reorder-intelligence` and `/reorder-assistance` are session-scoped and require `smart_reorder` plus `ORDERS_MANAGE` or `PROMOTIONS_MANAGE`; reminder messages are created as human-reviewed drafts, never auto-sent. No duplicate service, endpoint, UI, mobile contract, deal/order/price change, budget, or central purchasing was added. Next start at suggested deals only after confirming existing promotions/deal services do not already cover human-approved supplier offers.
 
+- [x] Supplier suggested deal reviews — implemented 2026-09-24. `GET /api/supplier/suggested-deals` reuses recorded slow-moving inventory and excludes exact products already targeted by active or pending product deals. It requires WAREHOUSES_VIEW, PROMOTIONS_MANAGE, inventory_management, promotions, and Supplier Scale; it is a human review only, never sets a discount or creates/submits/publishes a deal, message, stock change, budget, or central purchasing. Next start at supplier margin warnings only after verifying reliable supplier cost data exists.
+
 ### Phase 6 — Supplier Scale AI Assistant
 
 Same pattern: deterministic services calculate, assistant reads and explains.

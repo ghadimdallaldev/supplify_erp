@@ -75,6 +75,12 @@ The existing supplier Command Center and `SupplierFollowUpPanel` already surface
 
 The panel prepares an editable reminder draft and can optionally open a chat conversation. It does not automatically contact a restaurant, promise a sale, create a deal/order, change a price, or add budget or central-purchasing behavior. No duplicate service, endpoint, UI, or mobile contract was added during the 2026-09-24 verification.
 
+## Supplier suggested deal reviews (implemented)
+
+`GET /api/supplier/suggested-deals` is a Supplier Scale, read-only Command Center review. It requires `WAREHOUSES_VIEW`, `PROMOTIONS_MANAGE`, `inventory_management`, `promotions`, and Scale intelligence. It reuses slow-moving inventory and excludes exact products already targeted by active or pending product deals.
+
+It returns evidence only: recorded stock cover, completed-order sales, and an existing-deal exclusion. It does not infer a discount, create, submit, or publish a deal, message a restaurant, change stock, create a budget, or enable central purchasing. The supplier must use the existing promotions workflow for a human-reviewed deal.
+
 ## Price intelligence (implemented)
 
 `apps/api/src/services/restaurant-price-intelligence.service.js`, exposed on `/api/restaurant-intelligence`:

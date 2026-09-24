@@ -102,6 +102,15 @@
       "emptyTitle": "No cross-sell opportunities found",
       "emptyDescription": "Repeated completed-order product pairs are needed before this review can report an opportunity."
     },
+    "suggestedDeals": {
+      "title": "Suggested deal reviews",
+      "description": "Slow-moving products not already targeted by an active or pending product deal in the last {{days}} days; review before creating a deal.",
+      "loading": "Checking deal-review candidates…",
+      "item": "~{{cover}} days of recorded stock cover from {{sold}} sold in {{days}} days",
+      "reviewDeal": "Review deals",
+      "emptyTitle": "No deal reviews suggested",
+      "emptyDescription": "No eligible slow-moving products without an active or pending product deal were found."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",

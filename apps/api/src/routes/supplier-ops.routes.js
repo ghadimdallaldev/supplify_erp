@@ -34,6 +34,7 @@ import { listSupplierSlowMovingInventory } from '../services/supplier-slow-movin
 import { listSupplierDemandForecast } from '../services/supplier-demand-forecast.service.js'
 import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelligence.service.js'
 import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-sell-intelligence.service.js'
+import { listSupplierSuggestedDealCandidates } from '../services/supplier-suggested-deals-intelligence.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -286,12 +287,37 @@ async function requireSupplierForecastCapability(req, res, next) {
   }
 }
 
+const promotionsGate = requireFeature(
+  'promotions',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 const inventoryManagementGate = requireFeature(
   'inventory_management',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
 
+router.get(
+  '/suggested-deals',
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('PROMOTIONS_MANAGE'),
+  inventoryManagementGate,
+  promotionsGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierSuggestedDealCandidates(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
 router.get(
   '/cross-sell-opportunities',
   requirePermission('ORDERS_VIEW'),
