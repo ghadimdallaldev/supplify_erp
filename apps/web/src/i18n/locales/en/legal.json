@@ -23,6 +23,9 @@
     "footerPrivacy": "Privacy:",
     "footerAgreement": "By using Supplify, you agree to our <terms>Terms</terms>, <privacy>Privacy Policy</privacy>, and <legal>other legal agreements</legal>."
   },
+  "consumerGuestOrder": {
+    "notice": "By placing this order, you agree that {{restaurantName}} may use your contact and order details to prepare and fulfill your order. Supplify provides the ordering software. Read Supplify’s <privacy>Privacy Policy</privacy> and <terms>Terms</terms>."
+  },
   "reaccept": {
     "title": "Updated legal agreements",
     "description": "Our legal documents were updated (pack {{version}}{{previous}}). Review and accept the current agreements to continue using Supplify.",

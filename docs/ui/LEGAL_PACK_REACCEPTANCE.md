@@ -1,7 +1,7 @@
 # Legal pack re-acceptance on login
 
-**Pack version:** `2026-09-12`  
-**Introduced with:** Deals/Boosts legal terminology update + login gate
+**Pack version:** `2026-09-12` (from repo-root `legal-pack-version.json`)  
+**Note:** Legal markdown may update without a pack bump; bump the JSON only when re-acceptance is required.
 
 ---
 
@@ -37,7 +37,7 @@ Response includes `legalStatus`:
 | Field                 | Description                                      |
 | --------------------- | ------------------------------------------------ |
 | `needsReacceptance`   | `true` if any required document missing or stale |
-| `currentPackVersion`  | Active pack (`2026-09-12`)                       |
+| `currentPackVersion`  | Active pack (from `legal-pack-version.json`)     |
 | `acceptedPackVersion` | User’s latest version if uniform, else `null`    |
 | `requiredDocuments`   | Slugs user must accept                           |
 | `missingDocuments`    | Slugs not at current version                     |
@@ -91,11 +91,11 @@ Implementation: `resolveRequiredLegalDocuments()` in `apps/api/src/lib/legal-acc
 
 ## 5. Backend
 
-| Item            | Path                                                                        |
-| --------------- | --------------------------------------------------------------------------- |
-| Pack version    | `apps/web/src/lib/legalDocuments.ts`, `apps/api/src/lib/legal-documents.js` |
-| Status + record | `apps/api/src/lib/legal-acceptance.js`                                      |
-| Routes          | `apps/api/src/routes/auth.routes.js` (`/me`, `/legal-acceptance`)           |
+| Item            | Path                                                              |
+| --------------- | ----------------------------------------------------------------- |
+| Pack version    | `legal-pack-version.json` (imported by web + API)                 |
+| Status + record | `apps/api/src/lib/legal-acceptance.js`                            |
+| Routes          | `apps/api/src/routes/auth.routes.js` (`/me`, `/legal-acceptance`) |
 
 Validation rejects stale `packVersion` in payload (same as registration).
 

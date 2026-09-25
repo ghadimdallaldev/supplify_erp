@@ -23,6 +23,9 @@
     "footerPrivacy": "الخصوصية:",
     "footerAgreement": "باستخدامك سبلفاي فإنك توافق على <terms>الشروط والأحكام</terms> و<privacy>سياسة الخصوصية</privacy> و<legal>الاتفاقيات القانونية الأخرى</legal>."
   },
+  "consumerGuestOrder": {
+    "notice": "بتقديم هذا الطلب، فإنك توافق على أن {{restaurantName}} قد تستخدم بيانات الاتصال وتفاصيل طلبك لتحضير الطلب وتنفيذه. توفر Supplify برمجيات الطلب. اطّلع على <privacy>سياسة الخصوصية</privacy> و<terms>الشروط والأحكام</terms> الخاصة بـ Supplify."
+  },
   "reaccept": {
     "title": "اتفاقيات قانونية محدّثة",
     "description": "تم تحديث مستنداتنا القانونية (الحزمة {{version}}{{previous}}). راجع واقبل الاتفاقيات الحالية لمتابعة استخدام Supplify.",

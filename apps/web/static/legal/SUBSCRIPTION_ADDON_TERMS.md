@@ -1,7 +1,7 @@
 # Supplify Subscription, Billing, and Add-on Terms
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 
@@ -13,7 +13,9 @@ These Terms govern Supplify subscriptions, Free Trial, paid plans, add-ons, bill
 
 ## 2. Plans
 
-Supplify may offer Free Trial, Silver, Gold, Platinum, Enterprise, or other plans. Plans may differ by tenant type, features, limits, users, branches, warehouses, storage, order limits, deal limits, support level, and available tools.
+Supplify may offer a time-limited Free Trial (commonly 30 days), paid self-serve plans, Enterprise or custom plans, and add-ons. Customer-facing names may differ by tenant type—for example Restaurant Growth, Restaurant Intelligence, and Restaurant Scale for restaurants, and Supplier Growth and Supplier Scale for suppliers. Legacy or internal labels such as Silver, Gold, or Platinum may still appear in invoices, APIs, or admin records.
+
+Plans may differ by tenant type, features, limits, users, branches, warehouses, storage, order limits, deal limits, support level, and available tools. Published pricing and limits are described in-product and may change for future billing periods.
 
 ## 3. Free Trial
 

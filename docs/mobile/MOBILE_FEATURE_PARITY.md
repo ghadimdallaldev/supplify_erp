@@ -10,10 +10,11 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 ---
 
-## 2026-09-26 — Legal pack bump (`2026-09-26`)
+## 2026-09-26 — Legal copy refresh without pack bump
 
-- **Web + API:** Static legal markdown under `apps/web/static/legal/` (English and Arabic) updated for consumer guest ordering, staff portal labour features, Growth/Scale plan naming, live driver GPS disclosures, and read-only AI assistant language. `LEGAL_PACK_VERSION` bumped to `2026-09-26` in `apps/web/src/lib/legalDocuments.ts` and `apps/api/src/lib/legal-documents.js`; existing users will hit `/legal/reaccept` on next visit.
-- **Mobile:** Skipped — mobile apps load the same hosted legal URLs; no native code or API contract change beyond the pack version string returned by `GET /auth/me`.
+- **Web + API:** Static legal markdown updated (consumer guest ordering, staff portal, plan naming, GPS, AI assistant). **`legal-pack-version.json` stays `2026-09-12`** so registration and login are not broken by a web/API version mismatch or a forced mass re-acceptance before coordinated deploy. Web and API both import the same JSON file; `legal-pack-version-sync.test.js` guards drift.
+- **Web:** Public consumer checkout shows a short privacy notice (`ConsumerGuestPrivacyNotice`) linking to Supplify Terms and Privacy Policy.
+- **Mobile:** Skipped — hosted legal URLs only; `GET /auth/me` `legalStatus.currentPackVersion` unchanged until the JSON is bumped deliberately.
 
 ---
 

@@ -1,7 +1,7 @@
 # Supplify Mobile App Terms
 
-**Effective Date:** September 12, 2026  
-**Last Updated:** September 12, 2026
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 
@@ -9,7 +9,7 @@ Placeholders to replace before launch: `[Company Legal Name]`, `[Company Address
 
 ## 1. Scope
 
-These Mobile App Terms apply to Supplify mobile applications, mobile web views, driver views, staff views, push notifications, device permissions, and future mobile-specific features.
+These Mobile App Terms apply to Supplify mobile applications (including native Android and iOS apps), mobile web views, driver views, staff views, push notifications, device permissions, and other mobile-specific features.
 
 ## 2. Relationship to Main Terms
 
@@ -46,9 +46,9 @@ Drivers must not share devices or accounts and must update statuses truthfully.
 
 ## 7. Location Features
 
-If location tracking is introduced, Supplify will provide additional disclosures. Location may be used for delivery tracking, proof of delivery, ETA, route planning, and operational safety. Users may be required to consent where applicable.
+Location may be used for delivery tracking, proof of delivery, ETA, route planning, and operational safety. Users may be required to consent where applicable.
 
-The Supplify driver app requests background location permission to track delivery progress when the driver is marked active. If you are not a driver, the app does not use background location.
+The Supplify driver app requests background location permission to track delivery progress when the driver is marked active. If you are not a driver, the app does not use background location for delivery tracking.
 
 ## 8. Camera and Uploads
 
