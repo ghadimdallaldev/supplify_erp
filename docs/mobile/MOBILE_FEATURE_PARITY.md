@@ -2,6 +2,21 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-26 — Mobile UI/UX revamp (native only)
+
+- **Mobile (Android + iOS):** Operational UI redesign — shared design system, persona-specific tabs and task-focused home screens (Restaurant, Supplier, Driver). All existing features remain reachable via tabs, stacks, and More. No API, RBAC, entitlement, or workflow changes.
+- **ERP web:** Skipped — web UI unchanged.
+- **Verification:** `npx tsc --noEmit` in both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`.
+
+---
+
+## 2026-09-26 — Legal pack bump (`2026-09-26`)
+
+- **Web + API:** Static legal markdown under `apps/web/static/legal/` (English and Arabic) updated for consumer guest ordering, staff portal labour features, Growth/Scale plan naming, live driver GPS disclosures, and read-only AI assistant language. `LEGAL_PACK_VERSION` bumped to `2026-09-26` in `apps/web/src/lib/legalDocuments.ts` and `apps/api/src/lib/legal-documents.js`; existing users will hit `/legal/reaccept` on next visit.
+- **Mobile:** Skipped — mobile apps load the same hosted legal URLs; no native code or API contract change beyond the pack version string returned by `GET /auth/me`.
+
+---
+
 ## 2026-09-25 — Admin org context follows impersonation (server + web)
 
 - **API:** Platform ADMIN `/api/org` and `/api/restaurant-org` bind organization from the impersonated supplier/restaurant, not leftover personal org membership. Unscoped ADMIN cannot bind a leftover personal tenant from `active_tenant_token` (REST or sockets). Assistant restaurant org tools use the current restaurant’s `organization_id`.
