@@ -1,6 +1,15 @@
 /** @typedef {'RESTAURANT' | 'SUPPLIER'} TenantType */
 
-export const LEGAL_PACK_VERSION = '2026-09-12'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
+
+/** Must match `apps/web/src/lib/legalDocuments.ts` (single source: `legal-pack-version.json`). */
+export const LEGAL_PACK_VERSION = JSON.parse(
+  readFileSync(path.join(repoRoot, 'legal-pack-version.json'), 'utf8')
+).version
 
 /** Slugs stored in legal_acceptance.document_slug */
 export const LEGAL_DOCUMENT_SLUGS = {

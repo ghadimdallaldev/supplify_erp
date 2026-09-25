@@ -1,7 +1,7 @@
 # Supplify Privacy Policy
 
-**Effective Date:** September 12, 2026  
-**Last Updated:** September 12, 2026  
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026  
 **Operator:** [Company Legal Name]  
 **Contact:** [Privacy Email]
 
@@ -54,6 +54,25 @@ We may collect the following categories of data:
 - Notes and preferences
 - Cancellation/reschedule data
 - Public token or waitlist offer token
+
+### Consumer ordering and diner data
+
+- Diner name and contact details
+- Delivery or pickup preferences and addresses
+- Menu selections, modifiers, and order notes
+- Scheduled order times
+- Order and ticket status
+- Payment method selection (for example cash-on-delivery) where configured
+- Loyalty or rewards balances, redemptions, and earned points
+- Diner account identifiers where a restaurant offers member accounts
+- Reviews or feedback submitted through consumer channels
+
+### Staff portal and labour data
+
+- Shift schedules, clock-in/clock-out times, and time punches
+- Time-off and shift-swap requests
+- Job role or station assignments where recorded
+- Acknowledgments of announcements and staff document access logs
 
 ### Driver and delivery data
 
@@ -131,6 +150,8 @@ Depending on the situation, we process data because it is necessary to provide t
 
 Restaurants using public booking pages are responsible for informing guests about how their data is used and for honoring privacy obligations. Supplify processes guest reservation and waitlist data to provide booking, confirmation, management, waitlist, and notification functions.
 
+Restaurants offering consumer menus or guest ordering are responsible for informing diners about how their data is used, including loyalty programs and marketing where applicable. Supplify processes consumer order and diner account data to provide ordering, fulfillment tracking, notifications, payments configuration, and loyalty features configured by the restaurant.
+
 ## 6. Notifications
 
 We may send in-app, email, WhatsApp, SMS, and push notifications. Notification delivery may require sharing contact details and message content with third-party providers.
@@ -139,9 +160,9 @@ Users may manage certain notification preferences in their account or device set
 
 ## 7. Mobile App Data
 
-The mobile app may request device permissions for push notifications, camera/photos, file upload, and location if location-based features are enabled. You can manage device permissions through your device settings.
+Supplify mobile applications may request device permissions for push notifications, camera/photos, file upload, and location for driver delivery tracking and related operational features. You can manage device permissions through your device settings.
 
-If driver tracking or live location is added, Supplify will provide additional disclosures and may require explicit permission.
+For driver accounts, background location may be collected during active delivery sessions when the driver is marked on duty. Location collection stops when the session ends. Non-driver accounts do not use background location for delivery tracking.
 
 ## 8. AI-Assisted Features
 

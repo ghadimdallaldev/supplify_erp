@@ -51,6 +51,7 @@ import {
   CalendarClock,
 } from 'lucide-react'
 import { ensureNamespace } from '../../i18n'
+import { ConsumerGuestPrivacyNotice } from '../../components/consumer/ConsumerGuestPrivacyNotice'
 
 function parseTimeToMinutes(timeStr?: string | null): number | null {
   if (!timeStr) return null
@@ -772,6 +773,8 @@ export function ConsumerCheckoutPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ConsumerGuestPrivacyNotice restaurantName={restaurant?.name} className="px-1" />
 
           <Button
             type="submit"

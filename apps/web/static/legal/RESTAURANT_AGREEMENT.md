@@ -1,7 +1,7 @@
 # Supplify Restaurant Agreement
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 
@@ -9,7 +9,7 @@ Placeholders to replace before launch: `[Company Legal Name]`, `[Company Address
 
 ## 1. Scope
 
-This Restaurant Agreement applies to restaurants using Supplify to browse suppliers, place orders, manage receiving, disputes, invoices, reservations, waitlists, branches, staff, and related operations.
+This Restaurant Agreement applies to restaurants using Supplify to browse suppliers, place orders, manage receiving, disputes, invoices, reservations, waitlists, optional consumer menus and guest orders, branches, staff, and related operations.
 
 ## 2. Restaurant Status
 
@@ -40,6 +40,12 @@ Supplify is not responsible for guest no-shows, overbooking caused by incorrect 
 ## 7. Guest Data
 
 Restaurants must use guest data responsibly and only for lawful booking, communication, hospitality, and operational purposes. Restaurants must not misuse guest phone numbers, emails, notes, or preferences.
+
+## 7a. Consumer Menu and Guest Orders
+
+If the restaurant enables consumer ordering, the restaurant is responsible for menu content, pricing, modifiers, availability, ordering hours, delivery zones, minimum order rules, food safety, allergen disclosures, guest communication, fulfillment, loyalty rules, and compliance with applicable consumer laws.
+
+Consumer orders are separate from B2B supplier purchase orders. Supplify is not the restaurant operator or seller of meals to diners unless expressly agreed in writing.
 
 ## 8. Branches and Staff
 
