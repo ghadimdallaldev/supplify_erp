@@ -12,6 +12,33 @@ export function normalizePhone(phone) {
   return digits || null
 }
 
+export function guestFollowUpSuggestion(guest) {
+  const visits = Number(guest?.visit_count) || 0
+  const upcoming = Number(guest?.upcoming_count) || 0
+  const noShows = Number(guest?.no_show_count) || 0
+  if (visits >= 3) return 'VIP — consider a welcome perk or priority seating.'
+  if (upcoming > 0) return 'Upcoming visit — send a confirmation reminder.'
+  if (noShows > 0 && visits === 0) return 'No-show — confirm before seating this guest again.'
+  if (visits >= 2) return 'Repeat guest — thank them on their next visit.'
+  return null
+}
+
+export function summarizeGuestIntelligence(guests) {
+  const rows = Array.isArray(guests) ? guests : []
+  const repeatGuests = rows.filter((guest) => Number(guest.visit_count) >= 2)
+  const vipGuests = rows.filter((guest) => Number(guest.visit_count) >= 3)
+  const followUps = rows
+    .map((guest) => ({ ...guest, suggestion: guestFollowUpSuggestion(guest) }))
+    .filter((guest) => guest.suggestion)
+    .slice(0, 8)
+  return {
+    recentGuests: rows.slice(0, 10),
+    repeatGuests: repeatGuests.slice(0, 10),
+    vipGuests: vipGuests.slice(0, 5),
+    followUps,
+  }
+}
+
 export function normalizeEmail(email) {
   if (!email || typeof email !== 'string') return null
   const trimmed = email.trim().toLowerCase()
@@ -122,6 +149,19 @@ export async function recordGuestVisit(db, guestId, { noShow = false } = {}) {
     UPDATE reservation_guest
     SET visit_count = visit_count + 1,
         last_visit_at = now(),
+        updated_at = now()
+    WHERE id = $1
+    `,
+    [guestId]
+  )
+}
+
+export async function reverseGuestNoShow(db, guestId) {
+  if (!guestId) return
+  await db.query(
+    `
+    UPDATE reservation_guest
+    SET no_show_count = GREATEST(no_show_count - 1, 0),
         updated_at = now()
     WHERE id = $1
     `,

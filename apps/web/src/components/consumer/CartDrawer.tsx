@@ -49,7 +49,11 @@ export function CartDrawer({
                   <p className="text-xs text-muted-foreground">{formatModifierLabels(line)}</p>
                 )}
                 {line.notes && <p className="text-xs text-muted-foreground">Note: {line.notes}</p>}
-                <p className="mt-1 text-sm">{formatPrice(line.unitPrice)} each</p>
+                {'unavailable' in line && line.unavailable ? (
+                  <p className="mt-1 text-sm text-destructive">No longer available</p>
+                ) : (
+                  <p className="mt-1 text-sm">{formatPrice(line.unitPrice)} each</p>
+                )}
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-1">

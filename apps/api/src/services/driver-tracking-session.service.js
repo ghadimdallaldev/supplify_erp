@@ -131,6 +131,31 @@ export async function startTrackingSession({
   }
 }
 
+/** Point the route driver's live session at the stop that just left the warehouse. */
+export async function advanceTrackingSessionStop({
+  supplierId,
+  routeId,
+  stopId,
+  driverId = null,
+  client = null,
+}) {
+  if (!supplierId || !routeId || !stopId) return
+  const run = client ? client.query.bind(client) : query
+  const params = [supplierId, routeId, stopId]
+  let driverClause = ''
+  if (driverId) {
+    params.push(driverId)
+    driverClause = ` AND driver_id = $${params.length}`
+  }
+  await run(
+    `UPDATE driver_tracking_session
+     SET current_stop_id = $3, updated_at = now()
+     WHERE supplier_id = $1 AND route_id = $2 AND status = 'ACTIVE'
+       AND current_stop_id IS DISTINCT FROM $3${driverClause}`,
+    params
+  )
+}
+
 async function loadOwnedActiveSession(sessionId, supplierId, driverId) {
   const { rows } = await query(
     `SELECT s.*, rs.order_id AS current_order_id

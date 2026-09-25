@@ -25,7 +25,7 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { RequirePermission } from '../components/RequirePermission'
 import { usePermissions } from '../hooks/usePermissions'
-import { formatPrice } from '../utils/format'
+import { formatCurrency } from '../utils/format'
 import { toast } from 'sonner'
 import { Loader2, Plus, Pencil, Ban, Search } from 'lucide-react'
 import {
@@ -67,8 +67,21 @@ type ContractPricingRow = Record<string, unknown>
 
 type ContractDisplayStatus = 'active' | 'inactive' | 'expired' | 'scheduled'
 
+function localTodayKey() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function contractMoney(amount: number, currency: unknown) {
+  const code = typeof currency === 'string' && currency ? currency : 'USD'
+  return formatCurrency(amount, { currency: code })
+}
+
 function getContractDisplayStatus(row: Record<string, unknown>): ContractDisplayStatus {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localTodayKey()
   if (row.is_active === false) return 'inactive'
   const start = row.contract_start_date ? String(row.contract_start_date).slice(0, 10) : null
   const end = row.contract_end_date ? String(row.contract_end_date).slice(0, 10) : null
@@ -84,6 +97,7 @@ function contractStatusLabel(status: ContractDisplayStatus, t: (key: string) => 
     case 'expired':
       return t('pricing.statusExpired')
     case 'scheduled':
+      return t('pricing.statusScheduled')
     case 'inactive':
     default:
       return t('pricing.statusInactive')
@@ -191,12 +205,18 @@ export function ContractPricingPage() {
       price,
       contractDiscountPercentage: form.contractDiscountPercentage
         ? parseFloat(form.contractDiscountPercentage)
-        : undefined,
-      contractStartDate: form.contractStartDate || undefined,
-      contractEndDate: form.contractEndDate || undefined,
+        : editingId
+          ? null
+          : undefined,
+      contractStartDate: form.contractStartDate || (editingId ? null : undefined),
+      contractEndDate: form.contractEndDate || (editingId ? null : undefined),
       agreementType: form.agreementType,
-      minOrderQuantity: form.minOrderQuantity ? parseFloat(form.minOrderQuantity) : undefined,
-      notes: form.notes || undefined,
+      minOrderQuantity: form.minOrderQuantity
+        ? parseFloat(form.minOrderQuantity)
+        : editingId
+          ? null
+          : undefined,
+      notes: form.notes || (editingId ? null : undefined),
     }
 
     try {
@@ -309,7 +329,8 @@ export function ContractPricingPage() {
                 tableMinWidth={720}
                 renderCard={(row) => {
                   const displayStatus = getContractDisplayStatus(row)
-                  const isEffectivelyActive = displayStatus === 'active'
+                  const isEffectivelyActive =
+                    displayStatus === 'active' || displayStatus === 'scheduled'
                   return (
                     <div className="space-y-3 p-4">
                       <div className="flex items-start justify-between gap-2">
@@ -329,7 +350,7 @@ export function ContractPricingPage() {
                           <p className="text-xs text-[var(--text-muted)]">{t('pricing.catalog')}</p>
                           <p>
                             {row.catalog_price != null
-                              ? formatPrice(Number(row.catalog_price))
+                              ? contractMoney(Number(row.catalog_price), row.currency)
                               : '—'}
                           </p>
                         </div>
@@ -337,7 +358,9 @@ export function ContractPricingPage() {
                           <p className="text-xs text-[var(--text-muted)]">
                             {t('pricing.contract')}
                           </p>
-                          <p className="font-semibold">{formatPrice(Number(row.price))}</p>
+                          <p className="font-semibold">
+                            {contractMoney(Number(row.price), row.currency)}
+                          </p>
                         </div>
                       </div>
                       {canManage && (
@@ -403,7 +426,8 @@ export function ContractPricingPage() {
                 }
                 renderTableRow={(row) => {
                   const displayStatus = getContractDisplayStatus(row)
-                  const isEffectivelyActive = displayStatus === 'active'
+                  const isEffectivelyActive =
+                    displayStatus === 'active' || displayStatus === 'scheduled'
                   return (
                     <tr className="border-b border-[var(--app-border)]">
                       <td className="px-4 py-3">{String(row.restaurant_name)}</td>
@@ -414,10 +438,12 @@ export function ContractPricingPage() {
                         </div>
                       </td>
                       <td className={cn('px-4 py-3', responsiveDataListClasses.columnSecondary)}>
-                        {row.catalog_price != null ? formatPrice(Number(row.catalog_price)) : '—'}
+                        {row.catalog_price != null
+                          ? contractMoney(Number(row.catalog_price), row.currency)
+                          : '—'}
                       </td>
                       <td className="px-4 py-3 font-semibold">
-                        {formatPrice(Number(row.price))}
+                        {contractMoney(Number(row.price), row.currency)}
                         {row.contract_discount_percentage != null && (
                           <Badge variant="outline" className="ml-2 text-xs">
                             {t('pricing.discountOff', {
@@ -627,9 +653,7 @@ export function ContractPricingPage() {
                       onChange={(event) =>
                         setForm({
                           ...form,
-                          contractEndDate: event.target.checked
-                            ? ''
-                            : new Date().toISOString().slice(0, 10),
+                          contractEndDate: event.target.checked ? '' : localTodayKey(),
                         })
                       }
                     />

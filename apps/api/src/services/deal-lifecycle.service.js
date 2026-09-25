@@ -100,6 +100,71 @@ export function resolveStatusAfterApproval(deal, { activationAmount = 0, now = n
   })
 }
 
+/** Draft stays a draft until the supplier submits it. Approval is a later step. */
+export function resolveInitialDealStatus(submitForReview) {
+  return submitForReview ? DEAL_STATUSES.PENDING_APPROVAL : DEAL_STATUSES.DRAFT
+}
+
+/**
+ * Supplier create/edit rules shared by web and mobile.
+ * @returns {string|null} user-facing error, or null when the offer is valid
+ */
+export function getDealFieldError(fields, { requireDescription = true } = {}) {
+  const description = fields.description == null ? '' : String(fields.description).trim()
+  if (requireDescription && !description) return 'Describe what this deal is about'
+  if (fields.description != null && !description) return 'Describe what this deal is about'
+  if (description.length > 1000) return 'Deal description must be 1000 characters or fewer'
+
+  const type = fields.type
+  const rawDiscount = fields.discountValue
+  const hasDiscount = rawDiscount != null && rawDiscount !== ''
+  const discount = hasDiscount ? Number(rawDiscount) : null
+
+  if (type === 'percentage_discount') {
+    if (discount == null || !Number.isFinite(discount) || discount <= 0 || discount > 100) {
+      return 'Percentage discounts must be greater than 0 and at most 100'
+    }
+  } else if (type === 'fixed_discount') {
+    if (discount == null || !Number.isFinite(discount) || discount <= 0) {
+      return 'Fixed discounts must be greater than zero'
+    }
+  } else if (type === 'buy_x_get_y') {
+    const buy = Number(fields.buyQuantity)
+    const get = Number(fields.getQuantity)
+    if (!Number.isInteger(buy) || buy <= 0 || !Number.isInteger(get) || get <= 0) {
+      return 'Buy X Get Y deals need a buy quantity and a free quantity'
+    }
+  } else if (type === 'free_shipping' && hasDiscount) {
+    if (!Number.isFinite(discount) || discount < 0) return 'Free delivery amount cannot be negative'
+  }
+
+  if (fields.startsAt && fields.endsAt) {
+    const start = new Date(fields.startsAt)
+    const end = new Date(fields.endsAt)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return 'Deal end must be after the start'
+    }
+  }
+
+  if (fields.ctaType === 'use_coupon') {
+    const code = fields.couponCode == null ? '' : String(fields.couponCode).trim()
+    if (!code) return 'Coupon deals need a coupon code'
+  }
+
+  return null
+}
+
+/** Resume a paused deal, or expire it when the boost or offer window has already ended. */
+export function resolveResumeStatus(deal, now = new Date()) {
+  const ts = now instanceof Date ? now : new Date(now)
+  if (deal?.boost_end_at && new Date(deal.boost_end_at) <= ts) return DEAL_STATUSES.EXPIRED
+  if (deal?.ends_at && new Date(deal.ends_at) <= ts) return DEAL_STATUSES.EXPIRED
+  return resolveScheduledOrActive(deal, {
+    payment_status: deal?.payment_status || PAYMENT_STATUSES.NOT_REQUIRED,
+    now: ts,
+  }).status
+}
+
 export function resolveScheduledOrActive(
   deal,
   { payment_status = PAYMENT_STATUSES.PAID, now = new Date() } = {}

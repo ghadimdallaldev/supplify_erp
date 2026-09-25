@@ -15,6 +15,9 @@ import {
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../lib/smart-reorder-tier.js'
+import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { config } from '../config/env.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { writeAuditLog } from '../lib/audit.js'
@@ -27,6 +30,14 @@ import { ValidationError, ConflictError } from '../middlewares/errorHandler.js'
 import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getSupplierCommandCenter } from '../services/supplier-command-center.service.js'
+import { listSupplierSlowMovingInventory } from '../services/supplier-slow-moving-intelligence.service.js'
+import { listSupplierDemandForecast } from '../services/supplier-demand-forecast.service.js'
+import { listSupplierStockoutRisks } from '../services/supplier-stockout-intelligence.service.js'
+import { listSupplierCrossSellOpportunities } from '../services/supplier-cross-sell-intelligence.service.js'
+import { listSupplierSuggestedDealCandidates } from '../services/supplier-suggested-deals-intelligence.service.js'
+import { listSupplierWarehousePerformance } from '../services/supplier-warehouse-performance-intelligence.service.js'
+import { listSupplierWarehouseDemandForecast } from '../services/supplier-warehouse-demand-forecast.service.js'
+import { getSupplierWeeklyIntelligenceSummary } from '../services/supplier-weekly-intelligence-summary.service.js'
 import { getSupplierRunSheet } from '../services/supplier-run-sheet.service.js'
 import {
   getReorderIntelligence,
@@ -95,6 +106,12 @@ const router = express.Router()
 
 const financeGate = requireFeature(
   'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+const apiIntegrationsGate = requireFeature(
+  'api_integrations',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -215,12 +232,13 @@ const imageImportPresignSchema = z.object({
   jobId: z.string().uuid().optional(),
 })
 
-const commandCenterGate = requireAnyPermission(
+const commandCenterGate = requireAnyPermission('ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW')
+
+const runSheetGate = requireAnyPermission(
   'ORDERS_MANAGE',
-  'INVOICES_VIEW',
-  'CATALOG_EDIT',
   'FULFILLMENT_VIEW',
-  'PROMOTIONS_MANAGE'
+  'INVOICES_VIEW',
+  'DRIVER_DELIVERIES_VIEW'
 )
 
 router.get('/command-center', commandCenterGate, async (req, res, next) => {
@@ -238,7 +256,7 @@ const runSheetDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
   .optional()
 
-router.get('/run-sheet', commandCenterGate, async (req, res, next) => {
+router.get('/run-sheet', runSheetGate, async (req, res, next) => {
   try {
     const supplierId = await resolveSupplier(req)
     const parsedDate = runSheetDateSchema.safeParse(req.query.date)
@@ -256,6 +274,208 @@ const smartReorderGate = requireFeature(
   'smart_reorder',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
+)
+
+async function requireSupplierForecastCapability(req, res, next) {
+  try {
+    const featureValue = await getResolvedFeatureValue(
+      req.tenantContext?.tenantId,
+      req.tenantContext?.tenantType,
+      'smart_reorder'
+    )
+    if (!hasSmartReorderCapability(featureValue, 'forecast')) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FEATURE_NOT_AVAILABLE', message: 'Forecasting capability is required' },
+        requestId: req.requestId,
+      })
+    }
+    return next()
+  } catch (err) {
+    return next(err)
+  }
+}
+
+const promotionsGate = requireFeature(
+  'promotions',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+const inventoryManagementGate = requireFeature(
+  'inventory_management',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+const warehousesGate = requireFeature(
+  'warehouses',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+const multiWarehouseGate = requireFeature(
+  'multi_warehouse',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+router.get(
+  '/weekly-intelligence-summary',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('FULFILLMENT_VIEW'),
+  inventoryManagementGate,
+  warehousesGate,
+  fulfillmentGate,
+  multiWarehouseGate,
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await getSupplierWeeklyIntelligenceSummary(supplierId, { days: req.query.days })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/warehouse-demand-forecast',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  multiWarehouseGate,
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierWarehouseDemandForecast(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/warehouse-performance',
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('FULFILLMENT_VIEW'),
+  warehousesGate,
+  fulfillmentGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierWarehousePerformance(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/suggested-deals',
+  requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('PROMOTIONS_MANAGE'),
+  inventoryManagementGate,
+  promotionsGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierSuggestedDealCandidates(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/cross-sell-opportunities',
+  requirePermission('ORDERS_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierCrossSellOpportunities(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/stockout-risks',
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('WAREHOUSES_VIEW'),
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierStockoutRisks(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/demand-forecast',
+  requirePermission('ORDERS_VIEW'),
+  smartReorderGate,
+  requireSupplierForecastCapability,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierDemandForecast(supplierId, {
+        horizonDays: req.query.horizon_days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+router.get(
+  '/slow-moving-inventory',
+  requirePermission('WAREHOUSES_VIEW'),
+  inventoryManagementGate,
+  requireIntelligenceTier('scale'),
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplier(req)
+      const data = await listSupplierSlowMovingInventory(supplierId, {
+        days: req.query.days,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
 )
 
 router.get(
@@ -387,6 +607,7 @@ router.get(
   '/invoices/receivables/statement/:restaurantId',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -414,6 +635,7 @@ router.get(
   '/invoices/export.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -431,6 +653,7 @@ router.get(
   '/invoices/export/quickbooks.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -447,6 +670,7 @@ router.get(
   '/payments/export.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -463,6 +687,7 @@ router.get(
   '/accounting/summary.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -1178,15 +1403,13 @@ router.post(
         replacementUnit: body.replacementUnit,
         message: body.message,
       }
-      const result = body.replacementProductId
-        ? await createSubstitutionIssue({
-            ...common,
-            substituteProductId: body.replacementProductId,
-          })
-        : await createShortageIssue({
-            ...common,
-            shortageQuantity: body.shortageQuantity,
-          })
+      if (body.replacementProductId) {
+        throw new ValidationError('Report a substitution on the substitution endpoint')
+      }
+      const result = await createShortageIssue({
+        ...common,
+        shortageQuantity: body.shortageQuantity,
+      })
       res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

@@ -38,6 +38,7 @@ import {
 } from '../../lib/subscription-addons.js'
 import { getAllowedFeatureKeys, featureDisplayName } from '../../lib/feature-keys.js'
 import {
+  evaluatePlanFeatureValue,
   listGlobalFeatureFlags,
   setGlobalFeatureOverride,
   listTenantFeatureOverrides,
@@ -814,6 +815,22 @@ router.put('/tenants/:tenantType/:id/subscription-addons/:addonKey', async (req,
         error: {
           name: 'VALIDATION_ERROR',
           message: "This add-on is not available for the tenant's current plan",
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    if (
+      body.quantity > 0 &&
+      !evaluatePlanFeatureValue(entitlements?.features?.feature_flags_access)
+    ) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FEATURE_NOT_AVAILABLE',
+          message: 'Add-on provisioning requires feature flag access on this plan',
+          details: { featureKey: 'feature_flags_access' },
         },
         requestId: req.requestId,
       })

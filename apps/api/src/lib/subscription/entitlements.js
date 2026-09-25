@@ -526,6 +526,161 @@ export async function incrementDailyUsageMeterInTransaction(
   }
 }
 
+async function readUserAiCurrent(userId, tenantId, tenantType, meterType, periodStart = null) {
+  const { rows } = await query(
+    `SELECT current_value
+     FROM user_ai_request_usage
+     WHERE user_id = $1
+       AND tenant_id = $2
+       AND tenant_type = $3
+       AND meter_type = $4
+       AND period_start_date = COALESCE($5::date, CURRENT_DATE)`,
+    [userId, tenantId, tenantType, meterType, periodStart]
+  )
+  return parseInt(rows[0]?.current_value || 0, 10)
+}
+
+async function incrementUserDailyAiUsageInTransaction(
+  client,
+  userId,
+  tenantId,
+  tenantType,
+  increment,
+  resolved
+) {
+  if (!resolved) return { allowed: false, current: 0, limit: 0 }
+
+  const inc = Number(increment) || 0
+  if (inc <= 0) return { allowed: true }
+  const meterType = 'ai_requests_per_day'
+
+  if (resolved.isUnlimited) {
+    const { rows } = await client.query(
+      `INSERT INTO user_ai_request_usage (
+         user_id, tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date
+       ) VALUES ($1, $2, $3, $4, $5, 'DAILY', CURRENT_DATE)
+       ON CONFLICT (user_id, tenant_id, tenant_type, meter_type, period_start_date)
+       DO UPDATE SET
+         current_value = user_ai_request_usage.current_value + EXCLUDED.current_value,
+         last_updated = now()
+       RETURNING current_value`,
+      [userId, tenantId, tenantType, meterType, inc]
+    )
+    return { allowed: true, current: parseInt(rows[0]?.current_value || inc, 10), limit: null }
+  }
+
+  const effectiveLimit = resolved.effectiveLimit
+  await client.query(
+    `INSERT INTO user_ai_request_usage (
+       user_id, tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date, limit_value
+     ) VALUES ($1, $2, $3, $4, 0, 'DAILY', CURRENT_DATE, $5)
+     ON CONFLICT (user_id, tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING`,
+    [userId, tenantId, tenantType, meterType, effectiveLimit]
+  )
+
+  const { rows: updated } = await client.query(
+    `UPDATE user_ai_request_usage
+     SET current_value = current_value + $5,
+         last_updated = now(),
+         is_over_limit = (current_value + $5) >= $6,
+         limit_value = COALESCE(limit_value, $6)
+     WHERE user_id = $1
+       AND tenant_id = $2
+       AND tenant_type = $3
+       AND meter_type = $4
+       AND period_start_date = CURRENT_DATE
+       AND current_value + $5 <= $6
+     RETURNING current_value`,
+    [userId, tenantId, tenantType, meterType, inc, effectiveLimit]
+  )
+  if (updated.length) {
+    return { allowed: true, current: parseInt(updated[0].current_value, 10), limit: effectiveLimit }
+  }
+
+  const { rows: locked } = await client.query(
+    `SELECT current_value FROM user_ai_request_usage
+     WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 AND meter_type = $4
+       AND period_start_date = CURRENT_DATE
+     FOR UPDATE`,
+    [userId, tenantId, tenantType, meterType]
+  )
+  const current = locked.length > 0 ? parseInt(locked[0].current_value || 0, 10) : 0
+  if (current + inc > effectiveLimit) {
+    throw new DailyUsageLimitExceededError(current, effectiveLimit)
+  }
+  throw new DailyUsageLimitExceededError(current, effectiveLimit)
+}
+
+async function incrementUserTrialAiUsageInTransaction(
+  client,
+  userId,
+  tenantId,
+  tenantType,
+  subscription,
+  increment
+) {
+  const limit = AI_TRIAL_TOTAL_LIMITS[tenantType] ?? 0
+  const inc = Number(increment) || 0
+  if (inc <= 0) return { allowed: true }
+
+  const periodStart = subscription.current_period_start || subscription.created_at || new Date()
+  const periodEnd = subscription.free_sandbox_expires_at || null
+  await client.query(
+    `INSERT INTO user_ai_request_usage (
+       user_id, tenant_id, tenant_type, meter_type, current_value, period_type,
+       period_start_date, period_end_date, limit_value
+     ) VALUES ($1, $2, $3, $4, 0, 'Billing Cycle', $5::date, $6::date, $7)
+     ON CONFLICT (user_id, tenant_id, tenant_type, meter_type, period_start_date) DO NOTHING`,
+    [userId, tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart, periodEnd, limit]
+  )
+
+  const { rows: updated } = await client.query(
+    `UPDATE user_ai_request_usage SET
+       current_value = current_value + $6,
+       last_updated = now(),
+       limit_value = $7,
+       is_over_limit = (current_value + $6) >= $7
+     WHERE user_id = $1
+       AND tenant_id = $2
+       AND tenant_type = $3
+       AND meter_type = $4
+       AND period_start_date = $5::date
+       AND current_value + $6 <= $7
+     RETURNING current_value`,
+    [userId, tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart, inc, limit]
+  )
+
+  const resetAt = periodEnd ? new Date(periodEnd).toISOString() : null
+  if (updated.length) {
+    return {
+      allowed: true,
+      current: parseInt(updated[0].current_value, 10),
+      limit,
+      meterType: AI_TRIAL_METER_TYPE,
+      periodType: 'trial_total',
+      resetAt,
+      trialPool: true,
+    }
+  }
+
+  const { rows } = await client.query(
+    `SELECT current_value FROM user_ai_request_usage
+     WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3 AND meter_type = $4
+       AND period_start_date = $5::date
+     FOR UPDATE`,
+    [userId, tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart]
+  )
+  return {
+    allowed: false,
+    current: parseInt(rows[0]?.current_value || 0, 10),
+    limit,
+    meterType: AI_TRIAL_METER_TYPE,
+    periodType: 'trial_total',
+    resetAt,
+    trialPool: true,
+  }
+}
+
 /**
  * Atomic check and increment for daily usage meters (orders_per_day, chats_per_day).
  * Uses transaction + row lock to avoid race conditions. Use this instead of checkLimit + incrementUsage for these meters.
@@ -626,9 +781,75 @@ async function incrementTrialAiUsageInTransaction(
   }
 }
 
-export async function reserveAiUsage(tenantId, tenantType = 'RESTAURANT', increment = 1) {
+function aiUsageResetAt() {
+  return new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString()
+}
+
+export async function reserveAiUsage(
+  tenantId,
+  tenantType = 'RESTAURANT',
+  increment = 1,
+  userId = null
+) {
   const subscription = await getTenantSubscription(tenantId, tenantType)
-  if (!subscription) return { allowed: false, current: 0, limit: 0 }
+  if (!subscription) return { allowed: false, current: 0, limit: 0, userId: userId || null }
+
+  if (userId) {
+    if (isFreeTrialSubscription(subscription)) {
+      const usage = await withTransaction((client) =>
+        incrementUserTrialAiUsageInTransaction(
+          client,
+          userId,
+          tenantId,
+          tenantType,
+          subscription,
+          increment
+        )
+      )
+      return { ...usage, userId }
+    }
+
+    const enforcement = await resolveDailyMeterEnforcementFromSubscription(
+      subscription,
+      tenantId,
+      tenantType,
+      'ai_requests_per_day'
+    )
+    try {
+      const usage = await withTransaction((client) =>
+        incrementUserDailyAiUsageInTransaction(
+          client,
+          userId,
+          tenantId,
+          tenantType,
+          increment,
+          enforcement.resolved
+        )
+      )
+      return {
+        ...usage,
+        userId,
+        meterType: 'ai_requests_per_day',
+        periodType: 'daily',
+        resetAt: aiUsageResetAt(),
+        trialPool: false,
+      }
+    } catch (err) {
+      if (err instanceof DailyUsageLimitExceededError) {
+        return {
+          allowed: false,
+          current: err.current,
+          limit: err.limit,
+          userId,
+          meterType: 'ai_requests_per_day',
+          periodType: 'daily',
+          resetAt: aiUsageResetAt(),
+          trialPool: false,
+        }
+      }
+      throw err
+    }
+  }
 
   if (isFreeTrialSubscription(subscription)) {
     return withTransaction((client) =>
@@ -641,7 +862,7 @@ export async function reserveAiUsage(tenantId, tenantType = 'RESTAURANT', increm
     ...usage,
     meterType: 'ai_requests_per_day',
     periodType: 'daily',
-    resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString(),
+    resetAt: aiUsageResetAt(),
     trialPool: false,
   }
 }
@@ -653,13 +874,34 @@ export async function refundReservedAiUsage(
   decrement = 1
 ) {
   const meterType = reservation?.meterType || 'ai_requests_per_day'
+  const userId = reservation?.userId || null
   const subscription = await getTenantSubscription(tenantId, tenantType)
   const periodStart =
     meterType === AI_TRIAL_METER_TYPE && subscription
       ? subscription.current_period_start || subscription.created_at || new Date()
       : null
+  const amount = Math.max(1, Number(decrement) || 1)
 
   try {
+    if (userId) {
+      await query(
+        `UPDATE user_ai_request_usage
+         SET current_value = GREATEST(0, current_value - $6),
+             last_updated = now(),
+             is_over_limit = CASE
+               WHEN limit_value IS NULL THEN false
+               ELSE GREATEST(0, current_value - $6) >= limit_value
+             END
+         WHERE user_id = $1
+           AND tenant_id = $2
+           AND tenant_type = $3
+           AND meter_type = $4
+           AND period_start_date = COALESCE($5::date, CURRENT_DATE)`,
+        [userId, tenantId, tenantType, meterType, periodStart, amount]
+      )
+      return
+    }
+
     await query(
       `UPDATE usage_meter
        SET current_value = GREATEST(0, current_value - $5),
@@ -672,26 +914,23 @@ export async function refundReservedAiUsage(
          AND tenant_type = $2
          AND meter_type = $3
          AND period_start_date = COALESCE($4::date, CURRENT_DATE)`,
-      [tenantId, tenantType, meterType, periodStart, Math.max(1, Number(decrement) || 1)]
+      [tenantId, tenantType, meterType, periodStart, amount]
     )
   } catch {
     // Best-effort only; never fail the caller because a refund could not be recorded.
   }
 }
 
-export async function getAiUsageSummary(tenantId, tenantType = 'RESTAURANT') {
+export async function getAiUsageSummary(tenantId, tenantType = 'RESTAURANT', userId = null) {
   const subscription = await getTenantSubscription(tenantId, tenantType)
   if (!subscription) return null
 
   if (isFreeTrialSubscription(subscription)) {
     const limit = AI_TRIAL_TOTAL_LIMITS[tenantType] ?? 0
     const periodStart = subscription.current_period_start || subscription.created_at || new Date()
-    const { rows } = await query(
-      `SELECT current_value FROM usage_meter
-       WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = $4::date`,
-      [tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart]
-    )
-    const current = parseInt(rows[0]?.current_value || 0, 10)
+    const current = userId
+      ? await readUserAiCurrent(userId, tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart)
+      : await readTenantMeterCurrent(tenantId, tenantType, AI_TRIAL_METER_TYPE, periodStart)
     return {
       meterType: AI_TRIAL_METER_TYPE,
       periodType: 'trial_total',
@@ -702,6 +941,32 @@ export async function getAiUsageSummary(tenantId, tenantType = 'RESTAURANT') {
         ? new Date(subscription.free_sandbox_expires_at).toISOString()
         : null,
       trialPool: true,
+      userId: userId || null,
+    }
+  }
+
+  if (userId) {
+    const enforcement = await resolveDailyMeterEnforcementFromSubscription(
+      subscription,
+      tenantId,
+      tenantType,
+      'ai_requests_per_day'
+    )
+    const limit = !enforcement.resolved
+      ? 0
+      : enforcement.resolved.isUnlimited
+        ? null
+        : enforcement.resolved.effectiveLimit
+    const current = await readUserAiCurrent(userId, tenantId, tenantType, 'ai_requests_per_day')
+    return {
+      meterType: 'ai_requests_per_day',
+      periodType: 'daily',
+      current,
+      limit,
+      remaining: limit == null ? null : Math.max(0, limit - current),
+      resetAt: aiUsageResetAt(),
+      trialPool: false,
+      userId,
     }
   }
 
@@ -712,8 +977,34 @@ export async function getAiUsageSummary(tenantId, tenantType = 'RESTAURANT') {
     current: daily.current,
     limit: daily.limit,
     remaining: daily.limit == null ? null : Math.max(0, daily.limit - daily.current),
-    resetAt: new Date(new Date().setUTCHours(24, 0, 0, 0)).toISOString(),
+    resetAt: aiUsageResetAt(),
     trialPool: false,
+    userId: null,
+  }
+}
+
+async function readTenantMeterCurrent(tenantId, tenantType, meterType, periodStart) {
+  const { rows } = await query(
+    `SELECT current_value FROM usage_meter
+     WHERE tenant_id = $1 AND tenant_type = $2 AND meter_type = $3 AND period_start_date = $4::date`,
+    [tenantId, tenantType, meterType, periodStart]
+  )
+  return parseInt(rows[0]?.current_value || 0, 10)
+}
+
+async function withRequesterAiUsage(payload, req) {
+  if (!payload) return payload
+  const userId = req?.userData?.id
+  if (!userId) return payload
+  const summary = await getAiUsageSummary(payload.tenantId, payload.tenantType, userId)
+  if (!summary) return payload
+  return {
+    ...payload,
+    usage: {
+      ...(payload.usage || {}),
+      ai_requests_per_day: summary.current,
+    },
+    aiUsage: summary,
   }
 }
 /**
@@ -1012,7 +1303,29 @@ async function getUsageSnapshot(tenantId, tenantType) {
     })
   }
 
+  await applyPerUserAiUsageTotal(usage, tenantId, tenantType)
   return usage
+}
+
+async function applyPerUserAiUsageTotal(usage, tenantId, tenantType) {
+  try {
+    const { rows } = await query(
+      `SELECT COALESCE(SUM(current_value), 0)::int AS total
+       FROM user_ai_request_usage
+       WHERE tenant_id = $1
+         AND tenant_type = $2
+         AND meter_type = 'ai_requests_per_day'
+         AND period_start_date = CURRENT_DATE`,
+      [tenantId, tenantType]
+    )
+    if (rows[0] && rows[0].total != null) {
+      usage.ai_requests_per_day = parseInt(rows[0].total, 10) || 0
+    }
+  } catch (error) {
+    if (error.code !== '42P01') {
+      logger.warn('Per-user AI usage total failed', { tenantId, tenantType, error: error.message })
+    }
+  }
 }
 
 /**
@@ -1022,7 +1335,7 @@ async function getUsageSnapshot(tenantId, tenantType) {
  * @param {string} tenantType - 'RESTAURANT' | 'SUPPLIER'
  * @returns {Promise<Object|null>} Entitlements object or null if no subscription
  */
-export async function getEntitlements(tenantId, tenantType, req = null) {
+async function loadEntitlements(tenantId, tenantType, req = null) {
   const cacheKey = entitlementsCacheKey(tenantId, tenantType)
   const cached = await getCache(cacheKey)
   if (cached !== null) {
@@ -1308,6 +1621,11 @@ export async function getEntitlements(tenantId, tenantType, req = null) {
   })
 }
 
+export async function getEntitlements(tenantId, tenantType, req = null) {
+  const payload = await loadEntitlements(tenantId, tenantType, req)
+  return withRequesterAiUsage(payload, req)
+}
+
 /**
  * Check headroom and record bytes against storage_mb (cumulative meter).
  * Call when a file is committed (presign approved, attachment saved, etc.).
@@ -1550,7 +1868,9 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
       }
 
       const { resolveOrgBillingTenantId } = await import('../org-billing-tenant.js')
-      const { resolveFeatureEnabled, FEATURE_ALIASES } = await import('../feature-flags.js')
+      const { resolveFeatureEnabled, shouldAliasAfterResolution, FEATURE_ALIASES } = await import(
+        '../feature-flags.js'
+      )
       const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
       const planFeatures = subscription
         ? await resolveEffectivePlanFeatures(subscription)
@@ -1561,8 +1881,7 @@ export function requireFeature(featureKey, getTenantId, getTenantType) {
         featureKey,
         planFeatures
       )
-      const { shouldResolveFeatureAlias } = await import('../feature-flags.js')
-      if (!featureResult.enabled && shouldResolveFeatureAlias(featureKey, planFeatures)) {
+      if (shouldAliasAfterResolution(featureResult, featureKey, planFeatures)) {
         featureResult = await resolveFeatureEnabled(
           billingTenantId,
           tenantType,

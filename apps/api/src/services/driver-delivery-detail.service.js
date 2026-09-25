@@ -3,13 +3,15 @@ import { NotFoundError } from '../middlewares/errorHandler.js'
 import { resolveDestinationFromOrderRow } from '../lib/delivery-coordinates.js'
 
 /** Operational allow-list for drivers; prices, billing and customer PII are intentionally excluded. */
-export async function getDriverDeliveryDetail(orderId, supplierId) {
+export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = null } = {}) {
   const { rows } = await query(
     `
     SELECT
       o.id AS order_id,
       o.status AS order_status,
       o.requested_delivery_date,
+      o.requested_delivery_time,
+      UPPER(LEFT(o.id::text, 8)) AS order_reference,
       o.created_at AS order_created_at,
       o.delivery_location_snapshot,
       r.name AS restaurant_name,
@@ -31,36 +33,55 @@ export async function getDriverDeliveryDetail(orderId, supplierId) {
       da.failed_at,
       da.failure_reason,
       da.notes AS assignment_notes,
-      dr.id AS route_id,
-      dr.route_number,
-      dr.scheduled_date AS route_date,
-      rs.id AS route_stop_id,
-      rs.sequence_number,
-      EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id) AS pod_available
+      route.route_id,
+      route.route_number,
+      route.route_date,
+      route.route_stop_id,
+      route.sequence_number,
+      EXISTS (
+        SELECT 1 FROM proof_of_delivery pod
+        WHERE pod.order_id = o.id
+          AND (da.id IS NULL OR pod.driver_assignment_id IS NULL OR pod.driver_assignment_id = da.id)
+      ) AS pod_available
     FROM customer_order o
     JOIN restaurant r ON r.id = o.restaurant_id
-    LEFT JOIN branch b ON b.id = o.branch_id
+    LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT da2.*
       FROM driver_assignments da2
       WHERE da2.order_id = o.id
         AND da2.supplier_id = $2
+        AND ($3::uuid IS NULL OR da2.driver_id = $3::uuid)
         AND da2.status NOT IN ('reassigned', 'superseded')
       ORDER BY da2.created_at DESC
       LIMIT 1
     ) da ON TRUE
-    LEFT JOIN route_stop rs ON rs.order_id = o.id
-    LEFT JOIN delivery_route dr ON dr.id = rs.route_id AND dr.supplier_id = $2
+    LEFT JOIN LATERAL (
+      SELECT
+        rs2.id AS route_stop_id,
+        rs2.sequence_number,
+        dr2.id AS route_id,
+        dr2.route_number,
+        dr2.scheduled_date AS route_date
+      FROM route_stop rs2
+      JOIN delivery_route dr2 ON dr2.id = rs2.route_id AND dr2.supplier_id = $2
+      WHERE rs2.order_id = o.id
+        AND dr2.status <> 'CANCELLED'
+        AND (da.driver_id IS NULL OR dr2.driver_id = da.driver_id)
+      ORDER BY
+        CASE WHEN dr2.status IN ('PLANNED', 'IN_PROGRESS') THEN 0 ELSE 1 END,
+        dr2.scheduled_date DESC NULLS LAST
+      LIMIT 1
+    ) route ON TRUE
     WHERE o.id = $1
       AND EXISTS (SELECT 1 FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $2)
       AND (da.id IS NOT NULL OR EXISTS (
         SELECT 1 FROM driver_assignments any_da
         WHERE any_da.order_id = o.id AND any_da.supplier_id = $2
       ))
-    ORDER BY dr.scheduled_date DESC NULLS LAST
     LIMIT 1
     `,
-    [orderId, supplierId]
+    [orderId, supplierId, driverId]
   )
   if (!rows.length) throw new NotFoundError('Delivery not found')
 
@@ -92,7 +113,7 @@ export async function getDriverDeliveryDetail(orderId, supplierId) {
     orderId: row.order_id,
     orderStatus: row.order_status,
     restaurantName: row.restaurant_name,
-    orderReference: row.order_number ?? null,
+    orderReference: row.order_reference ? `ORD-${row.order_reference}` : null,
     deliveryStatus: row.assignment_status ?? null,
     deliveryWindow: row.requested_delivery_time ?? null,
     notes: row.assignment_notes ?? null,

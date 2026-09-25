@@ -3,14 +3,20 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   getRestaurantIdForRequest,
+  requirePermission,
 } from '../lib/rbac.js'
 import { orgStructureGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../lib/smart-reorder-tier.js'
+import { requireIntelligenceTier } from '../lib/intelligence-tier.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
+import { presentRestaurant } from '../lib/tenant-profile-redaction.js'
 import {
   getUserRestaurantOrgMembership,
   listRestaurantOrgBranches,
@@ -42,15 +48,14 @@ import {
   applyOrgBillingOnUnlink,
   recordBranchAccountLinkHistory,
 } from '../lib/branch-account-billing.js'
-import { restaurantOrgConsolidatedOverview } from '../services/org-reports.service.js'
 import {
-  assertCentralPurchasingEnabled,
-  listCentralPurchasingBranchAccounts,
-  getOrCreateCentralPurchasingDraft,
-  listCentralPurchasingDrafts,
-  updateCentralPurchasingDraftLines,
-  submitCentralPurchasingDrafts,
-} from '../services/central-purchasing.service.js'
+  restaurantOrgConsolidatedOverview,
+  restaurantOrgBranchComparison,
+  restaurantOrgBranchDemandForecast,
+  restaurantOrgCrossBranchPurchasingInsights,
+  restaurantOrgStockTransferSuggestions,
+  restaurantOrgAdvancedAnalytics,
+} from '../services/org-reports.service.js'
 
 const router = express.Router()
 
@@ -60,6 +65,19 @@ const multiBranchFeature = requireFeature(
   () => 'RESTAURANT'
 )
 
+async function requireSmartReorderForecast(req, res, next) {
+  const restaurantId = req.restaurantOrgContext?.primaryRestaurantId
+  const featureValue = await getResolvedFeatureValue(restaurantId, 'RESTAURANT', 'smart_reorder')
+  if (!hasSmartReorderCapability(featureValue, 'forecast')) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FEATURE_NOT_AVAILABLE', message: 'Forecasting capability is required' },
+      requestId: req.requestId,
+    })
+  }
+  next()
+}
 async function requireRestaurantOrgContext(req, res, next) {
   if (req.userData?.role !== 'RESTAURANT' && req.userData?.role !== 'ADMIN') {
     return res.status(403).json({
@@ -70,14 +88,46 @@ async function requireRestaurantOrgContext(req, res, next) {
     })
   }
 
-  const membership = await getUserRestaurantOrgMembership(req.userData.id)
+  const requestedOrgId =
+    req.userData.role === 'ADMIN' && typeof req.query.organization_id === 'string'
+      ? req.query.organization_id.trim() || null
+      : null
+  const effectiveTenant = getEffectiveTenant(req)
 
-  let organizationId = membership?.organization_id
+  if (req.userData.role === 'ADMIN' && !effectiveTenant) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Impersonate a tenant to access this organization' },
+      requestId: req.requestId,
+    })
+  }
+
+  let membership = null
+  if (req.userData.role === 'RESTAURANT') {
+    membership = await getUserRestaurantOrgMembership(req.userData.id)
+    if (!membership) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'No organization membership' },
+        requestId: req.requestId,
+      })
+    }
+  }
+
+  let organizationId = membership?.organization_id || null
   let organizationName = membership?.organization_name || ''
   let primaryRestaurantId = null
 
-  if (req.userData.role === 'ADMIN' && req.query.organization_id) {
-    organizationId = req.query.organization_id
+  if (req.userData.role === 'ADMIN') {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (restaurantId) {
+      const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+        restaurantId,
+      ])
+      organizationId = rows[0]?.organization_id || null
+    }
   }
 
   if (organizationId) {
@@ -93,7 +143,7 @@ async function requireRestaurantOrgContext(req, res, next) {
       )
       primaryRestaurantId = anyBranch[0]?.id || null
     }
-  } else if (req.userData.role === 'RESTAURANT' || req.userData.role === 'ADMIN') {
+  } else if (req.userData.role === 'RESTAURANT') {
     const restaurantId = await getRestaurantIdForRequest(req)
     if (restaurantId) {
       const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
@@ -102,6 +152,24 @@ async function requireRestaurantOrgContext(req, res, next) {
       organizationId = rows[0]?.organization_id
       primaryRestaurantId = restaurantId
     }
+  }
+
+  if (requestedOrgId && effectiveTenant && organizationId !== requestedOrgId) {
+    return res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+      requestId: req.requestId,
+    })
+  }
+
+  if (req.userData.role === 'ADMIN' && !organizationId) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Organization context required' },
+      requestId: req.requestId,
+    })
   }
 
   if (organizationId && !organizationName) {
@@ -115,11 +183,12 @@ async function requireRestaurantOrgContext(req, res, next) {
   req.restaurantOrgContext = {
     organizationId,
     organizationName,
-    roleName: membership?.role_name || null,
+    roleName: req.userData.role === 'ADMIN' ? null : membership?.role_name || null,
     primaryRestaurantId,
-    isOrgOwner: membership?.role_name === 'Org Owner',
-    isOrgManager: membership?.role_name === 'Org Manager',
+    isOrgOwner: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Owner',
+    isOrgManager: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Manager',
     canManageAllBranches:
+      req.userData.role === 'ADMIN' ||
       membership?.role_name === 'Org Owner' ||
       membership?.role_name === 'Org Manager' ||
       membership?.role_name === 'Org Viewer',
@@ -150,8 +219,15 @@ async function listBranchesForRequest(req) {
 }
 
 async function assertRestaurantBranchAccess(req, restaurantId) {
-  if (req.userData?.role === 'ADMIN') return true
   if (!req.restaurantOrgContext?.organizationId) return false
+  if (req.userData?.role === 'ADMIN') {
+    if (!getEffectiveTenant(req)) return false
+    const { rows } = await query(
+      `SELECT 1 FROM restaurant WHERE id = $1 AND organization_id = $2`,
+      [restaurantId, req.restaurantOrgContext.organizationId]
+    )
+    return rows.length > 0
+  }
   return userHasRestaurantOrgBranchAccess(
     req.userData.id,
     restaurantId,
@@ -159,13 +235,34 @@ async function assertRestaurantBranchAccess(req, restaurantId) {
   )
 }
 
+function forbiddenBranch(res, req) {
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: { name: 'FORBIDDEN', message: 'Access denied for this branch' },
+    requestId: req.requestId,
+  })
+}
+
 router.use(
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
   resolveTenantContext,
+  resolveAdminContext,
   requireRestaurantOrgContext,
   orgStructureGuard
 )
+// Cross-branch purchasing is deliberately not a launch capability. Keep the
+// historical endpoints explicit and fail-closed so old deep links cannot submit
+// one order on behalf of another branch.
+router.use('/central-purchasing', (req, res) => {
+  res.status(410).json({
+    ok: false,
+    data: null,
+    error: { name: 'GONE', message: 'Central purchasing is not available' },
+    requestId: req.requestId,
+  })
+})
 
 router.get('/', async (req, res) => {
   try {
@@ -338,6 +435,14 @@ router.post('/branches', requireRestaurantOrgOwner, multiBranchFeature, async (r
 
 router.get('/branches/:restaurantId', async (req, res) => {
   try {
+    if (!req.restaurantOrgContext?.organizationId) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
     const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
     if (!allowed) {
       return res.status(403).json({
@@ -348,9 +453,10 @@ router.get('/branches/:restaurantId', async (req, res) => {
       })
     }
 
-    const { rows } = await query(`SELECT * FROM restaurant WHERE id = $1`, [
-      req.params.restaurantId,
-    ])
+    const { rows } = await query(
+      `SELECT * FROM restaurant WHERE id = $1 AND organization_id = $2`,
+      [req.params.restaurantId, req.restaurantOrgContext.organizationId]
+    )
     if (!rows.length) {
       return res.status(404).json({
         ok: false,
@@ -360,7 +466,16 @@ router.get('/branches/:restaurantId', async (req, res) => {
       })
     }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentRestaurant(req, rows[0], {
+          orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+        }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('GET /api/restaurant-org/branches/:id error:', error)
     res.status(500).json({
@@ -455,10 +570,25 @@ router.patch('/branches/:restaurantId', async (req, res) => {
     }
 
     if (!updates.length) {
-      const { rows } = await query(`SELECT * FROM restaurant WHERE id = $1`, [restaurantId])
+      const { rows } = await query(
+        `SELECT * FROM restaurant WHERE id = $1 AND organization_id = $2`,
+        [restaurantId, req.restaurantOrgContext.organizationId]
+      )
+      if (!rows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Branch not found' },
+          requestId: req.requestId,
+        })
+      }
       return res.json({
         ok: true,
-        data: { branch: rows[0] },
+        data: {
+          branch: presentRestaurant(req, rows[0], {
+            orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+          }),
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -466,12 +596,31 @@ router.patch('/branches/:restaurantId', async (req, res) => {
 
     updates.push('updated_at = NOW()')
     values.push(restaurantId)
+    values.push(req.restaurantOrgContext.organizationId)
     const { rows } = await query(
-      `UPDATE restaurant SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE restaurant SET ${updates.join(', ')}
+       WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
       values
     )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentRestaurant(req, rows[0], {
+          orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+        }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('PATCH /api/restaurant-org/branches/:id error:', error)
     res.status(500).json({
@@ -485,7 +634,13 @@ router.patch('/branches/:restaurantId', async (req, res) => {
 
 router.delete('/branches/:restaurantId', requireRestaurantOrgOwner, async (req, res) => {
   try {
-    const result = await deactivateRestaurantOrgBranch(req.params.restaurantId)
+    const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+    if (!allowed) return forbiddenBranch(res, req)
+
+    const result = await deactivateRestaurantOrgBranch(
+      req.params.restaurantId,
+      req.restaurantOrgContext.organizationId
+    )
     if (!result.ok) {
       const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
@@ -563,7 +718,13 @@ router.post(
         })
       }
 
-      const result = await reactivateRestaurantOrgBranch(req.params.restaurantId)
+      const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+      if (!allowed) return forbiddenBranch(res, req)
+
+      const result = await reactivateRestaurantOrgBranch(
+        req.params.restaurantId,
+        req.restaurantOrgContext.organizationId
+      )
       if (!result.ok) {
         const messages = {
           NOT_FOUND: 'Branch Account not found',
@@ -616,6 +777,9 @@ router.post(
 
 router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (req, res) => {
   try {
+    const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+    if (!allowed) return forbiddenBranch(res, req)
+
     const { confirm } = req.body || {}
     if (confirm !== true && confirm !== 'unlink') {
       return res.status(400).json({
@@ -630,7 +794,10 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
     }
 
     const result = await withTransaction(async (client) => {
-      const unlinked = await unlinkRestaurantFromOrganization(req.params.restaurantId, { client })
+      const unlinked = await unlinkRestaurantFromOrganization(req.params.restaurantId, {
+        client,
+        organizationId: req.restaurantOrgContext.organizationId,
+      })
       if (!unlinked.ok) return unlinked
 
       const billing = await applyOrgBillingOnUnlink(req.params.restaurantId, 'RESTAURANT', {
@@ -902,10 +1069,14 @@ router.post('/users/:userId/branches', requireRestaurantOrgOwner, async (req, re
       .json({ ok: true, data: { granted: true }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('POST restaurant-org user branch access error:', error)
-    res.status(500).json({
+    const status = error.code === 'NOT_FOUND' ? 404 : 500
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to grant branch access' },
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to grant branch access',
+      },
       requestId: req.requestId,
     })
   }
@@ -916,14 +1087,22 @@ router.delete(
   requireRestaurantOrgOwner,
   async (req, res) => {
     try {
-      await revokeRestaurantOrgBranchAccess(req.params.userId, req.params.restaurantId)
+      await revokeRestaurantOrgBranchAccess(
+        req.params.userId,
+        req.params.restaurantId,
+        req.restaurantOrgContext.organizationId
+      )
       res.json({ ok: true, data: { revoked: true }, error: null, requestId: req.requestId })
     } catch (error) {
       logger.error('DELETE restaurant-org user branch access error:', error)
-      res.status(500).json({
+      const status = error.code === 'NOT_FOUND' ? 404 : 500
+      res.status(status).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to revoke branch access' },
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to revoke branch access',
+        },
         requestId: req.requestId,
       })
     }
@@ -1074,227 +1253,164 @@ router.get('/reports/overview', async (req, res) => {
   }
 })
 
-/**
- * Central purchasing foundation (Restaurant Scale only).
- * Drafts are per destination Branch Account — no organization-owned orders.
- */
-router.get('/central-purchasing/branches', async (req, res) => {
-  try {
-    await assertCentralPurchasingEnabled(req.restaurantOrgContext.primaryRestaurantId)
-    const branches = await listCentralPurchasingBranchAccounts(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
-    res.json({
-      ok: true,
-      data: { branches, foundationOnly: true },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('GET restaurant-org central-purchasing/branches error:', error)
-    const status = error.statusCode || 500
-    res.status(status).json({
-      ok: false,
-      data: null,
-      error: {
-        name: error.code || 'INTERNAL_ERROR',
-        message: error.message || 'Failed to list central purchasing branches',
-      },
-      requestId: req.requestId,
-    })
-  }
-})
-
-router.get('/central-purchasing/drafts', async (req, res) => {
-  try {
-    await assertCentralPurchasingEnabled(req.restaurantOrgContext.primaryRestaurantId)
-    const drafts = await listCentralPurchasingDrafts(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
-    res.json({
-      ok: true,
-      data: { drafts, foundationOnly: true },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('GET restaurant-org central-purchasing/drafts error:', error)
-    const status = error.statusCode || 500
-    res.status(status).json({
-      ok: false,
-      data: null,
-      error: {
-        name: error.code || 'INTERNAL_ERROR',
-        message: error.message || 'Failed to list drafts',
-      },
-      requestId: req.requestId,
-    })
-  }
-})
-
-router.post('/central-purchasing/drafts', async (req, res) => {
-  try {
-    await assertCentralPurchasingEnabled(req.restaurantOrgContext.primaryRestaurantId)
-    const destinationRestaurantId =
-      req.body?.destination_restaurant_id || req.body?.destinationRestaurantId
-    if (!destinationRestaurantId) {
-      return res.status(400).json({
+router.get(
+  '/reports/comparison',
+  multiBranchFeature,
+  requireFeature(
+    'waste_tracking',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requireFeature(
+    'receiving_quality',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('ORDERS_VIEW'),
+  requirePermission('INVENTORY_VIEW'),
+  requirePermission('RECEIVING_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgBranchComparison(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/comparison error:', error)
+      res.status(error.statusCode || error.status || 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'destination_restaurant_id is required',
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load branch comparison',
         },
         requestId: req.requestId,
       })
     }
-    const branches = await listCentralPurchasingBranchAccounts(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
-    if (!branches.some((b) => b.id === destinationRestaurantId)) {
-      return res.status(403).json({
+  }
+)
+router.get(
+  '/reports/demand-forecast',
+  multiBranchFeature,
+  requireFeature(
+    'smart_reorder',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('INVENTORY_VIEW'),
+  requireSmartReorderForecast,
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgBranchDemandForecast(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/demand-forecast error:', error)
+      res.status(error.statusCode || error.status || 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'FORBIDDEN',
-          message: 'Destination Branch Account is not authorized',
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load branch demand forecasts',
         },
         requestId: req.requestId,
       })
     }
-    const draft = await getOrCreateCentralPurchasingDraft({
-      organizationId: req.restaurantOrgContext.organizationId,
-      destinationRestaurantId,
-      userId: req.userData.id,
-    })
-    res.status(201).json({
-      ok: true,
-      data: { draft, foundationOnly: true },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('POST restaurant-org central-purchasing/drafts error:', error)
-    const status = error.statusCode || 500
-    res.status(status).json({
-      ok: false,
-      data: null,
-      error: {
-        name: error.code || 'INTERNAL_ERROR',
-        message: error.message || 'Failed to create draft',
-      },
-      requestId: req.requestId,
-    })
   }
-})
-
-router.patch('/central-purchasing/drafts/:draftId', async (req, res) => {
-  try {
-    await assertCentralPurchasingEnabled(req.restaurantOrgContext.primaryRestaurantId)
-    const lineItems = req.body?.line_items ?? req.body?.lineItems
-    if (!Array.isArray(lineItems)) {
-      return res.status(400).json({
-        ok: false,
-        data: null,
-        error: { name: 'VALIDATION_ERROR', message: 'line_items array is required' },
-        requestId: req.requestId,
-      })
-    }
-    const draft = await updateCentralPurchasingDraftLines({
-      draftId: req.params.draftId,
-      userId: req.userData.id,
-      organizationId: req.restaurantOrgContext.organizationId,
-      lineItems,
-    })
-    if (!draft) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: 'Draft not found' },
-        requestId: req.requestId,
-      })
-    }
-    res.json({
-      ok: true,
-      data: { draft, foundationOnly: true },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('PATCH restaurant-org central-purchasing/drafts error:', error)
-    const status = error.statusCode || 500
-    res.status(status).json({
-      ok: false,
-      data: null,
-      error: {
-        name: error.code || 'INTERNAL_ERROR',
-        message: error.message || 'Failed to update draft',
-      },
-      requestId: req.requestId,
-    })
-  }
-})
-
-router.post('/central-purchasing/submit', async (req, res) => {
-  try {
-    await assertCentralPurchasingEnabled(req.restaurantOrgContext.primaryRestaurantId)
-    const destinationIds =
-      req.body?.destination_restaurant_ids || req.body?.destinationRestaurantIds || []
-    if (!Array.isArray(destinationIds) || !destinationIds.length) {
-      return res.status(400).json({
+)
+router.get(
+  '/reports/purchasing-insights',
+  multiBranchFeature,
+  requirePermission('CATALOG_VIEW'),
+  requirePermission('ORDERS_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgCrossBranchPurchasingInsights(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/purchasing-insights error:', error)
+      res.status(error.statusCode || error.status || 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'destination_restaurant_ids array is required',
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load cross-branch purchasing insights',
         },
         requestId: req.requestId,
       })
     }
-    const authorized = await listCentralPurchasingBranchAccounts(
-      req.userData.id,
-      req.restaurantOrgContext.organizationId
-    )
-    const authorizedIds = new Set(authorized.map((b) => b.id))
-    const filtered = destinationIds.filter((id) => authorizedIds.has(id))
-    if (!filtered.length) {
-      return res.status(403).json({
+  }
+)
+router.get(
+  '/reports/stock-transfer-suggestions',
+  multiBranchFeature,
+  requireFeature(
+    'smart_reorder',
+    (req) => req.restaurantOrgContext?.primaryRestaurantId,
+    () => 'RESTAURANT'
+  ),
+  requirePermission('INVENTORY_VIEW'),
+  requireSmartReorderForecast,
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgStockTransferSuggestions(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/stock-transfer-suggestions error:', error)
+      res.status(error.statusCode || error.status || 500).json({
         ok: false,
         data: null,
         error: {
-          name: 'FORBIDDEN',
-          message: 'No authorized destination Branch Accounts in request',
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load stock-transfer suggestions',
         },
         requestId: req.requestId,
       })
     }
-    const result = await submitCentralPurchasingDrafts({
-      userId: req.userData.id,
-      organizationId: req.restaurantOrgContext.organizationId,
-      destinationRestaurantIds: filtered,
-    })
-    res.json({
-      ok: true,
-      data: { ...result, foundationOnly: true },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('POST restaurant-org central-purchasing/submit error:', error)
-    const status = error.statusCode || 500
-    res.status(status).json({
-      ok: false,
-      data: null,
-      error: {
-        name: error.code || 'INTERNAL_ERROR',
-        message: error.message || 'Failed to submit central purchasing drafts',
-      },
-      requestId: req.requestId,
-    })
   }
-})
-
+)
+router.get(
+  '/reports/advanced-analytics',
+  multiBranchFeature,
+  requirePermission('ORDERS_VIEW'),
+  requireIntelligenceTier('scale'),
+  async (req, res) => {
+    try {
+      const result = await restaurantOrgAdvancedAnalytics(
+        req.userData.id,
+        req.restaurantOrgContext.organizationId,
+        req.query
+      )
+      res.json({ ok: true, ...result, error: null, requestId: req.requestId })
+    } catch (error) {
+      logger.error('GET /api/restaurant-org/reports/advanced-analytics error:', error)
+      res.status(error.statusCode || error.status || 500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to load advanced analytics',
+        },
+        requestId: req.requestId,
+      })
+    }
+  }
+)
 export default router

@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import { computeExpiryStatus, mapLotRow } from '../lib/inventory-expiry-status.js'
 import { notifyTenantUsers } from './notification.service.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
@@ -98,6 +99,7 @@ export async function getExpirySummary(restaurantId) {
 export async function createExpiryLot(restaurantId, data) {
   if (!data.itemName?.trim()) throw new ValidationError('itemName is required')
   if (!data.expiryDate) throw new ValidationError('expiryDate is required')
+  await assertLegacyBranchOwnedByRestaurant(data.branchId, restaurantId)
 
   const { rows } = await query(
     `
@@ -141,6 +143,9 @@ export async function updateExpiryLot(restaurantId, lotId, data) {
     [lotId, restaurantId]
   )
   if (!existing.length) throw new NotFoundError('Expiry lot not found')
+  if (data.branchId !== undefined) {
+    await assertLegacyBranchOwnedByRestaurant(data.branchId, restaurantId)
+  }
 
   const fields = []
   const params = []
@@ -194,6 +199,7 @@ export async function createLotFromReceivingLine(
   client,
   {
     restaurantId,
+    branchId = null,
     reportId,
     lineItemId,
     productId,
@@ -216,15 +222,16 @@ export async function createLotFromReceivingLine(
   const { rows } = await q(
     `
     INSERT INTO restaurant_inventory_lot (
-      restaurant_id, product_id, supplier_id, order_id, order_item_id,
+      restaurant_id, branch_id, product_id, supplier_id, order_id, order_item_id,
       receiving_report_id, receiving_line_item_id,
       item_name, product_sku, quantity, unit,
       batch_lot_number, received_date, expiry_date, storage_location, notes
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
     RETURNING id
     `,
     [
       restaurantId,
+      branchId || null,
       productId || null,
       supplierId || null,
       orderId || null,

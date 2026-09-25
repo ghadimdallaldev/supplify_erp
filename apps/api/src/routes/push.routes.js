@@ -97,18 +97,24 @@ router.delete(
   }
 )
 
-router.post('/devices', requireAuth, async (req, res, next) => {
-  try {
-    const body = deviceSchema.parse(req.body)
-    const device = await saveExpoPushDevice(req.userData.id, {
-      token: body.token,
-      platform: body.platform,
-    })
-    res.status(201).json({ ok: true, data: { device }, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+router.post(
+  '/devices',
+  requireAuth,
+  resolveTenantContext,
+  pushFeatureGate,
+  async (req, res, next) => {
+    try {
+      const body = deviceSchema.parse(req.body)
+      const device = await saveExpoPushDevice(req.userData.id, {
+        token: body.token,
+        platform: body.platform,
+      })
+      res.status(201).json({ ok: true, data: { device }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
 
 router.delete('/devices', requireAuth, async (req, res, next) => {
   try {

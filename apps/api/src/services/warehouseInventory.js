@@ -149,9 +149,19 @@ async function lineItemsForAssignment(client, orderId, assignment) {
     )
     return rows
   }
+  // A whole-order leg does not own lines that have their own warehouse assignment.
   const { rows } = await client.query(
-    `SELECT product_id, quantity FROM order_item WHERE order_id = $1`,
-    [orderId]
+    `SELECT oi.product_id, oi.quantity
+     FROM order_item oi
+     WHERE oi.order_id = $1
+       AND NOT EXISTS (
+         SELECT 1 FROM order_warehouse_assignment other
+         WHERE other.order_id = oi.order_id
+           AND other.order_item_id = oi.id
+           AND other.status <> 'superseded'
+           AND ($2::uuid IS NULL OR other.id IS DISTINCT FROM $2::uuid)
+       )`,
+    [orderId, assignment.id ?? null]
   )
   return rows
 }
@@ -224,13 +234,22 @@ export async function reassignOrderWarehouseAssignment(
   }
 
   const { rows: orderRows } = await client.query(
-    `SELECT id, status, supplier_organization_id, delivery_location_snapshot
+    `SELECT id, status, restaurant_id, branch_id, supplier_organization_id, delivery_location_snapshot
      FROM customer_order WHERE id = $1 FOR UPDATE`,
     [orderId]
   )
   if (!orderRows.length) return null
   const order = orderRows[0]
-  if (!['PLACED', 'CONFIRMED', 'FULFILLING'].includes(order.status)) {
+  if (
+    ![
+      'PLACED',
+      'PENDING_APPROVAL',
+      'ACKNOWLEDGED',
+      'PROCESSING',
+      'CONFIRMED',
+      'FULFILLING',
+    ].includes(order.status)
+  ) {
     const err = new Error('Fulfillment can only be reassigned for an active order')
     err.code = 'INVALID_STATUS'
     throw err
@@ -330,10 +349,11 @@ export async function reassignOrderWarehouseAssignment(
     [target.supplier_id, newWarehouseId]
   )
   if (zones.length) {
-    const { restaurantMatchesZone } = await import('./warehouseRouting.js')
-    if (
-      !zones.some((zone) => restaurantMatchesZone(zone, order.delivery_location_snapshot || null))
-    ) {
+    const { restaurantMatchesZone, resolveRoutingDestination } = await import(
+      './warehouseRouting.js'
+    )
+    const destination = await resolveRoutingDestination(client, order)
+    if (!zones.some((zone) => restaurantMatchesZone(zone, destination))) {
       const err = new Error('Target warehouse does not serve the committed delivery location')
       err.code = 'ZONE_INELIGIBLE'
       throw err
@@ -391,9 +411,16 @@ export async function releaseInventoryForAssignment(client, orderId, assignmentI
   if (!rows.length) return null
 
   const assignment = rows[0]
-  if (assignment.status !== 'dispatched') {
-    const lines = await lineItemsForAssignment(client, orderId, assignment)
-    for (const line of lines) {
+  const lines = await lineItemsForAssignment(client, orderId, assignment)
+  for (const line of lines) {
+    if (assignment.status === 'dispatched') {
+      await restoreDispatchedWarehouseStock(
+        client,
+        assignment.warehouse_id,
+        line.product_id,
+        line.quantity
+      )
+    } else {
       await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
     }
   }
@@ -515,13 +542,18 @@ export async function releaseInventoryForFailedDelivery(client, orderId) {
   )
 
   for (const assignment of assignments) {
-    if (assignment.status === 'dispatched') {
-      // Already committed on-hand — do not restore available; just mark failed.
-      continue
-    }
     const lines = await lineItemsForAssignment(client, orderId, assignment)
     for (const line of lines) {
-      await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+      if (assignment.status === 'dispatched') {
+        await restoreDispatchedWarehouseStock(
+          client,
+          assignment.warehouse_id,
+          line.product_id,
+          line.quantity
+        )
+      } else {
+        await releaseWarehouseStock(client, assignment.warehouse_id, line.product_id, line.quantity)
+      }
     }
   }
 

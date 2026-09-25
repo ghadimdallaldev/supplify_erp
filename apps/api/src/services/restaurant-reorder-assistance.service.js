@@ -338,6 +338,8 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
     fetchQuickListSuggestions(restaurantId),
   ])
 
+  // Expiry-driven items stay in the same suppression-filtered list: pulling them
+  // out bypassed snooze/not-needed suppression and dropped them from the panel.
   let filtered = [...stock, ...cadence, ...expiry, ...quickList].filter(
     (item) => !isSuppressed(suppressions, item.scopeType, item.scopeId)
   )

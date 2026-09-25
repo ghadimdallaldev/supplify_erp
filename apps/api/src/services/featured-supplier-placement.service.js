@@ -34,9 +34,9 @@ export async function listActiveFeaturedSupplierIds() {
 }
 
 /**
- * Purchase featured placement. In live/payments mode: creates pending + invoice,
- * optionally charges immediately when a payment method exists.
- * Dev/non-live: may waive and activate immediately.
+ * Purchase featured placement. A purchase can become paid/waived, but it always
+ * remains pending until a platform admin approves it. The paid placement period
+ * starts at approval time so review latency never consumes the supplier's term.
  */
 export async function purchaseAndActivateFeaturedPlacement({
   supplierId,
@@ -61,7 +61,7 @@ export async function purchaseAndActivateFeaturedPlacement({
     const endsAt = new Date(startsAt)
     endsAt.setDate(endsAt.getDate() + (pricing.duration_days || 7))
     const amount = parseFloat(pricing.amount) || 0
-    const status = waive ? 'active' : 'pending'
+    const status = 'pending'
     const paymentStatus = waive ? 'waived' : 'pending'
 
     const { rows } = await client.query(
@@ -86,7 +86,7 @@ export async function purchaseAndActivateFeaturedPlacement({
     let placement = rows[0]
 
     if (waive || !(amount > 0)) {
-      return placement
+      return { ...placement, approvalRequired: true }
     }
 
     const { invoice } = await createFeaturedPlacementInvoice({
@@ -123,11 +123,11 @@ export async function purchaseAndActivateFeaturedPlacement({
       })
       const { rows } = await query(
         `UPDATE supplier_featured_placements SET
-           status = 'active', payment_status = 'paid', updated_at = now()
+           status = 'pending', payment_status = 'paid', updated_at = now()
          WHERE id = $1 RETURNING *`,
         [result.id]
       )
-      return rows[0]
+      return { ...rows[0], approvalRequired: true }
     } catch (err) {
       if (err instanceof PromotionAdError && err.code === 'PROMOTION_AD_PAYMENT_REQUIRED') {
         const { _invoice, _chargeNow, _paymentMethodId, _idempotencyKey, ...placement } = result
@@ -152,6 +152,9 @@ export async function payFeaturedPlacement({
   const placement = rows[0]
   if (placement.status === 'active' && placement.payment_status === 'paid') {
     return { placement, duplicate: true }
+  }
+  if (placement.status === 'cancelled' || placement.status === 'expired') {
+    throw new ValidationError('Featured placement can no longer be paid')
   }
   if (placement.payment_status === 'waived') {
     return { placement, duplicate: true }
@@ -180,11 +183,87 @@ export async function payFeaturedPlacement({
 
   const { rows: activated } = await query(
     `UPDATE supplier_featured_placements SET
-       status = 'active', payment_status = 'paid', billing_invoice_id = $2, updated_at = now()
+       status = 'pending', payment_status = 'paid', billing_invoice_id = $2, updated_at = now()
      WHERE id = $1 RETURNING *`,
     [placementId, invoiceId]
   )
-  return { placement: activated[0], duplicate: false }
+  return {
+    placement: { ...activated[0], approvalRequired: true },
+    duplicate: false,
+  }
+}
+
+export async function approveFeaturedPlacement({ placementId, approvedBy }) {
+  return withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `SELECT fp.*, COALESCE(pc.duration_days, 7) AS package_duration_days
+       FROM supplier_featured_placements fp
+       LEFT JOIN promotion_pricing_config pc ON pc.pricing_key = fp.pricing_key
+       WHERE fp.id = $1
+       FOR UPDATE`,
+      [placementId]
+    )
+    const placement = rows[0]
+    if (!placement) throw new NotFoundError('Featured placement not found')
+    if (placement.status === 'active') return { placement, duplicate: true }
+    if (placement.status !== 'pending') {
+      throw new ValidationError('Only pending featured placements can be approved')
+    }
+    if (!['paid', 'waived'].includes(placement.payment_status)) {
+      throw new ValidationError('Featured placement must be paid before approval')
+    }
+
+    const startsAt = new Date()
+    const endsAt = new Date(startsAt)
+    endsAt.setDate(endsAt.getDate() + Number(placement.package_duration_days || 7))
+    const { rows: approved } = await client.query(
+      `UPDATE supplier_featured_placements
+       SET status = 'active', starts_at = $2, ends_at = $3,
+           approved_by = $4, approved_at = now(), rejection_reason = NULL, updated_at = now()
+       WHERE id = $1
+       RETURNING *`,
+      [placementId, startsAt.toISOString(), endsAt.toISOString(), approvedBy]
+    )
+    return { placement: approved[0], duplicate: false }
+  })
+}
+
+export async function rejectFeaturedPlacement({ placementId, rejectedBy, reason = null }) {
+  const { rows: existing } = await query(
+    `SELECT * FROM supplier_featured_placements WHERE id = $1`,
+    [placementId]
+  )
+  if (!existing.length) throw new NotFoundError('Featured placement not found')
+  const placement = existing[0]
+  if (placement.status !== 'pending') {
+    throw new ValidationError('Only pending featured placements can be rejected')
+  }
+
+  if (placement.payment_status === 'paid') {
+    if (!placement.billing_invoice_id) {
+      throw new ValidationError('Paid featured placement has no invoice to refund')
+    }
+    await markPromotionAdInvoiceRefunded({
+      invoiceId: placement.billing_invoice_id,
+      supplierId: placement.supplier_id,
+      reason: 'admin_rejection',
+    })
+  }
+
+  const { rows } = await query(
+    `UPDATE supplier_featured_placements
+     SET status = 'cancelled', rejected_by = $2, rejected_at = now(),
+         rejection_reason = $3,
+         payment_status = CASE WHEN payment_status = 'paid' THEN 'refunded' ELSE payment_status END,
+         updated_at = now()
+     WHERE id = $1 AND status = 'pending'
+     RETURNING *`,
+    [placementId, rejectedBy, reason]
+  )
+  if (!rows.length) {
+    throw new ValidationError('Featured placement changed while it was being reviewed')
+  }
+  return { placement: rows[0] }
 }
 
 export async function refundFeaturedPlacement({
@@ -223,16 +302,20 @@ export async function listPlacementsForSupplier(supplierId) {
   return rows
 }
 
-export async function listAllActivePlacementsForAdmin() {
+export async function listFeaturedPlacementsForAdmin() {
   const { rows } = await query(
     `
     SELECT fp.*, s.name AS supplier_name
     FROM supplier_featured_placements fp
     JOIN supplier s ON s.id = fp.supplier_id
-    WHERE fp.status = 'active' AND fp.ends_at > NOW()
-    ORDER BY fp.starts_at DESC
+    WHERE fp.status = 'pending'
+       OR (fp.status = 'active' AND fp.ends_at > NOW())
+    ORDER BY CASE WHEN fp.status = 'pending' THEN 0 ELSE 1 END, fp.created_at DESC
     LIMIT 100
     `
   )
   return rows
 }
+
+// Compatibility for split supplier route modules that still import the legacy name.
+export const listAllActivePlacementsForAdmin = listFeaturedPlacementsForAdmin

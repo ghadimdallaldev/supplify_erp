@@ -136,7 +136,9 @@ export function OrderPickingTab({ orderId }: OrderPickingTabProps) {
   const { data: assignmentData } = useGetOrderWarehouseAssignmentsQuery(orderId, {
     skip: !isEffectiveSupplier,
   })
-  const { data: warehousesData } = useGetWarehousesQuery(undefined, { skip: !canTransfer })
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
+    skip: !canTransfer || !can('WAREHOUSES_VIEW'),
+  })
 
   const order = data?.order
   const assignments = (assignmentData?.assignments ||

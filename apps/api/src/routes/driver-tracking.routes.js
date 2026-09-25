@@ -1,6 +1,12 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext, getRequestTenant } from '../lib/rbac.js'
+import {
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+  getRequestTenant,
+  rolesIncludeOwner,
+} from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { getLinkedDriverId } from '../lib/driver-rbac.js'
 import { hasPermission } from '../lib/permissions.js'
@@ -36,6 +42,7 @@ async function driverContext(req) {
 }
 
 function requireDriverPermission(req, manage = false) {
+  if (rolesIncludeOwner(req.tenantContext?.roles)) return
   const permissions = req.tenantContext?.permissions ?? []
   const key = manage ? P.DRIVER_DELIVERIES_MANAGE : P.DRIVER_DELIVERIES_VIEW
   if (!hasPermission(permissions, key))

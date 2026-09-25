@@ -13,7 +13,11 @@ import {
 import { useImpersonation } from '../hooks/useImpersonation'
 import { SupplifyLogo } from './SupplifyLogo'
 import { BranchSwitcher } from './BranchSwitcher'
-import { getOrderUsageBadge, isEntitlementFeatureEnabled } from '../lib/planLimits'
+import {
+  getOrderUsageBadge,
+  isEntitlementFeatureEnabled,
+  meetsIntelligenceTier,
+} from '../lib/planLimits'
 import { countActiveDisputes } from '../lib/disputeHelpers'
 import {
   canUseGlobalReports,
@@ -76,6 +80,9 @@ export function Sidebar({
   const fulfillmentEnabled = canUseFulfillment(entitlementsData?.entitlements)
   const quickListsEnabled = canUseQuickLists(entitlementsData?.entitlements)
   const recipeCostingEnabled = canUseRecipeCosting(entitlementsData?.entitlements)
+  // Price intelligence is a deterministic Intelligence-tier surface; the API
+  // enforces the same tier, so this only hides an entry point it would refuse.
+  const priceIntelligenceEnabled = meetsIntelligenceTier(entitlementsData?.entitlements, 'advanced')
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
@@ -119,6 +126,7 @@ export function Sidebar({
     fulfillmentEnabled,
     quickListsEnabled,
     recipeCostingEnabled,
+    priceIntelligenceEnabled,
     disputesEnabled,
     promotionsEnabled,
     supplierGrowthEnabled,

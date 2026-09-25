@@ -73,6 +73,9 @@ import {
   checkOutSchema,
   ptoTypeEnum,
   createPtoSchema,
+  getPtoDateError,
+  getInactiveStaffError,
+  findShiftDuringTimeOffError,
   updatePtoSchema,
   availabilitySchema,
   createSwapSchema,
@@ -131,7 +134,7 @@ router.post('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
     const restaurantId = await resolveRestaurantId(req)
 
     const ownershipCheck = await query(
-      `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+      `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
       [payload.staffId, restaurantId]
     )
     if (!ownershipCheck.rowCount) {
@@ -141,6 +144,49 @@ router.post('/pto', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
         error: {
           name: 'PTO_CREATE_ERROR',
           message: 'Staff member does not belong to this restaurant',
+        },
+        requestId: req.requestId,
+      })
+    }
+    const inactiveError = getInactiveStaffError(ownershipCheck.rows[0].status)
+    if (inactiveError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'PTO_CREATE_ERROR', message: inactiveError },
+        requestId: req.requestId,
+      })
+    }
+
+    const dateError = getPtoDateError(payload.startDate, payload.endDate)
+    if (dateError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'PTO_CREATE_ERROR', message: dateError },
+        requestId: req.requestId,
+      })
+    }
+
+    const { rows: overlapRows } = await query(
+      `
+        SELECT id FROM staff_pto_request
+        WHERE restaurant_id = $1
+          AND staff_id = $2
+          AND status IN ('PENDING', 'APPROVED')
+          AND start_date <= $4::date
+          AND end_date >= $3::date
+        LIMIT 1
+      `,
+      [restaurantId, payload.staffId, payload.startDate, payload.endDate]
+    )
+    if (overlapRows.length) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'PTO_CREATE_ERROR',
+          message: 'This person already has time off that overlaps these dates',
         },
         requestId: req.requestId,
       })
@@ -204,6 +250,39 @@ router.patch('/pto/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
   try {
     const payload = updatePtoSchema.parse(req.body)
     const restaurantId = await resolveRestaurantId(req)
+
+    if (payload.status === 'APPROVED') {
+      const { rows: currentRows } = await query(
+        `
+          SELECT staff_id, start_date, end_date
+          FROM staff_pto_request
+          WHERE id = $1 AND restaurant_id = $2
+        `,
+        [req.params.id, restaurantId]
+      )
+      if (!currentRows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'PTO request not found' },
+          requestId: req.requestId,
+        })
+      }
+      const conflict = await findShiftDuringTimeOffError(
+        restaurantId,
+        currentRows[0].staff_id,
+        currentRows[0].start_date,
+        currentRows[0].end_date
+      )
+      if (conflict) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'PTO_UPDATE_ERROR', message: conflict },
+          requestId: req.requestId,
+        })
+      }
+    }
 
     const { rows } = await query(
       `

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ensureNamespace } from '../i18n'
 import { getApiErrorMessage } from '../lib/apiError'
+import { localDateKey } from '../lib/invoiceBalance'
 import {
   useGetReservationBoardQuery,
   useGetReservationAnalyticsQuery,
@@ -55,7 +56,7 @@ export function ReservationsPage() {
   const reservationsTitle = persona.pageCopy?.reservations?.title ?? t('page.title')
   const reservationsDescription =
     persona.pageCopy?.reservations?.description ?? t('page.description')
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [selectedDate, setSelectedDate] = useState(() => localDateKey())
   const [range, setRange] = useState<'day' | 'week' | 'month'>('week')
   const [branchId, setBranchId] = useState('')
 
@@ -180,7 +181,7 @@ export function ReservationsPage() {
                   variant="ghost"
                   size="sm"
                   className="h-8 shrink-0 text-xs"
-                  onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+                  onClick={() => setSelectedDate(localDateKey())}
                 >
                   {t('page.today')}
                 </Button>

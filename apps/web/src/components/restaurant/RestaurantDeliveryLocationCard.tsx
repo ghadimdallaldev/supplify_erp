@@ -22,6 +22,7 @@ import {
   type DeliveryLocationForm,
 } from '../../lib/deliveryLocationForm'
 import { ensureNamespace } from '../../i18n'
+import { usePermissions } from '../../hooks/usePermissions'
 
 const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
   'Enter both latitude and longitude, or leave both empty.': 'validation.bothOrEmpty',
@@ -121,7 +122,12 @@ function DeliveryLocationFields({
 
 export function RestaurantDeliveryLocationCard() {
   const { t } = useTranslation('restaurants')
-  const { data, isLoading, isError, refetch } = useGetRestaurantDeliveryLocationsQuery()
+  const { can, canAny } = usePermissions()
+  const canLoadLocations = canAny('SETTINGS_VIEW', 'ORDERS_VIEW', 'ORDERS_CREATE')
+  const canEditLocations = can('SETTINGS_EDIT')
+  const { data, isLoading, isError, refetch } = useGetRestaurantDeliveryLocationsQuery(undefined, {
+    skip: !canLoadLocations,
+  })
   const [updateRestaurant, { isLoading: savingRestaurant }] =
     useUpdateRestaurantDeliveryLocationMutation()
   const [updateBranch, { isLoading: savingBranch }] = useUpdateBranchDeliveryLocationMutation()
@@ -235,6 +241,8 @@ export function RestaurantDeliveryLocationCard() {
 
   const branches = data?.branches ?? []
 
+  if (!canLoadLocations) return null
+
   return (
     <Card data-testid="restaurant-delivery-location-card">
       <CardHeader>
@@ -256,7 +264,7 @@ export function RestaurantDeliveryLocationCard() {
         />
         <Button
           onClick={handleSaveRestaurant}
-          disabled={savingRestaurant}
+          disabled={savingRestaurant || !canEditLocations}
           data-testid="save-restaurant-delivery-location"
         >
           {savingRestaurant ? (
@@ -295,7 +303,7 @@ export function RestaurantDeliveryLocationCard() {
                 <Button
                   variant="outline"
                   onClick={() => handleSaveBranch(branch.id)}
-                  disabled={savingBranch}
+                  disabled={savingBranch || !canEditLocations}
                 >
                   Save branch location
                 </Button>

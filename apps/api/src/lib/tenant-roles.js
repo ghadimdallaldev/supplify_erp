@@ -38,6 +38,11 @@ export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Admin/Manager',
   'Catalog/Product Manager',
   'Fulfillment Staff',
+  // Org-layer names must not be creatable as tenant roles (would collide with owner bypass).
+  'Org Owner',
+  'Org Manager',
+  'Org Viewer',
+  'Regional Manager',
 ])
 
 const RESTAURANT_PERMISSIONS = [
@@ -81,10 +86,9 @@ const RESTAURANT_PERMISSIONS = [
   PERMISSION_KEYS.RECIPES_MANAGE,
 ]
 
-/** Role names that grant full tenant owner access (API + web must stay aligned). */
+/** Tenant-role names that grant full workspace owner bypass in requirePermission. */
 export const TENANT_OWNER_ROLE_NAMES = Object.freeze([
   'Owner',
-  'Org Owner',
   'RESTAURANT_OWNER',
   'SUPPLIER_OWNER',
 ])

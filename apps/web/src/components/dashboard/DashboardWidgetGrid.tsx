@@ -227,7 +227,7 @@ export function DashboardWidgetGrid(props: any) {
                   color: 'var(--amber-mid)',
                 },
                 {
-                  label: t('widgets.orderStatus.processing'),
+                  label: t('widgets.orderStatus.other'),
                   value: Math.max(
                     0,
                     (stats?.totalOrders ?? 0) -

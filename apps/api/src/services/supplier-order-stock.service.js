@@ -186,8 +186,19 @@ export async function syncWarehouseMirrorFromLegacy(
   const mode = await resolveOrderStockMode(supplierId, { client: clientForMode })
   if (mode !== 'warehouse') return null
 
+  const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => run(sql, params))
+
   let targetWarehouseId = warehouseId
-  if (!targetWarehouseId) {
+  if (targetWarehouseId) {
+    const { rows: owned } = await run(
+      `SELECT id FROM warehouse WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
+      [targetWarehouseId, supplierId]
+    )
+    if (!owned.length) {
+      throw new ValidationError('Warehouse not found for this supplier')
+    }
+  } else {
     const warehouse = await ensureDefaultWarehouseForSupplier(supplierId, {
       client: clientForMode,
     })
@@ -195,19 +206,42 @@ export async function syncWarehouseMirrorFromLegacy(
   }
   if (!targetWarehouseId) return null
 
+  const { rows: currentRows } = await run(
+    `
+    SELECT
+      COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty,
+      COALESCE(SUM(wi.quantity_reserved), 0)::numeric AS reserved_qty
+    FROM warehouse_inventory wi
+    JOIN warehouse w ON w.id = wi.warehouse_id
+    WHERE wi.product_id = $1
+      AND w.${supplierCol} = $2
+      AND w.is_active = TRUE
+    `,
+    [productId, supplierId]
+  )
+
   const available = Number(availableQty) || 0
   const reserved = Number(reservedQty) || 0
+  const deltaAvailable = available - (Number(currentRows[0]?.available_qty) || 0)
+  const deltaReserved = reserved - (Number(currentRows[0]?.reserved_qty) || 0)
 
+  if (deltaAvailable === 0 && deltaReserved === 0) {
+    return { warehouseId: targetWarehouseId, available, reserved }
+  }
+
+  // Apply the product-level delta to one owned warehouse. Overwriting that row
+  // with the full aggregate would inflate multi-warehouse stock.
   await run(
     `INSERT INTO warehouse_inventory (
        warehouse_id, product_id, quantity_available, quantity_reserved, quantity_on_hand, updated_at
-     ) VALUES ($1, $2, $3, $4, $3 + $4, now())
+     ) VALUES ($1, $2, GREATEST(0, $3), GREATEST(0, $4), GREATEST(0, $3) + GREATEST(0, $4), now())
      ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
-       quantity_available = EXCLUDED.quantity_available,
-       quantity_reserved = EXCLUDED.quantity_reserved,
-       quantity_on_hand = EXCLUDED.quantity_on_hand,
+       quantity_available = GREATEST(0, warehouse_inventory.quantity_available + $3),
+       quantity_reserved = GREATEST(0, warehouse_inventory.quantity_reserved + $4),
+       quantity_on_hand = GREATEST(0, warehouse_inventory.quantity_available + $3)
+                         + GREATEST(0, warehouse_inventory.quantity_reserved + $4),
        updated_at = now()`,
-    [targetWarehouseId, productId, available, reserved]
+    [targetWarehouseId, productId, deltaAvailable, deltaReserved]
   )
 
   return { warehouseId: targetWarehouseId, available, reserved }
@@ -264,4 +298,100 @@ export async function syncLegacyMirrorFromWarehouse(dbOrClient, { supplierId, pr
   )
 
   return { available, reserved }
+}
+
+/**
+ * Apply an IN/OUT adjustment to warehouse_inventory, then mirror the aggregate into legacy inventory.
+ * Uses warehouse totals as the source of truth so a stale inventory row cannot wipe warehouse stock.
+ */
+export async function applyWarehouseInventoryAdjustment(
+  dbOrClient,
+  { supplierId, productId, adjustmentType, quantity, warehouseId = null }
+) {
+  const mode = await resolveOrderStockMode(supplierId, {
+    client: typeof dbOrClient?.query === 'function' ? dbOrClient : null,
+  })
+  if (mode !== 'warehouse') return { applied: false }
+
+  const qty = Number(quantity)
+  if (!Number.isFinite(qty) || qty <= 0) {
+    throw new ValidationError('Adjustment quantity must be positive')
+  }
+  if (adjustmentType !== 'IN' && adjustmentType !== 'OUT') {
+    throw new ValidationError('Invalid adjustment type')
+  }
+
+  const { query } = await import('../lib/db.js')
+  const run =
+    typeof dbOrClient?.query === 'function'
+      ? (sql, params) => dbOrClient.query(sql, params)
+      : typeof dbOrClient === 'function'
+        ? dbOrClient
+        : query
+  const clientForMode = typeof dbOrClient?.query === 'function' ? dbOrClient : null
+
+  const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => run(sql, params))
+
+  let targetWarehouseId = warehouseId
+  if (targetWarehouseId) {
+    const { rows: owned } = await run(
+      `SELECT id FROM warehouse WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
+      [targetWarehouseId, supplierId]
+    )
+    if (!owned.length) {
+      throw new ValidationError('Warehouse not found for this supplier')
+    }
+  } else {
+    const warehouse = await ensureDefaultWarehouseForSupplier(supplierId, {
+      client: clientForMode,
+    })
+    targetWarehouseId = warehouse?.id
+  }
+  if (!targetWarehouseId) {
+    throw new ValidationError('No warehouse available for this supplier')
+  }
+
+  const { rows: sumRows } = await run(
+    `
+    SELECT
+      COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty,
+      COALESCE(SUM(wi.quantity_reserved), 0)::numeric AS reserved_qty
+    FROM warehouse_inventory wi
+    JOIN warehouse w ON w.id = wi.warehouse_id
+    WHERE wi.product_id = $1
+      AND w.${supplierCol} = $2
+      AND w.is_active = TRUE
+    `,
+    [productId, supplierId]
+  )
+  const { rows: targetRows } = await run(
+    `SELECT COALESCE(quantity_available, 0)::numeric AS available_qty
+     FROM warehouse_inventory
+     WHERE warehouse_id = $1 AND product_id = $2`,
+    [targetWarehouseId, productId]
+  )
+
+  const productAvailable = Number(sumRows[0]?.available_qty || 0)
+  const productReserved = Number(sumRows[0]?.reserved_qty || 0)
+  const warehouseAvailable = Number(targetRows[0]?.available_qty || 0)
+  const delta = adjustmentType === 'IN' ? qty : -qty
+  if (delta < 0 && warehouseAvailable + delta < 0) {
+    throw new ValidationError('Insufficient available inventory')
+  }
+
+  await syncWarehouseMirrorFromLegacy(dbOrClient, {
+    supplierId,
+    productId,
+    availableQty: productAvailable + delta,
+    reservedQty: productReserved,
+    warehouseId: targetWarehouseId,
+  })
+  const mirrored = await syncLegacyMirrorFromWarehouse(dbOrClient, { supplierId, productId })
+  return {
+    applied: true,
+    warehouseId: targetWarehouseId,
+    availableQty: mirrored?.available ?? productAvailable + delta,
+    reservedQty: mirrored?.reserved ?? productReserved,
+  }
 }

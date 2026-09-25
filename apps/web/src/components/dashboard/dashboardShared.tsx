@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { DashboardKpiKey } from '../../lib/workspaceRoleProfile'
+import type { DashboardStats } from '../../types/dashboard'
 import { AppPanel } from '../ui/app-panel'
 import type { KpiTone } from '../ui/kpi-card'
 
@@ -44,6 +45,42 @@ export interface KpiCardProps {
   iconColor: string
   Icon: any
   meta?: string
+}
+
+/**
+ * Role dashboards reuse the same KPI slots, but some roles describe a different metric.
+ * Returns a value when the persona label is not the all-time default; otherwise undefined.
+ */
+export function resolvePersonaKpiValue(
+  personaId: string,
+  kpiKey: DashboardKpiKey,
+  stats: DashboardStats | undefined,
+  formatMoney: (amount: number) => string,
+  zeroMoney: string
+): string | number | undefined {
+  const money = (value: number | undefined) =>
+    typeof value === 'number' ? formatMoney(value) : zeroMoney
+
+  if (personaId === 'supplier_warehouse' && kpiKey === 'orders') {
+    return stats?.ordersToday ?? 0
+  }
+  if (personaId === 'supplier_fulfillment') {
+    if (kpiKey === 'orders') return stats?.assignedDeliveries ?? 0
+    if (kpiKey === 'pending') return stats?.deliveriesInProgress ?? 0
+  }
+  if (personaId === 'supplier_accountant') {
+    if (kpiKey === 'revenue') return money(stats?.outstandingBalance)
+    if (kpiKey === 'pending') return stats?.overdueAccountCount ?? 0
+    if (kpiKey === 'counterpart') return stats?.debtorCount ?? 0
+  }
+  if (personaId === 'restaurant_manager' && kpiKey === 'revenue') {
+    return money(stats?.spendLast30Days)
+  }
+  if (personaId === 'restaurant_accountant') {
+    if (kpiKey === 'revenue') return money(stats?.invoiceSpendLast30Days)
+    if (kpiKey === 'orders') return stats?.billedOrderCount ?? 0
+  }
+  return undefined
 }
 
 export function dashboardKpiTone(kpiKey: DashboardKpiKey): KpiTone {

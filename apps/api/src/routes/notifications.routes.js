@@ -1,5 +1,5 @@
 import express from 'express'
-import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
+import { requireAuth, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { notificationsMutationGuard } from '../lib/route-permissions.js'
 import { getEntitlements } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
@@ -58,6 +58,7 @@ const updatePreferencesSchema = z.object({
   notifyStaffAnnouncement: z.boolean().optional(),
   notifyStaffDocument: z.boolean().optional(),
   notifyScheduledOrder: z.boolean().optional(),
+  notifyReorderCadence: z.boolean().optional(),
 })
 
 // Get user's notifications
@@ -285,25 +286,30 @@ async function resolveWebhookAccess(req) {
 }
 
 // Get outbound notification webhook config (Scale tier)
-router.get('/webhook', resolveTenantContext, async (req, res, next) => {
-  try {
-    const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
-    const webhook = allowed ? await getTenantWebhook(tenantId, tenantType) : null
-    res.json({
-      ok: true,
-      data: {
-        allowed,
-        webhook: webhook
-          ? { url: webhook.url, enabled: webhook.enabled, hasSecret: Boolean(webhook.secret) }
-          : null,
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    next(error)
+router.get(
+  '/webhook',
+  resolveTenantContext,
+  requirePermission('SETTINGS_VIEW'),
+  async (req, res, next) => {
+    try {
+      const { allowed, tenantId, tenantType } = await resolveWebhookAccess(req)
+      const webhook = allowed ? await getTenantWebhook(tenantId, tenantType) : null
+      res.json({
+        ok: true,
+        data: {
+          allowed,
+          webhook: webhook
+            ? { url: webhook.url, enabled: webhook.enabled, hasSecret: Boolean(webhook.secret) }
+            : null,
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      next(error)
+    }
   }
-})
+)
 
 // Create/update outbound notification webhook config (Scale tier)
 router.put('/webhook', ...tenantMutationGuard, async (req, res, next) => {

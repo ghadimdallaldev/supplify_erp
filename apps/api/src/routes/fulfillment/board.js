@@ -11,7 +11,10 @@ import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { isFeatureEnabled, requireFeature } from '../../lib/subscription.js'
-import { isMultiWarehouseFulfillmentActive } from '../../lib/warehouse-helpers.js'
+import {
+  isMultiWarehouseFulfillmentActive,
+  getWarehouseSupplierColumn,
+} from '../../lib/warehouse-helpers.js'
 import { z } from 'zod'
 import {
   listDeliveryRoutes,
@@ -131,6 +134,13 @@ router.get('/board', async (req, res) => {
               JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
               WHERE pod.delivery_timestamp >= date_trunc('day', now())
             ) delivered_orders
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM driver_assignments open_da
+              WHERE open_da.order_id = delivered_orders.order_id
+                AND open_da.supplier_id = $1
+                AND open_da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'rescheduled')
+            )
           ) AS delivered_today
         `,
         [supplierId]
@@ -192,6 +202,14 @@ router.get('/board', async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
     logger.error('Get fulfillment board error:', error)
     res.status(500).json({
       ok: false,
@@ -301,12 +319,12 @@ const DISPATCH_BUCKET_LIMIT = 200
 const DISPATCH_CACHE_TTL_SECONDS = 45
 
 function dispatchCacheKey(supplierId, days, warehouseId) {
-  return `fulfillment:dispatch:v1:${supplierId}:${days}:${warehouseId || 'all'}`
+  return `fulfillment:dispatch:v2:${supplierId}:${days}:${warehouseId || 'all'}`
 }
 
 export { invalidateDispatchCacheForSupplier }
 
-function buildDispatchBaseSelect() {
+export function buildDispatchBaseSelect(supplierCol) {
   // One row per driver assignment (multi-WH legs). Unassigned orders appear once
   // via DISTINCT ON (COALESCE(da.id, o.id)).
   return `
@@ -329,7 +347,7 @@ function buildDispatchBaseSelect() {
         d.phone AS driver_phone,
         d.vehicle_type,
         d.vehicle_plate,
-        (pod.order_id IS NOT NULL) AS has_pod,
+        (pod.present IS NOT NULL) AS has_pod,
         ar.route_id AS active_route_id,
         ar.route_number AS active_route_number,
         ar.route_status AS active_route_status,
@@ -346,12 +364,30 @@ function buildDispatchBaseSelect() {
         WHERE supplier_id = $1
         GROUP BY order_id
       ) oic ON oic.order_id = o.id
-      LEFT JOIN (SELECT DISTINCT order_id FROM proof_of_delivery) pod ON pod.order_id = o.id
       LEFT JOIN driver_assignments da
         ON da.order_id = o.id
        AND da.supplier_id = $1
        AND da.status NOT IN ('reassigned', 'superseded')
       LEFT JOIN drivers d ON d.id = da.driver_id
+      LEFT JOIN LATERAL (
+        SELECT 1 AS present
+        FROM proof_of_delivery pod
+        WHERE pod.order_id = o.id
+          AND (
+            pod.driver_assignment_id = da.id
+            OR (
+              pod.driver_assignment_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM driver_assignments sibling
+                WHERE sibling.order_id = o.id
+                  AND sibling.supplier_id = $1
+                  AND sibling.id IS DISTINCT FROM da.id
+                  AND sibling.status NOT IN ('reassigned', 'superseded')
+              )
+            )
+          )
+        LIMIT 1
+      ) pod ON true
       LEFT JOIN LATERAL (
         SELECT dr.id AS route_id, dr.route_number, dr.status AS route_status
         FROM route_stop rs
@@ -359,12 +395,15 @@ function buildDispatchBaseSelect() {
         WHERE rs.order_id = o.id
           AND dr.supplier_id = $1
           AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+          AND (da.driver_id IS NULL OR dr.driver_id = da.driver_id)
+        ORDER BY CASE WHEN dr.status = 'IN_PROGRESS' THEN 0 ELSE 1 END,
+                 dr.scheduled_date DESC NULLS LAST
         LIMIT 1
       ) ar ON true
       LEFT JOIN LATERAL (
         SELECT w.id AS warehouse_id, w.name AS warehouse_name, w.code AS warehouse_code
         FROM order_warehouse_assignment owa
-        JOIN warehouse w ON w.id = owa.warehouse_id
+        JOIN warehouse w ON w.id = owa.warehouse_id AND w.${supplierCol} = $1
         WHERE owa.id = da.warehouse_assignment_id
       ) owa_leg ON true
       LEFT JOIN LATERAL (
@@ -413,7 +452,8 @@ router.get('/dispatch', async (req, res) => {
     params.push(days)
     const placedSinceClause = `AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($${dateParamIndex}::int * INTERVAL '1 day')`
 
-    const baseSelect = `${buildDispatchBaseSelect()}
+    const supplierCol = await getWarehouseSupplierColumn()
+    const baseSelect = `${buildDispatchBaseSelect(supplierCol)}
         ${placedSinceClause}
         ${whFilter.clause}
     `
@@ -521,6 +561,14 @@ router.get('/dispatch', async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
     logger.error('Get fulfillment dispatch error:', {
       message: error?.message,
       code: error?.code,

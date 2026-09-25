@@ -100,7 +100,9 @@
     "createReservationFailed": "Unable to create reservation",
     "enterNameForWaitlist": "Enter your name to join the waitlist",
     "waitlistJoined": "You are on the waitlist. We will contact you when a table opens.",
-    "joinWaitlistFailed": "Could not join waitlist"
+    "joinWaitlistFailed": "Could not join waitlist",
+    "depositFixed": "Deposit: {{amount}}. This confirms the policy and is not a payment.",
+    "depositPercent": "Deposit: {{percent}}% of the booking. This confirms the policy and is not a payment."
   },
   "manage": {
     "linkRequiredTitle": "Link required",
@@ -214,7 +216,8 @@
       "cancel": "Cancel",
       "seat": "Seat",
       "complete": "Complete",
-      "noShow": "No-show"
+      "noShow": "No-show",
+      "restore": "Restore"
     },
     "statusLower": {
       "PENDING": "pending",

@@ -3,7 +3,6 @@ import PDFDocument from 'pdfkit'
 import {
   requireAuth,
   requireRole,
-  getRequestTenant,
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
   resolveTenantContext,
@@ -59,7 +58,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
-import { loadOrderWarehouseAssignments } from './orders.helpers.js'
+import { assertOrderReadAccess, loadOrderWarehouseAssignments } from './orders.helpers.js'
 
 const router = express.Router()
 
@@ -67,34 +66,20 @@ const router = express.Router()
 router.get('/:id/warehouses', async (req, res, next) => {
   try {
     const { id } = req.params
-    const { rows: orders } = await query(`SELECT restaurant_id FROM customer_order WHERE id = $1`, [
-      id,
-    ])
+    const { rows: orders } = await query(
+      `SELECT id, restaurant_id FROM customer_order WHERE id = $1`,
+      [id]
+    )
     if (!orders.length) throw new NotFoundError('Order not found')
 
-    const tenant = await getRequestTenant(req)
-    if (tenant?.tenantType === 'RESTAURANT' && orders[0].restaurant_id !== tenant.tenantId) {
+    const allowed = await assertOrderReadAccess(req, orders[0], id)
+    if (!allowed) {
       return res.status(403).json({
         ok: false,
         data: null,
         error: { name: 'FORBIDDEN', message: 'Access denied' },
         requestId: req.requestId,
       })
-    }
-
-    if (tenant?.tenantType === 'SUPPLIER') {
-      const { rows: supplierItems } = await query(
-        `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
-        [id, tenant.tenantId]
-      )
-      if (!supplierItems.length) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Access denied' },
-          requestId: req.requestId,
-        })
-      }
     }
 
     const assignments = await loadOrderWarehouseAssignments(id)

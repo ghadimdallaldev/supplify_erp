@@ -405,6 +405,7 @@
     "scheduleShift": "Schedule shift",
     "validationShiftFields": "Please provide role, date, start time, and end time",
     "endAfterStart": "End time must be after start time",
+    "overnightHint": "If the end time is earlier than the start, the shift finishes the next day.",
     "shiftScheduled": "Shift scheduled",
     "scheduleFailed": "Unable to schedule shift",
     "upcomingTitle": "Upcoming schedule",

@@ -137,7 +137,11 @@ export function formatOrderRef(id: string): string {
 export function canSelectOrderForRoute(order: {
   active_route_id?: string | null
   status?: string
+  assignment?: { status?: string | null } | null
 }): { ok: boolean; reasonKey?: string } {
+  if (order.assignment?.status === 'failed') {
+    return { ok: false, reasonKey: 'dispatch.selectReason.failedNeedsRetry' }
+  }
   if (order.active_route_id) {
     return { ok: false, reasonKey: 'dispatch.selectReason.alreadyOnRoute' }
   }

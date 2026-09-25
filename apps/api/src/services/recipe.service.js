@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { assertLegacyBranchesOwnedByRestaurant } from '../lib/branch-scope.js'
 import {
   calculateRecipeCost,
   persistRecipeCalculation,
@@ -256,7 +257,10 @@ async function insertIngredients(client, recipeId, ingredients) {
   }
 }
 
-async function syncBranches(client, recipeId, branchIds = []) {
+async function syncBranches(client, restaurantId, recipeId, branchIds = []) {
+  await assertLegacyBranchesOwnedByRestaurant(branchIds, restaurantId, {
+    db: (sql, params) => client.query(sql, params),
+  })
   await client.query(`DELETE FROM recipe_branches WHERE recipe_id = $1`, [recipeId])
   for (const branchId of branchIds) {
     if (!branchId) continue
@@ -298,7 +302,7 @@ export async function createRecipe(restaurantId, input, userId = null) {
       ]
     )
     const recipe = rows[0]
-    await syncBranches(client, recipe.id, input.branchIds || [])
+    await syncBranches(client, restaurantId, recipe.id, input.branchIds || [])
     if (input.ingredients?.length) {
       await insertIngredients(client, recipe.id, input.ingredients)
     }
@@ -365,7 +369,7 @@ export async function updateRecipe(restaurantId, recipeId, input, userId = null)
     }
 
     if (input.branchIds !== undefined) {
-      await syncBranches(client, recipeId, input.branchIds)
+      await syncBranches(client, restaurantId, recipeId, input.branchIds)
     }
 
     if (input.ingredients !== undefined) {
@@ -483,7 +487,8 @@ export async function getRecipeCostingDashboard(restaurantId, dbQuery = query) {
 
   const { rows: lowestMargin } = await dbQuery(
     `
-    SELECT id, name, gross_margin_pct, food_cost_pct, selling_price, cost_per_portion
+    SELECT id, name, gross_margin_pct, food_cost_pct, selling_price, cost_per_portion,
+           target_food_cost_pct, calc_status
     FROM recipes
     WHERE restaurant_id = $1 AND is_active = true AND gross_margin_pct IS NOT NULL
     ORDER BY gross_margin_pct ASC
@@ -541,6 +546,10 @@ export async function getRecipeCostingDashboard(restaurantId, dbQuery = query) {
       foodCostPct: r.food_cost_pct != null ? Number(r.food_cost_pct) : null,
       sellingPrice: r.selling_price != null ? Number(r.selling_price) : null,
       costPerPortion: r.cost_per_portion != null ? Number(r.cost_per_portion) : null,
+      // The UI previously hardcoded a 30% target and a WARNING status here.
+      // Send the real per-recipe values; both are legitimately nullable.
+      targetFoodCostPct: r.target_food_cost_pct != null ? Number(r.target_food_cost_pct) : null,
+      calcStatus: r.calc_status,
     })),
     recentPriceChanges: recentEvents.map((e) => ({
       id: e.id,
@@ -607,18 +616,30 @@ export async function listPriceImpacts(
     [restaurantId, limit, offset]
   )
 
-  const result = []
-  for (const event of events) {
-    const { rows: impacts } = await dbQuery(
+  // One query for every event's impacts rather than one per event: the CSV
+  // export calls this with limit 500, which was 501 round trips.
+  const impactsByEvent = new Map()
+  if (events.length) {
+    const { rows: allImpacts } = await dbQuery(
       `
       SELECT rpi.*, r.name AS recipe_name
       FROM recipe_price_impacts rpi
       JOIN recipes r ON r.id = rpi.recipe_id
-      WHERE rpi.price_event_id = $1
-      ORDER BY r.name
+      WHERE rpi.price_event_id = ANY($1::uuid[])
+      ORDER BY rpi.price_event_id, r.name
       `,
-      [event.id]
+      [events.map((e) => e.id)]
     )
+    for (const impact of allImpacts) {
+      const bucket = impactsByEvent.get(impact.price_event_id)
+      if (bucket) bucket.push(impact)
+      else impactsByEvent.set(impact.price_event_id, [impact])
+    }
+  }
+
+  const result = []
+  for (const event of events) {
+    const impacts = impactsByEvent.get(event.id) ?? []
     result.push({
       event: {
         id: event.id,

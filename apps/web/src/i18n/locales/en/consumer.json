@@ -152,6 +152,32 @@
     "DELIVERED": "Delivered",
     "CANCELLED": "Cancelled"
   },
+  "columnStatus": {
+    "RECEIVED": "Received",
+    "PREPARING": "Preparing",
+    "SHIPPED": "Ready",
+    "DELIVERED": "Done"
+  },
+  "fulfillmentStatus": {
+    "DELIVERY": {
+      "RECEIVED": "Order received",
+      "PREPARING": "Preparing",
+      "SHIPPED": "On the way",
+      "DELIVERED": "Delivered"
+    },
+    "TAKEAWAY": {
+      "RECEIVED": "Order received",
+      "PREPARING": "Preparing",
+      "SHIPPED": "Ready for pickup",
+      "DELIVERED": "Picked up"
+    },
+    "DINE_IN": {
+      "RECEIVED": "Order received",
+      "PREPARING": "Preparing",
+      "SHIPPED": "Ready to serve",
+      "DELIVERED": "Served"
+    }
+  },
   "account": {
     "title": "Rewards account",
     "description": "Sign in or create an account to earn points on every order.",
@@ -209,6 +235,10 @@
     "scheduleTimeRequired": "Please choose a scheduled time",
     "scheduleWhenOpen": "Please schedule your order for when we open",
     "scheduleTooEarly": "Scheduled time is before the next available ordering window",
+    "scheduleOutsideHours": "Choose a time while the kitchen is open",
+    "restaurantLocalTime": "Times use the restaurant clock ({{timeZone}}).",
+    "pricesUpdated": "Menu prices changed. Your total now matches the current menu.",
+    "itemUnavailable": "An item in your cart is no longer available. Go back and choose again.",
     "orderPlaced": "Order placed!",
     "unableToPlace": "Unable to place order"
   },
@@ -227,7 +257,10 @@
     "newOrdersCount": "{{count}} new orders",
     "markedStatus": "Order marked {{status}}",
     "unableToUpdate": "Unable to update order",
-    "advanceTo": "→ {{status}}"
+    "advanceTo": "→ {{status}}",
+    "cancelOrder": "Cancel",
+    "confirmCancel": "Cancel this guest order? Redeemed rewards points are returned.",
+    "cancelledToast": "Order cancelled"
   },
   "receipt": {
     "notFound": "Receipt not found.",

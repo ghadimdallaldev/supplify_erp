@@ -47,10 +47,16 @@ const createSchema = z.object({
 async function assertOrderAccess(req, orderId) {
   const order = await getOrderForAmendment(orderId)
   const tenant = await getRequestTenant(req)
-  if (tenant?.tenantType === 'RESTAURANT' && order.restaurant_id !== tenant.tenantId) {
+  if (!tenant?.tenantId) {
     throw new ValidationError('Access denied')
   }
-  if (tenant?.tenantType === 'SUPPLIER' && order.supplier_id !== tenant.tenantId) {
+  if (tenant.tenantType === 'RESTAURANT' && order.restaurant_id !== tenant.tenantId) {
+    throw new ValidationError('Access denied')
+  }
+  if (tenant.tenantType === 'SUPPLIER' && order.supplier_id !== tenant.tenantId) {
+    throw new ValidationError('Access denied')
+  }
+  if (tenant.tenantType !== 'RESTAURANT' && tenant.tenantType !== 'SUPPLIER') {
     throw new ValidationError('Access denied')
   }
   return order
@@ -249,6 +255,14 @@ router.post(
         }
         throw new NotFoundError('Pending amendment not found')
       }
+
+      await query(
+        `UPDATE order_fulfillment_issue
+         SET status = 'rejected', updated_at = now()
+         WHERE amendment_id = $1
+           AND status IN ('shortage_reported', 'substitution_suggested', 'waiting_restaurant_approval')`,
+        [amendmentId]
+      )
 
       await notifyAmendmentParty(order, rows[0], 'rejected')
       res.json({ ok: true, data: { amendment: rows[0] }, error: null, requestId: req.requestId })

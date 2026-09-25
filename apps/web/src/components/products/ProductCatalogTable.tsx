@@ -13,6 +13,7 @@ type ProductCatalogTableProps = {
   onAddToCart: (product: any) => void
   onToggleFavorite?: (product: any) => void
   onAdjustStock: (product: any) => void
+  canAdjustStock?: boolean
 }
 
 const thClass = cn('border-b border-[var(--app-border)] text-start', tableHeadCellClass)
@@ -25,6 +26,7 @@ export function ProductCatalogTable({
   onAddToCart,
   onToggleFavorite,
   onAdjustStock,
+  canAdjustStock = false,
 }: ProductCatalogTableProps) {
   const { t } = useTranslation('products')
   const showFavorite = isRestaurant && Boolean(onToggleFavorite)
@@ -58,6 +60,7 @@ export function ProductCatalogTable({
           onAddToCart={onAddToCart}
           onToggleFavorite={onToggleFavorite}
           onAdjustStock={onAdjustStock}
+          canAdjustStock={canAdjustStock}
           layout="card"
         />
       )}
@@ -83,6 +86,7 @@ export function ProductCatalogTable({
           onAddToCart={onAddToCart}
           onToggleFavorite={onToggleFavorite}
           onAdjustStock={onAdjustStock}
+          canAdjustStock={canAdjustStock}
           layout="table"
           isLastRow={index === products.length - 1}
           cellClassName={tdClass}

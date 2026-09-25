@@ -104,7 +104,14 @@ export function getPlanTierDisabledFeatures(entitlements: Entitlements): PlanTie
     if (src !== 'plan' && src !== 'default') continue
     // Keys never on the plan JSON are N/A for this tier, not "missing from subscription".
     if (src === 'default' && !Object.prototype.hasOwnProperty.call(planFeatures, key)) continue
-    if (isEntitlementFeatureEnabled(entitlements, key)) continue
+    // This banner answers "does your plan tier include this?", so judge by the
+    // plan JSON. The resolved value would also fold in overrides and global
+    // flags, which belong to getExternallyDisabledFeatures instead — and those
+    // sources are already filtered out by the `src` check above.
+    const grantedByPlanTier = Object.prototype.hasOwnProperty.call(planFeatures, key)
+      ? featureEnabled(planFeatures[key])
+      : isEntitlementFeatureEnabled(entitlements, key)
+    if (grantedByPlanTier) continue
     out.push({
       key,
       label: formatFeatureKeyLabel(key),

@@ -16,6 +16,12 @@ export async function isAiPlatformEnabledForTenant(tenantId, tenantType) {
   return isFeatureEnabledForTenant(tenantId, tenantType, 'ai_platform')
 }
 
+/** Conversational assistant is separately entitled from any deterministic intelligence. */
+export async function isAiAssistantEnabledForTenant(tenantId, tenantType) {
+  if (!isAiEnvEnabled()) return false
+  return isFeatureEnabledForTenant(tenantId, tenantType, 'ai_assistant')
+}
+
 /**
  * LLM explain: forecast-capable smart_reorder + ai_platform.
  */

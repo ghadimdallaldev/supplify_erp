@@ -9,12 +9,15 @@ import {
   useUpdateSupplierCustomDomainMutation,
   useVerifySupplierCustomDomainMutation,
 } from '../../services/api'
+import { customDomainUpgradeMessage } from '../../lib/planLimits'
 
 type Props = {
   allowed: boolean
+  planName?: string | null
+  planCode?: string | null
 }
 
-export function CustomDomainCard({ allowed }: Props) {
+export function CustomDomainCard({ allowed, planName, planCode }: Props) {
   const { data, isLoading, refetch } = useGetSupplierCustomDomainQuery()
   const [updateDomain, { isLoading: saving }] = useUpdateSupplierCustomDomainMutation()
   const [verifyDomain, { isLoading: verifying }] = useVerifySupplierCustomDomainMutation()
@@ -78,7 +81,9 @@ export function CustomDomainCard({ allowed }: Props) {
         {!allowed ? (
           <div className="flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-bg-subtle)]/40 p-4">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-            <p className="text-sm text-[var(--text-mid)]">Custom domains are available on Scale.</p>
+            <p className="text-sm text-[var(--text-mid)]">
+              {customDomainUpgradeMessage(planName, planCode)}
+            </p>
           </div>
         ) : (
           <>

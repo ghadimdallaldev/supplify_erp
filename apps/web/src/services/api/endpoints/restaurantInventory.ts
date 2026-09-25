@@ -183,6 +183,7 @@ export const restaurantInventoryApi = api.injectEndpoints({
         method: 'POST',
         body: body ?? {},
       }),
+      invalidatesTags: ['Subscription'],
     }),
     askReorderAssistance: builder.mutation<
       ReorderAiAskResult,
@@ -193,6 +194,7 @@ export const restaurantInventoryApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
+      invalidatesTags: ['Subscription'],
     }),
     aiRecommendReorderAssistance: builder.mutation<
       ReorderAiRecommendResponse,
@@ -203,6 +205,7 @@ export const restaurantInventoryApi = api.injectEndpoints({
         method: 'POST',
         body: body ?? {},
       }),
+      invalidatesTags: ['Subscription'],
     }),
     feedbackReorderAssistance: builder.mutation<
       unknown,

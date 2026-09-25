@@ -8,7 +8,15 @@ import { Select, SelectTrigger } from '../ui/select'
 import { Skeleton } from '../ui/skeleton'
 import { applyReportDatePreset } from '../reports/ReportFiltersBar'
 import { useGetSupplierStatementQuery, useGetSuppliersQuery } from '../../services/api'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatPrice } from '../../utils/format'
+
+function moneyLabel(amount: number | string | null | undefined, currency?: string | null) {
+  const code = String(currency || '')
+    .trim()
+    .toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) return formatCurrency(amount ?? 0, { currency: code })
+  return formatPrice(amount ?? 0)
+}
 
 const DATE_PRESET_KEYS = [
   { key: 'statement.presets.days7', days: 7 },
@@ -189,33 +197,90 @@ export function SupplierStatementPanel() {
             </p>
           )}
 
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-            <Stat
-              label={t('statement.openingBalance')}
-              value={formatCurrency(summary.openingBalance)}
-              testId="statement-opening"
-            />
-            <Stat
-              label={t('statement.charges')}
-              value={formatCurrency(summary.totalCharges)}
-              testId="statement-charges"
-            />
-            <Stat
-              label={t('statement.payments')}
-              value={formatCurrency(summary.totalPayments)}
-              testId="statement-payments"
-            />
-            <Stat
-              label={t('statement.adjustments')}
-              value={formatCurrency(summary.totalAdjustments)}
-              testId="statement-adjustments"
-            />
-            <Stat
-              label={t('statement.closingBalance')}
-              value={formatCurrency(summary.closingBalance)}
-              testId="statement-closing"
-            />
-          </div>
+          {summary.byCurrency && summary.byCurrency.length > 1 ? (
+            <div className="space-y-2">
+              {summary.byCurrency.map((row) => (
+                <div
+                  key={row.currency || 'unscoped'}
+                  className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+                >
+                  <Stat
+                    label={
+                      row.currency
+                        ? `${t('statement.openingBalance')} (${row.currency})`
+                        : t('statement.openingBalance')
+                    }
+                    value={moneyLabel(row.openingBalance, row.currency)}
+                    testId={`statement-opening-${row.currency || 'unscoped'}`}
+                  />
+                  <Stat
+                    label={
+                      row.currency
+                        ? `${t('statement.charges')} (${row.currency})`
+                        : t('statement.charges')
+                    }
+                    value={moneyLabel(row.totalCharges, row.currency)}
+                    testId={`statement-charges-${row.currency || 'unscoped'}`}
+                  />
+                  <Stat
+                    label={
+                      row.currency
+                        ? `${t('statement.payments')} (${row.currency})`
+                        : t('statement.payments')
+                    }
+                    value={moneyLabel(row.totalPayments, row.currency)}
+                    testId={`statement-payments-${row.currency || 'unscoped'}`}
+                  />
+                  <Stat
+                    label={
+                      row.currency
+                        ? `${t('statement.adjustments')} (${row.currency})`
+                        : t('statement.adjustments')
+                    }
+                    value={moneyLabel(row.totalAdjustments, row.currency)}
+                    testId={`statement-adjustments-${row.currency || 'unscoped'}`}
+                  />
+                  <Stat
+                    label={
+                      row.currency
+                        ? `${t('statement.closingBalance')} (${row.currency})`
+                        : t('statement.closingBalance')
+                    }
+                    value={moneyLabel(row.closingBalance, row.currency)}
+                    testId={`statement-closing-${row.currency || 'unscoped'}`}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+              <Stat
+                label={t('statement.openingBalance')}
+                value={moneyLabel(summary.openingBalance, summary.byCurrency?.[0]?.currency)}
+                testId="statement-opening"
+              />
+              <Stat
+                label={t('statement.charges')}
+                value={moneyLabel(summary.totalCharges, summary.byCurrency?.[0]?.currency)}
+                testId="statement-charges"
+              />
+              <Stat
+                label={t('statement.payments')}
+                value={moneyLabel(summary.totalPayments, summary.byCurrency?.[0]?.currency)}
+                testId="statement-payments"
+              />
+              <Stat
+                label={t('statement.adjustments')}
+                value={moneyLabel(summary.totalAdjustments, summary.byCurrency?.[0]?.currency)}
+                testId="statement-adjustments"
+              />
+              <Stat
+                label={t('statement.closingBalance')}
+                value={moneyLabel(summary.closingBalance, summary.byCurrency?.[0]?.currency)}
+                testId="statement-closing"
+              />
+            </div>
+          )}
 
           {data?.invoices && data.invoices.length > 0 && (
             <div className="overflow-x-auto rounded-lg border border-[var(--app-border)]">
@@ -240,7 +305,9 @@ export function SupplierStatementPanel() {
                           {inv.invoice_number}
                         </a>
                       </td>
-                      <td className="p-2 text-right">{formatCurrency(Number(inv.total_amount))}</td>
+                      <td className="p-2 text-right">
+                        {moneyLabel(Number(inv.total_amount), inv.currency)}
+                      </td>
                       <td className="p-2">{inv.status}</td>
                     </tr>
                   ))}

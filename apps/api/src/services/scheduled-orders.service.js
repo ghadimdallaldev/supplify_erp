@@ -119,7 +119,7 @@ export async function executeScheduledOrders() {
 
           try {
             if (quickList.auto_create_order) {
-              const result = await createOrderFromQuickList(quickList, client)
+              const result = await createOrderFromQuickList(quickList, client, executionDate)
               const orders = result?.orders
               aiAdjustments = result?.aiAdjustments ?? null
               outcome = 'executed'
@@ -214,7 +214,7 @@ export async function executeScheduledOrders() {
  * Create order from quick list items (within an open transaction when client is passed).
  * Unit prices come from resolveProductPricesBatch so restaurant contract prices win over catalog.
  */
-export async function createOrderFromQuickList(quickList, client) {
+export async function createOrderFromQuickList(quickList, client, executionDate = null) {
   const q = client ? client.query.bind(client) : query
 
   const { rows: items } = await q(
@@ -291,6 +291,7 @@ export async function createOrderFromQuickList(quickList, client) {
           supplierId,
           quantity: Number(item.quantity),
         })),
+        date: executionDate || undefined,
       },
       q
     )

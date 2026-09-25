@@ -1,6 +1,8 @@
 import { query } from '../lib/db.js'
 import { getDeliveryBoardSqlFragments } from '../lib/delivery-board-schema.js'
 import { logger } from '../lib/logger.js'
+import { getZonedParts } from '../lib/delivery-rollover-time.js'
+import { getSupplierTimezone } from '../lib/tenant-timezone.js'
 import { getSupplierCommandCenter } from './supplier-command-center.service.js'
 import { getSupplierDeliveryBoard } from './supplier-deliveries.service.js'
 import { getSupplierReceivables } from './supplier-receivables.service.js'
@@ -14,11 +16,11 @@ const OPEN_ISSUE_STATUSES = [
 
 const PICK_ORDER_STATUSES = ['ACKNOWLEDGED', 'PROCESSING']
 
-function normalizeRunSheetDate(date) {
+function normalizeRunSheetDate(date, fallbackDate) {
   if (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
     return String(date)
   }
-  return new Date().toISOString().slice(0, 10)
+  return fallbackDate
 }
 
 function toDateOnly(value) {
@@ -275,7 +277,11 @@ async function getShortages(supplierId) {
  * Morning run sheet for a supplier — aggregates KPIs, pick queue, deliveries, collections, and risks.
  */
 export async function getSupplierRunSheet(supplierId, { date } = {}) {
-  const runDate = normalizeRunSheetDate(date)
+  const explicitDate = date && /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? String(date) : null
+  const fallbackDate = explicitDate
+    ? explicitDate
+    : getZonedParts(new Date(), await getSupplierTimezone(supplierId)).calendarDate
+  const runDate = normalizeRunSheetDate(date, fallbackDate)
 
   const [commandCenter, deliveries, receivables, reorderIntel, ordersToPick, shortages] =
     await Promise.all([

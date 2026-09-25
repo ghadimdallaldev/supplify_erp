@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../ui/button'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
-import { Textarea } from '../../ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -44,7 +43,6 @@ export function OnboardingBranchesTab() {
     name: '',
     phone: '',
     address: '',
-    deliveryInstructions: '',
   })
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
@@ -88,7 +86,7 @@ export function OnboardingBranchesTab() {
         contact_phone: newBranch.phone || null,
         address: newBranch.address ? { street: newBranch.address } : null,
       }).unwrap()
-      setNewBranch({ name: '', phone: '', address: '', deliveryInstructions: '' })
+      setNewBranch({ name: '', phone: '', address: '' })
       setShowAddBranchDialog(false)
       refetchBranches()
       toast.success(t('restaurantBranches.toasts.added'))
@@ -244,21 +242,6 @@ export function OnboardingBranchesTab() {
                 placeholder={t('restaurantBranches.dialog.addressPlaceholder')}
                 value={newBranch.address}
                 onChange={(e) => setNewBranch({ ...newBranch, address: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="branchDeliveryInstructions">
-                {t('restaurantBranches.dialog.deliveryInstructions')}
-              </Label>
-              <Textarea
-                id="branchDeliveryInstructions"
-                placeholder={t('restaurantBranches.dialog.deliveryInstructionsPlaceholder')}
-                rows={3}
-                value={newBranch.deliveryInstructions}
-                onChange={(e) =>
-                  setNewBranch({ ...newBranch, deliveryInstructions: e.target.value })
-                }
               />
             </div>
           </div>

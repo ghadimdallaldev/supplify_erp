@@ -102,6 +102,9 @@ export interface RecipeCostingDashboard {
     foodCostPct: number | null
     sellingPrice: number | null
     costPerPortion: number | null
+    /** Nullable: not every recipe has a target. Never substitute a default. */
+    targetFoodCostPct: number | null
+    calcStatus: RecipeCalcStatus
   }>
   recentPriceChanges: Array<{
     id: string

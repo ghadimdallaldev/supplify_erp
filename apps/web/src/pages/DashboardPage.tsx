@@ -23,7 +23,7 @@ import { formatDate } from '../i18n/formatters'
 import { useAppSelector } from '../hooks/redux'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useWorkspaceRole } from '../hooks/useWorkspaceRole'
-import { featureEnabled } from '../lib/planLimits'
+import { featureEnabled, smartReorderHasForecast } from '../lib/planLimits'
 import { canUseFinanceInvoices } from '../lib/planFeatureGates'
 import {
   getRestaurantDashboardLayout,
@@ -39,6 +39,7 @@ import {
   DASHBOARD_CALENDAR_EXTRA_GAP,
   buildOrderSpendTrend,
   dashboardKpiTone,
+  resolvePersonaKpiValue,
   SPEND_TREND_DAYS,
   type KpiCardProps,
   type SpendTrendPeriodDays,
@@ -120,10 +121,7 @@ export function DashboardPage() {
   const smartReorderFeatureValue = entitlementsData?.entitlements?.features?.smart_reorder
   const smartReorderEnabled = featureEnabled(smartReorderFeatureValue)
   // Provider-backed forecast capability; use the same gate as POST .../ai-recommend.
-  const smartReorderAiRecommendEligible =
-    smartReorderFeatureValue === true ||
-    smartReorderFeatureValue === 'full_90day_trends' ||
-    smartReorderFeatureValue === 'ai_forecast_seasonality'
+  const smartReorderAiRecommendEligible = smartReorderHasForecast(smartReorderFeatureValue)
   const { data: reorderSuggestions } = useGetReorderSuggestionsQuery(undefined, {
     skip: !isRestaurant || !smartReorderEnabled || !showRestaurantSection('showReorderAlerts'),
   })
@@ -317,7 +315,18 @@ export function DashboardPage() {
         .filter((kpi) => dashboardConfig.kpiKeys.includes(kpi.kpiKey))
         .map((kpi) => {
           const override = dashboardConfig.kpiLabels[kpi.kpiKey]
-          return override ? { ...kpi, label: override.label, meta: override.meta } : kpi
+          const personaValue = resolvePersonaKpiValue(
+            persona.id,
+            kpi.kpiKey,
+            stats,
+            formatCurrency,
+            t('kpi.zeroCurrency')
+          )
+          return {
+            ...kpi,
+            ...(override ? { label: override.label, meta: override.meta } : {}),
+            ...(personaValue !== undefined ? { value: personaValue } : {}),
+          }
         })
     : baseKpis
 

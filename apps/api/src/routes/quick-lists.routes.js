@@ -8,6 +8,7 @@ import {
 } from '../lib/rbac.js'
 import { ordersCreateMutationGuard } from '../lib/route-permissions.js'
 import { query, withTransaction } from '../lib/db.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { executeScheduledOrders } from '../services/scheduled-orders.service.js'
@@ -180,6 +181,7 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
 
     const supplierFilter = req.query.supplier_id || req.query.supplierId
     const branchFilter = req.query.branch_id || req.query.branchId
+    await assertLegacyBranchOwnedByRestaurant(branchFilter, restaurantId)
     const params = [restaurantId]
     let where = 'ql.restaurant_id = $1'
     if (supplierFilter) {
@@ -239,8 +241,8 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
           SELECT amount
           FROM price
           WHERE price.product_id = p.id
-            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-          ORDER BY valid_from DESC
+            AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+          ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
           LIMIT 1
         ) pr ON true
         WHERE qli.quick_list_id = ANY($1::uuid[])
@@ -334,8 +336,8 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
         SELECT amount
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true
       WHERE qli.quick_list_id = $1
@@ -383,6 +385,8 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
     if (!restaurantId) {
       throw new ValidationError('Restaurant not found')
     }
+
+    await assertLegacyBranchOwnedByRestaurant(data.branchId || null, restaurantId)
 
     const listLimit = await checkLimit(restaurantId, 'RESTAURANT', 'quick_lists')
     if (!listLimit.isUnlimited && listLimit.limit != null && listLimit.current >= listLimit.limit) {
@@ -472,6 +476,17 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         ok: false,

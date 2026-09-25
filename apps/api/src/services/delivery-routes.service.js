@@ -23,7 +23,7 @@ const DRIVER_ACTIVE_ROUTE_STATUSES = ['IN_PROGRESS']
 const DRIVER_TODAY_ROUTE_STATUSES = ['IN_PROGRESS', 'PLANNED']
 const FIXED_STOP_UI_STATUSES = new Set(['DELIVERED', 'FAILED'])
 
-const ROUTABLE_ASSIGNMENT_STATUSES = ['assigned', 'rescheduled', 'failed']
+const ROUTABLE_ASSIGNMENT_STATUSES = ['assigned', 'rescheduled']
 /** Live driver legs cleared when a route is cancelled or an order is removed — never `delivered`. */
 const RELEASEABLE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery', 'rescheduled']
 
@@ -37,8 +37,9 @@ export async function assertDriverBelongsToSupplier(driverId, supplierId) {
   return rows[0]
 }
 
-export async function getActiveRouteForOrder(orderId, supplierId) {
-  const { rows } = await query(
+export async function getActiveRouteForOrder(orderId, supplierId, client = null) {
+  const run = client ? client.query.bind(client) : query
+  const { rows } = await run(
     `
     SELECT dr.id, dr.route_number, dr.status
     FROM route_stop rs
@@ -53,19 +54,34 @@ export async function getActiveRouteForOrder(orderId, supplierId) {
   return rows[0] ?? null
 }
 
+async function assertOrderAvailableForRoute(client, orderId, supplierId, routeId) {
+  await client.query(`SELECT id FROM customer_order WHERE id = $1 FOR UPDATE`, [orderId])
+  const onRoute = await getActiveRouteForOrder(orderId, supplierId, client)
+  if (onRoute && onRoute.id !== routeId) {
+    throw new ValidationError(
+      `Order ${orderId.slice(0, 8)} is already on route ${onRoute.route_number}`
+    )
+  }
+}
+
 async function nextRouteNumber(supplierId, client) {
   const db = client ? (sql, p) => client.query(sql, p) : query
+  await db(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`delivery_route:${supplierId}`])
   const { rows } = await db(
     `
-    SELECT COUNT(*)::int AS n
-    FROM delivery_route
-    WHERE supplier_id = $1
-      AND created_at >= date_trunc('day', now())
+    SELECT
+      to_char(now() AT TIME ZONE 'UTC', 'YYYYMMDD') AS date_part,
+      COALESCE((
+        SELECT MAX(NULLIF(substring(route_number FROM '[0-9]+$'), '')::int)
+        FROM delivery_route
+        WHERE supplier_id = $1
+          AND route_number LIKE 'R-' || to_char(now() AT TIME ZONE 'UTC', 'YYYYMMDD') || '-%'
+      ), 0) AS n
     `,
     [supplierId]
   )
-  const seq = (rows[0]?.n ?? 0) + 1
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const datePart = rows[0]?.date_part || new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const seq = (Number(rows[0]?.n) || 0) + 1
   return `R-${datePart}-${String(seq).padStart(3, '0')}`
 }
 
@@ -182,13 +198,20 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
     FROM route_stop rs
     JOIN customer_order o ON o.id = rs.order_id
     JOIN restaurant r ON r.id = o.restaurant_id
-    LEFT JOIN branch b ON b.id = o.branch_id
+    LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT da2.status FROM driver_assignments da2
       WHERE da2.order_id = rs.order_id AND da2.status NOT IN ('reassigned', 'superseded')
       ORDER BY da2.created_at DESC LIMIT 1
     ) da ON true
-    LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id AND owa.status <> 'superseded'
+    LEFT JOIN LATERAL (
+      SELECT owa.warehouse_id
+      FROM order_warehouse_assignment owa
+      WHERE owa.order_id = o.id
+        AND owa.status NOT IN ('failed', 'superseded')
+      ORDER BY owa.assigned_at DESC NULLS LAST
+      LIMIT 1
+    ) owa ON TRUE
     ${deliveryZoneJoin}
     WHERE rs.route_id = ANY($1::uuid[])
     ORDER BY rs.route_id, rs.sequence_number ASC
@@ -273,8 +296,13 @@ export async function listDeliveryRoutes(
   return rows.map((row) => mapRouteSummary(row, stopsByRoute.get(row.id) ?? []))
 }
 
-export async function getDeliveryRoute(supplierId, routeId, { driverIdScope = null } = {}) {
-  const { rows } = await query(
+export async function getDeliveryRoute(
+  supplierId,
+  routeId,
+  { driverIdScope = null, client = null } = {}
+) {
+  const run = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await run(
     `
     SELECT dr.*, d.full_name AS driver_name
     FROM delivery_route dr
@@ -288,7 +316,7 @@ export async function getDeliveryRoute(supplierId, routeId, { driverIdScope = nu
   if (driverIdScope && route.driver_id !== driverIdScope) {
     throw new ForbiddenError('You can only view your own routes')
   }
-  const stops = await loadRouteStops(routeId)
+  const stops = await loadRouteStops(routeId, client)
   const locationMap = route.driver_id
     ? await getLatestLocationsForDrivers([route.driver_id])
     : new Map()
@@ -346,8 +374,22 @@ export async function getDriverActiveRoute(supplierId, driverId) {
  * Without this the dispatch board keeps showing a driver on an order whose stop
  * was removed / whose route was cancelled.
  */
-async function releaseDriverAssignments(dbLike, { supplierId, orderIds }) {
+async function releaseDriverAssignments(dbLike, { supplierId, orderIds, driverId }) {
   if (!orderIds?.length) return
+  // A route with no driver did not assign anyone; do not clear other legs.
+  if (driverId === null) return
+  if (driverId) {
+    await dbLike.query(
+      `UPDATE driver_assignments
+       SET status = 'reassigned', updated_at = now()
+       WHERE supplier_id = $1
+         AND order_id = ANY($2::uuid[])
+         AND driver_id = $3
+         AND status = ANY($4::text[])`,
+      [supplierId, orderIds, driverId, RELEASEABLE_ASSIGNMENT_STATUSES]
+    )
+    return
+  }
   await dbLike.query(
     `UPDATE driver_assignments
      SET status = 'reassigned', updated_at = now()
@@ -390,7 +432,29 @@ async function syncDriverAssignment(
 
     if (existing.length) {
       const row = existing[0]
-      if (row.driver_id === driverId && ROUTABLE_ASSIGNMENT_STATUSES.includes(row.status)) {
+      if (row.driver_id !== driverId) {
+        throw new ValidationError(
+          `Order ${orderId.slice(0, 8)} already has another driver on a warehouse leg`
+        )
+      }
+      if (row.status === 'failed') {
+        throw new ValidationError(
+          `Order ${orderId.slice(0, 8)} has a failed delivery. Retry that delivery before adding it to a route`
+        )
+      }
+      if (row.status === 'picked_up' || row.status === 'out_for_delivery') {
+        synced.push(row)
+        continue
+      }
+      if (ROUTABLE_ASSIGNMENT_STATUSES.includes(row.status)) {
+        if (scheduledDate) {
+          await client.query(
+            `UPDATE driver_assignments
+             SET scheduled_delivery_date = $2::date, updated_at = now()
+             WHERE id = $1`,
+            [row.id, scheduledDate]
+          )
+        }
         synced.push(row)
         continue
       }
@@ -449,6 +513,15 @@ export async function createDeliveryRoute({
   }
 
   return withTransaction(async (client) => {
+    for (const orderId of uniqueOrderIds) {
+      await client.query(`SELECT id FROM customer_order WHERE id = $1 FOR UPDATE`, [orderId])
+      const onRoute = await getActiveRouteForOrder(orderId, supplierId, client)
+      if (onRoute) {
+        throw new ValidationError(
+          `Order ${orderId.slice(0, 8)} is already on route ${onRoute.route_number}`
+        )
+      }
+    }
     const routeNumber = await nextRouteNumber(supplierId, client)
     const vehicleInfo =
       [driver.vehicle_type, driver.vehicle_plate].filter(Boolean).join(' · ') || null
@@ -516,6 +589,7 @@ async function activateRouteDispatch(client, { supplierId, route, userId }) {
     const orderStatus = orderRows[0]?.status
     if (orderStatus === 'CANCELLED') {
       await client.query(`DELETE FROM route_stop WHERE id = $1`, [stop.id])
+      await releaseDriverAssignments(client, { supplierId, orderIds: [stop.orderId] })
       continue
     }
     if (!isDispatchEligibleStatus(orderStatus)) {
@@ -576,6 +650,7 @@ export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, u
         [routeId, orderId]
       )
       if (existing.length) continue
+      await assertOrderAvailableForRoute(client, orderId, supplierId, routeId)
 
       const { rows: orderRows } = await client.query(
         `SELECT r.address_json FROM customer_order o
@@ -599,7 +674,7 @@ export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, u
       }
     }
 
-    return getDeliveryRoute(supplierId, routeId)
+    return getDeliveryRoute(supplierId, routeId, { client })
   }).then(async (updated) => {
     await invalidateDispatchCacheForSupplier(supplierId)
     return updated
@@ -612,14 +687,31 @@ export async function removeOrderFromPlannedRoute({ supplierId, routeId, orderId
     throw new ValidationError('Can only remove orders from a planned route')
   }
   await withTransaction(async (client) => {
-    await client.query(`DELETE FROM route_stop WHERE route_id = $1 AND order_id = $2`, [
-      routeId,
-      orderId,
-    ])
-    await releaseDriverAssignments(client, { supplierId, orderIds: [orderId] })
+    const { rowCount } = await client.query(
+      `DELETE FROM route_stop WHERE route_id = $1 AND order_id = $2`,
+      [routeId, orderId]
+    )
+    if (!rowCount) return
+    await releaseDriverAssignments(client, {
+      supplierId,
+      orderIds: [orderId],
+      driverId: route.driverId ?? null,
+    })
   })
   await invalidateDispatchCacheForSupplier(supplierId)
   return getDeliveryRoute(supplierId, routeId)
+}
+
+const ROUTE_STATUS_TRANSITIONS = {
+  PLANNED: new Set(['IN_PROGRESS', 'CANCELLED']),
+  IN_PROGRESS: new Set(['CANCELLED']),
+}
+
+const STOP_STATUS_TRANSITIONS = {
+  PLANNED: new Set(['IN_TRANSIT', 'FAILED']),
+  IN_TRANSIT: new Set(['COMPLETED', 'FAILED']),
+  COMPLETED: new Set(),
+  FAILED: new Set(),
 }
 
 export async function updateDeliveryRoute(supplierId, routeId, patch) {
@@ -629,6 +721,18 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
   }
   if (existing.status === 'COMPLETED') {
     throw new ValidationError('Cannot update a completed route')
+  }
+
+  if (patch.status !== undefined && patch.status !== existing.status) {
+    const allowed = ROUTE_STATUS_TRANSITIONS[existing.status]
+    if (!allowed?.has(patch.status)) {
+      throw new ValidationError(
+        `Cannot transition route from ${existing.status} to ${patch.status}; completion follows terminal stops`
+      )
+    }
+  }
+  if (patch.status === 'CANCELLED') {
+    return cancelDeliveryRoute(supplierId, routeId)
   }
 
   const fields = []
@@ -674,6 +778,13 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
 
   if (!fields.length) return existing
 
+  const nextDriverId = patch.driverId !== undefined ? patch.driverId : existing.driverId
+  const nextDate = patch.scheduledDate !== undefined ? patch.scheduledDate : existing.scheduledDate
+  const shouldSyncAssignments =
+    Boolean(nextDriverId) &&
+    existing.status === 'PLANNED' &&
+    (patch.driverId !== undefined || patch.scheduledDate !== undefined)
+
   const activating = patch.status === 'IN_PROGRESS' && existing.status === 'PLANNED'
 
   if (activating) {
@@ -693,8 +804,33 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
         route: routeRows[0],
         userId: patch.userId ?? null,
       })
-      const detail = await getDeliveryRoute(supplierId, routeId)
+      const detail = await getDeliveryRoute(supplierId, routeId, { client })
       return { ...detail, activation }
+    }).then(async (detail) => {
+      await invalidateDispatchCacheForSupplier(supplierId)
+      return detail
+    })
+  }
+
+  if (shouldSyncAssignments) {
+    return withTransaction(async (client) => {
+      const syncParams = [...params, routeId, supplierId]
+      let syncIdx = idx
+      await client.query(
+        `UPDATE delivery_route SET ${fields.join(', ')}, updated_at = now()
+         WHERE id = $${syncIdx++} AND supplier_id = $${syncIdx}`,
+        syncParams
+      )
+      for (const stop of existing.stops) {
+        await syncDriverAssignment(client, {
+          supplierId,
+          orderId: stop.orderId,
+          driverId: nextDriverId,
+          userId: patch.userId ?? null,
+          scheduledDate: nextDate,
+        })
+      }
+      return getDeliveryRoute(supplierId, routeId, { client })
     }).then(async (detail) => {
       await invalidateDispatchCacheForSupplier(supplierId)
       return detail
@@ -712,7 +848,11 @@ export async function updateDeliveryRoute(supplierId, routeId, patch) {
   if (patch.status === 'CANCELLED') {
     await releaseDriverAssignments(
       { query },
-      { supplierId, orderIds: existing.stops.map((s) => s.orderId) }
+      {
+        supplierId,
+        orderIds: existing.stops.map((s) => s.orderId),
+        driverId: existing.driverId ?? null,
+      }
     )
   }
   await invalidateDispatchCacheForSupplier(supplierId)
@@ -764,8 +904,8 @@ export async function reorderRouteStops(
   assertDriverOwnsRoute(route, driverIdScope)
 
   const existingIds = new Set(route.stops.map((s) => s.id))
-  if (stopIds.length !== route.stops.length) {
-    throw new ValidationError('Stop list must include all stops on the route')
+  if (stopIds.length !== route.stops.length || new Set(stopIds).size !== stopIds.length) {
+    throw new ValidationError('Stop list must include every stop on the route exactly once')
   }
   for (const id of stopIds) {
     if (!existingIds.has(id)) throw new ValidationError('Invalid stop on route')
@@ -774,7 +914,7 @@ export async function reorderRouteStops(
 
   return withTransaction(async (client) => {
     await persistStopSequence(routeId, stopIds, client)
-    return getDeliveryRoute(supplierId, routeId, { driverIdScope })
+    return getDeliveryRoute(supplierId, routeId, { driverIdScope, client })
   })
 }
 
@@ -805,14 +945,17 @@ export async function reorderRouteStopsByOrder(
   const sorted = [...stopUpdates].sort((a, b) => a.stopSequence - b.stopSequence)
   const movableOrderIds = sorted.map((u) => orderToStop.get(u.orderId).id)
 
-  if (movableOrderIds.length !== movable.length) {
-    throw new ValidationError('Include all active stops in the reorder request')
+  if (
+    movableOrderIds.length !== movable.length ||
+    new Set(movableOrderIds).size !== movableOrderIds.length
+  ) {
+    throw new ValidationError('Include all active stops in the reorder request exactly once')
   }
 
   const merged = [...fixed.map((s) => s.id), ...movableOrderIds]
   return withTransaction(async (client) => {
     await persistStopSequence(routeId, merged, client)
-    return getDeliveryRoute(supplierId, routeId, { driverIdScope })
+    return getDeliveryRoute(supplierId, routeId, { driverIdScope, client })
   })
 }
 
@@ -842,7 +985,7 @@ export async function setNextRouteStop(
 
   return withTransaction(async (client) => {
     await persistStopSequence(routeId, merged, client)
-    return getDeliveryRoute(supplierId, routeId, { driverIdScope })
+    return getDeliveryRoute(supplierId, routeId, { driverIdScope, client })
   })
 }
 
@@ -874,7 +1017,7 @@ export async function updateRouteStop(
 
   await withTransaction(async (client) => {
     const { rows: routeRows } = await client.query(
-      `SELECT id, status FROM delivery_route
+      `SELECT id, status, driver_id FROM delivery_route
        WHERE id = $1 AND supplier_id = $2
        FOR UPDATE`,
       [routeId, supplierId]
@@ -891,22 +1034,41 @@ export async function updateRouteStop(
     if (!stopRows.length) throw new NotFoundError('Stop not found')
     const stopRow = stopRows[0]
     const orderId = stopRow.order_id
+    if (dbStatus && routeRow.status !== 'IN_PROGRESS') {
+      throw new ValidationError('Start the route before updating its stops')
+    }
+
+    if (dbStatus && dbStatus !== stopRow.status) {
+      const allowed = STOP_STATUS_TRANSITIONS[stopRow.status]
+      if (!allowed?.has(dbStatus)) {
+        throw new ValidationError(`Cannot transition stop from ${stopRow.status} to ${dbStatus}`)
+      }
+    }
 
     if (dbStatus) {
       const assignmentStatus = STOP_TO_ASSIGNMENT[status]
       if (assignmentStatus) {
+        if (!routeRow.driver_id) {
+          throw new ValidationError('Assign a driver to the route before updating its stops')
+        }
         const activeAssignments = await listActiveDriverAssignments(orderId, {
           client,
           forUpdate: true,
+          statuses: ['assigned', 'picked_up', 'out_for_delivery', 'rescheduled'],
         })
-        // Multi-WH: one route stop may map to several driver legs — update each explicitly.
-        const targets = activeAssignments.length ? activeAssignments : [{ id: null, status: null }]
+        const targets = activeAssignments.filter(
+          (assignment) => assignment.driver_id === routeRow.driver_id
+        )
 
         // Validate every leg's transition before mutating any, so failures are predictable.
         for (const assignment of targets) {
           if (!assignment?.id) continue
           const hops = []
-          if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
+          if (assignment.status === 'rescheduled') hops.push('assigned')
+          if (
+            assignmentStatus === 'out_for_delivery' &&
+            (assignment.status === 'assigned' || assignment.status === 'rescheduled')
+          ) {
             hops.push('picked_up')
           }
           hops.push(assignmentStatus)
@@ -922,29 +1084,32 @@ export async function updateRouteStop(
         }
 
         for (const assignment of targets) {
-          if (assignmentStatus === 'out_for_delivery' && assignment.status === 'assigned') {
+          if (!assignment?.id) continue
+          const hops = []
+          if (assignment.status === 'rescheduled') hops.push('assigned')
+          if (
+            assignmentStatus === 'out_for_delivery' &&
+            (assignment.status === 'assigned' || assignment.status === 'rescheduled')
+          ) {
+            hops.push('picked_up')
+          }
+          hops.push(assignmentStatus)
+          let fromStatus = assignment.status
+          for (const toStatus of hops) {
+            if (fromStatus === toStatus) continue
             await updateDeliveryStatus({
               supplierId,
               orderId,
-              status: 'picked_up',
+              status: toStatus,
               notes,
+              failureReason: toStatus === assignmentStatus ? failureReason : undefined,
               userId,
               driverAssignmentId: assignment.id,
               client,
               postCommitEffects,
             })
+            fromStatus = toStatus
           }
-          await updateDeliveryStatus({
-            supplierId,
-            orderId,
-            status: assignmentStatus,
-            notes,
-            failureReason,
-            userId,
-            driverAssignmentId: assignment.id,
-            client,
-            postCommitEffects,
-          })
         }
       }
     }
@@ -962,6 +1127,17 @@ export async function updateRouteStop(
          WHERE id = $3 AND route_id = $4`,
         [dbStatus, notes ?? null, stopId, routeId]
       )
+    }
+
+    if (dbStatus === 'IN_TRANSIT') {
+      const { advanceTrackingSessionStop } = await import('./driver-tracking-session.service.js')
+      await advanceTrackingSessionStop({
+        supplierId,
+        routeId,
+        stopId,
+        driverId: routeRow.driver_id,
+        client,
+      })
     }
 
     if (dbStatus && TERMINAL_STOP_DB_STATUSES.has(dbStatus) && routeRow.status === 'IN_PROGRESS') {
@@ -1002,26 +1178,29 @@ export async function cancelDeliveryRoute(supplierId, routeId) {
     await releaseDriverAssignments(client, {
       supplierId,
       orderIds: route.stops.map((s) => s.orderId),
+      driverId: route.driverId ?? null,
     })
   })
   await invalidateDispatchCacheForSupplier(supplierId)
   return getDeliveryRoute(supplierId, routeId)
 }
 
-export async function releaseOrderFromPlannedRoutes(orderId, supplierId) {
-  if (!orderId || !supplierId) return
-  const { rowCount } = await query(
+export async function releaseOrderFromPlannedRoutes(orderId, supplierId, client = null) {
+  if (!orderId || !supplierId) return { releasedStops: 0 }
+  const run = client ? client.query.bind(client) : query
+  const { rowCount } = await run(
     `DELETE FROM route_stop rs
      USING delivery_route dr
      WHERE rs.route_id = dr.id
        AND rs.order_id = $1
        AND dr.supplier_id = $2
-       AND dr.status = 'PLANNED'`,
+       AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+       AND rs.status NOT IN ('COMPLETED', 'FAILED')`,
     [orderId, supplierId]
   )
-  if (!rowCount) return
-  await releaseDriverAssignments({ query }, { supplierId, orderIds: [orderId] })
-  await invalidateDispatchCacheForSupplier(supplierId)
+  await releaseDriverAssignments(client ?? { query }, { supplierId, orderIds: [orderId] })
+  if (!client && rowCount) await invalidateDispatchCacheForSupplier(supplierId)
+  return { releasedStops: rowCount ?? 0 }
 }
 
 export function orderEligibleForRoute(order) {
@@ -1060,7 +1239,13 @@ async function findEligibleStandaloneAssignments(supplierId, driverId, routeDate
       AND da.driver_id = $2
       AND da.status = ANY($3::text[])
       AND o.status NOT IN ('CANCELLED', 'COMPLETED', 'DELIVERED')
-      AND COALESCE(o.placed_at, o.created_at)::date <= $4::date
+      AND (
+        da.scheduled_delivery_date = $4::date
+        OR (
+          da.scheduled_delivery_date IS NULL
+          AND COALESCE(o.requested_delivery_date, (COALESCE(o.placed_at, o.created_at))::date) <= $4::date
+        )
+      )
       AND NOT EXISTS (
         SELECT 1 FROM route_stop rs
         JOIN delivery_route dr ON dr.id = rs.route_id
@@ -1075,7 +1260,7 @@ async function findEligibleStandaloneAssignments(supplierId, driverId, routeDate
   return rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
 }
 
-async function appendOrdersToRoute(client, routeId, orderRows, startSeq) {
+async function appendOrdersToRoute(client, routeId, orderRows, startSeq, supplierId) {
   let seq = startSeq
   for (const row of orderRows) {
     const { rows: existing } = await client.query(
@@ -1083,6 +1268,7 @@ async function appendOrdersToRoute(client, routeId, orderRows, startSeq) {
       [routeId, row.order_id]
     )
     if (existing.length) continue
+    await assertOrderAvailableForRoute(client, row.order_id, supplierId, routeId)
     const stopStatus = mapAssignmentStatusToStopStatus(row.assignment_status)
     await client.query(
       `INSERT INTO route_stop (route_id, order_id, sequence_number, status, address_json)
@@ -1119,7 +1305,13 @@ export async function buildDriverRouteFromAssignments(
           `SELECT COALESCE(MAX(sequence_number), 0)::int AS n FROM route_stop WHERE route_id = $1`,
           [existingRoute.id]
         )
-        await appendOrdersToRoute(client, existingRoute.id, eligible, (maxSeq[0]?.n ?? 0) + 1)
+        await appendOrdersToRoute(
+          client,
+          existingRoute.id,
+          eligible,
+          (maxSeq[0]?.n ?? 0) + 1,
+          supplierId
+        )
         if (existingRoute.status === 'PLANNED') {
           await client.query(
             `UPDATE delivery_route
@@ -1156,7 +1348,7 @@ export async function buildDriverRouteFromAssignments(
       [supplierId, routeNumber, routeLabel, driverId, driver.full_name, vehicleInfo, routeDate]
     )
     const route = routeRows[0]
-    await appendOrdersToRoute(client, route.id, eligible, 1)
+    await appendOrdersToRoute(client, route.id, eligible, 1, supplierId)
     return getDeliveryRoute(supplierId, route.id, { driverIdScope: driverId })
   }).then(async (built) => {
     await invalidateDispatchCacheForSupplier(supplierId)

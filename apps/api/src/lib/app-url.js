@@ -16,3 +16,23 @@ export function buildAppUrl(path) {
   const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
   return `${base}${normalized}`
 }
+/**
+ * Email clients do not resolve relative browser paths against the application.
+ * Make app-local links absolute before an email is handed to the mail provider.
+ */
+export function normalizeEmailHtmlLinks(html) {
+  if (!html || typeof html !== 'string') return html
+
+  return html.replace(/\bhref\s*=\s*(["'])(.*?)\1/gi, (match, quote, href) => {
+    const value = href.trim()
+    if (
+      !value ||
+      value.startsWith('#') ||
+      /^(?:https?:|mailto:|tel:|data:|javascript:)/i.test(value)
+    ) {
+      return match
+    }
+    const absoluteUrl = buildAppUrl(value)
+    return absoluteUrl ? `href=${quote}${absoluteUrl}${quote}` : match
+  })
+}

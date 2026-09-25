@@ -18,6 +18,7 @@ import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.j
 import { createPendingActivationSubscription } from '../../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../../lib/tenant-roles.js'
 import { restaurantSupplierMutationGuard } from '../../lib/route-permissions.js'
+import { presentPublicSupplier } from '../../lib/tenant-profile-redaction.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../../lib/safe-update.js'
 import {
@@ -40,8 +41,32 @@ import {
   supplierListSchema,
 } from './suppliers.helpers.js'
 import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
+import { listCommonProductBestPrices } from '../../services/supplier-price-comparison.service.js'
 
 const router = express.Router()
+
+router.get(
+  '/price-comparison',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requirePermission('CATALOG_VIEW'),
+  async (req, res, next) => {
+    try {
+      const tenant = await getRequestTenant(req)
+      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+        throw new ValidationError('Restaurant not found')
+      }
+      const comparisons = await listCommonProductBestPrices(tenant.tenantId, {
+        search: req.query.search,
+        limit: req.query.limit,
+      })
+      res.json({ ok: true, data: { comparisons }, error: null, requestId: req.requestId })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
 
 // Get followed suppliers (restaurant only)
 router.get(
@@ -76,7 +101,7 @@ router.get(
 
       res.json({
         ok: true,
-        data: { suppliers: rows },
+        data: { suppliers: rows.map((row) => presentPublicSupplier(row)) },
         error: null,
         requestId: req.requestId,
       })

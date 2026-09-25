@@ -15,6 +15,8 @@
   "openAria": "Open Supplify Assistant",
   "closeAria": "Close assistant",
   "suggestions": {
+    "followedSuppliers": "Which suppliers do I follow?",
+    "bestPrices": "Show the best prices for products my suppliers have in common",
     "stock": "How many tomato kilos do we still have?",
     "need": "What do we still need to order this week?",
     "orders": "Show my recent orders",

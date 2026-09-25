@@ -5,7 +5,7 @@ import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Textarea } from '../../ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '../../ui/select'
-import { Mail, Phone, Globe, Save, Loader2 } from 'lucide-react'
+import { Mail, Phone, Save, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { TenantBrandingPanel } from '../../settings/TenantBrandingPanel'
 import {
@@ -49,8 +49,6 @@ export function OnboardingProfileTab() {
     contact_email: '',
     address: { street: '', city: '', area: '', region: '', country: '' },
     delivery_instructions: '',
-    description: '',
-    website: '',
   })
 
   useEffect(() => {
@@ -65,8 +63,6 @@ export function OnboardingProfileTab() {
         contact_email: restaurant.contact_email || '',
         address: normalizeAddress(restaurant.address_json),
         delivery_instructions: restaurant.delivery_instructions || '',
-        description: restaurant.description || '',
-        website: restaurant.website || '',
       })
     }
   }, [restaurant])
@@ -92,6 +88,7 @@ export function OnboardingProfileTab() {
   }) => getPresignedUrl(params).unwrap()
 
   const handleSaveProfile = async () => {
+    if (!can('SETTINGS_EDIT')) return
     if (!restaurant?.id) {
       toast.error(t('restaurantProfile.toasts.notLoaded'))
       return
@@ -104,6 +101,9 @@ export function OnboardingProfileTab() {
           name: profileForm.name,
           businessType: coerceRestaurantBusinessType(profileForm.business_type),
           tradeLicenseNo: profileForm.trade_license_no,
+          taxId: profileForm.tax_id,
+          vatNumber: profileForm.vat_number,
+          deliveryInstructions: profileForm.delivery_instructions,
           phone: profileForm.phone,
           contactEmail: profileForm.contact_email,
           address: {
@@ -146,7 +146,7 @@ export function OnboardingProfileTab() {
         title={t('restaurantProfile.title')}
         description={t('restaurantProfile.description')}
         footer={
-          <Button onClick={handleSaveProfile} disabled={isUpdating}>
+          <Button onClick={handleSaveProfile} disabled={isUpdating || !can('SETTINGS_EDIT')}>
             {isUpdating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -258,32 +258,6 @@ export function OnboardingProfileTab() {
                 />
               </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="website">{t('restaurantProfile.fields.website')}</Label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-              <Input
-                id="website"
-                type="url"
-                placeholder="https://www.restaurant.com"
-                value={profileForm.website}
-                onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">{t('restaurantProfile.fields.description')}</Label>
-            <Textarea
-              id="description"
-              placeholder={t('restaurantProfile.placeholders.description')}
-              rows={4}
-              value={profileForm.description}
-              onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
-            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

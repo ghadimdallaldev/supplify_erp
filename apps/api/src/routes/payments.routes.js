@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -12,7 +13,11 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyPaymentReceived } from '../services/notification.service.js'
 import { invoicesMutationGuard } from '../lib/route-permissions.js'
-import { recordCashPayment, computeRemainingBalance } from '../services/invoice.service.js'
+import {
+  recordCashPayment,
+  computeRemainingBalance,
+  withInvoiceCalendarDates,
+} from '../services/invoice.service.js'
 
 const router = express.Router()
 
@@ -63,19 +68,17 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
 
     const invoice = invoices[0]
 
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || invoice.supplier_id !== supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Invoice does not belong to your supplier account',
-          },
-          requestId: req.requestId,
-        })
-      }
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId || invoice.supplier_id !== supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Invoice does not belong to your supplier account',
+        },
+        requestId: req.requestId,
+      })
     }
 
     const balanceDue = computeRemainingBalance(invoice)
@@ -160,10 +163,11 @@ router.get('/invoice/:invoiceId', async (req, res) => {
 
     if (req.userData.role === 'SUPPLIER') {
       const supplierId = await getSupplierIdForRequest(req)
-      const { rows: inv } = await query(`SELECT supplier_id FROM invoice WHERE id = $1`, [
-        invoiceId,
-      ])
-      if (!inv.length || inv[0].supplier_id !== supplierId) {
+      const { rows: inv } = await query(
+        `SELECT supplier_id, restaurant_id FROM invoice WHERE id = $1`,
+        [invoiceId]
+      )
+      if (!supplierId || !inv.length || inv[0].supplier_id !== supplierId) {
         return res.status(403).json({
           ok: false,
           data: null,
@@ -171,6 +175,46 @@ router.get('/invoice/:invoiceId', async (req, res) => {
           requestId: req.requestId,
         })
       }
+    } else if (req.userData.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      const { rows: inv } = await query(
+        `SELECT supplier_id, restaurant_id FROM invoice WHERE id = $1`,
+        [invoiceId]
+      )
+      if (!inv.length || !restaurantId || inv[0].restaurant_id !== restaurantId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'ADMIN') {
+      const supplierId = await getSupplierIdForRequest(req)
+      const restaurantId = await getRestaurantIdForRequest(req)
+      const { rows: inv } = await query(
+        `SELECT supplier_id, restaurant_id FROM invoice WHERE id = $1`,
+        [invoiceId]
+      )
+      const ok =
+        inv.length &&
+        ((supplierId && inv[0].supplier_id === supplierId) ||
+          (restaurantId && inv[0].restaurant_id === restaurantId))
+      if (!ok) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
+      }
+    } else {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Access denied' },
+        requestId: req.requestId,
+      })
     }
 
     const { rows } = await query(
@@ -180,7 +224,7 @@ router.get('/invoice/:invoiceId', async (req, res) => {
 
     res.json({
       ok: true,
-      data: { payments: rows },
+      data: { payments: rows.map((row) => withInvoiceCalendarDates(row)) },
       error: null,
       requestId: req.requestId,
     })

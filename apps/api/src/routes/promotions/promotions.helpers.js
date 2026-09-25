@@ -201,7 +201,7 @@ async function syncRestaurantTargets(client, promotionId, restaurantIds = []) {
 function mapPromotionInsertFields(body) {
   return {
     name: body.name,
-    description: body.description ?? null,
+    description: body.description == null ? null : String(body.description).trim(),
     type: body.type,
     discountValue: body.discountValue ?? null,
     minOrderAmount: body.minOrderAmount ?? null,

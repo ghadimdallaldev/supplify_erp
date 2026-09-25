@@ -36,6 +36,7 @@ import './endpoints/growth'
 import './endpoints/recipes'
 import './endpoints/loyalty'
 import './endpoints/runSheet'
+import './endpoints/priceIntelligence'
 import '../staffApi'
 import '../reservationsApi'
 import '../consumerApi'
@@ -71,6 +72,9 @@ export const {
   useLogoutMutation,
   useGetProductsQuery,
   useGetProductCategoriesQuery,
+  useCreateProductCategoryMutation,
+  useUpdateProductCategoryMutation,
+  useDeleteProductCategoryMutation,
   useGetProductTagsQuery,
   useGetProductQuery,
   useCreateProductMutation,
@@ -127,6 +131,7 @@ export const {
   useResolveFulfillmentExceptionMutation,
   useIgnoreFulfillmentExceptionMutation,
   useGetSuppliersQuery,
+  useGetSupplierPriceComparisonsQuery,
   useGetSupplierQuery,
   useGetSupplierStatisticsQuery,
   useFollowSupplierMutation,
@@ -161,6 +166,7 @@ export const {
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
   useSetDefaultWarehouseMutation,
+  useUpdateWarehouseMutation,
   useGetSupplierFulfillmentQuery,
   useUpdateSupplierFulfillmentMutation,
   useGetWarehouseRoutingRulesQuery,
@@ -182,6 +188,8 @@ export const {
   usePurchaseFeaturedPlacementMutation,
   usePayFeaturedPlacementMutation,
   useGetAdminFeaturedPlacementsQuery,
+  useApproveFeaturedPlacementMutation,
+  useRejectFeaturedPlacementMutation,
   useRefundFeaturedPlacementMutation,
   useGetMessagesQuery,
   useCreateConversationMutation,
@@ -252,6 +260,14 @@ export const {
   useSendInvoiceReminderMutation,
   useRemindOverdueInvoicesMutation,
   useGetSupplierCommandCenterQuery,
+  useGetSupplierSlowMovingInventoryQuery,
+  useGetSupplierWeeklyIntelligenceSummaryQuery,
+  useGetSupplierDemandForecastQuery,
+  useGetSupplierCrossSellOpportunitiesQuery,
+  useGetSupplierWarehouseDemandForecastQuery,
+  useGetSupplierWarehousePerformanceQuery,
+  useGetSupplierSuggestedDealCandidatesQuery,
+  useGetSupplierStockoutRisksQuery,
   useGetSupplierRunSheetQuery,
   useGetSupplierReorderIntelligenceQuery,
   useGetSupplierReorderAssistanceQuery,
@@ -315,10 +331,12 @@ export const {
   useCancelRestaurantOrgLinkInvitationMutation,
   useResendRestaurantOrgLinkInvitationMutation,
   useGetRestaurantOrgReportsOverviewQuery,
-  useGetCentralPurchasingDraftsQuery,
-  useCreateCentralPurchasingDraftMutation,
-  useUpdateCentralPurchasingDraftMutation,
-  useSubmitCentralPurchasingDraftsMutation,
+  useGetRestaurantOrgBranchComparisonQuery,
+  useGetRestaurantOrgBranchDemandForecastQuery,
+  useGetRestaurantOrgCrossBranchPurchasingInsightsQuery,
+  useGetRestaurantOrgStockTransferSuggestionsQuery,
+  useGetRestaurantOrgAdvancedAnalyticsQuery,
+
   useGetRestaurantMemberInviteRolesQuery,
   useGetRestaurantBranchInviteRolesQuery,
   useGetRestaurantMemberInvitationsQuery,

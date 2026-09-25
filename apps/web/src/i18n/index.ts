@@ -146,7 +146,10 @@ if (typeof window !== 'undefined') {
     typeof requestIdleCallback === 'function'
       ? (cb: () => void) => requestIdleCallback(cb, { timeout: 4000 })
       : (cb: () => void) => window.setTimeout(cb, 2000)
-  window.setTimeout(() => scheduleIdle(warmNamespaces), 1500)
+  window.setTimeout(() => {
+    if (typeof window === 'undefined') return
+    scheduleIdle(warmNamespaces)
+  }, 1500)
 }
 
 export { i18n, loadNamespaces }

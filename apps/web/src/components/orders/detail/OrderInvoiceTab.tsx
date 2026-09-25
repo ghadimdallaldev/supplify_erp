@@ -5,7 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Badge } from '../../ui/badge'
 import { Button } from '../../ui/button'
 import { ArrowLeft, DollarSign, FileText } from 'lucide-react'
-import { formatPrice } from '../../../utils/format'
+import { formatCurrency } from '../../../utils/format'
+import {
+  formatCalendarDate,
+  invoiceRemainingBalance,
+  invoiceIsOverdue,
+} from '../../../lib/invoiceBalance'
 import { getOrderStatusColor, OrderDetailTabLoading } from './orderDetailShared'
 
 export interface OrderInvoiceTabProps {
@@ -62,10 +67,8 @@ export function OrderInvoiceTab({ orderId }: OrderInvoiceTabProps) {
         ) : invoiceCount > 0 ? (
           <div className="space-y-4">
             {invoicesData!.invoices!.map((invoice: any) => {
-              const remaining =
-                parseFloat(invoice.total_amount || 0) - parseFloat(invoice.total_paid || 0)
-              const isOverdue =
-                invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0
+              const remaining = invoiceRemainingBalance(invoice)
+              const isOverdue = invoiceIsOverdue(invoice)
 
               return (
                 <div
@@ -89,26 +92,38 @@ export function OrderInvoiceTab({ orderId }: OrderInvoiceTabProps) {
                       <div className="flex gap-4 text-xs text-[var(--text-muted)] mt-2">
                         <span>
                           {t('invoiceTab.invoiceDate', {
-                            date: new Date(invoice.invoice_date).toLocaleDateString(),
+                            date: formatCalendarDate(invoice.invoice_date),
                           })}
                         </span>
                         <span>
                           {t('invoiceTab.dueDate', {
-                            date: new Date(invoice.due_date).toLocaleDateString(),
+                            date: formatCalendarDate(invoice.due_date),
                           })}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold">${formatPrice(invoice.total_amount)}</p>
+                      <p className="text-2xl font-bold">
+                        {formatCurrency(invoice.total_amount, {
+                          currency: invoice.currency || 'USD',
+                        })}
+                      </p>
                       <p
                         className={`text-sm font-semibold ${remaining > 0 ? 'text-[var(--red)]' : 'text-[var(--mint)]'}`}
                       >
-                        {t('invoiceTab.balance', { amount: formatPrice(remaining) })}
+                        {t('invoiceTab.balance', {
+                          amount: formatCurrency(remaining, {
+                            currency: invoice.currency || 'USD',
+                          }),
+                        })}
                       </p>
                       {parseFloat(String(invoice.total_paid || 0)) > 0 && (
                         <p className="text-xs text-[var(--mint)]">
-                          {t('invoiceTab.paid', { amount: formatPrice(invoice.total_paid) })}
+                          {t('invoiceTab.paid', {
+                            amount: formatCurrency(invoice.total_paid, {
+                              currency: invoice.currency || 'USD',
+                            }),
+                          })}
                         </p>
                       )}
                     </div>

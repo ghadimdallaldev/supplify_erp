@@ -58,6 +58,24 @@ export const chatApi = api.injectEndpoints({
       query: () => '/api/suppliers/featured-placement/admin/active',
       providesTags: ['Admin'],
     }),
+    approveFeaturedPlacement: builder.mutation<{ placement: unknown }, { id: string }>({
+      query: ({ id }) => ({
+        url: `/api/suppliers/featured-placement/${id}/approve`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Supplier', 'Admin'],
+    }),
+    rejectFeaturedPlacement: builder.mutation<
+      { placement: unknown },
+      { id: string; reason?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/suppliers/featured-placement/${id}/reject`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Supplier', 'Admin'],
+    }),
     refundFeaturedPlacement: builder.mutation<
       { placement: unknown },
       { id: string; reason?: string; amount?: number }

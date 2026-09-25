@@ -10,6 +10,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
+import { getRestaurantTimezone, getSupplierTimezone } from '../lib/tenant-timezone.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import {
@@ -108,6 +109,18 @@ const bulkCreateSchema = z.object({
     .max(500),
 })
 
+function calendarDateKey(value) {
+  if (value == null || value === '') return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear()
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
 function mapPricingRow(row) {
   return {
     ...row,
@@ -115,12 +128,16 @@ function mapPricingRow(row) {
     contract_discount_percentage:
       row.contract_discount_percentage != null ? Number(row.contract_discount_percentage) : null,
     min_order_quantity: row.min_order_quantity != null ? Number(row.min_order_quantity) : null,
+    contract_start_date: calendarDateKey(row.contract_start_date),
+    contract_end_date: calendarDateKey(row.contract_end_date),
   }
 }
 
 function validateContractDateRange(startDate, endDate) {
-  if (!startDate || !endDate) return
-  if (String(endDate) < String(startDate)) {
+  const start = calendarDateKey(startDate)
+  const end = calendarDateKey(endDate)
+  if (!start || !end) return
+  if (end < start) {
     throw new ValidationError('contractEndDate must be on or after contractStartDate')
   }
 }
@@ -289,14 +306,16 @@ router.get(
         })
       }
 
+      const timeZone = await getRestaurantTimezone(restaurantId)
+      const today = '(now() AT TIME ZONE $2)::date'
       const conditions = [
         'rp.restaurant_id = $1',
         'rp.is_active = true',
-        '(rp.contract_end_date IS NULL OR rp.contract_end_date >= CURRENT_DATE)',
-        '(rp.contract_start_date IS NULL OR rp.contract_start_date <= CURRENT_DATE)',
+        `(rp.contract_end_date IS NULL OR rp.contract_end_date >= ${today})`,
+        `(rp.contract_start_date IS NULL OR rp.contract_start_date <= ${today})`,
       ]
-      const params = [restaurantId]
-      let idx = 2
+      const params = [restaurantId, timeZone]
+      let idx = 3
 
       if (supplierId) {
         conditions.push(`rp.supplier_id = $${idx++}`)
@@ -327,8 +346,8 @@ router.get(
         LEFT JOIN LATERAL (
           SELECT amount FROM price
           WHERE product_id = p.id
-            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-          ORDER BY valid_from DESC
+            AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+          ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
           LIMIT 1
         ) pr ON true
         WHERE ${conditions.join(' AND ')}
@@ -342,16 +361,17 @@ router.get(
       const pricing = rows.map(mapPricingRow)
       const bySupplier = {}
       for (const row of pricing) {
-        if (!bySupplier[row.supplier_name]) {
-          bySupplier[row.supplier_name] = {
+        const supplierKey = row.supplier_id || row.supplier_name
+        if (!bySupplier[supplierKey]) {
+          bySupplier[supplierKey] = {
             supplier_id: row.supplier_id,
             supplier_name: row.supplier_name,
             product_count: 0,
             products: [],
           }
         }
-        bySupplier[row.supplier_name].product_count++
-        bySupplier[row.supplier_name].products.push(row)
+        bySupplier[supplierKey].product_count++
+        bySupplier[supplierKey].products.push(row)
       }
 
       res.json({
@@ -386,9 +406,11 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
     }
 
     const { restaurantId, productId, q, status = 'all' } = req.query
+    const timeZone = await getSupplierTimezone(supplierId)
+    const today = '(now() AT TIME ZONE $2)::date'
     const conditions = ['rp.supplier_id = $1']
-    const params = [supplierId]
-    let idx = 2
+    const params = [supplierId, timeZone]
+    let idx = 3
 
     if (restaurantId) {
       conditions.push(`rp.restaurant_id = $${idx++}`)
@@ -405,13 +427,13 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
     }
     if (status === 'active') {
       conditions.push('rp.is_active = true')
-      conditions.push('(rp.contract_end_date IS NULL OR rp.contract_end_date >= CURRENT_DATE)')
-      conditions.push('(rp.contract_start_date IS NULL OR rp.contract_start_date <= CURRENT_DATE)')
+      conditions.push(`(rp.contract_end_date IS NULL OR rp.contract_end_date >= ${today})`)
+      conditions.push(`(rp.contract_start_date IS NULL OR rp.contract_start_date <= ${today})`)
     } else if (status === 'inactive') {
       conditions.push('rp.is_active = false')
     } else if (status === 'expired') {
       // Date-expired only (includes inactive rows); UI labels inactive separately from expired.
-      conditions.push('rp.contract_end_date IS NOT NULL AND rp.contract_end_date < CURRENT_DATE')
+      conditions.push(`rp.contract_end_date IS NOT NULL AND rp.contract_end_date < ${today}`)
     }
 
     const { rows } = await query(
@@ -429,8 +451,8 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
       LEFT JOIN LATERAL (
         SELECT amount FROM price
         WHERE product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true
       WHERE ${conditions.join(' AND ')}
@@ -487,6 +509,12 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       pricingData.price,
       pricingData.contractDiscountPercentage
     )
+    const catalogForCurrency = await getDefaultCatalogPricesBatch([pricingData.productId])
+    const catalogCurrency = catalogForCurrency.get(pricingData.productId)?.currency
+    const currency =
+      pricingData.currency && pricingData.currency !== 'USD'
+        ? pricingData.currency
+        : catalogCurrency || pricingData.currency || 'USD'
 
     const {
       rows: [pricing],
@@ -501,12 +529,12 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       DO UPDATE SET
         price = EXCLUDED.price,
         currency = EXCLUDED.currency,
-        contract_discount_percentage = EXCLUDED.contract_discount_percentage,
-        contract_start_date = EXCLUDED.contract_start_date,
-        contract_end_date = EXCLUDED.contract_end_date,
+        contract_discount_percentage = COALESCE(EXCLUDED.contract_discount_percentage, restaurant_pricing.contract_discount_percentage),
+        contract_start_date = COALESCE(EXCLUDED.contract_start_date, restaurant_pricing.contract_start_date),
+        contract_end_date = COALESCE(EXCLUDED.contract_end_date, restaurant_pricing.contract_end_date),
         agreement_type = EXCLUDED.agreement_type,
-        min_order_quantity = EXCLUDED.min_order_quantity,
-        notes = EXCLUDED.notes,
+        min_order_quantity = COALESCE(EXCLUDED.min_order_quantity, restaurant_pricing.min_order_quantity),
+        notes = COALESCE(EXCLUDED.notes, restaurant_pricing.notes),
         is_active = true,
         updated_at = now()
       RETURNING *
@@ -516,7 +544,7 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
         pricingData.restaurantId,
         pricingData.productId,
         resolvedPrice.price,
-        pricingData.currency,
+        currency,
         resolvedPrice.contractDiscountPercentage,
         pricingData.contractStartDate || null,
         pricingData.contractEndDate || null,
@@ -658,12 +686,12 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
         DO UPDATE SET
           price = EXCLUDED.price,
           currency = EXCLUDED.currency,
-          contract_discount_percentage = EXCLUDED.contract_discount_percentage,
-          contract_start_date = EXCLUDED.contract_start_date,
-          contract_end_date = EXCLUDED.contract_end_date,
+          contract_discount_percentage = COALESCE(EXCLUDED.contract_discount_percentage, restaurant_pricing.contract_discount_percentage),
+          contract_start_date = COALESCE(EXCLUDED.contract_start_date, restaurant_pricing.contract_start_date),
+          contract_end_date = COALESCE(EXCLUDED.contract_end_date, restaurant_pricing.contract_end_date),
           agreement_type = EXCLUDED.agreement_type,
-          min_order_quantity = EXCLUDED.min_order_quantity,
-          notes = EXCLUDED.notes,
+          min_order_quantity = COALESCE(EXCLUDED.min_order_quantity, restaurant_pricing.min_order_quantity),
+          notes = COALESCE(EXCLUDED.notes, restaurant_pricing.notes),
           is_active = true,
           updated_at = now()
         RETURNING *

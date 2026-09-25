@@ -111,7 +111,7 @@ export async function loadRouteStopsForEta(orderId, supplierId) {
     JOIN delivery_route dr ON dr.id = rs.route_id
     JOIN customer_order o ON o.id = rs.order_id
     JOIN restaurant r ON r.id = o.restaurant_id
-    LEFT JOIN branch b ON b.id = o.branch_id
+    LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     WHERE dr.id = (
       SELECT dr2.id
       FROM route_stop rs2

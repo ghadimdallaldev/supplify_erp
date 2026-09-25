@@ -9,9 +9,11 @@ import { PageShell } from '../../components/ui/page-shell'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { useGetBranchesQuery, useGetEntitlementsQuery } from '../../services/api'
 import { useImpersonation } from '../../hooks/useImpersonation'
+import { usePermissions } from '../../hooks/usePermissions'
 import { useWorkspaceRole } from '../../hooks/useWorkspaceRole'
 import { RequirePermission } from '../../components/RequirePermission'
 import { canUseGlobalReports } from '../../lib/planFeatureGates'
+import { featureEnabled } from '../../lib/planLimits'
 import {
   RESTAURANT_REPORTS_ANY_OF,
   SUPPLIER_ANALYTICS_ANY_OF,
@@ -25,8 +27,11 @@ function defaultRange() {
   return applyReportDatePreset(30)
 }
 
-function buildRestaurantReports(t: TFunction<'reports'>): ReportDef[] {
-  return [
+function buildRestaurantReports(
+  t: TFunction<'reports'>,
+  options: { receiving: boolean; waste: boolean; invoices: boolean }
+): ReportDef[] {
+  const reports: ReportDef[] = [
     {
       key: 'order-volume',
       label: t('reports.orderVolume.label'),
@@ -38,6 +43,7 @@ function buildRestaurantReports(t: TFunction<'reports'>): ReportDef[] {
         { key: 'period', label: t('reports.orderVolume.columns.period') },
         { key: 'order_count', label: t('reports.orderVolume.columns.orderCount') },
         { key: 'total_amount', label: t('reports.orderVolume.columns.totalAmount') },
+        { key: 'currency', label: t('reports.currency') },
       ],
     },
     {
@@ -50,6 +56,7 @@ function buildRestaurantReports(t: TFunction<'reports'>): ReportDef[] {
       columns: [
         { key: 'supplier_name', label: t('reports.spendBySupplier.columns.supplierName') },
         { key: 'total_spend', label: t('reports.spendBySupplier.columns.totalSpend') },
+        { key: 'currency', label: t('reports.currency') },
         { key: 'order_count', label: t('reports.spendBySupplier.columns.orderCount') },
       ],
     },
@@ -63,14 +70,99 @@ function buildRestaurantReports(t: TFunction<'reports'>): ReportDef[] {
       columns: [
         { key: 'product_name', label: t('reports.topProducts.columns.productName') },
         { key: 'total_spend', label: t('reports.topProducts.columns.totalSpend') },
-        { key: 'quantity', label: t('reports.topProducts.columns.quantity') },
+        { key: 'currency', label: t('reports.currency') },
+        { key: 'total_qty', label: t('reports.topProducts.columns.quantity') },
+      ],
+    },
+    {
+      key: 'spend-category',
+      label: t('reports.spendByCategory.label'),
+      path: 'spend-by-category',
+      chart: 'bar',
+      xKey: 'category',
+      yKey: 'total_spend',
+      columns: [
+        { key: 'category', label: t('reports.spendByCategory.columns.category') },
+        { key: 'total_spend', label: t('reports.spendByCategory.columns.totalSpend') },
+        { key: 'currency', label: t('reports.currency') },
+        { key: 'order_count', label: t('reports.spendByCategory.columns.orderCount') },
+      ],
+    },
+    {
+      key: 'cogs-trend',
+      label: t('reports.cogsTrend.label'),
+      path: 'cogs-trend',
+      chart: 'line',
+      xKey: 'period',
+      yKey: 'cogs',
+      columns: [
+        { key: 'period', label: t('reports.cogsTrend.columns.period') },
+        { key: 'cogs', label: t('reports.cogsTrend.columns.cogs') },
+        { key: 'currency', label: t('reports.currency') },
       ],
     },
   ]
+
+  if (options.receiving) {
+    reports.push({
+      key: 'receiving-quality',
+      label: t('reports.receivingQuality.label'),
+      path: 'receiving-quality',
+      chart: 'bar',
+      xKey: 'supplier_name',
+      yKey: 'avg_quality_score',
+      columns: [
+        { key: 'supplier_name', label: t('reports.receivingQuality.columns.supplierName') },
+        { key: 'report_count', label: t('reports.receivingQuality.columns.reportCount') },
+        { key: 'avg_quality_score', label: t('reports.receivingQuality.columns.avgQuality') },
+        { key: 'avg_fill_rate_pct', label: t('reports.receivingQuality.columns.fillRate') },
+      ],
+    })
+  }
+
+  if (options.waste) {
+    reports.push({
+      key: 'waste',
+      label: t('reports.waste.label'),
+      path: 'waste',
+      chart: 'bar',
+      xKey: 'period',
+      yKey: 'total_cost',
+      columns: [
+        { key: 'period', label: t('reports.waste.columns.period') },
+        { key: 'waste_category', label: t('reports.waste.columns.category') },
+        { key: 'incident_count', label: t('reports.waste.columns.incidents') },
+        { key: 'total_qty', label: t('reports.waste.columns.quantity') },
+        { key: 'total_cost', label: t('reports.waste.columns.cost') },
+      ],
+    })
+  }
+
+  if (options.invoices) {
+    reports.push({
+      key: 'invoice-aging',
+      label: t('reports.invoiceAging.label'),
+      path: 'invoice-aging',
+      chart: 'bar',
+      xKey: 'bucket',
+      yKey: 'total_balance',
+      columns: [
+        { key: 'bucket', label: t('reports.invoiceAging.columns.bucket') },
+        { key: 'invoice_count', label: t('reports.invoiceAging.columns.invoiceCount') },
+        { key: 'total_balance', label: t('reports.invoiceAging.columns.balance') },
+        { key: 'currency', label: t('reports.currency') },
+      ],
+    })
+  }
+
+  return reports
 }
 
-function buildSupplierReports(t: TFunction<'reports'>): ReportDef[] {
-  return [
+function buildSupplierReports(
+  t: TFunction<'reports'>,
+  options: { invoices: boolean }
+): ReportDef[] {
+  const reports: ReportDef[] = [
     {
       key: 'revenue',
       label: t('reports.revenueTrend.label'),
@@ -81,6 +173,7 @@ function buildSupplierReports(t: TFunction<'reports'>): ReportDef[] {
       columns: [
         { key: 'period', label: t('reports.revenueTrend.columns.period') },
         { key: 'revenue', label: t('reports.revenueTrend.columns.revenue') },
+        { key: 'currency', label: t('reports.currency') },
         { key: 'order_count', label: t('reports.revenueTrend.columns.orderCount') },
       ],
     },
@@ -94,6 +187,7 @@ function buildSupplierReports(t: TFunction<'reports'>): ReportDef[] {
       columns: [
         { key: 'restaurant_name', label: t('reports.topRestaurants.columns.restaurantName') },
         { key: 'revenue', label: t('reports.topRestaurants.columns.revenue') },
+        { key: 'currency', label: t('reports.currency') },
         { key: 'order_count', label: t('reports.topRestaurants.columns.orderCount') },
       ],
     },
@@ -107,9 +201,58 @@ function buildSupplierReports(t: TFunction<'reports'>): ReportDef[] {
       columns: [
         { key: 'period', label: t('reports.orderVolume.columns.period') },
         { key: 'order_count', label: t('reports.orderVolume.columns.orderCount') },
+        { key: 'total_amount', label: t('reports.orderVolume.columns.totalAmount') },
+        { key: 'currency', label: t('reports.currency') },
+      ],
+    },
+    {
+      key: 'supplier-top-products',
+      label: t('reports.supplierTopProducts.label'),
+      path: 'top-products',
+      chart: 'bar',
+      xKey: 'product_name',
+      yKey: 'revenue',
+      columns: [
+        { key: 'product_name', label: t('reports.supplierTopProducts.columns.productName') },
+        { key: 'revenue', label: t('reports.supplierTopProducts.columns.revenue') },
+        { key: 'currency', label: t('reports.currency') },
+        { key: 'total_qty', label: t('reports.supplierTopProducts.columns.quantity') },
+      ],
+    },
+    {
+      key: 'fulfillment',
+      label: t('reports.fulfillment.label'),
+      path: 'fulfillment-performance',
+      chart: 'bar',
+      xKey: 'status',
+      yKey: 'order_count',
+      columns: [
+        { key: 'status', label: t('reports.fulfillment.columns.status') },
+        { key: 'order_count', label: t('reports.fulfillment.columns.orderCount') },
       ],
     },
   ]
+
+  if (options.invoices) {
+    reports.push({
+      key: 'invoice-collection',
+      label: t('reports.invoiceCollection.label'),
+      path: 'invoice-collection',
+      chart: 'bar',
+      xKey: 'status',
+      yKey: 'balance_due',
+      columns: [
+        { key: 'status', label: t('reports.invoiceCollection.columns.status') },
+        { key: 'invoice_count', label: t('reports.invoiceCollection.columns.invoiceCount') },
+        { key: 'total_amount', label: t('reports.invoiceCollection.columns.totalAmount') },
+        { key: 'paid_amount', label: t('reports.invoiceCollection.columns.paid') },
+        { key: 'balance_due', label: t('reports.invoiceCollection.columns.balance') },
+        { key: 'currency', label: t('reports.currency') },
+      ],
+    })
+  }
+
+  return reports
 }
 
 const RESTAURANT_REPORT_ICONS: Record<string, typeof TrendingUp> = {
@@ -127,6 +270,7 @@ export function ReportsPage() {
 
   const { isEffectiveRestaurant } = useImpersonation()
   const { persona } = useWorkspaceRole()
+  const { can } = usePermissions()
   const isRestaurant = isEffectiveRestaurant
   const range = defaultRange()
   const [from, setFrom] = useState(range.from)
@@ -134,14 +278,28 @@ export function ReportsPage() {
   const [branchId, setBranchId] = useState('')
   const [granularity, setGranularity] = useState('day')
 
-  const restaurantReports = useMemo(() => buildRestaurantReports(t), [t])
-  const supplierReports = useMemo(() => buildSupplierReports(t), [t])
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
+  const wasteEnabled = featureEnabled(entitlementsData?.entitlements?.features?.waste_tracking)
+  const canViewInvoices = can('INVOICES_VIEW')
+  const canViewReceiving = can('RECEIVING_VIEW')
+
+  const restaurantReports = useMemo(
+    () =>
+      buildRestaurantReports(t, {
+        receiving: canViewReceiving,
+        waste: wasteEnabled,
+        invoices: canViewInvoices,
+      }),
+    [t, canViewReceiving, wasteEnabled, canViewInvoices]
+  )
+  const supplierReports = useMemo(
+    () => buildSupplierReports(t, { invoices: canViewInvoices }),
+    [t, canViewInvoices]
+  )
   const defs = isRestaurant ? restaurantReports : supplierReports
 
   const [activeReport, setActiveReport] = useState(defs[0]?.key ?? 'order-volume')
-
-  const { data: entitlementsData } = useGetEntitlementsQuery()
-  const reportsEnabled = canUseGlobalReports(entitlementsData?.entitlements)
   const { data: branchesData } = useGetBranchesQuery(undefined, { skip: !isRestaurant })
   const branches = branchesData?.branches || []
   const current = defs.find((d) => d.key === activeReport) || defs[0]

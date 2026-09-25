@@ -11,6 +11,7 @@ import { RequirePermission } from '../../components/RequirePermission'
 import { RecipeAttentionBanner } from '../../components/recipes/RecipeAttentionBanner'
 import { RecipeStatusBadge } from '../../components/recipes/RecipeStatusBadge'
 import { FoodCostBar } from '../../components/recipes/FoodCostBar'
+import { FoodCostWarningsCard } from '../../components/recipes/FoodCostWarningsCard'
 import { usePermissions } from '../../hooks/usePermissions'
 import {
   useGetRecipeAlertsQuery,
@@ -20,6 +21,8 @@ import { formatPrice } from '../../utils/format'
 import { Skeleton } from '../../components/ui/skeleton'
 import { EmptyState } from '../../components/ui/empty-state'
 import { ensureNamespace } from '../../i18n'
+import { meetsIntelligenceTier } from '../../lib/planLimits'
+import { useGetEntitlementsQuery } from '../../services/api'
 
 export function RecipeCostingDashboardPage() {
   const { t } = useTranslation('recipes')
@@ -29,6 +32,11 @@ export function RecipeCostingDashboardPage() {
   const canViewCosts = can('RECIPES_VIEW_COSTS')
   const { data, isLoading, isError, refetch } = useGetRecipeCostingDashboardQuery()
   const { data: alertsData } = useGetRecipeAlertsQuery()
+  const { data: entitlementsData } = useGetEntitlementsQuery()
+  // Threshold-based food-cost warnings are an Intelligence-tier addition on
+  // top of the costing dashboard, which itself ships with recipe costing.
+  const hasCostWarnings =
+    canViewCosts && meetsIntelligenceTier(entitlementsData?.entitlements, 'advanced')
   const dashboard = data?.dashboard
   const alerts = alertsData?.alerts ?? []
 
@@ -207,12 +215,14 @@ export function RecipeCostingDashboardPage() {
                     name: r.name,
                     metric: t('dashboard.marginMetric', { pct: r.grossMarginPct.toFixed(1) }),
                     foodCostPct: r.foodCostPct,
-                    calcStatus: 'WARNING' as const,
-                    targetFoodCostPct: 30,
+                    calcStatus: r.calcStatus,
+                    targetFoodCostPct: r.targetFoodCostPct,
                   }))}
                 />
               )}
             </div>
+
+            {hasCostWarnings && <FoodCostWarningsCard />}
 
             {dashboard.mostImpactedRecipes?.length > 0 && (
               <RecipeRankCard

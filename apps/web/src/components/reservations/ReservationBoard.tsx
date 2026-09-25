@@ -83,9 +83,9 @@ function SortableReservationCard({
         { status: 'COMPLETED', labelKey: 'board.actions.complete' },
         { status: 'NO_SHOW', labelKey: 'board.actions.noShow' },
       ],
-      NO_SHOW: [],
+      NO_SHOW: [{ status: 'CONFIRMED', labelKey: 'board.actions.restore' }],
       COMPLETED: [],
-      CANCELLED: [],
+      CANCELLED: [{ status: 'CONFIRMED', labelKey: 'board.actions.restore' }],
       WAITLIST: [
         { status: 'CONFIRMED', labelKey: 'board.actions.confirm' },
         { status: 'CANCELLED', labelKey: 'board.actions.cancel' },

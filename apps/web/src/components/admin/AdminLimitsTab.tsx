@@ -49,7 +49,17 @@ import { OverridesTable } from './limits/OverridesTable'
 import type { Entitlements } from '../../types/admin'
 
 const SUPPLIER_ADDON_KEYS = ['supplier_extra_branch', 'supplier_extra_warehouse'] as const
-const RESTAURANT_ADDON_KEYS = ['restaurant_extra_branch'] as const
+const HISTORICAL_RESTAURANT_ADDON_KEY = 'restaurant_extra_branch'
+
+export function getAdminAddonOptionKeys(
+  tenantType: AdminTenantType,
+  activeAddons: Array<{ addon_key?: unknown }>
+): string[] {
+  if (tenantType === 'SUPPLIER') return [...SUPPLIER_ADDON_KEYS]
+  return activeAddons.some((addon) => String(addon.addon_key) === HISTORICAL_RESTAURANT_ADDON_KEY)
+    ? [HISTORICAL_RESTAURANT_ADDON_KEY]
+    : []
+}
 
 export function AdminLimitsTab() {
   const { t } = useTranslation('admin')
@@ -129,7 +139,7 @@ export function AdminLimitsTab() {
     })
   }, [plansData?.plans])
 
-  const [addonKey, setAddonKey] = useState('restaurant_extra_branch')
+  const [addonKey, setAddonKey] = useState('')
   const [addonQty, setAddonQty] = useState(1)
   const [addonReason, setAddonReason] = useState('')
   const [upsertAddon, { isLoading: savingAddon }] = useUpsertAdminSubscriptionAddonMutation()
@@ -233,7 +243,8 @@ export function AdminLimitsTab() {
     }
   }, [overridesData, entitlements, tenantType])
 
-  const addonOptionKeys = tenantType === 'RESTAURANT' ? RESTAURANT_ADDON_KEYS : SUPPLIER_ADDON_KEYS
+  const addonOptionKeys = getAdminAddonOptionKeys(tenantType, activeAddons)
+  const showAddonEditor = tenantType === 'SUPPLIER' || addonOptionKeys.includes(addonKey)
 
   const addonLabel = (key: string) =>
     t(`addonKeys.${key}`, { defaultValue: formatAddonKeyLabel(key) })
@@ -330,7 +341,7 @@ export function AdminLimitsTab() {
 
   const editAddonRow = (key: string, currentQty: number) => {
     setAddonKey(key)
-    setAddonQty(currentQty)
+    setAddonQty(tenantType === 'RESTAURANT' ? 0 : currentQty)
   }
 
   const handleRefresh = () => {
@@ -396,7 +407,8 @@ export function AdminLimitsTab() {
           onTenantTypeChange={(t) => {
             setTenantType(t)
             setSelectedTenant(null)
-            setAddonKey(t === 'RESTAURANT' ? 'restaurant_extra_branch' : 'supplier_extra_branch')
+            setAddonKey(t === 'SUPPLIER' ? 'supplier_extra_branch' : '')
+            setAddonQty(1)
           }}
           tenants={tenants}
           selectedId={tenantId}
@@ -569,74 +581,86 @@ export function AdminLimitsTab() {
                 />
               )}
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-end">
-                <div>
-                  <Label>{t('limits.addonTypeLabel')}</Label>
-                  <Select value={addonKey} onValueChange={(value) => setAddonKey(value)}>
-                    <SelectTrigger className="mt-1.5 w-full">
-                      {addonOptionKeys.map((key) => (
-                        <option key={key} value={key}>
-                          {addonLabel(key)}
-                        </option>
-                      ))}
-                    </SelectTrigger>
-                  </Select>
-                </div>
-                <div>
-                  <Label>{t('limits.quantityLabel')}</Label>
-                  <div className="mt-1 flex items-center gap-1">
+              {showAddonEditor && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-end">
+                    <div>
+                      <Label>{t('limits.addonTypeLabel')}</Label>
+                      <Select value={addonKey} onValueChange={(value) => setAddonKey(value)}>
+                        <SelectTrigger
+                          className="mt-1.5 w-full"
+                          disabled={tenantType === 'RESTAURANT'}
+                        >
+                          {addonOptionKeys.map((key) => (
+                            <option key={key} value={key}>
+                              {addonLabel(key)}
+                            </option>
+                          ))}
+                        </SelectTrigger>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>{t('limits.quantityLabel')}</Label>
+                      <div className="mt-1 flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          onClick={() => adjustAddonQty(-1)}
+                          disabled={tenantType === 'RESTAURANT'}
+                          aria-label={t('limits.decreaseQtyAriaLabel')}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={99}
+                          className="text-center"
+                          value={addonQty}
+                          disabled={tenantType === 'RESTAURANT'}
+                          onChange={(e) =>
+                            setAddonQty(
+                              Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0))
+                            )
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          onClick={() => adjustAddonQty(1)}
+                          disabled={tenantType === 'RESTAURANT'}
+                          aria-label={t('limits.increaseQtyAriaLabel')}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>{t('limits.reasonRequiredLabel')}</Label>
+                      <Input
+                        className="mt-1.5"
+                        value={addonReason}
+                        onChange={(e) => setAddonReason(e.target.value)}
+                        placeholder={t('limits.addonReasonPlaceholder')}
+                      />
+                    </div>
+                  </div>
+                  <div className="action-bar">
                     <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 shrink-0"
-                      onClick={() => adjustAddonQty(-1)}
-                      aria-label={t('limits.decreaseQtyAriaLabel')}
+                      onClick={handleGrantAddon}
+                      disabled={savingAddon || addonsFetching}
+                      className="w-full sm:w-auto"
                     >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={99}
-                      className="text-center"
-                      value={addonQty}
-                      onChange={(e) =>
-                        setAddonQty(Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)))
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 shrink-0"
-                      onClick={() => adjustAddonQty(1)}
-                      aria-label={t('limits.increaseQtyAriaLabel')}
-                    >
-                      <Plus className="h-4 w-4" />
+                      {savingAddon ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      {addonQty === 0 ? t('limits.removeAddon') : t('limits.grantUpdateAddon')}
                     </Button>
                   </div>
-                </div>
-                <div className="md:col-span-2">
-                  <Label>{t('limits.reasonRequiredLabel')}</Label>
-                  <Input
-                    className="mt-1.5"
-                    value={addonReason}
-                    onChange={(e) => setAddonReason(e.target.value)}
-                    placeholder={t('limits.addonReasonPlaceholder')}
-                  />
-                </div>
-              </div>
-              <div className="action-bar">
-                <Button
-                  onClick={handleGrantAddon}
-                  disabled={savingAddon || addonsFetching}
-                  className="w-full sm:w-auto"
-                >
-                  {savingAddon ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  {addonQty === 0 ? t('limits.removeAddon') : t('limits.grantUpdateAddon')}
-                </Button>
-              </div>
+                </>
+              )}
             </div>
           </AppPanel>
         </>

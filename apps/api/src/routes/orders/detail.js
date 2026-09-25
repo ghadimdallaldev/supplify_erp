@@ -77,7 +77,7 @@ router.get('/:id', async (req, res, next) => {
         b.phone as branch_phone
       FROM customer_order o
       JOIN restaurant r ON r.id = o.restaurant_id
-      LEFT JOIN branch b ON b.id = o.branch_id
+      LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
       WHERE o.id = $1
     `,
       [id]

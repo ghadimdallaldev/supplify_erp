@@ -16,7 +16,7 @@ import {
   useGetReceivingHistoryQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
-import { isEntitlementFeatureEnabled } from '../lib/planLimits'
+import { isEntitlementFeatureEnabled, meetsIntelligenceTier } from '../lib/planLimits'
 import { FeatureLockedCard } from '../components/FeatureLockedCard'
 import { toast } from 'sonner'
 import { normalizeReceivedQuantity } from '../lib/quantityUnit'
@@ -32,6 +32,7 @@ import { ReceivingDialog } from '../components/receiving/ReceivingDialog'
 import { ReceivingPendingTab } from '../components/receiving/ReceivingPendingTab'
 import { ReceivingHistoryTab } from '../components/receiving/ReceivingHistoryTab'
 import { ReceivingSummaryStrip } from '../components/receiving/ReceivingPendingOrderRow'
+import { SupplierReliabilityCard } from '../components/receiving/SupplierReliabilityCard'
 
 export function ReceivingPage() {
   const { t } = useTranslation('orders')
@@ -59,6 +60,7 @@ export function ReceivingPage() {
     entitlementsData?.entitlements,
     'receiving_quality'
   )
+  const hasAdvancedIntelligence = meetsIntelligenceTier(entitlementsData?.entitlements, 'advanced')
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
     'disputes_returns'
@@ -313,6 +315,8 @@ export function ReceivingPage() {
               historyCount={historyReports.length}
             />
           ) : null}
+
+          {hasAdvancedIntelligence ? <SupplierReliabilityCard /> : null}
 
           <Tabs defaultValue="pending" className="space-y-4">
             <TabsList className="tabs-scroll h-auto w-full justify-start gap-1 rounded-lg p-1 sm:w-auto">

@@ -453,7 +453,10 @@ export interface PublicAvailabilityResponse {
   blackout?: boolean
   blackoutReason?: string | null
   depositMode?: 'none' | 'fixed' | 'percent'
+  depositAmount?: number
+  depositPercent?: number
   depositPolicyText?: string
+  depositRequired?: boolean
   cancelWindowHours?: number
   partySizeRejected?: boolean
 }

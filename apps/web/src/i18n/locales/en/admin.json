@@ -1268,8 +1268,16 @@
     "saveButton": "Save growth settings"
   },
   "placements": {
-    "title": "Active featured placements",
-    "empty": "No active featured placements",
+    "title": "Featured placement review",
+    "empty": "No featured placements awaiting review or active",
+    "awaitingReview": "Paid — awaiting admin review",
+    "awaitingPayment": "Awaiting supplier payment",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approveSuccess": "Featured placement approved",
+    "rejectSuccess": "Featured placement rejected",
+    "rejectReasonPrompt": "Optional rejection reason",
+    "reviewFailed": "Could not review featured placement",
     "until": "Until {{date}}",
     "refund": "Refund",
     "refundSuccess": "Featured placement refunded",

@@ -256,6 +256,12 @@ export async function userHasOrgBranchAccess(userId, supplierId, organizationId)
   const membership = await getUserOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return false
 
+  const { rows: tenantRows } = await query(
+    `SELECT 1 FROM supplier WHERE id = $1 AND organization_id = $2`,
+    [supplierId, organizationId]
+  )
+  if (!tenantRows.length) return false
+
   const { rows: roleRows } = await query(
     `
     SELECT orp.branch_scope, orgr.name
@@ -417,6 +423,15 @@ export async function grantOrgBranchAccess({
   organizationId,
   grantedBy = null,
 }) {
+  const { rows: owned } = await query(
+    `SELECT 1 FROM supplier WHERE id = $1 AND organization_id = $2`,
+    [supplierId, organizationId]
+  )
+  if (!owned.length) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
+  }
   await query(
     `
     INSERT INTO org_user_branch_access (user_id, supplier_id, organization_id, granted_by)
@@ -428,15 +443,27 @@ export async function grantOrgBranchAccess({
   await invalidateOrgPermissionCaches(userId, organizationId)
 }
 
-export async function revokeOrgBranchAccess(userId, supplierId) {
-  const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [supplierId])
-  await query(`DELETE FROM org_user_branch_access WHERE user_id = $1 AND supplier_id = $2`, [
-    userId,
-    supplierId,
-  ])
-  if (rows[0]?.organization_id) {
-    await invalidateOrgPermissionCaches(userId, rows[0].organization_id)
+export async function revokeOrgBranchAccess(userId, supplierId, organizationId) {
+  if (!organizationId) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
   }
+  const { rows: owned } = await query(
+    `SELECT 1 FROM supplier WHERE id = $1 AND organization_id = $2`,
+    [supplierId, organizationId]
+  )
+  if (!owned.length) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
+  }
+  await query(
+    `DELETE FROM org_user_branch_access
+     WHERE user_id = $1 AND supplier_id = $2 AND organization_id = $3`,
+    [userId, supplierId, organizationId]
+  )
+  await invalidateOrgPermissionCaches(userId, organizationId)
 }
 
 export async function invalidateOrgPermissionCaches(userId, organizationId) {
@@ -528,12 +555,15 @@ export async function branchHasPendingOrders(supplierId) {
   return Number(rows[0]?.count || 0) > 0
 }
 
-export async function deactivateOrgBranch(supplierId) {
+export async function deactivateOrgBranch(supplierId, organizationId = null) {
   const { rows } = await query(
     `SELECT is_main_branch, organization_id FROM supplier WHERE id = $1`,
     [supplierId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (organizationId && rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
 
   const { getSupplierDeactivationBlockers, invalidateCachesForSupplierBranchLifecycle } =
@@ -557,12 +587,15 @@ export async function deactivateOrgBranch(supplierId) {
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
-export async function reactivateOrgBranch(supplierId) {
+export async function reactivateOrgBranch(supplierId, organizationId = null) {
   const { rows } = await query(
     `SELECT is_main_branch, organization_id, is_branch_active FROM supplier WHERE id = $1`,
     [supplierId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (organizationId && rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
   if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
   await query(
@@ -581,10 +614,13 @@ export async function reactivateOrgBranch(supplierId) {
 /**
  * Unlink a Branch Account from its organization. Retains the tenant and history.
  */
-export async function unlinkSupplierFromOrganization(supplierId, { client = null } = {}) {
+export async function unlinkSupplierFromOrganization(
+  supplierId,
+  { client = null, organizationId = null } = {}
+) {
   if (!client)
     return withTransaction((transactionClient) =>
-      unlinkSupplierFromOrganization(supplierId, { client: transactionClient })
+      unlinkSupplierFromOrganization(supplierId, { client: transactionClient, organizationId })
     )
   const db = (sql, params) => client.query(sql, params)
   const { rows } = await db(
@@ -592,10 +628,12 @@ export async function unlinkSupplierFromOrganization(supplierId, { client = null
     [supplierId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (!organizationId || rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
 
-  const organizationId = rows[0].organization_id
   await db(`DELETE FROM org_user_branch_access WHERE supplier_id = $1`, [supplierId])
   await db(
     `UPDATE supplier

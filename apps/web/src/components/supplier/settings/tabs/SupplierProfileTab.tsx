@@ -4,18 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../../ui/button'
 import { Input } from '../../../ui/input'
 import { Label } from '../../../ui/label'
-import { Textarea } from '../../../ui/textarea'
-import {
-  Building2,
-  Mail,
-  Phone,
-  Globe,
-  Save,
-  Loader2,
-  Link2,
-  Copy,
-  ExternalLink,
-} from 'lucide-react'
+import { Building2, Mail, Phone, Save, Loader2, Link2, Copy, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import { TenantBrandingPanel } from '../../../settings/TenantBrandingPanel'
 import { useAppSelector } from '../../../../hooks/redux'
@@ -59,8 +48,6 @@ export function SupplierProfileTab() {
       region: '',
       country: '',
     },
-    description: '',
-    website: '',
   })
 
   const catalogLink = useMemo(() => {
@@ -84,8 +71,6 @@ export function SupplierProfileTab() {
         phone: supplier.phone || '',
         contact_email: supplier.contact_email || '',
         address: normalizeAddress(supplier.address_json),
-        description: supplier.description || '',
-        website: supplier.website || '',
       })
     }
   }, [supplier])
@@ -144,6 +129,7 @@ export function SupplierProfileTab() {
   }
 
   const handleSaveProfile = async () => {
+    if (!can('SETTINGS_EDIT')) return
     if (!supplier?.id) {
       toast.error(t('profile.toast.notLoaded'))
       return
@@ -154,7 +140,9 @@ export function SupplierProfileTab() {
         id: supplier.id,
         data: {
           name: profileForm.name,
+          legalName: profileForm.legal_name,
           vatNo: profileForm.vat_no,
+          tradeLicenseNo: profileForm.trade_license_no,
           phone: profileForm.phone,
           contactEmail: profileForm.contact_email,
           address: profileForm.address,
@@ -323,32 +311,6 @@ export function SupplierProfileTab() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="website">{t('profile.fields.website')}</Label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-              <Input
-                id="website"
-                type="url"
-                value={profileForm.website}
-                onChange={(e) => setProfileForm({ ...profileForm, website: e.target.value })}
-                placeholder={t('profile.placeholders.website')}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">{t('profile.fields.description')}</Label>
-            <Textarea
-              id="description"
-              value={profileForm.description}
-              onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
-              placeholder={t('profile.placeholders.description')}
-              rows={4}
-            />
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="street">{t('profile.fields.street')}</Label>
@@ -408,7 +370,11 @@ export function SupplierProfileTab() {
             </div>
           </div>
 
-          <Button onClick={handleSaveProfile} disabled={isUpdating} className="w-full sm:w-auto">
+          <Button
+            onClick={handleSaveProfile}
+            disabled={isUpdating || !can('SETTINGS_EDIT')}
+            className="w-full sm:w-auto"
+          >
             {isUpdating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

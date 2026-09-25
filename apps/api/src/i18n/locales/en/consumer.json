@@ -7,6 +7,7 @@
     "scheduleInvalid": "Scheduled time must be in the future",
     "preorderRequired": "Live ordering opens at {{start}}. Please schedule your order.",
     "scheduleTooEarly": "Preorder must be scheduled for {{start}} or later",
+    "scheduleOutsideHours": "Schedule the order during live hours, from {{start}}",
     "windowClosed": "Ordering is currently closed"
   },
   "menu": {

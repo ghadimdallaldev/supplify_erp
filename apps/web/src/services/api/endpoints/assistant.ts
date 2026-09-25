@@ -4,6 +4,7 @@ import type {
   AssistantConversation,
   AssistantMessage,
   AssistantSendResponse,
+  AssistantAttachment,
 } from '../../../types/assistant'
 
 export const assistantApi = api.injectEndpoints({
@@ -25,14 +26,14 @@ export const assistantApi = api.injectEndpoints({
     }),
     sendAssistantMessage: builder.mutation<
       AssistantSendResponse,
-      { conversationId?: string | null; message: string }
+      { conversationId?: string | null; message: string; attachments?: AssistantAttachment[] }
     >({
       query: (body) => ({
         url: '/api/assistant/messages',
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Assistant'],
+      invalidatesTags: ['Assistant', 'Subscription'],
     }),
   }),
 })

@@ -105,7 +105,26 @@ router.get('/exceptions', async (req, res) => {
       exceptionParams
     )
 
-    const openCount = rows.filter((r) => r.status === 'open').length
+    const countParams = [supplierId]
+    let countIdx = 2
+    let countClause = ''
+    if (typeFilter) {
+      countClause += ` AND fe.type = $${countIdx++}`
+      countParams.push(typeFilter)
+    }
+    if (whFilter.warehouseId) {
+      countClause += ` AND fe.warehouse_id = $${countIdx++}`
+      countParams.push(whFilter.warehouseId)
+    }
+    const { rows: openRows } = await query(
+      `
+      SELECT COUNT(*)::int AS cnt
+      FROM fulfillment_exceptions fe
+      WHERE fe.supplier_id = $1 AND fe.status = 'open'${countClause}
+      `,
+      countParams
+    )
+    const openCount = openRows[0]?.cnt ?? 0
 
     res.json({
       ok: true,
@@ -128,6 +147,14 @@ router.get('/exceptions', async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
     logger.error('Get fulfillment exceptions error:', {
       message: error?.message,
       code: error?.code,

@@ -31,6 +31,23 @@ export const warehousesApi = api.injectEndpoints({
       query: (id) => ({ url: `/api/warehouses/${id}/set-default`, method: 'POST' }),
       invalidatesTags: ['Inventory'],
     }),
+    updateWarehouse: builder.mutation<
+      { warehouse: any },
+      {
+        id: string
+        name?: string
+        code?: string
+        address?: string
+        is_active?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/warehouses/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['Inventory'],
+    }),
     getSupplierFulfillment: builder.query<{ fulfillment: any }, void>({
       query: () => '/api/suppliers/me/fulfillment',
     }),
@@ -159,12 +176,12 @@ export type WarehouseDeliveryZone = {
 export type WarehouseZoneInput = {
   name: string
   zone_type?: 'polygon' | 'radius' | 'postal_codes'
-  postal_codes?: string[]
+  postal_codes?: string[] | null
   min_order_amount?: number
   delivery_fee?: number
-  radius_km?: number
-  center_lat?: number
-  center_lng?: number
+  radius_km?: number | null
+  center_lat?: number | null
+  center_lng?: number | null
 }
 
 export const {

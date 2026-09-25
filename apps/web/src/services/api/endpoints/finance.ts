@@ -1,11 +1,158 @@
 import { api } from '../base'
+export type SupplierWeeklyIntelligenceSummaryResponse = {
+  periodDays: number
+  summary: {
+    slowMovingProducts: number
+    stockoutRisks: number
+    crossSellOpportunities: number
+    warehousesWithLowStock: number
+    warehouseForecasts: number
+  }
+}
+export type SupplierDemandForecastResponse = {
+  observationDays: number
+  recentDays: number
+  horizonDays: number
+  coverage: {
+    productsWithCompletedSales: number
+    productsWithSufficientHistory: number
+  }
+  forecasts: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    soldQuantity30: number
+    soldQuantity90: number
+    saleDays90: number
+    orderCount90: number
+    forecastDailyDemand: number
+    projectedDemandQty: number
+  }>
+}
+export type SupplierWarehouseDemandForecastResponse = {
+  observationDays: number
+  recentDays: number
+  horizonDays: number
+  coverage: {
+    warehouseProductRowsWithDeliveredHistory: number
+    warehouseProductRowsWithSufficientHistory: number
+    warehousesWithSufficientHistory: number
+  }
+  forecasts: Array<{
+    warehouseId: string
+    warehouseName: string
+    warehouseCode: string | null
+    productId: string
+    productName: string
+    sku: string | null
+    soldQuantity30: number
+    soldQuantity90: number
+    saleDays90: number
+    orderCount90: number
+    forecastDailyDemand: number
+    projectedDemandQty: number
+  }>
+}
+export type SupplierWarehousePerformanceResponse = {
+  windowDays: number
+  coverage: {
+    activeWarehouses: number
+    warehousesWithAssignments: number
+    warehousesWithLowStock: number
+  }
+  warehouses: Array<{
+    warehouseId: string
+    warehouseName: string
+    warehouseCode: string | null
+    stockedProducts: number
+    lowStockProducts: number
+    availableQuantity: number
+    assignmentCount: number
+    deliveredCount: number
+    failedCount: number
+    activeCount: number
+  }>
+}
+export type SupplierSuggestedDealCandidatesResponse = {
+  windowDays: number
+  coverage: {
+    slowMovingProducts: number
+    productsWithActiveOrPendingProductDeal: number
+    candidates: number
+  }
+  candidates: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    availableQty: number
+    soldQuantity: number
+    orderCount: number
+    stockCoverDays: number
+  }>
+}
+export type SupplierCrossSellOpportunitiesResponse = {
+  observationDays: number
+  minPairedOrders: number
+  opportunities: Array<{
+    restaurantId: string
+    restaurantName: string
+    anchorProduct: { productId: string; productName: string; sku: string | null }
+    candidateProduct: { productId: string; productName: string; sku: string | null }
+    pairedOrderCount: number
+  }>
+}
+export type SupplierStockoutRiskResponse = {
+  horizonDays: number
+  coverage: {
+    productsWithCompletedSales: number
+    productsWithSufficientHistory: number
+    forecastedProductsWithRecordedStock: number
+  }
+  risks: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    forecastDailyDemand: number
+    projectedDemandQty: number
+    availableQty: number
+    shortfallQty: number
+    daysUntilStockout: number | null
+    currentlyOutOfStock: boolean
+  }>
+}
+export type SupplierSlowMovingInventoryResponse = {
+  windowDays: number
+  coverage: {
+    stockedProducts: number
+    productsWithSalesHistory: number
+    slowMovingProducts: number
+  }
+  products: Array<{
+    productId: string
+    productName: string
+    sku: string | null
+    availableQty: number
+    soldQuantity: number
+    orderCount: number
+    stockCoverDays: number
+  }>
+}
+
 export type SupplierStatementSummary = {
-  openingBalance: number
-  totalCharges: number
-  totalPayments: number
-  totalAdjustments: number
-  closingBalance: number
+  openingBalance: number | null
+  totalCharges: number | null
+  totalPayments: number | null
+  totalAdjustments: number | null
+  closingBalance: number | null
   invoiceCount?: number
+  byCurrency?: Array<{
+    currency: string
+    openingBalance: number
+    totalCharges: number
+    totalPayments: number
+    totalAdjustments: number
+    closingBalance: number
+  }>
 }
 
 export type SupplierStatementInvoice = {
@@ -16,6 +163,7 @@ export type SupplierStatementInvoice = {
   total_paid?: string | number
   supplier_name?: string
   status?: string
+  currency?: string | null
 }
 
 export type SupplierStatementResponse = {
@@ -132,6 +280,44 @@ export const financeApi = api.injectEndpoints({
     getSupplierCommandCenter: builder.query<any, void>({
       query: () => '/api/supplier/command-center',
       providesTags: ['SupplierOps', 'Order', 'Fulfillment', 'RestaurantFinance'],
+    }),
+    getSupplierWeeklyIntelligenceSummary: builder.query<
+      SupplierWeeklyIntelligenceSummaryResponse,
+      void
+    >({ query: () => '/api/supplier/weekly-intelligence-summary', providesTags: ['SupplierOps'] }),
+    getSupplierDemandForecast: builder.query<SupplierDemandForecastResponse, void>({
+      query: () => '/api/supplier/demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierWarehouseDemandForecast: builder.query<
+      SupplierWarehouseDemandForecastResponse,
+      void
+    >({
+      query: () => '/api/supplier/warehouse-demand-forecast',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierWarehousePerformance: builder.query<SupplierWarehousePerformanceResponse, void>({
+      query: () => '/api/supplier/warehouse-performance',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierSuggestedDealCandidates: builder.query<
+      SupplierSuggestedDealCandidatesResponse,
+      void
+    >({
+      query: () => '/api/supplier/suggested-deals',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierCrossSellOpportunities: builder.query<SupplierCrossSellOpportunitiesResponse, void>({
+      query: () => '/api/supplier/cross-sell-opportunities',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierStockoutRisks: builder.query<SupplierStockoutRiskResponse, void>({
+      query: () => '/api/supplier/stockout-risks',
+      providesTags: ['SupplierOps'],
+    }),
+    getSupplierSlowMovingInventory: builder.query<SupplierSlowMovingInventoryResponse, void>({
+      query: () => '/api/supplier/slow-moving-inventory',
+      providesTags: ['SupplierOps'],
     }),
     getSupplierReorderIntelligence: builder.query<any, { graceDays?: number } | void>({
       query: (arg) => {

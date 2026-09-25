@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useGetSupplierMeQuery, useUpdateSupplierMutation } from '../../../../services/api'
 import type { Supplier } from '../../../../types'
 import { ensureNamespace } from '../../../../i18n'
+import { usePermissions } from '../../../../hooks/usePermissions'
 
 type SupplierWithContacts = Supplier & {
   sales_contact_email?: string | null
@@ -97,6 +98,7 @@ function toPatchPayload(form: ContactFormState) {
 
 export function SupplierContactsTab() {
   const { t } = useTranslation('suppliers')
+  const { can } = usePermissions()
   const {
     data: supplierData,
     isLoading: isLoadingSupplier,
@@ -121,6 +123,7 @@ export function SupplierContactsTab() {
   }
 
   const handleSaveContacts = async () => {
+    if (!can('SETTINGS_EDIT')) return
     if (!supplier?.id) {
       toast.error(t('contacts.toast.notLoaded'))
       return
@@ -203,7 +206,11 @@ export function SupplierContactsTab() {
         )
       })}
 
-      <Button onClick={handleSaveContacts} disabled={isUpdating} className="w-full sm:w-auto">
+      <Button
+        onClick={handleSaveContacts}
+        disabled={isUpdating || !can('SETTINGS_EDIT')}
+        className="w-full sm:w-auto"
+      >
         {isUpdating ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

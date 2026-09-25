@@ -10,7 +10,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
@@ -29,7 +29,9 @@ import {
   getSupplierProductAvailableQty,
   overlayProductRowsWithAuthoritativeStock,
 } from '../services/supplier-stock.service.js'
+import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
 
@@ -163,6 +165,7 @@ const productCreateSchema = z.object({
   description_ar: z.string().max(1000).optional(),
   brand: z.string().max(100).optional(),
   category: z.string().max(100).optional(),
+  category_id: z.string().uuid().nullable().optional(),
   image_url: z.string().url().optional(),
   image_thumb_url: z.string().url().optional(),
   unit: z.string().max(20).optional(),
@@ -170,6 +173,16 @@ const productCreateSchema = z.object({
 
 const productUpdateSchema = productCreateSchema.partial()
 
+const categoryCreateSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  description: z.string().trim().max(500).optional(),
+})
+
+const categoryUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  is_active: z.boolean().optional(),
+})
 const productListSchema = z.object({
   q: z.string().optional(),
   category: z.string().optional(), // Support both old category and category_id
@@ -227,6 +240,7 @@ router.get('/categories', async (req, res) => {
         `
         SELECT
           pc.id,
+          pc.supplier_id,
           pc.name,
           pc.slug,
           pc.description,
@@ -236,8 +250,9 @@ router.get('/categories', async (req, res) => {
         LEFT JOIN product p ON p.category_id = pc.id
           AND ($1::uuid IS NULL OR p.supplier_id = $1)
         WHERE pc.is_active = true
+          AND (pc.supplier_id IS NULL OR pc.supplier_id = $1)
         GROUP BY pc.id
-        HAVING ($1::uuid IS NULL OR COUNT(p.id) > 0)
+        HAVING ($1::uuid IS NOT NULL OR COUNT(p.id) > 0)
         ORDER BY product_count DESC, pc.display_order, pc.name
         `,
         [supplierId],
@@ -254,6 +269,156 @@ router.get('/categories', async (req, res) => {
   }
 })
 
+function categorySlug(name) {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 90)
+}
+
+async function assertCategoryAvailable(categoryId, supplierId) {
+  if (!categoryId) return null
+  const { rows } = await query(
+    `SELECT id, name
+     FROM product_category
+     WHERE id = $1
+       AND is_active = true
+       AND (supplier_id IS NULL OR supplier_id = $2)`,
+    [categoryId, supplierId]
+  )
+  if (!rows[0]) throw new ValidationError('Category is not available for this supplier')
+  return rows[0]
+}
+
+// Supplier category management. Shared platform categories intentionally remain read-only.
+router.post('/categories', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const category = categoryCreateSchema.parse(req.body)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    const { rows } = await query(
+      `INSERT INTO product_category (supplier_id, name, slug, description)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (supplier_id, lower(name)) DO NOTHING
+       RETURNING id, supplier_id, name, slug, description, display_order, is_active`,
+      [
+        supplierId,
+        category.name,
+        categorySlug(category.name) || 'category',
+        category.description || null,
+      ]
+    )
+    if (!rows[0]) throw new ValidationError('A category with this name already exists')
+    await invalidateCatalogMetaCache(supplierId)
+    return res
+      .status(201)
+      .json({ ok: true, data: { category: rows[0] }, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status = error instanceof z.ZodError || error instanceof ValidationError ? 400 : 500
+    logger.error('Create supplier product category failed', { error: error.message })
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to create category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.patch('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const categoryId = z.string().uuid().parse(req.params.categoryId)
+    const updates = categoryUpdateSchema.parse(req.body)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    if (!Object.keys(updates).length) throw new ValidationError('No fields to update')
+    const fields = []
+    const values = []
+    let index = 1
+    if (updates.name !== undefined) {
+      fields.push(`name = $${index++}`, `slug = $${index++}`)
+      values.push(updates.name, categorySlug(updates.name) || 'category')
+    }
+    if (updates.description !== undefined) {
+      fields.push(`description = $${index++}`)
+      values.push(updates.description)
+    }
+    if (updates.is_active !== undefined) {
+      fields.push(`is_active = $${index++}`)
+      values.push(updates.is_active)
+    }
+    values.push(categoryId, supplierId)
+    const { rows } = await query(
+      `UPDATE product_category
+       SET ${fields.join(', ')}, updated_at = now()
+       WHERE id = $${index++} AND supplier_id = $${index}
+       RETURNING id, supplier_id, name, slug, description, display_order, is_active`,
+      values
+    )
+    if (!rows[0]) throw new NotFoundError('Supplier category not found')
+    await invalidateCatalogMetaCache(supplierId)
+    return res.json({
+      ok: true,
+      data: { category: rows[0] },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    const status =
+      error instanceof z.ZodError || error instanceof ValidationError
+        ? 400
+        : error instanceof NotFoundError
+          ? 404
+          : 500
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 404 ? 'NOT_FOUND' : status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to update category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
+
+router.delete('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, res) => {
+  try {
+    const categoryId = z.string().uuid().parse(req.params.categoryId)
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) throw new ValidationError('Supplier record not found for user')
+    const { rows } = await query(
+      'DELETE FROM product_category WHERE id = $1 AND supplier_id = $2 RETURNING id',
+      [categoryId, supplierId]
+    )
+    if (!rows[0]) throw new NotFoundError('Supplier category not found')
+    await invalidateCatalogMetaCache(supplierId)
+    return res.json({ ok: true, data: { id: categoryId }, error: null, requestId: req.requestId })
+  } catch (error) {
+    const status =
+      error instanceof z.ZodError || error instanceof ValidationError
+        ? 400
+        : error instanceof NotFoundError
+          ? 404
+          : 500
+    return res.status(status).json({
+      ok: false,
+      data: null,
+      error: {
+        name: status === 404 ? 'NOT_FOUND' : status === 400 ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR',
+        message: error.message || 'Unable to delete category',
+      },
+      requestId: req.requestId,
+    })
+  }
+})
 // Get available tags (from all products; no-op when product.tags column does not exist)
 router.get('/tags', async (req, res) => {
   try {
@@ -497,8 +662,8 @@ router.get('/', async (req, res) => {
         SELECT amount, currency
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true
       ${whereClause}
@@ -516,8 +681,8 @@ router.get('/', async (req, res) => {
         SELECT amount
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true`
           : ''
@@ -709,8 +874,8 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
           SELECT amount, currency
           FROM price
           WHERE price.product_id = p.id
-            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-          ORDER BY valid_from DESC
+            AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+          ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
           LIMIT 1
         ) pr ON true
         WHERE pf.restaurant_id = $1 AND pf.user_id = $2
@@ -991,6 +1156,16 @@ router.get('/:id', async (req, res) => {
       }
       const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
       product = enriched
+    } else {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Product not found',
+        },
+        requestId: req.requestId,
+      })
     }
 
     product.available_qty = await getSupplierProductAvailableQty(product.supplier_id, product.id)
@@ -1023,89 +1198,110 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
   try {
     const productData = productCreateSchema.parse(req.body)
 
-    // For suppliers, ensure they can only create products for their own supplier record
-    let supplierId = req.body.supplier_id
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier record not found for user',
+        },
+        requestId: req.requestId,
+      })
+    }
 
-    if (req.userData.role === 'SUPPLIER') {
-      supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
+    const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
+    if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+      const [subscription, recommendedPlans] = await Promise.all([
+        getTenantSubscription(supplierId, 'SUPPLIER'),
+        getRecommendedPlanNames('SUPPLIER'),
+      ])
+      const err = buildLimitExceededPayload(
+        limitCheck,
+        'supplier_products_skus',
+        subscription?.plan_name || subscription?.plan_display_name,
+        recommendedPlans,
+        undefined,
+        'SUPPLIER'
+      )
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: err,
+        requestId: req.requestId,
+      })
+    }
+
+    const requestedWarehouseId =
+      typeof req.body.warehouse_id === 'string' && req.body.warehouse_id.trim()
+        ? req.body.warehouse_id.trim()
+        : null
+    if (requestedWarehouseId) {
+      const parsedWarehouseId = z.string().uuid().safeParse(requestedWarehouseId)
+      if (!parsedWarehouseId.success) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Invalid warehouse_id' },
+          requestId: req.requestId,
+        })
+      }
+      const supplierColumn = await getWarehouseSupplierColumn()
+      const { rows: warehouseRows } = await query(
+        `SELECT id FROM warehouse WHERE id = $1 AND ${supplierColumn} = $2 AND is_active = TRUE`,
+        [parsedWarehouseId.data, supplierId]
+      )
+      if (!warehouseRows.length) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Supplier record not found for user',
+            message: 'Warehouse not found for this supplier',
           },
           requestId: req.requestId,
         })
       }
-
-      // Check plan limits for suppliers
-      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
-      if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
-        const [subscription, recommendedPlans] = await Promise.all([
-          getTenantSubscription(supplierId, 'SUPPLIER'),
-          getRecommendedPlanNames('SUPPLIER'),
-        ])
-        const err = buildLimitExceededPayload(
-          limitCheck,
-          'supplier_products_skus',
-          subscription?.plan_name || subscription?.plan_display_name,
-          recommendedPlans,
-          undefined,
-          'SUPPLIER'
-        )
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: err,
-          requestId: req.requestId,
-        })
-      }
     }
 
-    if (!supplierId) {
-      throw new ValidationError('supplier_id is required')
+    const selectedCategory = await assertCategoryAvailable(productData.category_id, supplierId)
+
+    const hasTags = await productHasTagsColumn()
+    const tagsArray =
+      hasTags && req.body.tags
+        ? Array.isArray(req.body.tags)
+          ? req.body.tags
+          : req.body.tags
+              .split(',')
+              .map((t) => t.trim())
+              .filter((t) => t)
+        : []
+
+    let insertCols =
+      'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
+    let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
+    let insertValues = [
+      supplierId,
+      productData.sku,
+      productData.name,
+      productData.name_ar || null,
+      productData.description || null,
+      productData.description_ar || null,
+      productData.brand || null,
+      selectedCategory?.name || productData.category || null,
+      productData.category_id || null,
+      productData.image_url || null,
+      productData.unit || null,
+    ]
+    if (hasTags) {
+      insertCols += ', tags'
+      insertPlaceholders += ', $12::jsonb'
+      insertValues.push(JSON.stringify(tagsArray))
     }
 
-    // Use transaction to create product, price, and inventory together
-    await query('BEGIN')
-
-    try {
-      const hasTags = await productHasTagsColumn()
-      const tagsArray =
-        hasTags && req.body.tags
-          ? Array.isArray(req.body.tags)
-            ? req.body.tags
-            : req.body.tags
-                .split(',')
-                .map((t) => t.trim())
-                .filter((t) => t)
-          : []
-
-      let insertCols =
-        'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
-      let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
-      let insertValues = [
-        supplierId,
-        productData.sku,
-        productData.name,
-        productData.name_ar || null,
-        productData.description || null,
-        productData.description_ar || null,
-        productData.brand || null,
-        productData.category || null,
-        req.body.category_id || null,
-        productData.image_url || null,
-        productData.unit || null,
-      ]
-      if (hasTags) {
-        insertCols += ', tags'
-        insertPlaceholders += ', $12::jsonb'
-        insertValues.push(JSON.stringify(tagsArray))
-      }
-
-      const { rows } = await query(
+    const product = await withTransaction(async (client) => {
+      const { rows } = await client.query(
         `INSERT INTO product (${insertCols}) VALUES (${insertPlaceholders}) RETURNING *`,
         insertValues
       )
@@ -1114,7 +1310,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create price if provided
       if (req.body.price !== undefined && req.body.price !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO price (product_id, amount, currency, valid_from)
           VALUES ($1, $2, 'USD', now())
@@ -1125,48 +1321,52 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create inventory if initial stock provided
       if (req.body.initialStock !== undefined && req.body.initialStock !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO inventory (product_id, warehouse_id, available_qty, reserved_qty, on_order_qty)
           VALUES ($1, $2, $3, 0, 0)
         `,
-          [product.id, req.body.warehouse_id || null, req.body.initialStock]
+          [product.id, requestedWarehouseId, req.body.initialStock]
         )
+        await syncWarehouseMirrorFromLegacy(client, {
+          supplierId,
+          productId: product.id,
+          availableQty: Number(req.body.initialStock),
+          reservedQty: 0,
+          warehouseId: requestedWarehouseId || null,
+        })
       }
 
-      await query('COMMIT')
+      return product
+    })
 
-      // Track usage for supplier
-      if (req.userData.role === 'SUPPLIER' && supplierId) {
-        await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
-      }
-
-      logger.info('Product created with price and inventory', {
-        productId: product.id,
-        sku: product.sku,
-        actor: req.userData.id,
-      })
-
-      await writeAuditLog(req, {
-        action_type: 'product.created',
-        tenant_type: 'SUPPLIER',
-        tenant_id: supplierId,
-        target_id: product.id,
-        payload_json: { resource_type: 'product', sku: product.sku },
-      })
-
-      await invalidateCatalogMetaCache(supplierId)
-
-      res.status(201).json({
-        ok: true,
-        data: { product },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      await query('ROLLBACK')
-      throw error
+    // Track usage for supplier
+    if (req.userData.role === 'SUPPLIER' && supplierId) {
+      await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
     }
+
+    logger.info('Product created with price and inventory', {
+      productId: product.id,
+      sku: product.sku,
+      actor: req.userData.id,
+    })
+
+    await writeAuditLog(req, {
+      action_type: 'product.created',
+      tenant_type: 'SUPPLIER',
+      tenant_id: supplierId,
+      target_id: product.id,
+      payload_json: { resource_type: 'product', sku: product.sku },
+    })
+
+    await invalidateCatalogMetaCache(supplierId)
+
+    res.status(201).json({
+      ok: true,
+      data: { product },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -1211,21 +1411,23 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
 
     const product = existingProducts[0]
 
-    // Check ownership for suppliers
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || product.supplier_id !== supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update your own products',
-          },
-          requestId: req.requestId,
-        })
-      }
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId || product.supplier_id !== supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied. You can only update your own products',
+        },
+        requestId: req.requestId,
+      })
     }
+
+    const selectedCategory =
+      updateData.category_id !== undefined
+        ? await assertCategoryAvailable(updateData.category_id, product.supplier_id)
+        : null
 
     const imageSizeBytes =
       req.body.image_size_bytes != null ? Math.max(0, Number(req.body.image_size_bytes) || 0) : 0
@@ -1277,10 +1479,15 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     }
 
     // Handle category_id separately
-    if (req.body.category_id !== undefined) {
+    if (updateData.category_id !== undefined) {
       updateFields.push(`category_id = $${paramIndex}`)
-      updateValues.push(req.body.category_id || null)
+      updateValues.push(updateData.category_id || null)
       paramIndex++
+      if (selectedCategory && updateData.category === undefined) {
+        updateFields.push(`category = $${paramIndex}`)
+        updateValues.push(selectedCategory.name)
+        paramIndex++
+      }
     }
 
     const {

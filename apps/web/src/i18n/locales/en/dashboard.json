@@ -50,6 +50,7 @@
       "completed": "Completed",
       "pending": "Pending",
       "processing": "Processing",
+      "other": "Other",
       "totalAllTime": "Total orders (all time)"
     },
     "spendTrend": {

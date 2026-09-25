@@ -9,11 +9,13 @@ import {
   requirePermission,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
-import { getEffectiveTenant } from '../lib/impersonation.js'
-import { writeAuditLog } from '../lib/audit.js'
 import { logger } from '../lib/logger.js'
 import { requireFeature, requireWithinLimit } from '../lib/subscription.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import {
+  assertWarehouseOwnedBySupplier,
+  getWarehouseSupplierColumn,
+} from '../lib/warehouse-helpers.js'
 import {
   linkDriverToUser,
   unlinkDriverUser,
@@ -25,8 +27,7 @@ const router = express.Router()
 
 const driverManagementFeature = requireFeature(
   'driver_management',
-  (req) =>
-    req.tenantContext?.tenantId || (req.userData?.role === 'ADMIN' ? req.query.supplier_id : null),
+  (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType || 'SUPPLIER'
 )
 
@@ -41,44 +42,15 @@ router.use(
 async function resolveSupplierId(req) {
   const requestedSupplierId =
     typeof req.query.supplier_id === 'string' ? req.query.supplier_id.trim() : null
-  const effective = getEffectiveTenant(req)
-
+  const fromRequest = await getSupplierIdForRequest(req)
   if (requestedSupplierId) {
-    if (effective) {
-      return effective.tenantType === 'SUPPLIER' && effective.tenantId === requestedSupplierId
-        ? requestedSupplierId
-        : null
-    }
-    const adminPermissions = req.adminContext?.permissions || []
-    if (
-      req.userData?.role === 'ADMIN' &&
-      (adminPermissions.includes('ADMIN_TENANTS') || adminPermissions.includes('ADMIN_ACCESS'))
-    ) {
-      await writeAuditLog(req, {
-        action_type: 'admin.tenant_override',
-        tenant_type: 'SUPPLIER',
-        tenant_id: requestedSupplierId,
-        payload_json: { resource_type: 'SUPPLIER', source: 'supplier_id_query' },
-      })
-      return requestedSupplierId
-    }
+    return fromRequest && fromRequest === requestedSupplierId ? requestedSupplierId : null
   }
-
-  return getSupplierIdForRequest(req)
+  return fromRequest
 }
 
-/**
- * A driver may only be parked at one of this supplier's own warehouses.
- * Previously only existence was checked, which let a supplier point a driver at
- * another tenant's warehouse and leak that warehouse through the driver list.
- */
 async function assertWarehouseBelongsToSupplier(warehouseId, supplierId) {
-  if (!warehouseId) return
-  const { rows } = await query(`SELECT id FROM warehouse WHERE id = $1 AND supplier_id = $2`, [
-    warehouseId,
-    supplierId,
-  ])
-  if (!rows.length) throw new ValidationError('Warehouse not found')
+  await assertWarehouseOwnedBySupplier(warehouseId, supplierId)
 }
 
 const createDriverSchema = z.object({
@@ -156,12 +128,14 @@ router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
 
     const warehouseId = req.query.warehouse_id
     const activeOnly = req.query.active !== 'false'
+    await assertWarehouseOwnedBySupplier(warehouseId, supplierId)
+    const supplierCol = await getWarehouseSupplierColumn()
     const params = [supplierId]
     let sql = `
       SELECT d.*, w.name AS warehouse_name,
              u.email AS linked_user_email, u.display_name AS linked_user_name
       FROM drivers d
-      LEFT JOIN warehouse w ON w.id = d.warehouse_id
+      LEFT JOIN warehouse w ON w.id = d.warehouse_id AND w.${supplierCol} = d.supplier_id
       LEFT JOIN app_user u ON u.id = d.user_id
       WHERE d.supplier_id = $1
     `
@@ -180,6 +154,14 @@ router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'VALIDATION_ERROR', message: error.message },
+        requestId: req.requestId,
+      })
+    }
     logger.error('List drivers error:', error)
     res.status(500).json({
       ok: false,
@@ -363,12 +345,13 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
       driverRow = existing[0]
     }
 
+    const supplierCol = await getWarehouseSupplierColumn()
     const { rows: enriched } = await query(
       `
       SELECT d.*, w.name AS warehouse_name,
              u.email AS linked_user_email, u.display_name AS linked_user_name
       FROM drivers d
-      LEFT JOIN warehouse w ON w.id = d.warehouse_id
+      LEFT JOIN warehouse w ON w.id = d.warehouse_id AND w.${supplierCol} = d.supplier_id
       LEFT JOIN app_user u ON u.id = d.user_id
       WHERE d.id = $1
       `,

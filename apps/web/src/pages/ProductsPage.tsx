@@ -24,7 +24,7 @@ import { TablePagination } from '../components/ui/table-pagination'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
-import { Plus, Upload, Image, FileQuestion, Heart, Package, Loader2 } from 'lucide-react'
+import { Plus, Upload, Image, FileQuestion, Heart, Package, Loader2, Tags } from 'lucide-react'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { toast } from 'sonner'
@@ -46,6 +46,7 @@ import {
 } from '../components/products/ProductFilters'
 import { ProductCatalogTable } from '../components/products/ProductCatalogTable'
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { ProductCategoriesDialog } from '../components/products/ProductCategoriesDialog'
 import { useProductCatalogImport } from '../hooks/useProductCatalogImport'
 import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
@@ -73,6 +74,7 @@ export function ProductsPage() {
   const [cursor, setCursor] = useState<string | undefined>()
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
+  const [showCategories, setShowCategories] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [showImageImport, setShowImageImport] = useState(false)
   const [showInventoryAdjustment, setShowInventoryAdjustment] = useState(false)
@@ -382,6 +384,10 @@ export function ProductsPage() {
                         <Plus className="h-4 w-4 mr-2" />
                         {t('page.addProduct')}
                       </Button>
+                      <Button variant="outline" onClick={() => setShowCategories(true)}>
+                        <Tags className="h-4 w-4 mr-2" />
+                        {t('page.manageCategories')}
+                      </Button>
                       <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                         <Upload className="h-4 w-4 mr-2" />
                         {t('page.bulkUpload')}
@@ -528,6 +534,7 @@ export function ProductsPage() {
                 isRestaurant={isRestaurant}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
+                canAdjustStock={isSupplier && can('INVENTORY_EDIT')}
                 onAdjustStock={(product) => {
                   setSelectedProductForAdjustment(product)
                   setShowInventoryAdjustment(true)
@@ -535,6 +542,12 @@ export function ProductsPage() {
               />
             </div>
           </DataTableShell>
+
+          <ProductCategoriesDialog
+            open={showCategories}
+            onOpenChange={setShowCategories}
+            categories={categoriesData?.categories ?? []}
+          />
 
           <Suspense fallback={null}>
             {showAddProduct && (

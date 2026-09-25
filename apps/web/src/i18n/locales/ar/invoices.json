@@ -86,6 +86,7 @@
     "pay": "دفع",
     "emptyTitle": "لم يتم العثور على فواتير",
     "emptyDescription": "جرّب تعديل عوامل التصفية",
+    "loadMore": "تحميل المزيد من الفواتير",
     "statuses": {
       "ISSUED": "صادرة",
       "PARTIALLY_PAID": "مدفوعة جزئياً",
@@ -201,6 +202,18 @@
       "ACH": "تحويل مصرفي آلي",
       "STRIPE": "سترايب",
       "OTHER": "أخرى"
+    }
+  },
+  "anomalies": {
+    "title": "فحوصات الفواتير",
+    "description": "فروقات مسجلة بين الفاتورة والطلب والعقد والسعر السابق تحتاج إلى مراجعة.",
+    "empty": "لا توجد مخالفات فاتورة مدعومة بالبيانات في هذه الفترة.",
+    "signals": {
+      "quantity_exceeds_order": "الكمية المفوترة تتجاوز الطلب",
+      "price_above_order_snapshot": "السعر يتجاوز لقطة الطلب",
+      "price_above_active_contract": "السعر يتجاوز العقد النشط",
+      "price_movement_above_threshold": "حركة السعر تحتاج مراجعة",
+      "duplicate_linked_invoice": "فاتورة مرتبطة مكررة"
     }
   }
 }

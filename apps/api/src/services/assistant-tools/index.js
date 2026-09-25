@@ -2,7 +2,8 @@ import { query } from '../../lib/db.js'
 import { hasPermission } from '../../lib/permissions.js'
 import { rolesIncludeOwner } from '../../lib/tenant-roles.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
-import { isFeatureEnabledForTenant } from '../../lib/feature-flags.js'
+import { isFeatureEnabledForTenant, getResolvedFeatureValue } from '../../lib/feature-flags.js'
+import { hasSmartReorderCapability } from '../../lib/smart-reorder-tier.js'
 import { getReorderAssistance } from '../restaurant-reorder-assistance.service.js'
 import { getOrderTracking } from '../driver-location.service.js'
 import { getRestaurantPayables } from '../restaurant-payables.service.js'
@@ -13,9 +14,35 @@ import * as reports from '../reports.service.js'
 import { listDeliveryRoutes, getDriverActiveRoute } from '../delivery-routes.service.js'
 import { listSupplierStockDisplay } from '../supplier-stock.service.js'
 import { getSupplierCommandCenter } from '../supplier-command-center.service.js'
+import { listSupplierSlowMovingInventory } from '../supplier-slow-moving-intelligence.service.js'
+import { listSupplierDemandForecast } from '../supplier-demand-forecast.service.js'
+import { listSupplierStockoutRisks } from '../supplier-stockout-intelligence.service.js'
+import { listSupplierCrossSellOpportunities } from '../supplier-cross-sell-intelligence.service.js'
+import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals-intelligence.service.js'
+import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
+import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
+import { getSupplierWeeklyIntelligenceSummary } from '../supplier-weekly-intelligence-summary.service.js'
+import { listCommonProductBestPrices } from '../supplier-price-comparison.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
+import {
+  getProductPriceHistory,
+  listPriceChangeAlerts,
+} from '../restaurant-price-intelligence.service.js'
+import { getWasteIntelligence } from '../restaurant-waste-intelligence.service.js'
+import { listSupplierReliability } from '../restaurant-supplier-reliability.service.js'
+import { listWeakMarginMenuItems } from '../restaurant-margin-intelligence.service.js'
+import { listOverOrderingIntelligence } from '../restaurant-over-ordering-intelligence.service.js'
+import { listInvoiceAnomalies } from '../restaurant-invoice-anomaly-intelligence.service.js'
+import {
+  restaurantOrgBranchComparison,
+  restaurantOrgStockTransferSuggestions,
+} from '../org-reports.service.js'
+import {
+  getIntelligenceTierForTenant,
+  INTELLIGENCE_TIER_ORDER,
+} from '../../lib/intelligence-tier.js'
 
 const ROW_CAP = 15
 
@@ -33,7 +60,8 @@ const ROW_CAP = 15
  */
 
 function can(ctx, permissionKey) {
-  if (ctx.isAdmin && !ctx.isImpersonating) return true
+  if (ctx.isAdmin && !ctx.isImpersonating)
+    return hasPermission(ctx.permissions || [], P.ADMIN_ACCESS)
   if (rolesIncludeOwner(ctx.roles)) return true
   return hasPermission(ctx.permissions || [], permissionKey)
 }
@@ -43,8 +71,52 @@ async function featureOn(ctx, key) {
   return isFeatureEnabledForTenant(ctx.tenantId, ctx.tenantType, key)
 }
 
+async function intelligenceAtLeast(ctx, minimum) {
+  const resolved = await getIntelligenceTierForTenant(ctx.tenantId, ctx.tenantType)
+  return INTELLIGENCE_TIER_ORDER.indexOf(resolved.tier) >= INTELLIGENCE_TIER_ORDER.indexOf(minimum)
+}
 function cap(rows) {
   return Array.isArray(rows) ? rows.slice(0, ROW_CAP) : rows
+}
+
+async function getRestaurantOrgScope(ctx) {
+  if (ctx.restaurantOrgScopeResolved) return ctx.restaurantOrgScope
+  ctx.restaurantOrgScopeResolved = true
+  ctx.restaurantOrgScope = null
+
+  if (ctx.tenantType !== 'RESTAURANT' || !ctx.tenantId) return null
+  const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+    ctx.tenantId,
+  ])
+  const organizationId = rows[0]?.organization_id
+  if (!organizationId) return null
+
+  const { rows: mainRows } = await query(
+    `SELECT id FROM restaurant WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+    [organizationId]
+  )
+  const primaryRestaurantId = mainRows[0]?.id
+  if (!primaryRestaurantId) return null
+
+  ctx.restaurantOrgScope = { organizationId, primaryRestaurantId }
+  return ctx.restaurantOrgScope
+}
+
+async function organizationFeatureOn(ctx, featureKey) {
+  const org = await getRestaurantOrgScope(ctx)
+  if (!org) return false
+  return isFeatureEnabledForTenant(org.primaryRestaurantId, 'RESTAURANT', featureKey)
+}
+
+async function organizationHasForecast(ctx) {
+  const org = await getRestaurantOrgScope(ctx)
+  if (!org) return false
+  const featureValue = await getResolvedFeatureValue(
+    org.primaryRestaurantId,
+    'RESTAURANT',
+    'smart_reorder'
+  )
+  return hasSmartReorderCapability(featureValue, 'forecast')
 }
 
 /** @type {Record<string, { definition: import('../../lib/ai/provider.js').AiToolDefinition, available: (ctx: AssistantToolContext) => Promise<boolean>, run: (ctx: AssistantToolContext, args: Record<string, unknown>) => Promise<unknown> }>} */
@@ -53,13 +125,16 @@ const TOOLS = {
     definition: {
       name: 'get_inventory',
       description:
-        'Look up restaurant on-hand stock by product name (e.g. tomatoes). Returns quantity and unit.',
+        'Restaurant on-hand stock. Call with no arguments to list current inventory, lowest stock first. Use search to filter by product name or SKU, or lowStockOnly to return only items at or below their low-stock threshold.',
       parameters: {
         type: 'object',
         properties: {
-          search: { type: 'string', description: 'Product name fragment to search' },
+          search: { type: 'string', description: 'Optional product name or SKU fragment' },
+          lowStockOnly: {
+            type: 'boolean',
+            description: 'Only return items at or below their low-stock threshold',
+          },
         },
-        required: ['search'],
       },
     },
     available: async (ctx) =>
@@ -68,7 +143,7 @@ const TOOLS = {
       (await featureOn(ctx, 'inventory_management')),
     run: async (ctx, args) => {
       const search = String(args.search || '').trim()
-      if (!search) return { items: [] }
+      const lowStockOnly = args.lowStockOnly === true
       const { rows } = await query(
         `
         SELECT
@@ -86,20 +161,118 @@ const TOOLS = {
         JOIN product p ON p.id = ri.product_id
         WHERE ri.restaurant_id = $1
           AND (
-            p.name ILIKE '%' || $2 || '%'
+            $2::text = ''
+            OR p.name ILIKE '%' || $2 || '%'
             OR COALESCE(p.sku, '') ILIKE '%' || $2 || '%'
           )
+          AND (
+            $3::boolean = false
+            OR (ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold)
+          )
         ORDER BY
-          CASE WHEN lower(p.name) = lower($2) THEN 0
+          CASE
+            WHEN ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold
+            THEN 0 ELSE 1
+          END,
+          CASE WHEN $2::text = '' THEN 2
+               WHEN lower(p.name) = lower($2) THEN 0
                WHEN lower(p.name) LIKE lower($2) || '%' THEN 1
                ELSE 2 END,
           p.name
-        LIMIT $3
+        LIMIT $4
         `,
-        [ctx.tenantId, search, ROW_CAP]
+        [ctx.tenantId, search, lowStockOnly, ROW_CAP]
       )
-      return { items: rows }
+      return { items: rows, filtered: Boolean(search) || lowStockOnly }
     },
+  },
+
+  get_account_overview: {
+    definition: {
+      name: 'get_account_overview',
+      description:
+        'Whole-account snapshot for the restaurant: how many products are tracked, how many are low or out of stock, and recent order count and spend. Call this first for broad questions about how the business is doing or what needs attention.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.INVENTORY_VIEW),
+    run: async (ctx) => {
+      const { rows: inventoryRows } = await query(
+        `
+        SELECT
+          COUNT(*)::int AS "trackedProducts",
+          COUNT(*) FILTER (
+            WHERE ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold
+          )::int AS "lowStockCount",
+          COUNT(*) FILTER (WHERE ri.quantity <= 0)::int AS "outOfStockCount"
+        FROM restaurant_inventory ri
+        WHERE ri.restaurant_id = $1
+        `,
+        [ctx.tenantId]
+      )
+
+      if (!can(ctx, P.ORDERS_VIEW)) {
+        return { inventory: inventoryRows[0] || null, orders: null }
+      }
+
+      const { rows: orderRows } = await query(
+        `
+        SELECT
+          COUNT(*)::int AS "ordersLast30Days",
+          COALESCE(SUM(o.total_amount), 0) AS "spendLast30Days",
+          COUNT(*) FILTER (WHERE o.status NOT IN ('DELIVERED', 'CANCELLED'))::int AS "openOrders"
+        FROM customer_order o
+        WHERE o.restaurant_id = $1
+          AND o.status <> 'DRAFT'
+          AND COALESCE(o.placed_at, o.created_at) >= now() - interval '30 days'
+        `,
+        [ctx.tenantId]
+      )
+      return { inventory: inventoryRows[0] || null, orders: orderRows[0] || null }
+    },
+  },
+
+  get_followed_suppliers: {
+    definition: {
+      name: 'get_followed_suppliers',
+      description:
+        'List the suppliers the current restaurant follows. Use for followed suppliers, following count, or supplier network questions.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
+    run: async (ctx) => {
+      const { rows } = await query(
+        `SELECT DISTINCT ON (COALESCE(s.organization_id, s.id))
+          COALESCE(s.organization_id, s.id) AS "supplierId",
+          COALESCE(so.name, s.name) AS "supplierName",
+          sf.created_at AS "followedAt"
+         FROM supplier_follow sf
+         JOIN supplier s ON s.id = sf.supplier_id
+         LEFT JOIN supplier_organizations so ON so.id = s.organization_id
+         WHERE sf.restaurant_id = $1
+         ORDER BY COALESCE(s.organization_id, s.id), sf.created_at DESC`,
+        [ctx.tenantId]
+      )
+      return { count: rows.length, suppliers: cap(rows) }
+    },
+  },
+
+  compare_supplier_prices: {
+    definition: {
+      name: 'compare_supplier_prices',
+      description:
+        'Compare current like-for-like prices for products sold by at least two followed suppliers and identify the best price.',
+      parameters: {
+        type: 'object',
+        properties: { search: { type: 'string', description: 'Optional product or brand filter' } },
+      },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
+    run: async (ctx, args) => ({
+      comparisons: await listCommonProductBestPrices(ctx.tenantId, {
+        search: String(args.search || ''),
+        limit: ROW_CAP,
+      }),
+    }),
   },
 
   get_reorder_need: {
@@ -431,6 +604,237 @@ const TOOLS = {
     },
   },
 
+  get_price_history: {
+    definition: {
+      name: 'get_price_history',
+      description: 'Observed purchase-price history for one restaurant catalog product.',
+      parameters: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string', description: 'Restaurant catalog product ID' },
+          days: { type: 'number', description: 'Lookback days, default 180' },
+        },
+        required: ['productId'],
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.CATALOG_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'basic')),
+    run: async (ctx, args) => {
+      const productId = String(args.productId || '').trim()
+      if (!productId) return { productId: null, events: [], summary: null }
+      const days = Math.min(Math.max(Number(args.days) || 180, 1), 730)
+      const result = await getProductPriceHistory(ctx.tenantId, productId, { days, limit: ROW_CAP })
+      return { ...result, events: cap(result.events) }
+    },
+  },
+  get_price_changes: {
+    definition: {
+      name: 'get_price_changes',
+      description: 'Meaningful observed restaurant purchase-price changes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number' },
+          minChangePct: { type: 'number' },
+          direction: { type: 'string', enum: ['up', 'down', 'any'] },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.CATALOG_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 30, 1), 365)
+      const result = await listPriceChangeAlerts(ctx.tenantId, {
+        days,
+        minChangePct: args.minChangePct,
+        direction: args.direction,
+      })
+      return { ...result, alerts: cap(result.alerts) }
+    },
+  },
+  get_waste_intelligence: {
+    definition: {
+      name: 'get_waste_intelligence',
+      description: 'Repeated or rising restaurant waste and spoilage signals.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 30' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      (await featureOn(ctx, 'waste_tracking')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 30, 7), 365)
+      const result = await getWasteIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, hotspots: cap(result.hotspots) }
+    },
+  },
+  get_supplier_reliability: {
+    definition: {
+      name: 'get_supplier_reliability',
+      description: 'Observed receiving, delivery, and dispute reliability facts by supplier.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await featureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 7), 730)
+      const result = await listSupplierReliability(ctx.tenantId, { days })
+      return { ...result, suppliers: cap(result.suppliers) }
+    },
+  },
+  get_recipe_profitability: {
+    definition: {
+      name: 'get_recipe_profitability',
+      description:
+        'Computed menu-item profitability facts below a selected gross-margin threshold.',
+      parameters: {
+        type: 'object',
+        properties: {
+          maxMarginPct: {
+            type: 'number',
+            description: 'Gross-margin display threshold, default 60',
+          },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.RECIPES_VIEW_COSTS) &&
+      (await featureOn(ctx, 'recipe_costing')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const result = await listWeakMarginMenuItems(ctx.tenantId, {
+        maxMarginPct: args.maxMarginPct,
+        limit: ROW_CAP,
+      })
+      return { ...result, items: cap(result.items) }
+    },
+  },
+  get_over_ordering: {
+    definition: {
+      name: 'get_over_ordering',
+      description:
+        'Coverage-aware signals of restaurant stock purchased faster than observed depletion.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await featureOn(ctx, 'waste_tracking')) &&
+      (await featureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listOverOrderingIntelligence(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, products: cap(result.products) }
+    },
+  },
+  get_invoice_anomalies: {
+    definition: {
+      name: 'get_invoice_anomalies',
+      description:
+        'Factual invoice-line differences from order, contract, and prior invoice records.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: { type: 'number', description: 'Lookback days, default 90' },
+          minChangePct: { type: 'number', description: 'Minimum prior-price movement percentage' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVOICES_VIEW) &&
+      (await featureOn(ctx, 'finance_invoices')) &&
+      (await intelligenceAtLeast(ctx, 'advanced')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 7), 365)
+      const result = await listInvoiceAnomalies(ctx.tenantId, {
+        days,
+        minChangePct: args.minChangePct,
+        limit: ROW_CAP,
+      })
+      return { ...result, invoices: cap(result.invoices) }
+    },
+  },
+  get_branch_comparison: {
+    definition: {
+      name: 'get_branch_comparison',
+      description: 'Authorized cross-branch purchasing, inventory, waste, and receiving facts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          from: { type: 'string', description: 'Start date (YYYY-MM-DD)' },
+          to: { type: 'string', description: 'End date (YYYY-MM-DD)' },
+        },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.ORDERS_VIEW) &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      can(ctx, P.RECEIVING_VIEW) &&
+      (await organizationFeatureOn(ctx, 'multi_branch')) &&
+      (await organizationFeatureOn(ctx, 'waste_tracking')) &&
+      (await organizationFeatureOn(ctx, 'receiving_quality')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const org = await getRestaurantOrgScope(ctx)
+      if (!org) throw new Error('Restaurant organization access is required')
+      const result = await restaurantOrgBranchComparison(ctx.userId, org.organizationId, {
+        from: args.from,
+        to: args.to,
+      })
+      return {
+        ...result,
+        data: { ...result.data, branches: cap(result.data?.branches) },
+      }
+    },
+  },
+  get_transfer_suggestions: {
+    definition: {
+      name: 'get_transfer_suggestions',
+      description:
+        'Read-only cross-branch stock-transfer suggestions from fresh forecasts and observed surplus.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      (await organizationFeatureOn(ctx, 'multi_branch')) &&
+      (await organizationHasForecast(ctx)) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx) => {
+      const org = await getRestaurantOrgScope(ctx)
+      if (!org) throw new Error('Restaurant organization access is required')
+      const result = await restaurantOrgStockTransferSuggestions(ctx.userId, org.organizationId)
+      return { ...result, data: { ...result.data, suggestions: cap(result.data?.suggestions) } }
+    },
+  },
   get_waste: {
     definition: {
       name: 'get_waste',
@@ -549,6 +953,243 @@ const TOOLS = {
             }
           : null,
       }
+    },
+  },
+
+  get_supplier_demand_forecast: {
+    definition: {
+      name: 'get_supplier_demand_forecast',
+      description: 'Recorded supplier product-demand forecast; review only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          horizonDays: { type: 'number', description: 'Forecast horizon in days, default 14' },
+        },
+      },
+    },
+    available: async (ctx) => {
+      if (ctx.tenantType !== 'SUPPLIER' || !can(ctx, P.ORDERS_VIEW)) return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const horizonDays = Math.min(Math.max(Number(args.horizonDays) || 14, 1), 90)
+      const result = await listSupplierDemandForecast(ctx.tenantId, {
+        horizonDays,
+        limit: ROW_CAP,
+      })
+      return { ...result, forecasts: cap(result.forecasts) }
+    },
+  },
+  get_supplier_stockout_risks: {
+    definition: {
+      name: 'get_supplier_stockout_risks',
+      description: 'Recorded supplier projected-stockout risks; review only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          horizonDays: { type: 'number', description: 'Projection horizon in days, default 14' },
+        },
+      },
+    },
+    available: async (ctx) => {
+      if (
+        ctx.tenantType !== 'SUPPLIER' ||
+        !can(ctx, P.ORDERS_VIEW) ||
+        !can(ctx, P.WAREHOUSES_VIEW)
+      ) {
+        return false
+      }
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const horizonDays = Math.min(Math.max(Number(args.horizonDays) || 14, 1), 90)
+      const result = await listSupplierStockoutRisks(ctx.tenantId, {
+        horizonDays,
+        limit: ROW_CAP,
+      })
+      return { ...result, risks: cap(result.risks) }
+    },
+  },
+  get_supplier_cross_sell_opportunities: {
+    definition: {
+      name: 'get_supplier_cross_sell_opportunities',
+      description: 'Recorded supplier product-pair cross-sell evidence; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Observation days, default 180' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.ORDERS_VIEW) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 180, 30), 365)
+      const result = await listSupplierCrossSellOpportunities(ctx.tenantId, {
+        days,
+        limit: ROW_CAP,
+      })
+      return { ...result, opportunities: cap(result.opportunities) }
+    },
+  },
+  get_supplier_suggested_deals: {
+    definition: {
+      name: 'get_supplier_suggested_deals',
+      description: 'Recorded supplier deal-review candidates; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Observation days, default 90' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.WAREHOUSES_VIEW) &&
+      can(ctx, P.PROMOTIONS_MANAGE) &&
+      (await featureOn(ctx, 'inventory_management')) &&
+      (await featureOn(ctx, 'promotions')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listSupplierSuggestedDealCandidates(ctx.tenantId, {
+        days,
+        limit: ROW_CAP,
+      })
+      return { ...result, candidates: cap(result.candidates) }
+    },
+  },
+  get_supplier_warehouse_performance: {
+    definition: {
+      name: 'get_supplier_warehouse_performance',
+      description: 'Recorded supplier warehouse performance; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Observation days, default 30' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.WAREHOUSES_VIEW) &&
+      can(ctx, P.FULFILLMENT_VIEW) &&
+      (await featureOn(ctx, 'warehouses')) &&
+      (await featureOn(ctx, 'fulfillment')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 30, 1), 365)
+      const result = await listSupplierWarehousePerformance(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, warehouses: cap(result.warehouses) }
+    },
+  },
+  get_supplier_warehouse_demand_forecast: {
+    definition: {
+      name: 'get_supplier_warehouse_demand_forecast',
+      description: 'Recorded supplier warehouse product-demand forecast; review only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          horizonDays: { type: 'number', description: 'Forecast horizon in days, default 14' },
+        },
+      },
+    },
+    available: async (ctx) => {
+      if (
+        ctx.tenantType !== 'SUPPLIER' ||
+        !can(ctx, P.ORDERS_VIEW) ||
+        !can(ctx, P.WAREHOUSES_VIEW) ||
+        !(await featureOn(ctx, 'multi_warehouse'))
+      )
+        return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const horizonDays = Math.min(Math.max(Number(args.horizonDays) || 14, 1), 90)
+      const result = await listSupplierWarehouseDemandForecast(ctx.tenantId, {
+        horizonDays,
+        limit: ROW_CAP,
+      })
+      return { ...result, forecasts: cap(result.forecasts) }
+    },
+  },
+  get_supplier_weekly_intelligence_summary: {
+    definition: {
+      name: 'get_supplier_weekly_intelligence_summary',
+      description: 'Recorded supplier weekly intelligence summary; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Summary period in days, default 7' } },
+      },
+    },
+    available: async (ctx) => {
+      if (
+        ctx.tenantType !== 'SUPPLIER' ||
+        !can(ctx, P.ORDERS_VIEW) ||
+        !can(ctx, P.WAREHOUSES_VIEW) ||
+        !can(ctx, P.FULFILLMENT_VIEW)
+      )
+        return false
+      if (
+        !(await featureOn(ctx, 'inventory_management')) ||
+        !(await featureOn(ctx, 'warehouses')) ||
+        !(await featureOn(ctx, 'fulfillment')) ||
+        !(await featureOn(ctx, 'multi_warehouse'))
+      )
+        return false
+      const smartReorderValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        ctx.tenantType,
+        'smart_reorder'
+      )
+      return (
+        hasSmartReorderCapability(smartReorderValue, 'forecast') &&
+        (await intelligenceAtLeast(ctx, 'scale'))
+      )
+    },
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 7, 7), 31)
+      return getSupplierWeeklyIntelligenceSummary(ctx.tenantId, { days })
+    },
+  },
+  get_supplier_slow_moving_inventory: {
+    definition: {
+      name: 'get_supplier_slow_moving_inventory',
+      description: 'Recorded supplier stock cover for repeatedly sold products; review only.',
+      parameters: {
+        type: 'object',
+        properties: { days: { type: 'number', description: 'Lookback days, default 90' } },
+      },
+    },
+    available: async (ctx) =>
+      ctx.tenantType === 'SUPPLIER' &&
+      can(ctx, P.WAREHOUSES_VIEW) &&
+      (await featureOn(ctx, 'inventory_management')) &&
+      (await intelligenceAtLeast(ctx, 'scale')),
+    run: async (ctx, args) => {
+      const days = Math.min(Math.max(Number(args.days) || 90, 30), 365)
+      const result = await listSupplierSlowMovingInventory(ctx.tenantId, { days, limit: ROW_CAP })
+      return { ...result, products: cap(result.products) }
     },
   },
 

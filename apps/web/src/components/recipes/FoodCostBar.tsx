@@ -20,7 +20,10 @@ export const FoodCostBar = memo(function FoodCostBar({
   className,
 }: FoodCostBarProps) {
   const { t } = useTranslation('recipes')
-  const target = targetFoodCostPct ?? 30
+  // Never invent a target. `target_food_cost_pct` is nullable and per recipe;
+  // defaulting to 30 displayed "Target: 30%" and flagged recipes as over target
+  // against a benchmark the restaurant never set.
+  const target = targetFoodCostPct ?? null
   const fill = getFoodCostFillPercent(foodCostPct, target)
   const barColor = foodCostBarColor(foodCostPct, target, calcStatus)
   const above = isAboveTargetFoodCost(foodCostPct, target)
@@ -37,9 +40,13 @@ export const FoodCostBar = memo(function FoodCostBar({
           >
             {foodCostPct != null ? `${foodCostPct.toFixed(1)}%` : '—'}
           </span>
-          <span className="text-[var(--text-muted)] tabular-nums">
-            {t('foodCostBar.target', { pct: target })}
-          </span>
+          {target != null ? (
+            <span className="text-[var(--text-muted)] tabular-nums">
+              {t('foodCostBar.target', { pct: target })}
+            </span>
+          ) : (
+            <span className="text-[var(--text-muted)]">{t('foodCostBar.noTarget')}</span>
+          )}
         </div>
       ) : null}
       <div
@@ -58,7 +65,7 @@ export const FoodCostBar = memo(function FoodCostBar({
           className={cn('h-full rounded-full', barColor)}
           style={{ width: `${Math.max(fill, foodCostPct != null ? 4 : 0)}%` }}
         />
-        {target > 0 ? (
+        {target != null && target > 0 ? (
           <div
             className="absolute top-0 h-full w-0.5 bg-[var(--text-muted)]/50"
             style={{ left: `${Math.min(100, (target / Math.max(target * 1.5, target)) * 100)}%` }}

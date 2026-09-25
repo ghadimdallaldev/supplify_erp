@@ -5,6 +5,7 @@ import type {
   SupplierFilters,
   SuppliersResponse,
   UpdateSupplierBusinessSettingsRequest,
+  CommonProductPriceComparison,
 } from '../../../types'
 export const suppliersApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -13,6 +14,13 @@ export const suppliersApi = api.injectEndpoints({
         url: '/api/suppliers',
         params,
       }),
+      providesTags: ['Supplier'],
+    }),
+    getSupplierPriceComparisons: builder.query<
+      { comparisons: CommonProductPriceComparison[] },
+      { search?: string; limit?: number } | void
+    >({
+      query: (params) => ({ url: '/api/suppliers/price-comparison', params: params || undefined }),
       providesTags: ['Supplier'],
     }),
     getSupplier: builder.query<Supplier, string>({
@@ -70,7 +78,26 @@ export const suppliersApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Supplier'],
     }),
-    updateSupplier: builder.mutation<Supplier, { id: string; data: Partial<Supplier> }>({
+    updateSupplier: builder.mutation<
+      Supplier,
+      {
+        id: string
+        data: Partial<Supplier> & {
+          legalName?: string
+          vatNo?: string
+          tradeLicenseNo?: string
+          contactEmail?: string
+          address?: Supplier['address_json']
+          publicCatalogEnabled?: boolean
+          salesContactEmail?: string | null
+          salesContactPhone?: string | null
+          accountingContactEmail?: string | null
+          accountingContactPhone?: string | null
+          logisticsContactEmail?: string | null
+          logisticsContactPhone?: string | null
+        }
+      }
+    >({
       query: ({ id, data }) => ({
         url: `/api/suppliers/${id}`,
         method: 'PATCH',

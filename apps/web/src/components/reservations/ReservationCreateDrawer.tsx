@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -6,7 +6,10 @@ import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { toast } from 'sonner'
-import { useCreateReservationMutation } from '../../services/reservationsApi'
+import {
+  useCreateReservationMutation,
+  useGetPublicBookingSettingsQuery,
+} from '../../services/reservationsApi'
 import type { ReservationTable } from '../../types'
 import {
   Dialog,
@@ -17,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../ui/dialog'
+import { toDatetimeLocalValue } from '../../lib/consumerOrderingHours'
 
 interface ReservationCreateDrawerProps {
   tables: ReservationTable[]
@@ -32,13 +36,18 @@ export function ReservationCreateDrawer({
   onCreated,
 }: ReservationCreateDrawerProps) {
   const { t } = useTranslation('reservations')
+  const { data: bookingSettings } = useGetPublicBookingSettingsQuery()
+  const turnMinutes =
+    bookingSettings?.durationMinutes && bookingSettings.durationMinutes >= 30
+      ? bookingSettings.durationMinutes
+      : DEFAULT_DURATION
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
     customerEmail: '',
     partySize: 2,
-    scheduledAt: new Date().toISOString().slice(0, 16),
+    scheduledAt: toDatetimeLocalValue(new Date()),
     durationMinutes: DEFAULT_DURATION,
     notes: '',
     occasion: '',
@@ -49,14 +58,21 @@ export function ReservationCreateDrawer({
 
   const [createReservation, { isLoading }] = useCreateReservationMutation()
 
+  useEffect(() => {
+    if (!open) return
+    setForm((prev) =>
+      prev.durationMinutes === DEFAULT_DURATION ? { ...prev, durationMinutes: turnMinutes } : prev
+    )
+  }, [open, turnMinutes])
+
   const resetForm = () =>
     setForm({
       customerName: '',
       customerPhone: '',
       customerEmail: '',
       partySize: 2,
-      scheduledAt: new Date().toISOString().slice(0, 16),
-      durationMinutes: DEFAULT_DURATION,
+      scheduledAt: toDatetimeLocalValue(new Date()),
+      durationMinutes: turnMinutes,
       notes: '',
       occasion: '',
       allergies: '',
@@ -87,12 +103,26 @@ export function ReservationCreateDrawer({
       resetForm()
       onCreated?.()
     } catch (error: any) {
-      toast.error(error?.data?.message || t('createDrawer.toasts.createFailed'))
+      toast.error(
+        error?.data?.error?.message || error?.data?.message || t('createDrawer.toasts.createFailed')
+      )
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (next) {
+          setForm((prev) => ({
+            ...prev,
+            durationMinutes: turnMinutes,
+            scheduledAt: toDatetimeLocalValue(new Date()),
+          }))
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>{t('createDrawer.trigger')}</Button>
       </DialogTrigger>

@@ -18,8 +18,8 @@ export function RestaurantConfirmPodButton({ orderId, className, fullWidth }: Pr
   const { data, isLoading: loadingPod } = useGetOrderProofOfDeliveryQuery(orderId)
   const [confirmPod, { isLoading: confirming }] = useConfirmOrderProofOfDeliveryMutation()
 
-  const proof = data?.proof
-  const canConfirm = proof && !proof.confirmed_at
+  const proofs = data?.proofs?.length ? data.proofs : data?.proof ? [data.proof] : []
+  const canConfirm = proofs.some((proof) => !proof.confirmed_at)
 
   if (loadingPod || !canConfirm) return null
 

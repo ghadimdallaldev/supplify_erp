@@ -63,7 +63,21 @@ async function checkMissingPod() {
      WHERE da.status = 'delivered'
        AND da.delivered_at < now() - interval '2 hours'
        AND NOT EXISTS (
-         SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = da.order_id
+         SELECT 1 FROM proof_of_delivery pod
+         WHERE pod.order_id = da.order_id
+           AND (
+             pod.driver_assignment_id = da.id
+             OR (
+               pod.driver_assignment_id IS NULL
+               AND NOT EXISTS (
+                 SELECT 1 FROM driver_assignments sibling
+                 WHERE sibling.order_id = da.order_id
+                   AND sibling.supplier_id = da.supplier_id
+                   AND sibling.id <> da.id
+                   AND sibling.status NOT IN ('reassigned', 'superseded')
+               )
+             )
+           )
        )
        AND EXISTS (
          SELECT 1
@@ -97,13 +111,19 @@ async function checkUnassignedOverdue() {
     `SELECT DISTINCT oi.supplier_id, o.id AS order_id, owa.warehouse_id
      FROM customer_order o
      JOIN order_item oi ON oi.order_id = o.id
-     LEFT JOIN order_warehouse_assignment owa ON owa.order_id = o.id
+     LEFT JOIN order_warehouse_assignment owa
+       ON owa.order_id = o.id
+      AND owa.status NOT IN ('delivered', 'failed', 'superseded')
      WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING')
        AND COALESCE(o.placed_at, o.created_at) < now() - interval '24 hours'
        AND NOT EXISTS (
          SELECT 1 FROM driver_assignments da
          WHERE da.order_id = o.id
-           AND da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'delivered')
+           AND da.status IN ('assigned', 'picked_up', 'out_for_delivery', 'delivered', 'rescheduled')
+           AND (
+             (owa.id IS NULL AND da.warehouse_assignment_id IS NULL)
+             OR da.warehouse_assignment_id = owa.id
+           )
        )
        AND EXISTS (
          SELECT 1

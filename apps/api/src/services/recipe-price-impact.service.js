@@ -42,22 +42,47 @@ export async function recordSupplierPriceEvent(event, dbQuery = query) {
     supplierId = null,
     productName = null,
     oldPrice = null,
+    oldCurrency = null,
     newPrice,
+    currency = null,
     source,
   } = event
 
-  const changePct = oldPrice != null ? moneyToNumber(pctChange(oldPrice, newPrice) ?? 0, 4) : null
+  const normalizedCurrency = currency ? String(currency).trim().toUpperCase() : null
+  const normalizedOldCurrency = oldCurrency ? String(oldCurrency).trim().toUpperCase() : null
+  const comparableOldPrice =
+    oldPrice != null &&
+    (normalizedOldCurrency == null ||
+      normalizedCurrency == null ||
+      normalizedOldCurrency === normalizedCurrency)
+      ? oldPrice
+      : null
+
+  const changePct =
+    comparableOldPrice != null
+      ? moneyToNumber(pctChange(comparableOldPrice, newPrice) ?? 0, 4)
+      : null
 
   const { rows: eventRows } = await dbQuery(
     `
     INSERT INTO supplier_price_events (
       restaurant_id, product_id, supplier_id, product_name,
-      old_price, new_price, change_pct, source
+      old_price, new_price, change_pct, source, currency
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *
     `,
-    [restaurantId, productId, supplierId, productName, oldPrice, newPrice, changePct, source]
+    [
+      restaurantId,
+      productId,
+      supplierId,
+      productName,
+      comparableOldPrice,
+      newPrice,
+      changePct,
+      source,
+      normalizedCurrency,
+    ]
   )
   const priceEvent = eventRows[0]
   const recipeIds = await findRecipesUsingProduct(restaurantId, productId, dbQuery)
@@ -251,14 +276,31 @@ export async function propagateCatalogPriceChange(
   for (const { restaurant_id: restaurantId } of restaurants) {
     const cached = await dbQuery(
       `
-      SELECT unit_price FROM restaurant_ingredient_costs
+      SELECT unit_price, currency FROM restaurant_ingredient_costs
       WHERE restaurant_id = $1 AND product_id = $2
       ORDER BY effective_at DESC LIMIT 1
       `,
       [restaurantId, productId]
     )
+    const { rows: priceRows } = await dbQuery(
+      `
+      SELECT currency FROM price
+      WHERE product_id = $1
+        AND valid_from <= now()
+        AND (valid_to IS NULL OR valid_to >= now())
+      ORDER BY (CASE WHEN min_qty <= 1 THEN 0 ELSE 1 END), valid_from DESC
+      LIMIT 1
+      `,
+      [productId]
+    )
     const oldPrice = cached.rows[0]?.unit_price != null ? Number(cached.rows[0].unit_price) : null
-    if (oldPrice != null && Math.abs(oldPrice - newPrice) < 0.0001) continue
+    const nextCurrency = priceRows[0]?.currency || null
+    const oldCurrency = cached.rows[0]?.currency || null
+    const sameCurrency =
+      oldCurrency == null ||
+      nextCurrency == null ||
+      String(oldCurrency).toUpperCase() === String(nextCurrency).toUpperCase()
+    if (sameCurrency && oldPrice != null && Math.abs(oldPrice - newPrice) < 0.0001) continue
 
     await recordSupplierPriceEvent(
       {
@@ -267,7 +309,9 @@ export async function propagateCatalogPriceChange(
         supplierId: product.supplier_id,
         productName: product.name,
         oldPrice,
+        oldCurrency,
         newPrice,
+        currency: nextCurrency,
         source,
       },
       dbQuery

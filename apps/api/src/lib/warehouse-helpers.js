@@ -1,7 +1,13 @@
 import { query, withTransaction } from './db.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
 
 let cachedSupplierCol = null
 let cachedOwnerInsert = null
+
+export function __resetWarehouseColumnCacheForTests() {
+  cachedSupplierCol = null
+  cachedOwnerInsert = null
+}
 
 /** Resolve warehouse.supplier_id vs warehouse.tenant_id column name (for filters). */
 export async function getWarehouseSupplierColumn(db = query) {
@@ -53,6 +59,23 @@ export async function getWarehouseOwnerInsertSpec(db = query) {
 export function warehouseBelongsToSupplier(warehouse, supplierId) {
   const owner = warehouse.tenant_id ?? warehouse.supplier_id
   return owner === supplierId
+}
+
+/**
+ * Reject warehouse IDs that are missing, inactive, or owned by another supplier.
+ */
+export async function assertWarehouseOwnedBySupplier(warehouseId, supplierId, { db = query } = {}) {
+  if (!warehouseId) return null
+  const supplierCol = await getWarehouseSupplierColumn(db)
+  const { rows } = await db(
+    `SELECT id FROM warehouse
+     WHERE id = $1 AND ${supplierCol} = $2 AND COALESCE(is_active, TRUE) = TRUE`,
+    [warehouseId, supplierId]
+  )
+  if (!rows.length) {
+    throw new ValidationError('Warehouse not found for this supplier')
+  }
+  return rows[0]
 }
 
 /** Effective default flag (is_default or legacy is_main). */

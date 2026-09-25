@@ -3,8 +3,10 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   requireAnyPermission,
 } from '../lib/rbac.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import {
@@ -26,16 +28,49 @@ const router = express.Router()
 async function resolveOrgContextFromTenant(req, res, next) {
   try {
     if (req.userData?.role === 'ADMIN') {
-      const orgId = req.query.organization_id || req.body?.organization_id
-      if (orgId) {
-        const { rows } = await query(
-          `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
-          [orgId]
-        )
-        req.orgContext = {
-          organizationId: orgId,
-          primarySupplierId: rows[0]?.id || null,
-        }
+      const requestedOrgId =
+        (typeof req.query.organization_id === 'string' && req.query.organization_id.trim()) ||
+        (typeof req.body?.organization_id === 'string' && req.body.organization_id.trim()) ||
+        null
+      const effectiveTenant = getEffectiveTenant(req)
+      let organizationId = null
+      if (requestedOrgId && !effectiveTenant) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Impersonate a tenant to access this organization' },
+          requestId: req.requestId,
+        })
+      }
+      if (effectiveTenant?.tenantType === 'SUPPLIER' && effectiveTenant.tenantId) {
+        const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
+          effectiveTenant.tenantId,
+        ])
+        organizationId = rows[0]?.organization_id || null
+      }
+      if (requestedOrgId && effectiveTenant && organizationId !== requestedOrgId) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+          requestId: req.requestId,
+        })
+      }
+      if (!organizationId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Organization context required' },
+          requestId: req.requestId,
+        })
+      }
+      const { rows } = await query(
+        `SELECT id FROM supplier WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+        [organizationId]
+      )
+      req.orgContext = {
+        organizationId,
+        primarySupplierId: rows[0]?.id || null,
       }
       return next()
     }
@@ -92,6 +127,7 @@ router.use(
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   resolveTenantContext,
+  resolveAdminContext,
   requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE'),
   resolveOrgContextFromTenant
 )

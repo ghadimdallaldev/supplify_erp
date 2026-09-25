@@ -5,6 +5,7 @@ import { query } from '../../lib/db.js'
 import { claimEmailDelivery, finalizeEmailDelivery } from './email-delivery-log.js'
 import { resolveLocale } from '../../i18n/index.js'
 import { renderTemplate } from './templates/registry.js'
+import { normalizeEmailHtmlLinks } from '../../lib/app-url.js'
 
 let bootLogged = false
 
@@ -113,6 +114,7 @@ export async function sendEmail({
     logId = claim.logId
   }
 
+  const normalizedHtml = normalizeEmailHtmlLinks(html)
   const payload = {
     to: recipients.length === 1 ? recipients[0] : recipients,
     subject,

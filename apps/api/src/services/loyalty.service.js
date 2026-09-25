@@ -75,6 +75,50 @@ export function computeRedeemValue(program, points) {
   return Math.max(0, points * rate)
 }
 
+/** Discount a redemption is allowed to take off the food subtotal. */
+export function quoteConsumerLoyaltyRedeem(program, points, orderSubtotal) {
+  const subtotal = roundMoney(Number(orderSubtotal || 0))
+  if (!(subtotal > 0)) {
+    throw new ValidationError('Rewards can only be used on a food order')
+  }
+  if (!(Number(program?.redeem_currency_per_point) > 0)) {
+    throw new ValidationError('Rewards redemption is not configured')
+  }
+  const discountValue = roundMoney(computeRedeemValue(program, points))
+  const maxByPercent = roundMoney(subtotal * (Number(program.max_redeem_percent) / 100))
+  if (discountValue <= 0 || discountValue > maxByPercent || discountValue > subtotal) {
+    throw new ValidationError(
+      `Redemption exceeds maximum ${program.max_redeem_percent}% of order subtotal`
+    )
+  }
+  return discountValue
+}
+
+/** Largest point amount whose rounded discount still fits the food bill and the percent cap. */
+export function suggestConsumerRedeemPoints(program, memberBalance, orderSubtotal) {
+  if (!program?.enabled) return null
+  const subtotal = roundMoney(Number(orderSubtotal || 0))
+  const rate = Number(program.redeem_currency_per_point)
+  const minPoints = Number(program.min_redeem_points ?? 0)
+  const balance = Math.floor(Number(memberBalance || 0))
+  if (!(subtotal > 0) || !(rate > 0) || balance < minPoints) return null
+  const maxDiscount = roundMoney(subtotal * (Number(program.max_redeem_percent ?? 50) / 100))
+  let suggestedPoints = Math.min(balance, Math.floor(maxDiscount / rate))
+  while (suggestedPoints >= minPoints) {
+    const discount = roundMoney(computeRedeemValue(program, suggestedPoints))
+    if (discount > 0 && discount <= maxDiscount && discount <= subtotal) {
+      return { points: suggestedPoints, discount }
+    }
+    suggestedPoints -= 1
+  }
+  return null
+}
+
+/** Points are earned on food spend after a rewards discount, never on the discount itself. */
+export function consumerLoyaltyEarnBasis(subtotal, discountValue) {
+  return Math.max(0, roundMoney(Number(subtotal || 0) - Number(discountValue || 0)))
+}
+
 async function getOrCreateBalance(client, supplierId, restaurantId) {
   const q = client?.query ? client.query.bind(client) : query
   const { rows } = await q(
@@ -540,6 +584,123 @@ export async function earnConsumerLoyaltyOnOrderComplete(
   }
 }
 
+function readLedgerMetadata(value) {
+  if (!value) return {}
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return {}
+    }
+  }
+  return value
+}
+
+/**
+ * Give redeemed points back and remove points earned on this order.
+ * A second cancel finds the reversal rows and does nothing.
+ */
+export async function reverseConsumerLoyaltyOnOrderCancel(
+  client,
+  { restaurantId, memberId, consumerOrderId }
+) {
+  if (!memberId || !consumerOrderId) return null
+  const db = client || { query: (...args) => query(...args) }
+
+  const { rows: reversalRows } = await db.query(
+    `
+    SELECT metadata FROM consumer_loyalty_ledger
+    WHERE restaurant_id = $1 AND consumer_member_id = $2
+      AND consumer_order_id = $3 AND entry_type = 'REVERSAL'
+    `,
+    [restaurantId, memberId, consumerOrderId]
+  )
+  const reversed = new Set(
+    reversalRows.map((row) => readLedgerMetadata(row.metadata).reverses).filter(Boolean)
+  )
+
+  const { rows: entries } = await db.query(
+    `
+    SELECT entry_type, points_delta FROM consumer_loyalty_ledger
+    WHERE restaurant_id = $1 AND consumer_member_id = $2
+      AND consumer_order_id = $3 AND entry_type IN ('EARN', 'REDEEM')
+    `,
+    [restaurantId, memberId, consumerOrderId]
+  )
+
+  let earnPoints = 0
+  let redeemedPoints = 0
+  for (const entry of entries) {
+    const delta = Number(entry.points_delta) || 0
+    if (entry.entry_type === 'EARN') earnPoints += delta
+    if (entry.entry_type === 'REDEEM') redeemedPoints += Math.abs(Math.min(0, delta))
+  }
+
+  if (
+    (earnPoints <= 0 || reversed.has('EARN')) &&
+    (redeemedPoints <= 0 || reversed.has('REDEEM'))
+  ) {
+    return null
+  }
+
+  const { rows: memberRows } = await db.query(
+    `SELECT * FROM consumer_member WHERE id = $1 AND restaurant_id = $2 FOR UPDATE`,
+    [memberId, restaurantId]
+  )
+  if (!memberRows.length) return null
+
+  let balance = Number(memberRows[0].loyalty_points) || 0
+  let lifetimeEarned = Number(memberRows[0].lifetime_earned) || 0
+  let lifetimeRedeemed = Number(memberRows[0].lifetime_redeemed) || 0
+
+  const writeReversal = async (kind, pointsDelta) => {
+    balance += pointsDelta
+    if (balance < 0) balance = 0
+    await db.query(
+      `
+      INSERT INTO consumer_loyalty_ledger (
+        restaurant_id, consumer_member_id, consumer_order_id,
+        entry_type, points_delta, balance_after, metadata
+      )
+      VALUES ($1, $2, $3, 'REVERSAL', $4, $5, $6::jsonb)
+      `,
+      [
+        restaurantId,
+        memberId,
+        consumerOrderId,
+        pointsDelta,
+        balance,
+        JSON.stringify({ reverses: kind }),
+      ]
+    )
+  }
+
+  if (redeemedPoints > 0 && !reversed.has('REDEEM')) {
+    await writeReversal('REDEEM', redeemedPoints)
+    lifetimeRedeemed = Math.max(0, lifetimeRedeemed - redeemedPoints)
+  }
+
+  if (earnPoints > 0 && !reversed.has('EARN')) {
+    const clawback = Math.min(balance, earnPoints)
+    await writeReversal('EARN', -clawback)
+    lifetimeEarned = Math.max(0, lifetimeEarned - clawback)
+  }
+
+  await db.query(
+    `
+    UPDATE consumer_member
+    SET loyalty_points = $1,
+        lifetime_earned = $2,
+        lifetime_redeemed = $3,
+        updated_at = NOW()
+    WHERE id = $4 AND restaurant_id = $5
+    `,
+    [balance, lifetimeEarned, lifetimeRedeemed, memberId, restaurantId]
+  )
+
+  return { balanceAfter: balance }
+}
+
 export async function validateConsumerLoyaltyRedeem({
   restaurantId,
   memberId,
@@ -573,14 +734,7 @@ export async function validateConsumerLoyaltyRedeem({
     throw new ValidationError('Insufficient loyalty points')
   }
 
-  const discountValue = roundMoney(computeRedeemValue(program, points))
-  const subtotal = Number(orderSubtotal || 0)
-  const maxByPercent = subtotal * (Number(program.max_redeem_percent) / 100)
-  if (subtotal > 0 && discountValue > maxByPercent) {
-    throw new ValidationError(
-      `Redemption exceeds maximum ${program.max_redeem_percent}% of order subtotal`
-    )
-  }
+  const discountValue = quoteConsumerLoyaltyRedeem(program, points, orderSubtotal)
 
   return {
     program,
@@ -671,14 +825,13 @@ export async function getConsumerLoyaltyPreview({
   }
 
   const subtotal = Number(orderSubtotal || 0)
-  const earnPoints =
-    memberId && program?.enabled ? computeEarnPoints(program, subtotal, { fulfillmentType }) : 0
+  let redeemDiscount = 0
 
   const preview = {
     programEnabled: Boolean(program?.enabled),
     programName: program?.name ?? 'Rewards',
     memberBalance,
-    earnPoints,
+    earnPoints: 0,
     minRedeemPoints: program?.min_redeem_points ?? 0,
     redeemCurrencyPerPoint: program?.redeem_currency_per_point ?? 0,
     maxRedeemPercent: program?.max_redeem_percent ?? 50,
@@ -696,24 +849,21 @@ export async function getConsumerLoyaltyPreview({
         pointsToRedeem,
         orderSubtotal: subtotal,
       })
+      redeemDiscount = Number(preview.redeem.discountValue || 0)
     } catch (err) {
       preview.redeem = { error: err.message }
     }
-  } else if (
-    memberId &&
-    program?.enabled &&
-    memberBalance >= (program.min_redeem_points ?? 0) &&
-    subtotal > 0
-  ) {
-    const rate = Number(program.redeem_currency_per_point) || 0.01
-    const maxDiscount = subtotal * (Number(program.max_redeem_percent ?? 50) / 100)
-    const maxByValue = Math.floor(maxDiscount / rate)
-    const suggestedPoints = Math.min(memberBalance, maxByValue)
-    if (suggestedPoints >= program.min_redeem_points) {
-      preview.suggestedRedeemPoints = suggestedPoints
-      preview.suggestedDiscount = roundMoney(computeRedeemValue(program, suggestedPoints))
+  } else if (memberId && program?.enabled) {
+    const suggestion = suggestConsumerRedeemPoints(program, memberBalance, subtotal)
+    if (suggestion) {
+      preview.suggestedRedeemPoints = suggestion.points
+      preview.suggestedDiscount = suggestion.discount
     }
   }
+
+  const earnBasis = consumerLoyaltyEarnBasis(subtotal, redeemDiscount)
+  preview.earnPoints =
+    memberId && program?.enabled ? computeEarnPoints(program, earnBasis, { fulfillmentType }) : 0
 
   return preview
 }
