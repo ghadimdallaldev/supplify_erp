@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-25 — Reorder Ask box routed to the conversational assistant + AI quota counter fix
+
+**Change (web + API):** The inventory / reorder-assistance "Ask" box previously called `POST /api/restaurant-inventory/reorder-assistance/ask` → `parseReorderIntent`, an intent-to-product matcher whose response shape (`{intent, matchedProducts[], clarifyingQuestion}`) has no answer field and whose allowlist was restricted to products with a current reorder suggestion. Any question outside that narrow set returned "Which items did you mean?". When the `ai_assistant` entitlement is present, the box now sends the question to the conversational assistant (`POST /api/assistant/messages`) and renders the prose answer; the legacy product matcher is retained as the fallback for tenants that have reorder seasonality but not `ai_assistant`, so no existing behaviour is lost.
+
+**Assistant tool coverage:** `get_inventory` no longer requires a `search` argument — calling it with no arguments lists current stock, lowest first, and a new `lowStockOnly` flag returns only items at or below threshold. A new `get_account_overview` tool returns a restaurant-wide snapshot (tracked products, low/out-of-stock counts, and — only with `ORDERS_VIEW` — 30-day order count, spend, and open orders). The system prompt now instructs the model to list candidates rather than ask which product was meant, and `maxRounds` was raised 4 → 8 so multi-tool gathering completes.
+
+**AI quota counter:** the "n/300 AI assists today" meter read `entitlements.aiUsage.current` from a query tagged `Subscription`, but `explainReorderAssistance`, `askReorderAssistance`, `aiRecommendReorderAssistance`, and `sendAssistantMessage` declared no `invalidatesTags`, so the cache was never refreshed and the counter showed its page-load value indefinitely. All four now invalidate `Subscription`. The server-side meter was already incrementing correctly; this was a client cache bug only.
+
+**Mobile:** Skipped — no API contract change. The assistant and reorder-assistance endpoints, their payloads, auth, RBAC, plan feature keys, and mobile-facing types are unchanged; `get_inventory`'s `search` argument became optional, which is backward compatible. The affected surfaces (reorder assistance panel, assistant FAB) are web-only cockpit features with no mobile equivalent.
+
+---
+
 ## 2026-09-25 — Admin UI add-on gate (AdminLimitsTab) + final verification block
 
 **Change:** `AdminLimitsTab.tsx` now hides the addon grant/update editor entirely for Restaurant tenants with no historical `restaurant_extra_branch` row, and restricts it to removal-only (quantity forced to zero, controls disabled) for tenants with an existing historical row. `getAdminAddonOptionKeys` is an exported pure helper. Two new API route tests confirm the backend rejects positive quantities for Restaurant plans and accepts zero for cleanup. Final full verification block: API 334 / 1977 ✓, web 137 / 537 ✓, typecheck ✓, lint 0 errors ✓, build ✓.

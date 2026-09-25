@@ -32,7 +32,7 @@ export const assistantApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Assistant'],
+      invalidatesTags: ['Assistant', 'Subscription'],
     }),
   }),
 })

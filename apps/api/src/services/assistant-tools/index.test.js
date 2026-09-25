@@ -343,6 +343,62 @@ describe('assistant tools', () => {
     expect(query).toHaveBeenCalled()
   })
 
+  it('lists restaurant inventory when no search term is supplied', async () => {
+    query.mockResolvedValueOnce({
+      rows: [
+        { productId: 'p1', productName: 'Tomato', quantity: 2, isLowStock: true },
+        { productId: 'p2', productName: 'Onion', quantity: 40, isLowStock: false },
+      ],
+    })
+    const result = await executeAssistantTool(restaurantCtx(), 'get_inventory', {})
+    expect(result.items).toHaveLength(2)
+    expect(result.filtered).toBe(false)
+    expect(query).toHaveBeenCalledWith(expect.any(String), ['rest-1', '', false, 15])
+  })
+
+  it('returns only low stock rows when lowStockOnly is set', async () => {
+    query.mockResolvedValueOnce({
+      rows: [{ productId: 'p1', productName: 'Tomato', quantity: 2, isLowStock: true }],
+    })
+    const result = await executeAssistantTool(restaurantCtx(), 'get_inventory', {
+      lowStockOnly: true,
+    })
+    expect(result.items).toHaveLength(1)
+    expect(result.filtered).toBe(true)
+    expect(query).toHaveBeenCalledWith(expect.any(String), ['rest-1', '', true, 15])
+  })
+
+  it('exposes broad lookup tools without requiring a product name', async () => {
+    getUserRestaurantOrgMembership.mockResolvedValue(null)
+    const { names, definitions } = await resolveAvailableTools(restaurantCtx())
+    const inventory = definitions.find((d) => d.name === 'get_inventory')
+    expect(inventory.parameters.required).toBeUndefined()
+    expect(names).toContain('get_account_overview')
+  })
+
+  it('builds a whole-account overview for a restaurant', async () => {
+    query
+      .mockResolvedValueOnce({
+        rows: [{ trackedProducts: 120, lowStockCount: 7, outOfStockCount: 2 }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ ordersLast30Days: 18, spendLast30Days: 5400, openOrders: 3 }],
+      })
+    const result = await executeAssistantTool(restaurantCtx(), 'get_account_overview', {})
+    expect(result.inventory).toMatchObject({ trackedProducts: 120, lowStockCount: 7 })
+    expect(result.orders).toMatchObject({ ordersLast30Days: 18, openOrders: 3 })
+  })
+
+  it('omits order figures from the overview without ORDERS_VIEW', async () => {
+    query.mockResolvedValueOnce({
+      rows: [{ trackedProducts: 5, lowStockCount: 0, outOfStockCount: 0 }],
+    })
+    const ctx = restaurantCtx({ permissions: [P.INVENTORY_VIEW], roles: [] })
+    const result = await executeAssistantTool(ctx, 'get_account_overview', {})
+    expect(result.inventory.trackedProducts).toBe(5)
+    expect(result.orders).toBeNull()
+  })
+
   it('only offers driver stops when driverId is set', async () => {
     const without = await resolveAvailableTools(
       restaurantCtx({

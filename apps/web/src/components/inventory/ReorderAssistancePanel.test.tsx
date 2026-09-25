@@ -9,6 +9,7 @@ import { testI18n, resetTestI18n } from '../../test/i18n'
 const mockAiRecommend = vi.fn()
 const mockFeedback = vi.fn()
 const mockAddItem = vi.fn()
+const mockAskAssistant = vi.fn()
 const mockSuppress = vi.fn()
 let mockEntitlements: any = {
   limits: { ai_requests_per_day: 20 },
@@ -58,6 +59,7 @@ vi.mock('../../services/api', () => ({
   useAskReorderAssistanceMutation: () => [vi.fn(), { isLoading: false }],
   useAiRecommendReorderAssistanceMutation: () => [mockAiRecommend, { isLoading: false }],
   useFeedbackReorderAssistanceMutation: () => [mockFeedback],
+  useSendAssistantMessageMutation: () => [mockAskAssistant, { isLoading: false }],
 }))
 
 function renderPanel() {
@@ -105,6 +107,37 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
 
   afterEach(() => {
     cleanup()
+  })
+
+  it('answers account-wide questions through the assistant instead of matching product names', async () => {
+    mockEntitlements = {
+      limits: { ai_requests_per_day: 20 },
+      usage: { ai_requests_per_day: 1 },
+      features: { ai_assistant: true },
+    }
+    mockAskAssistant.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({
+          conversationId: 'conv-1',
+          reply: 'You have 7 products below their low-stock threshold.',
+          sources: [{ tool: 'get_account_overview', ok: true }],
+        }),
+    })
+    renderPanel()
+
+    const input = await screen.findByPlaceholderText(/Ask anything about this restaurant/i)
+    await userEvent.type(input, 'what is running low?')
+    await userEvent.keyboard('{Enter}')
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('You have 7 products below their low-stock threshold.')
+      ).toBeInTheDocument()
+    })
+    expect(mockAskAssistant).toHaveBeenCalledWith({
+      conversationId: null,
+      message: 'what is running low?',
+    })
   })
 
   it('shows AI Reorder Recommendation label, summary, reasoning, and warnings', async () => {

@@ -21,6 +21,9 @@ Rules:
 - If a tool returns no match, say so clearly.
 - You cannot place orders, change stock, assign drivers, or mutate any data. If asked to take an action, refuse and tell the user which screen to use instead.
 - Prefer calling tools before answering numerical or status questions.
+- Never ask the user which product, order, or supplier they mean when a tool can list the candidates. Call the listing tool and answer from what it returns. Most listing tools work with no arguments.
+- For broad questions ("how are we doing", "what needs attention", "what is low"), start with get_account_overview when it is available, then call the other tools you need and combine everything into one answer.
+- You may call several tools before replying. Only ask a clarifying question when the tools genuinely cannot narrow it down.
 - Available tools: ${toolNames.join(', ') || 'none'}.
 - When citing stock, include quantity and unit (e.g. "12 kg").
 - "How much do we still have?" means on-hand inventory. "How much do we need?" means reorder suggestions.`
@@ -271,7 +274,7 @@ export async function sendAssistantMessage(req, { conversationId = null, message
       }),
       messages,
       tools: definitions,
-      maxRounds: 4,
+      maxRounds: 8,
       executeTool: async (name, args) => {
         const out = await executeAssistantTool(ctx, name, args)
         await insertMessage(convId, 'tool', name, { name, args, result: out })

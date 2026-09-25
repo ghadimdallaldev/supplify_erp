@@ -11,7 +11,9 @@ import {
   useAskReorderAssistanceMutation,
   useAiRecommendReorderAssistanceMutation,
   useFeedbackReorderAssistanceMutation,
+  useSendAssistantMessageMutation,
 } from '../../services/api'
+import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -124,6 +126,7 @@ export function ReorderAssistancePanel({
   const [addItemToQuickList] = useAddItemToQuickListMutation()
   const [explainAssistance, { isLoading: isExplaining }] = useExplainReorderAssistanceMutation()
   const [askAssistance, { isLoading: isAsking }] = useAskReorderAssistanceMutation()
+  const [askAssistant, { isLoading: isAssistantAnswering }] = useSendAssistantMessageMutation()
   const [aiRecommend, { isLoading: isAiRecommending }] = useAiRecommendReorderAssistanceMutation()
   const [sendFeedback] = useFeedbackReorderAssistanceMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -133,6 +136,9 @@ export function ReorderAssistancePanel({
   const [askOpen, setAskOpen] = useState(false)
   const [askResult, setAskResult] = useState<ReorderAiAskResult | null>(null)
   const [askBusyProductId, setAskBusyProductId] = useState<string | null>(null)
+  const [answerOpen, setAnswerOpen] = useState(false)
+  const [answer, setAnswer] = useState<{ question: string; reply: string } | null>(null)
+  const assistantConversationId = useRef<string | null>(null)
   const [recommendationsByProduct, setRecommendationsByProduct] = useState<
     Record<string, ReorderAiRecommendation>
   >({})
@@ -147,6 +153,9 @@ export function ReorderAssistancePanel({
   const canAskLlm = data?.ai?.canAskLlm === true
 
   const entitlements = entitlementsData?.entitlements
+  // The conversational assistant answers account-wide questions; the legacy
+  // reorder "ask" endpoint only ever matched product names in the suggestion list.
+  const assistantAvailable = isEntitlementFeatureEnabled(entitlements, 'ai_assistant')
   const aiUsageSummary = entitlements?.aiUsage
   const aiRequestLimit = aiUsageSummary?.limit ?? entitlements?.limits?.ai_requests_per_day ?? 0
   const aiRequestUsage = aiUsageSummary?.current ?? entitlements?.usage?.ai_requests_per_day ?? 0
@@ -313,6 +322,23 @@ export function ReorderAssistancePanel({
   const handleAsk = async () => {
     const q = askQuery.trim()
     if (!q || aiUsageAtCap) return
+
+    if (assistantAvailable) {
+      try {
+        const res = await askAssistant({
+          conversationId: assistantConversationId.current,
+          message: q,
+        }).unwrap()
+        assistantConversationId.current = res.conversationId
+        setAnswer({ question: q, reply: res.reply })
+        setAnswerOpen(true)
+        setAskQuery('')
+      } catch (e: any) {
+        toast.error(e?.data?.error?.message || t('toast.parseRequestFailed'))
+      }
+      return
+    }
+
     try {
       const result = await askAssistance({ query: q }).unwrap()
       if (result.usageLimited) {
@@ -438,18 +464,22 @@ export function ReorderAssistancePanel({
                   Why these suggestions?
                 </Button>
               )}
-              {canAsk && (
+              {(assistantAvailable || canAsk) && (
                 <div className="flex flex-1 flex-col gap-1.5">
                   <div className="flex gap-2">
                     <Input
-                      placeholder='Ask: "order more tomatoes for the weekend"'
+                      placeholder={
+                        assistantAvailable
+                          ? 'Ask anything about this restaurant — stock, orders, invoices, waste'
+                          : 'Ask: "order more tomatoes for the weekend"'
+                      }
                       value={askQuery}
                       onChange={(e) => setAskQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
                       className="h-8 text-sm"
                       disabled={aiUsageAtCap}
                       title={
-                        canAskLlm
+                        assistantAvailable || canAskLlm
                           ? aiUsageAtCap
                             ? aiUsageLimitTitle
                             : undefined
@@ -459,18 +489,20 @@ export function ReorderAssistancePanel({
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={isAsking || !askQuery.trim() || aiUsageAtCap}
+                      disabled={
+                        isAsking || isAssistantAnswering || !askQuery.trim() || aiUsageAtCap
+                      }
                       onClick={handleAsk}
                       title={aiUsageAtCap ? aiUsageLimitTitle : undefined}
                     >
-                      {isAsking ? (
+                      {isAsking || isAssistantAnswering ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <MessageSquare className="h-3.5 w-3.5" />
                       )}
                     </Button>
                   </div>
-                  {!canAskLlm && (
+                  {!assistantAvailable && !canAskLlm && (
                     <p className="text-xs text-[var(--text-muted)]">
                       Keyword matching only — enable AI platform for purchase-language assist
                     </p>
@@ -706,6 +738,16 @@ export function ReorderAssistancePanel({
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={answerOpen} onOpenChange={setAnswerOpen}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Assistant</DialogTitle>
+            <DialogDescription>{answer?.question}</DialogDescription>
+          </DialogHeader>
+          {answer && <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer.reply}</p>}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={askOpen} onOpenChange={setAskOpen}>
         <DialogContent size="md">

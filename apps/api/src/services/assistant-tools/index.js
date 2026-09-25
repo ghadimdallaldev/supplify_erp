@@ -123,13 +123,16 @@ const TOOLS = {
     definition: {
       name: 'get_inventory',
       description:
-        'Look up restaurant on-hand stock by product name (e.g. tomatoes). Returns quantity and unit.',
+        'Restaurant on-hand stock. Call with no arguments to list current inventory, lowest stock first. Use search to filter by product name or SKU, or lowStockOnly to return only items at or below their low-stock threshold.',
       parameters: {
         type: 'object',
         properties: {
-          search: { type: 'string', description: 'Product name fragment to search' },
+          search: { type: 'string', description: 'Optional product name or SKU fragment' },
+          lowStockOnly: {
+            type: 'boolean',
+            description: 'Only return items at or below their low-stock threshold',
+          },
         },
-        required: ['search'],
       },
     },
     available: async (ctx) =>
@@ -138,7 +141,7 @@ const TOOLS = {
       (await featureOn(ctx, 'inventory_management')),
     run: async (ctx, args) => {
       const search = String(args.search || '').trim()
-      if (!search) return { items: [] }
+      const lowStockOnly = args.lowStockOnly === true
       const { rows } = await query(
         `
         SELECT
@@ -156,19 +159,73 @@ const TOOLS = {
         JOIN product p ON p.id = ri.product_id
         WHERE ri.restaurant_id = $1
           AND (
-            p.name ILIKE '%' || $2 || '%'
+            $2::text = ''
+            OR p.name ILIKE '%' || $2 || '%'
             OR COALESCE(p.sku, '') ILIKE '%' || $2 || '%'
           )
+          AND (
+            $3::boolean = false
+            OR (ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold)
+          )
         ORDER BY
-          CASE WHEN lower(p.name) = lower($2) THEN 0
+          CASE
+            WHEN ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold
+            THEN 0 ELSE 1
+          END,
+          CASE WHEN $2::text = '' THEN 2
+               WHEN lower(p.name) = lower($2) THEN 0
                WHEN lower(p.name) LIKE lower($2) || '%' THEN 1
                ELSE 2 END,
           p.name
-        LIMIT $3
+        LIMIT $4
         `,
-        [ctx.tenantId, search, ROW_CAP]
+        [ctx.tenantId, search, lowStockOnly, ROW_CAP]
       )
-      return { items: rows }
+      return { items: rows, filtered: Boolean(search) || lowStockOnly }
+    },
+  },
+
+  get_account_overview: {
+    definition: {
+      name: 'get_account_overview',
+      description:
+        'Whole-account snapshot for the restaurant: how many products are tracked, how many are low or out of stock, and recent order count and spend. Call this first for broad questions about how the business is doing or what needs attention.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.INVENTORY_VIEW),
+    run: async (ctx) => {
+      const { rows: inventoryRows } = await query(
+        `
+        SELECT
+          COUNT(*)::int AS "trackedProducts",
+          COUNT(*) FILTER (
+            WHERE ri.low_stock_threshold IS NOT NULL AND ri.quantity <= ri.low_stock_threshold
+          )::int AS "lowStockCount",
+          COUNT(*) FILTER (WHERE ri.quantity <= 0)::int AS "outOfStockCount"
+        FROM restaurant_inventory ri
+        WHERE ri.restaurant_id = $1
+        `,
+        [ctx.tenantId]
+      )
+
+      if (!can(ctx, P.ORDERS_VIEW)) {
+        return { inventory: inventoryRows[0] || null, orders: null }
+      }
+
+      const { rows: orderRows } = await query(
+        `
+        SELECT
+          COUNT(*)::int AS "ordersLast30Days",
+          COALESCE(SUM(o.total_amount), 0) AS "spendLast30Days",
+          COUNT(*) FILTER (WHERE o.status NOT IN ('DELIVERED', 'CANCELLED'))::int AS "openOrders"
+        FROM customer_order o
+        WHERE o.restaurant_id = $1
+          AND o.status <> 'DRAFT'
+          AND COALESCE(o.placed_at, o.created_at) >= now() - interval '30 days'
+        `,
+        [ctx.tenantId]
+      )
+      return { inventory: inventoryRows[0] || null, orders: orderRows[0] || null }
     },
   },
 

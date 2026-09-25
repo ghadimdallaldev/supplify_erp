@@ -16,7 +16,7 @@ Users ask natural-language questions (e.g. “how many tomato kilos do we still 
 
 1. Gates on `AI_ENABLED` + provider credentials + tenant feature `ai_platform` (admins: env + `ADMIN_ACCESS` only).
 2. Reserves **one** `ai_requests_per_day` unit per user turn (tool hops do not extra-meter).
-3. Runs an OpenAI tool-calling loop (max 4 rounds) against allowlisted **read-only** tools.
+3. Runs an OpenAI tool-calling loop (max 8 rounds) against allowlisted **read-only** tools.
 4. Answers using tool JSON only — quantities, ETAs, and totals must not be invented.
 5. Refuses mutations (place order, adjust stock, assign driver) and points users to the right screen.
 
@@ -47,6 +47,7 @@ Middleware: `requireAuth` → `resolveTenantContext` → `resolveAdminContext` (
 | Tool                       | Who                          | Gates                                                              |
 | -------------------------- | ---------------------------- | ------------------------------------------------------------------ |
 | `get_inventory`            | Restaurant                   | `INVENTORY_VIEW`, `inventory_management`                           |
+| `get_account_overview`     | Restaurant                   | `INVENTORY_VIEW` (order figures also need `ORDERS_VIEW`)           |
 | `get_reorder_need`         | Restaurant                   | `INVENTORY_VIEW`, `smart_reorder`                                  |
 | `get_orders` / `get_order` | Restaurant, supplier         | `ORDERS_VIEW`                                                      |
 | `get_deliveries`           | Restaurant, supplier, driver | `ORDERS_VIEW` or `DRIVER_DELIVERIES_VIEW`                          |
@@ -58,6 +59,16 @@ Middleware: `requireAuth` → `resolveTenantContext` → `resolveAdminContext` (
 | `get_warehouse_stock`      | Supplier                     | `INVENTORY_VIEW`, `inventory_management`                           |
 | `get_my_stops`             | Driver                       | `DRIVER_DELIVERIES_VIEW` + linked driver profile                   |
 | `get_admin_overview`       | Admin (not impersonating)    | `ADMIN_ACCESS`                                                     |
+
+### Broad questions (2026-09-25)
+
+`get_inventory` takes **no required arguments**. Called bare it lists current stock lowest-first; `search` filters by name or SKU and `lowStockOnly` returns only items at or below threshold. `get_account_overview` returns a whole-account snapshot (tracked products, low/out-of-stock counts, 30-day order count, spend, open orders).
+
+The system prompt instructs the model to call a listing tool and answer from the result rather than asking the user which product they meant, and to combine several tools into one answer for broad questions. Before this, `get_inventory` **required** a `search` term, so questions like "what is running low?" had no callable tool and the model fell back to asking for a product name.
+
+## Reorder Ask box
+
+The inventory / reorder-assistance Ask box routes to this assistant (`POST /api/assistant/messages`) whenever the tenant holds `ai_assistant`, and renders the prose answer. Tenants with reorder seasonality but **without** `ai_assistant` keep the legacy `POST /api/restaurant-inventory/reorder-assistance/ask` product matcher, which maps a phrase onto products in the current suggestion list for "add to ordering list" — it answers no questions by design and returns `clarifyingQuestion` when nothing matches.
 
 ## Storage
 
