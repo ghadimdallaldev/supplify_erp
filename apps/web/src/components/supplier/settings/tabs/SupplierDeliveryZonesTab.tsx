@@ -44,8 +44,9 @@ export function SupplierDeliveryZonesTab() {
   const { t } = useTranslation('suppliers')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
-  const { canAny } = usePermissions()
+  const { can, canAny } = usePermissions()
   const canManageZones = canAny('WAREHOUSES_MANAGE')
+  const canViewWarehouses = can('WAREHOUSES_VIEW')
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
@@ -53,7 +54,7 @@ export function SupplierDeliveryZonesTab() {
 
   const { data: warehousesData, isLoading: isLoadingWarehouses } = useGetWarehousesQuery(
     undefined,
-    { skip: !warehousesEnabled }
+    { skip: !warehousesEnabled || !canViewWarehouses }
   )
 
   const [zonesWarehouse, setZonesWarehouse] = useState<{ id: string; name: string } | null>(null)

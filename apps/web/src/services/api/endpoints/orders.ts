@@ -270,12 +270,12 @@ export const ordersApi = api.injectEndpoints({
     }),
     assignDriverToOrder: builder.mutation<
       { assignment: unknown },
-      { orderId: string; driver_id: string }
+      { orderId: string; driver_id: string; warehouse_assignment_id?: string | null }
     >({
-      query: ({ orderId, driver_id }) => ({
+      query: ({ orderId, driver_id, warehouse_assignment_id }) => ({
         url: `/api/orders/${orderId}/assign-driver`,
         method: 'POST',
-        body: { driver_id },
+        body: { driver_id, warehouse_assignment_id },
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
@@ -298,12 +298,18 @@ export const ordersApi = api.injectEndpoints({
     }),
     reassignDriverOnOrder: builder.mutation<
       { assignment: unknown },
-      { orderId: string; driver_id: string; reason?: string }
+      {
+        orderId: string
+        driver_id: string
+        reason?: string
+        driver_assignment_id?: string | null
+        warehouse_assignment_id?: string | null
+      }
     >({
-      query: ({ orderId, driver_id, reason }) => ({
+      query: ({ orderId, driver_id, reason, driver_assignment_id, warehouse_assignment_id }) => ({
         url: `/api/orders/${orderId}/reassign-driver`,
         method: 'POST',
-        body: { driver_id, reason },
+        body: { driver_id, reason, driver_assignment_id, warehouse_assignment_id },
       }),
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
@@ -357,7 +363,10 @@ export const ordersApi = api.injectEndpoints({
         body: { fileName, fileType, fileSize },
       }),
     }),
-    getOrderProofOfDelivery: builder.query<{ proof: ProofOfDelivery | null }, string>({
+    getOrderProofOfDelivery: builder.query<
+      { proof: ProofOfDelivery | null; proofs: ProofOfDelivery[] },
+      string
+    >({
       query: (orderId) => `/api/orders/${orderId}/proof-of-delivery`,
       providesTags: (_r, _e, orderId) => [{ type: 'Order', id: `${orderId}-pod` }],
     }),

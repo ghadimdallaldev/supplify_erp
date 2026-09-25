@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, isAfter } from 'date-fns'
 import { toast } from 'sonner'
+import { formatShiftClockRange, resolveStaffShiftWindow } from '../../../lib/staffShiftWindow'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Button } from '../../ui/button'
 import { Badge } from '../../ui/badge'
@@ -89,13 +90,16 @@ export function StaffScheduleTab() {
       return
     }
 
-    const startsAt = new Date(`${shiftForm.shiftDate}T${shiftForm.startTime}`)
-    const endsAt = new Date(`${shiftForm.shiftDate}T${shiftForm.endTime}`)
-
-    if (endsAt <= startsAt) {
+    const shiftWindow = resolveStaffShiftWindow(
+      shiftForm.shiftDate,
+      shiftForm.startTime,
+      shiftForm.endTime
+    )
+    if ('error' in shiftWindow) {
       toast.error(t('schedule.endAfterStart'))
       return
     }
+    const { startsAt, endsAt } = shiftWindow
 
     try {
       await createShift({
@@ -215,6 +219,7 @@ export function StaffScheduleTab() {
                     />
                   </div>
                 </div>
+                <p className="text-xs text-[var(--text-muted)]">{t('schedule.overnightHint')}</p>
                 <div>
                   <Label htmlFor="shiftNotes">{t('shared.notes')}</Label>
                   <Input
@@ -292,8 +297,7 @@ export function StaffScheduleTab() {
                       </td>
                       <td className="px-4 py-3 text-[var(--text-mid)]">{shift.role}</td>
                       <td className="px-4 py-3 text-[var(--text-mid)]">
-                        {format(new Date(shift.startsAt), 'p')} –{' '}
-                        {format(new Date(shift.endsAt), 'p')}
+                        {formatShiftClockRange(shift.startsAt, shift.endsAt)}
                       </td>
                       <td className="px-4 py-3">
                         <Badge className="bg-[var(--brand-pale)] text-[var(--brand-mid)]">

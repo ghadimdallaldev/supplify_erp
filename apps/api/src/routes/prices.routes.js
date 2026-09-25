@@ -4,6 +4,7 @@ import {
   requireRole,
   resolveTenantContext,
   requirePermission,
+  requireAnyPermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
@@ -39,53 +40,57 @@ const priceUpdateSchema = z.object({
 })
 
 // Get prices for a product
-router.get('/product/:productId', requireAuth, async (req, res) => {
-  try {
-    const { productId } = req.params
+router.get(
+  '/product/:productId',
+  requireAuth,
+  resolveTenantContext,
+  requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW'),
+  async (req, res) => {
+    try {
+      const { productId } = req.params
 
-    const { rows: products } = await query(
-      `
-      SELECT p.id, p.supplier_id, s.contact_email
+      const { rows: products } = await query(
+        `
+      SELECT p.id, p.supplier_id
       FROM product p
-      JOIN supplier s ON s.id = p.supplier_id
       WHERE p.id = $1
     `,
-      [productId]
-    )
+        [productId]
+      )
 
-    if (products.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
-        requestId: req.requestId,
-      })
-    }
+      if (products.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
+          requestId: req.requestId,
+        })
+      }
 
-    const product = products[0]
+      const product = products[0]
 
-    if (req.userData.role === 'SUPPLIER') {
       const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || product.supplier_id !== supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: priceErr(req, 'FORBIDDEN', 'accessDeniedOwnProducts'),
-          requestId: req.requestId,
-        })
-      }
-    } else if (req.userData.role === 'RESTAURANT') {
-      const restaurantId = await getRestaurantIdForRequest(req)
-      if (!restaurantId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: priceErr(req, 'FORBIDDEN', 'accessDenied'),
-          requestId: req.requestId,
-        })
-      }
-      const { rows: connected } = await query(
-        `
+      if (supplierId) {
+        if (product.supplier_id !== supplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: priceErr(req, 'FORBIDDEN', 'accessDeniedOwnProducts'),
+            requestId: req.requestId,
+          })
+        }
+      } else {
+        const restaurantId = await getRestaurantIdForRequest(req)
+        if (!restaurantId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: priceErr(req, 'FORBIDDEN', 'accessDenied'),
+            requestId: req.requestId,
+          })
+        }
+        const { rows: connected } = await query(
+          `
         SELECT 1
         FROM supplier_follow sf
         WHERE sf.supplier_id = $1
@@ -96,52 +101,46 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
           )
         LIMIT 1
       `,
-        [product.supplier_id, restaurantId]
-      )
-      if (!connected.length) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
-          requestId: req.requestId,
-        })
+          [product.supplier_id, restaurantId]
+        )
+        if (!connected.length) {
+          return res.status(404).json({
+            ok: false,
+            data: null,
+            error: priceErr(req, 'NOT_FOUND', 'productNotFound'),
+            requestId: req.requestId,
+          })
+        }
       }
-    } else if (req.userData.role !== 'ADMIN') {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: priceErr(req, 'FORBIDDEN', 'accessDenied'),
-        requestId: req.requestId,
-      })
-    }
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       SELECT p.*, pr.name as product_name, pr.sku
       FROM price p
       JOIN product pr ON pr.id = p.product_id
       WHERE p.product_id = $1
       ORDER BY p.valid_from DESC
     `,
-      [productId]
-    )
+        [productId]
+      )
 
-    res.json({
-      ok: true,
-      data: { prices: rows },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get prices error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: priceErr(req, 'INTERNAL_ERROR', 'failedGetPrices'),
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { prices: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get prices error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: priceErr(req, 'INTERNAL_ERROR', 'failedGetPrices'),
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Create price (supplier or admin only)
 router.post(
@@ -154,30 +153,27 @@ router.post(
     try {
       const priceData = priceCreateSchema.parse(req.body)
 
-      // Verify product ownership for suppliers
-      if (req.userData.role === 'SUPPLIER') {
-        const { rows: products } = await query(
-          `
-        SELECT p.*, s.contact_email 
-        FROM product p 
-        JOIN supplier s ON s.id = p.supplier_id 
+      const { rows: products } = await query(
+        `
+        SELECT p.id, p.supplier_id
+        FROM product p
         WHERE p.id = $1
       `,
-          [priceData.productId]
-        )
+        [priceData.productId]
+      )
 
-        if (products.length === 0) {
-          throw new ValidationError('Product not found')
-        }
+      if (products.length === 0) {
+        throw new ValidationError('Product not found')
+      }
 
-        if (products[0].contact_email !== req.userData.email) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: priceErr(req, 'FORBIDDEN', 'accessDeniedSetOwnProducts'),
-            requestId: req.requestId,
-          })
-        }
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || products[0].supplier_id !== supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: priceErr(req, 'FORBIDDEN', 'accessDeniedSetOwnProducts'),
+          requestId: req.requestId,
+        })
       }
 
       const { rows } = await query(
@@ -253,31 +249,28 @@ router.patch(
       const { id } = req.params
       const updateData = priceUpdateSchema.parse(req.body)
 
-      // Check ownership for suppliers
-      if (req.userData.role === 'SUPPLIER') {
-        const { rows: prices } = await query(
-          `
-        SELECT p.*, s.contact_email 
-        FROM price p 
+      const { rows: prices } = await query(
+        `
+        SELECT p.id, pr.supplier_id
+        FROM price p
         JOIN product pr ON pr.id = p.product_id
-        JOIN supplier s ON s.id = pr.supplier_id 
         WHERE p.id = $1
       `,
-          [id]
-        )
+        [id]
+      )
 
-        if (prices.length === 0) {
-          throw new ValidationError('Price not found')
-        }
+      if (prices.length === 0) {
+        throw new ValidationError('Price not found')
+      }
 
-        if (prices[0].contact_email !== req.userData.email) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: priceErr(req, 'FORBIDDEN', 'accessDeniedUpdateOwnProducts'),
-            requestId: req.requestId,
-          })
-        }
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || prices[0].supplier_id !== supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: priceErr(req, 'FORBIDDEN', 'accessDeniedUpdateOwnProducts'),
+          requestId: req.requestId,
+        })
       }
 
       const {

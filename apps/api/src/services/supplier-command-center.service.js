@@ -6,6 +6,7 @@ import { buildTrackingPayload } from '../lib/delivery-tracking-payload.js'
 import { isGpsTrackingEnabled } from '../lib/delivery-tracking-payload.js'
 import { getSupplierGrowthMetrics } from './supplier-growth-metrics.service.js'
 import { DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD } from '../lib/supplier-stock-status.js'
+import { getSupplierTimezone } from '../lib/tenant-timezone.js'
 import { listSupplierStockDisplay } from './supplier-stock.service.js'
 
 const OPEN_INVOICE_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
@@ -28,6 +29,7 @@ export async function getSupplierCommandCenter(supplierId) {
 }
 
 async function buildSupplierCommandCenter(supplierId) {
+  const timeZone = await getSupplierTimezone(supplierId)
   const [
     ordersToPrepare,
     deliveriesPending,
@@ -40,7 +42,7 @@ async function buildSupplierCommandCenter(supplierId) {
     boostedDeals,
     customerGrowth,
   ] = await Promise.all([
-    countOrdersToPrepareToday(supplierId),
+    countOrdersToPrepareToday(supplierId, timeZone),
     countDeliveriesPendingToday(supplierId),
     countOrdersNeedingSupplierAction(supplierId),
     getLowStockProducts(supplierId),
@@ -83,6 +85,7 @@ async function buildSupplierCommandCenter(supplierId) {
       receivables: {
         unpaidTotal: receivables.summary.unpaidTotal,
         overdueTotal: receivables.summary.overdueTotal,
+        byCurrency: receivables.summary.byCurrency,
         topDebtors: receivables.topDebtors.slice(0, 5),
         aging: receivables.aging,
       },
@@ -94,16 +97,17 @@ async function buildSupplierCommandCenter(supplierId) {
   }
 }
 
-async function countOrdersToPrepareToday(supplierId) {
+async function countOrdersToPrepareToday(supplierId, timeZone) {
   const { rows } = await query(
     `
     SELECT COUNT(DISTINCT o.id)::int AS count
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING')
-      AND COALESCE(o.placed_at, o.created_at) >= date_trunc('day', now())
+      AND (COALESCE(o.placed_at, o.created_at) AT TIME ZONE $2)::date
+        = (now() AT TIME ZONE $2)::date
     `,
-    [supplierId]
+    [supplierId, timeZone]
   )
   return rows[0]?.count ?? 0
 }

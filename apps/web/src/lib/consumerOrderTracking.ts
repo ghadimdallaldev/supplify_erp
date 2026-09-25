@@ -42,6 +42,24 @@ const FULFILLMENT_STATUS_LABELS: Record<
   },
 }
 
+export function labelForConsumerStatus(
+  translate: (key: string, options?: { defaultValue?: string }) => string,
+  status: string,
+  fulfillmentType?: string | null
+): string {
+  const fallback =
+    getConsumerStatusLabels(fulfillmentType)[status as ConsumerOrderTrackingStatus] ??
+    status.replace(/_/g, ' ')
+  if (fulfillmentType) {
+    const key = `fulfillmentStatus.${fulfillmentType}.${status}`
+    const specific = translate(key, { defaultValue: fallback })
+    if (specific && specific !== key) return specific
+  }
+  const genericKey = `orderStatus.${status}`
+  const generic = translate(genericKey, { defaultValue: fallback })
+  return generic && generic !== genericKey ? generic : fallback
+}
+
 export function getConsumerStatusLabels(
   fulfillmentType?: ConsumerFulfillmentType | string | null
 ): Record<ConsumerOrderTrackingStatus, string> {

@@ -12,7 +12,6 @@ export const ADDON_KEYS = {
 
 /** Default monthly unit price (USD) by plan code when admin does not set a custom price. */
 export const ADDON_UNIT_PRICING = {
-  restaurant_extra_branch: { gold: 39 },
   supplier_extra_branch: { platinum: 49 },
   supplier_extra_warehouse: { platinum: 19 },
   supplier_active_customer_locations_50: { platinum: 75 },
@@ -33,9 +32,11 @@ export function addonKeyForLimitKey(tenantType, limitKey) {
   return null
 }
 
-export function canPurchaseLocationAddons(planCode) {
+export function canPurchaseLocationAddons(planCode, tenantType, limitKey) {
   const code = (planCode || '').toLowerCase()
-  return code === 'gold' || code === 'platinum'
+  if (!tenantType || !limitKey) return false
+  const addonKey = addonKeyForLimitKey(tenantType, limitKey)
+  return addonKey ? isAddonKeyCompatibleWithPlan(addonKey, code) : false
 }
 
 export function defaultAddonUnitPrice(addonKey, planCode) {

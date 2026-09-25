@@ -5,7 +5,9 @@ import {
   requireAnyPermission,
   getRestaurantIdForRequest,
   resolveTenantContext,
+  resolveAdminContext,
 } from '../lib/rbac.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -35,17 +37,50 @@ const multiBranchFeature = requireFeature(
 
 async function requireRestaurantOrgOwnerContext(req, res, next) {
   if (req.userData?.role === 'ADMIN') {
-    const orgId = req.query.organization_id
-    if (orgId) {
-      const { rows } = await query(
-        `SELECT id FROM restaurant WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
-        [orgId]
-      )
-      req.restaurantOrgContext = {
-        organizationId: orgId,
-        primaryRestaurantId: rows[0]?.id || null,
-        isOrgOwner: true,
-      }
+    const requestedOrgId =
+      typeof req.query.organization_id === 'string'
+        ? req.query.organization_id.trim() || null
+        : null
+    const effectiveTenant = getEffectiveTenant(req)
+    let organizationId = null
+    if (requestedOrgId && !effectiveTenant) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Impersonate a tenant to access this organization' },
+        requestId: req.requestId,
+      })
+    }
+    if (effectiveTenant?.tenantType === 'RESTAURANT' && effectiveTenant.tenantId) {
+      const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+        effectiveTenant.tenantId,
+      ])
+      organizationId = rows[0]?.organization_id || null
+    }
+    if (requestedOrgId && effectiveTenant && organizationId !== requestedOrgId) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+        requestId: req.requestId,
+      })
+    }
+    if (!organizationId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'Organization context required' },
+        requestId: req.requestId,
+      })
+    }
+    const { rows } = await query(
+      `SELECT id FROM restaurant WHERE organization_id = $1 AND is_main_branch = true LIMIT 1`,
+      [organizationId]
+    )
+    req.restaurantOrgContext = {
+      organizationId,
+      primaryRestaurantId: rows[0]?.id || null,
+      isOrgOwner: true,
     }
     return next()
   }
@@ -279,6 +314,8 @@ const branchesRouter = express.Router()
 branchesRouter.use(
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
+  resolveTenantContext,
+  resolveAdminContext,
   requireRestaurantOrgOwnerContext,
   multiBranchFeature
 )

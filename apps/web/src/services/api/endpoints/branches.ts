@@ -112,8 +112,11 @@ export const branchesApi = api.injectEndpoints({
       {
         kpis: {
           order_count: number
-          total_revenue?: number
-          total_spend?: number
+          total_revenue?: number | null
+          total_spend?: number | null
+          currency?: string | null
+          revenue_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
+          spend_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
           active_branch_accounts: number
         }
         by_branch: Array<Record<string, unknown>>
@@ -383,7 +386,9 @@ export const branchesApi = api.injectEndpoints({
       {
         kpis: {
           order_count: number
-          total_spend: number
+          total_spend: number | null
+          currency?: string | null
+          spend_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
           active_branch_accounts: number
         }
         by_branch: Array<Record<string, unknown>>
@@ -400,50 +405,97 @@ export const branchesApi = api.injectEndpoints({
       providesTags: ['RestaurantOrg'],
       keepUnusedDataFor: 60,
     }),
-    getCentralPurchasingDrafts: builder.query<
-      { drafts: Array<Record<string, unknown>>; foundationOnly?: boolean },
+    getRestaurantOrgBranchComparison: builder.query<
+      {
+        branches: Array<Record<string, any>>
+        coverage: { foodCost: { available: boolean; reason: string } }
+      },
       void
     >({
-      query: () => '/api/restaurant-org/central-purchasing/drafts',
+      query: () => '/api/restaurant-org/reports/comparison',
       providesTags: ['RestaurantOrg'],
     }),
-    createCentralPurchasingDraft: builder.mutation<
-      { draft: Record<string, unknown> },
-      { destination_restaurant_id: string }
-    >({
-      query: (body) => ({
-        url: '/api/restaurant-org/central-purchasing/drafts',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['RestaurantOrg'],
-    }),
-    updateCentralPurchasingDraft: builder.mutation<
-      { draft: Record<string, unknown> },
-      { draftId: string; line_items: Array<Record<string, unknown>> }
-    >({
-      query: ({ draftId, line_items }) => ({
-        url: `/api/restaurant-org/central-purchasing/drafts/${draftId}`,
-        method: 'PATCH',
-        body: { line_items },
-      }),
-      invalidatesTags: ['RestaurantOrg'],
-    }),
-    submitCentralPurchasingDrafts: builder.mutation<
+    getRestaurantOrgBranchDemandForecast: builder.query<
       {
-        results: Array<Record<string, unknown>>
-        summary: { total: number; succeeded: number; failed: number }
-        partialFailure?: boolean
-        foundationOnly?: boolean
+        branches: Array<{
+          branchAccountId: string
+          branchAccountName: string
+          coverage: {
+            freshForecasts: number
+            highOrUrgentForecasts: number
+            latestComputedAt: string | null
+          }
+          forecasts: Array<{
+            productId: string
+            productName: string
+            productUnit: string
+            forecastDailyUsage: number | null
+            forecastReorderQty: number | null
+            reorderByDate: string | null
+            confidence: number
+            urgency: string
+          }>
+        }>
+        coverage: { scope: string; source: string }
       },
-      { destination_restaurant_ids: string[] }
+      void
     >({
-      query: (body) => ({
-        url: '/api/restaurant-org/central-purchasing/submit',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['RestaurantOrg', 'Order'],
+      query: () => '/api/restaurant-org/reports/demand-forecast',
+      providesTags: ['RestaurantOrg'],
+    }),
+    getRestaurantOrgCrossBranchPurchasingInsights: builder.query<
+      {
+        signals: Array<{
+          productId: string
+          productName: string
+          productUnit: string
+          supplierId: string
+          supplierName: string | null
+          currency?: string
+          branchCount: number
+          minUnitPrice: number
+          maxUnitPrice: number
+          priceSpreadPct: number
+        }>
+        coverage: { source: string; comparableOnly: string }
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/purchasing-insights',
+      providesTags: ['RestaurantOrg'],
+    }),
+    getRestaurantOrgStockTransferSuggestions: builder.query<
+      {
+        suggestions: Array<{
+          sourceBranchAccountName: string
+          destinationBranchAccountName: string
+          productId: string
+          productName: string
+          productUnit: string
+          urgency: string
+          suggestedQty: number
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/stock-transfer-suggestions',
+      providesTags: ['RestaurantOrg'],
+    }),
+    getRestaurantOrgAdvancedAnalytics: builder.query<
+      {
+        months: Array<{
+          month: string
+          branchAccountId: string
+          branchAccountName: string
+          currency?: string
+          orderCount: number
+          spend: number
+        }>
+      },
+      void
+    >({
+      query: () => '/api/restaurant-org/reports/advanced-analytics',
+      providesTags: ['RestaurantOrg'],
     }),
     getRestaurantMemberInviteRoles: builder.query<
       { roles: Array<{ id: string; name: string; description?: string }> },

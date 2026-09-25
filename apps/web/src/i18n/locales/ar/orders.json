@@ -500,5 +500,20 @@
     "reminderSent": "تم إرسال التذكير إلى المورد بنجاح",
     "reminderFailed": "فشل إرسال التذكير",
     "productAdded": "تمت إضافة {{name}} إلى الطلب"
+  },
+  "supplierReliability": {
+    "title": "موثوقية الموردين",
+    "description": "حقائق عن التسليم والاستلام والإكمال والنزاعات خلال آخر {{days}} يوماً.",
+    "empty": "لا توجد بيانات موثوقية للموردين في هذه الفترة.",
+    "ordersCompleted": "اكتمل {{completed}} من {{placed}} طلبات",
+    "fillRate": "معدل التوريد",
+    "quality": "الجودة",
+    "onTime": "في الموعد",
+    "openDisputes": "نزاعات مفتوحة",
+    "signals": {
+      "short_receipt": "تم تسجيل استلام ناقص",
+      "late_delivery": "تم تسجيل تسليم متأخر",
+      "open_dispute": "نزاع مفتوح"
+    }
   }
 }

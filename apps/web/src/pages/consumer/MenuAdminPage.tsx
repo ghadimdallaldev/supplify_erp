@@ -312,7 +312,7 @@ export function MenuAdminPage() {
         id: editingItemId,
         name: editForm.name.trim(),
         basePrice: Number(editForm.basePrice),
-        description: editForm.description.trim() || undefined,
+        description: editForm.description.trim(),
         isAvailable: editForm.isAvailable,
         imageUrl: editForm.imageUrl,
         allergens: editForm.allergens,
@@ -440,7 +440,7 @@ export function MenuAdminPage() {
   }
 
   return (
-    <RequirePermission anyOf={['CATALOG_VIEW', 'SETTINGS_VIEW']}>
+    <RequirePermission permission="CATALOG_VIEW">
       <PageShell>
         <PageHeader title={t('menuAdmin.title')} description={t('menuAdmin.description')} />
 

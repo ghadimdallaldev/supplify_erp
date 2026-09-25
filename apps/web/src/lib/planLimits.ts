@@ -40,25 +40,71 @@ export function resolveEntitlementFeature(
   key: string
 ): unknown {
   if (!entitlements) return undefined
-  const fromFeatures = entitlements.features?.[key]
-  const fromPlan = entitlements.planFeatures?.[key]
-  if (featureEnabled(fromFeatures)) return fromFeatures
-  if (featureEnabled(fromPlan)) return fromPlan
-  if (fromFeatures !== undefined && fromFeatures !== null) return fromFeatures
-  return fromPlan
+  if (Object.prototype.hasOwnProperty.call(entitlements.features || {}, key)) {
+    return entitlements.features?.[key]
+  }
+  return entitlements.planFeatures?.[key]
 }
 
 export function isEntitlementFeatureEnabled(
   entitlements: Entitlements | null | undefined,
   key: string
 ): boolean {
-  if (featureEnabled(entitlements?.features?.[key])) return true
-  return featureEnabled(entitlements?.planFeatures?.[key])
+  return featureEnabled(resolveEntitlementFeature(entitlements, key))
 }
 
 /** Plan allows multi-branch on Scale-capable plans. */
 export function multiBranchEnabled(entitlements: Entitlements | null | undefined): boolean {
   return isEntitlementFeatureEnabled(entitlements, 'multi_branch')
+}
+
+/**
+ * Does the plan's `smart_reorder` value include statistical forecasting?
+ *
+ * Mirrors resolveSmartReorderCapabilities().capabilities.forecast in
+ * apps/api/src/lib/smart-reorder-tier.js. Growth resolves to the `basic` tier
+ * (`suggestions_only`) — assistance without forecasting — while Intelligence
+ * and Scale carry `ai_forecast_seasonality`.
+ *
+ * Callers must not re-list the tier strings inline; that duplication is how the
+ * UI and the API drift apart.
+ */
+export function smartReorderHasForecast(featureValue: unknown): boolean {
+  if (!featureEnabled(featureValue)) return false
+  const raw = typeof featureValue === 'string' ? featureValue.trim().toLowerCase() : featureValue
+  return raw === 'ai_forecast_seasonality' || raw === 'full_90day_trends' || raw === true
+}
+
+/**
+ * Operational intelligence tier. Mirrors apps/api/src/lib/intelligence-tier.js.
+ *
+ * The API is authoritative — this only decides what the UI offers, so it never
+ * shows an entry point the backend would refuse. A bare enabled value resolves
+ * to `basic`, never `scale`.
+ */
+export const INTELLIGENCE_TIER_ORDER = ['none', 'basic', 'advanced', 'scale'] as const
+
+export type IntelligenceTier = (typeof INTELLIGENCE_TIER_ORDER)[number]
+
+export function getIntelligenceTier(
+  entitlements: Entitlements | null | undefined
+): IntelligenceTier {
+  const value = resolveEntitlementFeature(entitlements, 'intelligence')
+  if (!featureEnabled(value)) return 'none'
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : value
+  if (raw === 'scale') return 'scale'
+  if (raw === 'advanced') return 'advanced'
+  return 'basic'
+}
+
+export function meetsIntelligenceTier(
+  entitlements: Entitlements | null | undefined,
+  minTier: IntelligenceTier
+): boolean {
+  return (
+    INTELLIGENCE_TIER_ORDER.indexOf(getIntelligenceTier(entitlements)) >=
+    INTELLIGENCE_TIER_ORDER.indexOf(minTier)
+  )
 }
 
 export type BranchAddGate = {
@@ -341,9 +387,36 @@ export function canUseCustomBranding(entitlements: Entitlements | null | undefin
   return isEntitlementFeatureEnabled(entitlements, 'custom_branding')
 }
 
-export function customBrandingUpgradeMessage(planName?: string | null): string {
+/**
+ * Scale (`platinum`) and bespoke plans sit at the top of the self-serve ladder,
+ * so upgrade copy must never tell these tenants to buy the plan they are on.
+ */
+export function isTopTierPlanCode(planCode?: string | null): boolean {
+  const code = (planCode || '').trim().toLowerCase()
+  return code === 'platinum' || code === 'enterprise' || code === 'custom'
+}
+
+export function customBrandingUpgradeMessage(
+  planName?: string | null,
+  planCode?: string | null
+): string {
   const plan = planName ?? 'your current plan'
+  if (isTopTierPlanCode(planCode)) {
+    return `Custom branding is not part of ${plan}. Contact support to have brand controls enabled for your account.`
+  }
   return `Custom branding is not included on ${plan}. Upgrade to Scale for advanced branding controls.`
+}
+
+/** Copy for the white-label/custom-domain capability, which Scale may still omit. */
+export function customDomainUpgradeMessage(
+  planName?: string | null,
+  planCode?: string | null
+): string {
+  const plan = planName ?? 'your current plan'
+  if (isTopTierPlanCode(planCode)) {
+    return `Custom domains are not part of ${plan}. Contact support about white-label catalog hosting.`
+  }
+  return `Custom domains are available on Scale. Your plan is ${plan}.`
 }
 
 export type OrderPlaceGate = {

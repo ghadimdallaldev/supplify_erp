@@ -1,6 +1,7 @@
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { getDeliveryRoute, reorderRouteStops } from './delivery-routes.service.js'
 import { query } from '../lib/db.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const FIXED_STATUSES = new Set(['DELIVERED', 'FAILED'])
 
@@ -64,11 +65,12 @@ export function optimizeStopOrderNearestNeighbor(stops, depot) {
 }
 
 async function getSupplierDepot(supplierId) {
+  const supplierCol = await getWarehouseSupplierColumn()
   const { rows } = await query(
     `
     SELECT w.latitude, w.longitude
     FROM warehouse w
-    WHERE w.supplier_id = $1 AND w.is_active = true
+    WHERE w.${supplierCol} = $1 AND w.is_active = true
     ORDER BY w.is_default DESC NULLS LAST, w.created_at ASC
     LIMIT 1
     `,

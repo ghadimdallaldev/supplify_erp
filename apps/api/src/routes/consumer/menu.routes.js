@@ -8,6 +8,7 @@ import {
   requireRole,
 } from '../../lib/rbac.js'
 import { requireRestaurantId } from '../../lib/tenant-resolve.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../../lib/branch-scope.js'
 import { logger } from '../../lib/logger.js'
 import {
   getAdminMenu,
@@ -112,11 +113,15 @@ router.get('/', async (req, res) => {
     if (!restaurant) {
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
+    await assertLegacyBranchOwnedByRestaurant(branchId || null, restaurant.id)
     const menu = await getPublicMenu(restaurant.id, branchId || null)
     // Anonymous public content — safe for CDN/browser caching.
     res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600')
     jsonOk(res, { restaurant, menu })
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'ZodError') {
+      return jsonError(res, 400, 'VALIDATION_ERROR', error.message || 'Invalid request')
+    }
     logger.error('Public consumer menu fetch failed', { error: error.message })
     jsonError(res, 500, 'CONSUMER_MENU_ERROR', 'Unable to load menu')
   }
@@ -138,9 +143,13 @@ consumerMenuAdminRoutes.get('/', async (req, res) => {
   try {
     const { branchId } = branchQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(branchId || null, restaurantId)
     const menu = await getAdminMenu(restaurantId, branchId || null)
     jsonOk(res, menu)
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'ZodError') {
+      return jsonError(res, 400, 'VALIDATION_ERROR', error.message || 'Invalid request')
+    }
     logger.error('Admin consumer menu fetch failed', { error: error.message })
     jsonError(res, 500, 'CONSUMER_MENU_ERROR', 'Unable to load menu')
   }
@@ -150,6 +159,7 @@ consumerMenuAdminRoutes.post('/categories', requirePermission('CATALOG_EDIT'), a
   try {
     const body = categorySchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
     const { rows } = await query(
       `
       INSERT INTO menu_category (restaurant_id, branch_id, name, description, sort_order, is_active)
@@ -180,6 +190,7 @@ consumerMenuAdminRoutes.patch(
     try {
       const body = categorySchema.partial().parse(req.body)
       const restaurantId = await requireRestaurantId(req)
+      await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
       const { rows } = await query(
         `
         UPDATE menu_category
@@ -241,6 +252,7 @@ consumerMenuAdminRoutes.post('/items', requirePermission('CATALOG_EDIT'), async 
   try {
     const body = itemSchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
     const { rows: cats } = await query(
       `SELECT id FROM menu_category WHERE id = $1 AND restaurant_id = $2`,
       [body.categoryId, restaurantId]
@@ -286,6 +298,7 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
   try {
     const body = itemSchema.partial().parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
 
     const allergens =
       body.allergens !== undefined ? sanitizeMenuTagList(body.allergens, MENU_ALLERGENS) : undefined
@@ -297,6 +310,31 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
       validateMenuTags(allergens ?? [], dietaryTags ?? [])
     }
 
+    if (body.categoryId) {
+      const { rows: categoryRows } = await query(
+        `SELECT id, branch_id FROM menu_category WHERE id = $1 AND restaurant_id = $2`,
+        [body.categoryId, restaurantId]
+      )
+      if (!categoryRows.length) {
+        return jsonError(res, 404, 'CATEGORY_NOT_FOUND', 'Category not found')
+      }
+      const { rows: itemRows } = await query(
+        `SELECT branch_id FROM menu_item WHERE id = $1 AND restaurant_id = $2`,
+        [req.params.id, restaurantId]
+      )
+      const itemBranch =
+        body.branchId !== undefined ? body.branchId : (itemRows[0]?.branch_id ?? null)
+      const categoryBranch = categoryRows[0].branch_id
+      if (itemBranch && categoryBranch && itemBranch !== categoryBranch) {
+        return jsonError(
+          res,
+          400,
+          'CATEGORY_BRANCH_MISMATCH',
+          'That category belongs to a different branch'
+        )
+      }
+    }
+
     const { rows } = await query(
       `
       UPDATE menu_item
@@ -306,7 +344,7 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
         description = COALESCE($3, description),
         base_price = COALESCE($4, base_price),
         branch_id = COALESCE($5, branch_id),
-        image_url = COALESCE($6, image_url),
+        image_url = CASE WHEN $13::boolean THEN $6 ELSE image_url END,
         sort_order = COALESCE($7, sort_order),
         is_available = COALESCE($8, is_available),
         allergens = COALESCE($9, allergens),
@@ -328,6 +366,7 @@ consumerMenuAdminRoutes.patch('/items/:id', requirePermission('CATALOG_EDIT'), a
         dietaryTags ?? null,
         req.params.id,
         restaurantId,
+        body.imageUrl !== undefined,
       ]
     )
     if (!rows.length) {
@@ -521,6 +560,7 @@ consumerMenuAdminRoutes.post('/import', requirePermission('CATALOG_EDIT'), async
   try {
     const body = menuImportSchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
     const result = await executeMenuImport(restaurantId, body.csv, {
       branchId: body.branchId ?? null,
       updateExisting: body.updateExisting ?? true,

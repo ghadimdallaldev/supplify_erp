@@ -6,6 +6,77 @@ import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 
 const ACTIVE_ORDER_STATUSES = ['PLACED', 'ACKNOWLEDGED', 'PROCESSING', 'FULFILLING', 'SHIPPED']
 
+const ORDER_LINES_SQL = `SELECT id, product_id, quantity, supplier_id FROM order_item WHERE order_id = $1 AND supplier_id = $2 ORDER BY id`
+
+/**
+ * Lines to reserve on a retry.
+ * A driver attempt tied to one warehouse leg retries that leg.
+ * An untied failure retries only the warehouse legs that failed, and leaves
+ * delivered legs out of the new reservation.
+ */
+async function loadRetryLines(client, { orderId, supplierId, sourceDriver, sourceWarehouse }) {
+  if (sourceWarehouse?.order_item_id) {
+    const { rows } = await client.query(
+      `SELECT id, product_id, quantity, supplier_id FROM order_item WHERE id = $1`,
+      [sourceWarehouse.order_item_id]
+    )
+    return { lines: rows, failedLegIds: [] }
+  }
+
+  if (sourceDriver.warehouse_assignment_id) {
+    const { rows: liveSpecific } = await client.query(
+      `SELECT order_item_id FROM order_warehouse_assignment
+       WHERE order_id = $1
+         AND order_item_id IS NOT NULL
+         AND status NOT IN ('failed', 'superseded')`,
+      [orderId]
+    )
+    const keep = new Set(liveSpecific.map((row) => String(row.order_item_id)))
+    const { rows } = await client.query(ORDER_LINES_SQL, [orderId, supplierId])
+    return {
+      lines: rows.filter((line) => !keep.has(String(line.id))),
+      failedLegIds: [],
+    }
+  }
+
+  const { rows: failedLegs } = await client.query(
+    `SELECT id, order_item_id FROM order_warehouse_assignment
+     WHERE order_id = $1 AND status = 'failed'
+     ORDER BY id`,
+    [orderId]
+  )
+  if (!failedLegs.length) {
+    const { rows } = await client.query(ORDER_LINES_SQL, [orderId, supplierId])
+    return { lines: rows, failedLegIds: [] }
+  }
+
+  const itemIds = [...new Set(failedLegs.map((leg) => leg.order_item_id).filter(Boolean))]
+  const coversWholeOrder = failedLegs.some((leg) => !leg.order_item_id)
+  if (!coversWholeOrder && itemIds.length) {
+    const { rows } = await client.query(
+      `SELECT id, product_id, quantity, supplier_id
+       FROM order_item WHERE id = ANY($1::uuid[]) AND supplier_id = $2
+       ORDER BY id`,
+      [itemIds, supplierId]
+    )
+    return { lines: rows, failedLegIds: failedLegs.map((leg) => leg.id) }
+  }
+
+  const { rows: liveSpecific } = await client.query(
+    `SELECT order_item_id FROM order_warehouse_assignment
+     WHERE order_id = $1
+       AND order_item_id IS NOT NULL
+       AND status NOT IN ('failed', 'superseded')`,
+    [orderId]
+  )
+  const keep = new Set(liveSpecific.map((row) => String(row.order_item_id)))
+  const { rows } = await client.query(ORDER_LINES_SQL, [orderId, supplierId])
+  return {
+    lines: rows.filter((line) => !keep.has(String(line.id))),
+    failedLegIds: failedLegs.map((leg) => leg.id),
+  }
+}
+
 /** Create a linked fulfillment attempt without deleting the failed attempt or restoring consumed stock. */
 export async function retryFailedDelivery({
   orderId,
@@ -78,14 +149,15 @@ export async function retryFailedDelivery({
 
     let newWarehouseAssignment = null
     if (sourceWarehouse || newWarehouse) {
-      const { rows: lines } = await client.query(
-        sourceWarehouse?.order_item_id
-          ? `SELECT id, product_id, quantity, supplier_id FROM order_item WHERE id = $1`
-          : `SELECT id, product_id, quantity, supplier_id FROM order_item WHERE order_id = $1 AND supplier_id = $2 ORDER BY id`,
-        sourceWarehouse?.order_item_id ? [sourceWarehouse.order_item_id] : [orderId, supplierId]
-      )
-      if (!lines.length) throw new ValidationError('No order lines are available for retry')
-      if (lines.some((line) => line.supplier_id !== supplierId)) {
+      const retryLines = await loadRetryLines(client, {
+        orderId,
+        supplierId,
+        sourceDriver,
+        sourceWarehouse,
+      })
+      if (!retryLines.lines.length)
+        throw new ValidationError('No order lines are available for retry')
+      if (retryLines.lines.some((line) => line.supplier_id !== supplierId)) {
         throw new ValidationError('Retry cannot cross supplier-owned order lines')
       }
 
@@ -119,13 +191,22 @@ export async function retryFailedDelivery({
       await reserveWarehouseStockBatch(
         client,
         targetWarehouseId,
-        lines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
+        retryLines.lines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
         { supplierId }
       )
       if (sourceWarehouse) {
         await client.query(
           `UPDATE order_warehouse_assignment SET superseded_by_assignment_id = $1 WHERE id = $2`,
           [newWarehouseAssignment.id, sourceWarehouse.id]
+        )
+      } else if (!sourceDriver.warehouse_assignment_id && retryLines.failedLegIds.length) {
+        await client.query(
+          `UPDATE order_warehouse_assignment
+           SET status = 'superseded',
+               superseded_at = now(),
+               superseded_by_assignment_id = $2
+           WHERE order_id = $1 AND id = ANY($3::uuid[]) AND status = 'failed'`,
+          [orderId, newWarehouseAssignment.id, retryLines.failedLegIds]
         )
       }
     }

@@ -35,7 +35,7 @@ export function formatPlanDisplayName(planCode, planName) {
   const name = (planName || '').trim()
   if (name && !LEGACY_PUBLIC_NAMES.has(name)) return name
   if (code === 'silver') return 'Growth'
-  if (code === 'gold') return 'Scale'
+  if (code === 'gold') return 'Intelligence'
   if (code === 'platinum') return 'Scale'
   return 'Plan'
 }
@@ -62,8 +62,9 @@ export function formatTenantPlanDisplayName(planCode, tenantType, planName) {
 
   if (type === 'RESTAURANT') {
     if (code === 'silver') return 'Restaurant Growth'
-    if (code === 'gold') return 'Restaurant Scale'
-    if (code === 'platinum') return 'Restaurant Custom'
+    if (code === 'gold') return 'Restaurant Intelligence'
+    if (code === 'platinum') return 'Restaurant Scale'
+    if (code === 'custom') return 'Restaurant Custom'
   }
 
   return formatPlanDisplayName(code, name)

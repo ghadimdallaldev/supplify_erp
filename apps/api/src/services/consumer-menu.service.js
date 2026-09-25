@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
 import { resolveConsumerOrderingStatus } from '../lib/consumer-ordering-hours.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 
 const MENU_CACHE_TTL_SECONDS = 300
 
@@ -283,8 +284,24 @@ export async function getAdminMenu(restaurantId, branchId = null) {
   }
 }
 
+export function getModifierSelectionError(minSelections, maxSelections) {
+  const min = Number(minSelections ?? 0)
+  const max = Number(maxSelections ?? 1)
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 1) {
+    return 'Modifier limits are invalid'
+  }
+  if (min > max) {
+    return 'Minimum selections cannot be greater than the maximum'
+  }
+  return null
+}
+
 export async function createModifierGroup(restaurantId, payload) {
   const { menuItemId, name, minSelections, maxSelections, isRequired, sortOrder } = payload
+  const selectionError = getModifierSelectionError(minSelections ?? 0, maxSelections ?? 1)
+  if (selectionError) {
+    throw Object.assign(new Error(selectionError), { name: 'INVALID_MODIFIER_GROUP' })
+  }
   const { rows: items } = await query(
     `SELECT id, branch_id FROM menu_item WHERE id = $1 AND restaurant_id = $2`,
     [menuItemId, restaurantId]
@@ -316,6 +333,25 @@ export async function createModifierGroup(restaurantId, payload) {
 }
 
 export async function updateModifierGroup(restaurantId, groupId, payload) {
+  const { rows: currentRows } = await query(
+    `
+    SELECT g.min_selections, g.max_selections
+    FROM menu_modifier_group g
+    WHERE g.id = $1 AND g.restaurant_id = $2
+    `,
+    [groupId, restaurantId]
+  )
+  if (!currentRows.length) {
+    throw Object.assign(new Error('Modifier group not found'), { name: 'MODIFIER_GROUP_NOT_FOUND' })
+  }
+  const selectionError = getModifierSelectionError(
+    payload.minSelections ?? currentRows[0].min_selections,
+    payload.maxSelections ?? currentRows[0].max_selections
+  )
+  if (selectionError) {
+    throw Object.assign(new Error(selectionError), { name: 'INVALID_MODIFIER_GROUP' })
+  }
+
   const { rows } = await query(
     `
     UPDATE menu_modifier_group g
@@ -469,6 +505,8 @@ export async function getFulfillmentOptions(restaurantId, branchId) {
     return { branches: [] }
   }
 
+  const timeZone = await getRestaurantTimezone(restaurantId)
+
   const branchIds = branches.map((b) => b.id)
   const { rows: configs } = await query(
     `
@@ -512,7 +550,8 @@ export async function getFulfillmentOptions(restaurantId, branchId) {
         liveOrderStart: config?.live_order_start ?? '12:00',
         liveOrderEnd: config?.live_order_end ?? '00:00',
         allowPreordersOutsideLiveHours: config?.allow_preorders_outside_live_hours ?? true,
-        ordering: resolveConsumerOrderingStatus(config ?? {}),
+        ordering: resolveConsumerOrderingStatus(config ?? {}, new Date(), 'en', timeZone),
+        timeZone,
         deliveryZones: zonesByBranch[branch.id] || [],
       }
     }),

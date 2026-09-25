@@ -303,5 +303,80 @@
     "addToOrderingListFailed": "Could not add to list",
     "createdListAndAddedItem": "Created list and added item",
     "createOrderingListFailed": "Could not create list"
+  },
+  "priceIntelligence": {
+    "title": "Price intelligence",
+    "description": "What you actually paid, drawn from receiving, invoices, catalog and contract changes.",
+    "loadErrorTitle": "Could not load price intelligence",
+    "loadErrorDesc": "Something went wrong reading your price data. Try again.",
+    "retry": "Try again",
+    "upgradeTitle": "Available on Restaurant Intelligence",
+    "upgradeDesc": "Price-change and cheaper-buy alerts are part of the Intelligence plan. Price history is included in your current plan.",
+    "viewPlans": "View plans",
+    "windowLabel": "Window",
+    "days30": "Last 30 days",
+    "days90": "Last 90 days",
+    "days180": "Last 180 days",
+    "changes": {
+      "title": "Price increases",
+      "description": "Supplier price movements above the noise threshold, largest first.",
+      "empty": "No meaningful price changes in this window.",
+      "product": "Product",
+      "supplier": "Supplier",
+      "was": "Was",
+      "now": "New price",
+      "change": "Change",
+      "detected": "Detected",
+      "source": "Source",
+      "severityHigh": "Large increase",
+      "severityMedium": "Increase"
+    },
+    "cheaper": {
+      "title": "Cheaper options",
+      "description": "Only from an agreed contract price or a substitute the supplier approved. Nothing is inferred across suppliers.",
+      "empty": "No cheaper authorised option found for the products that went up.",
+      "currentlyPaying": "Currently paying",
+      "alternative": "Cheaper option",
+      "saving": "Saving per unit",
+      "contractPrice": "Contract price",
+      "supplierSubstitute": "Approved substitute"
+    },
+    "history": {
+      "title": "Price history",
+      "description": "Every observed price change for one product.",
+      "empty": "No price observations recorded for this product yet.",
+      "current": "Current",
+      "lowest": "Lowest",
+      "highest": "Highest",
+      "average": "Average",
+      "observations": "Observations",
+      "changeOverWindow": "Change over window"
+    }
+  },
+  "wasteIntelligence": {
+    "title": "Waste intelligence",
+    "description": "Repeat and period-over-period waste signals from the last {{days}} days.",
+    "currentCost": "Current waste cost",
+    "changeFromPrevious": "vs. previous period",
+    "empty": "No repeated or rising waste pattern in this period.",
+    "repeated": "{{count}} waste incidents",
+    "costRising": "Cost rising {{pct}}",
+    "missingCostCoverage": "{{count}} incident is excluded from cost comparisons because no cost was recorded.",
+    "missingCostCoverage_plural": "{{count}} incidents are excluded from cost comparisons because no cost was recorded."
+  },
+  "overOrdering": {
+    "title": "Over-ordering review",
+    "description": "Flags only products with comparable purchasing, receiving, usage, stock, and waste data from the last {{days}} days.",
+    "empty": "No product currently has a supported excess-stock pattern.",
+    "stockCoverage": "{{days}} days of stock cover",
+    "ordered": "Ordered",
+    "received": "Received",
+    "used": "Used",
+    "waste": "Waste",
+    "signals": {
+      "excess_stock_coverage": "High stock cover after repeated receipts",
+      "waste_with_excess_stock": "Waste is high while stock cover remains high"
+    },
+    "unitCoverage": "Some products have receiving lines in a different unit and are excluded from the comparison."
   }
 }

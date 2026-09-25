@@ -13,10 +13,29 @@ export const DRIVER_ALLOWED_STATUS_UPDATES = Object.freeze([
   'rescheduled',
 ])
 
+/**
+ * True when a user should be scoped to their own assigned deliveries.
+ *
+ * Matching on "every permission is a driver permission" was unsafe: granting a
+ * driver any unrelated extra permission (say ORDERS_VIEW) silently turned off
+ * assignment scoping and the delivery-status allowlist everywhere this is used.
+ *
+ * Fulfillment *visibility* is what separates a driver from a back-office user:
+ * the Driver role holds only DRIVER_DELIVERIES_*, while every supplier role
+ * that works the fulfillment board — Viewer included — holds FULFILLMENT_VIEW.
+ * Keying off FULFILLMENT_MANAGE alone would misclassify the read-only Viewer
+ * role, which carries DRIVER_DELIVERIES_VIEW, as a driver.
+ */
 export function isDriverOnlyPermissions(permissions) {
   if (!Array.isArray(permissions) || !permissions.length) return false
-  const allowed = new Set([P.DRIVER_DELIVERIES_VIEW, P.DRIVER_DELIVERIES_MANAGE])
-  return permissions.every((p) => allowed.has(p))
+  const hasDriverPermission =
+    hasPermission(permissions, P.DRIVER_DELIVERIES_VIEW) ||
+    hasPermission(permissions, P.DRIVER_DELIVERIES_MANAGE)
+  if (!hasDriverPermission) return false
+  return (
+    !hasPermission(permissions, P.FULFILLMENT_VIEW) &&
+    !hasPermission(permissions, P.FULFILLMENT_MANAGE)
+  )
 }
 
 export async function getLinkedDriverId(userId, supplierId) {

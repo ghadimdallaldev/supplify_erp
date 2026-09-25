@@ -14,8 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Loader2, Download, CreditCard, ArrowRightLeft, FileText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { formatPrice } from '../../utils/format'
-import { invoiceRemainingBalance } from '../../lib/invoiceBalance'
+import { formatCurrency } from '../../utils/format'
+import { formatAddressLine } from '../../lib/address'
+import {
+  formatCalendarDate,
+  invoiceRemainingBalance,
+  invoiceIsOverdue,
+} from '../../lib/invoiceBalance'
 import { apiUrl } from '../../lib/apiBase'
 
 export function InvoiceDetailDialog(props: any) {
@@ -34,6 +39,9 @@ export function InvoiceDetailDialog(props: any) {
   } = props
 
   const { t } = useTranslation('invoices')
+  const invoiceCurrency = invoiceDetail?.invoice?.currency || selectedInvoice?.currency || 'USD'
+  const money = (amount: number | string | null | undefined) =>
+    formatCurrency(amount, { currency: invoiceCurrency })
 
   return (
     <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
@@ -116,11 +124,11 @@ export function InvoiceDetailDialog(props: any) {
                     <div>
                       <h3 className="font-semibold mb-2">{t('detail.billFrom')}</h3>
                       <p className="font-medium">{invoiceDetail.invoice.supplier_name}</p>
-                      {invoiceDetail.invoice.supplier_address && (
+                      {formatAddressLine(invoiceDetail.invoice.supplier_address) ? (
                         <p className="text-sm text-[var(--text-muted)] mt-1">
-                          {invoiceDetail.invoice.supplier_address}
+                          {formatAddressLine(invoiceDetail.invoice.supplier_address)}
                         </p>
-                      )}
+                      ) : null}
                       {invoiceDetail.invoice.supplier_phone && (
                         <p className="text-sm text-[var(--text-muted)]">
                           {invoiceDetail.invoice.supplier_phone}
@@ -139,20 +147,22 @@ export function InvoiceDetailDialog(props: any) {
                             {t('detail.invoiceDate')}
                           </p>
                           <p className="font-semibold">
-                            {new Date(invoiceDetail.invoice.invoice_date).toLocaleDateString()}
+                            {formatCalendarDate(invoiceDetail.invoice.invoice_date)}
                           </p>
                         </div>
                         <div>
                           <p className="text-sm text-[var(--text-muted)]">{t('detail.dueDate')}</p>
                           <p
                             className={`font-semibold ${
-                              new Date(invoiceDetail.invoice.due_date) < new Date() &&
-                              remainingBalance > 0
+                              invoiceIsOverdue({
+                                ...invoiceDetail.invoice,
+                                remaining_balance: remainingBalance,
+                              })
                                 ? 'text-[var(--red)]'
                                 : ''
                             }`}
                           >
-                            {new Date(invoiceDetail.invoice.due_date).toLocaleDateString()}
+                            {formatCalendarDate(invoiceDetail.invoice.due_date)}
                           </p>
                         </div>
                         {invoiceDetail.invoice.order_id && (
@@ -205,19 +215,17 @@ export function InvoiceDetailDialog(props: any) {
                                 {item.sku || t('stats.na')}
                               </td>
                               <td className="py-3 px-4 text-right">{item.quantity}</td>
-                              <td className="py-3 px-4 text-right">
-                                {formatPrice(item.unit_price)}
-                              </td>
+                              <td className="py-3 px-4 text-right">{money(item.unit_price)}</td>
                               <td className="py-3 px-4 text-right">
                                 {parseFloat(item.tax_amount || 0) > 0 && (
                                   <span className="text-xs text-[var(--text-muted)]">
-                                    {formatPrice(item.tax_amount)}
+                                    {money(item.tax_amount)}
                                     {item.tax_rate && ` (${item.tax_rate}%)`}
                                   </span>
                                 )}
                               </td>
                               <td className="py-3 px-4 text-right font-medium">
-                                {formatPrice(item.line_total)}
+                                {money(item.line_total)}
                               </td>
                             </tr>
                           ))}
@@ -231,7 +239,7 @@ export function InvoiceDetailDialog(props: any) {
                     <div className="space-y-2 border rounded-lg p-4 bg-[var(--brand-ultra)]">
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">{t('detail.subtotal')}</span>
-                        <span>{formatPrice(invoiceDetail.invoice.subtotal)}</span>
+                        <span>{money(invoiceDetail.invoice.subtotal)}</span>
                       </div>
                       {parseFloat(invoiceDetail.invoice.tax_amount || 0) > 0 && (
                         <div className="flex justify-between">
@@ -240,23 +248,23 @@ export function InvoiceDetailDialog(props: any) {
                               ? t('detail.taxWithRate', { rate: invoiceDetail.invoice.tax_rate })
                               : t('detail.tax')}
                           </span>
-                          <span>{formatPrice(invoiceDetail.invoice.tax_amount)}</span>
+                          <span>{money(invoiceDetail.invoice.tax_amount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
                         <span>{t('detail.total')}</span>
-                        <span>{formatPrice(invoiceDetail.invoice.total_amount)}</span>
+                        <span>{money(invoiceDetail.invoice.total_amount)}</span>
                       </div>
                       {parseFloat(invoiceDetail.invoice.total_paid || 0) > 0 && (
                         <div className="flex justify-between text-[var(--mint)] border-t pt-2 mt-2">
                           <span>{t('detail.paid')}</span>
-                          <span>-{formatPrice(invoiceDetail.invoice.total_paid)}</span>
+                          <span>-{money(invoiceDetail.invoice.total_paid)}</span>
                         </div>
                       )}
                       {remainingBalance > 0 && (
                         <div className="flex justify-between font-semibold text-lg text-[var(--red)] border-t pt-2 mt-2">
                           <span>{t('detail.balanceDue')}</span>
-                          <span>{formatPrice(remainingBalance)}</span>
+                          <span>{money(remainingBalance)}</span>
                         </div>
                       )}
                       {remainingBalance === 0 && (
@@ -297,7 +305,7 @@ export function InvoiceDetailDialog(props: any) {
                               })}
                             </p>
                             <p className="text-sm text-[var(--text-muted)]">
-                              {new Date(payment.payment_date).toLocaleDateString()} •
+                              {formatCalendarDate(payment.payment_date)} •
                               {payment.payment_number && ` ${payment.payment_number}`}
                             </p>
                             {payment.payment_reference && (
@@ -318,7 +326,7 @@ export function InvoiceDetailDialog(props: any) {
                           </div>
                           <div className="text-right">
                             <p className="text-lg font-semibold text-[var(--mint)]">
-                              {formatPrice(payment.payment_amount)}
+                              {money(payment.payment_amount)}
                             </p>
                             <StatusBadge status={String(payment.status)} className="mt-1" />
                           </div>
@@ -335,13 +343,13 @@ export function InvoiceDetailDialog(props: any) {
                           </p>
                           <p className="text-sm text-[var(--amber)]">
                             {t('detail.due', {
-                              date: new Date(selectedInvoice.due_date).toLocaleDateString(),
+                              date: formatCalendarDate(selectedInvoice.due_date),
                             })}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-[var(--red)]">
-                            {formatPrice(remainingBalance)}
+                            {money(remainingBalance)}
                           </p>
                         </div>
                       </div>

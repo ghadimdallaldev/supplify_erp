@@ -70,6 +70,68 @@
       "left": "{{name}} — {{qty}} left",
       "viewAll": "View all"
     },
+    "slowMoving": {
+      "title": "Slow-moving inventory",
+      "description": "Recorded stock cover based on completed supplier orders; review before taking action.",
+      "loading": "Checking recorded stock cover…",
+      "coverage": "~{{days}} days of stock cover from {{sold}} sold in the last {{window}} days",
+      "emptyTitle": "No slow-moving stock found",
+      "emptyDescription": "Products need repeated completed-order history before this review can report a result."
+    },
+    "demandForecast": {
+      "title": "Demand forecast",
+      "description": "Recorded completed-order demand projected for the next {{horizon}} days from the last {{observation}} days.",
+      "loading": "Calculating recorded demand…",
+      "item": "{{quantity}} projected over {{horizon}} days ({{daily}} per day)",
+      "emptyTitle": "Not enough sales history",
+      "emptyDescription": "Products need completed sales on at least seven days before this forecast reports a result."
+    },
+    "stockoutRisks": {
+      "title": "Projected stockout risks",
+      "description": "Recorded stock that may fall short of recorded demand over the next {{horizon}} days; review before acting.",
+      "loading": "Checking recorded stock against demand…",
+      "item": "{{available}} recorded available; projected shortfall {{shortfall}} over {{horizon}} days",
+      "emptyTitle": "No projected stockout risks",
+      "emptyDescription": "No recorded-stock shortfall was found among products with enough completed sales history."
+    },
+    "crossSell": {
+      "title": "Cross-sell opportunities",
+      "description": "Products customers have not ordered that were repeatedly bought with their recent products in the last {{days}} days; review before acting.",
+      "loading": "Checking recorded product-pair history…",
+      "item": "{{anchor}} was ordered with {{candidate}} in {{orders}} recorded orders",
+      "emptyTitle": "No cross-sell opportunities found",
+      "emptyDescription": "Repeated completed-order product pairs are needed before this review can report an opportunity."
+    },
+    "suggestedDeals": {
+      "title": "Suggested deal reviews",
+      "description": "Slow-moving products not already targeted by an active or pending product deal in the last {{days}} days; review before creating a deal.",
+      "loading": "Checking deal-review candidates…",
+      "item": "~{{cover}} days of recorded stock cover from {{sold}} sold in {{days}} days",
+      "reviewDeal": "Review deals",
+      "emptyTitle": "No deal reviews suggested",
+      "emptyDescription": "No eligible slow-moving products without an active or pending product deal were found."
+    },
+    "weeklySummary": {
+      "title": "Weekly intelligence review",
+      "description": "Recorded supplier review signals; no action is taken automatically.",
+      "counts": "{{slow}} slow-moving, {{stockout}} stockout risks, {{cross}} cross-sell, {{warehouses}} low-stock warehouses, {{forecast}} warehouse forecasts"
+    },
+    "warehouseForecast": {
+      "title": "Warehouse demand forecast",
+      "description": "Recorded delivered warehouse-item demand projected for the next {{horizon}} days; review before acting.",
+      "loading": "Calculating recorded warehouse demand…",
+      "item": "{{quantity}} projected over {{horizon}} days",
+      "emptyTitle": "Not enough delivered warehouse history",
+      "emptyDescription": "Warehouse products need delivered sales on at least seven days before this forecast reports a result."
+    },
+    "warehousePerformance": {
+      "title": "Warehouse performance",
+      "description": "Recorded stock thresholds and assignment states from the last {{days}} days; review before acting.",
+      "loading": "Loading recorded warehouse facts…",
+      "item": "{{assignments}} assignments: {{delivered}} delivered, {{active}} active, {{failed}} failed; {{lowStock}} low-stock products",
+      "emptyTitle": "No active warehouses found",
+      "emptyDescription": "No active supplier warehouses were available for this review."
+    },
     "reorder": {
       "title": "Reorder opportunities",
       "due": "({{count}} due)",

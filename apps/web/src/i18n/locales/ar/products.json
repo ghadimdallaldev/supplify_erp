@@ -21,7 +21,8 @@
     "next": "التالي",
     "loadFailedTitle": "فشل تحميل المنتجات",
     "loadFailedDescription": "تحقق من اتصالك وحاول مرة أخرى.",
-    "retry": "إعادة المحاولة"
+    "retry": "إعادة المحاولة",
+    "manageCategories": "إدارة الفئات"
   },
   "detail": {
     "title": "منتج",
@@ -290,5 +291,20 @@
     "catalogErrorReportDownloadFailed": "تعذّر تنزيل تقرير الأخطاء",
     "catalogFixValidationErrors": "أصلح أخطاء التحقق قبل الاستيراد",
     "catalogLargeImportQueued": "تمت جدولة استيراد كبير — المعالجة في الخلفية"
+  },
+  "categories": {
+    "title": "إدارة فئات المنتجات",
+    "description": "أنشئ فئات لكتالوجك. فئات المنصة المشتركة متاحة لكنه لا يمكن تغييرها هنا.",
+    "name": "اسم الفئة",
+    "descriptionLabel": "الوصف (اختياري)",
+    "add": "إضافة فئة",
+    "creating": "جارٍ الإضافة…",
+    "created": "تم إنشاء الفئة",
+    "createFailed": "تعذّر إنشاء الفئة",
+    "deleted": "تم حذف الفئة",
+    "deleteFailed": "تعذّر حذف الفئة",
+    "delete": "حذف {{name}}",
+    "nameRequired": "أدخل اسم الفئة",
+    "empty": "لا توجد فئات متاحة بعد"
   }
 }

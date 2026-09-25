@@ -3,6 +3,7 @@ import { Expo } from 'expo-server-sdk'
 import { config } from '../config/env.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { ConflictError } from '../middlewares/errorHandler.js'
 
 const _expo = new Expo()
 
@@ -59,24 +60,36 @@ export function buildPushPayload({ title, message, url, referenceId, referenceTy
   })
 }
 
-export async function savePushSubscription(userId, { endpoint, keys, userAgent }) {
-  if (!endpoint || !keys?.p256dh || !keys?.auth) {
-    throw new Error('Invalid push subscription payload')
-  }
+async function upsertOwnedPushSubscription(userId, { endpoint, p256dh, auth, userAgent }) {
   const { rows } = await query(
     `
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
     VALUES ($1, $2, $3, $4, $5)
     ON CONFLICT (endpoint)
-    DO UPDATE SET user_id = EXCLUDED.user_id,
-                  p256dh = EXCLUDED.p256dh,
+    DO UPDATE SET p256dh = EXCLUDED.p256dh,
                   auth = EXCLUDED.auth,
                   user_agent = EXCLUDED.user_agent
+    WHERE push_subscriptions.user_id = EXCLUDED.user_id
     RETURNING *
     `,
-    [userId, endpoint, keys.p256dh, keys.auth, userAgent || null]
+    [userId, endpoint, p256dh, auth, userAgent || null]
   )
+  if (!rows[0]) {
+    throw new ConflictError('Push endpoint is already registered to another account')
+  }
   return rows[0]
+}
+
+export async function savePushSubscription(userId, { endpoint, keys, userAgent }) {
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    throw new Error('Invalid push subscription payload')
+  }
+  return upsertOwnedPushSubscription(userId, {
+    endpoint,
+    p256dh: keys.p256dh,
+    auth: keys.auth,
+    userAgent,
+  })
 }
 
 export async function removePushSubscription(userId, endpoint) {
@@ -105,20 +118,12 @@ export async function saveExpoPushDevice(userId, { token, platform }) {
   if (!isValidExpoPushToken(token) || !['ios', 'android'].includes(platform)) {
     throw new Error('Invalid expo push device payload')
   }
-  const { rows } = await query(
-    `
-    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
-    VALUES ($1, $2, $3, $4, $5)
-    ON CONFLICT (endpoint)
-    DO UPDATE SET user_id = EXCLUDED.user_id,
-                  p256dh = EXCLUDED.p256dh,
-                  auth = EXCLUDED.auth,
-                  user_agent = EXCLUDED.user_agent
-    RETURNING *
-    `,
-    [userId, expoPushEndpoint(token), 'expo', platform, null]
-  )
-  return rows[0]
+  return upsertOwnedPushSubscription(userId, {
+    endpoint: expoPushEndpoint(token),
+    p256dh: 'expo',
+    auth: platform,
+    userAgent: null,
+  })
 }
 
 export async function removeExpoPushDevice(userId, token) {

@@ -1,4 +1,9 @@
 import { query } from '../lib/db.js'
+import {
+  findApprovedTimeOffError,
+  getPtoDateError,
+  openTimeEntryConflictError,
+} from '../routes/staff/staff.shared.js'
 import { notifyStaffPtoRequest, notifyStaffSwapRequest } from './notification.service.js'
 import { logger } from '../lib/logger.js'
 
@@ -180,16 +185,36 @@ export async function staffPortalCheckIn(staffId, restaurantId, note) {
   }
 
   const clockInAt = new Date().toISOString()
-  const { rows } = await query(
-    `
-      INSERT INTO staff_time_entry (
-        restaurant_id, staff_id, clock_in_at, clock_in_method, note, created_by, updated_by
-      )
-      VALUES ($1, $2, $3, 'portal', $4, NULL, NULL)
-      RETURNING *
-    `,
-    [restaurantId, staffId, clockInAt, note ?? null]
+  const timeOffError = await findApprovedTimeOffError(
+    restaurantId,
+    staffId,
+    clockInAt,
+    new Date(Date.now() + 1).toISOString()
   )
+  if (timeOffError) {
+    const err = new Error(timeOffError)
+    err.name = 'TIME_OFF'
+    err.status = 400
+    throw err
+  }
+  let rows
+  try {
+    const inserted = await query(
+      `
+        INSERT INTO staff_time_entry (
+          restaurant_id, staff_id, clock_in_at, clock_in_method, note, created_by, updated_by
+        )
+        VALUES ($1, $2, $3, 'portal', $4, NULL, NULL)
+        RETURNING *
+      `,
+      [restaurantId, staffId, clockInAt, note ?? null]
+    )
+    rows = inserted.rows
+  } catch (error) {
+    const conflict = openTimeEntryConflictError(error)
+    if (conflict) throw conflict
+    throw error
+  }
   const entry = rows[0]
   const { rows: staffRows } = await query(
     `SELECT display_name AS staff_name, role AS staff_role FROM staff_member WHERE id = $1`,
@@ -231,6 +256,33 @@ export async function staffPortalCheckOut(staffId, restaurantId, entryId) {
 }
 
 export async function submitStaffPortalPto(staffId, restaurantId, payload) {
+  const dateError = getPtoDateError(payload.startDate, payload.endDate)
+  if (dateError) {
+    const err = new Error(dateError)
+    err.name = 'PTO_CREATE_ERROR'
+    err.status = 400
+    throw err
+  }
+
+  const { rows: overlapRows } = await query(
+    `
+      SELECT id FROM staff_pto_request
+      WHERE restaurant_id = $1
+        AND staff_id = $2
+        AND status IN ('PENDING', 'APPROVED')
+        AND start_date <= $4::date
+        AND end_date >= $3::date
+      LIMIT 1
+    `,
+    [restaurantId, staffId, payload.startDate, payload.endDate]
+  )
+  if (overlapRows.length) {
+    const err = new Error('You already have time off that overlaps these dates')
+    err.name = 'PTO_CREATE_ERROR'
+    err.status = 400
+    throw err
+  }
+
   const { rows } = await query(
     `
       INSERT INTO staff_pto_request (
@@ -260,7 +312,7 @@ export async function submitStaffPortalPto(staffId, restaurantId, payload) {
 export async function submitStaffPortalSwap(staffId, restaurantId, payload) {
   const { rows: shiftRows } = await query(
     `
-      SELECT id FROM staff_shift
+      SELECT id, status FROM staff_shift
       WHERE id = $1 AND restaurant_id = $2 AND staff_id = $3
     `,
     [payload.shiftId, restaurantId, staffId]
@@ -269,6 +321,12 @@ export async function submitStaffPortalSwap(staffId, restaurantId, payload) {
     const err = new Error('Shift not found')
     err.name = 'SHIFT_NOT_FOUND'
     err.status = 404
+    throw err
+  }
+  if (String(shiftRows[0].status || '').toUpperCase() === 'CANCELLED') {
+    const err = new Error('This shift is cancelled')
+    err.name = 'SHIFT_CANCELLED'
+    err.status = 400
     throw err
   }
 

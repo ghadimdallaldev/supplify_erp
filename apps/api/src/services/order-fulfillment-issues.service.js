@@ -1,7 +1,11 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { getOrCreateConversation, postConversationMessage } from '../lib/chat-conversation.js'
-import { canAmendOrderStatus, getOrderForAmendment } from './order-amendments.service.js'
+import {
+  canAmendOrderStatus,
+  getOrderForAmendment,
+  notifyAmendmentParty,
+} from './order-amendments.service.js'
 import { proposeOrderSubstitution } from './product-substitutes.service.js'
 import { notifyTenantUsers } from './notification.service.js'
 
@@ -88,7 +92,6 @@ export async function createShortageIssue({
 }) {
   const item = await loadOrderItem(orderId, orderItemId, supplierId)
   const order = await getOrderForAmendment(orderId)
-  if (order.supplier_id !== supplierId) throw new ValidationError('Access denied')
   if (!canAmendOrderStatus(order.status)) {
     throw new ValidationError('Shortages and substitutions cannot be reported after processing')
   }
@@ -110,12 +113,24 @@ export async function createShortageIssue({
   ) {
     throw new ValidationError('Shortage quantities must be within the ordered quantity')
   }
+  if (
+    available != null &&
+    shortageQuantity != null &&
+    Math.abs(shortage - (orderedQuantity - available)) > 0.0001
+  ) {
+    throw new ValidationError(
+      'Shortage quantity must equal ordered quantity minus available quantity'
+    )
+  }
 
   let replacementName = null
   if (replacementProductId) {
-    const { rows: rp } = await query(`SELECT name, unit FROM product WHERE id = $1`, [
+    const { rows: rp } = await query(`SELECT name, unit, supplier_id FROM product WHERE id = $1`, [
       replacementProductId,
     ])
+    if (!rp.length || rp[0].supplier_id !== supplierId) {
+      throw new ValidationError('Replacement product is not in your catalog')
+    }
     replacementName = rp[0]?.name
   }
 
@@ -131,7 +146,7 @@ export async function createShortageIssue({
     customNote,
   })
 
-  return withTransaction(async (client) => {
+  const created = await withTransaction(async (client) => {
     const conversation = openChat
       ? await getOrCreateConversation(supplierId, item.restaurant_id, { enforceOpenLimit: false })
       : null
@@ -178,27 +193,29 @@ export async function createShortageIssue({
       ]
     )
 
-    const issue = rows[0]
-
-    await notifyTenantUsers({
-      tenantId: item.restaurant_id,
-      tenantType: 'RESTAURANT',
-      notificationType: 'ORDER',
-      notificationCategory: 'order_fulfillment_issue',
-      title: 'Supplier reported a shortage',
-      message: chatMessage.slice(0, 280),
-      referenceId: orderId,
-      referenceType: conversation ? 'CONVERSATION' : 'ORDER',
-      metadata: {
-        link: conversation ? `/app/chat?conversation=${conversation.id}` : `/app/orders/${orderId}`,
-        orderId,
-        issueId: issue.id,
-        issueType: 'shortage',
-      },
-    })
-
-    return { issue, conversation, message: messageRow }
+    return { issue: rows[0], conversation, message: messageRow }
   })
+
+  await notifyTenantUsers({
+    tenantId: item.restaurant_id,
+    tenantType: 'RESTAURANT',
+    notificationType: 'ORDER',
+    notificationCategory: 'order_fulfillment_issue',
+    title: 'Supplier reported a shortage',
+    message: chatMessage.slice(0, 280),
+    referenceId: orderId,
+    referenceType: created.conversation ? 'CONVERSATION' : 'ORDER',
+    metadata: {
+      link: created.conversation
+        ? `/app/chat?conversation=${created.conversation.id}`
+        : `/app/orders/${orderId}`,
+      orderId,
+      issueId: created.issue.id,
+      issueType: 'shortage',
+    },
+  })
+
+  return created
 }
 
 export async function createSubstitutionIssue({
@@ -215,7 +232,6 @@ export async function createSubstitutionIssue({
 }) {
   const item = await loadOrderItem(orderId, orderItemId, supplierId)
   const order = await getOrderForAmendment(orderId)
-  if (order.supplier_id !== supplierId) throw new ValidationError('Access denied')
   if (!canAmendOrderStatus(order.status)) {
     throw new ValidationError('Shortages and substitutions cannot be reported after processing')
   }
@@ -223,9 +239,12 @@ export async function createSubstitutionIssue({
   let replacementName = null
   let replacementUnitResolved = replacementUnit
   if (substituteProductId) {
-    const { rows: rp } = await query(`SELECT name, unit FROM product WHERE id = $1`, [
+    const { rows: rp } = await query(`SELECT name, unit, supplier_id FROM product WHERE id = $1`, [
       substituteProductId,
     ])
+    if (!rp.length || rp[0].supplier_id !== supplierId) {
+      throw new ValidationError('Replacement product is not in your catalog')
+    }
     replacementName = rp[0]?.name
     replacementUnitResolved = replacementUnitResolved || rp[0]?.unit
   }
@@ -242,61 +261,68 @@ export async function createSubstitutionIssue({
     customNote,
   })
 
-  let amendmentResult = null
-  if (proposeAmendment && substituteProductId) {
-    amendmentResult = await proposeOrderSubstitution({
-      orderId,
-      supplierId,
-      orderItemId,
-      substituteProductId,
-      requestedByUserId: createdByUserId,
-      description: customNote || chatMessage,
-    })
-  }
-
   const conversation = await getOrCreateConversation(supplierId, item.restaurant_id, {
     enforceOpenLimit: false,
   })
-  const messageRow = await postConversationMessage({
-    conversationId: conversation.id,
-    senderType: 'SUPPLIER',
-    senderId: supplierId,
-    content: chatMessage,
-    messageType: 'ORDER_REFERENCE',
-    orderId,
-  })
 
-  const status = amendmentResult ? 'waiting_restaurant_approval' : 'substitution_suggested'
+  const created = await withTransaction(async (client) => {
+    const amendmentResult =
+      proposeAmendment && substituteProductId
+        ? await proposeOrderSubstitution({
+            orderId,
+            supplierId,
+            orderItemId,
+            substituteProductId,
+            requestedByUserId: createdByUserId,
+            description: customNote || chatMessage,
+            client,
+            skipNotify: true,
+          })
+        : null
 
-  const { rows } = await query(
-    `
-    INSERT INTO order_fulfillment_issue (
-      order_id, order_item_id, supplier_id, restaurant_id, created_by,
-      issue_type, status,
-      ordered_quantity, available_quantity,
-      replacement_product_id, replacement_quantity, replacement_unit,
-      message, amendment_id, conversation_id, message_id
-    ) VALUES ($1,$2,$3,$4,$5,'substitution',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-    RETURNING *
-    `,
-    [
+    const messageRow = await postConversationMessage({
+      conversationId: conversation.id,
+      senderType: 'SUPPLIER',
+      senderId: supplierId,
+      content: chatMessage,
+      messageType: 'ORDER_REFERENCE',
       orderId,
-      orderItemId,
-      supplierId,
-      item.restaurant_id,
-      createdByUserId,
-      status,
-      item.quantity,
-      availableQuantity ?? null,
-      substituteProductId || null,
-      replacementQuantity ?? null,
-      replacementUnitResolved || item.product_unit,
-      customNote || chatMessage,
-      amendmentResult?.amendmentId || null,
-      conversation.id,
-      messageRow.id,
-    ]
-  )
+      client,
+    })
+
+    const status = amendmentResult ? 'waiting_restaurant_approval' : 'substitution_suggested'
+    const { rows } = await client.query(
+      `
+      INSERT INTO order_fulfillment_issue (
+        order_id, order_item_id, supplier_id, restaurant_id, created_by,
+        issue_type, status,
+        ordered_quantity, available_quantity,
+        replacement_product_id, replacement_quantity, replacement_unit,
+        message, amendment_id, conversation_id, message_id
+      ) VALUES ($1,$2,$3,$4,$5,'substitution',$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      RETURNING *
+      `,
+      [
+        orderId,
+        orderItemId,
+        supplierId,
+        item.restaurant_id,
+        createdByUserId,
+        status,
+        item.quantity,
+        availableQuantity ?? null,
+        substituteProductId || null,
+        replacementQuantity ?? null,
+        replacementUnitResolved || item.product_unit,
+        customNote || chatMessage,
+        amendmentResult?.amendmentId || null,
+        conversation.id,
+        messageRow.id,
+      ]
+    )
+
+    return { issue: rows[0], conversation, message: messageRow, amendment: amendmentResult }
+  })
 
   await notifyTenantUsers({
     tenantId: item.restaurant_id,
@@ -310,12 +336,16 @@ export async function createSubstitutionIssue({
     metadata: {
       link: `/app/chat?conversation=${conversation.id}`,
       orderId,
-      issueId: rows[0].id,
+      issueId: created.issue.id,
       issueType: 'substitution',
     },
   })
 
-  return { issue: rows[0], conversation, message: messageRow, amendment: amendmentResult }
+  if (created.amendment?.amendment) {
+    await notifyAmendmentParty(order, created.amendment.amendment, 'created')
+  }
+
+  return created
 }
 
 export async function openFulfillmentChat({

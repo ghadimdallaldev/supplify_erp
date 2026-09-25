@@ -21,6 +21,19 @@ export function evaluatePlanFeatureValue(featureValue) {
   return Boolean(featureValue)
 }
 
+/**
+ * Admin "on" enables a feature without discarding the plan tier.
+ * Scale intelligence stays "scale"; a plan that had the feature off becomes boolean true.
+ * Admin "off" is always false.
+ * @param {boolean} forcedOn
+ * @param {unknown} planValue
+ */
+export function resolveForcedFeatureValue(forcedOn, planValue) {
+  if (!forcedOn) return false
+  if (evaluatePlanFeatureValue(planValue)) return planValue
+  return true
+}
+
 async function getTenantOverride(tenantId, tenantType, featureKey) {
   try {
     const { rows } = await query(
@@ -137,13 +150,14 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
     const features = {}
     const featureSources = {}
     for (const key of keys) {
+      const planValue = planFeatures?.[key]
       if (Object.prototype.hasOwnProperty.call(tenantMap, key)) {
-        features[key] = tenantMap[key]
+        features[key] = resolveForcedFeatureValue(tenantMap[key] === true, planValue)
         featureSources[key] = 'tenant_override'
         continue
       }
       if (Object.prototype.hasOwnProperty.call(globalMap, key) && globalMap[key] !== null) {
-        features[key] = globalMap[key] === true
+        features[key] = resolveForcedFeatureValue(globalMap[key] === true, planValue)
         featureSources[key] = 'global'
         continue
       }
@@ -183,6 +197,16 @@ export function shouldResolveFeatureAlias(featureKey, planFeatures) {
   return !Object.prototype.hasOwnProperty.call(planFeatures, featureKey)
 }
 
+/**
+ * An explicit admin off (tenant or global) must not be re-enabled by an alias.
+ * Aliases only fill a key the plan omitted.
+ */
+export function shouldAliasAfterResolution(result, featureKey, planFeatures) {
+  if (result?.enabled) return false
+  if (result?.source === 'tenant_override' || result?.source === 'global') return false
+  return shouldResolveFeatureAlias(featureKey, planFeatures)
+}
+
 export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
@@ -194,7 +218,7 @@ export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey
     const subscription = await getTenantSubscription(tenantId, tenantType)
     const planFeatures = await resolveEffectivePlanFeatures(subscription)
     let result = await resolveFeatureEnabled(billingTenantId, tenantType, featureKey, planFeatures)
-    if (!result.enabled && shouldResolveFeatureAlias(featureKey, planFeatures)) {
+    if (shouldAliasAfterResolution(result, featureKey, planFeatures)) {
       result = await resolveFeatureEnabled(
         billingTenantId,
         tenantType,
@@ -292,6 +316,32 @@ export async function listTenantFeatureOverrides(tenantId, tenantType) {
 /**
  * Effective feature map for admin UI (plan + global + tenant overrides).
  */
+/**
+ * Resolved value of one feature key, preserving tier strings.
+ *
+ * `isFeatureEnabledForTenant` answers only yes/no, and
+ * `getEffectiveFeaturesForTenant` returns an ARRAY of descriptor objects — code
+ * that reached for `.features[key]` on it silently read undefined. Use this
+ * when a tiered value (smart_reorder, quick_lists, intelligence, ...) is needed
+ * rather than a boolean.
+ *
+ * @param {string} tenantId
+ * @param {string} tenantType
+ * @param {string} featureKey
+ * @returns {Promise<unknown>} tier string, true, or false
+ */
+export async function getResolvedFeatureValue(tenantId, tenantType, featureKey) {
+  if (!tenantId || !tenantType) return false
+  const { getTenantSubscription } = await import('./subscription.js')
+  const { resolveEffectivePlanFeatures } = await import(
+    './subscription/free-trial-plan-features.js'
+  )
+  const subscription = await getTenantSubscription(tenantId, tenantType)
+  const planFeatures = await resolveEffectivePlanFeatures(subscription)
+  const { features } = await resolveAllFeaturesForTenant(tenantId, tenantType, planFeatures)
+  return features?.[featureKey] ?? false
+}
+
 export async function getEffectiveFeaturesForTenant(tenantId, tenantType) {
   const { getTenantSubscription } = await import('./subscription.js')
   const { resolveEffectivePlanFeatures } = await import(

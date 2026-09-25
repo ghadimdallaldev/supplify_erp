@@ -1,5 +1,7 @@
 import {
   useGetAdminFeaturedPlacementsQuery,
+  useApproveFeaturedPlacementMutation,
+  useRejectFeaturedPlacementMutation,
   useRefundFeaturedPlacementMutation,
 } from '../../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -15,6 +17,8 @@ export function AdminFeaturedPlacementsPanel() {
   const { t } = useTranslation('admin')
   const { data, isLoading, refetch } = useGetAdminFeaturedPlacementsQuery()
   const [refundFeatured] = useRefundFeaturedPlacementMutation()
+  const [approveFeatured] = useApproveFeaturedPlacementMutation()
+  const [rejectFeatured] = useRejectFeaturedPlacementMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
   const placements = data?.placements ?? []
 
@@ -27,6 +31,26 @@ export function AdminFeaturedPlacementsPanel() {
     } catch (e: unknown) {
       const err = e as { data?: { error?: { message?: string } } }
       toast.error(err?.data?.error?.message || t('placements.refundFailed'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleReview = async (id: string, approve: boolean) => {
+    setBusyId(id)
+    try {
+      if (approve) {
+        await approveFeatured({ id }).unwrap()
+        toast.success(t('placements.approveSuccess'))
+      } else {
+        const reason = window.prompt(t('placements.rejectReasonPrompt')) || undefined
+        await rejectFeatured({ id, reason }).unwrap()
+        toast.success(t('placements.rejectSuccess'))
+      }
+      refetch()
+    } catch (e: unknown) {
+      const err = e as { data?: { error?: { message?: string } } }
+      toast.error(err?.data?.error?.message || t('placements.reviewFailed'))
     } finally {
       setBusyId(null)
     }
@@ -52,25 +76,54 @@ export function AdminFeaturedPlacementsPanel() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{p.supplier_name}</p>
                   <p className="text-xs text-[var(--text-muted)]">
-                    {t('placements.until', {
-                      date: new Date(p.ends_at).toLocaleDateString(),
-                    })}
+                    {p.status === 'pending'
+                      ? p.payment_status === 'paid' || p.payment_status === 'waived'
+                        ? t('placements.awaitingReview')
+                        : t('placements.awaitingPayment')
+                      : t('placements.until', {
+                          date: new Date(p.ends_at).toLocaleDateString(),
+                        })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant="outline">{p.pricing_key}</Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busyId === p.id}
-                    onClick={() => handleRefund(p.id)}
-                  >
-                    {busyId === p.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      t('placements.refund')
-                    )}
-                  </Button>
+                  {p.status === 'pending' &&
+                  (p.payment_status === 'paid' || p.payment_status === 'waived') ? (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={busyId === p.id}
+                        onClick={() => handleReview(p.id, true)}
+                      >
+                        {busyId === p.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          t('placements.approve')
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === p.id}
+                        onClick={() => handleReview(p.id, false)}
+                      >
+                        {t('placements.reject')}
+                      </Button>
+                    </>
+                  ) : p.status === 'active' ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busyId === p.id}
+                      onClick={() => handleRefund(p.id)}
+                    >
+                      {busyId === p.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        t('placements.refund')
+                      )}
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             ))}

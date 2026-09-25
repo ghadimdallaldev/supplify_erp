@@ -10,7 +10,11 @@ import { isTenantOwner } from '../lib/tenantRoles'
 function hasPermission(permissions: string[] | undefined, required: string): boolean {
   if (!Array.isArray(permissions)) return false
   if (permissions.includes(required)) return true
-  const manageKey = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_MANAGE$/, '_MANAGE')
+  if (required.endsWith('_VIEW_COSTS')) {
+    const manageKey = `${required.replace(/_VIEW_COSTS$/, '')}_MANAGE`
+    if (permissions.includes(manageKey)) return true
+  }
+  const manageKey = required.replace(/_VIEW$|_CREATE$|_EDIT$|_SEND$|_IMPORT$|_MANAGE$/, '_MANAGE')
   if (manageKey !== required && permissions.includes(manageKey)) return true
   return false
 }

@@ -22,6 +22,7 @@ import {
 } from '../services/recipe.service.js'
 import { recalculateRecipe } from '../services/recipe-recalc-queue.service.js'
 import { query } from '../lib/db.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 
 const recipeCostingFeatureGate = requireFeature(
   'recipe_costing',
@@ -138,6 +139,9 @@ function createRecipesRouter() {
   router.get('/', async (req, res, next) => {
     try {
       const restaurantId = await requireRestaurantId(req)
+      if (req.query.branchId) {
+        await assertLegacyBranchOwnedByRestaurant(String(req.query.branchId), restaurantId)
+      }
       const limit = Math.min(parseInt(req.query.limit || '50', 10), 200)
       const offset = parseInt(req.query.offset || '0', 10)
       const includeCosts = canViewCosts(req)

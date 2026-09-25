@@ -1,6 +1,6 @@
 import { Badge } from './ui/badge'
 import { ContractPriceDisplay } from './ContractPriceDisplay'
-import { formatPrice } from '../utils/format'
+import { formatCurrency } from '../utils/format'
 import { cn } from '../lib/utils'
 import { Tag } from 'lucide-react'
 import { responsiveDataListClasses } from './ui/responsive-data-list'
@@ -16,6 +16,7 @@ export type MyContractPriceRowData = {
   contract_end_date?: string | null
   agreement_type?: string | null
   min_order_quantity?: number | string | null
+  currency?: string | null
 }
 
 function formatValidity(start?: string | null, end?: string | null) {
@@ -77,9 +78,12 @@ export function MyContractPriceRow({ row }: { row: MyContractPriceRowData }) {
             currentPrice={contractPrice}
             catalogPrice={catalogPrice}
             pricingSource="CONTRACT_PRICE"
+            currency={row.currency || 'USD'}
           />
           {catalogPrice != null ? (
-            <p className="text-xs text-[var(--text-mid)]">Catalog {formatPrice(catalogPrice)}</p>
+            <p className="text-xs text-[var(--text-mid)]">
+              Catalog {formatCurrency(catalogPrice, { currency: row.currency || 'USD' })}
+            </p>
           ) : null}
         </div>
       </div>
@@ -110,6 +114,7 @@ export function MyContractPriceTableRow({ row }: { row: MyContractPriceRowData }
           currentPrice={contractPrice}
           catalogPrice={catalogPrice}
           pricingSource="CONTRACT_PRICE"
+          currency={row.currency || 'USD'}
         />
         {savings ? (
           <p className="mt-0.5 text-xs font-medium text-[var(--mint)]">{savings}</p>
@@ -121,7 +126,9 @@ export function MyContractPriceTableRow({ row }: { row: MyContractPriceRowData }
           responsiveDataListClasses.columnSecondary
         )}
       >
-        {catalogPrice != null ? formatPrice(catalogPrice) : '—'}
+        {catalogPrice != null
+          ? formatCurrency(catalogPrice, { currency: row.currency || 'USD' })
+          : '—'}
       </td>
       <td
         className={cn(

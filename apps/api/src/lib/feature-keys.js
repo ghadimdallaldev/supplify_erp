@@ -26,6 +26,8 @@ export const RESTAURANT_FEATURE_KEYS = [
   'supplier_deals',
   'supplier_deals_redeem',
   'fulfillment_tools',
+  'intelligence',
+  'ai_assistant',
   'ai_platform',
 ]
 
@@ -56,6 +58,8 @@ export const SUPPLIER_FEATURE_KEYS = [
   'order_amendments',
   'tenant_audit_log',
   'supplier_growth',
+  'intelligence',
+  'ai_assistant',
 ]
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
@@ -104,7 +108,9 @@ const DISPLAY_NAMES = {
   waitlist_auto_promo: 'Waitlist Auto-Promotion',
   supplier_deals: 'Supplier deals',
   supplier_deals_redeem: 'Supplier deal redemptions',
-  ai_platform: 'AI platform (assistant + reorder LLM)',
+  intelligence: 'Operational intelligence',
+  ai_assistant: 'Supplify AI Assistant',
+  ai_platform: 'AI platform (Smart Reorder LLM)',
 }
 
 export function featureDisplayName(featureKey) {

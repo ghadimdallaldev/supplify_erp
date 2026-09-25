@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
+import { Textarea } from '../../components/ui/textarea'
 import { Label } from '../../components/ui/label'
 import { PageHeader } from '../../components/ui/page-header'
 import { PageShell } from '../../components/ui/page-shell'
@@ -112,8 +113,11 @@ export function PromotionsPage() {
   const [createPricingKey, setCreatePricingKey] = useState('')
   const [form, setForm] = useState({
     name: '',
+    description: '',
     type: 'percentage_discount' as (typeof SUPPLIER_DEAL_TYPES)[number],
     discountValue: '10',
+    buyQuantity: '2',
+    getQuantity: '1',
     minOrderAmount: '',
     couponCode: '',
     ctaType: 'order_now',
@@ -153,11 +157,17 @@ export function PromotionsPage() {
   }
 
   const buildCreatePayload = (submitForReview: boolean) => ({
-    name: form.name,
+    name: form.name.trim(),
+    description: form.description.trim(),
     type: form.type,
-    discountValue: Number(form.discountValue) || 0,
+    discountValue:
+      form.type === 'percentage_discount' || form.type === 'fixed_discount'
+        ? Number(form.discountValue)
+        : null,
+    buyQuantity: form.type === 'buy_x_get_y' ? Number(form.buyQuantity) : null,
+    getQuantity: form.type === 'buy_x_get_y' ? Number(form.getQuantity) : null,
     minOrderAmount: form.minOrderAmount ? Number(form.minOrderAmount) : null,
-    couponCode: form.couponCode || null,
+    couponCode: form.ctaType === 'use_coupon' ? form.couponCode.trim() || null : null,
     ctaType: form.ctaType,
     startsAt: new Date(form.startsAt).toISOString(),
     endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
@@ -175,6 +185,40 @@ export function PromotionsPage() {
   const validateForm = () => {
     if (!form.name.trim()) {
       toast.error(t('promotions.toastNameRequired'))
+      return false
+    }
+    if (!form.description.trim()) {
+      toast.error(t('promotions.toastDescriptionRequired'))
+      return false
+    }
+    if (form.type === 'percentage_discount') {
+      const discount = Number(form.discountValue)
+      if (!Number.isFinite(discount) || discount <= 0 || discount > 100) {
+        toast.error(t('promotions.toastPercentageRange'))
+        return false
+      }
+    }
+    if (form.type === 'fixed_discount') {
+      const discount = Number(form.discountValue)
+      if (!Number.isFinite(discount) || discount <= 0) {
+        toast.error(t('promotions.toastFixedRequired'))
+        return false
+      }
+    }
+    if (form.type === 'buy_x_get_y') {
+      const buy = Number(form.buyQuantity)
+      const free = Number(form.getQuantity)
+      if (!Number.isInteger(buy) || buy <= 0 || !Number.isInteger(free) || free <= 0) {
+        toast.error(t('promotions.toastBuyGetRequired'))
+        return false
+      }
+    }
+    if (form.ctaType === 'use_coupon' && !form.couponCode.trim()) {
+      toast.error(t('promotions.toastCouponRequired'))
+      return false
+    }
+    if (form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
+      toast.error(t('promotions.toastEndAfterStart'))
       return false
     }
     if (targeting.appliesTo === 'specific_products' && targeting.productIds.length === 0) {
@@ -344,9 +388,14 @@ export function PromotionsPage() {
                     setSubmitDealName(name)
                   }}
                   onDelete={async (id) => {
-                    await deletePromotion(id).unwrap()
-                    toast.success(t('promotions.toastDeleted'))
-                    refetch()
+                    try {
+                      await deletePromotion(id).unwrap()
+                      toast.success(t('promotions.toastDeleted'))
+                      refetch()
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || t('promotions.toastDeleteFailed'))
+                    }
                   }}
                   onPayActivation={async (id) => {
                     try {
@@ -363,14 +412,28 @@ export function PromotionsPage() {
                     }
                   }}
                   onPause={async (id) => {
-                    await pausePromotion(id).unwrap()
-                    toast.success(t('promotions.toastPaused'))
-                    refetch()
+                    try {
+                      await pausePromotion(id).unwrap()
+                      toast.success(t('promotions.toastPaused'))
+                      refetch()
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || t('promotions.toastPauseFailed'))
+                    }
                   }}
                   onResume={async (id) => {
-                    await resumePromotion(id).unwrap()
-                    toast.success(t('promotions.toastResumed'))
-                    refetch()
+                    try {
+                      const result = await resumePromotion(id).unwrap()
+                      toast.success(
+                        result.promotion?.status === 'expired'
+                          ? t('promotions.toastResumeExpired')
+                          : t('promotions.toastResumed')
+                      )
+                      refetch()
+                    } catch (e: unknown) {
+                      const err = e as { data?: { error?: { message?: string } } }
+                      toast.error(err?.data?.error?.message || t('promotions.toastResumeFailed'))
+                    }
                   }}
                   onAnalytics={setAnalyticsId}
                 />
@@ -412,6 +475,15 @@ export function PromotionsPage() {
                 />
               </div>
               <div>
+                <Label>{t('promotions.description')}</Label>
+                <Textarea
+                  value={form.description}
+                  maxLength={1000}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder={t('promotions.descriptionPlaceholder')}
+                />
+              </div>
+              <div>
                 <Label>{t('promotions.dealType')}</Label>
                 <Select
                   value={form.type}
@@ -436,14 +508,42 @@ export function PromotionsPage() {
                   </p>
                 ) : null}
               </div>
-              <div>
-                <Label>{t('promotions.discountValue')}</Label>
-                <Input
-                  type="number"
-                  value={form.discountValue}
-                  onChange={(e) => setForm((f) => ({ ...f, discountValue: e.target.value }))}
-                />
-              </div>
+              {form.type === 'percentage_discount' || form.type === 'fixed_discount' ? (
+                <div>
+                  <Label>{t('promotions.discountValue')}</Label>
+                  <Input
+                    type="number"
+                    min={form.type === 'percentage_discount' ? 1 : 0.01}
+                    max={form.type === 'percentage_discount' ? 100 : undefined}
+                    value={form.discountValue}
+                    onChange={(e) => setForm((f) => ({ ...f, discountValue: e.target.value }))}
+                  />
+                </div>
+              ) : null}
+              {form.type === 'buy_x_get_y' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>{t('promotions.buyQuantity')}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={form.buyQuantity}
+                      onChange={(e) => setForm((f) => ({ ...f, buyQuantity: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t('promotions.getQuantity')}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={form.getQuantity}
+                      onChange={(e) => setForm((f) => ({ ...f, getQuantity: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <Label>{t('promotions.minOrderOptional')}</Label>
                 <Input
@@ -532,7 +632,11 @@ export function PromotionsPage() {
               <DealCreatePreview
                 name={form.name}
                 type={form.type}
-                discountValue={form.discountValue}
+                discountValue={
+                  form.type === 'percentage_discount' || form.type === 'fixed_discount'
+                    ? form.discountValue
+                    : ''
+                }
                 ctaType={form.ctaType}
                 couponCode={form.couponCode}
                 restaurantTypes={targeting.restaurantTypes}

@@ -83,11 +83,7 @@ export type WorkspacePersonaProfile = {
   pageCopy?: WorkspacePageCopy
 }
 
-export const SUPPLIER_ANALYTICS_ANY_OF = [
-  'FULFILLMENT_VIEW',
-  'INVOICES_VIEW',
-  'CATALOG_EDIT',
-] as const
+export const SUPPLIER_ANALYTICS_ANY_OF = ['FULFILLMENT_VIEW', 'INVOICES_VIEW'] as const
 
 export const RESTAURANT_DASHBOARD_ANY_OF = ['ORDERS_VIEW', 'INVOICES_VIEW'] as const
 

@@ -331,7 +331,7 @@ export async function sendNotification({
         !!contact?.phone,
       sms: false,
       push: isPrefEnabled(prefs, 'push_enabled', false) && pushFeatureEnabled,
-      inApp: isPrefEnabled(prefs, 'in_app_enabled'),
+      inApp: allowedChannels.has('in_app') && isPrefEnabled(prefs, 'in_app_enabled'),
       webhook: allowedChannels.has('webhook'),
     }
 
@@ -339,6 +339,20 @@ export async function sendNotification({
     const shouldSend = preferenceKey ? isPrefEnabled(prefs, preferenceKey) : true
     if (!shouldSend) {
       logger.info('Notification skipped due to user preference', { userId, notificationCategory })
+      return null
+    }
+
+    if (
+      !channels.email &&
+      !channels.whatsapp &&
+      !channels.push &&
+      !channels.inApp &&
+      !channels.webhook
+    ) {
+      logger.info('Notification skipped because notifications are disabled for this plan', {
+        userId,
+        notificationCategory,
+      })
       return null
     }
 
@@ -377,7 +391,7 @@ export async function sendNotification({
       sms: false,
       whatsapp: false,
       push: false,
-      inApp: true,
+      inApp: !!channels.inApp,
     }
 
     if (metadataPayload.skipEmail) {

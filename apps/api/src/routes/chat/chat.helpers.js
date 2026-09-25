@@ -1,4 +1,6 @@
 import { getRestaurantIdForRequest, getSupplierIdForRequest } from '../../lib/rbac.js'
+import { getEffectiveTenant } from '../../lib/impersonation.js'
+import { adminHasSupportChatAccess } from '../../lib/chat-access.js'
 import { query } from '../../lib/db.js'
 import { ValidationError } from '../../middlewares/errorHandler.js'
 import { requireFeature, checkLimit } from '../../lib/subscription.js'
@@ -31,11 +33,17 @@ export const sendMessageSchema = z.preprocess(
       .array(
         z.object({
           fileUrl: z.string().url(),
-          fileType: z.string(),
-          fileName: z.string(),
-          fileSize: z.number().optional(),
+          fileType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+          fileName: z.string().min(1).max(255),
+          fileSize: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(10 * 1024 * 1024)
+            .optional(),
         })
       )
+      .max(5)
       .optional(),
   })
 )
@@ -138,7 +146,25 @@ export async function getOrCreateConversation(
 /** Tenant-scoped access (supports invited staff, not only contact_email on the tenant row). */
 export async function userCanAccessConversation(req, conversation) {
   const role = req.userData?.role
-  if (role === 'ADMIN') return true
+  if (role === 'ADMIN') {
+    if (conversation.is_admin_conversation) {
+      return adminHasSupportChatAccess(req.userData?.id)
+    }
+    const effectiveTenant = getEffectiveTenant(req)
+    if (
+      effectiveTenant?.tenantType === 'SUPPLIER' &&
+      effectiveTenant.tenantId === conversation.supplier_id
+    ) {
+      return true
+    }
+    if (
+      effectiveTenant?.tenantType === 'RESTAURANT' &&
+      effectiveTenant.tenantId === conversation.restaurant_id
+    ) {
+      return true
+    }
+    return false
+  }
 
   if (role === 'RESTAURANT') {
     const restaurantId = await getRestaurantIdForRequest(req)

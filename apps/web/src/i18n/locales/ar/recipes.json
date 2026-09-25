@@ -191,7 +191,8 @@
   "foodCostBar": {
     "target": "الهدف {{pct}}%",
     "ariaKnown": "تكلفة الطعام {{pct}}%",
-    "ariaUnknown": "تكلفة الطعام غير معروفة"
+    "ariaUnknown": "تكلفة الطعام غير معروفة",
+    "noTarget": "لم يُحدَّد هدف"
   },
   "empty": {
     "loadErrorTitle": "تعذر تحميل الوصفات",
@@ -206,5 +207,14 @@
     "saveFailed": "فشل حفظ الوصفة",
     "duplicated": "تم نسخ الوصفة",
     "recalculated": "تم إعادة حساب التكلفة"
+  },
+  "foodCostWarnings": {
+    "title": "تنبيهات تكلفة الطعام",
+    "description": "الوصفات التي تجاوزت هدف تكلفة الطعام الخاص بها، مع تغيّر سعر المكوّن المسبب لذلك.",
+    "empty": "لا توجد وصفة تتجاوز هدف تكلفة الطعام.",
+    "overBy": "تجاوز بـ {{pct}} نقطة",
+    "actualVsTarget": "تكلفة الطعام {{actual}}٪ مقابل الهدف {{target}}٪",
+    "drivenBy": "آخر سبب: {{ingredient}} (تغيّر التكلفة {{pct}}٪)",
+    "coverage": "{{withoutTarget}} وصفة بلا هدف محدد و{{missingCostData}} يتعذّر حساب تكلفتها بعد، لذلك لا يتم تقييمها هنا."
   }
 }

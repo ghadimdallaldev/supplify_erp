@@ -12,6 +12,7 @@
     "statusAll": "All",
     "statusActive": "Active",
     "statusInactive": "Inactive",
+    "statusScheduled": "Scheduled",
     "statusExpired": "Expired",
     "empty": "No contract prices match your filters.",
     "catalog": "Catalog",

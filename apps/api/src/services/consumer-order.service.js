@@ -1,10 +1,14 @@
 import { query, withTransaction } from '../lib/db.js'
 import {
+  consumerLoyaltyEarnBasis,
   earnConsumerLoyaltyOnOrderComplete,
   redeemConsumerLoyaltyAtCheckout,
+  reverseConsumerLoyaltyOnOrderCancel,
   validateConsumerLoyaltyRedeem,
 } from './loyalty.service.js'
 import { validateConsumerOrderSchedule } from '../lib/consumer-ordering-hours.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
+import { addCalendarDays, getZonedParts } from '../lib/delivery-rollover-time.js'
 
 export const CONSUMER_ORDER_STATUS_CHAIN = Object.freeze([
   'RECEIVED',
@@ -23,16 +27,64 @@ export function getNextStatus(current) {
   return null
 }
 
+export function getConsumerOrderStatusError(current, next) {
+  if (current === next) return null
+  if (current === 'CANCELLED') return 'Order is already cancelled'
+  if (current === 'DELIVERED') return 'A delivered order cannot be cancelled'
+  if (next === 'CANCELLED') return null
+  const expectedNext = getNextStatus(current)
+  if (expectedNext !== next) {
+    return expectedNext
+      ? `Invalid status transition from ${current} to ${next}; expected ${expectedNext}`
+      : `Order is already in terminal status ${current}`
+  }
+  return null
+}
+
 function roundMoney(value) {
   return Math.round(Number(value) * 100) / 100
 }
 
-async function loadItemPricing(itemIds) {
+function nonNegativeFee(value) {
+  const fee = Number(value)
+  if (!Number.isFinite(fee) || fee < 0) return 0
+  return fee
+}
+
+/** Branch minimum, or the higher of the branch and delivery-zone minimums. */
+export function requiredOrderMinimum(config, zone) {
+  const branchMin = Number(config?.min_order_amount ?? 0)
+  const zoneMin = zone ? Number(zone.min_order_amount ?? 0) : 0
+  return Math.max(
+    0,
+    Number.isFinite(branchMin) ? branchMin : 0,
+    Number.isFinite(zoneMin) ? zoneMin : 0
+  )
+}
+
+export function minimumOrderError(subtotal, minimum) {
+  if (!(minimum > 0) || Number(subtotal) >= minimum) return null
+  return Object.assign(new Error('Order below minimum'), {
+    name: 'MIN_ORDER_NOT_MET',
+    details: { minOrderAmount: minimum },
+  })
+}
+
+async function loadItemPricing(itemIds, restaurantId, branchId) {
   if (!itemIds.length) return { items: {}, groups: {}, options: {} }
 
   const { rows: items } = await query(
-    `SELECT id, name, base_price, is_available FROM menu_item WHERE id = ANY($1::uuid[])`,
-    [itemIds]
+    `
+    SELECT i.id, i.name, i.base_price, i.is_available
+    FROM menu_item i
+    JOIN menu_category c ON c.id = i.category_id AND c.restaurant_id = i.restaurant_id
+    WHERE i.id = ANY($1::uuid[])
+      AND i.restaurant_id = $2
+      AND c.is_active = TRUE
+      AND (i.branch_id IS NULL OR i.branch_id = $3)
+      AND (c.branch_id IS NULL OR c.branch_id = $3)
+    `,
+    [itemIds, restaurantId, branchId]
   )
 
   const { rows: groups } = await query(
@@ -129,6 +181,9 @@ function validateAndPriceLine(line, pricing) {
   }
 
   const unitPrice = roundMoney(Number(item.base_price) + modifierTotal)
+  if (unitPrice < 0) {
+    throw Object.assign(new Error('Item price cannot be negative'), { name: 'INVALID_PRICE' })
+  }
   const quantity = Number(line.quantity)
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw Object.assign(new Error('Invalid quantity'), { name: 'INVALID_QUANTITY' })
@@ -153,6 +208,8 @@ async function resolveDeliveryFee(branchId, fulfillmentType, subtotal, deliveryZ
   const config = configs[0]
 
   if (fulfillmentType !== 'DELIVERY') {
+    const belowMinimum = minimumOrderError(subtotal, requiredOrderMinimum(config, null))
+    if (belowMinimum) throw belowMinimum
     return { deliveryFee: 0, config }
   }
 
@@ -165,23 +222,14 @@ async function resolveDeliveryFee(branchId, fulfillmentType, subtotal, deliveryZ
     if (!zone) {
       throw Object.assign(new Error('Delivery zone not found'), { name: 'DELIVERY_ZONE_NOT_FOUND' })
     }
-    if (subtotal < Number(zone.min_order_amount)) {
-      throw Object.assign(new Error('Order below delivery zone minimum'), {
-        name: 'MIN_ORDER_NOT_MET',
-        details: { minOrderAmount: Number(zone.min_order_amount) },
-      })
-    }
-    return { deliveryFee: Number(zone.delivery_fee), config, zone }
+    const zoneMinimum = minimumOrderError(subtotal, requiredOrderMinimum(config, zone))
+    if (zoneMinimum) throw zoneMinimum
+    return { deliveryFee: nonNegativeFee(zone.delivery_fee), config, zone }
   }
 
-  const fee = Number(config?.delivery_fee ?? 0)
-  const minOrder = Number(config?.min_order_amount ?? 0)
-  if (subtotal < minOrder) {
-    throw Object.assign(new Error('Order below minimum'), {
-      name: 'MIN_ORDER_NOT_MET',
-      details: { minOrderAmount: minOrder },
-    })
-  }
+  const fee = nonNegativeFee(config?.delivery_fee)
+  const belowMinimum = minimumOrderError(subtotal, requiredOrderMinimum(config, null))
+  if (belowMinimum) throw belowMinimum
   return { deliveryFee: fee, config }
 }
 
@@ -201,19 +249,36 @@ function assertFulfillmentAllowed(fulfillmentType, config) {
   }
 }
 
-async function nextOrderNumber(restaurantId, client) {
+export function consumerTicketDay(now, timeZone) {
+  const parts = getZonedParts(now instanceof Date ? now : new Date(now), timeZone)
+  const calendarDate =
+    parts.hour === 24 ? addCalendarDays(parts.calendarDate, 1) : parts.calendarDate
+  return calendarDate.replace(/-/g, '')
+}
+
+export function nextConsumerOrderNumber(existingNumber, day) {
+  const prefix = `CO-${day}-`
+  const raw = existingNumber ? String(existingNumber) : ''
+  const seq = raw.startsWith(prefix) ? Number(raw.slice(prefix.length)) : 0
+  const next = Number.isFinite(seq) && seq > 0 ? seq + 1 : 1
+  return `${prefix}${String(next).padStart(4, '0')}`
+}
+
+async function nextOrderNumber(restaurantId, client, timeZone) {
+  await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [restaurantId])
+  const day = consumerTicketDay(new Date(), timeZone)
+  const prefix = `CO-${day}-`
   const { rows } = await client.query(
     `
-    SELECT COUNT(*)::int AS count
+    SELECT order_number
     FROM consumer_order
-    WHERE restaurant_id = $1
-      AND created_at >= date_trunc('day', now())
+    WHERE restaurant_id = $1 AND order_number LIKE $2
+    ORDER BY length(order_number) DESC, order_number DESC
+    LIMIT 1
     `,
-    [restaurantId]
+    [restaurantId, `${prefix}%`]
   )
-  const seq = (rows[0]?.count ?? 0) + 1
-  const day = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  return `CO-${day}-${String(seq).padStart(4, '0')}`
+  return nextConsumerOrderNumber(rows[0]?.order_number, day)
 }
 
 export async function createConsumerOrder(restaurantId, payload) {
@@ -245,7 +310,7 @@ export async function createConsumerOrder(restaurantId, payload) {
   }
 
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))]
-  const pricing = await loadItemPricing(itemIds)
+  const pricing = await loadItemPricing(itemIds, restaurantId, branchId)
   const pricedLines = lines.map((line) => validateAndPriceLine(line, pricing))
   const subtotal = roundMoney(pricedLines.reduce((sum, line) => sum + line.lineTotal, 0))
 
@@ -257,7 +322,8 @@ export async function createConsumerOrder(restaurantId, payload) {
   )
   assertFulfillmentAllowed(fulfillmentType, config)
 
-  validateConsumerOrderSchedule(config, scheduledFor || null)
+  const timeZone = await getRestaurantTimezone(restaurantId)
+  validateConsumerOrderSchedule(config, scheduledFor || null, new Date(), 'en', timeZone)
 
   if (fulfillmentType === 'DELIVERY' && !deliveryAddress) {
     throw Object.assign(new Error('Delivery address required'), {
@@ -292,7 +358,44 @@ export async function createConsumerOrder(restaurantId, payload) {
   return withTransaction(async (client) => {
     const consumerMemberId = authMemberId || null
 
-    const orderNumber = await nextOrderNumber(restaurantId, client)
+    const orderNumber = await nextOrderNumber(restaurantId, client, timeZone)
+
+    const { rows: lockedItems } = await client.query(
+      `
+      SELECT id, is_available
+      FROM menu_item
+      WHERE id = ANY($1::uuid[]) AND restaurant_id = $2
+      FOR UPDATE
+      `,
+      [itemIds, restaurantId]
+    )
+    const availableIds = new Set(lockedItems.filter((row) => row.is_available).map((row) => row.id))
+    if (pricedLines.some((line) => !availableIds.has(line.menuItemId))) {
+      throw Object.assign(new Error('Menu item unavailable'), { name: 'MENU_ITEM_UNAVAILABLE' })
+    }
+
+    const optionIds = [
+      ...new Set(lines.flatMap((line) => line.modifierOptionIds || []).filter(Boolean)),
+    ]
+    if (optionIds.length) {
+      const { rows: lockedOptions } = await client.query(
+        `
+        SELECT id, is_available
+        FROM menu_modifier_option
+        WHERE id = ANY($1::uuid[])
+        FOR UPDATE
+        `,
+        [optionIds]
+      )
+      const availableOptions = new Set(
+        lockedOptions.filter((row) => row.is_available).map((row) => row.id)
+      )
+      if (optionIds.some((id) => !availableOptions.has(id))) {
+        throw Object.assign(new Error('Modifier option unavailable'), {
+          name: 'MODIFIER_UNAVAILABLE',
+        })
+      }
+    }
 
     const { rows: orders } = await client.query(
       `
@@ -382,7 +485,7 @@ export async function getOrderReceipt(receiptToken) {
     SELECT o.*, r.name AS restaurant_name, r.slug AS restaurant_slug, b.name AS branch_name
     FROM consumer_order o
     JOIN restaurant r ON r.id = o.restaurant_id
-    JOIN branch b ON b.id = o.branch_id
+    JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     WHERE o.receipt_token = $1
     `,
     [receiptToken]
@@ -450,7 +553,7 @@ export async function trackConsumerOrder(restaurantId, { orderNumber, email, pho
     SELECT o.*, r.name AS restaurant_name, r.slug AS restaurant_slug, b.name AS branch_name
     FROM consumer_order o
     JOIN restaurant r ON r.id = o.restaurant_id
-    JOIN branch b ON b.id = o.branch_id
+    JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     WHERE o.restaurant_id = $1
       AND o.order_number = $2
       AND (${contactFilters.join(' OR ')})
@@ -530,62 +633,63 @@ export async function listRestaurantConsumerOrders(
 }
 
 export async function updateConsumerOrderStatus(orderId, restaurantId, status, changedBy, notes) {
-  const { rows: existing } = await query(
-    `SELECT * FROM consumer_order WHERE id = $1 AND restaurant_id = $2`,
-    [orderId, restaurantId]
-  )
-  if (!existing.length) {
-    throw Object.assign(new Error('Order not found'), { name: 'ORDER_NOT_FOUND' })
-  }
-
-  const current = existing[0].status
-  if (status !== 'CANCELLED' && status !== current) {
-    const expectedNext = getNextStatus(current)
-    if (expectedNext !== status) {
-      throw Object.assign(
-        new Error(
-          expectedNext
-            ? `Invalid status transition from ${current} to ${status}; expected ${expectedNext}`
-            : `Order is already in terminal status ${current}`
-        ),
-        { name: 'INVALID_STATUS_TRANSITION' }
-      )
+  return withTransaction(async (client) => {
+    const { rows: existing } = await client.query(
+      `SELECT * FROM consumer_order WHERE id = $1 AND restaurant_id = $2 FOR UPDATE`,
+      [orderId, restaurantId]
+    )
+    if (!existing.length) {
+      throw Object.assign(new Error('Order not found'), { name: 'ORDER_NOT_FOUND' })
     }
-  }
 
-  const { rows } = await query(
-    `
-    UPDATE consumer_order
-    SET status = $1, updated_at = now()
-    WHERE id = $2
-    RETURNING *
-    `,
-    [status, orderId]
-  )
+    const current = existing[0].status
+    if (current === status) return existing[0]
+    const transitionError = getConsumerOrderStatusError(current, status)
+    if (transitionError) {
+      throw Object.assign(new Error(transitionError), { name: 'INVALID_STATUS_TRANSITION' })
+    }
 
-  await query(
-    `
-    INSERT INTO consumer_order_status_history (order_id, status, changed_by, notes)
-    VALUES ($1, $2, $3, $4)
-    `,
-    [orderId, status, changedBy || null, notes || null]
-  )
+    const { rows } = await client.query(
+      `
+      UPDATE consumer_order
+      SET status = $1, updated_at = now()
+      WHERE id = $2
+      RETURNING *
+      `,
+      [status, orderId]
+    )
 
-  const order = rows[0]
-  if (status === 'DELIVERED' && order.consumer_member_id) {
-    try {
-      const earnSubtotal = Number(order.subtotal) - Number(order.loyalty_discount_amount || 0)
-      await earnConsumerLoyaltyOnOrderComplete(null, {
+    await client.query(
+      `
+      INSERT INTO consumer_order_status_history (order_id, status, changed_by, notes)
+      VALUES ($1, $2, $3, $4)
+      `,
+      [orderId, status, changedBy || null, notes || null]
+    )
+
+    const order = rows[0]
+    if (status === 'CANCELLED' && order.consumer_member_id) {
+      await reverseConsumerLoyaltyOnOrderCancel(client, {
         restaurantId,
         memberId: order.consumer_member_id,
         consumerOrderId: orderId,
-        spendAmount: earnSubtotal,
-        fulfillmentType: order.fulfillment_type,
       })
-    } catch (err) {
-      // non-blocking loyalty earn
     }
-  }
+    if (status === 'DELIVERED' && order.consumer_member_id) {
+      try {
+        const earnSubtotal = consumerLoyaltyEarnBasis(order.subtotal, order.loyalty_discount_amount)
+        await earnConsumerLoyaltyOnOrderComplete(client, {
+          restaurantId,
+          memberId: order.consumer_member_id,
+          consumerOrderId: orderId,
+          spendAmount: earnSubtotal,
+          fulfillmentType: order.fulfillment_type,
+        })
+      } catch {
+        // Points earn must not block the kitchen from completing the ticket.
+      }
+    }
 
-  return order
+    return order
+  })
 }

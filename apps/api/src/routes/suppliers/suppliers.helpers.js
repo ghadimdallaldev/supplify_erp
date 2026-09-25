@@ -106,6 +106,8 @@ export const supplierCreateSchema = z.object({
 })
 
 export const supplierUpdateSchema = supplierCreateSchema.partial().extend({
+  legalName: z.string().max(200).optional(),
+  tradeLicenseNo: z.string().max(50).optional(),
   publicCatalogEnabled: z.boolean().optional(),
   salesContactEmail: z.string().email().optional().nullable(),
   salesContactPhone: z.string().max(20).optional().nullable(),

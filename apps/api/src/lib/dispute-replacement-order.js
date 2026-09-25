@@ -38,7 +38,7 @@ export function computeReplacementQuantity(disputeItem) {
  * @param {Map<string, Record<string, unknown>>} orderItemsById
  */
 export function buildReplacementLineItems(disputeItems, orderItemsById) {
-  const lines = []
+  const grouped = new Map()
 
   for (const disputeItem of disputeItems) {
     const replacementQty = computeReplacementQuantity(disputeItem)
@@ -46,22 +46,39 @@ export function buildReplacementLineItems(disputeItems, orderItemsById) {
 
     const orderItemId = String(disputeItem.order_item_id ?? disputeItem.orderItemId ?? '')
     const orderItem = orderItemId ? orderItemsById.get(orderItemId) : null
+    if (!orderItem?.product_id) continue
 
-    if (!orderItem?.product_id) {
-      continue
+    const key = String(orderItem.id)
+    const current = grouped.get(key) ?? {
+      orderItem,
+      quantity: 0,
+      notes: null,
+      productName: disputeItem.product_name || disputeItem.productName || null,
     }
+    current.quantity += replacementQty
+    current.notes =
+      current.notes || disputeItem.issue_description || disputeItem.issueDescription || null
+    grouped.set(key, current)
+  }
 
-    const originalUnitPrice = toNumber(orderItem.unit_price) ?? 0
-
+  const lines = []
+  for (const current of grouped.values()) {
+    const orderedCap = toNumber(current.orderItem.quantity)
+    const quantity =
+      orderedCap != null && orderedCap >= 0
+        ? Math.min(current.quantity, orderedCap)
+        : current.quantity
+    if (quantity <= 0) continue
     lines.push({
-      productId: orderItem.product_id,
-      supplierId: orderItem.supplier_id,
-      quantity: replacementQty,
-      originalUnitPrice,
-      sourceOrderItemId: orderItem.id,
-      productName: orderItem.product_name || disputeItem.product_name || disputeItem.productName,
-      productSku: orderItem.product_sku,
-      notes: disputeItem.issue_description || disputeItem.issueDescription || null,
+      productId: current.orderItem.product_id,
+      supplierId: current.orderItem.supplier_id,
+      quantity,
+      originalUnitPrice: toNumber(current.orderItem.unit_price) ?? 0,
+      sourceOrderItemId: current.orderItem.id,
+      productName:
+        current.orderItem.product_name || current.orderItem.productName || current.productName,
+      productSku: current.orderItem.product_sku,
+      notes: current.notes,
     })
   }
 
@@ -137,10 +154,16 @@ export async function createReplacementOrderFromDispute(
       placement_source,
       source_order_id,
       source_dispute_id,
-      notes
+      notes,
+      supplier_organization_id,
+      delivery_location_snapshot,
+      requested_delivery_method,
+      requested_delivery_time,
+      requested_delivery_date
     ) VALUES (
       $1, $2, COALESCE($3, 'USD'), 'PLACED', 0, now(),
-      $4, $5, $6, $7
+      $4, $5, $6, $7,
+      $8, $9::jsonb, $10, $11, $12
     )
     RETURNING id
     `,
@@ -152,6 +175,13 @@ export async function createReplacementOrderFromDispute(
       originalOrderId,
       disputeId,
       notes,
+      originalOrder?.supplier_organization_id ?? null,
+      originalOrder?.delivery_location_snapshot
+        ? JSON.stringify(originalOrder.delivery_location_snapshot)
+        : null,
+      originalOrder?.requested_delivery_method ?? null,
+      originalOrder?.requested_delivery_time ?? null,
+      originalOrder?.requested_delivery_date ?? null,
     ]
   )
 

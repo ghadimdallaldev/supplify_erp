@@ -534,6 +534,7 @@ export function ProductsPage() {
                 isRestaurant={isRestaurant}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
+                canAdjustStock={isSupplier && can('INVENTORY_EDIT')}
                 onAdjustStock={(product) => {
                   setSelectedProductForAdjustment(product)
                   setShowInventoryAdjustment(true)

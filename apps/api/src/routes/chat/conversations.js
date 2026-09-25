@@ -22,6 +22,7 @@ import {
 import { z } from 'zod'
 import { notifyMessageReceived } from '../../services/notification.service.js'
 import { assertChatAttachmentUrl } from '../../lib/sanitize-upload.js'
+import { assertCleanUploadOwnership } from '../../services/storage/upload-security.service.js'
 import {
   getOrCreateConversation,
   userCanAccessConversation,
@@ -203,7 +204,7 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
 
     const conversation = conversations[0]
 
-    if (role !== 'ADMIN' && !(await userCanAccessConversation(req, conversation))) {
+    if (!(await userCanAccessConversation(req, conversation))) {
       return res.status(403).json({
         ok: false,
         data: null,
@@ -243,7 +244,7 @@ router.delete('/conversations/:conversationId', requireAuth, async (req, res) =>
     }
 
     // Admins can optionally hard-delete the conversation (including messages) by passing ?hard=true
-    if (role === 'ADMIN' && req.query.hard === 'true') {
+    if (role === 'ADMIN' && req.query.hard === 'true' && conversation.is_admin_conversation) {
       await query(`DELETE FROM conversation WHERE id = $1`, [conversationId])
     }
 
@@ -449,7 +450,13 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
     if (messageIds.length > 0) {
       const { rows: attRows } = await query(
         `
-        SELECT * FROM message_attachment
+        SELECT id, message_id,
+               file_url AS "fileUrl",
+               file_type AS "fileType",
+               file_name AS "fileName",
+               file_size AS "fileSize",
+               created_at AS "createdAt"
+        FROM message_attachment
         WHERE message_id = ANY($1)
       `,
         [messageIds]
@@ -546,7 +553,12 @@ router.post(
 
       if (messageData.attachments?.length) {
         for (const attachment of messageData.attachments) {
-          assertChatAttachmentUrl(attachment.fileUrl, req.userData.id)
+          const fileKey = assertChatAttachmentUrl(attachment.fileUrl, req.userData.id)
+          await assertCleanUploadOwnership(fileKey, {
+            userId: req.userData.id,
+            tenantId: tenantId || null,
+            tenantType: tenantId ? tenantType : null,
+          })
         }
       }
 
@@ -756,6 +768,17 @@ router.post(
             name: 'VALIDATION_ERROR',
             message: 'Invalid message data',
             details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError || error?.name === 'UPLOAD_NOT_CLEAN') {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: error.name || 'VALIDATION_ERROR',
+            message: error.message || 'Invalid attachment',
           },
           requestId: req.requestId,
         })

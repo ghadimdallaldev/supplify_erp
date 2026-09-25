@@ -264,7 +264,7 @@ export async function explainReorderSuggestions(restaurantId, opts) {
   }
 
   // Reserve a plan-usage unit up front to avoid races; refund if the call fails.
-  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1, opts.userId)
   if (!usage.allowed) {
     return { ...heuristicResult(), ...quotaLimitedDetails(usage) }
   }
@@ -376,7 +376,7 @@ export async function parseReorderIntent(restaurantId, opts) {
 
   // Reserve a plan-usage unit up front; on limit fall back to heuristics
   // (symmetric with explain — no hard error).
-  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1, opts.userId)
   if (!usage.allowed) {
     return { ...keywordFallback(true), ...quotaLimitedDetails(usage) }
   }
@@ -547,7 +547,7 @@ export async function generateReorderRecommendations(contexts, opts) {
     }
   }
 
-  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1)
+  const usage = await reserveAiUsage(restaurantId, 'RESTAURANT', 1, opts.userId)
   if (!usage.allowed) {
     return {
       recommendations: [

@@ -3,6 +3,8 @@ import { ConflictError, NotFoundError, ValidationError } from '../middlewares/er
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { escapeCsvField } from '../lib/sanitize-upload.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
+import { getZonedParts } from '../lib/delivery-rollover-time.js'
 
 const VALID_STATUS_TRANSITIONS = {
   DRAFT: new Set(['ISSUED', 'VOID']),
@@ -19,6 +21,63 @@ function roundMoney(value) {
   const n = Number(value)
   if (!Number.isFinite(n)) return 0
   return Math.round(n * 10 ** MONEY_SCALE) / 10 ** MONEY_SCALE
+}
+
+function invoiceCalendarDate(value) {
+  const formatted = formatInvoiceCalendarDate(value)
+  if (!formatted) throw new ValidationError('Invalid invoice date')
+  return formatted
+}
+
+/** Calendar day for a DATE column. A date-only string stays literal. */
+export function formatInvoiceCalendarDate(value) {
+  if (value == null || value === '') return null
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value.trim()
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+const INVOICE_CALENDAR_FIELDS = ['invoice_date', 'due_date', 'issue_date', 'payment_date']
+
+/** Days past due on the restaurant's calendar. Zero when the balance is clear or the due day has not ended there. */
+export function overdueDaysOnRestaurantCalendar(invoice, now = new Date()) {
+  if (!invoice) return 0
+  if (!['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(invoice.status)) return 0
+  if (!(Number(invoice.balance_due) > 0)) return 0
+  const dueKey = formatInvoiceCalendarDate(invoice.due_date)
+  if (!dueKey) return 0
+  const zone = String(invoice.restaurant_timezone || '').trim() || getDefaultTenantTimezone()
+  let todayKey
+  try {
+    todayKey = getZonedParts(now, zone).calendarDate
+  } catch {
+    todayKey = getZonedParts(now, getDefaultTenantTimezone()).calendarDate
+  }
+  if (dueKey >= todayKey) return 0
+  const due = Date.parse(`${dueKey}T00:00:00Z`)
+  const today = Date.parse(`${todayKey}T00:00:00Z`)
+  return Math.round((today - due) / 86400000)
+}
+
+export function withInvoiceCalendarDates(row, fields = INVOICE_CALENDAR_FIELDS) {
+  if (!row || typeof row !== 'object') return row
+  const next = { ...row }
+  for (const field of fields) {
+    if (next[field] == null || next[field] === '') continue
+    const formatted = formatInvoiceCalendarDate(next[field])
+    if (formatted) next[field] = formatted
+  }
+  return next
+}
+
+function normalizeInvoiceCurrency(value) {
+  const currency = String(value || 'USD')
+    .trim()
+    .toUpperCase()
+  return /^[A-Z]{3}$/.test(currency) ? currency : 'USD'
 }
 
 export function computeRemainingBalance(invoice, totalPaid) {
@@ -67,15 +126,22 @@ export async function assertNoDuplicateInvoice(client, { orderId, supplierId }) 
 export async function getSupplierTaxConfig(client, supplierId) {
   const { rows } = await client.query(
     `
-    SELECT tax_rate, tax_type, tax_name
-    FROM tax_config
-    WHERE supplier_id = $1 AND is_active = true
-      AND effective_from <= CURRENT_DATE
-      AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
-    ORDER BY effective_from DESC
+    WITH supplier_today AS (
+      SELECT (now() AT TIME ZONE COALESCE(
+        (SELECT NULLIF(TRIM(last_order_timezone), '') FROM supplier WHERE id = $1),
+        $2
+      ))::date AS today
+    )
+    SELECT tc.tax_rate, tc.tax_type, tc.tax_name
+    FROM tax_config tc
+    CROSS JOIN supplier_today st
+    WHERE tc.supplier_id = $1 AND tc.is_active = true
+      AND tc.effective_from <= st.today
+      AND (tc.effective_to IS NULL OR tc.effective_to >= st.today)
+    ORDER BY tc.effective_from DESC
     LIMIT 1
     `,
-    [supplierId]
+    [supplierId, getDefaultTenantTimezone()]
   )
   if (rows.length === 0) {
     return { tax_rate: 0, tax_type: 'SALES_TAX', tax_name: 'Tax' }
@@ -83,15 +149,46 @@ export async function getSupplierTaxConfig(client, supplierId) {
   return rows[0]
 }
 
+/** Days until an invoice is due. Unrecognised terms stay on Net 30. */
+export function paymentTermsToDays(terms) {
+  const text = String(terms || '').trim()
+  const netMatch = /net\s*(\d+)/i.exec(text)
+  if (netMatch) return parseInt(netMatch[1], 10)
+  if (
+    /\bcod\b/i.test(text) ||
+    /cash\s*on\s*delivery/i.test(text) ||
+    /due\s*(on|upon)\s*receipt/i.test(text) ||
+    /\bimmediate\b/i.test(text) ||
+    /\bprepaid\b/i.test(text) ||
+    text.includes('الدفع عند التسليم') ||
+    text.includes('عند الاستلام')
+  ) {
+    return 0
+  }
+  return 30
+}
+
 export async function getSupplierPaymentTermsDays(client, supplierId) {
   const { rows } = await client.query(`SELECT payment_terms FROM supplier WHERE id = $1 LIMIT 1`, [
     supplierId,
   ])
-  const terms = rows[0]?.payment_terms || ''
-  const netMatch = /net\s*(\d+)/i.exec(terms)
-  if (netMatch) return parseInt(netMatch[1], 10)
-  if (/cod/i.test(terms)) return 0
-  return 30
+  return paymentTermsToDays(rows[0]?.payment_terms || '')
+}
+
+const NON_PAYABLE_INVOICE_STATUSES = new Set(['VOID', 'DRAFT'])
+
+export function assertCreditApplication({ creditAmount, creditNoteId }) {
+  const amount = roundMoney(creditAmount || 0)
+  if (amount > 0 && !creditNoteId) {
+    throw new ValidationError('A credit note is required to apply credit')
+  }
+}
+
+export function assertInvoiceAcceptsPayment(invoice) {
+  if (!invoice) throw new NotFoundError('Invoice not found')
+  if (NON_PAYABLE_INVOICE_STATUSES.has(invoice.status)) {
+    throw new ValidationError(`Cannot record a payment on a ${invoice.status} invoice`)
+  }
 }
 
 export async function getOrderAdjustments(client, orderId) {
@@ -161,6 +258,37 @@ export function prorateOrderDiscount(orderDiscount, receivedSubtotal, orderSubto
   return roundMoney(discount * (received / ordered))
 }
 
+/** Share of an order-wide promotion that belongs to one supplier's lines. */
+export function supplierShareOfDiscount(fullDiscount, supplierSubtotal, orderSubtotal) {
+  return prorateOrderDiscount(fullDiscount, supplierSubtotal, orderSubtotal)
+}
+
+export async function getAcceptedOrderedValue(client, reportId) {
+  const { rows } = await client.query(
+    `
+    SELECT COALESCE(SUM(rli.received_quantity * rli.expected_unit_price), 0)::numeric AS ordered_value
+    FROM receiving_line_item rli
+    WHERE rli.receiving_report_id = $1
+      AND rli.quality_status = 'ACCEPTED'
+      AND rli.received_quantity > 0
+    `,
+    [reportId]
+  )
+  return roundMoney(rows[0]?.ordered_value || 0)
+}
+
+export async function getOrderSubtotal(client, orderId) {
+  const { rows } = await client.query(
+    `
+    SELECT COALESCE(SUM(oi.line_total), 0)::numeric AS subtotal
+    FROM order_item oi
+    WHERE oi.order_id = $1
+    `,
+    [orderId]
+  )
+  return roundMoney(rows[0]?.subtotal || 0)
+}
+
 export async function getOrderSubtotalForSupplier(client, orderId, supplierId) {
   const { rows } = await client.query(
     `
@@ -175,16 +303,20 @@ export async function getOrderSubtotalForSupplier(client, orderId, supplierId) {
 
 export function calculateInvoiceTotals(
   lineItems,
-  { taxRate = 0, orderDiscount = 0, deliveryFee = 0 } = {}
+  { taxRate = 0, orderDiscount = 0, deliveryFee = 0, taxIncluded = false } = {}
 ) {
   const itemsSubtotal = roundMoney(
     lineItems.reduce((sum, line) => sum + roundMoney(line.line_total), 0)
   )
   const discount = roundMoney(Math.min(orderDiscount, itemsSubtotal))
   const fee = roundMoney(deliveryFee)
-  const subtotal = roundMoney(itemsSubtotal - discount + fee)
-  const taxAmount = roundMoney((subtotal * taxRate) / 100)
-  const totalAmount = roundMoney(subtotal + taxAmount)
+  const charged = roundMoney(itemsSubtotal - discount + fee)
+  const taxAmount =
+    taxIncluded && taxRate > 0
+      ? roundMoney((charged * taxRate) / (100 + taxRate))
+      : roundMoney((charged * taxRate) / 100)
+  const subtotal = taxIncluded ? roundMoney(charged - taxAmount) : charged
+  const totalAmount = taxIncluded ? charged : roundMoney(subtotal + taxAmount)
 
   const extraLines = []
   if (discount > 0) {
@@ -224,9 +356,20 @@ export function calculateInvoiceTotals(
   }
 }
 
-async function insertInvoiceLineItems(client, invoiceId, lineItems, taxRate) {
+async function insertInvoiceLineItems(
+  client,
+  invoiceId,
+  lineItems,
+  taxRate,
+  { taxIncluded = false } = {}
+) {
   for (const it of lineItems) {
-    const lineTax = roundMoney((it.line_total * taxRate) / 100)
+    const lineTax =
+      it.tax_amount != null
+        ? it.tax_amount
+        : taxIncluded && taxRate > 0
+          ? roundMoney((it.line_total * taxRate) / (100 + taxRate))
+          : roundMoney((it.line_total * taxRate) / 100)
     await client.query(
       `
       INSERT INTO invoice_line_item (
@@ -265,11 +408,21 @@ export async function createInvoiceFromReceiving(
   const taxConfig = await getSupplierTaxConfig(client, supplierId)
   const taxRate = parseFloat(taxConfig.tax_rate || 0)
   const { orderDiscount: fullOrderDiscount } = await getOrderAdjustments(client, order.id)
-  const receivedSubtotal = roundMoney(
-    lineItems.reduce((sum, line) => sum + roundMoney(line.line_total), 0)
+  // Discount share follows ordered prices and accepted quantity. The billed
+  // unit price can differ and must not enlarge or shrink the promotion.
+  const acceptedOrderedValue = await getAcceptedOrderedValue(client, report.id)
+  const supplierSubtotal = await getOrderSubtotalForSupplier(client, order.id, supplierId)
+  const orderSubtotal = await getOrderSubtotal(client, order.id)
+  const supplierDiscount = supplierShareOfDiscount(
+    fullOrderDiscount,
+    supplierSubtotal,
+    orderSubtotal
   )
-  const orderSubtotal = await getOrderSubtotalForSupplier(client, order.id, supplierId)
-  const orderDiscount = prorateOrderDiscount(fullOrderDiscount, receivedSubtotal, orderSubtotal)
+  const orderDiscount = prorateOrderDiscount(
+    supplierDiscount,
+    acceptedOrderedValue,
+    supplierSubtotal
+  )
   const paymentTermsDays = await getSupplierPaymentTermsDays(client, supplierId)
 
   const totals = calculateInvoiceTotals(lineItems, { taxRate, orderDiscount })
@@ -325,6 +478,21 @@ export async function createInvoiceFromReceiving(
 
 export async function createInvoiceManual(client, { invoiceData, supplierId, orderItems, userId }) {
   if (invoiceData.order_id) {
+    const { rows: orders } = await client.query(
+      `SELECT restaurant_id FROM customer_order WHERE id = $1 FOR KEY SHARE`,
+      [invoiceData.order_id]
+    )
+    if (!orders.length || orders[0].restaurant_id !== invoiceData.restaurant_id) {
+      throw new ValidationError('Invoice restaurant must match the selected order')
+    }
+    const { rows: supplierItems } = await client.query(
+      `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+      [invoiceData.order_id, supplierId]
+    )
+    if (!supplierItems.length || !orderItems.length) {
+      throw new ValidationError('The selected order has no invoiceable items for this supplier')
+    }
+
     await assertNoDuplicateInvoice(client, {
       orderId: invoiceData.order_id,
       supplierId,
@@ -332,6 +500,7 @@ export async function createInvoiceManual(client, { invoiceData, supplierId, ord
   }
 
   const taxRate = parseFloat(invoiceData.tax_rate || 0)
+  const taxIncluded = invoiceData.tax_included === true
   const lineItems = orderItems.map((item) => {
     const quantity = parseFloat(item.quantity || 0)
     const unitPrice = parseFloat(item.unit_price || 0)
@@ -347,17 +516,24 @@ export async function createInvoiceManual(client, { invoiceData, supplierId, ord
     }
   })
 
-  const totals = calculateInvoiceTotals(lineItems, { taxRate })
+  const totals = calculateInvoiceTotals(lineItems, { taxRate, taxIncluded })
+  if (!lineItems.length || totals.totalAmount <= 0) {
+    throw new ValidationError('Invoice total must be greater than zero')
+  }
   const invoiceNumber = await generateInvoiceNumber(client, supplierId)
-  const dueDate = new Date(invoiceData.due_date)
+  const dueDate = invoiceCalendarDate(invoiceData.due_date)
+  const invoiceDate = invoiceCalendarDate(new Date())
   const paymentTermsDays = invoiceData.payment_terms_days ?? 30
 
   let branchId = null
+  let currency = normalizeInvoiceCurrency(invoiceData.currency)
   if (invoiceData.order_id) {
-    const { rows } = await client.query(`SELECT branch_id FROM customer_order WHERE id = $1`, [
-      invoiceData.order_id,
-    ])
+    const { rows } = await client.query(
+      `SELECT branch_id, currency FROM customer_order WHERE id = $1`,
+      [invoiceData.order_id]
+    )
     branchId = rows[0]?.branch_id || null
+    if (!invoiceData.currency) currency = normalizeInvoiceCurrency(rows[0]?.currency)
   }
 
   const { rows: invoice } = await client.query(
@@ -377,24 +553,24 @@ export async function createInvoiceManual(client, { invoiceData, supplierId, ord
       invoiceData.restaurant_id,
       invoiceData.order_id || null,
       branchId,
-      new Date(),
+      invoiceDate,
       dueDate,
-      new Date(),
+      invoiceDate,
       totals.subtotal,
       totals.taxAmount,
       totals.totalAmount,
       totals.totalAmount,
       'ISSUED',
-      'USD',
+      currency,
       taxRate,
-      invoiceData.tax_included ?? false,
+      taxIncluded,
       paymentTermsDays,
       invoiceData.notes || null,
       userId,
     ]
   )
 
-  await insertInvoiceLineItems(client, invoice[0].id, lineItems, taxRate)
+  await insertInvoiceLineItems(client, invoice[0].id, lineItems, taxRate, { taxIncluded })
   return invoice[0]
 }
 
@@ -427,6 +603,7 @@ const INVOICE_DETAIL_SELECT = `
   SELECT
     i.*,
     r.name AS restaurant_name,
+    r.timezone AS restaurant_timezone,
     r.contact_name AS restaurant_contact,
     r.email AS restaurant_email,
     r.phone AS restaurant_phone,
@@ -442,7 +619,7 @@ const INVOICE_DETAIL_SELECT = `
   FROM invoice i
   LEFT JOIN restaurant r ON r.id = i.restaurant_id
   LEFT JOIN supplier s ON s.id = i.supplier_id
-  LEFT JOIN branch b ON b.id = i.branch_id
+  LEFT JOIN branch b ON b.id = i.branch_id AND b.tenant_id = i.restaurant_id
   LEFT JOIN customer_order o ON o.id = i.order_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(payment_amount) FILTER (WHERE status = 'COMPLETED'), 0) AS total_paid
@@ -477,6 +654,7 @@ export async function getInvoiceDetail(
 
   const invoice = rows[0]
   invoice.remaining_balance = computeRemainingBalance(invoice, invoice.total_paid)
+  invoice.days_overdue = overdueDaysOnRestaurantCalendar(invoice)
 
   const { rows: lineItems } = await query(
     `SELECT * FROM invoice_line_item WHERE invoice_id = $1 ORDER BY created_at`,
@@ -509,7 +687,16 @@ export async function getInvoiceDetail(
     [invoiceId]
   )
 
-  return { invoice, lineItems, payments, creditNotes }
+  return {
+    invoice: (() => {
+      const dated = withInvoiceCalendarDates(invoice)
+      delete dated.restaurant_timezone
+      return dated
+    })(),
+    lineItems,
+    payments: payments.map((payment) => withInvoiceCalendarDates(payment, ['payment_date'])),
+    creditNotes: creditNotes.map((note) => withInvoiceCalendarDates(note, ['issue_date'])),
+  }
 }
 
 export async function getInvoiceDetailForPdf(invoiceId, tenantId, tenantType) {
@@ -591,8 +778,8 @@ export function invoiceToCsvRow(invoice) {
     escapeCsvField(invoice.supplier_name || ''),
     escapeCsvField(invoice.restaurant_name || ''),
     escapeCsvField(invoice.branch_name || ''),
-    escapeCsvField(invoice.invoice_date),
-    escapeCsvField(invoice.due_date),
+    escapeCsvField(formatInvoiceCalendarDate(invoice.invoice_date) || ''),
+    escapeCsvField(formatInvoiceCalendarDate(invoice.due_date) || ''),
     escapeCsvField(invoice.status),
     invoice.subtotal ?? '',
     invoice.tax_amount ?? '',
@@ -638,12 +825,18 @@ export async function applyCreditToInvoice(
     throw new NotFoundError('Invoice not found')
   }
   const invoice = invoices[0]
+  assertInvoiceAcceptsPayment(invoice)
 
   if (
     creditNote.restaurant_id !== invoice.restaurant_id ||
     creditNote.supplier_id !== invoice.supplier_id
   ) {
     throw new ValidationError('Credit note does not match invoice parties')
+  }
+  const creditCurrency = String(creditNote.currency || 'USD').toUpperCase()
+  const invoiceCurrency = String(invoice.currency || 'USD').toUpperCase()
+  if (creditCurrency !== invoiceCurrency) {
+    throw new ValidationError('Credit note currency does not match the invoice')
   }
 
   const { rows: paidRows } = await client.query(
@@ -681,7 +874,7 @@ export async function applyCreditToInvoice(
     [
       invoiceId,
       paymentNumber,
-      paymentDate || new Date().toISOString().slice(0, 10),
+      paymentDate || invoiceCalendarDate(new Date()),
       amount,
       invoice.currency || 'USD',
       recordedBy,
@@ -722,6 +915,12 @@ export async function recordCashPayment(
     throw new NotFoundError('Invoice not found')
   }
   const invoice = invoices[0]
+  assertInvoiceAcceptsPayment(invoice)
+  const paymentCurrency = normalizeInvoiceCurrency(currency || invoice.currency)
+  const invoiceCurrency = normalizeInvoiceCurrency(invoice.currency)
+  if (paymentCurrency !== invoiceCurrency) {
+    throw new ValidationError('Payment currency does not match the invoice')
+  }
 
   const { rows: paidRows } = await client.query(
     `
@@ -753,11 +952,11 @@ export async function recordCashPayment(
     [
       invoiceId,
       paymentNumber,
-      paymentDate,
+      paymentDate ? invoiceCalendarDate(paymentDate) : invoiceCalendarDate(new Date()),
       amount,
       paymentMethod,
       paymentReference || null,
-      currency || invoice.currency || 'USD',
+      invoiceCurrency,
       recordedBy,
       notes || null,
       bankName || null,

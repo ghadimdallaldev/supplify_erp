@@ -55,16 +55,14 @@ export function validateAndEnrichReceivingLines(orderItems, lineItems) {
     enriched.push({
       ...line,
       orderItemId,
-      productId: line.productId ?? line.product_id ?? orderItem.product_id,
-      product_name:
-        orderItem.product_name ?? line.product_name ?? line.productName ?? 'Unknown product',
-      sku: orderItem.sku ?? line.sku ?? 'N/A',
+      productId: orderItem.product_id,
+      product_name: orderItem.product_name ?? 'Unknown product',
+      sku: orderItem.sku ?? 'N/A',
       ordered_quantity: parseFloat(orderItem.quantity),
       received_quantity: receivedQuantity,
-      unit: line.unit || orderItem.unit || 'unit',
-      expected_unit_price:
-        line.expected_unit_price ?? line.expectedUnitPrice ?? orderItem.unit_price,
-      actual_unit_price: line.actual_unit_price ?? line.actualUnitPrice ?? orderItem.unit_price,
+      unit: orderItem.unit || 'unit',
+      expected_unit_price: orderItem.unit_price,
+      actual_unit_price: orderItem.unit_price,
       quality_status: qualityStatus,
       notes: line.notes ?? '',
       expiryDate: line.expiryDate ?? line.expiry_date,

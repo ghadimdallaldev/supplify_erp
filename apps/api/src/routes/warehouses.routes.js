@@ -8,6 +8,8 @@ import {
   resolveAdminContext,
   requirePermission,
 } from '../lib/rbac.js'
+import { hasPermission } from '../lib/permissions.js'
+import { rolesIncludeOwner } from '../lib/tenant-roles.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkWarehouseLimit, createAuditLog } from '../lib/plan-enforcement.js'
@@ -24,22 +26,19 @@ import {
   transferWarehouseInventory,
 } from '../services/supplier-stock.service.js'
 import { syncLegacyMirrorFromWarehouse } from '../services/supplier-order-stock.service.js'
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { normalizeZoneCoverage } from '../lib/delivery-zone-input.js'
 import { withTransaction } from '../lib/db.js'
-import { getEffectiveTenant } from '../lib/impersonation.js'
-import { writeAuditLog } from '../lib/audit.js'
 
 const warehousesFeature = requireFeature(
   'warehouses',
-  (req) =>
-    req.tenantContext?.tenantId || (req.userData?.role === 'ADMIN' ? req.query.supplier_id : null),
+  (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType || 'SUPPLIER'
 )
 
 const multiWarehouseFeature = requireFeature(
   'multi_warehouse',
-  (req) =>
-    req.tenantContext?.tenantId || (req.userData?.role === 'ADMIN' ? req.query.supplier_id : null),
+  (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType || 'SUPPLIER'
 )
 
@@ -48,30 +47,11 @@ router.use(requireAuth, resolveTenantContext, resolveAdminContext)
 async function resolveSupplierId(req) {
   const requestedSupplierId =
     typeof req.query.supplier_id === 'string' ? req.query.supplier_id.trim() : null
-  const effective = getEffectiveTenant(req)
-
+  const fromRequest = await getSupplierIdForRequest(req)
   if (requestedSupplierId) {
-    if (effective) {
-      return effective.tenantType === 'SUPPLIER' && effective.tenantId === requestedSupplierId
-        ? requestedSupplierId
-        : null
-    }
-    const adminPermissions = req.adminContext?.permissions || []
-    if (
-      req.userData?.role === 'ADMIN' &&
-      (adminPermissions.includes('ADMIN_TENANTS') || adminPermissions.includes('ADMIN_ACCESS'))
-    ) {
-      await writeAuditLog(req, {
-        action_type: 'admin.tenant_override',
-        tenant_type: 'SUPPLIER',
-        tenant_id: requestedSupplierId,
-        payload_json: { resource_type: 'SUPPLIER', source: 'supplier_id_query' },
-      })
-      return requestedSupplierId
-    }
+    return fromRequest && fromRequest === requestedSupplierId ? requestedSupplierId : null
   }
-
-  return getSupplierIdForRequest(req)
+  return fromRequest
 }
 
 async function getWarehouseForSupplier(warehouseId, supplierId) {
@@ -115,7 +95,9 @@ router.get(
            FROM warehouse_inventory wi
            LEFT JOIN LATERAL (
              SELECT amount FROM price WHERE product_id = wi.product_id
-             ORDER BY valid_from DESC LIMIT 1
+               AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+             ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
+             LIMIT 1
            ) pr ON true
            WHERE wi.warehouse_id = w.id) AS stock_value,
           COALESCE((
@@ -177,10 +159,11 @@ router.get(
           requestId: req.requestId,
         })
       }
+      const supplierCol = await getWarehouseSupplierColumn()
       const { rows } = await query(
         `SELECT r.*, w.name AS warehouse_name
          FROM warehouse_routing_rule r
-         JOIN warehouse w ON w.id = r.warehouse_id
+         JOIN warehouse w ON w.id = r.warehouse_id AND w.${supplierCol} = r.supplier_id
          WHERE r.supplier_id = $1
          ORDER BY r.priority ASC, r.created_at ASC`,
         [supplierId]
@@ -267,6 +250,10 @@ router.patch(
       const supplierId = await resolveSupplierId(req)
       const { priority, rule_type, warehouse_id, product_id, category_id, zone_id, is_active } =
         req.body
+      if (warehouse_id) {
+        const target = await getWarehouseForSupplier(warehouse_id, supplierId)
+        if (!target) throw new NotFoundError('Warehouse not found')
+      }
       const { rows } = await query(
         `UPDATE warehouse_routing_rule SET
           priority = COALESCE($1, priority),
@@ -399,8 +386,11 @@ router.post(
       const productIds = items.map((i) => i.product_id ?? i.productId).filter(Boolean)
       const { rows: stockRows } = productIds.length
         ? await query(
-            `SELECT warehouse_id, product_id, quantity_available FROM warehouse_inventory WHERE product_id = ANY($1)`,
-            [productIds]
+            `SELECT wi.warehouse_id, wi.product_id, wi.quantity_available
+             FROM warehouse_inventory wi
+             JOIN warehouse w ON w.id = wi.warehouse_id
+             WHERE wi.product_id = ANY($1) AND w.${supplierCol} = $2`,
+            [productIds, supplierId]
           )
         : { rows: [] }
 
@@ -412,7 +402,10 @@ router.post(
       )
 
       const { rows: products } = productIds.length
-        ? await query(`SELECT id, category_id FROM product WHERE id = ANY($1)`, [productIds])
+        ? await query(
+            `SELECT id, category_id FROM product WHERE id = ANY($1) AND supplier_id = $2`,
+            [productIds, supplierId]
+          )
         : { rows: [] }
       const catMap = new Map(products.map((p) => [p.id, p.category_id]))
 
@@ -583,14 +576,14 @@ router.post(
 router.patch(
   '/:id',
   warehousesFeature,
-  requirePermission('WAREHOUSES_MANAGE'),
+  requirePermission('WAREHOUSES_EDIT'),
   requireRole(['SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
       const warehouseId = req.params.id
       const wh = await getWarehouseForSupplier(warehouseId, supplierId)
-      if (!wh && req.userData.role !== 'ADMIN') {
+      if (!wh) {
         return res.status(404).json({
           ok: false,
           data: null,
@@ -616,6 +609,21 @@ router.patch(
 
       const deactivating = is_active === false && wh?.is_active !== false
       if (deactivating) {
+        const perms = req.tenantContext?.permissions ?? []
+        if (
+          !rolesIncludeOwner(req.tenantContext?.roles) &&
+          !hasPermission(perms, 'WAREHOUSES_MANAGE')
+        ) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Missing permission: WAREHOUSES_MANAGE',
+            },
+            requestId: req.requestId,
+          })
+        }
         const supplierCol = await getWarehouseSupplierColumn()
         if (isDefaultWarehouse(wh)) {
           const { rows: others } = await query(
@@ -690,7 +698,7 @@ router.patch(
               notes = COALESCE($10, notes),
               code = COALESCE($11, code),
               updated_at = now()
-             WHERE id = $12 RETURNING *`,
+             WHERE id = $12 AND ${supplierCol} = $13 RETURNING *`,
             [
               name,
               address,
@@ -704,6 +712,7 @@ router.patch(
               notes,
               code,
               warehouseId,
+              supplierId,
             ]
           )
           return rows[0]
@@ -717,6 +726,7 @@ router.patch(
         })
       }
 
+      const supplierCol = await getWarehouseSupplierColumn()
       const { rows } = await query(
         `UPDATE warehouse SET
           name = COALESCE($1, name),
@@ -732,7 +742,7 @@ router.patch(
           notes = COALESCE($11, notes),
           code = COALESCE($12, code),
           updated_at = now()
-         WHERE id = $13 RETURNING *`,
+         WHERE id = $13 AND ${supplierCol} = $14 RETURNING *`,
         [
           name,
           address,
@@ -747,6 +757,7 @@ router.patch(
           notes,
           code,
           warehouseId,
+          supplierId,
         ]
       )
 
@@ -766,7 +777,7 @@ router.patch(
 router.post(
   '/:id/set-default',
   warehousesFeature,
-  requirePermission('WAREHOUSES_MANAGE'),
+  requirePermission('WAREHOUSES_EDIT'),
   requireRole(['SUPPLIER']),
   async (req, res) => {
     try {
@@ -880,8 +891,9 @@ router.delete(
         }
 
         const { rows } = await client.query(
-          `UPDATE warehouse SET is_active = FALSE, updated_at = now() WHERE id = $1 RETURNING *`,
-          [warehouseId]
+          `UPDATE warehouse SET is_active = FALSE, updated_at = now()
+           WHERE id = $1 AND ${supplierCol} = $2 RETURNING *`,
+          [warehouseId, supplierId]
         )
         return rows[0]
       })
@@ -922,11 +934,11 @@ router.get(
       const { rows } = await query(
         `SELECT wi.*, p.name AS product_name, p.sku
          FROM warehouse_inventory wi
-         JOIN product p ON p.id = wi.product_id
+         JOIN product p ON p.id = wi.product_id AND p.supplier_id = $2
          WHERE wi.warehouse_id = $1
          ORDER BY p.name
-         LIMIT $2 OFFSET $3`,
-        [req.params.id, limit, offset]
+         LIMIT $3 OFFSET $4`,
+        [req.params.id, supplierId, limit, offset]
       )
       res.json({ ok: true, data: { inventory: rows }, error: null, requestId: req.requestId })
     } catch (error) {
@@ -967,11 +979,21 @@ router.patch(
         reorder_quantity,
       } = req.body
 
+      const { rows: productRows } = await query(
+        `SELECT id FROM product WHERE id = $1 AND supplier_id = $2`,
+        [req.params.productId, supplierId]
+      )
+      if (!productRows.length) throw new NotFoundError('Product not found')
+
+      const qtyAvailable = Object.hasOwn(req.body, 'quantity_available') ? quantity_available : null
+      const qtyReserved = Object.hasOwn(req.body, 'quantity_reserved') ? quantity_reserved : null
+      const qtyOnHand = Object.hasOwn(req.body, 'quantity_on_hand') ? quantity_on_hand : null
+
       const { rows } = await query(
         `INSERT INTO warehouse_inventory (
           warehouse_id, product_id, quantity_available, quantity_reserved, quantity_on_hand,
           reorder_point, reorder_quantity, last_counted_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+        ) VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, 0), COALESCE($5, 0), $6, $7, now(), now())
         ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
           quantity_available = COALESCE($3, warehouse_inventory.quantity_available),
           quantity_reserved = COALESCE($4, warehouse_inventory.quantity_reserved),
@@ -984,11 +1006,11 @@ router.patch(
         [
           req.params.id,
           req.params.productId,
-          quantity_available ?? 0,
-          quantity_reserved ?? 0,
-          quantity_on_hand ?? 0,
-          reorder_point ?? null,
-          reorder_quantity ?? null,
+          qtyAvailable,
+          qtyReserved,
+          qtyOnHand,
+          Object.hasOwn(req.body, 'reorder_point') ? reorder_point : null,
+          Object.hasOwn(req.body, 'reorder_quantity') ? reorder_quantity : null,
         ]
       )
 
@@ -1034,7 +1056,7 @@ router.get(
          FROM order_warehouse_assignment owa
          JOIN customer_order co ON co.id = owa.order_id
          JOIN restaurant r ON r.id = co.restaurant_id
-         WHERE owa.warehouse_id = $1 AND owa.status NOT IN ('delivered', 'failed')
+         WHERE owa.warehouse_id = $1 AND owa.status NOT IN ('delivered', 'failed', 'superseded')
          ORDER BY owa.assigned_at DESC
          LIMIT 100`,
         [req.params.id]
@@ -1105,19 +1127,11 @@ router.post(
       const wh = await getWarehouseForSupplier(req.params.id, supplierId)
       if (!wh) throw new NotFoundError('Warehouse not found')
 
-      const {
-        name,
-        zone_type = 'polygon',
-        geometry,
-        postal_codes,
-        radius_km,
-        center_lat,
-        center_lng,
-        min_order_amount,
-        delivery_fee,
-        estimated_delivery_hours,
-        coverage_area_json,
-      } = req.body
+      const { name, min_order_amount, delivery_fee, estimated_delivery_hours } = req.body
+      const coverage = normalizeZoneCoverage(req.body)
+      if (!coverage) {
+        throw new ValidationError('zone_type must be polygon, radius, or postal_codes')
+      }
 
       const { rows } = await query(
         `INSERT INTO delivery_zone (
@@ -1130,16 +1144,16 @@ router.post(
           supplierId,
           req.params.id,
           name,
-          zone_type,
-          geometry ?? null,
-          postal_codes ?? null,
-          radius_km ?? null,
-          center_lat ?? null,
-          center_lng ?? null,
+          coverage.zone_type,
+          coverage.geometry,
+          coverage.postal_codes,
+          coverage.radius_km,
+          coverage.center_lat,
+          coverage.center_lng,
           min_order_amount ?? 0,
           delivery_fee ?? 0,
           estimated_delivery_hours ?? null,
-          coverage_area_json ?? geometry ?? null,
+          coverage.coverage_area_json,
         ]
       )
       res
@@ -1151,6 +1165,14 @@ router.post(
           ok: false,
           data: null,
           error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
           requestId: req.requestId,
         })
       }
@@ -1172,34 +1194,34 @@ router.patch(
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
-      const {
-        name,
-        zone_type,
-        geometry,
-        postal_codes,
-        min_order_amount,
-        delivery_fee,
-        estimated_delivery_hours,
-        is_active,
-      } = req.body
+      const { name, min_order_amount, delivery_fee, estimated_delivery_hours, is_active } = req.body
+      const coverage = normalizeZoneCoverage(req.body)
       const { rows } = await query(
         `UPDATE delivery_zone SET
           name = COALESCE($1, name),
           zone_type = COALESCE($2, zone_type),
-          geometry = COALESCE($3, geometry),
-          postal_codes = COALESCE($4, postal_codes),
-          min_order_amount = COALESCE($5, min_order_amount),
-          delivery_fee = COALESCE($6, delivery_fee),
-          estimated_delivery_hours = COALESCE($7, estimated_delivery_hours),
-          is_active = COALESCE($8, is_active),
+          geometry = CASE WHEN $2 = 'polygon' THEN COALESCE($3, geometry) WHEN $2 IS NOT NULL THEN NULL ELSE geometry END,
+          postal_codes = CASE WHEN $2 = 'postal_codes' THEN $4 WHEN $2 IS NOT NULL THEN NULL ELSE postal_codes END,
+          radius_km = CASE WHEN $2 = 'radius' THEN $5 WHEN $2 IS NOT NULL THEN NULL ELSE radius_km END,
+          center_lat = CASE WHEN $2 = 'radius' THEN $6 WHEN $2 IS NOT NULL THEN NULL ELSE center_lat END,
+          center_lng = CASE WHEN $2 = 'radius' THEN $7 WHEN $2 IS NOT NULL THEN NULL ELSE center_lng END,
+          coverage_area_json = CASE WHEN $2 = 'polygon' THEN COALESCE($8, coverage_area_json) WHEN $2 IS NOT NULL THEN NULL ELSE coverage_area_json END,
+          min_order_amount = COALESCE($9, min_order_amount),
+          delivery_fee = COALESCE($10, delivery_fee),
+          estimated_delivery_hours = COALESCE($11, estimated_delivery_hours),
+          is_active = COALESCE($12, is_active),
           updated_at = now()
-         WHERE id = $9 AND warehouse_id = $10 AND supplier_id = $11
+         WHERE id = $13 AND warehouse_id = $14 AND supplier_id = $15
          RETURNING *`,
         [
           name,
-          zone_type,
-          geometry,
-          postal_codes,
+          coverage?.zone_type ?? null,
+          coverage?.geometry ?? null,
+          coverage?.postal_codes ?? null,
+          coverage?.radius_km ?? null,
+          coverage?.center_lat ?? null,
+          coverage?.center_lng ?? null,
+          coverage?.coverage_area_json ?? null,
           min_order_amount,
           delivery_fee,
           estimated_delivery_hours,
@@ -1217,6 +1239,14 @@ router.patch(
           ok: false,
           data: null,
           error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
           requestId: req.requestId,
         })
       }

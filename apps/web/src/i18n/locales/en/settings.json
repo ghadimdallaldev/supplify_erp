@@ -63,7 +63,53 @@
       "notifyLowStock": {
         "label": "Low stock warnings",
         "description": "Stay informed about items running low."
+      },
+      "notifyInvoiceIssued": {
+        "label": "Invoice reminders",
+        "description": "Issued and overdue invoices."
+      },
+      "notifyReorderCadence": {
+        "label": "Reorder reminders",
+        "description": "Suggested reorders based on your ordering patterns."
+      },
+      "notifyReservationCreated": {
+        "label": "New reservations",
+        "description": "Reservations booked by guests or staff."
+      },
+      "notifyReservationWaitlist": {
+        "label": "Waitlist changes",
+        "description": "Guests added or moved on the waitlist."
+      },
+      "notifyStaffPto": {
+        "label": "PTO requests",
+        "description": "Team time-off submissions awaiting review."
+      },
+      "notifyStaffSwap": {
+        "label": "Shift swap requests",
+        "description": "Coverage and swap approvals."
+      },
+      "notifyScheduledOrder": {
+        "label": "Scheduled orders",
+        "description": "Recurring orders executing automatically."
       }
+    },
+    "restaurantPanel": {
+      "title": "Notification preferences",
+      "description": "Choose how and when Supplify alerts you.",
+      "channels": "Delivery methods",
+      "types": "Notification types",
+      "pushTitle": "Browser push",
+      "pushHint": "Real-time alerts when Supplify is in the background.",
+      "blockedTitle": "Notifications blocked by your browser",
+      "blockedStep1": "Click the lock or tune icon to the left of the address bar",
+      "blockedStep2": "Open Permissions and set Notifications to Allow",
+      "blockedStep3": "Reload this page, then click Enable below",
+      "enable": "Enable push notifications",
+      "enableAction": "Enable",
+      "disableAction": "Disable",
+      "save": "Save preferences",
+      "unavailable": "Push is not configured on this server. Ask your admin to set VAPID keys on the API.",
+      "notOnPlan": "Browser push is not included on your plan. Upgrade to enable real-time alerts."
     },
     "comingSoon": {
       "systemAlerts": {

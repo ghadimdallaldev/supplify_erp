@@ -8,6 +8,7 @@
     "planUnavailable": "Reports are not available on your current plan. Contact support if this looks wrong."
   },
   "reports": {
+    "currency": "Currency",
     "orderVolume": {
       "label": "Order volume",
       "columns": {
@@ -47,6 +48,74 @@
         "restaurantName": "Restaurant",
         "revenue": "Revenue",
         "orderCount": "Orders"
+      }
+    },
+    "spendByCategory": {
+      "label": "Spend by category",
+      "columns": {
+        "category": "Category",
+        "totalSpend": "Spend",
+        "orderCount": "Orders"
+      }
+    },
+    "cogsTrend": {
+      "label": "Cost of goods",
+      "columns": {
+        "period": "Period",
+        "cogs": "COGS"
+      }
+    },
+    "receivingQuality": {
+      "label": "Receiving quality",
+      "columns": {
+        "supplierName": "Supplier",
+        "reportCount": "Receipts",
+        "avgQuality": "Avg quality",
+        "fillRate": "Fill rate %"
+      }
+    },
+    "waste": {
+      "label": "Waste",
+      "columns": {
+        "period": "Period",
+        "category": "Category",
+        "incidents": "Incidents",
+        "quantity": "Qty",
+        "cost": "Cost"
+      }
+    },
+    "invoiceAging": {
+      "label": "Invoice aging",
+      "columns": {
+        "bucket": "Bucket",
+        "invoiceCount": "Invoices",
+        "balance": "Balance"
+      }
+    },
+    "supplierTopProducts": {
+      "label": "Top products",
+      "columns": {
+        "productName": "Product",
+        "revenue": "Revenue",
+        "quantity": "Qty"
+      }
+    },
+    "fulfillment": {
+      "label": "Fulfillment",
+      "columns": {
+        "status": "Status",
+        "orderCount": "Orders",
+        "completionRate": "Completed %"
+      }
+    },
+    "invoiceCollection": {
+      "label": "Collections",
+      "columns": {
+        "status": "Status",
+        "invoiceCount": "Invoices",
+        "totalAmount": "Invoiced",
+        "paid": "Paid",
+        "balance": "Balance"
       }
     }
   },

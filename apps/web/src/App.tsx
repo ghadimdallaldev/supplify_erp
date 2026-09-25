@@ -106,6 +106,10 @@ const RecipePriceImpactPage = lazyNamedPage(
   () => import('./pages/recipes/RecipePriceImpactPage'),
   'RecipePriceImpactPage'
 )
+const PriceIntelligencePage = lazyNamedPage(
+  () => import('./pages/PriceIntelligencePage'),
+  'PriceIntelligencePage'
+)
 const SupplierCustomerGrowthPage = lazyNamedPage(
   () => import('./pages/SupplierCustomerGrowthPage'),
   'SupplierCustomerGrowthPage'
@@ -594,7 +598,9 @@ const router = createBrowserRouter([
             path: 'app/orders',
             element: (
               <LazyPage>
-                <OrdersPage />
+                <RequirePermission permission="ORDERS_VIEW" title="orders">
+                  <OrdersPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -602,7 +608,9 @@ const router = createBrowserRouter([
             path: 'app/orders/:id',
             element: (
               <LazyPage>
-                <OrderDetailPage />
+                <RequirePermission permission="ORDERS_VIEW" title="order details">
+                  <OrderDetailPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -620,7 +628,12 @@ const router = createBrowserRouter([
             path: 'app/reports',
             element: (
               <LazyPage>
-                <ReportsPage />
+                <RequirePermission
+                  anyOf={['ORDERS_VIEW', 'INVOICES_VIEW', 'FULFILLMENT_VIEW']}
+                  title="reports"
+                >
+                  <ReportsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -628,7 +641,9 @@ const router = createBrowserRouter([
             path: 'app/disputes',
             element: (
               <LazyPage>
-                <DisputesPage />
+                <RequirePermission anyOf={['ORDERS_VIEW', 'FULFILLMENT_VIEW']} title="disputes">
+                  <DisputesPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -636,7 +651,9 @@ const router = createBrowserRouter([
             path: 'app/disputes/:id',
             element: (
               <LazyPage>
-                <DisputeDetailPage />
+                <RequirePermission anyOf={['ORDERS_VIEW', 'FULFILLMENT_VIEW']} title="disputes">
+                  <DisputeDetailPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -644,7 +661,12 @@ const router = createBrowserRouter([
             path: 'app/promotions',
             element: (
               <LazyPage>
-                <PromotionsPage />
+                <RequirePermission
+                  anyOf={['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']}
+                  title="promotions"
+                >
+                  <PromotionsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -652,7 +674,9 @@ const router = createBrowserRouter([
             path: 'app/loyalty',
             element: (
               <LazyPage>
-                <LoyaltyProgramPage />
+                <RequirePermission permission="CATALOG_VIEW">
+                  <LoyaltyProgramPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -660,7 +684,9 @@ const router = createBrowserRouter([
             path: 'app/consumer-loyalty',
             element: (
               <LazyPage>
-                <ConsumerLoyaltyPage />
+                <RequirePermission permission="CATALOG_VIEW">
+                  <ConsumerLoyaltyPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -668,7 +694,9 @@ const router = createBrowserRouter([
             path: 'app/contract-pricing',
             element: (
               <LazyPage>
-                <ContractPricingPage />
+                <RequirePermission permission="CATALOG_VIEW">
+                  <ContractPricingPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -676,7 +704,9 @@ const router = createBrowserRouter([
             path: 'app/my-prices',
             element: (
               <LazyPage>
-                <MyContractPricesPage />
+                <RequirePermission permission="CATALOG_VIEW">
+                  <MyContractPricesPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -684,7 +714,9 @@ const router = createBrowserRouter([
             path: 'app/deals',
             element: (
               <LazyPage>
-                <DealsPage />
+                <RequirePermission anyOf={['ORDERS_VIEW', 'CATALOG_VIEW']} title="deals">
+                  <DealsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -692,7 +724,9 @@ const router = createBrowserRouter([
             path: 'app/cart',
             element: (
               <LazyPage>
-                <CartPage />
+                <RequirePermission permission="ORDERS_CREATE" title="cart">
+                  <CartPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -700,7 +734,9 @@ const router = createBrowserRouter([
             path: 'app/quick-lists',
             element: (
               <LazyPage>
-                <QuickListsPage />
+                <RequirePermission permission="ORDERS_VIEW" title="quick lists">
+                  <QuickListsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -708,7 +744,9 @@ const router = createBrowserRouter([
             path: 'app/restaurant-inventory',
             element: (
               <LazyPage>
-                <RestaurantInventoryPage />
+                <RequirePermission permission="INVENTORY_VIEW" title="inventory">
+                  <RestaurantInventoryPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -716,7 +754,12 @@ const router = createBrowserRouter([
             path: 'app/onboarding',
             element: (
               <LazyPage>
-                <RestaurantOnboardingPage />
+                <RequirePermission
+                  anyOf={['SETTINGS_VIEW', 'STAFF_VIEW']}
+                  title="restaurant settings"
+                >
+                  <RestaurantOnboardingPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -724,7 +767,9 @@ const router = createBrowserRouter([
             path: 'app/receiving',
             element: (
               <LazyPage>
-                <ReceivingPage />
+                <RequirePermission permission="RECEIVING_VIEW" title="receiving">
+                  <ReceivingPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -732,7 +777,9 @@ const router = createBrowserRouter([
             path: 'app/recipes',
             element: (
               <LazyPage>
-                <RecipesListPage />
+                <RequirePermission permission="RECIPES_VIEW" title="recipes">
+                  <RecipesListPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -740,7 +787,12 @@ const router = createBrowserRouter([
             path: 'app/recipes/new',
             element: (
               <LazyPage>
-                <RecipeBuilderPage />
+                <RequirePermission
+                  anyOf={['RECIPES_EDIT', 'RECIPES_MANAGE']}
+                  title="recipe builder"
+                >
+                  <RecipeBuilderPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -748,7 +800,12 @@ const router = createBrowserRouter([
             path: 'app/recipes/:id/edit',
             element: (
               <LazyPage>
-                <RecipeBuilderPage />
+                <RequirePermission
+                  anyOf={['RECIPES_EDIT', 'RECIPES_MANAGE']}
+                  title="recipe builder"
+                >
+                  <RecipeBuilderPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -756,7 +813,9 @@ const router = createBrowserRouter([
             path: 'app/recipes/:id',
             element: (
               <LazyPage>
-                <RecipeDetailPage />
+                <RequirePermission permission="RECIPES_VIEW" title="recipe">
+                  <RecipeDetailPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -764,7 +823,9 @@ const router = createBrowserRouter([
             path: 'app/recipe-costing',
             element: (
               <LazyPage>
-                <RecipeCostingDashboardPage />
+                <RequirePermission permission="RECIPES_VIEW" title="recipe costing">
+                  <RecipeCostingDashboardPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -772,7 +833,19 @@ const router = createBrowserRouter([
             path: 'app/recipe-costing/price-impact',
             element: (
               <LazyPage>
-                <RecipePriceImpactPage />
+                <RequirePermission permission="RECIPES_VIEW" title="price impact">
+                  <RecipePriceImpactPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/price-intelligence',
+            element: (
+              <LazyPage>
+                <RequirePermission permission="CATALOG_VIEW" title="price intelligence">
+                  <PriceIntelligencePage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -780,7 +853,9 @@ const router = createBrowserRouter([
             path: 'app/reservations',
             element: (
               <LazyPage>
-                <ReservationsPage />
+                <RequirePermission permission="RESERVATIONS_VIEW" title="reservations">
+                  <ReservationsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -788,7 +863,9 @@ const router = createBrowserRouter([
             path: 'app/consumer-menu',
             element: (
               <LazyPage>
-                <MenuAdminPage />
+                <RequirePermission permission="CATALOG_VIEW" title="consumer menu">
+                  <MenuAdminPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -796,7 +873,9 @@ const router = createBrowserRouter([
             path: 'app/consumer-orders',
             element: (
               <LazyPage>
-                <ConsumerOrdersPage />
+                <RequirePermission permission="ORDERS_VIEW" title="consumer orders">
+                  <ConsumerOrdersPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -804,7 +883,9 @@ const router = createBrowserRouter([
             path: 'app/staff',
             element: (
               <LazyPage>
-                <StaffPage />
+                <RequirePermission permission="STAFF_VIEW" title="staff">
+                  <StaffPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -890,7 +971,9 @@ const router = createBrowserRouter([
             path: 'app/restaurants',
             element: (
               <LazyPage>
-                <RestaurantsPage />
+                <RequirePermission permission="ORDERS_VIEW" title="restaurants">
+                  <RestaurantsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -898,7 +981,9 @@ const router = createBrowserRouter([
             path: 'app/restaurants/:id',
             element: (
               <LazyPage>
-                <RestaurantDetailPage />
+                <RequirePermission permission="ORDERS_VIEW" title="restaurant">
+                  <RestaurantDetailPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -906,7 +991,9 @@ const router = createBrowserRouter([
             path: 'app/settings',
             element: (
               <LazyPage>
-                <SettingsPage />
+                <RequirePermission permission="SETTINGS_VIEW" title="settings">
+                  <SettingsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -914,7 +1001,9 @@ const router = createBrowserRouter([
             path: 'app/org',
             element: (
               <LazyPage>
-                <OrgOverviewPage />
+                <RequirePermission permission="SETTINGS_VIEW" title="organization">
+                  <OrgOverviewPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -923,7 +1012,9 @@ const router = createBrowserRouter([
             path: 'app/org/branches/:supplierId',
             element: (
               <LazyPage>
-                <BranchDetailPage />
+                <RequirePermission permission="SETTINGS_VIEW" title="organization">
+                  <BranchDetailPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -931,7 +1022,9 @@ const router = createBrowserRouter([
             path: 'app/chat',
             element: (
               <LazyPage>
-                <ChatPage />
+                <RequirePermission permission="CHAT_VIEW" title="chat">
+                  <ChatPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -967,7 +1060,9 @@ const router = createBrowserRouter([
             path: 'app/invoices',
             element: (
               <LazyPage>
-                <InvoicesPage />
+                <RequirePermission permission="INVOICES_VIEW" title="invoices">
+                  <InvoicesPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },
@@ -975,7 +1070,9 @@ const router = createBrowserRouter([
             path: 'app/supplier-settings',
             element: (
               <LazyPage>
-                <SupplierSettingsPage />
+                <RequirePermission permission="SETTINGS_VIEW" title="settings">
+                  <SupplierSettingsPage />
+                </RequirePermission>
               </LazyPage>
             ),
           },

@@ -8,6 +8,7 @@ import {
   requireRole,
 } from '../../lib/rbac.js'
 import { requireRestaurantId } from '../../lib/tenant-resolve.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../../lib/branch-scope.js'
 import { logger } from '../../lib/logger.js'
 import {
   getFulfillmentOptions,
@@ -75,7 +76,7 @@ async function assertDeliveryZoneForRestaurant(zoneId, restaurantId) {
     `
     SELECT dz.*
     FROM delivery_zone dz
-    JOIN branch b ON b.id = dz.branch_id
+    JOIN branch b ON b.id = dz.branch_id AND b.tenant_id = $2
     WHERE dz.id = $1 AND b.tenant_id = $2
     `,
     [zoneId, restaurantId]
@@ -93,9 +94,13 @@ consumerFulfillmentPublicRoutes.get('/', async (req, res) => {
     if (!restaurant) {
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
+    await assertLegacyBranchOwnedByRestaurant(branchId || null, restaurant.id)
     const options = await getFulfillmentOptions(restaurant.id, branchId || null)
     jsonOk(res, { restaurant, ...options })
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'ZodError') {
+      return jsonError(res, 400, 'VALIDATION_ERROR', error.message || 'Invalid request')
+    }
     logger.error('Public fulfillment options fetch failed', { error: error.message })
     jsonError(res, 500, 'FULFILLMENT_OPTIONS_ERROR', 'Unable to load fulfillment options')
   }
@@ -115,9 +120,13 @@ consumerFulfillmentAdminRoutes.get('/', async (req, res) => {
   try {
     const { branchId } = branchQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(branchId || null, restaurantId)
     const options = await getFulfillmentOptions(restaurantId, branchId || null)
     jsonOk(res, options)
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'ZodError') {
+      return jsonError(res, 400, 'VALIDATION_ERROR', error.message || 'Invalid request')
+    }
     logger.error('Admin fulfillment options fetch failed', { error: error.message })
     jsonError(res, 500, 'FULFILLMENT_OPTIONS_ERROR', 'Unable to load fulfillment options')
   }

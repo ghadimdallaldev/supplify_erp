@@ -12,6 +12,7 @@
     "statusAll": "الكل",
     "statusActive": "نشط",
     "statusInactive": "غير نشط",
+    "statusScheduled": "مجدول",
     "statusExpired": "منتهٍ",
     "empty": "لا توجد أسعار عقود تطابق عوامل التصفية.",
     "catalog": "الكتالوج",

@@ -18,6 +18,7 @@ type ProductCatalogRowProps = {
   onAddToCart: (product: any) => void
   onToggleFavorite?: (product: any) => void
   onAdjustStock: (product: any) => void
+  canAdjustStock?: boolean
   layout: 'card' | 'table'
   isLastRow?: boolean
   cellClassName?: string
@@ -177,9 +178,10 @@ function ProductActions({
   layout,
   onAddToCart,
   onAdjustStock,
+  canAdjustStock = false,
 }: Pick<
   ProductCatalogRowProps,
-  'product' | 'isSupplier' | 'layout' | 'onAddToCart' | 'onAdjustStock'
+  'product' | 'isSupplier' | 'layout' | 'onAddToCart' | 'onAdjustStock' | 'canAdjustStock'
 >) {
   const { t } = useTranslation('products')
   const compactTable = layout === 'table'
@@ -211,7 +213,7 @@ function ProductActions({
             ) : null}
           </>
         )}
-        {isSupplier && (
+        {canAdjustStock && (
           <Button
             size="sm"
             variant="outline"
@@ -257,7 +259,7 @@ function ProductActions({
           )}
         </>
       )}
-      {isSupplier && (
+      {canAdjustStock && (
         <Button
           size="sm"
           variant="outline"
@@ -296,6 +298,7 @@ function ProductCatalogRowInner({
   onAddToCart,
   onToggleFavorite,
   onAdjustStock,
+  canAdjustStock = false,
   layout,
   isLastRow = false,
   cellClassName = 'px-4 py-4',
@@ -329,6 +332,7 @@ function ProductCatalogRowInner({
           layout="card"
           onAddToCart={onAddToCart}
           onAdjustStock={onAdjustStock}
+          canAdjustStock={canAdjustStock}
         />
       </div>
     )
@@ -382,6 +386,7 @@ function ProductCatalogRowInner({
           layout="table"
           onAddToCart={onAddToCart}
           onAdjustStock={onAdjustStock}
+          canAdjustStock={canAdjustStock}
         />
       </td>
     </tr>

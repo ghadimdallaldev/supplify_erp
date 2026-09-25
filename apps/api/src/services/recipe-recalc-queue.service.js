@@ -5,6 +5,8 @@ import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-loc
 
 const NULL_UUID = '00000000-0000-0000-0000-000000000000'
 const BATCH_LIMIT = 50
+/** Failed scopes are retried this many times, then parked so they stop blocking the batch. */
+const MAX_RECALC_ATTEMPTS = 5
 
 /**
  * @param {string} restaurantId
@@ -72,14 +74,15 @@ export async function recalculateRecipe(
 /**
  * Process dirty queue batch.
  * @param {Function} [dbQuery]
- * @returns {Promise<{ processed: number, errors: number }>}
+ * @returns {Promise<{ processed: number, errors: number, skippedLocked: number, parkedFailures: number }>}
  */
 export async function processRecipeRecalcQueue(dbQuery = query) {
   const { rows: dirty } = await dbQuery(
     `
     SELECT d.*
     FROM recipe_recalc_dirty d
-    WHERE EXISTS (
+    WHERE d.failed_at IS NULL
+      AND EXISTS (
       SELECT 1
       FROM subscription sub
       WHERE sub.tenant_id = d.restaurant_id
@@ -96,6 +99,7 @@ export async function processRecipeRecalcQueue(dbQuery = query) {
   let processed = 0
   let errors = 0
   let skippedLocked = 0
+  let parkedFailures = 0
 
   for (const row of dirty) {
     try {
@@ -138,14 +142,29 @@ export async function processRecipeRecalcQueue(dbQuery = query) {
       await dbQuery(`DELETE FROM recipe_recalc_dirty WHERE id = $1`, [row.id])
     } catch (error) {
       errors += 1
+      // Keep the work queued so a transient failure is retried, but spend a
+      // retry budget: an unfixable scope would otherwise sit at the head of
+      // `ORDER BY created_at ASC` forever and starve the rest of the batch.
+      const { rows: parked } = await dbQuery(
+        `UPDATE recipe_recalc_dirty
+            SET attempts = attempts + 1,
+                last_error = $2,
+                last_attempt_at = now(),
+                failed_at = CASE WHEN attempts + 1 >= $3 THEN now() ELSE NULL END
+          WHERE id = $1
+          RETURNING attempts, failed_at`,
+        [row.id, String(error.message).slice(0, 500), MAX_RECALC_ATTEMPTS]
+      )
+      if (parked[0]?.failed_at) parkedFailures += 1
       logger.error({
         event: 'recipe_recalc.failed',
         dirtyId: row.id,
+        attempts: parked[0]?.attempts ?? null,
+        parked: Boolean(parked[0]?.failed_at),
         error: error.message,
       })
-      await dbQuery(`DELETE FROM recipe_recalc_dirty WHERE id = $1`, [row.id])
     }
   }
 
-  return { processed, errors, skippedLocked }
+  return { processed, errors, skippedLocked, parkedFailures }
 }

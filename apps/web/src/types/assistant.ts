@@ -24,8 +24,16 @@ export interface AssistantMessage {
   toolPayload?: {
     sources?: Array<{ tool: string; args: unknown; ok: boolean }>
     quotaLimited?: boolean
+    attachments?: AssistantAttachment[]
   } | null
   createdAt: string
+}
+
+export interface AssistantAttachment {
+  fileUrl: string
+  fileType: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'
+  fileName: string
+  fileSize?: number | null
 }
 
 export interface AssistantSendResponse {

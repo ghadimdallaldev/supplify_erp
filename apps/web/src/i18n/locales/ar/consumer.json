@@ -153,6 +153,32 @@
     "DELIVERED": "تم التسليم",
     "CANCELLED": "ملغى"
   },
+  "columnStatus": {
+    "RECEIVED": "مستلم",
+    "PREPARING": "قيد التحضير",
+    "SHIPPED": "جاهز",
+    "DELIVERED": "مكتمل"
+  },
+  "fulfillmentStatus": {
+    "DELIVERY": {
+      "RECEIVED": "تم استلام الطلب",
+      "PREPARING": "قيد التحضير",
+      "SHIPPED": "في الطريق",
+      "DELIVERED": "تم التسليم"
+    },
+    "TAKEAWAY": {
+      "RECEIVED": "تم استلام الطلب",
+      "PREPARING": "قيد التحضير",
+      "SHIPPED": "جاهز للاستلام",
+      "DELIVERED": "تم الاستلام"
+    },
+    "DINE_IN": {
+      "RECEIVED": "تم استلام الطلب",
+      "PREPARING": "قيد التحضير",
+      "SHIPPED": "جاهز للتقديم",
+      "DELIVERED": "تم التقديم"
+    }
+  },
   "account": {
     "title": "حساب المكافآت",
     "description": "سجّل الدخول أو أنشئ حساباً لكسب النقاط مع كل طلب.",
@@ -210,6 +236,10 @@
     "scheduleTimeRequired": "يرجى اختيار وقت للجدولة",
     "scheduleWhenOpen": "يرجى جدولة طلبك لوقت افتتاح المطعم",
     "scheduleTooEarly": "الوقت المجدول قبل أقرب نافذة طلب متاحة",
+    "scheduleOutsideHours": "اختر وقتاً والمطبخ مفتوح",
+    "restaurantLocalTime": "الأوقات حسب ساعة المطعم ({{timeZone}}).",
+    "pricesUpdated": "تغيّرت أسعار القائمة. الإجمالي يطابق القائمة الحالية.",
+    "itemUnavailable": "صنف في سلتك لم يعد متاحاً. ارجع واختر من جديد.",
     "orderPlaced": "تم تقديم الطلب!",
     "unableToPlace": "تعذر تقديم الطلب"
   },
@@ -228,7 +258,10 @@
     "newOrdersCount": "{{count}} طلبات جديدة",
     "markedStatus": "تم تحديث الطلب إلى {{status}}",
     "unableToUpdate": "تعذر تحديث الطلب",
-    "advanceTo": "→ {{status}}"
+    "advanceTo": "→ {{status}}",
+    "cancelOrder": "إلغاء",
+    "confirmCancel": "إلغاء طلب الضيف؟ تُعاد نقاط المكافآت التي استُبدلت.",
+    "cancelledToast": "تم إلغاء الطلب"
   },
   "receipt": {
     "notFound": "الإيصال غير موجود.",

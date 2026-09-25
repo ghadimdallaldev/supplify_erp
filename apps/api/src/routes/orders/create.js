@@ -48,6 +48,7 @@ import {
   findOpenQuoteLocksForOrder,
 } from '../../services/resolve-product-price.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
+import { resolveSupplierDeliveryDate } from '../../lib/supplier-last-order.js'
 import { resolveOrderDeliveryLocation } from '../../services/restaurant-delivery-location.service.js'
 import {
   claimOrderPlacementKey,
@@ -153,7 +154,12 @@ router.post(
         p.category_id,
         p.name,
         COALESCE(pis.moq, 1) AS moq,
-        COALESCE(pis.order_multiple, 1) AS order_multiple
+        COALESCE(pis.order_multiple, 1) AS order_multiple,
+        s.last_order_mode,
+        s.last_order_cutoff_type,
+        s.last_order_cutoff_time,
+        s.last_order_cutoff_minutes,
+        s.last_order_rollover_days
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
@@ -181,12 +187,25 @@ router.post(
         }
       }
 
+      const deliveryDateBySupplier = new Map()
       const resolveItems = orderData.items.map((item) => {
         const product = productMap.get(item.productId)
+        const supplierId = product?.supplier_id
+        let deliveryDate = orderData.deliveryDate ?? undefined
+        if (supplierId) {
+          if (!deliveryDateBySupplier.has(supplierId)) {
+            deliveryDateBySupplier.set(
+              supplierId,
+              resolveSupplierDeliveryDate(product, orderData.deliveryDate ?? null).deliveryDate
+            )
+          }
+          deliveryDate = deliveryDateBySupplier.get(supplierId)
+        }
         return {
           productId: item.productId,
-          supplierId: product?.supplier_id,
+          supplierId,
           quantity: item.quantity,
+          date: deliveryDate,
         }
       })
       const resolvedPrices = await resolveProductPricesBatch({
@@ -194,7 +213,6 @@ router.post(
         items: resolveItems.filter((item) => item.supplierId),
         catalogByProductId,
         quoteLocks: orderData.quoteLocks,
-        date: orderData.deliveryDate ?? undefined,
       })
       const resolvedMap = new Map(resolvedPrices.map((r) => [r.productId, r]))
       orderCreateTimings.productPriceLookupMs = elapsedMsSince(phaseStart)
@@ -953,16 +971,20 @@ router.post(
           return null
         }
 
+        const manualDeliveryDate = resolveSupplierDeliveryDate(
+          supplierProfile,
+          orderData.deliveryDate || null
+        ).deliveryDate
         const manualResolveItems = orderData.items.map((item) => ({
           productId: item.productId,
           supplierId,
           quantity: item.quantity,
+          date: manualDeliveryDate,
         }))
         const manualResolved = await resolveProductPricesBatch({
           restaurantId: orderData.restaurant_id,
           items: manualResolveItems,
           quoteLocks: quoteLocks.length ? quoteLocks : undefined,
-          date: orderData.deliveryDate ?? undefined,
         })
         const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
 
@@ -1051,7 +1073,7 @@ router.post(
           SELECT p.*, pr.amount as current_price, pr.currency
           FROM product p
           LEFT JOIN price pr ON pr.product_id = p.id 
-            AND (pr.valid_to IS NULL OR now() BETWEEN pr.valid_from AND pr.valid_to)
+            AND pr.valid_from <= now() AND (pr.valid_to IS NULL OR pr.valid_to >= now())
           WHERE p.id = $1 AND p.supplier_id = $2
         `,
             [item.productId, supplierId]

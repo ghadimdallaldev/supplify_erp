@@ -49,6 +49,7 @@ export function InventoryPage() {
   const { can } = usePermissions()
   const canViewInventory = can('INVENTORY_VIEW')
   const canViewWarehouses = can('WAREHOUSES_VIEW')
+  const canAdjustInventory = can('INVENTORY_EDIT')
   const [showAdjustment, setShowAdjustment] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
@@ -274,29 +275,33 @@ export function InventoryPage() {
                           </Badge>
                         </div>
                         <CardActionGrid>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={cardActionBtnClass()}
-                            onClick={() => {
-                              setSelectedProduct(item)
-                              setShowAdjustment(true)
-                            }}
-                          >
-                            {t('supplierPage.table.adjust')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={cardActionBtnClass({ iconOnly: true })}
-                            onClick={() => {
-                              setSelectedProduct(item)
-                              setShowSettings(true)
-                            }}
-                            aria-label={t('supplierPage.settingsDialog.title')}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
+                          {canAdjustInventory && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cardActionBtnClass()}
+                              onClick={() => {
+                                setSelectedProduct(item)
+                                setShowAdjustment(true)
+                              }}
+                            >
+                              {t('supplierPage.table.adjust')}
+                            </Button>
+                          )}
+                          {canAdjustInventory && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cardActionBtnClass({ iconOnly: true })}
+                              onClick={() => {
+                                setSelectedProduct(item)
+                                setShowSettings(true)
+                              }}
+                              aria-label={t('supplierPage.settingsDialog.title')}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          )}
                         </CardActionGrid>
                       </div>
                     ))}
@@ -384,35 +389,39 @@ export function InventoryPage() {
                             <td className="py-3 px-4 text-right">{renderInventoryStatus(item)}</td>
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-center gap-1.5">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2.5 xl:px-3"
-                                  onClick={() => {
-                                    setSelectedProduct(item)
-                                    setShowAdjustment(true)
-                                  }}
-                                  aria-label={t('supplierPage.table.adjust')}
-                                  title={t('supplierPage.table.adjust')}
-                                >
-                                  <Package className="h-4 w-4 xl:mr-1" />
-                                  <span className="hidden xl:inline">
-                                    {t('supplierPage.table.adjust')}
-                                  </span>
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="px-2.5"
-                                  onClick={() => {
-                                    setSelectedProduct(item)
-                                    setShowSettings(true)
-                                  }}
-                                  aria-label={t('supplierPage.settingsDialog.title')}
-                                  title={t('supplierPage.settingsDialog.title')}
-                                >
-                                  <Settings className="h-4 w-4" />
-                                </Button>
+                                {canAdjustInventory && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-2.5 xl:px-3"
+                                    onClick={() => {
+                                      setSelectedProduct(item)
+                                      setShowAdjustment(true)
+                                    }}
+                                    aria-label={t('supplierPage.table.adjust')}
+                                    title={t('supplierPage.table.adjust')}
+                                  >
+                                    <Package className="h-4 w-4 xl:mr-1" />
+                                    <span className="hidden xl:inline">
+                                      {t('supplierPage.table.adjust')}
+                                    </span>
+                                  </Button>
+                                )}
+                                {canAdjustInventory && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="px-2.5"
+                                    onClick={() => {
+                                      setSelectedProduct(item)
+                                      setShowSettings(true)
+                                    }}
+                                    aria-label={t('supplierPage.settingsDialog.title')}
+                                    title={t('supplierPage.settingsDialog.title')}
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </td>
                           </tr>

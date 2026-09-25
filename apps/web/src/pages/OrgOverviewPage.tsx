@@ -18,12 +18,16 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { ensureNamespace } from '../i18n'
 
-function formatMoney(n: number) {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n || 0)
+function formatMoney(n: number, currency = 'USD') {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(n || 0)
+  } catch {
+    return `${currency} ${n || 0}`
+  }
 }
 
 export function OrgOverviewPage() {
@@ -62,7 +66,12 @@ export function OrgOverviewPage() {
   const kpis = reports?.kpis
   const byBranch = reports?.by_branch ?? []
   const spendById = new Map(
-    byBranch.map((row) => [String(row.branch_account_id), Number(row.total_revenue || 0)])
+    byBranch.map((row) => [
+      String(row.branch_account_id),
+      row.total_revenue == null
+        ? null
+        : formatMoney(Number(row.total_revenue), String(row.currency || 'USD')),
+    ])
   )
 
   const handleOpenBranch = async (supplierId: string) => {
@@ -121,7 +130,13 @@ export function OrgOverviewPage() {
             <div className="rounded-lg border border-[var(--app-border)] p-4">
               <p className="text-xs text-[var(--text-muted)]">Revenue (period)</p>
               <p className="text-2xl font-semibold mt-1">
-                {formatMoney(Number(kpis.total_revenue || 0))}
+                {kpis.revenue_by_currency?.length
+                  ? kpis.revenue_by_currency
+                      .map((row) => formatMoney(row.amount, row.currency))
+                      .join(' · ')
+                  : kpis.total_revenue == null
+                    ? '—'
+                    : formatMoney(Number(kpis.total_revenue), kpis.currency || 'USD')}
               </p>
             </div>
             <div className="rounded-lg border border-[var(--app-border)] p-4">
@@ -171,9 +186,7 @@ export function OrgOverviewPage() {
                         staff: b.staff_count ?? 0,
                         orders: b.order_count ?? 0,
                       })}
-                      {spendById.has(b.id)
-                        ? ` · ${formatMoney(Number(spendById.get(b.id) ?? 0))} revenue`
-                        : ''}
+                      {spendById.get(b.id) ? ` · ${spendById.get(b.id)} revenue` : ''}
                     </p>
                     <div className="flex flex-wrap gap-3 mt-3 text-sm">
                       <button

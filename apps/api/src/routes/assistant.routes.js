@@ -8,6 +8,7 @@ import {
   rolesIncludeOwner,
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
+import { hasPermission } from '../lib/permissions.js'
 import {
   getAssistantCapabilities,
   buildAssistantContext,
@@ -22,6 +23,22 @@ const router = express.Router()
 const messageSchema = z.object({
   conversationId: z.string().uuid().optional().nullable(),
   message: z.string().min(1).max(4000),
+  attachments: z
+    .array(
+      z.object({
+        fileUrl: z.string().url(),
+        fileType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+        fileName: z.string().min(1).max(255),
+        fileSize: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(10 * 1024 * 1024)
+          .optional(),
+      })
+    )
+    .max(5)
+    .optional(),
 })
 
 /** Baseline: any workspace view permission (or Owner) can open the assistant. */
@@ -41,7 +58,7 @@ function assistantAccessGuard(req, res, next) {
 }
 
 const assistantFeatureGate = requireFeature(
-  'ai_platform',
+  'ai_assistant',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -54,6 +71,32 @@ router.use((req, res, next) => {
   }
   return next()
 })
+router.use((req, res, next) => {
+  if (req.userData?.role !== 'ADMIN' && !req.adminContext) return next()
+  if (hasPermission(req.adminContext?.permissions || [], 'ADMIN_ACCESS')) return next()
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: {
+      name: 'FORBIDDEN',
+      message: 'Administrator access is required to use the assistant',
+    },
+    requestId: req.requestId,
+  })
+})
+router.use((req, res, next) => {
+  if (req.userData?.role !== 'DRIVER') return next()
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: {
+      name: 'FORBIDDEN',
+      message: 'Drivers use guided delivery tools instead of the conversational assistant',
+    },
+    requestId: req.requestId,
+  })
+})
+
 router.use((req, res, next) => {
   if (req.userData?.role === 'ADMIN' || req.adminContext) return next()
   return assistantFeatureGate(req, res, next)

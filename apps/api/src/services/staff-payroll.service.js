@@ -1,25 +1,45 @@
 import { query } from '../lib/db.js'
+import { getZonedDayBounds } from '../lib/reservation-board-date.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 
-function entryHours(entry, periodEnd) {
+export function payrollQueryWindow(periodStart, periodEnd, timeZone) {
+  if (!timeZone) {
+    return {
+      start: new Date(`${periodStart}T00:00:00.000Z`),
+      end: new Date(`${periodEnd}T23:59:59.999Z`),
+    }
+  }
+  return {
+    start: getZonedDayBounds(periodStart, timeZone).start,
+    end: getZonedDayBounds(periodEnd, timeZone).end,
+  }
+}
+
+function entryHours(entry, periodEnd, now = new Date(), timeZone) {
   const clockIn = new Date(entry.clock_in_at)
-  const clockOut = entry.clock_out_at ? new Date(entry.clock_out_at) : new Date(periodEnd)
+  const periodCap = timeZone
+    ? getZonedDayBounds(periodEnd, timeZone).end
+    : new Date(`${periodEnd}T23:59:59.999Z`)
+  const rawEnd = entry.clock_out_at ? new Date(entry.clock_out_at) : now
+  const clockOutMs = Math.min(rawEnd.getTime(), periodCap.getTime())
   const breakMin = entry.break_minutes != null ? Number(entry.break_minutes) : 0
-  const ms = clockOut.getTime() - clockIn.getTime()
+  const ms = clockOutMs - clockIn.getTime()
   return Math.max(0, ms / 3600000 - breakMin / 60)
 }
 
-export function buildPayrollPreview(rows, periodStart, periodEnd) {
+export function buildPayrollPreview(rows, periodStart, periodEnd, now = new Date(), timeZone) {
   const byStaff = new Map()
   const byRole = new Map()
   let totalHours = 0
   let totalBreakMinutes = 0
   let estimatedCost = 0
   let hasOpenEntries = false
+  let sawHourlyRate = false
   const staffMissingRate = []
 
   for (const row of rows) {
     if (!row.clock_out_at) hasOpenEntries = true
-    const hours = entryHours(row, `${periodEnd}T23:59:59.999Z`)
+    const hours = entryHours(row, periodEnd, now, timeZone)
     if (hours <= 0) continue
 
     totalHours += hours
@@ -47,7 +67,8 @@ export function buildPayrollPreview(rows, periodStart, periodEnd) {
     byRole.set(roleKey, (byRole.get(roleKey) || 0) + hours)
 
     if (row.wage_type === 'HOURLY') {
-      if (row.wage_rate != null && Number(row.wage_rate) > 0) {
+      if (row.wage_rate != null && row.wage_rate !== '') {
+        sawHourlyRate = true
         const cost = hours * Number(row.wage_rate)
         staffLine.estimatedCost = (staffLine.estimatedCost || 0) + cost
         estimatedCost += cost
@@ -74,7 +95,7 @@ export function buildPayrollPreview(rows, periodStart, periodEnd) {
     periodEnd,
     totalHours: Math.round(totalHours * 100) / 100,
     totalBreakMinutes: Math.round(totalBreakMinutes),
-    estimatedLabourCost: estimatedCost > 0 ? Math.round(estimatedCost * 100) / 100 : null,
+    estimatedLabourCost: sawHourlyRate ? Math.round(estimatedCost * 100) / 100 : null,
     staffLines,
     byRole: byRoleLines,
     staffMissingRate,
@@ -86,19 +107,21 @@ export function buildPayrollPreview(rows, periodStart, periodEnd) {
 }
 
 export async function computePayrollPreview(restaurantId, periodStart, periodEnd) {
+  const timeZone = await getRestaurantTimezone(restaurantId)
+  const window = payrollQueryWindow(periodStart, periodEnd, timeZone)
   const { rows } = await query(
     `
       SELECT te.*, sm.display_name, sm.role, sm.wage_type, sm.wage_rate
       FROM staff_time_entry te
       JOIN staff_member sm ON sm.id = te.staff_id
       WHERE te.restaurant_id = $1
-        AND te.clock_in_at >= $2::date
-        AND te.clock_in_at < ($3::date + interval '1 day')
+        AND te.clock_in_at >= $2
+        AND te.clock_in_at <= $3
         AND te.status IN ('OPEN', 'APPROVED', 'LOCKED')
     `,
-    [restaurantId, periodStart, periodEnd]
+    [restaurantId, window.start.toISOString(), window.end.toISOString()]
   )
-  return buildPayrollPreview(rows, periodStart, periodEnd)
+  return buildPayrollPreview(rows, periodStart, periodEnd, new Date(), timeZone)
 }
 
 export function previewToPayrollTotals(preview) {

@@ -95,11 +95,10 @@ export async function proposeOrderSubstitution({
   substituteProductId,
   requestedByUserId,
   description,
+  client = null,
+  skipNotify = false,
 }) {
   const order = await getOrderForAmendment(orderId)
-  if (order.supplier_id !== supplierId) {
-    throw new ValidationError('Access denied')
-  }
   if (!canAmendOrderStatus(order.status)) {
     throw new ValidationError('Shortages and substitutions cannot be proposed after processing')
   }
@@ -117,9 +116,9 @@ export async function proposeOrderSubstitution({
     throw new ValidationError('Substitute is not configured for this product')
   }
 
-  const amendment = await withTransaction(async (client) => {
-    await assertNoPendingAmendment(orderId, client)
-    const { rows } = await client.query(
+  const writeAmendment = async (db) => {
+    await assertNoPendingAmendment(orderId, db)
+    const { rows } = await db.query(
       `
       INSERT INTO order_amendments (
         order_id, requested_by_role, requested_by, change_type, description
@@ -129,7 +128,7 @@ export async function proposeOrderSubstitution({
       [orderId, requestedByUserId, description || 'Supplier proposed product substitute']
     )
     const created = rows[0]
-    await client.query(
+    await db.query(
       `
       INSERT INTO order_amendment_items (
         amendment_id, order_item_id, original_product_id, substitute_product_id, notes
@@ -138,9 +137,13 @@ export async function proposeOrderSubstitution({
       [created.id, orderItemId, item.product_id, substituteProductId, description || null]
     )
     return created
-  })
+  }
 
-  await notifyAmendmentParty(order, amendment, 'created')
+  const amendment = client ? await writeAmendment(client) : await withTransaction(writeAmendment)
 
-  return { amendmentId: amendment.id, status: 'pending', autoSent: false }
+  if (!skipNotify) {
+    await notifyAmendmentParty(order, amendment, 'created')
+  }
+
+  return { amendmentId: amendment.id, status: 'pending', autoSent: false, amendment }
 }

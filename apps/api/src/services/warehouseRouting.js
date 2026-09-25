@@ -3,6 +3,7 @@
  */
 import { reserveWarehouseStock, reserveWarehouseStockBatch } from './warehouseInventory.js'
 import { haversineDistanceKm } from './delivery-eta.service.js'
+import { postalCodeMatches } from '../lib/postal-code-match.js'
 
 const RULE_PRIORITY = {
   product: 1,
@@ -15,12 +16,20 @@ const RULE_PRIORITY = {
 function extractLatLng(address) {
   if (!address || typeof address !== 'object') return null
   const lat = Number(
-    address.lat ?? address.latitude ?? address.Lat ?? address.coords?.lat ?? address.location?.lat
+    address.lat ??
+      address.latitude ??
+      address.deliveryLatitude ??
+      address.delivery_latitude ??
+      address.Lat ??
+      address.coords?.lat ??
+      address.location?.lat
   )
   const lng = Number(
     address.lng ??
       address.lon ??
       address.longitude ??
+      address.deliveryLongitude ??
+      address.delivery_longitude ??
       address.Lng ??
       address.coords?.lng ??
       address.location?.lng
@@ -42,18 +51,26 @@ function pointInRing(lat, lng, ring) {
   return inside
 }
 
+function pointInPolygonRings(lat, lng, rings) {
+  if (!Array.isArray(rings?.[0]) || !pointInRing(lat, lng, rings[0])) return false
+  for (let i = 1; i < rings.length; i++) {
+    if (Array.isArray(rings[i]) && pointInRing(lat, lng, rings[i])) return false
+  }
+  return true
+}
+
 function pointInGeoJson(lat, lng, geo) {
   if (!geo || typeof geo !== 'object') return false
   const type = geo.type
   const coords = geo.coordinates
   if (type === 'Polygon' && Array.isArray(coords?.[0])) {
-    return pointInRing(lat, lng, coords[0])
+    return pointInPolygonRings(lat, lng, coords)
   }
   if (type === 'MultiPolygon' && Array.isArray(coords)) {
-    return coords.some((poly) => Array.isArray(poly?.[0]) && pointInRing(lat, lng, poly[0]))
+    return coords.some((poly) => Array.isArray(poly) && pointInPolygonRings(lat, lng, poly))
   }
   if (Array.isArray(geo.rings?.[0])) {
-    return pointInRing(lat, lng, geo.rings[0])
+    return pointInPolygonRings(lat, lng, geo.rings)
   }
   if (Array.isArray(geo.coordinates?.[0]) && typeof geo.coordinates[0][0] === 'number') {
     return pointInRing(lat, lng, geo.coordinates)
@@ -65,16 +82,26 @@ function pointInGeoJson(lat, lng, geo) {
  * Whether a restaurant address falls inside a delivery zone.
  * Fail-closed: unknown/incomplete geo data does not count as a match.
  */
+function postalCodesOf(zone) {
+  const raw = zone?.postal_codes
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.split(',').map((code) => code.trim())
+  }
+  return []
+}
+
 export function restaurantMatchesZone(zone, address) {
   if (!zone) return false
   const postalCode = address?.postalCode ?? address?.zip ?? address?.postal_code ?? null
 
   if (zone.zone_type === 'postal_codes') {
-    if (!postalCode || !Array.isArray(zone.postal_codes) || !zone.postal_codes.length) return false
-    return zone.postal_codes.includes(postalCode)
+    const codes = postalCodesOf(zone)
+    if (!postalCode || !codes.length) return false
+    return codes.some((code) => postalCodeMatches(code, postalCode))
   }
 
-  if (zone.zone_type === 'radius' || (zone.radius_km != null && zone.center_lat != null)) {
+  if (zone.zone_type === 'radius') {
     const point = extractLatLng(address)
     const centerLat = Number(zone.center_lat)
     const centerLng = Number(zone.center_lng)
@@ -119,6 +146,53 @@ export function restaurantMatchesZone(zone, address) {
   )
 }
 
+function destinationHasRoutingSignal(address) {
+  if (!address || typeof address !== 'object') return false
+  const postal = address.postalCode ?? address.postal_code ?? address.zip
+  if (postal != null && String(postal).trim()) return true
+  return Boolean(extractLatLng(address))
+}
+
+/** Order snapshot, then branch, then restaurant — the same destination warehouse routing uses. */
+export async function resolveRoutingDestination(client, order) {
+  let destinationAddress = order?.delivery_location_snapshot || null
+  if (typeof destinationAddress === 'string') {
+    try {
+      destinationAddress = JSON.parse(destinationAddress)
+    } catch {
+      destinationAddress = null
+    }
+  }
+  if (destinationAddress?.address && typeof destinationAddress.address === 'object') {
+    destinationAddress = { ...destinationAddress, ...destinationAddress.address }
+  }
+  if (destinationHasRoutingSignal(destinationAddress)) return destinationAddress
+
+  if (order?.branch_id && order?.restaurant_id) {
+    const { rows } = await client.query(
+      `SELECT name, address, delivery_latitude AS latitude, delivery_longitude AS longitude,
+              delivery_location_label AS label
+       FROM branch WHERE id = $1 AND tenant_id = $2 AND COALESCE(is_active, TRUE) = TRUE`,
+      [order.branch_id, order.restaurant_id]
+    )
+    const branch = rows[0] ? { ...rows[0], ...(rows[0].address || {}) } : null
+    if (destinationHasRoutingSignal(branch)) return branch
+  }
+
+  if (order?.restaurant_id) {
+    const { rows } = await client.query(
+      `SELECT address_json, delivery_latitude AS latitude, delivery_longitude AS longitude,
+              delivery_location_label AS label
+       FROM restaurant WHERE id = $1`,
+      [order.restaurant_id]
+    )
+    const restaurant = rows[0] ? { ...rows[0], ...(rows[0].address_json || {}) } : null
+    if (destinationHasRoutingSignal(restaurant)) return restaurant
+  }
+
+  return destinationAddress
+}
+
 /**
  * Pick warehouse for one line item using routing rules (pure, no side effects).
  * @returns {{ warehouseId: string, ruleType: string, ruleId?: string }}
@@ -129,6 +203,7 @@ export function resolveWarehouseForItem(item, context) {
     warehouses = [],
     warehouseStock = new Map(),
     restaurantInZoneByWarehouse = new Map(),
+    restaurantZoneIds = null,
     defaultWarehouseId = null,
   } = context
 
@@ -170,8 +245,11 @@ export function resolveWarehouseForItem(item, context) {
   for (const rule of activeRules) {
     if (rule.rule_type === 'zone' && rule.zone_id) {
       const whForZone = rule.warehouse_id
+      const inRuleZone = restaurantZoneIds
+        ? restaurantZoneIds.has(rule.zone_id)
+        : restaurantInZoneByWarehouse.get(whForZone)
       if (
-        restaurantInZoneByWarehouse.get(whForZone) &&
+        inRuleZone &&
         (!warehouses.length || warehouses.some((w) => w.id === whForZone && w.is_active !== false))
       ) {
         return { warehouseId: whForZone, ruleType: 'zone', ruleId: rule.id }
@@ -254,7 +332,10 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
 
   const productIds = orderItems.map((i) => i.product_id)
   const { rows: products } = productIds.length
-    ? await client.query(`SELECT id, category_id FROM product WHERE id = ANY($1)`, [productIds])
+    ? await client.query(
+        `SELECT id, category_id FROM product WHERE id = ANY($1) AND supplier_id = $2`,
+        [productIds, supplierId]
+      )
     : { rows: [] }
   const categoryByProduct = new Map(products.map((p) => [p.id, p.category_id]))
 
@@ -268,14 +349,17 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
         `SELECT wi.warehouse_id, wi.product_id, wi.quantity_available
          FROM warehouse_inventory wi
          JOIN warehouse w ON w.id = wi.warehouse_id
-         WHERE wi.product_id = ANY($1) AND w.is_active = TRUE`,
-        [productIds]
+         WHERE wi.product_id = ANY($1) AND w.${supplierCol} = $2 AND w.is_active = TRUE
+         ORDER BY wi.warehouse_id, wi.product_id
+         FOR UPDATE OF wi`,
+        [productIds, supplierId]
       )
     : { rows: [] }
 
   const warehouseStock = new Map(stockRows.map((r) => [`${r.warehouse_id}:${r.product_id}`, r]))
 
   let restaurantInZoneByWarehouse = new Map()
+  const restaurantZoneIds = new Set()
   if (order.restaurant_id) {
     const { rows: restaurantRows } = await client.query(
       `SELECT address_json FROM restaurant WHERE id = $1`,
@@ -297,6 +381,9 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
       const inZone = whZones.some((z) => restaurantMatchesZone(z, address))
       restaurantInZoneByWarehouse.set(wh.id, inZone)
     }
+    for (const zone of zones) {
+      if (restaurantMatchesZone(zone, address)) restaurantZoneIds.add(zone.id)
+    }
   }
 
   const activeIds = new Set(warehouses.map((w) => w.id))
@@ -314,6 +401,7 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
     enrichedItems,
     warehouseStock,
     restaurantInZoneByWarehouse,
+    restaurantZoneIds,
     defaultWarehouseId: defaultWarehouse,
   }
 }
@@ -341,6 +429,7 @@ async function assignWarehousesToOrderLegacy(
   const { getWarehouseSupplierColumn, isDefaultWarehouse } = await import(
     '../lib/warehouse-helpers.js'
   )
+  const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
 
   const useMulti =
     multiWarehouseActive &&
@@ -349,8 +438,8 @@ async function assignWarehousesToOrderLegacy(
 
   if (!useMulti && supplier.default_warehouse_id) {
     const { rows: activeDefault } = await client.query(
-      `SELECT id FROM warehouse WHERE id = $1 AND is_active = TRUE`,
-      [supplier.default_warehouse_id]
+      `SELECT id FROM warehouse WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
+      [supplier.default_warehouse_id, supplier.id]
     )
     if (activeDefault.length) {
       const warehouseId = activeDefault[0].id
@@ -368,8 +457,6 @@ async function assignWarehousesToOrderLegacy(
       return { mode: 'single', warehouseId, assignments: [assignment] }
     }
   }
-
-  const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
 
   const { rows: warehouses } = await client.query(
     `SELECT id, is_default, is_main, is_active FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE ORDER BY created_at`,
@@ -416,6 +503,7 @@ async function assignWarehousesToOrderLegacy(
       warehouses: ctx.warehouses,
       warehouseStock: ctx.warehouseStock,
       restaurantInZoneByWarehouse: ctx.restaurantInZoneByWarehouse,
+      restaurantZoneIds: ctx.restaurantZoneIds,
       defaultWarehouseId: ctx.defaultWarehouseId,
     })
 
@@ -453,11 +541,14 @@ export function buildSimulationFromPayload({
     (warehouseStock || []).map((r) => [`${r.warehouse_id}:${r.product_id}`, r])
   )
   const restaurantInZoneByWarehouse = new Map()
+  const restaurantZoneIds = new Set()
+  const address = { postalCode: restaurantPostalCode, zip: restaurantPostalCode }
+  for (const zone of zones || []) {
+    if (restaurantMatchesZone(zone, address)) restaurantZoneIds.add(zone.id)
+  }
   for (const wh of warehouses || []) {
     const whZones = (zones || []).filter((z) => z.warehouse_id === wh.id)
-    const inZone = whZones.some((z) =>
-      restaurantMatchesZone(z, { postalCode: restaurantPostalCode, zip: restaurantPostalCode })
-    )
+    const inZone = whZones.some((z) => restaurantMatchesZone(z, address))
     restaurantInZoneByWarehouse.set(wh.id, inZone)
   }
 
@@ -469,6 +560,7 @@ export function buildSimulationFromPayload({
     warehouses,
     warehouseStock: warehouseStockMap,
     restaurantInZoneByWarehouse,
+    restaurantZoneIds,
     defaultWarehouseId,
   })
 }
@@ -495,7 +587,7 @@ function ruleMatchesCandidate(item, warehouseId, rules) {
   return true
 }
 
-function candidateRuleRank(items, warehouseId, rules, zoneEligible) {
+function candidateRuleRank(items, warehouseId, rules, zoneEligible, matchedZoneIds = null) {
   const matching = []
   for (const item of items) {
     const productRule = rules.find(
@@ -515,7 +607,10 @@ function candidateRuleRank(items, warehouseId, rules, zoneEligible) {
   }
   if (zoneEligible) {
     const zoneRule = rules.find(
-      (rule) => rule.rule_type === 'zone' && rule.warehouse_id === warehouseId
+      (rule) =>
+        rule.rule_type === 'zone' &&
+        rule.warehouse_id === warehouseId &&
+        (matchedZoneIds ? matchedZoneIds.has(rule.zone_id) : true)
     )
     if (zoneRule) matching.push([3, Number(zoneRule.priority ?? 1)])
   }
@@ -535,7 +630,12 @@ function candidateRuleRank(items, warehouseId, rules, zoneEligible) {
  */
 export function resolveSingleWarehouseForOrder(items, context) {
   const warehouses = (context.warehouses || []).filter((warehouse) => warehouse.is_active !== false)
-  const rules = (context.rules || []).filter((rule) => rule.is_active !== false)
+  const activeWarehouseIds = new Set(warehouses.map((warehouse) => warehouse.id))
+  const rules = (context.rules || []).filter((rule) => {
+    if (rule.is_active === false) return false
+    if (!activeWarehouseIds.size || !rule.warehouse_id) return true
+    return activeWarehouseIds.has(rule.warehouse_id)
+  })
   const failures = []
   const eligible = []
 
@@ -560,7 +660,8 @@ export function resolveSingleWarehouseForOrder(items, context) {
         items,
         warehouse.id,
         rules,
-        context.zoneEligibleByWarehouse?.get(warehouse.id) === true
+        context.zoneEligibleByWarehouse?.get(warehouse.id) === true,
+        context.restaurantZoneIds
       )
       const isDefault =
         warehouse.id === context.defaultWarehouseId ||
@@ -631,7 +732,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
      ORDER BY priority ASC, created_at ASC, id ASC`,
     [supplierId]
   )
-  const productIds = orderItems.map((item) => item.product_id)
+  const productIds = [...new Set(orderItems.map((item) => item.product_id).filter(Boolean))]
   const { rows: products } = productIds.length
     ? await client.query(
         `SELECT id, supplier_id, category_id FROM product WHERE id = ANY($1::uuid[])`,
@@ -656,7 +757,9 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
          FROM warehouse_inventory wi
          JOIN warehouse w ON w.id = wi.warehouse_id
          WHERE wi.product_id = ANY($1::uuid[])
-           AND w.${supplierCol} = $2 AND w.is_active = TRUE`,
+           AND w.${supplierCol} = $2 AND w.is_active = TRUE
+         ORDER BY wi.warehouse_id, wi.product_id
+         FOR UPDATE OF wi`,
         [productIds, supplierId]
       )
     : { rows: [] }
@@ -664,28 +767,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
     stockRows.map((row) => [`${row.warehouse_id}:${row.product_id}`, row])
   )
 
-  let destinationAddress = order.delivery_location_snapshot || null
-  if (destinationAddress?.address && typeof destinationAddress.address === 'object') {
-    destinationAddress = { ...destinationAddress, ...destinationAddress.address }
-  }
-  if (!destinationAddress && order.branch_id) {
-    const { rows } = await client.query(
-      `SELECT name, address, delivery_latitude AS latitude, delivery_longitude AS longitude,
-              delivery_location_label AS label
-       FROM branch WHERE id = $1 AND tenant_id = $2 AND COALESCE(is_active, TRUE) = TRUE`,
-      [order.branch_id, order.restaurant_id]
-    )
-    destinationAddress = rows[0] ? { ...rows[0], ...(rows[0].address || {}) } : null
-  }
-  if (!destinationAddress) {
-    const { rows } = await client.query(
-      `SELECT address_json, delivery_latitude AS latitude, delivery_longitude AS longitude,
-              delivery_location_label AS label
-       FROM restaurant WHERE id = $1`,
-      [order.restaurant_id]
-    )
-    destinationAddress = rows[0] ? { ...rows[0], ...(rows[0].address_json || {}) } : null
-  }
+  const destinationAddress = await resolveRoutingDestination(client, order)
 
   const { rows: zones } = await client.query(
     `SELECT dz.id, dz.warehouse_id, dz.zone_type, dz.postal_codes, dz.geometry,
@@ -696,6 +778,10 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
     [supplierId]
   )
   const zoneEligibleByWarehouse = new Map()
+  const restaurantZoneIds = new Set()
+  for (const zone of zones) {
+    if (restaurantMatchesZone(zone, destinationAddress)) restaurantZoneIds.add(zone.id)
+  }
   for (const warehouse of warehouses) {
     const warehouseZones = zones.filter((zone) => zone.warehouse_id === warehouse.id)
     zoneEligibleByWarehouse.set(
@@ -720,6 +806,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
     rules,
     warehouseStock,
     zoneEligibleByWarehouse,
+    restaurantZoneIds,
     destinationAddress,
     defaultWarehouseId,
     enrichedItems,

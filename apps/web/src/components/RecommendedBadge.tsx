@@ -27,7 +27,7 @@ export function RecommendedBadge({ planCode, recommendedPlanCode, subtle }: Reco
           : 'text-xs font-medium bg-[var(--brand)] text-white'
       }
     >
-      Recommended
+      {subtle ? 'Best fit for you' : 'Recommended'}
     </Badge>
   )
 }

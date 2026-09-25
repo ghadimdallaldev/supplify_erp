@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Loader2, Truck, Plus, Link2 } from 'lucide-react'
+import { usePermissions } from '../../hooks/usePermissions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -44,8 +45,11 @@ const emptyForm = (): DriverForm => ({
 
 export function DriversSettingsPanel() {
   const { t } = useTranslation('fulfillment')
+  const { can } = usePermissions()
   const { data, isLoading, refetch } = useGetDriversQuery()
-  const { data: warehousesData } = useGetWarehousesQuery()
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
+    skip: !can('WAREHOUSES_VIEW'),
+  })
   const { data: teamUsersData } = useGetTenantRoleUsersQuery()
   const [createDriver, { isLoading: creating }] = useCreateDriverMutation()
   const [updateDriver, { isLoading: updating }] = useUpdateDriverMutation()

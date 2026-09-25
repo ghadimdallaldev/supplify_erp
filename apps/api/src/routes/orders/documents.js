@@ -54,7 +54,7 @@ import {
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
 
-import { buildPackingSlipPdf } from './orders.helpers.js'
+import { buildPackingSlipPdf, assertOrderReadAccess } from './orders.helpers.js'
 import { resolveRequestLocale } from '../../i18n/index.js'
 
 const router = express.Router()
@@ -84,21 +84,17 @@ router.post(
 
       const order = orders[0]
 
-      // Verify restaurant ownership (unless admin)
-      if (req.userData.role === 'RESTAURANT') {
-        const restaurantId = await getRestaurantIdForRequest(req)
-
-        if (!restaurantId || restaurantId !== order.restaurant_id) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied',
-            },
-            requestId: req.requestId,
-          })
-        }
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== order.restaurant_id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
       }
 
       // Allow reminders for orders that are not completed/cancelled
@@ -255,10 +251,16 @@ router.get(
         return res.status(404).json({ ok: false, error: { message: 'Order not found' } })
       }
       const order = orders[0]
-      let supplierId = null
-      if (req.userData.role === 'SUPPLIER') {
-        supplierId = await getSupplierIdForRequest(req)
+      const allowed = await assertOrderReadAccess(req, order, id)
+      if (!allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
       }
+      const supplierId = await getSupplierIdForRequest(req)
       const itemsQuery = supplierId
         ? `
         SELECT oi.*, COALESCE(p.name, 'Unavailable product') as product_name, COALESCE(p.sku, oi.product_id::text) as product_sku, COALESCE(p.unit, 'unit') AS unit,
@@ -332,12 +334,17 @@ router.get(
       }
 
       const order = orders[0]
-
-      // If supplier, verify they own items in this order and filter items
-      let supplierId = null
-      if (req.userData.role === 'SUPPLIER') {
-        supplierId = await getSupplierIdForRequest(req)
+      const allowed = await assertOrderReadAccess(req, order, id)
+      if (!allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Access denied' },
+          requestId: req.requestId,
+        })
       }
+
+      const supplierId = await getSupplierIdForRequest(req)
 
       // Get order items (filter by supplier if supplier role)
       const itemsQuery = supplierId

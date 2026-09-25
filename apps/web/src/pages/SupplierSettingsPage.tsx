@@ -169,10 +169,12 @@ export function SupplierSettingsPage() {
             {can('WAREHOUSES_VIEW') && (
               <TabsTrigger value="warehouses">{t('settings.tabs.warehouses')}</TabsTrigger>
             )}
-            {DELIVERY_ZONES_ENABLED && (
+            {DELIVERY_ZONES_ENABLED && can('WAREHOUSES_VIEW') && (
               <TabsTrigger value="delivery">{t('settings.tabs.delivery')}</TabsTrigger>
             )}
-            <TabsTrigger value="drivers">{t('settings.tabs.drivers')}</TabsTrigger>
+            {can('FULFILLMENT_VIEW') && (
+              <TabsTrigger value="drivers">{t('settings.tabs.drivers')}</TabsTrigger>
+            )}
             <TabsTrigger value="branches">{t('settings.tabs.branches')}</TabsTrigger>
             <TabsTrigger value="notifications">{t('settings.tabs.notifications')}</TabsTrigger>
             <TabsTrigger value="plan">{t('settings.tabs.plan')}</TabsTrigger>
@@ -229,7 +231,7 @@ export function SupplierSettingsPage() {
             </TabsContent>
           )}
 
-          {DELIVERY_ZONES_ENABLED && (
+          {DELIVERY_ZONES_ENABLED && can('WAREHOUSES_VIEW') && (
             <TabsContent value="delivery" className="space-y-4">
               <LazyTabMount
                 tab="delivery"
@@ -288,16 +290,18 @@ export function SupplierSettingsPage() {
             </LazyTabMount>
           </TabsContent>
 
-          <TabsContent value="drivers" className="space-y-4">
-            <LazyTabMount
-              tab="drivers"
-              selectedTab={activeTab}
-              className="space-y-4"
-              fallback={<SupplierSettingsTabLoading />}
-            >
-              <LazySupplierDriversTab />
-            </LazyTabMount>
-          </TabsContent>
+          {can('FULFILLMENT_VIEW') && (
+            <TabsContent value="drivers" className="space-y-4">
+              <LazyTabMount
+                tab="drivers"
+                selectedTab={activeTab}
+                className="space-y-4"
+                fallback={<SupplierSettingsTabLoading />}
+              >
+                <LazySupplierDriversTab />
+              </LazyTabMount>
+            </TabsContent>
+          )}
 
           {can('SETTINGS_VIEW') && tenantAuditEnabled && (
             <TabsContent value="activity" className="space-y-4">

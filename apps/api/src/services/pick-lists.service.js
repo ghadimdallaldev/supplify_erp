@@ -1,5 +1,9 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import {
+  assertWarehouseOwnedBySupplier,
+  getWarehouseSupplierColumn,
+} from '../lib/warehouse-helpers.js'
 
 const PICK_ELIGIBLE_ORDER_STATUSES = ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED']
 const ACTIVE_WAVE_STATUSES = ['PENDING', 'PICKING']
@@ -91,6 +95,7 @@ function mapPickList(row, items = []) {
 }
 
 async function loadWavePickLists(waveId) {
+  const supplierCol = await getWarehouseSupplierColumn()
   const { rows: pickLists } = await query(
     `
     SELECT
@@ -98,9 +103,10 @@ async function loadWavePickLists(waveId) {
       r.name AS restaurant_name,
       w.name AS warehouse_name
     FROM pick_list pl
+    JOIN delivery_wave dw ON dw.id = pl.wave_id
     JOIN customer_order o ON o.id = pl.order_id
     JOIN restaurant r ON r.id = o.restaurant_id
-    LEFT JOIN warehouse w ON w.id = pl.warehouse_id
+    LEFT JOIN warehouse w ON w.id = pl.warehouse_id AND w.${supplierCol} = dw.supplier_id
     WHERE pl.wave_id = $1
     ORDER BY pl.created_at
     `,
@@ -229,6 +235,7 @@ async function loadOrderItemsForPicking(supplierId, orderId, warehouseId) {
 
 export async function generateWave(supplierId, { date, warehouseId, orderIds } = {}) {
   const scheduledDate = date || todayDateString()
+  await assertWarehouseOwnedBySupplier(warehouseId, supplierId)
   const eligibleOrderIds = await resolveEligibleOrderIds(supplierId, {
     scheduledDate,
     warehouseId,
@@ -452,6 +459,7 @@ export async function completeWave(waveId, supplierId) {
       WHERE pl.wave_id = $1
         AND owa.order_id = pl.order_id
         AND owa.status IN ('pending', 'picking')
+        AND (pl.warehouse_id IS NULL OR owa.warehouse_id = pl.warehouse_id)
       `,
       [waveId]
     )

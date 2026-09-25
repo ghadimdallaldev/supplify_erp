@@ -111,6 +111,13 @@ export function adminDashboardPermissionGuard(req, res, next) {
   return requirePermission(key)(req, res, next)
 }
 
+/** After INVENTORY_VIEW on /api/inventory. */
+export function inventoryMutationGuard(req, res, next) {
+  const method = req.method.toUpperCase()
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+  return requireAnyPermission(P.INVENTORY_EDIT, P.INVENTORY_MANAGE)(req, res, next)
+}
+
 /** After CHAT_VIEW. */
 export function chatSendGuard(req, res, next) {
   const method = req.method.toUpperCase()
@@ -187,19 +194,30 @@ export function reviewsAccessGuard(req, res, next) {
   return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_EDIT, P.ORDERS_MANAGE)(req, res, next)
 }
 
-/** Presign / attach uploads tied to catalog, settings, staff, receiving, or invoices. */
+const FILES_DOMAIN_UPLOAD_KEYS = [
+  P.CATALOG_EDIT,
+  P.CATALOG_MANAGE,
+  P.SETTINGS_EDIT,
+  P.SETTINGS_MANAGE,
+  P.RECEIVING_MANAGE,
+  P.STAFF_EDIT,
+  P.STAFF_MANAGE,
+  P.INVOICES_EDIT,
+  P.INVOICES_MANAGE,
+]
+
+/** Product attach and other domain uploads (not chat). */
 export function filesUploadGuard(req, res, next) {
-  return requireAnyPermission(
-    P.CATALOG_EDIT,
-    P.CATALOG_MANAGE,
-    P.SETTINGS_EDIT,
-    P.SETTINGS_MANAGE,
-    P.RECEIVING_MANAGE,
-    P.STAFF_EDIT,
-    P.STAFF_MANAGE,
-    P.INVOICES_EDIT,
-    P.INVOICES_MANAGE
-  )(req, res, next)
+  return requireAnyPermission(...FILES_DOMAIN_UPLOAD_KEYS)(req, res, next)
+}
+
+/** Presign for catalog/settings/staff/receiving/invoices or chat attachments. */
+export function filesPresignGuard(req, res, next) {
+  return requireAnyPermission(...FILES_DOMAIN_UPLOAD_KEYS, P.CHAT_SEND, P.CHAT_MANAGE)(
+    req,
+    res,
+    next
+  )
 }
 
 /** Restaurant supplier relationship mutations (follow / block). */
@@ -209,12 +227,18 @@ export function restaurantSupplierMutationGuard(req, res, next) {
   return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_EDIT, P.ORDERS_MANAGE)(req, res, next)
 }
 
-/** Notification preferences and test sends. */
+/** Notification preferences, webhook config, and test sends. */
 export function notificationsMutationGuard(req, res, next) {
   const method = req.method.toUpperCase()
   const path = req.path || ''
   if (method === 'PATCH' && path === '/preferences') {
     return next()
+  }
+  if (path === '/webhook' || path.endsWith('/webhook')) {
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+      return requirePermission(P.SETTINGS_VIEW)(req, res, next)
+    }
+    return requirePermission(P.SETTINGS_MANAGE)(req, res, next)
   }
   if (method === 'POST' && path === '/test') {
     return requirePermission(P.SETTINGS_MANAGE)(req, res, next)

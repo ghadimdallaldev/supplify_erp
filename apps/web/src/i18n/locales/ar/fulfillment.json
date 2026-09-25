@@ -123,7 +123,8 @@
     },
     "selectReason": {
       "alreadyOnRoute": "موجود بالفعل على مسار",
-      "notEligible": "غير مؤهل لتخطيط المسار"
+      "notEligible": "غير مؤهل لتخطيط المسار",
+      "failedNeedsRetry": "أعد محاولة التوصيل الفاشل قبل إضافته إلى مسار"
     },
     "orderRow": {
       "restaurantFallback": "مطعم",

@@ -843,7 +843,8 @@ export async function applyPromotionByIdToOrder({
 }) {
   const { isFeatureEnabled, checkLimit, incrementUsage } = await import('../lib/subscription.js')
   const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
-  if (!dealsEnabled) return null
+  const redeemEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals_redeem')
+  if (!dealsEnabled || !redeemEnabled) return null
 
   const redemptionLimit = await checkLimit(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day')
   if (redemptionLimit.isOverLimit && !redemptionLimit.isUnlimited) {

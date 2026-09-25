@@ -97,8 +97,17 @@ router.get('/', async (req, res) => {
         },
         requestId: req.requestId,
       })
+    } else {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Impersonate a tenant to list orders',
+        },
+        requestId: req.requestId,
+      })
     }
-    // Admin with no impersonation sees all orders
 
     // Status filter
     if (params.status) {

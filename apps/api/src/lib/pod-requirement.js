@@ -11,7 +11,18 @@ export async function isPodRequiredForSupplier(supplierId, dbQuery = query) {
   return Boolean(rows[0]?.pod_required)
 }
 
-export async function orderHasProofOfDeliveryRecord(orderId, dbQuery = query) {
+export async function orderHasProofOfDeliveryRecord(
+  orderId,
+  dbQuery = query,
+  driverAssignmentId = null
+) {
+  if (driverAssignmentId) {
+    const { rows } = await dbQuery(
+      `SELECT 1 FROM proof_of_delivery WHERE order_id = $1 AND driver_assignment_id = $2 LIMIT 1`,
+      [orderId, driverAssignmentId]
+    )
+    return Boolean(rows[0])
+  }
   const { rows } = await dbQuery(`SELECT 1 FROM proof_of_delivery WHERE order_id = $1 LIMIT 1`, [
     orderId,
   ])
@@ -19,8 +30,13 @@ export async function orderHasProofOfDeliveryRecord(orderId, dbQuery = query) {
 }
 
 /** Response flags for delivery-status endpoints — podRequired reflects policy, not capture state. */
-export async function resolveDeliveryPodFlags({ supplierId, orderId, deliveryStatus }) {
-  const hasPod = await orderHasProofOfDeliveryRecord(orderId)
+export async function resolveDeliveryPodFlags({
+  supplierId,
+  orderId,
+  deliveryStatus,
+  driverAssignmentId = null,
+}) {
+  const hasPod = await orderHasProofOfDeliveryRecord(orderId, query, driverAssignmentId)
   const podRequired =
     deliveryStatus === 'delivered' ? await isPodRequiredForSupplier(supplierId) : false
   return { podRequired, hasPod }
@@ -35,11 +51,12 @@ export async function assertPodPresentWhenRequired({
   supplierId,
   orderId,
   status,
+  driverAssignmentId = null,
   dbQuery = query,
 }) {
   if (status !== 'delivered') return
   if (!(await isPodRequiredForSupplier(supplierId, dbQuery))) return
-  const hasPod = await orderHasProofOfDeliveryRecord(orderId, dbQuery)
+  const hasPod = await orderHasProofOfDeliveryRecord(orderId, dbQuery, driverAssignmentId)
   if (!hasPod) {
     throw new ValidationError('Proof of delivery is required before marking delivered')
   }

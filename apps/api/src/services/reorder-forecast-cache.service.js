@@ -1,7 +1,6 @@
 import { query } from '../lib/db.js'
 import { computeRestaurantForecasts } from './reorder-forecast.service.js'
-import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
-import { getEffectiveFeaturesForTenant } from '../lib/feature-flags.js'
+import { getResolvedFeatureValue } from '../lib/feature-flags.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
 const STALE_HOURS = 24
@@ -136,20 +135,21 @@ export async function refreshRestaurantForecasts(restaurantId, opts = {}) {
     return { refreshed: 0, skipped: 'tenant_locked' }
   }
 
-  const enabled = opts.featureValue
-    ? (await import('../lib/smart-reorder-tier.js')).resolveSmartReorderCapabilities(
-        opts.featureValue
-      ).capabilities.forecast
-    : await isFeatureEnabledForTenant(restaurantId, 'RESTAURANT', 'smart_reorder')
-
-  if (!enabled) {
-    return { refreshed: 0, skipped: 'feature_disabled' }
-  }
-
+  // Resolve the tiered value once, then judge capability from it. The previous
+  // code fell back to isFeatureEnabledForTenant(), a boolean check that passes
+  // for any truthy tier (including the Growth `suggestions_only` value, which
+  // has no forecast capability), and then read the value itself off
+  // getEffectiveFeaturesForTenant().features — but that helper returns an
+  // ARRAY of descriptors, so featureValue was always undefined and every
+  // cron-driven refresh bailed out as 'feature_disabled'.
   let featureValue = opts.featureValue
   if (featureValue === undefined) {
-    const eff = await getEffectiveFeaturesForTenant(restaurantId, 'RESTAURANT')
-    featureValue = eff?.features?.smart_reorder
+    featureValue = await getResolvedFeatureValue(restaurantId, 'RESTAURANT', 'smart_reorder')
+  }
+
+  const { resolveSmartReorderCapabilities } = await import('../lib/smart-reorder-tier.js')
+  if (!resolveSmartReorderCapabilities(featureValue).capabilities.forecast) {
+    return { refreshed: 0, skipped: 'feature_disabled' }
   }
 
   const { forecasts, skipped } = await computeRestaurantForecasts(restaurantId, {
@@ -326,12 +326,19 @@ export async function refreshAllDirtyForecasts() {
   }
 
   let totalForecasts = 0
+  let skippedNoForecastTier = 0
   for (const restaurantId of restaurantIds) {
-    const enabled = await isFeatureEnabledForTenant(restaurantId, 'RESTAURANT', 'smart_reorder')
-    if (!enabled) continue
-    const result = await refreshRestaurantForecasts(restaurantId)
+    // Pass the resolved tier value through so the capability check happens
+    // once. Growth (`suggestions_only`) is truthy but has no forecast
+    // capability, so a plain feature check would queue pointless work.
+    const featureValue = await getResolvedFeatureValue(restaurantId, 'RESTAURANT', 'smart_reorder')
+    const result = await refreshRestaurantForecasts(restaurantId, { featureValue })
+    if (result.skipped === 'feature_disabled') {
+      skippedNoForecastTier += 1
+      continue
+    }
     totalForecasts += result.refreshed || 0
   }
 
-  return { restaurants: restaurantIds.length, forecasts: totalForecasts }
+  return { restaurants: restaurantIds.length, forecasts: totalForecasts, skippedNoForecastTier }
 }

@@ -1,0 +1,447 @@
+import express from 'express'
+import request from 'supertest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  listSupplierSlowMovingInventory,
+  listSupplierDemandForecast,
+  listSupplierStockoutRisks,
+  listSupplierCrossSellOpportunities,
+  listSupplierSuggestedDealCandidates,
+  listSupplierWarehousePerformance,
+  listSupplierWarehouseDemandForecast,
+  getSupplierWeeklyIntelligenceSummary,
+  getRequestTenant,
+  gates,
+} = vi.hoisted(() => ({
+  listSupplierSlowMovingInventory: vi.fn(),
+  listSupplierDemandForecast: vi.fn(),
+  listSupplierStockoutRisks: vi.fn(),
+  listSupplierCrossSellOpportunities: vi.fn(),
+  listSupplierSuggestedDealCandidates: vi.fn(),
+  listSupplierWarehousePerformance: vi.fn(),
+  listSupplierWarehouseDemandForecast: vi.fn(),
+  getSupplierWeeklyIntelligenceSummary: vi.fn(),
+  getRequestTenant: vi.fn(),
+  gates: {
+    inventory: true,
+    warehouses: true,
+    multiWarehouse: true,
+    smartReorder: true,
+    forecast: true,
+    tier: 'scale',
+    permissions: new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW']),
+    order: [],
+  },
+}))
+
+vi.mock('../lib/rbac.js', () => ({
+  requireAuth: (req, _res, next) => {
+    gates.order.push('auth')
+    req.requestId = 'test-request'
+    next()
+  },
+  resolveTenantContext: (req, _res, next) => {
+    gates.order.push('tenant')
+    req.tenantContext = { tenantId: 'supplier-1', tenantType: 'SUPPLIER' }
+    next()
+  },
+  requireRole: () => (_req, _res, next) => {
+    gates.order.push('role')
+    next()
+  },
+  requirePermission: (permission) => (_req, res, next) => {
+    gates.order.push(`permission:${permission}`)
+    if (!gates.permissions.has(permission)) return res.status(403).json({ ok: false })
+    return next()
+  },
+  requireAnyPermission: () => (_req, _res, next) => next(),
+  getRequestTenant: (...args) => getRequestTenant(...args),
+}))
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: (feature) => (_req, res, next) => {
+    gates.order.push(`feature:${feature}`)
+    if (feature === 'multi_warehouse' && !gates.multiWarehouse) {
+      return res.status(403).json({ ok: false })
+    }
+    if (feature === 'warehouses' && !gates.warehouses) {
+      return res.status(403).json({ ok: false })
+    }
+    if (feature === 'inventory_management' && !gates.inventory) {
+      return res.status(403).json({ ok: false })
+    }
+    if (feature === 'smart_reorder' && !gates.smartReorder) {
+      return res.status(403).json({ ok: false })
+    }
+    return next()
+  },
+}))
+
+vi.mock('../lib/feature-flags.js', () => ({
+  getResolvedFeatureValue: vi.fn().mockResolvedValue('ai_forecast_seasonality'),
+}))
+vi.mock('../lib/smart-reorder-tier.js', () => ({
+  hasSmartReorderCapability: vi.fn(() => {
+    gates.order.push('capability:forecast')
+    return gates.forecast
+  }),
+}))
+vi.mock('../lib/intelligence-tier.js', () => ({
+  requireIntelligenceTier: (tier) => (_req, res, next) => {
+    gates.order.push(`tier:${tier}`)
+    if (gates.tier !== 'scale') return res.status(403).json({ ok: false })
+    return next()
+  },
+}))
+
+vi.mock('../lib/tenant-resolve.js', () => ({ requireSupplierId: vi.fn() }))
+vi.mock('../services/supplier-slow-moving-intelligence.service.js', () => ({
+  listSupplierSlowMovingInventory,
+}))
+vi.mock('../services/supplier-demand-forecast.service.js', () => ({ listSupplierDemandForecast }))
+vi.mock('../services/supplier-stockout-intelligence.service.js', () => ({
+  listSupplierStockoutRisks,
+}))
+vi.mock('../services/supplier-cross-sell-intelligence.service.js', () => ({
+  listSupplierCrossSellOpportunities,
+}))
+vi.mock('../services/supplier-suggested-deals-intelligence.service.js', () => ({
+  listSupplierSuggestedDealCandidates,
+}))
+vi.mock('../services/supplier-warehouse-performance-intelligence.service.js', () => ({
+  listSupplierWarehousePerformance,
+}))
+vi.mock('../services/supplier-warehouse-demand-forecast.service.js', () => ({
+  listSupplierWarehouseDemandForecast,
+}))
+vi.mock('../services/supplier-weekly-intelligence-summary.service.js', () => ({
+  getSupplierWeeklyIntelligenceSummary,
+}))
+
+const { supplierOpsRoutes } = await import('./supplier-ops.routes.js')
+
+function buildApp() {
+  const app = express()
+  app.use('/api/supplier', supplierOpsRoutes)
+  return app
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  gates.inventory = true
+  gates.warehouses = true
+  gates.multiWarehouse = true
+  gates.smartReorder = true
+  gates.forecast = true
+  gates.tier = 'scale'
+  gates.permissions = new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW'])
+  gates.order = []
+  getRequestTenant.mockResolvedValue({ tenantId: 'supplier-1', tenantType: 'SUPPLIER' })
+  listSupplierSlowMovingInventory.mockResolvedValue({ products: [], coverage: {}, windowDays: 90 })
+  listSupplierDemandForecast.mockResolvedValue({ forecasts: [], coverage: {}, horizonDays: 14 })
+  listSupplierStockoutRisks.mockResolvedValue({ risks: [], coverage: {}, horizonDays: 14 })
+  listSupplierCrossSellOpportunities.mockResolvedValue({ opportunities: [], observationDays: 180 })
+  listSupplierSuggestedDealCandidates.mockResolvedValue({
+    candidates: [],
+    coverage: {},
+    windowDays: 90,
+  })
+  listSupplierWarehousePerformance.mockResolvedValue({
+    warehouses: [],
+    coverage: {},
+    windowDays: 30,
+  })
+  listSupplierWarehouseDemandForecast.mockResolvedValue({
+    forecasts: [],
+    coverage: {},
+    horizonDays: 14,
+  })
+  getSupplierWeeklyIntelligenceSummary.mockResolvedValue({
+    summary: {},
+    sections: {},
+    periodDays: 7,
+  })
+})
+
+describe('supplier slow-moving inventory route', () => {
+  it('requires warehouse visibility, inventory management, and Supplier Scale in authorization order', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/slow-moving-inventory?days=120&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { products: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:WAREHOUSES_VIEW',
+      'feature:inventory_management',
+      'tier:scale',
+    ])
+    expect(listSupplierSlowMovingInventory).toHaveBeenCalledWith('supplier-1', {
+      days: '120',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke the service when warehouse visibility or Scale intelligence is absent', async () => {
+    gates.permissions = new Set()
+    await request(buildApp()).get('/api/supplier/slow-moving-inventory').expect(403)
+    expect(listSupplierSlowMovingInventory).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['WAREHOUSES_VIEW'])
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/slow-moving-inventory').expect(403)
+    expect(listSupplierSlowMovingInventory).not.toHaveBeenCalled()
+  })
+})
+
+describe('supplier suggested deals route', () => {
+  it('requires warehouse and promotions permissions, both source features, and Supplier Scale in authorization order', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'PROMOTIONS_MANAGE', 'ORDERS_VIEW'])
+    const res = await request(buildApp())
+      .get('/api/supplier/suggested-deals?days=120&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({
+      ok: true,
+      data: { candidates: [] },
+      requestId: 'test-request',
+    })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:WAREHOUSES_VIEW',
+      'permission:PROMOTIONS_MANAGE',
+      'feature:inventory_management',
+      'feature:promotions',
+      'tier:scale',
+    ])
+    expect(listSupplierSuggestedDealCandidates).toHaveBeenCalledWith('supplier-1', {
+      days: '120',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke suggested-deal analysis without promotions permission or Scale intelligence', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'ORDERS_VIEW'])
+    await request(buildApp()).get('/api/supplier/suggested-deals').expect(403)
+    expect(listSupplierSuggestedDealCandidates).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'PROMOTIONS_MANAGE', 'ORDERS_VIEW'])
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/suggested-deals').expect(403)
+    expect(listSupplierSuggestedDealCandidates).not.toHaveBeenCalled()
+  })
+})
+describe('supplier cross-sell route', () => {
+  it('requires order visibility and Supplier Scale before reading cross-sell evidence', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/cross-sell-opportunities?days=120&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({
+      ok: true,
+      data: { opportunities: [] },
+      requestId: 'test-request',
+    })
+    expect(gates.order).toEqual(['auth', 'tenant', 'role', 'permission:ORDERS_VIEW', 'tier:scale'])
+    expect(listSupplierCrossSellOpportunities).toHaveBeenCalledWith('supplier-1', {
+      days: '120',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke cross-sell analysis without order visibility or Scale intelligence', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW'])
+    await request(buildApp()).get('/api/supplier/cross-sell-opportunities').expect(403)
+    expect(listSupplierCrossSellOpportunities).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['ORDERS_VIEW'])
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/cross-sell-opportunities').expect(403)
+    expect(listSupplierCrossSellOpportunities).not.toHaveBeenCalled()
+  })
+})
+
+describe('supplier stockout risk route', () => {
+  it('requires both source permissions, forecast capability, and Supplier Scale in authorization order', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/stockout-risks?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { risks: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierStockoutRisks).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke stockout analysis without warehouse visibility or forecast capability', async () => {
+    gates.permissions = new Set(['ORDERS_VIEW'])
+    await request(buildApp()).get('/api/supplier/stockout-risks').expect(403)
+    expect(listSupplierStockoutRisks).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['ORDERS_VIEW', 'WAREHOUSES_VIEW'])
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/stockout-risks').expect(403)
+    expect(listSupplierStockoutRisks).not.toHaveBeenCalled()
+  })
+})
+describe('supplier demand forecast route', () => {
+  it('requires order visibility, forecasting capability, and Supplier Scale in authorization order', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/demand-forecast?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { forecasts: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke the forecast service without a forecast capability or Scale intelligence', async () => {
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/demand-forecast').expect(403)
+    expect(listSupplierDemandForecast).not.toHaveBeenCalled()
+
+    gates.forecast = true
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/demand-forecast').expect(403)
+    expect(listSupplierDemandForecast).not.toHaveBeenCalled()
+  })
+
+  it('uses the session supplier rather than a requested supplier id', async () => {
+    await request(buildApp())
+      .get('/api/supplier/demand-forecast?supplierId=other-supplier')
+      .expect(200)
+
+    expect(listSupplierDemandForecast.mock.calls[0][0]).toBe('supplier-1')
+  })
+})
+describe('supplier warehouse performance route', () => {
+  it('requires warehouse and fulfillment visibility, source features, and Supplier Scale in authorization order', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'FULFILLMENT_VIEW'])
+    const res = await request(buildApp())
+      .get('/api/supplier/warehouse-performance?days=60&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({
+      ok: true,
+      data: { warehouses: [] },
+      requestId: 'test-request',
+    })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:WAREHOUSES_VIEW',
+      'permission:FULFILLMENT_VIEW',
+      'feature:warehouses',
+      'feature:fulfillment',
+      'tier:scale',
+    ])
+    expect(listSupplierWarehousePerformance).toHaveBeenCalledWith('supplier-1', {
+      days: '60',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke performance analysis without the source permission, feature, or Scale intelligence', async () => {
+    gates.permissions = new Set(['WAREHOUSES_VIEW'])
+    await request(buildApp()).get('/api/supplier/warehouse-performance').expect(403)
+    expect(listSupplierWarehousePerformance).not.toHaveBeenCalled()
+
+    gates.permissions = new Set(['WAREHOUSES_VIEW', 'FULFILLMENT_VIEW'])
+    gates.warehouses = false
+    await request(buildApp()).get('/api/supplier/warehouse-performance').expect(403)
+    expect(listSupplierWarehousePerformance).not.toHaveBeenCalled()
+
+    gates.warehouses = true
+    gates.tier = 'basic'
+    await request(buildApp()).get('/api/supplier/warehouse-performance').expect(403)
+    expect(listSupplierWarehousePerformance).not.toHaveBeenCalled()
+  })
+})
+describe('supplier warehouse demand forecast route', () => {
+  it('requires order and warehouse visibility, multi-warehouse forecasting capability, and Supplier Scale', async () => {
+    const res = await request(buildApp())
+      .get('/api/supplier/warehouse-demand-forecast?horizon_days=21&limit=5')
+      .expect(200)
+
+    expect(res.body).toMatchObject({ ok: true, data: { forecasts: [] }, requestId: 'test-request' })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'feature:multi_warehouse',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(listSupplierWarehouseDemandForecast).toHaveBeenCalledWith('supplier-1', {
+      horizonDays: '21',
+      limit: '5',
+    })
+  })
+
+  it('does not invoke warehouse forecasting without the feature or forecast capability', async () => {
+    gates.multiWarehouse = false
+    await request(buildApp()).get('/api/supplier/warehouse-demand-forecast').expect(403)
+    expect(listSupplierWarehouseDemandForecast).not.toHaveBeenCalled()
+
+    gates.multiWarehouse = true
+    gates.forecast = false
+    await request(buildApp()).get('/api/supplier/warehouse-demand-forecast').expect(403)
+    expect(listSupplierWarehouseDemandForecast).not.toHaveBeenCalled()
+  })
+})
+describe('supplier weekly intelligence summary route', () => {
+  it('requires every source permission, feature, forecast capability, and Supplier Scale', async () => {
+    gates.permissions = new Set(['ORDERS_VIEW', 'WAREHOUSES_VIEW', 'FULFILLMENT_VIEW'])
+    const res = await request(buildApp())
+      .get('/api/supplier/weekly-intelligence-summary?days=14')
+      .expect(200)
+    expect(res.body).toMatchObject({ ok: true, data: { summary: {} } })
+    expect(gates.order).toEqual([
+      'auth',
+      'tenant',
+      'role',
+      'permission:ORDERS_VIEW',
+      'permission:WAREHOUSES_VIEW',
+      'permission:FULFILLMENT_VIEW',
+      'feature:inventory_management',
+      'feature:warehouses',
+      'feature:fulfillment',
+      'feature:multi_warehouse',
+      'feature:smart_reorder',
+      'capability:forecast',
+      'tier:scale',
+    ])
+    expect(getSupplierWeeklyIntelligenceSummary).toHaveBeenCalledWith('supplier-1', { days: '14' })
+  })
+})

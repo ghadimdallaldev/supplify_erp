@@ -1,6 +1,12 @@
 import { query } from './db.js'
-import { getPermissionsForUser } from './permissions.js'
+import { getPermissionsForUser, hasPermission } from './permissions.js'
 import { isFeatureEnabled } from './subscription.js'
+
+export async function adminHasSupportChatAccess(appUserId) {
+  if (!appUserId) return false
+  const adminPermissions = await getPermissionsForUser(appUserId, null, 'ADMIN')
+  return hasPermission(adminPermissions, 'ADMIN_SUPPORT')
+}
 
 /**
  * Verify a socket user may access a chat conversation in their active tenant.
@@ -13,13 +19,24 @@ export async function userCanAccessConversation(
   { tenantId = null, role = null, requiredPermission = 'CHAT_VIEW' } = {}
 ) {
   const { rows: convRows } = await query(
-    'SELECT id, supplier_id, restaurant_id FROM conversation WHERE id = $1',
+    'SELECT id, supplier_id, restaurant_id, is_admin_conversation FROM conversation WHERE id = $1',
     [conversationId]
   )
   if (convRows.length === 0) return false
   const conversation = convRows[0]
 
-  if (role === 'ADMIN') return true
+  if (role === 'ADMIN') {
+    if (conversation.is_admin_conversation) {
+      return adminHasSupportChatAccess(appUserId)
+    }
+    if (
+      tenantId &&
+      (conversation.supplier_id === tenantId || conversation.restaurant_id === tenantId)
+    ) {
+      return true
+    }
+    return false
+  }
   if (!appUserId || !tenantId || !['SUPPLIER', 'RESTAURANT'].includes(role)) return false
 
   const isParticipant =

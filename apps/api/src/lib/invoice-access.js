@@ -1,4 +1,4 @@
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
 import { requireRestaurantId, requireSupplierId } from './tenant-resolve.js'
 import { getEffectiveTenant } from './impersonation.js'
 
@@ -11,7 +11,9 @@ export async function assertInvoiceTenantAccess(req, invoice) {
   const role = req.userData?.role
   if (role === 'ADMIN') {
     const effectiveTenant = getEffectiveTenant(req)
-    if (!effectiveTenant) return
+    if (!effectiveTenant) {
+      throw new ForbiddenError('Impersonate a tenant to access invoices')
+    }
     const matchesSupplier =
       effectiveTenant.tenantType === 'SUPPLIER' && effectiveTenant.tenantId === invoice.supplier_id
     const matchesRestaurant =

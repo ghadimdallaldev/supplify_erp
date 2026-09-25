@@ -122,9 +122,9 @@ export const RESTAURANT_PROFILES = {
       description: 'Your carts, orders, and supplier catalog activity.',
       kpiKeys: ['orders', 'pending', 'counterpart'],
       kpiLabels: {
-        orders: { label: 'My orders', meta: 'Placed by you' },
+        orders: { label: 'Orders', meta: 'Placed by your team' },
         pending: { label: 'Awaiting delivery', meta: 'Track status' },
-        counterpart: { label: 'Suppliers', meta: 'Available to order' },
+        counterpart: { label: 'Suppliers', meta: 'You have ordered from' },
       },
     },
     promotionsCopy: DEFAULT_PROMOTIONS_COPY,

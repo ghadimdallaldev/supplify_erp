@@ -128,8 +128,19 @@ export async function runReservationGuestCommsJob() {
     `
   )
   for (const row of due24h) {
+    const { rows: claimed } = await query(
+      `
+      UPDATE reservation
+      SET reminder_24h_sent_at = now()
+      WHERE id = $1
+        AND status IN ('PENDING', 'CONFIRMED')
+        AND reminder_24h_sent_at IS NULL
+      RETURNING id
+      `,
+      [row.id]
+    )
+    if (!claimed.length) continue
     await notifyGuestReminder(row, row.restaurant_name, '24h')
-    await query(`UPDATE reservation SET reminder_24h_sent_at = now() WHERE id = $1`, [row.id])
     stats.reminders24h += 1
   }
 
@@ -147,11 +158,20 @@ export async function runReservationGuestCommsJob() {
     `
   )
   for (const row of due2h) {
-    await notifyGuestReminder(row, row.restaurant_name, '2h')
-    await query(
-      `UPDATE reservation SET reminder_2h_sent_at = now(), reminder_24h_sent_at = COALESCE(reminder_24h_sent_at, now()) WHERE id = $1`,
+    const { rows: claimed } = await query(
+      `
+      UPDATE reservation
+      SET reminder_2h_sent_at = now(),
+          reminder_24h_sent_at = COALESCE(reminder_24h_sent_at, now())
+      WHERE id = $1
+        AND status IN ('PENDING', 'CONFIRMED')
+        AND reminder_2h_sent_at IS NULL
+      RETURNING id
+      `,
       [row.id]
     )
+    if (!claimed.length) continue
+    await notifyGuestReminder(row, row.restaurant_name, '2h')
     stats.reminders2h += 1
   }
 
@@ -172,8 +192,19 @@ export async function runReservationGuestCommsJob() {
     `
   )
   for (const row of reviewDue) {
+    const { rows: claimed } = await query(
+      `
+      UPDATE reservation
+      SET review_invite_sent_at = now()
+      WHERE id = $1
+        AND status = 'COMPLETED'
+        AND review_invite_sent_at IS NULL
+      RETURNING id
+      `,
+      [row.id]
+    )
+    if (!claimed.length) continue
     await notifyGuestReviewInvite(row, row.restaurant_name)
-    await query(`UPDATE reservation SET review_invite_sent_at = now() WHERE id = $1`, [row.id])
     stats.reviewInvites += 1
   }
 

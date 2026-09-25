@@ -1,6 +1,25 @@
 import { useTranslation } from 'react-i18next'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency, formatPrice } from '../../utils/format'
+
+function moneyLabel(amount: number | string | null | undefined, currency?: string | null) {
+  const code = String(currency || '')
+    .trim()
+    .toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) return formatCurrency(amount ?? 0, { currency: code })
+  return formatPrice(amount ?? 0)
+}
 import { SummaryStrip } from '../ui/app-panel'
+
+function formatMoneyParts(
+  value: number | string | null | undefined,
+  parts?: Array<{ currency?: string; amount?: number }>
+) {
+  if (parts && parts.length > 0) {
+    return parts.map((part) => moneyLabel(part.amount ?? 0, part.currency)).join(' · ')
+  }
+  if (value == null || value === '') return '—'
+  return formatPrice(value)
+}
 
 type InvoiceStatsCardsProps = {
   stats: {
@@ -8,19 +27,34 @@ type InvoiceStatsCardsProps = {
     unpaid: number
     paidCount: number
     overdue: number
-    totalOutstanding: number
-    totalPaid: number
+    totalOutstanding: number | null
+    outstandingByCurrency?: Array<{ currency: string; amount: number }>
+    totalPaid: number | null
+    paidByCurrency?: Array<{ currency: string; amount: number }>
   }
   analytics: {
     issued_count?: number
     partial_count?: number
     paid_count?: number
     avg_days_to_pay?: string | number
-    total_paid_amount?: string | number
-    total_outstanding?: string | number
+    total_paid_amount?: string | number | null
+    total_outstanding?: string | number | null
+    money_by_currency?: Array<{
+      currency?: string
+      total_outstanding?: number
+      total_paid_amount?: number
+    }>
   }
   analyticsData: unknown
-  overdueData: { summary?: { totalOverdue?: number } } | undefined
+  overdueData:
+    | {
+        summary?: {
+          totalOverdue?: number | null
+          count?: number
+          byCurrency?: Array<{ currency: string; amount: number }>
+        }
+      }
+    | undefined
 }
 
 export function InvoiceStatsCards({
@@ -46,7 +80,7 @@ export function InvoiceStatsCards({
           },
           {
             label: t('stats.outstanding'),
-            value: formatPrice(stats.totalOutstanding),
+            value: formatMoneyParts(stats.totalOutstanding, stats.outstandingByCurrency),
             tone: 'amber',
             hint: t('stats.unpaid', { count: stats.unpaid }),
           },
@@ -54,13 +88,18 @@ export function InvoiceStatsCards({
             label: t('stats.overdue'),
             value: stats.overdue,
             tone: stats.overdue > 0 ? 'danger' : 'default',
-            hint: overdueData?.summary?.totalOverdue
-              ? formatPrice(overdueData.summary.totalOverdue)
-              : t('stats.allCurrent'),
+            hint:
+              overdueData?.summary?.byCurrency && overdueData.summary.byCurrency.length > 0
+                ? overdueData.summary.byCurrency
+                    .map((row) => moneyLabel(row.amount, row.currency))
+                    .join(' · ')
+                : overdueData?.summary?.totalOverdue
+                  ? formatPrice(overdueData.summary.totalOverdue)
+                  : t('stats.allCurrent'),
           },
           {
             label: t('stats.totalPaid'),
-            value: formatPrice(stats.totalPaid),
+            value: formatMoneyParts(stats.totalPaid, stats.paidByCurrency),
             tone: 'mint',
             hint:
               stats.paidCount > 0
@@ -83,12 +122,24 @@ export function InvoiceStatsCards({
             },
             {
               label: t('stats.paid30d'),
-              value: formatPrice(analytics.total_paid_amount),
+              value: formatMoneyParts(
+                analytics.total_paid_amount,
+                analytics.money_by_currency?.map((row) => ({
+                  currency: row.currency,
+                  amount: row.total_paid_amount,
+                }))
+              ),
               tone: 'mint',
             },
             {
               label: t('stats.outstanding30d'),
-              value: formatPrice(analytics.total_outstanding),
+              value: formatMoneyParts(
+                analytics.total_outstanding,
+                analytics.money_by_currency?.map((row) => ({
+                  currency: row.currency,
+                  amount: row.total_outstanding,
+                }))
+              ),
               tone: 'amber',
             },
           ]}

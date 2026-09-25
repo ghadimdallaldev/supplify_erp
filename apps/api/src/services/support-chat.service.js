@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
+import { adminHasSupportChatAccess } from '../lib/chat-access.js'
 
 export async function getOrCreateSupportConversation({
   tenantId,
@@ -100,13 +101,18 @@ export async function listAdminSupportConversations({ limit = 100 } = {}) {
 
 export async function assertSupportConversationAccess(
   conversationId,
-  { tenantId, tenantType, isAdmin }
+  { tenantId, tenantType, isAdmin, userId }
 ) {
   const { rows } = await query(`SELECT * FROM conversation WHERE id = $1`, [conversationId])
   const conv = rows[0]
   if (!conv || !conv.is_admin_conversation)
     throw new NotFoundError('Support conversation not found')
-  if (isAdmin) return conv
+  if (isAdmin) {
+    if (!(await adminHasSupportChatAccess(userId))) {
+      throw new NotFoundError('Support conversation not found')
+    }
+    return conv
+  }
   if (conv.support_tenant_id !== tenantId || conv.support_tenant_type !== tenantType) {
     throw new NotFoundError('Support conversation not found')
   }

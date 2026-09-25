@@ -7,6 +7,7 @@ import {
   requireRole,
 } from '../../lib/rbac.js'
 import { requireRestaurantId } from '../../lib/tenant-resolve.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../../lib/branch-scope.js'
 import { logger } from '../../lib/logger.js'
 import {
   createConsumerOrder,
@@ -184,9 +185,13 @@ consumerOrdersAdminRoutes.get('/', async (req, res) => {
   try {
     const params = listQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(params.branchId ?? null, restaurantId)
     const orders = await listRestaurantConsumerOrders(restaurantId, params)
     jsonOk(res, { orders })
   } catch (error) {
+    if (error.name === 'ValidationError' || error.name === 'ZodError') {
+      return jsonError(res, 400, 'VALIDATION_ERROR', error.message || 'Invalid request')
+    }
     logger.error('List consumer orders failed', { error: error.message })
     jsonError(res, 500, 'LIST_ORDERS_ERROR', 'Unable to load orders')
   }

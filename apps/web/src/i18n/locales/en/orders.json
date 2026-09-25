@@ -500,5 +500,20 @@
     "reminderSent": "Reminder sent to supplier successfully",
     "reminderFailed": "Failed to send reminder",
     "productAdded": "Added {{name}} to order"
+  },
+  "supplierReliability": {
+    "title": "Supplier reliability",
+    "description": "Observed delivery, receiving, completion, and dispute facts from the last {{days}} days.",
+    "empty": "No supplier reliability data in this period.",
+    "ordersCompleted": "{{completed}} of {{placed}} orders completed",
+    "fillRate": "Fill rate",
+    "quality": "Quality",
+    "onTime": "On time",
+    "openDisputes": "Open disputes",
+    "signals": {
+      "short_receipt": "Short receipt recorded",
+      "late_delivery": "Late delivery recorded",
+      "open_dispute": "Open dispute"
+    }
   }
 }

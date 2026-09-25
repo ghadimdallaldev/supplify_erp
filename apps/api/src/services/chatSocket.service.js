@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { adminHasSupportChatAccess } from '../lib/chat-access.js'
 
 /**
  * Persist a chat message received via socket (e.g. from legacy client that only emits send_message).
@@ -45,7 +46,7 @@ export async function persistMessageFromSocket(
         `SELECT 1 FROM conversation WHERE id = $1 AND COALESCE(is_admin_conversation, false) = true`,
         [conversationId]
       )
-      if (adminConv.length > 0) {
+      if (adminConv.length > 0 && (await adminHasSupportChatAccess(appUserId))) {
         senderType = 'ADMIN'
         senderId = appUserId
       }

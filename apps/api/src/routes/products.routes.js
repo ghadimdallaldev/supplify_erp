@@ -10,7 +10,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
@@ -29,7 +29,9 @@ import {
   getSupplierProductAvailableQty,
   overlayProductRowsWithAuthoritativeStock,
 } from '../services/supplier-stock.service.js'
+import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
 
@@ -660,8 +662,8 @@ router.get('/', async (req, res) => {
         SELECT amount, currency
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true
       ${whereClause}
@@ -679,8 +681,8 @@ router.get('/', async (req, res) => {
         SELECT amount
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true`
           : ''
@@ -872,8 +874,8 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
           SELECT amount, currency
           FROM price
           WHERE price.product_id = p.id
-            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-          ORDER BY valid_from DESC
+            AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+          ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
           LIMIT 1
         ) pr ON true
         WHERE pf.restaurant_id = $1 AND pf.user_id = $2
@@ -1154,6 +1156,16 @@ router.get('/:id', async (req, res) => {
       }
       const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
       product = enriched
+    } else {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Product not found',
+        },
+        requestId: req.requestId,
+      })
     }
 
     product.available_qty = await getSupplierProductAvailableQty(product.supplier_id, product.id)
@@ -1186,91 +1198,110 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
   try {
     const productData = productCreateSchema.parse(req.body)
 
-    // For suppliers, ensure they can only create products for their own supplier record
-    let supplierId = req.body.supplier_id
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier record not found for user',
+        },
+        requestId: req.requestId,
+      })
+    }
 
-    if (req.userData.role === 'SUPPLIER') {
-      supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
+    const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
+    if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+      const [subscription, recommendedPlans] = await Promise.all([
+        getTenantSubscription(supplierId, 'SUPPLIER'),
+        getRecommendedPlanNames('SUPPLIER'),
+      ])
+      const err = buildLimitExceededPayload(
+        limitCheck,
+        'supplier_products_skus',
+        subscription?.plan_name || subscription?.plan_display_name,
+        recommendedPlans,
+        undefined,
+        'SUPPLIER'
+      )
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: err,
+        requestId: req.requestId,
+      })
+    }
+
+    const requestedWarehouseId =
+      typeof req.body.warehouse_id === 'string' && req.body.warehouse_id.trim()
+        ? req.body.warehouse_id.trim()
+        : null
+    if (requestedWarehouseId) {
+      const parsedWarehouseId = z.string().uuid().safeParse(requestedWarehouseId)
+      if (!parsedWarehouseId.success) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Invalid warehouse_id' },
+          requestId: req.requestId,
+        })
+      }
+      const supplierColumn = await getWarehouseSupplierColumn()
+      const { rows: warehouseRows } = await query(
+        `SELECT id FROM warehouse WHERE id = $1 AND ${supplierColumn} = $2 AND is_active = TRUE`,
+        [parsedWarehouseId.data, supplierId]
+      )
+      if (!warehouseRows.length) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Supplier record not found for user',
+            message: 'Warehouse not found for this supplier',
           },
           requestId: req.requestId,
         })
       }
-
-      // Check plan limits for suppliers
-      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
-      if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
-        const [subscription, recommendedPlans] = await Promise.all([
-          getTenantSubscription(supplierId, 'SUPPLIER'),
-          getRecommendedPlanNames('SUPPLIER'),
-        ])
-        const err = buildLimitExceededPayload(
-          limitCheck,
-          'supplier_products_skus',
-          subscription?.plan_name || subscription?.plan_display_name,
-          recommendedPlans,
-          undefined,
-          'SUPPLIER'
-        )
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: err,
-          requestId: req.requestId,
-        })
-      }
-    }
-
-    if (!supplierId) {
-      throw new ValidationError('supplier_id is required')
     }
 
     const selectedCategory = await assertCategoryAvailable(productData.category_id, supplierId)
 
-    // Use transaction to create product, price, and inventory together
-    await query('BEGIN')
+    const hasTags = await productHasTagsColumn()
+    const tagsArray =
+      hasTags && req.body.tags
+        ? Array.isArray(req.body.tags)
+          ? req.body.tags
+          : req.body.tags
+              .split(',')
+              .map((t) => t.trim())
+              .filter((t) => t)
+        : []
 
-    try {
-      const hasTags = await productHasTagsColumn()
-      const tagsArray =
-        hasTags && req.body.tags
-          ? Array.isArray(req.body.tags)
-            ? req.body.tags
-            : req.body.tags
-                .split(',')
-                .map((t) => t.trim())
-                .filter((t) => t)
-          : []
+    let insertCols =
+      'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
+    let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
+    let insertValues = [
+      supplierId,
+      productData.sku,
+      productData.name,
+      productData.name_ar || null,
+      productData.description || null,
+      productData.description_ar || null,
+      productData.brand || null,
+      selectedCategory?.name || productData.category || null,
+      productData.category_id || null,
+      productData.image_url || null,
+      productData.unit || null,
+    ]
+    if (hasTags) {
+      insertCols += ', tags'
+      insertPlaceholders += ', $12::jsonb'
+      insertValues.push(JSON.stringify(tagsArray))
+    }
 
-      let insertCols =
-        'supplier_id, sku, name, name_ar, description, description_ar, brand, category, category_id, image_url, unit'
-      let insertPlaceholders = '$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11'
-      let insertValues = [
-        supplierId,
-        productData.sku,
-        productData.name,
-        productData.name_ar || null,
-        productData.description || null,
-        productData.description_ar || null,
-        productData.brand || null,
-        selectedCategory?.name || productData.category || null,
-        productData.category_id || null,
-        productData.image_url || null,
-        productData.unit || null,
-      ]
-      if (hasTags) {
-        insertCols += ', tags'
-        insertPlaceholders += ', $12::jsonb'
-        insertValues.push(JSON.stringify(tagsArray))
-      }
-
-      const { rows } = await query(
+    const product = await withTransaction(async (client) => {
+      const { rows } = await client.query(
         `INSERT INTO product (${insertCols}) VALUES (${insertPlaceholders}) RETURNING *`,
         insertValues
       )
@@ -1279,7 +1310,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create price if provided
       if (req.body.price !== undefined && req.body.price !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO price (product_id, amount, currency, valid_from)
           VALUES ($1, $2, 'USD', now())
@@ -1290,48 +1321,52 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
 
       // Create inventory if initial stock provided
       if (req.body.initialStock !== undefined && req.body.initialStock !== null) {
-        await query(
+        await client.query(
           `
           INSERT INTO inventory (product_id, warehouse_id, available_qty, reserved_qty, on_order_qty)
           VALUES ($1, $2, $3, 0, 0)
         `,
-          [product.id, req.body.warehouse_id || null, req.body.initialStock]
+          [product.id, requestedWarehouseId, req.body.initialStock]
         )
+        await syncWarehouseMirrorFromLegacy(client, {
+          supplierId,
+          productId: product.id,
+          availableQty: Number(req.body.initialStock),
+          reservedQty: 0,
+          warehouseId: requestedWarehouseId || null,
+        })
       }
 
-      await query('COMMIT')
+      return product
+    })
 
-      // Track usage for supplier
-      if (req.userData.role === 'SUPPLIER' && supplierId) {
-        await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
-      }
-
-      logger.info('Product created with price and inventory', {
-        productId: product.id,
-        sku: product.sku,
-        actor: req.userData.id,
-      })
-
-      await writeAuditLog(req, {
-        action_type: 'product.created',
-        tenant_type: 'SUPPLIER',
-        tenant_id: supplierId,
-        target_id: product.id,
-        payload_json: { resource_type: 'product', sku: product.sku },
-      })
-
-      await invalidateCatalogMetaCache(supplierId)
-
-      res.status(201).json({
-        ok: true,
-        data: { product },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      await query('ROLLBACK')
-      throw error
+    // Track usage for supplier
+    if (req.userData.role === 'SUPPLIER' && supplierId) {
+      await incrementUsage(supplierId, 'SUPPLIER', 'supplier_products_skus', 1)
     }
+
+    logger.info('Product created with price and inventory', {
+      productId: product.id,
+      sku: product.sku,
+      actor: req.userData.id,
+    })
+
+    await writeAuditLog(req, {
+      action_type: 'product.created',
+      tenant_type: 'SUPPLIER',
+      tenant_id: supplierId,
+      target_id: product.id,
+      payload_json: { resource_type: 'product', sku: product.sku },
+    })
+
+    await invalidateCatalogMetaCache(supplierId)
+
+    res.status(201).json({
+      ok: true,
+      data: { product },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
@@ -1376,20 +1411,17 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
 
     const product = existingProducts[0]
 
-    // Check ownership for suppliers
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || product.supplier_id !== supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update your own products',
-          },
-          requestId: req.requestId,
-        })
-      }
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId || product.supplier_id !== supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied. You can only update your own products',
+        },
+        requestId: req.requestId,
+      })
     }
 
     const selectedCategory =

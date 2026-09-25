@@ -24,7 +24,7 @@ const ORDER_DESTINATION_SQL = `
     b.address AS branch_address
   FROM customer_order o
   JOIN restaurant r ON r.id = o.restaurant_id
-  LEFT JOIN branch b ON b.id = o.branch_id
+  LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
   WHERE o.id = $1
 `
 

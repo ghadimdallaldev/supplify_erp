@@ -1,27 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Bot, Loader2, Send, Sparkles } from 'lucide-react'
+import { Bot, Loader2, Paperclip, Send, Sparkles, X } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { ensureNamespace } from '../../i18n'
-import { featureEnabled } from '../../lib/planLimits'
+import { isEntitlementFeatureEnabled } from '../../lib/planLimits'
 import { useAppSelector } from '../../hooks/redux'
 import { useImpersonation } from '../../hooks/useImpersonation'
 import {
   useGetAssistantCapabilitiesQuery,
   useGetAssistantMessagesQuery,
   useGetEntitlementsQuery,
+  useGetPresignedUrlMutation,
   useSendAssistantMessageMutation,
 } from '../../services/api'
-import type { AssistantMessage } from '../../types/assistant'
+import type { AssistantAttachment, AssistantMessage } from '../../types/assistant'
+import { uploadFileThroughGateway } from '../../utils/fileUpload'
 
 type LocalMsg = {
   id: string
   role: 'user' | 'assistant'
   content: string
   sources?: Array<{ tool: string; ok: boolean }>
+  attachments?: AssistantAttachment[]
 }
 
 function suggestionKeysForRole(role: string | undefined, tools: string[]): string[] {
@@ -32,7 +35,10 @@ function suggestionKeysForRole(role: string | undefined, tools: string[]): strin
   if (role === 'SUPPLIER') {
     return ['fulfillment', 'warehouse', 'orders', 'invoices']
   }
-  return ['stock', 'need', 'orders', 'deliveries', 'invoices']
+  const restaurantSuggestions = ['stock', 'need', 'orders', 'deliveries', 'invoices']
+  if (tools.includes('get_followed_suppliers')) restaurantSuggestions.unshift('followedSuppliers')
+  if (tools.includes('compare_supplier_prices')) restaurantSuggestions.unshift('bestPrices')
+  return restaurantSuggestions
 }
 
 export function AssistantFab() {
@@ -43,10 +49,13 @@ export function AssistantFab() {
   const { data: entitlements } = useGetEntitlementsQuery(undefined, {
     skip: !user || (user.role === 'ADMIN' && !isImpersonating),
   })
+  // The payload is `{ entitlements: {...} }`. Reading `entitlements.features`
+  // directly always yielded undefined, so this gate was permanently false for
+  // every non-admin user and the assistant entry point never rendered.
   const planHasAi =
     user?.role === 'ADMIN' && !isImpersonating
       ? true
-      : featureEnabled(entitlements?.features?.ai_platform)
+      : isEntitlementFeatureEnabled(entitlements?.entitlements, 'ai_assistant')
 
   useEffect(() => {
     void ensureNamespace('assistant')
@@ -56,7 +65,8 @@ export function AssistantFab() {
     skip: !user || !open,
   })
 
-  // Show FAB when plan has ai_platform (or admin). Env-disabled still shows panel with unavailable.
+  // The conversational assistant is a Scale entitlement. The API keeps its own
+  // authoritative gate; the UI only avoids rendering an unavailable entry point.
   if (!user || !planHasAi) return null
 
   return (
@@ -125,7 +135,11 @@ function AssistantChatBody({
   const [draft, setDraft] = useState('')
   const [localMessages, setLocalMessages] = useState<LocalMsg[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const [sendMessage, { isLoading }] = useSendAssistantMessageMutation()
+  const [generatePresignedUrl] = useGetPresignedUrlMutation()
 
   const { data: history } = useGetAssistantMessagesQuery(
     { conversationId: conversationId! },
@@ -141,6 +155,7 @@ function AssistantChatBody({
         role: m.role as 'user' | 'assistant',
         content: m.content,
         sources: m.toolPayload?.sources,
+        attachments: m.toolPayload?.attachments,
       }))
   }, [history?.messages, localMessages])
 
@@ -151,18 +166,38 @@ function AssistantChatBody({
   const suggestions = suggestionKeysForRole(role, tools)
 
   async function onSend(text: string) {
-    const message = text.trim()
-    if (!message || isLoading || !enabled) return
-    const optimistic: LocalMsg[] = [
-      ...messages,
-      { id: `u-${Date.now()}`, role: 'user', content: message },
-    ]
-    setLocalMessages(optimistic)
-    setDraft('')
+    const message = text.trim() || (selectedFiles.length ? 'Please review the attached files.' : '')
+    if (!message || isLoading || isUploading || !enabled) return
+    let optimistic: LocalMsg[] = messages
     try {
+      setIsUploading(selectedFiles.length > 0)
+      const attachments: AssistantAttachment[] = []
+      for (const file of selectedFiles) {
+        const presigned = await generatePresignedUrl({
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+        }).unwrap()
+        await uploadFileThroughGateway(presigned, file, file.type)
+        if (!presigned.publicUrl) throw new Error('Upload did not return a file URL')
+        attachments.push({
+          fileUrl: presigned.publicUrl,
+          fileType: file.type as AssistantAttachment['fileType'],
+          fileName: file.name,
+          fileSize: file.size,
+        })
+      }
+      optimistic = [
+        ...messages,
+        { id: `u-${Date.now()}`, role: 'user', content: message, attachments },
+      ]
+      setLocalMessages(optimistic)
+      setDraft('')
+      setSelectedFiles([])
       const res = await sendMessage({
         conversationId,
         message,
+        attachments: attachments.length ? attachments : undefined,
       }).unwrap()
       setConversationId(res.conversationId)
       setLocalMessages([
@@ -179,6 +214,8 @@ function AssistantChatBody({
         ...optimistic,
         { id: `e-${Date.now()}`, role: 'assistant', content: t('error') },
       ])
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -186,6 +223,7 @@ function AssistantChatBody({
     setConversationId(null)
     setLocalMessages([])
     setDraft('')
+    setSelectedFiles([])
   }
 
   if (loadingCaps) {
@@ -254,6 +292,22 @@ function AssistantChatBody({
             )}
           >
             <p className="whitespace-pre-wrap">{m.content}</p>
+            {m.attachments?.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {m.attachments.map((attachment) => (
+                  <a
+                    key={`${m.id}-${attachment.fileUrl}`}
+                    href={attachment.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex max-w-full items-center gap-1 rounded border border-current/20 px-2 py-1 text-[10px] underline-offset-2 hover:underline"
+                  >
+                    <Paperclip className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{attachment.fileName}</span>
+                  </a>
+                ))}
+              </div>
+            ) : null}
             {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
               <p className="mt-1 text-[10px] opacity-70">
                 {t('fromLiveData')}: {m.sources.map((s) => s.tool).join(', ')}
@@ -272,29 +326,81 @@ function AssistantChatBody({
       </div>
 
       <form
-        className="flex gap-2 border-t border-[var(--app-border)] p-3"
+        className="space-y-2 border-t border-[var(--app-border)] p-3"
         onSubmit={(e) => {
           e.preventDefault()
           void onSend(draft)
         }}
       >
         <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t('placeholder')}
-          className="min-w-0 flex-1 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/30"
-          disabled={isLoading}
-          data-testid="assistant-input"
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            const files = Array.from(event.target.files || []).filter(
+              (file) => file.size <= 10 * 1024 * 1024
+            )
+            setSelectedFiles((current) => [...current, ...files].slice(0, 5))
+            event.target.value = ''
+          }}
         />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={isLoading || !draft.trim()}
-          aria-label={t('send')}
-          data-testid="assistant-send"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        {selectedFiles.length ? (
+          <div className="flex flex-wrap gap-1">
+            {selectedFiles.map((file, index) => (
+              <span
+                key={`${file.name}-${index}`}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-[var(--bg)] px-2 py-1 text-[10px]"
+              >
+                <Paperclip className="h-3 w-3 shrink-0" />
+                <span className="max-w-40 truncate">{file.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() =>
+                    setSelectedFiles((files) => files.filter((_, itemIndex) => itemIndex !== index))
+                  }
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label="Attach files"
+            disabled={isLoading || isUploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={t('placeholder')}
+            className="min-w-0 flex-1 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--brand-mid)]/30"
+            disabled={isLoading || isUploading}
+            data-testid="assistant-input"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || isUploading || (!draft.trim() && !selectedFiles.length)}
+            aria-label={t('send')}
+            data-testid="assistant-send"
+          >
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </form>
     </div>
   )

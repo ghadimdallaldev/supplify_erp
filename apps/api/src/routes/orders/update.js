@@ -35,6 +35,7 @@ import { orderAmendmentsRouter } from '../order-amendments.routes.js'
 import { ordersDriverRoutes } from '../orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
+import { getEffectiveTenant } from '../../lib/impersonation.js'
 import { hasPermission } from '../../lib/permissions.js'
 import {
   updateDriverDeliveryStatus,
@@ -53,6 +54,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
+import { invalidateDispatchCacheForSupplier } from '../../lib/dispatch-cache.js'
 
 import {
   orderCreateSchema,
@@ -63,6 +65,7 @@ import {
   scheduleOrderStatusNotification,
   scheduleOrderPlacedNotification,
   handleOrderDelivery,
+  assertOrderReadAccess,
 } from './orders.helpers.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
@@ -140,6 +143,7 @@ router.patch('/:id', async (req, res) => {
         supplierId,
         orderId: id,
         deliveryStatus: updateData.delivery_status,
+        driverAssignmentId: assignment?.id ?? null,
       })
       return res.json({
         ok: true,
@@ -301,6 +305,35 @@ router.patch('/:id', async (req, res) => {
         }
         return await handleOrderDelivery(id, req.userData, res, req, order.status)
       }
+    } else {
+      const allowed = await assertOrderReadAccess(req, order, id)
+      if (!allowed) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const effective = getEffectiveTenant(req)
+      if (
+        effective?.tenantType === 'RESTAURANT' &&
+        updateData.status &&
+        updateData.status !== 'CANCELLED'
+      ) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Restaurants can only cancel orders',
+          },
+          requestId: req.requestId,
+        })
+      }
     }
 
     if (updateData.status && updateData.status !== order.status) {
@@ -421,6 +454,14 @@ router.patch('/:id', async (req, res) => {
         await restoreSupplierStockForOrder(client, id)
       }
 
+      if (
+        updateData.status === 'CANCELLED' &&
+        lockedOrder.status !== 'CANCELLED' &&
+        order.supplier_id
+      ) {
+        await releaseOrderFromPlannedRoutes(id, order.supplier_id, client)
+      }
+
       return updated
     })
 
@@ -431,14 +472,7 @@ router.patch('/:id', async (req, res) => {
     })
 
     if (updateData.status === 'CANCELLED' && order.status !== 'CANCELLED' && order.supplier_id) {
-      void releaseOrderFromPlannedRoutes(id, order.supplier_id).catch((error) => {
-        logger.warn({
-          event: 'order.route_release.background_failed',
-          orderId: id,
-          supplierId: order.supplier_id,
-          error: error?.message,
-        })
-      })
+      await invalidateDispatchCacheForSupplier(order.supplier_id)
     }
 
     if (updateData.status && updateData.status !== order.status) {

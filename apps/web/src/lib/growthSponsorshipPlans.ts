@@ -9,8 +9,8 @@ export type SponsorshipGiftPlanKey = (typeof SPONSORSHIP_GIFT_PLAN_KEYS)[number]
 
 export const SPONSORSHIP_PLAN_LABELS: Record<SponsorshipPlanKey, string> = {
   silver: 'Restaurant Growth',
-  gold: 'Restaurant Scale',
-  platinum: 'Restaurant Custom',
+  gold: 'Restaurant Intelligence',
+  platinum: 'Restaurant Scale',
   enterprise: 'Enterprise',
 }
 

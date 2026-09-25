@@ -10,6 +10,8 @@ export interface Supplier {
   organization_name?: string | null
   tenant_id?: string | null
   vat_no?: string
+  legal_name?: string
+  trade_license_no?: string
   contact_email: string
   phone?: string
   address_json?: Address
@@ -111,4 +113,26 @@ export interface SuppliersResponse {
     limit: number
     offset: number
   }
+}
+
+export interface SupplierPriceOffer {
+  productId: string
+  productName: string
+  supplierId: string
+  supplierName: string
+  amount: number | string
+  currency: string
+  minQty: number | string
+}
+
+export interface CommonProductPriceComparison {
+  productName: string
+  brand?: string | null
+  unit?: string | null
+  currency: string
+  bestOffer: SupplierPriceOffer
+  offers: SupplierPriceOffer[]
+  supplierCount: number
+  savings: number
+  savingsPercent: number
 }

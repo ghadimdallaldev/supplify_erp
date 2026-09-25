@@ -58,14 +58,7 @@ async function resolveRestaurantId(req) {
   if (req.tenantContext?.tenantType === 'RESTAURANT') {
     return req.tenantContext.tenantId
   }
-  const tenantId = await getRestaurantIdForRequest(req)
-  if (tenantId) return tenantId
-  if (req.userData?.role !== 'ADMIN') return null
-  const { rows } = await query(
-    `SELECT id FROM restaurant WHERE LOWER(TRIM(contact_email)) = LOWER(TRIM($1)) LIMIT 1`,
-    [req.userData.email]
-  )
-  return rows[0]?.id || null
+  return getRestaurantIdForRequest(req)
 }
 
 // Get delivered orders ready for receiving
@@ -95,7 +88,6 @@ router.get(
       SELECT DISTINCT ON (o.id)
         o.*,
         s.name AS supplier_name,
-        s.contact_email AS supplier_email,
         (rr.id IS NOT NULL) AS has_receiving_report
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id
@@ -452,6 +444,7 @@ router.post(
           ) {
             await createLotFromReceivingLine(client, {
               restaurantId,
+              branchId: order.branch_id ?? null,
               reportId: report.id,
               lineItemId,
               productId: item.productId,
@@ -542,7 +535,9 @@ router.post(
         let autoDispute = null
         if (discrepancies.length > 0) {
           let disputeItemsToAdd = discrepancies
-          let disputedAmount = discrepancies.reduce((sum, item) => sum + item.disputedAmount, 0)
+          // The invoice bills accepted units only, so the credit cap stays 0.
+          // Shortage and damage are tracked on dispute lines for replacement.
+          let disputedAmount = 0
           const hasQualityIssue = discrepancies.some((item) => item.qualityStatus !== 'ACCEPTED')
           const { rows: activeDisputes } = await client.query(
             `SELECT * FROM disputes
@@ -562,7 +557,7 @@ router.post(
             disputeItemsToAdd = discrepancies.filter(
               (item) => !existingOrderItemIds.has(String(item.orderItemId))
             )
-            disputedAmount = disputeItemsToAdd.reduce((sum, item) => sum + item.disputedAmount, 0)
+            disputedAmount = 0
             const { rows } = await client.query(
               `UPDATE disputes
                SET receiving_report_id = COALESCE(receiving_report_id, $2),
@@ -610,7 +605,7 @@ router.post(
                 item.orderItemId,
                 item.productName,
                 item.quantityOrdered,
-                item.quantityReceived,
+                item.qualityStatus === 'ACCEPTED' ? item.quantityReceived : 0,
                 item.unitPrice,
                 item.issueDescription,
               ]
@@ -655,8 +650,14 @@ router.post(
           autoDispute = rows[0]
         }
 
-        const earnBaseAmount =
-          totalActualCost > 0 ? totalActualCost : parseFloat(order.total_amount || 0)
+        if (createdInvoice) {
+          await client.query(
+            `UPDATE customer_order SET status = $1, updated_at = now() WHERE id = $2`,
+            [nextStatus, orderId]
+          )
+        }
+
+        const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0
         const loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
           supplierId,
           restaurantId,
@@ -665,7 +666,14 @@ router.post(
           createdBy: req.userData?.id,
         })
 
-        return { report, createdInvoice, loyaltyEarn, autoDispute, nextStatus }
+        return {
+          report,
+          createdInvoice,
+          loyaltyEarn,
+          autoDispute,
+          nextStatus,
+          currency: order.currency,
+        }
       })
 
       if (result.autoDispute) {
@@ -705,6 +713,7 @@ router.post(
           supplierId,
           unitPrice: item.actual_unit_price || item.expected_unit_price,
           unit: item.unit || 'unit',
+          currency: result.currency || 'USD',
         }))
       hookRecipeCostingAfterReceiving(restaurantId, costingItems)
       if (result.createdInvoice) {

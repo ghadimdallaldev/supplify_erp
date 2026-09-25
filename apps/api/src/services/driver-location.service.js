@@ -169,7 +169,10 @@ export async function recordDriverLocation({
 
   await assertSupplierOwnsOrder(supplierId, orderId)
 
-  const assignment = await getActiveDriverAssignment(orderId)
+  const assignment = await getActiveDriverAssignment(orderId, null, {
+    driverId,
+    assignmentId: driverAssignmentId || null,
+  })
   if (!assignment || assignment.supplier_id !== supplierId) {
     throw new ValidationError('No active driver assignment for this order')
   }

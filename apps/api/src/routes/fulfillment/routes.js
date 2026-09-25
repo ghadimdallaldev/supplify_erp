@@ -5,6 +5,7 @@ import {
   resolveTenantContext,
   getRequestTenant,
   requirePermission,
+  rolesIncludeOwner,
 } from '../../lib/rbac.js'
 import { hasPermission } from '../../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
@@ -64,7 +65,10 @@ router.get('/routes/today', async (req, res, next) => {
       })
     }
     const perms = req.tenantContext?.permissions ?? []
-    if (!hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) {
+    if (
+      !rolesIncludeOwner(req.tenantContext?.roles) &&
+      !hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)
+    ) {
       return res.status(403).json({
         ok: false,
         data: null,
@@ -100,7 +104,10 @@ router.get('/routes/active', async (req, res, next) => {
       })
     }
     const perms = req.tenantContext?.permissions ?? []
-    if (!hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) {
+    if (
+      !rolesIncludeOwner(req.tenantContext?.roles) &&
+      !hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)
+    ) {
       return res.status(403).json({
         ok: false,
         data: null,
@@ -143,7 +150,10 @@ router.post('/routes/build-from-assignments', async (req, res, next) => {
       })
     }
     const perms = req.tenantContext?.permissions ?? []
-    if (!hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)) {
+    if (
+      !rolesIncludeOwner(req.tenantContext?.roles) &&
+      !hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)
+    ) {
       return res.status(403).json({
         ok: false,
         data: null,

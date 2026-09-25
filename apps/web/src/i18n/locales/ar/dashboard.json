@@ -50,6 +50,7 @@
       "completed": "مكتمل",
       "pending": "قيد الانتظار",
       "processing": "قيد المعالجة",
+      "other": "أخرى",
       "totalAllTime": "إجمالي الطلبات (طوال الوقت)"
     },
     "spendTrend": {

@@ -57,15 +57,6 @@ async function resolveParentTenant(req) {
       }
       return { parentId: effectiveTenant.tenantId, parentType: effectiveTenant.tenantType }
     }
-    const adminPermissions = req.adminContext?.permissions || []
-    const canQueryAnyTenant =
-      adminPermissions.includes('ADMIN_TENANTS') || adminPermissions.includes('ADMIN_ACCESS')
-    if (restaurantId && canQueryAnyTenant) {
-      return { parentId: restaurantId, parentType: 'RESTAURANT' }
-    }
-    if (supplierId && canQueryAnyTenant) {
-      return { parentId: supplierId, parentType: 'SUPPLIER' }
-    }
     return null
   }
 

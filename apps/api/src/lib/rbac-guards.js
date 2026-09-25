@@ -4,7 +4,7 @@
 import { query } from './db.js'
 import { ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
 import { MAIN_ADMIN_ROLE_NAME } from './workspace-membership.js'
-import { getAllPermissionsForTenantType } from './tenant-roles.js'
+import { getAllPermissionsForTenantType, userHasOwnerRole } from './tenant-roles.js'
 import { getPermissionsForUser, hasPermission } from './permissions.js'
 
 export async function getRolePermissionSet(roleId, client = null) {
@@ -144,10 +144,11 @@ export async function assertCanAssignRole({
 
   if (role.name === MAIN_ADMIN_ROLE_NAME) {
     if (!requesterIsPlatformAdmin) {
-      const requesterIsOwner = organizationId
+      const requesterIsTenantOwner = await userHasOwnerRole(requesterId, tenantId, tenantType)
+      const requesterIsOrgOwner = organizationId
         ? await userIsOwnerInOrganization(requesterId, organizationId, tenantType)
         : false
-      if (!requesterIsOwner) {
+      if (!requesterIsTenantOwner && !requesterIsOrgOwner) {
         throw new ForbiddenError('Only an Owner can assign the Owner role')
       }
     }

@@ -1,5 +1,7 @@
 import { query } from '../lib/db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { addCalendarDays } from '../lib/delivery-rollover-time.js'
+import { getZonedParts, zonedDayBounds } from '../lib/tenant-timezone.js'
 
 const GRANULARITIES = ['day', 'week', 'month']
 /** Maximum inclusive report window (days). */
@@ -17,9 +19,64 @@ function endOfDay(d) {
   return x
 }
 
-export function parseReportQuery(query = {}) {
-  const from = query.from ? startOfDay(new Date(query.from)) : startOfDay(defaultFrom())
-  const to = query.to ? endOfDay(new Date(query.to)) : endOfDay(new Date())
+/** YYYY-MM-DD is a calendar day in the server's local timezone, not UTC midnight. */
+export function parseReportBoundary(value, boundary) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number)
+    if (boundary === 'end') return new Date(year, month - 1, day, 23, 59, 59, 999)
+    return new Date(year, month - 1, day, 0, 0, 0, 0)
+  }
+  const parsed = new Date(value)
+  return boundary === 'end' ? endOfDay(parsed) : startOfDay(parsed)
+}
+
+export function formatReportDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function calendarKeyFromInput(value, fallback) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  if (value) {
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) return formatReportDate(parsed)
+  }
+  return typeof fallback === 'string' ? fallback : formatReportDate(fallback)
+}
+
+function assertReportTimezone(timeZone) {
+  if (typeof timeZone !== 'string' || !/^[A-Za-z0-9_+/-]{1,64}$/.test(timeZone)) {
+    throw new ValidationError('Invalid timezone')
+  }
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone }).format(new Date())
+  } catch {
+    throw new ValidationError('Invalid timezone')
+  }
+  return timeZone
+}
+
+export function parseReportQuery(query = {}, options = {}) {
+  const timeZone = options.timeZone ? assertReportTimezone(options.timeZone) : null
+  const todayKey = timeZone
+    ? getZonedParts(new Date(), timeZone).calendarDate
+    : formatReportDate(new Date())
+  const fromDate = calendarKeyFromInput(
+    query.from,
+    timeZone ? addCalendarDays(todayKey, -30) : startOfDay(defaultFrom())
+  )
+  const toDate = calendarKeyFromInput(query.to, timeZone ? todayKey : new Date())
+  let from
+  let to
+  if (timeZone) {
+    from = zonedDayBounds(fromDate, timeZone).start
+    to = zonedDayBounds(toDate, timeZone).end
+  } else {
+    from = query.from ? parseReportBoundary(query.from, 'start') : startOfDay(defaultFrom())
+    to = query.to ? parseReportBoundary(query.to, 'end') : endOfDay(new Date())
+  }
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
     throw new ValidationError('Invalid from or to date')
   }
@@ -38,6 +95,9 @@ export function parseReportQuery(query = {}) {
   return {
     from,
     to,
+    fromDate: timeZone ? fromDate : formatReportDate(from),
+    toDate: timeZone ? toDate : formatReportDate(to),
+    timeZone,
     branchId: query.branch_id || query.branchId || null,
     granularity,
   }
@@ -52,15 +112,16 @@ function defaultFrom() {
 /**
  * SQL expression to bucket a timestamptz column by granularity.
  */
-export function dateBucketExpression(column, granularity) {
+export function dateBucketExpression(column, granularity, timeZone) {
+  const source = timeZone ? `(${column} AT TIME ZONE '${assertReportTimezone(timeZone)}')` : column
   switch (granularity) {
     case 'week':
-      return `date_trunc('week', ${column})::date`
+      return `date_trunc('week', ${source})::date`
     case 'month':
-      return `date_trunc('month', ${column})::date`
+      return `date_trunc('month', ${source})::date`
     case 'day':
     default:
-      return `(${column})::date`
+      return timeZone ? `${source}::date` : `(${column})::date`
   }
 }
 
@@ -115,8 +176,8 @@ function branchFilter(alias, branchId, params) {
 
 function reportMeta(params, rowCount) {
   return {
-    from: params.from.toISOString().slice(0, 10),
-    to: params.to.toISOString().slice(0, 10),
+    from: params.fromDate || formatReportDate(params.from),
+    to: params.toDate || formatReportDate(params.to),
     branchId: params.branchId,
     granularity: params.granularity,
     rowCount,
@@ -133,6 +194,7 @@ export async function restaurantSpendBySupplier(restaurantId, params) {
     SELECT
       s.id AS supplier_id,
       s.name AS supplier_name,
+      co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS total_spend,
       COUNT(DISTINCT co.id)::int AS order_count
     FROM customer_order co
@@ -143,7 +205,7 @@ export async function restaurantSpendBySupplier(restaurantId, params) {
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY s.id, s.name
+    GROUP BY s.id, s.name, co.currency
     ORDER BY total_spend DESC
     `,
     qParams
@@ -158,6 +220,7 @@ export async function restaurantSpendByCategory(restaurantId, params) {
     `
     SELECT
       COALESCE(pc.name, p.category, 'Uncategorized') AS category,
+      co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS total_spend,
       COUNT(DISTINCT co.id)::int AS order_count
     FROM customer_order co
@@ -169,7 +232,7 @@ export async function restaurantSpendByCategory(restaurantId, params) {
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY COALESCE(pc.name, p.category, 'Uncategorized')
+    GROUP BY COALESCE(pc.name, p.category, 'Uncategorized'), co.currency
     ORDER BY total_spend DESC
     `,
     qParams
@@ -178,22 +241,23 @@ export async function restaurantSpendByCategory(restaurantId, params) {
 }
 
 export async function restaurantOrderVolume(restaurantId, params) {
-  const bucket = dateBucketExpression('co.placed_at', params.granularity)
+  const bucket = dateBucketExpression('co.placed_at', params.granularity, params.timeZone)
   const qParams = [restaurantId, params.from, params.to]
   const branch = branchFilter('co', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
       ${bucket} AS period,
+      co.currency,
       COUNT(*)::int AS order_count,
       COALESCE(SUM(co.total_amount), 0)::numeric AS total_amount
     FROM customer_order co
     WHERE co.restaurant_id = $1
       AND co.placed_at >= $2
       AND co.placed_at <= $3
-      AND co.status NOT IN ('DRAFT', 'CANCELLED')
+      AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY period
+    GROUP BY period, co.currency
     ORDER BY period
     `,
     qParams
@@ -202,13 +266,14 @@ export async function restaurantOrderVolume(restaurantId, params) {
 }
 
 export async function restaurantCogsTrend(restaurantId, params) {
-  const bucket = dateBucketExpression('co.placed_at', params.granularity)
+  const bucket = dateBucketExpression('co.placed_at', params.granularity, params.timeZone)
   const qParams = [restaurantId, params.from, params.to]
   const branch = branchFilter('co', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
       ${bucket} AS period,
+      co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS cogs
     FROM customer_order co
     JOIN order_item oi ON oi.order_id = co.id
@@ -217,7 +282,7 @@ export async function restaurantCogsTrend(restaurantId, params) {
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY period
+    GROUP BY period, co.currency
     ORDER BY period
     `,
     qParams
@@ -234,6 +299,7 @@ export async function restaurantTopProducts(restaurantId, params) {
       p.id AS product_id,
       p.name AS product_name,
       p.sku,
+      co.currency,
       COALESCE(SUM(oi.quantity), 0)::numeric AS total_qty,
       COALESCE(SUM(oi.line_total), 0)::numeric AS total_spend
     FROM customer_order co
@@ -244,7 +310,7 @@ export async function restaurantTopProducts(restaurantId, params) {
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY p.id, p.name, p.sku
+    GROUP BY p.id, p.name, p.sku, co.currency
     ORDER BY total_spend DESC
     LIMIT 20
     `,
@@ -255,6 +321,7 @@ export async function restaurantTopProducts(restaurantId, params) {
 
 export async function restaurantReceivingQuality(restaurantId, params) {
   const qParams = [restaurantId, params.from, params.to]
+  const branch = branchFilter('co', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
@@ -269,9 +336,11 @@ export async function restaurantReceivingQuality(restaurantId, params) {
       )::numeric, 2) AS avg_fill_rate_pct
     FROM receiving_report rr
     JOIN supplier s ON s.id = rr.supplier_id
+    LEFT JOIN customer_order co ON co.id = rr.order_id
     WHERE rr.restaurant_id = $1
       AND rr.received_at >= $2
       AND rr.received_at <= $3
+      ${branch.sql}
     GROUP BY s.id, s.name
     ORDER BY report_count DESC
     `,
@@ -281,7 +350,9 @@ export async function restaurantReceivingQuality(restaurantId, params) {
 }
 
 export async function restaurantWaste(restaurantId, params) {
-  const bucket = dateBucketExpression('ia.created_at', params.granularity)
+  const bucket = dateBucketExpression('ia.created_at', params.granularity, params.timeZone)
+  const qParams = [restaurantId, params.from, params.to]
+  const branch = branchFilter('ia', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
@@ -295,36 +366,41 @@ export async function restaurantWaste(restaurantId, params) {
       AND ia.created_at >= $2
       AND ia.created_at <= $3
       AND ia.adjustment_type IN ('WASTAGE', 'SPOILAGE')
+      ${branch.sql}
     GROUP BY period, ia.waste_category
     ORDER BY period, total_cost DESC
     `,
-    [restaurantId, params.from, params.to]
+    qParams
   )
   return { data: rows, meta: reportMeta(params, rows.length) }
 }
 
 export async function restaurantInvoiceAging(restaurantId, params) {
+  const qParams = [restaurantId, params.toDate || formatReportDate(params.to)]
+  const branch = branchFilter('i', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
       CASE
-        WHEN i.due_date >= CURRENT_DATE THEN 'current'
-        WHEN CURRENT_DATE - i.due_date <= 30 THEN '1_30'
-        WHEN CURRENT_DATE - i.due_date <= 60 THEN '31_60'
-        WHEN CURRENT_DATE - i.due_date <= 90 THEN '61_90'
+        WHEN i.due_date >= $2::date THEN 'current'
+        WHEN $2::date - i.due_date <= 30 THEN '1_30'
+        WHEN $2::date - i.due_date <= 60 THEN '31_60'
+        WHEN $2::date - i.due_date <= 90 THEN '61_90'
         ELSE '90_plus'
       END AS bucket,
+      i.currency,
       COUNT(*)::int AS invoice_count,
       COALESCE(SUM(i.balance_due), 0)::numeric AS total_balance
     FROM invoice i
     WHERE i.restaurant_id = $1
-      AND i.status NOT IN ('PAID', 'VOID')
-      AND i.invoice_date >= $2::date
-      AND i.invoice_date <= $3::date
-    GROUP BY bucket
+      AND i.status NOT IN ('PAID', 'VOID', 'DRAFT')
+      AND i.balance_due > 0
+      AND i.invoice_date <= $2::date
+      ${branch.sql}
+    GROUP BY bucket, i.currency
     ORDER BY bucket
     `,
-    [restaurantId, params.from, params.to]
+    qParams
   )
   return { data: rows, meta: reportMeta(params, rows.length) }
 }
@@ -332,11 +408,12 @@ export async function restaurantInvoiceAging(restaurantId, params) {
 // --- Supplier reports ---
 
 export async function supplierRevenueTrend(supplierId, params) {
-  const bucket = dateBucketExpression('co.placed_at', params.granularity)
+  const bucket = dateBucketExpression('co.placed_at', params.granularity, params.timeZone)
   const { rows } = await query(
     `
     SELECT
       ${bucket} AS period,
+      co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS revenue,
       COUNT(DISTINCT co.id)::int AS order_count
     FROM customer_order co
@@ -345,7 +422,7 @@ export async function supplierRevenueTrend(supplierId, params) {
       AND co.placed_at >= $2
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-    GROUP BY period
+    GROUP BY period, co.currency
     ORDER BY period
     `,
     [supplierId, params.from, params.to]
@@ -359,6 +436,7 @@ export async function supplierTopRestaurants(supplierId, params) {
     SELECT
       r.id AS restaurant_id,
       r.name AS restaurant_name,
+      co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS revenue,
       COUNT(DISTINCT co.id)::int AS order_count
     FROM customer_order co
@@ -368,7 +446,7 @@ export async function supplierTopRestaurants(supplierId, params) {
       AND co.placed_at >= $2
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-    GROUP BY r.id, r.name
+    GROUP BY r.id, r.name, co.currency
     ORDER BY revenue DESC
     LIMIT 20
     `,
@@ -384,6 +462,7 @@ export async function supplierTopProducts(supplierId, params) {
       p.id AS product_id,
       p.name AS product_name,
       p.sku,
+      co.currency,
       COALESCE(SUM(oi.quantity), 0)::numeric AS total_qty,
       COALESCE(SUM(oi.line_total), 0)::numeric AS revenue
     FROM customer_order co
@@ -393,7 +472,7 @@ export async function supplierTopProducts(supplierId, params) {
       AND co.placed_at >= $2
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-    GROUP BY p.id, p.name, p.sku
+    GROUP BY p.id, p.name, p.sku, co.currency
     ORDER BY revenue DESC
     LIMIT 20
     `,
@@ -409,8 +488,10 @@ export async function supplierFulfillmentPerformance(supplierId, params) {
       co.status,
       COUNT(*)::int AS order_count,
       ROUND(
-        100.0 * COUNT(*) FILTER (WHERE co.status IN ('COMPLETED', 'DELIVERED', 'RECEIVED_FULL', 'RECEIVED_PARTIAL', 'INVOICED'))
-        / NULLIF(COUNT(*), 0),
+        100.0 * SUM(COUNT(*) FILTER (
+          WHERE co.status IN ('COMPLETED', 'DELIVERED', 'RECEIVED_FULL', 'RECEIVED_PARTIAL', 'INVOICED')
+        )) OVER ()
+        / NULLIF(SUM(COUNT(*)) OVER (), 0),
         2
       ) AS completion_rate_pct
     FROM customer_order co
@@ -419,7 +500,7 @@ export async function supplierFulfillmentPerformance(supplierId, params) {
     )
       AND co.placed_at >= $2
       AND co.placed_at <= $3
-      AND co.status NOT IN ('DRAFT', 'CANCELLED')
+      AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
     GROUP BY co.status
     ORDER BY order_count DESC
     `,
@@ -433,6 +514,7 @@ export async function supplierInvoiceCollection(supplierId, params) {
     `
     SELECT
       i.status,
+      i.currency,
       COUNT(*)::int AS invoice_count,
       COALESCE(SUM(i.total_amount), 0)::numeric AS total_amount,
       COALESCE(SUM(i.balance_due), 0)::numeric AS balance_due,
@@ -441,10 +523,15 @@ export async function supplierInvoiceCollection(supplierId, params) {
     WHERE i.supplier_id = $1
       AND i.invoice_date >= $2::date
       AND i.invoice_date <= $3::date
-    GROUP BY i.status
+      AND i.status NOT IN ('VOID', 'DRAFT')
+    GROUP BY i.status, i.currency
     ORDER BY invoice_count DESC
     `,
-    [supplierId, params.from, params.to]
+    [
+      supplierId,
+      params.fromDate || formatReportDate(params.from),
+      params.toDate || formatReportDate(params.to),
+    ]
   )
   return { data: rows, meta: reportMeta(params, rows.length) }
 }

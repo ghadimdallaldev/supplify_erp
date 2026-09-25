@@ -1,8 +1,9 @@
 import { Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import {
   CONSUMER_ORDER_STATUS_CHAIN,
-  getConsumerStatusLabels,
+  labelForConsumerStatus,
   type ConsumerOrderTrackingStatus,
 } from '../../lib/consumerOrderTracking'
 import type { ConsumerFulfillmentType } from '../../services/consumerApi'
@@ -24,9 +25,9 @@ export function OrderStatusStepper({
   fulfillmentType,
   className,
 }: OrderStatusStepperProps) {
+  const { t } = useTranslation('consumer')
   const currentIdx = stepIndex(status)
   const cancelled = status === 'CANCELLED'
-  const labels = getConsumerStatusLabels(fulfillmentType)
 
   return (
     <div className={cn('w-full', className)} aria-label="Order status">
@@ -74,7 +75,7 @@ export function OrderStatusStepper({
                   (upcoming || cancelled) && 'text-muted-foreground'
                 )}
               >
-                {labels[step]}
+                {labelForConsumerStatus((key, options) => t(key, options), step, fulfillmentType)}
               </span>
             </div>
           )

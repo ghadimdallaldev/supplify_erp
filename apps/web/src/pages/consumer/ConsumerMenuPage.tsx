@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/button'
 import { Skeleton } from '../../components/ui/skeleton'
 import { toast } from 'sonner'
 import { useConsumerCart } from '../../hooks/useConsumerCart'
+import { priceCartAgainstMenu } from '../../lib/consumerCart'
 import { PageShell } from '../../components/ui/page-shell'
 import { Search, CalendarClock, X } from 'lucide-react'
 import { Alert, AlertDescription } from '../../components/ui/alert'
@@ -72,7 +73,7 @@ export function ConsumerMenuPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const branchId = searchParams.get('branchId') ?? undefined
-  const { cart, cartCount, cartTotal, addLine, updateQuantity, removeLine } = useConsumerCart(slug)
+  const { cart, cartCount, addLine, updateQuantity, removeLine } = useConsumerCart(slug)
 
   const [cartOpen, setCartOpen] = useState(false)
   const [orderItem, setOrderItem] = useState<ConsumerMenuItem | null>(null)
@@ -134,6 +135,17 @@ export function ConsumerMenuPage() {
   const isError = branchId ? branchMenuError && !branchMenuEmpty : allMenuError
 
   const usingFallbackMenu = branchMenuEmpty && countMenuItems(fallbackMenuData?.menu.categories) > 0
+
+  const pricedCart = useMemo(
+    () => priceCartAgainstMenu(cart, data?.menu.categories),
+    [cart, data?.menu.categories]
+  )
+  const displayLines = pricedCart?.lines ?? cart
+  const displayTotal = displayLines.reduce(
+    (sum, line) =>
+      sum + ('unavailable' in line && line.unavailable ? 0 : line.unitPrice * line.quantity),
+    0
+  )
 
   // Default branch for checkout — only add to URL once storefront loads
   useEffect(() => {
@@ -444,7 +456,7 @@ export function ConsumerMenuPage() {
 
       <FloatingCartBar
         cartCount={cartCount}
-        cartTotal={cartTotal}
+        cartTotal={displayTotal}
         onOpenCart={() => setCartOpen(true)}
         onCheckout={goCheckout}
         checkoutDisabled={orderingClosed}
@@ -453,8 +465,8 @@ export function ConsumerMenuPage() {
       <CartDrawer
         open={cartOpen}
         onOpenChange={setCartOpen}
-        lines={cart}
-        total={cartTotal}
+        lines={displayLines}
+        total={displayTotal}
         onUpdateQuantity={updateQuantity}
         onRemoveLine={removeLine}
         onCheckout={() => {

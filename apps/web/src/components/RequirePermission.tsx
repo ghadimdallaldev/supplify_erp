@@ -10,7 +10,7 @@ type Props = {
   permission?: string
   anyOf?: readonly string[]
   title?: string
-  /** Allow workspace Owner / Org Owner through (e.g. before RBAC sync adds new keys). */
+  /** Allow workspace Owner through (not Org Owner — that is an org role). */
   allowOwner?: boolean
   children: ReactNode
 }

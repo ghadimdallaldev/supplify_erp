@@ -27,6 +27,7 @@ async function setOrderReceivedWithDispute(client, orderId) {
     SET status = 'RECEIVED_WITH_DISPUTE', updated_at = now()
     WHERE id = $1
       AND status::text = ANY($2::text[])
+      AND EXISTS (SELECT 1 FROM receiving_report rr WHERE rr.order_id = customer_order.id)
     `,
     [orderId, RECEIVED_STATUSES_FOR_DISPUTE_FLAG]
   )
@@ -42,7 +43,9 @@ async function restoreOrderStatusAfterDisputeClosed(client, orderId) {
   const { rows: agg } = await client.query(
     `
     SELECT
-      COALESCE(SUM(rli.received_quantity), 0)::float8 AS received,
+      COALESCE(SUM(
+        CASE WHEN rli.quality_status = 'ACCEPTED' THEN rli.received_quantity ELSE 0 END
+      ), 0)::float8 AS received,
       COALESCE(SUM(rli.ordered_quantity), 0)::float8 AS ordered
     FROM receiving_report rr
     INNER JOIN receiving_line_item rli ON rli.receiving_report_id = rr.id
@@ -59,7 +62,8 @@ async function restoreOrderStatusAfterDisputeClosed(client, orderId) {
 
   const received = Number(agg[0]?.received ?? 0)
   const ordered = Number(agg[0]?.ordered ?? 0)
-  const nextStatus = ordered > 0 && received < ordered ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL'
+  const nextStatus =
+    ordered <= 0 ? 'DELIVERED' : received < ordered ? 'RECEIVED_PARTIAL' : 'RECEIVED_FULL'
 
   await client.query(`UPDATE customer_order SET status = $2, updated_at = now() WHERE id = $1`, [
     orderId,
@@ -162,18 +166,22 @@ async function loadDisputeDetail(disputeId, { restaurantId, supplierId } = {}) {
   }
 }
 
-async function generateCreditNoteNumber(client) {
+export async function generateCreditNoteNumber(client) {
   const year = new Date().getFullYear()
   const month = String(new Date().getMonth() + 1).padStart(2, '0')
+  const prefix = `CN-${year}-${month}-`
+  // Serialize allocation for this month so two resolves cannot take the same number.
+  await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`credit_note:${prefix}`])
   const { rows } = await client.query(
     `
-    SELECT COUNT(*)::int AS cnt FROM credit_note
+    SELECT COALESCE(MAX(NULLIF(substring(credit_note_number FROM '[0-9]+$'), '')::int), 0) AS seq
+    FROM credit_note
     WHERE credit_note_number LIKE $1
     `,
-    [`CN-${year}-${month}-%`]
+    [`${prefix}%`]
   )
-  const seq = (rows[0]?.cnt || 0) + 1
-  return `CN-${year}-${month}-${String(seq).padStart(3, '0')}`
+  const seq = (rows[0]?.seq || 0) + 1
+  return `${prefix}${String(seq).padStart(3, '0')}`
 }
 
 export async function createDispute({
@@ -228,7 +236,83 @@ export async function createDispute({
     if (!rr.length) throw new ValidationError('Invalid receiving report for this order')
   }
 
+  if (invoiceId) {
+    const { rows: invoices } = await query(
+      `SELECT id FROM invoice
+       WHERE id = $1 AND order_id = $2 AND restaurant_id = $3 AND supplier_id = $4`,
+      [invoiceId, orderId, restaurantId, supplierId]
+    )
+    if (!invoices.length) throw new ValidationError('Invoice does not belong to this order')
+  }
+
+  let disputeLines = items
+  let cappedDisputedAmount = disputedAmount ?? null
+  if (items.length || disputedAmount != null) {
+    const { rows: lines } = await query(
+      `
+      SELECT oi.id, oi.quantity, oi.unit_price, oi.line_total, COALESCE(p.name, '') AS product_name
+      FROM order_item oi
+      LEFT JOIN product p ON p.id = oi.product_id
+      WHERE oi.order_id = $1 AND oi.supplier_id = $2
+      `,
+      [orderId, supplierId]
+    )
+    const byId = new Map(lines.map((line) => [String(line.id), line]))
+    const supplierTotal = lines.reduce((sum, line) => sum + Number(line.line_total || 0), 0)
+    if (cappedDisputedAmount != null && Number(cappedDisputedAmount) - supplierTotal > 0.0001) {
+      throw new ValidationError(
+        `Disputed amount cannot exceed the supplier total for this order (${supplierTotal})`
+      )
+    }
+    disputeLines = items.map((item) => {
+      if (!item.orderItemId) {
+        throw new ValidationError('Each dispute line must reference an order item')
+      }
+      const line = byId.get(String(item.orderItemId))
+      if (!line) throw new ValidationError('Dispute line does not belong to this order')
+      const received = item.quantityReceived == null ? null : Number(item.quantityReceived)
+      const ordered = Number(line.quantity)
+      if (received != null && (!Number.isFinite(received) || received < 0 || received > ordered)) {
+        throw new ValidationError('Received quantity must be within the ordered quantity')
+      }
+      return {
+        ...item,
+        productName: line.product_name || item.productName || null,
+        quantityOrdered: ordered,
+        quantityReceived: received,
+        unitPrice: Number(line.unit_price),
+      }
+    })
+    const seenItemIds = new Set()
+    for (const item of disputeLines) {
+      if (!item.orderItemId) continue
+      const key = String(item.orderItemId)
+      if (seenItemIds.has(key)) {
+        throw new ValidationError('Each order item can appear only once on a dispute')
+      }
+      seenItemIds.add(key)
+    }
+  }
+
   const result = await withTransaction(async (client) => {
+    const { rows: lockedOrders } = await client.query(
+      `SELECT id, status FROM customer_order WHERE id = $1 AND restaurant_id = $2 FOR UPDATE`,
+      [orderId, restaurantId]
+    )
+    if (!lockedOrders.length) throw new NotFoundError('Order not found')
+    if (!DELIVERED_ORDER_STATUSES.includes(lockedOrders[0].status)) {
+      throw new ValidationError(
+        'Disputes can only be opened after delivery (status must be delivered, received, invoiced, or completed)'
+      )
+    }
+    const { rows: activeLocked } = await client.query(
+      `SELECT id FROM disputes WHERE order_id = $1 AND status = ANY($2::text[])`,
+      [orderId, ACTIVE_STATUSES]
+    )
+    if (activeLocked.length) {
+      throw new ConflictError('An active dispute already exists for this order')
+    }
+
     const { rows: inserted } = await client.query(
       `
       INSERT INTO disputes (
@@ -245,13 +329,13 @@ export async function createDispute({
         invoiceId || null,
         type,
         description,
-        disputedAmount ?? null,
+        cappedDisputedAmount ?? null,
         userId,
       ]
     )
     const dispute = mapDisputeRow(inserted[0])
 
-    for (const item of items) {
+    for (const item of disputeLines) {
       await client.query(
         `
         INSERT INTO dispute_items (
@@ -401,10 +485,12 @@ export async function cancelDispute(disputeId, restaurantId) {
   const orderId = rows[0].order_id
 
   await withTransaction(async (client) => {
-    await client.query(
-      `UPDATE disputes SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+    const { rowCount } = await client.query(
+      `UPDATE disputes SET status = 'cancelled', updated_at = NOW()
+       WHERE id = $1 AND status = 'open'`,
       [disputeId]
     )
+    if (!rowCount) throw new ConflictError('Dispute is already closed')
     await restoreOrderStatusAfterDisputeClosed(client, orderId)
   })
 
@@ -421,9 +507,12 @@ export async function reviewDispute(disputeId, supplierId) {
     throw new ValidationError('Dispute cannot be moved to review in its current status')
   }
 
-  await query(`UPDATE disputes SET status = 'under_review', updated_at = NOW() WHERE id = $1`, [
-    disputeId,
-  ])
+  const { rowCount } = await query(
+    `UPDATE disputes SET status = 'under_review', updated_at = NOW()
+     WHERE id = $1 AND status IN ('open', 'escalated')`,
+    [disputeId]
+  )
+  if (!rowCount) throw new ConflictError('Dispute is already closed')
   return loadDisputeDetail(disputeId, { supplierId })
 }
 
@@ -557,9 +646,13 @@ export async function resolveDispute(
     const existing = existingEffects[0]
     if (existing) {
       const requestedAmount = resolutionType === 'refund' ? refundAmount : creditNoteAmount
+      const amountsMatch =
+        requestedAmount == null
+          ? existing.amount == null
+          : Number(existing.amount) === Number(requestedAmount)
       const same =
         existing.effect_type === resolutionType &&
-        (requestedAmount == null || Number(existing.amount) === Number(requestedAmount)) &&
+        amountsMatch &&
         (resolutionType !== 'refund' || existing.reference === refundReference)
       if (!same) throw new ConflictError('This dispute already has a conflicting resolution effect')
       idempotent = true
@@ -581,9 +674,41 @@ export async function resolveDispute(
         throw new ValidationError(
           `Resolution amount cannot exceed disputed amount (${disputeRow.disputed_amount})`
         )
+      const { rows: capRows } = await client.query(
+        `
+        SELECT
+          COALESCE((
+            SELECT SUM(line_total) FROM order_item
+            WHERE order_id = $1 AND supplier_id = $2
+          ), 0)::numeric AS supplier_total,
+          (SELECT total_amount FROM invoice WHERE id = $3) AS invoice_total
+        `,
+        [disputeRow.order_id, disputeRow.supplier_id, disputeRow.invoice_id]
+      )
+      const supplierTotal = Number(capRows[0]?.supplier_total || 0)
+      const invoiceTotal =
+        capRows[0]?.invoice_total == null ? null : Number(capRows[0].invoice_total)
+      const amountCap =
+        invoiceTotal != null && Number.isFinite(invoiceTotal)
+          ? Math.min(supplierTotal, invoiceTotal)
+          : supplierTotal
+      if (amount - amountCap > 0.0001) {
+        throw new ValidationError(
+          `Resolution amount cannot exceed the supplier total for this order (${amountCap})`
+        )
+      }
       if (resolutionType === 'refund' && !refundReference?.trim())
         throw new ValidationError('refundReference is required for refund resolution')
     }
+
+    const { rows: currencyRows } = await client.query(
+      `SELECT COALESCE(i.currency, o.currency, 'USD') AS currency
+       FROM customer_order o
+       LEFT JOIN invoice i ON i.id = $2
+       WHERE o.id = $1`,
+      [disputeRow.order_id, disputeRow.invoice_id]
+    )
+    const currency = currencyRows[0]?.currency || 'USD'
 
     let replacementOrderId = null
     let creditNote = null
@@ -615,7 +740,7 @@ export async function resolveDispute(
           : creditNoteNotes || `Credit for dispute ${disputeId.slice(0, 8)}`
       const { rows } = await client.query(
         `INSERT INTO credit_note (credit_note_number, invoice_id, supplier_id, restaurant_id, issue_date, reason, description, credit_amount, applied_amount, remaining_amount, status, currency, order_id, notes, dispute_id)
-         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, 0, $7, 'ISSUED', 'USD', $8, $9, $10) RETURNING *`,
+         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, 0, $7, 'ISSUED', $8, $9, $10, $11) RETURNING *`,
         [
           creditNoteNumber,
           disputeRow.invoice_id,
@@ -624,6 +749,7 @@ export async function resolveDispute(
           reason,
           description,
           amount,
+          currency,
           disputeRow.order_id,
           resolutionNotes || null,
           disputeId,
@@ -663,11 +789,12 @@ export async function resolveDispute(
     }
     const { rows: effects } = await client.query(
       `INSERT INTO dispute_resolution_effects (dispute_id, effect_type, amount, currency, reference, credit_note_id, replacement_order_id, effect_data, created_by)
-       VALUES ($1, $2, $3, 'USD', $4, $5, $6, $7::jsonb, $8) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9) RETURNING *`,
       [
         disputeId,
         resolutionType,
         amount,
+        currency,
         resolutionType === 'refund' ? refundReference.trim() : null,
         creditNote?.id ?? null,
         replacementOrderId,

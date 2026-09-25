@@ -6,12 +6,14 @@ import {
   getRequestTenant,
   getSupplierIdForRequest,
   requirePermission,
+  rolesIncludeOwner,
 } from '../../lib/rbac.js'
 import { hasPermission } from '../../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { query } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { requireFeature } from '../../lib/subscription.js'
+import { assertWarehouseOwnedBySupplier } from '../../lib/warehouse-helpers.js'
 import { z } from 'zod'
 import {
   listDeliveryRoutes,
@@ -46,7 +48,8 @@ async function resolveRouteReorderAccess(req, routeId) {
     return { error: { status: 403, message: 'Supplier not found' } }
   }
   const perms = req.tenantContext?.permissions ?? []
-  const canSupplier = hasPermission(perms, P.FULFILLMENT_MANAGE)
+  const canSupplier =
+    rolesIncludeOwner(req.tenantContext?.roles) || hasPermission(perms, P.FULFILLMENT_MANAGE)
   const canDriver =
     hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE) ||
     (isDriverOnlyPermissions(perms) && hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE))
@@ -74,6 +77,7 @@ const fulfillmentFeature = requireFeature(
 
 /** Fulfillment board for staff; driver-only endpoints use DRIVER_DELIVERIES_* instead. */
 function requireFulfillmentAccess(req, res, next) {
+  if (rolesIncludeOwner(req.tenantContext?.roles)) return next()
   const perms = req.tenantContext?.permissions ?? []
   const path = req.path
 
@@ -111,6 +115,8 @@ function parseWarehouseFilter(req) {
 async function warehouseFilterClause(req, supplierId, paramIndex = 1, { mode = 'order' } = {}) {
   const warehouseId = parseWarehouseFilter(req)
   if (!warehouseId) return { clause: '', params: [], warehouseId: null }
+
+  await assertWarehouseOwnedBySupplier(warehouseId, supplierId)
 
   if (mode === 'assignment') {
     return {

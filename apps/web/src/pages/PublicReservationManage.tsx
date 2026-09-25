@@ -18,6 +18,7 @@ import {
 } from '../services/api'
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
 import { ReservationTimeSlotGrid } from '../components/public/ReservationTimeSlotGrid'
+import { localDateKey } from '../lib/invoiceBalance'
 
 function formatDateTime(iso: string) {
   const date = new Date(iso)
@@ -54,12 +55,12 @@ export function PublicReservationManage() {
   const [reviewComment, setReviewComment] = useState('')
   const [submitReview, { isLoading: submittingReview }] = useSubmitPublicReservationReviewMutation()
 
-  const [rescheduleDate, setRescheduleDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [rescheduleDate, setRescheduleDate] = useState(() => localDateKey())
   const [rescheduleSlot, setRescheduleSlot] = useState('')
 
   useEffect(() => {
     if (reservation?.scheduled_at) {
-      setRescheduleDate(new Date(reservation.scheduled_at).toISOString().slice(0, 10))
+      setRescheduleDate(localDateKey(new Date(reservation.scheduled_at)))
     }
   }, [reservation?.scheduled_at])
 
@@ -241,7 +242,7 @@ export function PublicReservationManage() {
                     setRescheduleDate(event.target.value)
                     setRescheduleSlot('')
                   }}
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={localDateKey()}
                 />
               </div>
               <div>

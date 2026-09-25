@@ -62,6 +62,7 @@ export type ConsumerFulfillmentBranch = {
   liveOrderEnd?: string
   allowPreordersOutsideLiveHours?: boolean
   ordering?: ConsumerOrderingStatus
+  timeZone?: string
   deliveryZones: Array<{
     id: string
     name: string

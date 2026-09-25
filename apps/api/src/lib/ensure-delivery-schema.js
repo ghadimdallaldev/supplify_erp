@@ -1,4 +1,5 @@
 import { migrationQuery, query } from './db.js'
+import { resetDeliveryZoneJoinCache } from './delivery-zone-join.js'
 import { logger } from './logger.js'
 
 async function tableExists(tableName) {
@@ -66,5 +67,6 @@ export async function ensureDeliverySchema() {
     ON delivery_zone(supplier_id) WHERE is_active = true
   `)
 
+  resetDeliveryZoneJoinCache()
   logger.info('Delivery schema ensure completed')
 }

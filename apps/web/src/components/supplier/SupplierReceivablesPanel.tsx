@@ -7,10 +7,30 @@ import {
 } from '../../services/api/endpoints/finance'
 import { Skeleton } from '../ui/skeleton'
 import { Button } from '../ui/button'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatPrice } from '../../utils/format'
+
+function labeledMoney(amount: number, currency?: string | null) {
+  const code = String(currency || '')
+    .trim()
+    .toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) return formatCurrency(amount, { currency: code })
+  return formatPrice(amount)
+}
 import { AlertTriangle, Bell } from 'lucide-react'
 
 const AGING_BUCKET_KEYS = ['current', '0_7', '8_30', '31_60', '60_plus'] as const
+
+function formatMoneyTotal(
+  value: number | null | undefined,
+  byCurrency?: Array<{ currency?: string; unpaidTotal?: number; overdueTotal?: number }>,
+  field?: 'unpaidTotal' | 'overdueTotal'
+) {
+  if (field && byCurrency && byCurrency.length > 1) {
+    return byCurrency.map((row) => labeledMoney(row[field] ?? 0, row.currency)).join(' · ')
+  }
+  if (value == null) return '—'
+  return labeledMoney(value, byCurrency?.[0]?.currency)
+}
 
 function statusBadge(
   status: string,
@@ -59,7 +79,12 @@ export function SupplierReceivablesPanel() {
   const aging = data?.aging || {}
   const invoices = data?.invoices || []
   const topDebtors = data?.topDebtors || []
-  const overdueTotal = summary?.overdueTotal ?? 0
+  const overdueTotal = summary?.overdueTotal
+  const hasOverdue =
+    (overdueTotal != null && overdueTotal > 0) ||
+    (summary?.byCurrency || []).some(
+      (row: { overdueTotal?: number }) => Number(row.overdueTotal) > 0
+    )
 
   if (!summary?.unpaidCount) {
     return (
@@ -93,7 +118,7 @@ export function SupplierReceivablesPanel() {
     <div data-testid="supplier-receivables-panel" className="mb-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-bold text-[var(--text)]">{t('receivables.title')}</h3>
-        {overdueTotal > 0 && (
+        {hasOverdue && (
           <Button
             size="sm"
             variant="outline"
@@ -110,12 +135,12 @@ export function SupplierReceivablesPanel() {
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Stat
           label={t('receivables.stats.unpaidTotal')}
-          value={formatCurrency(summary.unpaidTotal ?? 0)}
+          value={formatMoneyTotal(summary.unpaidTotal, summary.byCurrency, 'unpaidTotal')}
           testId="receivables-unpaid"
         />
         <Stat
           label={t('receivables.stats.overdue')}
-          value={formatCurrency(summary.overdueTotal ?? 0)}
+          value={formatMoneyTotal(summary.overdueTotal, summary.byCurrency, 'overdueTotal')}
           testId="receivables-overdue"
         />
         <Stat
@@ -125,7 +150,7 @@ export function SupplierReceivablesPanel() {
         />
         <Stat
           label={t('receivables.stats.whoOwesMe')}
-          value={formatCurrency(summary.whoOwesMeTotal ?? 0)}
+          value={formatMoneyTotal(summary.whoOwesMeTotal, summary.byCurrency, 'unpaidTotal')}
           testId="receivables-who-owes"
         />
       </div>
@@ -138,7 +163,13 @@ export function SupplierReceivablesPanel() {
         {AGING_BUCKET_KEYS.map((key, i) => (
           <span key={key}>
             {i > 0 ? ' · ' : ''}
-            {t(`receivables.agingBuckets.${key}`)} {formatCurrency(aging[key] ?? 0)}
+            {t(`receivables.agingBuckets.${key}`)}{' '}
+            {aging[key] == null
+              ? '—'
+              : labeledMoney(
+                  Number(aging[key]),
+                  summary.byCurrency?.length === 1 ? summary.byCurrency[0].currency : null
+                )}
           </span>
         ))}
       </div>
@@ -158,11 +189,12 @@ export function SupplierReceivablesPanel() {
                 (debtor: {
                   restaurantId: string
                   restaurantName: string
+                  currency?: string
                   balanceDue: number
                   oldestInvoiceId?: string | null
                 }) => (
                   <li
-                    key={debtor.restaurantId}
+                    key={`${debtor.restaurantId}-${debtor.currency || 'USD'}`}
                     className="flex flex-wrap items-center justify-between gap-2 text-xs"
                   >
                     <Link
@@ -171,7 +203,7 @@ export function SupplierReceivablesPanel() {
                     >
                       {debtor.restaurantName}
                       <span className="text-[var(--text-muted)] ml-1">
-                        {formatCurrency(debtor.balanceDue)}
+                        {labeledMoney(debtor.balanceDue, debtor.currency)}
                       </span>
                     </Link>
                     {debtor.oldestInvoiceId && (
@@ -216,6 +248,7 @@ export function SupplierReceivablesPanel() {
                     restaurantName: string
                     dueDate: string
                     balanceDue: number
+                    currency?: string | null
                     status: string
                     isOverdue: boolean
                   }) => {
@@ -240,7 +273,7 @@ export function SupplierReceivablesPanel() {
                         </td>
                         <td className="px-3 py-2 text-[var(--text-muted)]">{inv.dueDate}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {formatCurrency(inv.balanceDue)}
+                          {labeledMoney(inv.balanceDue, inv.currency)}
                         </td>
                         <td className="px-3 py-2">
                           <span

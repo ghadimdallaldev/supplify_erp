@@ -122,6 +122,7 @@
     }
   },
   "restaurantTeam": {
+    "inviteViaLink": "Invite via link",
     "toast": {
       "memberRemoved": "Member removed",
       "removeFailed": "Failed to remove member"
