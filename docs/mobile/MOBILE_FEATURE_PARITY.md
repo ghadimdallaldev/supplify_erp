@@ -10,6 +10,13 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 ---
 
+## 2026-09-26 — API Docker image includes legal-pack-version.json
+
+- **API:** Runner stage copies repo-root `legal-pack-version.json` into the image so `legal-documents.js` can load it (fixes Railway dev API crash loop ENOENT).
+- **Mobile:** Skipped — no client change.
+
+---
+
 ## 2026-09-26 — Legal copy refresh without pack bump
 
 - **Web + API:** Static legal markdown updated (consumer guest ordering, staff portal, plan naming, GPS, AI assistant). **`legal-pack-version.json` stays `2026-09-12`** so registration and login are not broken by a web/API version mismatch or a forced mass re-acceptance before coordinated deploy. Web and API both import the same JSON file; `legal-pack-version-sync.test.js` guards drift.

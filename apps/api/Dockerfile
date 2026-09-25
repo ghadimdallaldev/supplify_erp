@@ -41,6 +41,8 @@ COPY --from=builder --chown=supplify:nodejs /app/apps/api/src ./apps/api/src
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/db/migrations ./apps/api/db/migrations
 # Full scripts tree: migrate.js, role/org backfills, and Railway shell one-offs (run-migration.js)
 COPY --from=builder --chown=supplify:nodejs /app/apps/api/scripts ./apps/api/scripts
+# Shared with web; required at runtime by apps/api/src/lib/legal-documents.js
+COPY --from=builder --chown=supplify:nodejs /app/legal-pack-version.json ./legal-pack-version.json
 # Railway runtime defaults (api.env per env) + in-process cron config (CRONS_ENABLED, CRON_*)
 COPY --from=builder --chown=supplify:nodejs /app/deploy/railway ./deploy/railway
 
