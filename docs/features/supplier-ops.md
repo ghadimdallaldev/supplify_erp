@@ -16,7 +16,7 @@ Aggregated **today view** for suppliers: orders to prepare, deliveries pending, 
 
 **Response shape:**
 
-- `kpis` — counts and balances (orders to prepare, deliveries, unpaid/overdue, customers due reorder, low stock, disputes)
+- `kpis` — counts and balances (orders to prepare, deliveries, unpaid/overdue, customers due reorder, low stock, disputes). **Orders to prepare today** uses the supplier `last_order_timezone` (platform default when unset), not the database server clock.
 - `todaysPriorities` — ranked action items (top 8)
 - `previews` — delivery board snippet, GPS summary, receivables aging, reorder at-risk customers, low stock, boosted deals, **`customerGrowth`** (import/invite/convert metrics when growth tables exist)
 
@@ -36,6 +36,10 @@ Open invoice aging for supplier AR — used by command center and the Invoices p
 Aging buckets: `current`, `0_7`, `8_30`, `31_60`, `60_plus` days overdue.
 
 Open statuses: `ISSUED`, `PARTIALLY_PAID`, `OVERDUE`.
+
+Receivables and restaurant payables total `balance_due` per currency. A supplier or restaurant with open invoices in more than one currency does not get those balances added into one number. A supplier statement does the same: opening balance is what was still owed before the start date, charges are invoices issued in the window, payments are completed payments dated in the window, and unused credit reduces the balance once. An applied credit is only the payment, and a credit note cannot be applied to an invoice in another currency. Void and draft invoices are left out.
+
+The overdue job marks a past-due invoice `OVERDUE` only while `balance_due > 0`, notifies both parties of that open balance, and sets `overdue_notified_at` after the notification call so a failed send can retry. A manual invoice must total more than zero. When `tax_included` is true, tax is extracted from the line prices instead of added on top. Currency follows the linked order unless the request sends a three-letter code. Invoice, due, payment, and credit-note dates are returned as `YYYY-MM-DD` calendar days, including receivables, payables, statements, and CSV export. Applying credit requires a credit note; an amount alone does not reduce the balance. Credit notes offered for an invoice are limited to that invoice's currency. Overdue days and expense windows use the restaurant's local calendar day. The invoice list, order invoice tab, and invoice detail use that day count, so a browser in another timezone does not mark the invoice overdue early. Receivables aging uses the supplier's local day, and payables aging uses the restaurant's. Overdue and statement totals are summed once per currency, and an invoice with no currency is not added into USD. The tax rate on a new invoice is the rate in effect on the supplier's local day. Payment lists return `payment_date` as `YYYY-MM-DD`. Invoice totals on the list, detail, payment dialog, and order invoice tab use the invoice currency.
 
 **Web:** `SupplierReceivablesPanel` on `/app/invoices` (supplier tenants with `finance_invoices`).
 
@@ -60,12 +64,13 @@ Service: `collections-reminders.service.js`
 
 CSV exports for supplier AR and bookkeeping integrations.
 
-| Method | Path                                | Gate                                 | Description             |
-| ------ | ----------------------------------- | ------------------------------------ | ----------------------- |
-| GET    | `/invoices/export.csv`              | `INVOICES_VIEW` + `finance_invoices` | Invoice lines CSV       |
-| GET    | `/invoices/export/quickbooks.csv`   | `INVOICES_VIEW` + `finance_invoices` | QuickBooks-style export |
-| GET    | `/payments/export.csv`              | `INVOICES_VIEW` + `finance_invoices` | Payment records CSV     |
-| GET    | `/invoices/receivables/summary.csv` | `INVOICES_VIEW` + `finance_invoices` | AR aging summary CSV    |
+| Method | Path                                            | Gate                                                      | Description             |
+| ------ | ----------------------------------------------- | --------------------------------------------------------- | ----------------------- |
+| GET    | `/invoices/export.csv`                          | `INVOICES_VIEW` + `finance_invoices` + `api_integrations` | Invoice lines CSV       |
+| GET    | `/invoices/export/quickbooks.csv`               | `INVOICES_VIEW` + `finance_invoices` + `api_integrations` | QuickBooks-style export |
+| GET    | `/payments/export.csv`                          | `INVOICES_VIEW` + `finance_invoices` + `api_integrations` | Payment records CSV     |
+| GET    | `/accounting/summary.csv`                       | `INVOICES_VIEW` + `finance_invoices` + `api_integrations` | AR aging summary CSV    |
+| GET    | `/invoices/receivables/statement/:restaurantId` | `INVOICES_VIEW` + `finance_invoices` + `api_integrations` | Customer statement CSV  |
 
 **Web:** Export dropdown on `/app/invoices` (supplier tenants).
 
@@ -75,11 +80,11 @@ Service: `supplier-accounting-export.service.js`
 
 Single-page **morning brief** for suppliers: orders to pick, deliveries, receivables due today, reorder leads, and shortage preview.
 
-| Method | Path         | Gate                | Description                                              |
-| ------ | ------------ | ------------------- | -------------------------------------------------------- |
-| GET    | `/run-sheet` | `commandCenterGate` | KPIs + pick queue + deliveries + receivables + shortages |
+| Method | Path         | Gate                                                                              | Description                                              |
+| ------ | ------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| GET    | `/run-sheet` | `ORDERS_MANAGE`, `FULFILLMENT_VIEW`, `INVOICES_VIEW`, or `DRIVER_DELIVERIES_VIEW` | KPIs + pick queue + deliveries + receivables + shortages |
 
-**Query:** `?date=YYYY-MM-DD` (defaults to today in supplier timezone).
+**Query:** `?date=YYYY-MM-DD`. When omitted, the date is today in the supplier `last_order_timezone` (platform default when unset). The web date picker uses the browser’s local calendar day.
 
 **Web:** `/app/run-sheet` — `SupplierRunSheetPage`; linked from command center and sidebar.
 

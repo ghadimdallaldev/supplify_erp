@@ -78,6 +78,10 @@ vi.mock('../lib/cache.js', () => ({
   deleteCache: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+}))
+
 // Now import routes (mocks are set up)
 import { productsRoutes, __resetProductTagsColumnCache } from './products.routes.js'
 
@@ -415,6 +419,24 @@ describe('Products Routes', () => {
         .expect(400)
 
       expect(response.body.ok).toBe(false)
+    })
+
+    it('rejects initial stock on another supplier warehouse', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] })
+
+      const response = await request(app)
+        .post('/api/products')
+        .send({
+          sku: 'SKU-WH',
+          name: 'Warehouse Product',
+          warehouse_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          initialStock: 12,
+        })
+        .expect(400)
+
+      expect(response.body.ok).toBe(false)
+      expect(response.body.error.message).toMatch(/Warehouse not found/)
+      expect(db.withTransaction).not.toHaveBeenCalled()
     })
   })
 

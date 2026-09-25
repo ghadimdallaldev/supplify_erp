@@ -2,6 +2,21 @@
 
 Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBAC.
 
+## 2026-09-25 - Branch and warehouse scoping hardening
+
+- [x] Server-only fail-closed org and warehouse scoping. No API contract, RBAC key, or mobile type change.
+- [x] Skip documented in `MOBILE_FEATURE_PARITY.md`.
+
+## 2026-09-25 - Featured review, supplier comparison, and chat attachments
+
+- [x] Featured placement package selection opens a payment sheet on web, Android, and iOS; payment leaves the request pending until an admin approves it.
+- [x] Admin approval/rejection API and audit fields added; no new permission or feature key was introduced.
+- [x] Common-product best-price API, types, query hooks, and restaurant supplier-directory panel synchronized across web, Android, and iOS.
+- [x] Assistant followed-supplier and comparison tools use the same tenant/organization-scoped data as the product UI.
+- [x] Assistant and ordinary human chat accept image/PDF attachments on web, Android, and iOS through the authenticated upload gateway.
+- [x] Android and iOS dependencies and types are synchronized; both native typechecks pass.
+- [x] ERP focused tests and root typecheck recorded in the parity log after verification.
+
 - [ ] Did API response types change? → Update `supplify-mobile/src/types`
 - [ ] Did web route behavior change? → Check mobile screen equivalent
 - [ ] Did RBAC / plan gating change? → Update mobile guards/navigation

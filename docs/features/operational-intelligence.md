@@ -180,7 +180,7 @@ It returns review facts only; it cannot create deals, orders, notifications, bud
 
 All three read `supplier_price_events`, written by the receiving/catalog/contract hooks in `recipe-purchasing-hooks.service.js`. The window and page size are clamped server-side; `direction` is validated against an allowlist rather than interpolated. `changePct` is recomputed from `old_price`/`new_price` instead of trusting the stored column, which is null on first observation.
 
-Web surface: `/app/price-intelligence` (`PriceIntelligencePage`), sidebar entry gated on the advanced tier. Price history has no standalone page yet; it is consumed per product.
+Web surface: `/app/price-intelligence` (`PriceIntelligencePage`), sidebar entry gated on the advanced tier. Price history has no standalone page yet; it is consumed per product. The history summary is computed over the whole window, not the returned page. Cheaper buys only include a contract that applies at quantity 1, and a substitute whose catalog price is already in effect. A contract or substitute in a different currency from the restaurant's latest order for that product is left out. Price history totals only the currency of the latest observation, and that currency is included on the summary. A cheaper contract or substitute is labeled with its own currency. A contract counts as cheaper only when it is in effect on the restaurant's local day. A currency change is stored as a new observation rather than a percentage move. Catalog prices imported from a spreadsheet write the same price events as a manual catalog change. A manual invoice writes an invoice price event when the billed unit price differs from the last observed price. A failure on one card does not hide the other.
 
 ### Cheaper-buy sources, and what is deliberately not inferred
 
@@ -257,7 +257,7 @@ Receiving lines in a non-matching product unit are counted as coverage gaps and 
 
 `GET /api/restaurant-intelligence/invoice-anomalies` is an advanced, read-only Restaurant Intelligence surface. It requires `finance_invoices`, `INVOICES_VIEW`, and the `advanced` intelligence tier.
 
-It reports only stored, line-level comparisons: billed quantity above the linked order line, billed unit price above the order snapshot, billed unit price above an active contract valid on the invoice date, and invoice-price movement above the existing 5% price-noise threshold. The database already enforces one linked invoice per `(order_id, supplier_id)`; that protection is reported as enforcement rather than turned into a speculative risk score. It does not call a difference fraud, infer missing contract terms, alter an invoice, or create disputes. The web card appears on the existing Restaurant Invoices page.
+It reports only stored, line-level comparisons: billed quantity above the linked order line, billed unit price above the order snapshot, billed unit price above an active contract valid on the invoice date, and invoice-price movement above the existing 5% price-noise threshold. The database already enforces one linked invoice per `(order_id, supplier_id)`; that protection is reported as enforcement rather than turned into a speculative risk score. It does not call a difference fraud, infer missing contract terms, alter an invoice, or create disputes. The web card appears on the existing Restaurant Invoices page. The review window is the restaurant's local calendar, not the database date.
 
 ## Weekly intelligence summary (implemented)
 

@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { toCalendarDateString } from '../lib/reservation-availability.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
 
 /**
  * Fetch the current catalog price for a product.
@@ -13,8 +14,9 @@ export async function getDefaultCatalogPrice(productId, dbQuery = query) {
     SELECT amount, currency
     FROM price
     WHERE product_id = $1
-      AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-    ORDER BY valid_from DESC
+      AND valid_from <= now()
+      AND (valid_to IS NULL OR valid_to >= now())
+    ORDER BY (CASE WHEN min_qty <= 1 THEN 0 ELSE 1 END), valid_from DESC
     LIMIT 1
     `,
     [productId]
@@ -38,8 +40,9 @@ export async function getDefaultCatalogPricesBatch(productIds, dbQuery = query) 
     SELECT DISTINCT ON (product_id) product_id, amount, currency
     FROM price
     WHERE product_id = ANY($1::uuid[])
-      AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-    ORDER BY product_id, valid_from DESC
+      AND valid_from <= now()
+      AND (valid_to IS NULL OR valid_to >= now())
+    ORDER BY product_id, (CASE WHEN min_qty <= 1 THEN 0 ELSE 1 END), valid_from DESC
     `,
     [productIds]
   )
@@ -48,10 +51,15 @@ export async function getDefaultCatalogPricesBatch(productIds, dbQuery = query) 
   )
 }
 
-/** @returns {string | null} YYYY-MM-DD for SQL, or null to use CURRENT_DATE */
+/** @returns {string | null} YYYY-MM-DD for SQL, or null to use the restaurant's local day */
 function toContractAsOfDate(date) {
   if (date == null) return null
   return toCalendarDateString(date)
+}
+
+/** Contract start/end compared to an explicit day, or the restaurant's local day. */
+function contractAsOfExpression(dateParam, fallbackParam) {
+  return `COALESCE(${dateParam}::date, (now() AT TIME ZONE COALESCE((SELECT NULLIF(TRIM(timezone), '') FROM restaurant WHERE id = $1), ${fallbackParam}))::date)`
 }
 
 function buildDefaultResolution(defaultPrice, currency = 'USD') {
@@ -369,13 +377,13 @@ export async function resolveProductPrice(
       AND supplier_id = $2
       AND product_id = $3
       AND is_active = true
-      AND (contract_start_date IS NULL OR contract_start_date <= COALESCE($4::date, CURRENT_DATE))
-      AND (contract_end_date IS NULL OR contract_end_date >= COALESCE($4::date, CURRENT_DATE))
+      AND (contract_start_date IS NULL OR contract_start_date <= ${contractAsOfExpression('$4', '$6')})
+      AND (contract_end_date IS NULL OR contract_end_date >= ${contractAsOfExpression('$4', '$6')})
       AND (min_order_quantity IS NULL OR min_order_quantity <= $5)
     ORDER BY updated_at DESC
     LIMIT 1
     `,
-    [restaurantId, supplierId, productId, dateStr, quantity]
+    [restaurantId, supplierId, productId, dateStr, quantity, getDefaultTenantTimezone()]
   )
 
   if (rows.length) {
@@ -416,6 +424,35 @@ export async function resolveProductPricesBatch(
 ) {
   if (!items?.length) return []
 
+  const itemDates = items.map((item) => toContractAsOfDate(item.date ?? date))
+  const uniqueDates = [...new Set(itemDates)]
+  if (uniqueDates.length > 1) {
+    const grouped = new Map()
+    items.forEach((item, index) => {
+      const key = itemDates[index] ?? ''
+      if (!grouped.has(key)) grouped.set(key, [])
+      grouped.get(key).push(item)
+    })
+    const resolved = []
+    for (const [key, group] of grouped) {
+      const part = await resolveProductPricesBatch(
+        {
+          restaurantId,
+          items: group.map(({ date: _itemDate, ...rest }) => rest),
+          date: key || undefined,
+          catalogByProductId,
+          quoteLocks,
+        },
+        dbQuery
+      )
+      resolved.push(...part)
+    }
+    const byProductId = new Map(resolved.map((row) => [row.productId, row]))
+    return items.map((item) => byProductId.get(item.productId)).filter(Boolean)
+  }
+
+  const effectiveDate = items.some((item) => item.date != null) ? itemDates[0] : date
+
   const productIds = [...new Set(items.map((i) => i.productId))]
   const catalogMap =
     catalogByProductId instanceof Map
@@ -426,7 +463,7 @@ export async function resolveProductPricesBatch(
     ? await resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery)
     : new Map()
 
-  const dateStr = toContractAsOfDate(date)
+  const dateStr = toContractAsOfDate(effectiveDate)
 
   const pairs = items.map((i) => [i.supplierId, i.productId])
   const uniquePairs = [...new Map(pairs.map((p) => [p.join(':'), p])).values()]
@@ -445,11 +482,11 @@ export async function resolveProductPricesBatch(
       AND supplier_id = ANY($2::uuid[])
       AND product_id = ANY($3::uuid[])
       AND is_active = true
-      AND (contract_start_date IS NULL OR contract_start_date <= COALESCE($4::date, CURRENT_DATE))
-      AND (contract_end_date IS NULL OR contract_end_date >= COALESCE($4::date, CURRENT_DATE))
+      AND (contract_start_date IS NULL OR contract_start_date <= ${contractAsOfExpression('$4', '$5')})
+      AND (contract_end_date IS NULL OR contract_end_date >= ${contractAsOfExpression('$4', '$5')})
     ORDER BY updated_at DESC
     `,
-    [restaurantId, supplierIds, pairProductIds, dateStr]
+    [restaurantId, supplierIds, pairProductIds, dateStr, getDefaultTenantTimezone()]
   )
 
   const contractByKey = new Map(contracts.map((c) => [`${c.supplier_id}:${c.product_id}`, c]))

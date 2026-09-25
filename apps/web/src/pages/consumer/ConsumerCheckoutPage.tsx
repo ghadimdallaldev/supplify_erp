@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   useCreatePublicConsumerOrderMutation,
   useGetPublicConsumerFulfillmentOptionsQuery,
+  useGetPublicConsumerMenuQuery,
   useGetPublicConsumerStorefrontQuery,
   useGetConsumerLoyaltyPreviewQuery,
   type ConsumerFulfillmentType,
@@ -27,14 +28,17 @@ import {
   clearCartStorage,
   formatModifierLabels,
   cartLineTotal,
+  priceCartAgainstMenu,
   type CartLine,
 } from '../../lib/consumerCart'
 import { useConsumerCart } from '../../hooks/useConsumerCart'
 import { matchDeliveryZone, zoneDeliveryFee, zoneMinOrder } from '../../lib/deliveryZones'
 import {
   orderingStatusFromBranch,
-  toDatetimeLocalValue,
+  toDatetimeLocalValueInZone,
+  scheduledInstant,
   formatMinutesToTime,
+  isWithinLiveOrderWindow,
 } from '../../lib/consumerOrderingHours'
 import {
   ArrowLeft,
@@ -123,6 +127,10 @@ export function ConsumerCheckoutPage() {
   )
 
   const { data: storefront } = useGetPublicConsumerStorefrontQuery(slug, { skip: !slug })
+  const { data: menuData } = useGetPublicConsumerMenuQuery(
+    { restaurantSlug: slug, branchId: branchId || undefined },
+    { skip: !slug }
+  )
   const restaurant = storefront?.restaurant
   const { data: fulfillmentData, isLoading: loadingFulfillment } =
     useGetPublicConsumerFulfillmentOptionsQuery(
@@ -140,6 +148,7 @@ export function ConsumerCheckoutPage() {
     [branches, branchId]
   )
 
+  const restaurantTimeZone = selectedBranch?.timeZone
   const orderingStatus = useMemo(() => orderingStatusFromBranch(selectedBranch), [selectedBranch])
   const orderingMessage = useMemo(
     () => localizedOrderingMessage(orderingStatus, t),
@@ -148,10 +157,13 @@ export function ConsumerCheckoutPage() {
 
   const minScheduleValue = useMemo(() => {
     if (orderingStatus.nextLiveOrderAt) {
-      return toDatetimeLocalValue(new Date(orderingStatus.nextLiveOrderAt))
+      return toDatetimeLocalValueInZone(
+        new Date(orderingStatus.nextLiveOrderAt),
+        restaurantTimeZone
+      )
     }
-    return toDatetimeLocalValue(new Date())
-  }, [orderingStatus.nextLiveOrderAt])
+    return toDatetimeLocalValueInZone(new Date(), restaurantTimeZone)
+  }, [orderingStatus.nextLiveOrderAt, restaurantTimeZone])
 
   useEffect(() => {
     if (!branchId && branches.length) {
@@ -163,10 +175,12 @@ export function ConsumerCheckoutPage() {
     if (orderingStatus.mode === 'PREORDER_ONLY') {
       setScheduleMode('scheduled')
       if (!scheduledFor && orderingStatus.nextLiveOrderAt) {
-        setScheduledFor(toDatetimeLocalValue(new Date(orderingStatus.nextLiveOrderAt)))
+        setScheduledFor(
+          toDatetimeLocalValueInZone(new Date(orderingStatus.nextLiveOrderAt), restaurantTimeZone)
+        )
       }
     }
-  }, [orderingStatus.mode, orderingStatus.nextLiveOrderAt, scheduledFor])
+  }, [orderingStatus.mode, orderingStatus.nextLiveOrderAt, restaurantTimeZone, scheduledFor])
 
   useEffect(() => {
     if (isAuthenticated && member?.displayName && !form.guestName) {
@@ -183,7 +197,13 @@ export function ConsumerCheckoutPage() {
     setDeliveryZoneId(matchedZone?.id)
   }, [matchedZone?.id])
 
-  const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
+  const pricedCart = useMemo(
+    () => priceCartAgainstMenu(cart, menuData?.menu.categories),
+    [cart, menuData?.menu.categories]
+  )
+  const orderLines = pricedCart?.lines ?? cart
+  const unavailableLines = pricedCart?.unavailable ?? []
+  const subtotal = orderLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
   const minOrderAmount = useMemo(() => {
     if (!selectedBranch) return 0
     if (fulfillmentType === 'DELIVERY') {
@@ -276,6 +296,10 @@ export function ConsumerCheckoutPage() {
       toast.error(orderingMessage)
       return
     }
+    if (unavailableLines.length) {
+      toast.error(t('checkout.itemUnavailable'))
+      return
+    }
     if (orderingStatus.mode === 'PREORDER_ONLY' && scheduleMode !== 'scheduled') {
       toast.error(t('checkout.scheduleWhenOpen'))
       return
@@ -284,9 +308,22 @@ export function ConsumerCheckoutPage() {
       scheduleMode === 'scheduled' &&
       scheduledFor &&
       orderingStatus.nextLiveOrderAt &&
-      new Date(scheduledFor) < new Date(orderingStatus.nextLiveOrderAt)
+      scheduledInstant(scheduledFor, restaurantTimeZone) < new Date(orderingStatus.nextLiveOrderAt)
     ) {
       toast.error(t('checkout.scheduleTooEarly'))
+      return
+    }
+    if (
+      scheduledFor &&
+      (scheduleMode === 'scheduled' || orderingStatus.mode === 'PREORDER_ONLY') &&
+      !isWithinLiveOrderWindow(
+        scheduledInstant(scheduledFor, restaurantTimeZone),
+        orderingStatus.liveOrderStart,
+        orderingStatus.liveOrderEnd,
+        restaurantTimeZone
+      )
+    ) {
+      toast.error(t('checkout.scheduleOutsideHours'))
       return
     }
 
@@ -303,9 +340,9 @@ export function ConsumerCheckoutPage() {
         deliveryZoneId: fulfillmentType === 'DELIVERY' ? deliveryZoneId : undefined,
         scheduledFor:
           scheduleMode === 'scheduled' && scheduledFor
-            ? new Date(scheduledFor).toISOString()
+            ? scheduledInstant(scheduledFor, restaurantTimeZone).toISOString()
             : orderingStatus.mode === 'PREORDER_ONLY' && scheduledFor
-              ? new Date(scheduledFor).toISOString()
+              ? scheduledInstant(scheduledFor, restaurantTimeZone).toISOString()
               : undefined,
         deliveryAddress:
           fulfillmentType === 'DELIVERY'
@@ -411,6 +448,20 @@ export function ConsumerCheckoutPage() {
             </Alert>
           )}
 
+          {unavailableLines.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{t('checkout.itemUnavailable')}</AlertDescription>
+            </Alert>
+          )}
+
+          {pricedCart?.priceChanged && unavailableLines.length === 0 && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{t('checkout.pricesUpdated')}</AlertDescription>
+            </Alert>
+          )}
+
           {belowMinOrder && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
@@ -428,7 +479,7 @@ export function ConsumerCheckoutPage() {
               <CardTitle>{t('checkout.yourOrder')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {cart.map((line: CartLine) => (
+              {orderLines.map((line: CartLine) => (
                 <div key={line.cartKey} className="space-y-0.5">
                   <div className="flex justify-between text-sm">
                     <span>
@@ -608,10 +659,18 @@ export function ConsumerCheckoutPage() {
                     min={minScheduleValue}
                     required={!orderingStatus.allowAsap}
                   />
+                  {restaurantTimeZone ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t('checkout.restaurantLocalTime', { timeZone: restaurantTimeZone })}
+                    </p>
+                  ) : null}
                   {orderingStatus.nextLiveOrderAt && (
                     <p className="text-xs text-muted-foreground">
                       {t('checkout.earliest', {
-                        time: new Date(orderingStatus.nextLiveOrderAt).toLocaleString(),
+                        time: toDatetimeLocalValueInZone(
+                          new Date(orderingStatus.nextLiveOrderAt),
+                          restaurantTimeZone
+                        ).replace('T', ' '),
                       })}
                     </p>
                   )}
@@ -721,6 +780,7 @@ export function ConsumerCheckoutPage() {
               placing ||
               !branchId ||
               belowMinOrder ||
+              unavailableLines.length > 0 ||
               orderingStatus.mode === 'CLOSED' ||
               (fulfillmentType === 'DELIVERY' &&
                 !!form.postcode.trim() &&

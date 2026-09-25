@@ -35,6 +35,27 @@ describe('invoice payment flow (unit)', () => {
     expect(client.query).toHaveBeenCalled()
   })
 
+  it('rejects a cash payment in a different currency from the invoice', async () => {
+    const client = {
+      query: vi.fn().mockResolvedValueOnce({
+        rows: [
+          { id: 'inv-1', total_amount: 100, balance_due: 100, currency: 'USD', status: 'ISSUED' },
+        ],
+      }),
+    }
+
+    await expect(
+      recordCashPayment(client, {
+        invoiceId: 'inv-1',
+        paymentAmount: 10,
+        paymentDate: '2026-06-01',
+        paymentMethod: 'CASH',
+        recordedBy: 'user-1',
+        currency: 'JOD',
+      })
+    ).rejects.toThrow(/currency/i)
+  })
+
   it('credit application creates payment row', async () => {
     const invoice = {
       id: 'inv-1',
@@ -71,6 +92,46 @@ describe('invoice payment flow (unit)', () => {
     })
 
     expect(result.creditNote).toBeTruthy()
+  })
+
+  it('rejects a credit note in a different currency from the invoice', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'cn-1',
+              restaurant_id: 'r1',
+              supplier_id: 's1',
+              remaining_amount: 20,
+              currency: 'JOD',
+              credit_note_number: 'CN-1',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'inv-1',
+              restaurant_id: 'r1',
+              supplier_id: 's1',
+              total_amount: 100,
+              currency: 'USD',
+              status: 'ISSUED',
+            },
+          ],
+        }),
+    }
+
+    await expect(
+      applyCreditToInvoice(client, {
+        creditNoteId: 'cn-1',
+        invoiceId: 'inv-1',
+        creditAmount: 20,
+        recordedBy: 'user-1',
+      })
+    ).rejects.toThrow(/currency/i)
   })
 
   it('computeRemainingBalance after partial pay', () => {

@@ -1,12 +1,8 @@
 import type { User } from '../types'
 
-/** Named + legacy owner role identifiers returned by /auth/me tenantRoles / workspace.roleName */
-export const TENANT_OWNER_ROLE_NAMES = [
-  'Owner',
-  'Org Owner',
-  'RESTAURANT_OWNER',
-  'SUPPLIER_OWNER',
-] as const
+/** Named + legacy owner role identifiers from /auth/me tenantRoles / workspace.roleName.
+ * Org Owner is an organization role, not a tenant-role bypass — access comes from org permission ALL. */
+export const TENANT_OWNER_ROLE_NAMES = ['Owner', 'RESTAURANT_OWNER', 'SUPPLIER_OWNER'] as const
 
 export function isTenantOwner(user: User | null | undefined): boolean {
   if (!user) return false

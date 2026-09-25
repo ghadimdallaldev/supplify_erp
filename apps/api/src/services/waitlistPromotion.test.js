@@ -266,6 +266,7 @@ describe('waitlistPromotion', () => {
           },
         ],
       })
+      queryMock.mockResolvedValueOnce({ rows: [{ id: 'rest-1' }] })
       queryMock.mockResolvedValueOnce({ rows: [{ operating_hours: {} }] })
       const slotError = new Error(
         'Sorry, this time slot was just booked. Please choose another time.'
@@ -298,7 +299,11 @@ describe('waitlistPromotion', () => {
             },
           ],
         })
+        .mockResolvedValueOnce({ rows: [{ id: 'rest-1' }] })
         .mockResolvedValueOnce({ rows: [{ operating_hours: {} }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'table-1', capacity: 4, is_active: true }] })
         .mockResolvedValueOnce({
           rows: [
             {

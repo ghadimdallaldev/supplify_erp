@@ -64,5 +64,20 @@ describe('driver-delivery-detail.service', () => {
     expect(detail.assignment).toMatchObject({ id: 'assignment-1', driverId: 'driver-1' })
     expect(detail.route).toMatchObject({ id: 'route-1', stopId: 'stop-1' })
     expect(detail.podAvailable).toBe(false)
+    expect(String(queryMock.mock.calls[0][0])).toMatch(/b\.tenant_id = o\.restaurant_id/)
+    expect(String(queryMock.mock.calls[0][0])).toMatch(/requested_delivery_time/)
+    expect(String(queryMock.mock.calls[0][0])).toMatch(/dr2\.driver_id = da\.driver_id/)
+    expect(queryMock.mock.calls[0][1]).toEqual(['order-1', 'supplier-1', null])
+  })
+
+  it('loads the signed-in driver assignment when several legs exist', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    await expect(
+      getDriverDeliveryDetail('order-1', 'supplier-1', { driverId: 'driver-2' })
+    ).rejects.toThrow(/Delivery not found/)
+
+    expect(queryMock.mock.calls[0][1]).toEqual(['order-1', 'supplier-1', 'driver-2'])
+    expect(String(queryMock.mock.calls[0][0])).toMatch(/da2\.driver_id = \$3::uuid/)
   })
 })

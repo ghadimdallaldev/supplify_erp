@@ -803,5 +803,69 @@ describe('Subscription lib', () => {
         })
       )
     })
+
+    it('gives each user their own plan AI allowance', async () => {
+      const { reserveAiUsage, getAiUsageSummary } = await import('./subscription.js')
+      const counts = new Map()
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow({ plan_id: 'plan-scale' })] },
+          fullSub: {
+            rows: [
+              subscriptionRow({
+                tenant_id: 'rest-1',
+                plan_id: 'plan-scale',
+                plan_code: 'platinum',
+                plan_name: 'Scale',
+                limits: { ai_requests_per_day: 300 },
+                free_sandbox_expires_at: null,
+              }),
+            ],
+          },
+          fallback: (sql, params) => {
+            const text = String(sql)
+            if (text.includes('UPDATE user_ai_request_usage')) {
+              const userId = params[0]
+              const next = (counts.get(userId) || 0) + Number(params[4] || 1)
+              counts.set(userId, next)
+              return { rows: [{ current_value: next }] }
+            }
+            if (text.includes('SELECT current_value') && text.includes('user_ai_request_usage')) {
+              return { rows: [{ current_value: counts.get(params[0]) || 0 }] }
+            }
+            return { rows: [] }
+          },
+        })
+      )
+
+      const first = await reserveAiUsage('rest-1', 'RESTAURANT', 1, 'user-a')
+      const second = await reserveAiUsage('rest-1', 'RESTAURANT', 1, 'user-b')
+      const again = await reserveAiUsage('rest-1', 'RESTAURANT', 1, 'user-a')
+
+      expect(first).toEqual(
+        expect.objectContaining({ allowed: true, current: 1, limit: 300, userId: 'user-a' })
+      )
+      expect(second).toEqual(
+        expect.objectContaining({ allowed: true, current: 1, limit: 300, userId: 'user-b' })
+      )
+      expect(again).toEqual(
+        expect.objectContaining({ allowed: true, current: 2, userId: 'user-a' })
+      )
+
+      const summaryA = await getAiUsageSummary('rest-1', 'RESTAURANT', 'user-a')
+      const summaryB = await getAiUsageSummary('rest-1', 'RESTAURANT', 'user-b')
+      expect(summaryA).toEqual(
+        expect.objectContaining({ current: 2, limit: 300, remaining: 298, userId: 'user-a' })
+      )
+      expect(summaryB).toEqual(
+        expect.objectContaining({ current: 1, limit: 300, remaining: 299, userId: 'user-b' })
+      )
+
+      const sharedWrites = mockQuery.mock.calls.filter((call) => {
+        const sql = String(call[0])
+        return sql.includes('UPDATE usage_meter') && !sql.includes('user_ai_request_usage')
+      })
+      expect(sharedWrites).toHaveLength(0)
+    })
   })
 })

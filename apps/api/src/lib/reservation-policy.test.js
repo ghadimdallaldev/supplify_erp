@@ -26,6 +26,13 @@ describe('reservation-policy', () => {
     expect(assertDepositAcknowledged(hours, true).required).toBe(true)
   })
 
+  it('skips deposit ack when the amount is zero', () => {
+    expect(
+      assertDepositAcknowledged({ _booking: { depositMode: 'percent', depositPercent: 0 } }, false)
+        .required
+    ).toBe(false)
+  })
+
   it('skips deposit ack when mode is none', () => {
     expect(assertDepositAcknowledged({ _booking: { depositMode: 'none' } }, false).required).toBe(
       false

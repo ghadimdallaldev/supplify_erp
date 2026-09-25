@@ -34,6 +34,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   getRequestTenant: vi.fn().mockResolvedValue({ tenantId: 'supplier-1', tenantType: 'SUPPLIER' }),
+  rolesIncludeOwner: (roles) => Array.isArray(roles) && roles.includes('Owner'),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -43,6 +44,7 @@ vi.mock('../lib/subscription.js', () => ({
 
 vi.mock('../lib/warehouse-helpers.js', () => ({
   isMultiWarehouseFulfillmentActive: vi.fn().mockReturnValue(false),
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
 }))
 
 vi.mock('../lib/logger.js', () => ({

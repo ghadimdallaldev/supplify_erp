@@ -35,6 +35,7 @@ import { writeAuditLog } from '../../lib/audit.js'
 import { orderAmendmentsRouter } from '../order-amendments.routes.js'
 import { ordersDriverRoutes } from '../orders-driver.routes.js'
 import { assignWarehousesToOrder } from '../../services/warehouseRouting.js'
+import { getWarehouseSupplierColumn } from '../../lib/warehouse-helpers.js'
 import { syncWarehouseFulfillmentOnOrderStatus } from '../../services/warehouseInventory.js'
 import { hasPermission } from '../../lib/permissions.js'
 import {
@@ -728,11 +729,11 @@ async function handleOrderDelivery(orderId, userData, res, req, previousStatus =
 /**
  * Enforce tenant-scoped read access for GET order detail (and similar read paths).
  * Prefers req.tenantContext (set by resolveTenantContext) over a fresh getRequestTenant lookup.
- * Admin without impersonation may read any order (matches order list behavior).
+ * Admin without impersonation is denied (matches invoice/payment tenant scope).
  */
 export async function assertOrderReadAccess(req, order, orderId) {
   if (req.userData?.role === 'ADMIN' && !getEffectiveTenant(req)) {
-    return true
+    return false
   }
 
   const tenant = req.tenantContext
@@ -760,9 +761,11 @@ export async function assertOrderReadAccess(req, order, orderId) {
   }
 
   if (req.userData?.role === 'SUPPLIER') {
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) return false
     const { rows: supplierItems } = await query(
-      `SELECT 1 FROM order_item oi JOIN supplier s ON s.id = oi.supplier_id WHERE oi.order_id = $1 AND s.contact_email = $2 LIMIT 1`,
-      [orderId, req.userData.email]
+      `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+      [orderId, supplierId]
     )
     return supplierItems.length > 0
   }
@@ -771,13 +774,18 @@ export async function assertOrderReadAccess(req, order, orderId) {
 }
 
 export async function loadOrderWarehouseAssignments(orderId) {
+  const supplierCol = await getWarehouseSupplierColumn()
   const { rows } = await query(
     `SELECT owa.*, w.name AS warehouse_name, w.code AS warehouse_code,
             oi.product_id, p.name AS product_name
      FROM order_warehouse_assignment owa
-     JOIN warehouse w ON w.id = owa.warehouse_id
      LEFT JOIN order_item oi ON oi.id = owa.order_item_id
      LEFT JOIN product p ON p.id = oi.product_id
+     LEFT JOIN warehouse w ON w.id = owa.warehouse_id
+       AND EXISTS (
+         SELECT 1 FROM order_item oi_s
+         WHERE oi_s.order_id = owa.order_id AND oi_s.supplier_id = w.${supplierCol}
+       )
      WHERE owa.order_id = $1
      ORDER BY w.name, owa.assigned_at`,
     [orderId]

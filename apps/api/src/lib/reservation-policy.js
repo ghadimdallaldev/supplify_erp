@@ -1,8 +1,10 @@
 /**
  * Reservation policy helpers (cancel window, deposit acknowledgment).
  */
-import { readBookingMeta } from './reservation-availability.js'
+import { depositIsRequired, readBookingMeta } from './reservation-availability.js'
 import { parseOperatingHours } from './reservation-booking-hours.js'
+
+export { depositIsRequired }
 
 /**
  * @param {unknown} operatingHours
@@ -29,7 +31,7 @@ export function evaluateCancelWindow(operatingHours, scheduledAt, now = new Date
  */
 export function assertDepositAcknowledged(operatingHours, acknowledged) {
   const meta = readBookingMeta(parseOperatingHours(operatingHours))
-  if (meta.depositMode === 'none') {
+  if (!depositIsRequired(meta)) {
     return { required: false, meta }
   }
   if (!acknowledged) {

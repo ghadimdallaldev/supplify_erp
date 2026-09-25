@@ -75,5 +75,8 @@ describe('fulfillmentDispatchUtils', () => {
     expect(canSelectOrderForRoute({ status: 'SHIPPED' }).ok).toBe(true)
     expect(canSelectOrderForRoute({ active_route_id: 'r1', status: 'SHIPPED' }).ok).toBe(false)
     expect(canSelectOrderForRoute({ status: 'DELIVERED' }).ok).toBe(false)
+    expect(canSelectOrderForRoute({ status: 'SHIPPED', assignment: { status: 'failed' } }).ok).toBe(
+      false
+    )
   })
 })

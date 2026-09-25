@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import { toast } from 'sonner'
+import { localDateKey } from '../lib/invoiceBalance'
 import { EmptyState } from '../components/ui/empty-state'
 import {
   useGetMeQuery,
@@ -128,8 +129,8 @@ export function StaffSelfServiceDashboard() {
 
   const [ptoForm, setPtoForm] = useState({
     type: 'VACATION',
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date().toISOString().slice(0, 10),
+    startDate: localDateKey(),
+    endDate: localDateKey(),
     hoursRequested: '',
     reason: '',
   })

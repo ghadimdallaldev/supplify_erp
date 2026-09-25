@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Receipt } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { StatusBadge } from '../ui/status-badge'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 
 type InvoiceCreditNotesCardProps = {
   tenantCreditNotes: Record<string, unknown>[]
@@ -37,7 +37,11 @@ export function InvoiceCreditNotesCard({ tenantCreditNotes }: InvoiceCreditNotes
                   <td className="py-2 font-mono text-xs">
                     {String(cn.credit_note_number || cn.id).slice(-12)}
                   </td>
-                  <td className="py-2">${formatPrice(Number(cn.amount || 0))}</td>
+                  <td className="py-2">
+                    {formatCurrency(Number(cn.credit_amount ?? cn.amount ?? 0), {
+                      currency: cn.currency ? String(cn.currency) : 'USD',
+                    })}
+                  </td>
                   <td className="py-2">
                     <StatusBadge status={String(cn.status || 'available')} />
                   </td>

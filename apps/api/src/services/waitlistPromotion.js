@@ -8,6 +8,9 @@ import { sendWhatsAppMessage } from './whatsapp.service.js'
 import {
   getRestaurantSlotAvailability,
   assertSlotBookable,
+  assertNoDuplicateGuestBooking,
+  holdTablesForParty,
+  DEFAULT_DURATION_MINUTES,
 } from '../lib/reservation-availability.js'
 
 const OFFER_DURATION_HOURS = 2
@@ -268,6 +271,7 @@ export async function acceptWaitlistOffer(token) {
 
     const scheduledAt = entry.preferred_time || new Date().toISOString()
 
+    await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [entry.restaurant_id])
     const { rows: ohRows } = await client.query(
       `SELECT operating_hours FROM restaurant WHERE id = $1`,
       [entry.restaurant_id]
@@ -279,6 +283,22 @@ export async function acceptWaitlistOffer(token) {
       operatingHours: ohRows[0]?.operating_hours,
     })
     assertSlotBookable(availability, scheduledAt, entry.party_size)
+    const durationMinutes = availability.durationMinutes || DEFAULT_DURATION_MINUTES
+    await assertNoDuplicateGuestBooking(
+      client,
+      entry.restaurant_id,
+      scheduledAt,
+      entry.customer_email,
+      entry.customer_phone,
+      durationMinutes
+    )
+    const tableIds = await holdTablesForParty(client.query.bind(client), {
+      restaurantId: entry.restaurant_id,
+      scheduledAt,
+      durationMinutes,
+      partySize: entry.party_size,
+      branchId: entry.branch_id,
+    })
 
     const { rows: reservationRows } = await client.query(
       `
@@ -299,7 +319,7 @@ export async function acceptWaitlistOffer(token) {
           public_token,
           public_token_expires_at
         )
-        VALUES ($1, $2, '{}', 'CONFIRMED', $3, $4, $5, $6, $7, 90, $8, false, true, gen_random_uuid(), now() + interval '180 days')
+        VALUES ($1, $2, $10::uuid[], 'CONFIRMED', $3, $4, $5, $6, $7, $9, $8, false, true, gen_random_uuid(), now() + interval '180 days')
         RETURNING *
       `,
       [
@@ -311,6 +331,8 @@ export async function acceptWaitlistOffer(token) {
         entry.party_size,
         scheduledAt,
         entry.notes,
+        durationMinutes,
+        tableIds,
       ]
     )
 

@@ -279,7 +279,7 @@ describe('resolve-product-price.service', () => {
     expect(String(queryMock.mock.calls[0][0])).toContain("qr.status = 'open'")
   })
 
-  it('uses CURRENT_DATE in contract query when no explicit date is provided', async () => {
+  it('uses the restaurant local day when no explicit date is provided', async () => {
     const { resolveProductPrice } = await import('./resolve-product-price.service.js')
     queryMock
       .mockResolvedValueOnce({ rows: [{ amount: '20.00', currency: 'USD' }] })
@@ -292,8 +292,10 @@ describe('resolve-product-price.service', () => {
     })
 
     const contractSql = String(queryMock.mock.calls[1][0])
-    expect(contractSql).toContain('COALESCE($4::date, CURRENT_DATE)')
+    expect(contractSql).toContain('AT TIME ZONE')
+    expect(contractSql).toContain('restaurant WHERE id = $1')
     expect(queryMock.mock.calls[1][1][3]).toBeNull()
+    expect(queryMock.mock.calls[1][1][5]).toEqual(expect.any(String))
   })
 
   it('uses local calendar date string for explicit Date values', async () => {
@@ -330,7 +332,7 @@ describe('resolve-product-price.service', () => {
     expect(queryMock.mock.calls[1][1][3]).toBe('2026-06-01')
   })
 
-  it('batch resolver passes null date for CURRENT_DATE semantics', async () => {
+  it('batch resolver uses the restaurant local day when no date is provided', async () => {
     const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
 
     queryMock
@@ -345,8 +347,9 @@ describe('resolve-product-price.service', () => {
     })
 
     const contractSql = String(queryMock.mock.calls[1][0])
-    expect(contractSql).toContain('COALESCE($4::date, CURRENT_DATE)')
+    expect(contractSql).toContain('AT TIME ZONE')
     expect(queryMock.mock.calls[1][1][3]).toBeNull()
+    expect(queryMock.mock.calls[1][1][4]).toEqual(expect.any(String))
   })
 
   it('enriches products with resolved pricing fields', async () => {

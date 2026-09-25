@@ -50,14 +50,16 @@ All report endpoints accept:
 
 ## Supplier endpoints (`/api/reports/supplier/...`)
 
-| Path                      | Description                       |
-| ------------------------- | --------------------------------- |
-| `revenue-trend`           | Revenue and order count over time |
-| `top-restaurants`         | Top 20 restaurants by revenue     |
-| `top-products`            | Top 20 products by revenue        |
-| `fulfillment-performance` | Order counts by status            |
-| `order-volume`            | Distinct order count over time    |
-| `invoice-collection`      | Invoices grouped by status        |
+| Path                      | Description                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `revenue-trend`           | Revenue and order count over time                                                              |
+| `top-restaurants`         | Top 20 restaurants by revenue                                                                  |
+| `top-products`            | Top 20 products by revenue                                                                     |
+| `fulfillment-performance` | Order counts by status, excluding drafts, cancellations, and orders still waiting for approval |
+| `order-volume`            | Distinct order count and line revenue over time                                                |
+| `invoice-collection`      | Issued invoices grouped by status and currency. Void and draft invoices are left out           |
+
+Money rows include `currency` and are grouped by it. The report table formats a money cell in that currency when the row has one. A summary total does the same, and a cost with no currency (waste) stays a plain number. A period, supplier, or branch that mixes currencies does not get a single summed total. Restaurant and supplier report windows and date buckets use that tenant's timezone, so an order placed after local midnight stays on that calendar day. Organization reports do the same per branch, using each restaurant timezone or supplier last-order timezone. Invoice aging and collection still filter on the invoice calendar date.
 
 ## Database
 
@@ -68,3 +70,13 @@ Migration: `0071_reports_analytics_indexes.sql` — supporting indexes only (no 
 - API: `apps/api/src/services/reports.service.test.js`, `apps/api/src/routes/reports.routes.test.js`
 - Web: `apps/web/src/lib/reportResponse.test.ts` (RTK unwrap / envelope parsing), `contractPricingResponse.test.ts` (contract pricing pages)
 - Manual: Reports page loads on Silver+; Free → 403 (GATE-R09)
+
+## Web reports page
+
+`/app/reports` lists every endpoint above.
+
+- Restaurant **receiving quality** is shown only with `RECEIVING_VIEW`.
+- Restaurant **waste** is shown only when `waste_tracking` is enabled.
+- Restaurant **invoice aging** and supplier **collections** are shown only with `INVOICES_VIEW`.
+- Top-product quantity uses the API field `total_qty`.
+- Supplier fulfillment shows order counts by status. The summary’s completed percent is the share of completed orders across the whole result.

@@ -191,7 +191,7 @@ async function detachOrderFromPriorRoutes(client, { orderId, supplierId, beforeD
     WHERE rs.route_id = dr.id
       AND rs.order_id = $1
       AND dr.supplier_id = $2
-      AND dr.scheduled_date <= $3::date
+      AND dr.scheduled_date < $3::date
       AND dr.status IN ('PLANNED', 'IN_PROGRESS')
       AND rs.status NOT IN ('COMPLETED', 'FAILED')
     `,
@@ -334,7 +334,7 @@ export async function rolloverAssignmentToNextDay({
 
     let routeId = null
     if (cfg.keepDriver && current.driver_id) {
-      const vehicleInfo = [row.vehicle_type, row.vehicle_plate].filter(Boolean).join(' Â· ') || null
+      const vehicleInfo = [row.vehicle_type, row.vehicle_plate].filter(Boolean).join(' · ') || null
       routeId = await findOrCreateRolloverRoute(client, {
         supplierId: current.supplier_id,
         driverId: current.driver_id,

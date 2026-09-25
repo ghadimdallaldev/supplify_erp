@@ -12,6 +12,7 @@
  *   advanced — price-change and cheaper-buy alerts
  */
 import { query } from '../lib/db.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
 
 /** Below this, a price move is rounding/packaging noise rather than a signal. */
 const DEFAULT_MIN_CHANGE_PCT = 5
@@ -49,6 +50,7 @@ function mapEvent(row) {
         ? ((newPrice - oldPrice) / oldPrice) * 100
         : toNumber(row.change_pct),
     source: row.source,
+    currency: row.currency || null,
     detectedAt: row.detected_at,
   }
 }
@@ -70,13 +72,44 @@ export async function getProductPriceHistory(restaurantId, productId, opts = {},
 
   const { rows } = await dbQuery(
     `
-    SELECT spe.*, s.name AS supplier_name
-    FROM supplier_price_events spe
-    LEFT JOIN supplier s ON s.id = spe.supplier_id
-    WHERE spe.restaurant_id = $1
-      AND spe.product_id = $2
-      AND spe.detected_at >= now() - ($3::int * INTERVAL '1 day')
-    ORDER BY spe.detected_at DESC
+    WITH window_events AS (
+      SELECT spe.*, s.name AS supplier_name
+      FROM supplier_price_events spe
+      LEFT JOIN supplier s ON s.id = spe.supplier_id
+      WHERE spe.restaurant_id = $1
+        AND spe.product_id = $2
+        AND spe.detected_at >= now() - ($3::int * INTERVAL '1 day')
+    ),
+    latest_currency AS (
+      SELECT currency
+      FROM window_events
+      ORDER BY detected_at DESC
+      LIMIT 1
+    ),
+    comparable AS (
+      SELECT we.*
+      FROM window_events we
+      LEFT JOIN latest_currency lc ON true
+      WHERE we.currency IS NULL
+        OR lc.currency IS NULL
+        OR upper(we.currency) = upper(lc.currency)
+    ),
+    stats AS (
+      SELECT
+        COUNT(*)::int AS observation_count,
+        MIN(new_price) AS lowest_price,
+        MAX(new_price) AS highest_price,
+        AVG(new_price) AS average_price,
+        (ARRAY_AGG(new_price ORDER BY detected_at DESC))[1] AS current_price,
+        (ARRAY_AGG(COALESCE(old_price, new_price) ORDER BY detected_at ASC))[1] AS first_observed_price,
+        (ARRAY_AGG(detected_at ORDER BY detected_at DESC))[1] AS last_changed_at
+      FROM comparable
+    )
+    SELECT we.*, st.observation_count, st.lowest_price, st.highest_price, st.average_price,
+           st.current_price, st.first_observed_price, st.last_changed_at
+    FROM comparable we
+    CROSS JOIN stats st
+    ORDER BY we.detected_at DESC
     LIMIT $4
     `,
     [restaurantId, productId, days, limit]
@@ -85,23 +118,38 @@ export async function getProductPriceHistory(restaurantId, productId, opts = {},
   const events = rows.map(mapEvent)
   const prices = events.map((e) => e.newPrice).filter((p) => p != null)
 
-  // Oldest observation in the window is the baseline; `old_price` on that row
-  // predates the window, so it is not part of the window's own range.
+  // Oldest observation in the returned page is the baseline when the query did
+  // not include window-wide stats (tests and older callers).
   const oldest = events[events.length - 1] ?? null
   const latest = events[0] ?? null
-  const baseline = oldest?.oldPrice ?? oldest?.newPrice ?? null
-  const current = latest?.newPrice ?? null
+  const pageBaseline = oldest?.oldPrice ?? oldest?.newPrice ?? null
+  const pageCurrent = latest?.newPrice ?? null
+  const windowStats = rows[0]?.observation_count != null
+  const baseline = windowStats ? toNumber(rows[0].first_observed_price) : pageBaseline
+  const current = windowStats ? toNumber(rows[0].current_price) : pageCurrent
 
   return {
     productId,
     windowDays: days,
     events,
     summary: {
-      observations: events.length,
+      observations: windowStats ? Number(rows[0].observation_count) : events.length,
       currentPrice: current,
-      lowestPrice: prices.length ? Math.min(...prices) : null,
-      highestPrice: prices.length ? Math.max(...prices) : null,
-      averagePrice: prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null,
+      lowestPrice: windowStats
+        ? toNumber(rows[0].lowest_price)
+        : prices.length
+          ? Math.min(...prices)
+          : null,
+      highestPrice: windowStats
+        ? toNumber(rows[0].highest_price)
+        : prices.length
+          ? Math.max(...prices)
+          : null,
+      averagePrice: windowStats
+        ? toNumber(rows[0].average_price)
+        : prices.length
+          ? prices.reduce((a, b) => a + b, 0) / prices.length
+          : null,
       firstObservedPrice: baseline,
       changePct:
         baseline != null && current != null && baseline !== 0
@@ -116,7 +164,8 @@ export async function getProductPriceHistory(restaurantId, productId, opts = {},
             : current < baseline
               ? 'down'
               : 'flat',
-      lastChangedAt: latest?.detectedAt ?? null,
+      lastChangedAt: windowStats ? (rows[0].last_changed_at ?? null) : (latest?.detectedAt ?? null),
+      currency: latest?.currency ?? null,
     },
   }
 }
@@ -197,10 +246,16 @@ export async function listCheaperBuyOptions(restaurantId, opts = {}, dbQuery = q
 
   const { rows } = await dbQuery(
     `
-    WITH latest_event AS (
+    WITH restaurant_today AS (
+      SELECT (now() AT TIME ZONE COALESCE(
+        (SELECT NULLIF(TRIM(timezone), '') FROM restaurant WHERE id = $1),
+        $5
+      ))::date AS today
+    ),
+    latest_event AS (
       SELECT DISTINCT ON (spe.product_id)
         spe.product_id, spe.supplier_id, spe.product_name,
-        spe.old_price, spe.new_price, spe.detected_at
+        spe.old_price, spe.new_price, spe.detected_at, spe.currency
       FROM supplier_price_events spe
       WHERE spe.restaurant_id = $1
         AND spe.detected_at >= now() - ($2::int * INTERVAL '1 day')
@@ -225,44 +280,79 @@ export async function listCheaperBuyOptions(restaurantId, opts = {}, dbQuery = q
       contract.price AS contract_price,
       sub.substitute_product_id,
       sub_product.name AS substitute_product_name,
-      sub_price.amount AS substitute_price
+      sub.substitute_price AS substitute_price
     FROM risen r
     LEFT JOIN supplier s ON s.id = r.supplier_id
     LEFT JOIN LATERAL (
-      SELECT rp.price
+      SELECT co.currency
+      FROM order_item oi
+      JOIN customer_order co ON co.id = oi.order_id
+      WHERE co.restaurant_id = $1
+        AND oi.product_id = r.product_id
+        AND (r.supplier_id IS NULL OR oi.supplier_id = r.supplier_id)
+        AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+      ORDER BY co.placed_at DESC NULLS LAST
+      LIMIT 1
+    ) observed ON true
+    LEFT JOIN LATERAL (
+      SELECT rp.price, rp.currency AS contract_currency
       FROM restaurant_pricing rp
       WHERE rp.restaurant_id = $1
         AND rp.product_id = r.product_id
         AND rp.supplier_id = r.supplier_id
         AND rp.is_active = true
-        AND (rp.contract_start_date IS NULL OR rp.contract_start_date <= CURRENT_DATE)
-        AND (rp.contract_end_date IS NULL OR rp.contract_end_date >= CURRENT_DATE)
+        AND (rp.contract_start_date IS NULL OR rp.contract_start_date <= (SELECT today FROM restaurant_today))
+        AND (rp.contract_end_date IS NULL OR rp.contract_end_date >= (SELECT today FROM restaurant_today))
+        AND (rp.min_order_quantity IS NULL OR rp.min_order_quantity <= 1)
+        AND (
+          observed.currency IS NULL
+          OR rp.currency IS NULL
+          OR upper(rp.currency) = upper(observed.currency)
+        )
       ORDER BY rp.updated_at DESC
       LIMIT 1
     ) contract ON true
     LEFT JOIN LATERAL (
-      SELECT ps.substitute_product_id
+      SELECT ps.substitute_product_id, sp.amount AS substitute_price, sp.currency AS substitute_currency
       FROM product_substitute ps
+      JOIN LATERAL (
+        SELECT p.amount, p.currency
+        FROM price p
+        WHERE p.product_id = ps.substitute_product_id
+          AND p.valid_from <= now()
+          AND (p.valid_to IS NULL OR p.valid_to >= now())
+          AND (
+            observed.currency IS NULL
+            OR p.currency IS NULL
+            OR upper(p.currency) = upper(observed.currency)
+          )
+        ORDER BY (CASE WHEN p.min_qty <= 1 THEN 0 ELSE 1 END), p.valid_from DESC
+        LIMIT 1
+      ) sp ON sp.amount < r.new_price
       WHERE ps.product_id = r.product_id
         AND ps.supplier_id = r.supplier_id
-      ORDER BY ps.priority ASC
+      ORDER BY sp.amount ASC, ps.priority ASC
       LIMIT 1
     ) sub ON true
     LEFT JOIN product sub_product ON sub_product.id = sub.substitute_product_id
-    LEFT JOIN LATERAL (
-      -- Same validity rule as getDefaultCatalogPrice, so a substitute is only
-      -- quoted at a price that is actually sellable right now.
-      SELECT p.amount
-      FROM price p
-      WHERE p.product_id = sub.substitute_product_id
-        AND (p.valid_to IS NULL OR now() BETWEEN p.valid_from AND p.valid_to)
-      ORDER BY p.valid_from DESC
-      LIMIT 1
-    ) sub_price ON true
-    ORDER BY ((r.new_price - r.old_price) / r.old_price) DESC
+    WHERE (
+      (contract.price IS NOT NULL AND contract.price < r.new_price)
+      OR sub.substitute_product_id IS NOT NULL
+    )
+    AND (
+      r.currency IS NULL
+      OR observed.currency IS NULL
+      OR upper(r.currency) = upper(observed.currency)
+    )
+    ORDER BY GREATEST(
+      CASE WHEN contract.price IS NOT NULL AND contract.price < r.new_price
+        THEN (r.new_price - contract.price) ELSE 0 END,
+      CASE WHEN sub.substitute_price IS NOT NULL
+        THEN (r.new_price - sub.substitute_price) ELSE 0 END
+    ) DESC
     LIMIT $4
     `,
-    [restaurantId, days, minChangePct, limit]
+    [restaurantId, days, minChangePct, limit, getDefaultTenantTimezone()]
   )
 
   const options = []
@@ -281,6 +371,7 @@ export async function listCheaperBuyOptions(restaurantId, opts = {}, dbQuery = q
         productId: row.product_id,
         productName: row.product_name,
         price: contractPrice,
+        currency: row.contract_currency || row.currency || null,
         savingPerUnit: currentPrice - contractPrice,
         // The contract is already agreed; paying above it is the anomaly.
         reason: 'An active contract price for this product is lower than the price last observed',
@@ -296,6 +387,7 @@ export async function listCheaperBuyOptions(restaurantId, opts = {}, dbQuery = q
         productId: row.substitute_product_id,
         productName: row.substitute_product_name,
         price: substitutePrice,
+        currency: row.substitute_currency || row.currency || null,
         savingPerUnit: currentPrice - substitutePrice,
         reason: 'The supplier lists this as an approved substitute at a lower price',
       })
@@ -308,6 +400,7 @@ export async function listCheaperBuyOptions(restaurantId, opts = {}, dbQuery = q
       productName: row.product_name,
       supplierId: row.supplier_id,
       supplierName: row.supplier_name ?? null,
+      currency: row.currency || null,
       previousPrice: toNumber(row.old_price),
       currentPrice,
       detectedAt: row.detected_at,

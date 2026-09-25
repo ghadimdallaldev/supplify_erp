@@ -86,6 +86,7 @@
     "pay": "Pay",
     "emptyTitle": "No invoices found",
     "emptyDescription": "Try adjusting your filters",
+    "loadMore": "Load more invoices",
     "statuses": {
       "ISSUED": "Issued",
       "PARTIALLY_PAID": "Partially Paid",

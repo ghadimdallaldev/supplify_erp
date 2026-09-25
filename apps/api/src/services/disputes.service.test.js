@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createDispute, resolveDispute, rejectDispute } from './disputes.service.js'
+import {
+  createDispute,
+  resolveDispute,
+  rejectDispute,
+  generateCreditNoteNumber,
+} from './disputes.service.js'
 import { assertCleanUploadOwnership } from './storage/upload-security.service.js'
 
 const queryMock = vi.fn()
@@ -63,6 +68,127 @@ describe('Disputes Service', () => {
       ).rejects.toMatchObject({ name: 'ValidationError' })
     })
 
+    it('rejects an invoice that does not belong to the order', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', restaurant_id: 'r-1', status: 'DELIVERED' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+
+      await expect(
+        createDispute({
+          restaurantId: 'r-1',
+          userId: 'u-1',
+          orderId: 'order-1',
+          supplierId: 's-1',
+          invoiceId: 'inv-other',
+          type: 'damaged_goods',
+          description: 'Damaged items',
+        })
+      ).rejects.toThrow(/Invoice does not belong to this order/)
+    })
+
+    it('rejects a disputed amount above the supplier lines on the order', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', restaurant_id: 'r-1', status: 'DELIVERED' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'oi-1',
+              quantity: 2,
+              unit_price: 10,
+              line_total: 20,
+              product_name: 'Rice',
+            },
+          ],
+        })
+
+      await expect(
+        createDispute({
+          restaurantId: 'r-1',
+          userId: 'u-1',
+          orderId: 'order-1',
+          supplierId: 's-1',
+          type: 'damaged_goods',
+          description: 'Damaged items',
+          disputedAmount: 500,
+        })
+      ).rejects.toThrow(/supplier total/)
+    })
+
+    it('rejects the same order item twice on one dispute', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', restaurant_id: 'r-1', status: 'DELIVERED' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'oi-1',
+              quantity: 4,
+              unit_price: 10,
+              line_total: 40,
+              product_name: 'Rice',
+            },
+          ],
+        })
+
+      await expect(
+        createDispute({
+          restaurantId: 'r-1',
+          userId: 'u-1',
+          orderId: 'order-1',
+          supplierId: 's-1',
+          type: 'short_delivery',
+          description: 'Missing items',
+          items: [
+            { orderItemId: 'oi-1', quantityReceived: 1 },
+            { orderItemId: 'oi-1', quantityReceived: 2 },
+          ],
+        })
+      ).rejects.toThrow(/only once/)
+    })
+
+    it('rejects a dispute line that is not on this order', async () => {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', restaurant_id: 'r-1', status: 'DELIVERED' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'oi-1',
+              quantity: 2,
+              unit_price: 10,
+              line_total: 20,
+              product_name: 'Rice',
+            },
+          ],
+        })
+
+      await expect(
+        createDispute({
+          restaurantId: 'r-1',
+          userId: 'u-1',
+          orderId: 'order-1',
+          supplierId: 's-1',
+          type: 'damaged_goods',
+          description: 'Damaged items',
+          items: [{ orderItemId: 'other-order-line', quantityReceived: 1 }],
+        })
+      ).rejects.toThrow(/does not belong to this order/)
+    })
+
     it('sets RECEIVED_WITH_DISPUTE when opening dispute on received order', async () => {
       queryMock
         .mockResolvedValueOnce({
@@ -79,7 +205,14 @@ describe('Disputes Service', () => {
       withTransactionMock.mockImplementation(async (handler) => {
         const client = {
           query: vi.fn().mockImplementation((sql) => {
-            if (String(sql).includes('RECEIVED_WITH_DISPUTE')) return updateStatus()
+            const text = String(sql)
+            if (text.includes('FROM customer_order') && text.includes('FOR UPDATE')) {
+              return Promise.resolve({ rows: [{ id: 'order-1', status: 'RECEIVED_PARTIAL' }] })
+            }
+            if (text.includes('FROM disputes WHERE order_id')) {
+              return Promise.resolve({ rows: [] })
+            }
+            if (text.includes('RECEIVED_WITH_DISPUTE')) return updateStatus()
             return Promise.resolve({
               rows: [
                 {
@@ -143,7 +276,16 @@ describe('Disputes Service', () => {
 
       withTransactionMock.mockImplementation(async (handler) => {
         const client = {
-          query: vi.fn().mockResolvedValue({ rows: [disputeRow] }),
+          query: vi.fn().mockImplementation((sql) => {
+            const text = String(sql)
+            if (text.includes('FROM customer_order') && text.includes('FOR UPDATE')) {
+              return Promise.resolve({ rows: [{ id: 'order-1', status: 'DELIVERED' }] })
+            }
+            if (text.includes('FROM disputes WHERE order_id')) {
+              return Promise.resolve({ rows: [] })
+            }
+            return Promise.resolve({ rows: [disputeRow] })
+          }),
         }
         return handler(client)
       })
@@ -207,7 +349,18 @@ describe('Disputes Service', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
       withTransactionMock.mockImplementation(async (handler) =>
-        handler({ query: vi.fn().mockResolvedValue({ rows: [disputeRow] }) })
+        handler({
+          query: vi.fn().mockImplementation((sql) => {
+            const text = String(sql)
+            if (text.includes('FROM customer_order') && text.includes('FOR UPDATE')) {
+              return Promise.resolve({ rows: [{ id: 'order-1', status: 'DELIVERED' }] })
+            }
+            if (text.includes('FROM disputes WHERE order_id')) {
+              return Promise.resolve({ rows: [] })
+            }
+            return Promise.resolve({ rows: [disputeRow] })
+          }),
+        })
       )
 
       await createDispute({
@@ -274,6 +427,56 @@ describe('Disputes Service', () => {
         })
       ).rejects.toMatchObject({ name: 'ValidationError' })
     })
+
+    it('caps a credit at the supplier order total when the dispute has no amount', async () => {
+      queryMock.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'd-1',
+            supplier_id: 's-1',
+            restaurant_id: 'r-1',
+            order_id: 'o-1',
+            invoice_id: null,
+            disputed_amount: null,
+            status: 'under_review',
+          },
+        ],
+      })
+      withTransactionMock.mockImplementation(async (handler) => {
+        const client = {
+          query: vi.fn(async (sql) => {
+            const text = String(sql)
+            if (text.includes('FROM disputes') && text.includes('FOR UPDATE')) {
+              return {
+                rows: [
+                  {
+                    id: 'd-1',
+                    supplier_id: 's-1',
+                    restaurant_id: 'r-1',
+                    order_id: 'o-1',
+                    invoice_id: null,
+                    disputed_amount: null,
+                    status: 'under_review',
+                  },
+                ],
+              }
+            }
+            if (text.includes('supplier_total')) {
+              return { rows: [{ supplier_total: '40.00', invoice_total: null }] }
+            }
+            return { rows: [] }
+          }),
+        }
+        return handler(client)
+      })
+
+      await expect(
+        resolveDispute('d-1', 's-1', {
+          resolutionType: 'credit_note',
+          creditNoteAmount: 100,
+        })
+      ).rejects.toThrow(/supplier total/)
+    })
   })
 
   describe('rejectDispute', () => {
@@ -304,6 +507,9 @@ describe('Disputes Service', () => {
               return Promise.resolve({
                 rows: [{ id: 'o-1', restaurant_id: 'r-1', currency: 'USD', branch_id: null }],
               })
+            }
+            if (String(sql).includes('supplier_total')) {
+              return Promise.resolve({ rows: [{ supplier_total: '50.00', invoice_total: null }] })
             }
             if (String(sql).includes('FROM dispute_items')) {
               return Promise.resolve({
@@ -394,6 +600,22 @@ describe('Disputes Service', () => {
       })
 
       expect(createReplacementOrderFromDisputeMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('generateCreditNoteNumber', () => {
+    it('takes the next suffix after the highest number, under a month lock', async () => {
+      const client = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [{ seq: 12 }] }),
+      }
+      const year = new Date().getFullYear()
+      const month = String(new Date().getMonth() + 1).padStart(2, '0')
+      await expect(generateCreditNoteNumber(client)).resolves.toBe(`CN-${year}-${month}-013`)
+      expect(client.query.mock.calls[0][0]).toMatch(/pg_advisory_xact_lock/)
+      expect(client.query.mock.calls[1][0]).toMatch(/MAX/)
     })
   })
 })

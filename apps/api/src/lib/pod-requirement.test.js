@@ -44,6 +44,20 @@ describe('pod-requirement', () => {
     ).resolves.toEqual({ podRequired: true, hasPod: false })
   })
 
+  it('resolveDeliveryPodFlags checks the driver leg when one is given', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ pod_required: true }] })
+    await resolveDeliveryPodFlags({
+      supplierId: 'sup-1',
+      orderId: 'order-1',
+      deliveryStatus: 'delivered',
+      driverAssignmentId: 'da-leg-b',
+    })
+    expect(query.mock.calls[0][0]).toMatch(/driver_assignment_id/)
+    expect(query.mock.calls[0][1]).toEqual(['order-1', 'da-leg-b'])
+  })
+
   it('blocks delivered when POD is required and missing', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ pod_required: true }] })
@@ -83,5 +97,21 @@ describe('pod-requirement', () => {
     ).resolves.toBeUndefined()
     expect(query).not.toHaveBeenCalled()
     expect(dbQuery).toHaveBeenCalledTimes(2)
+  })
+
+  it('requires proof for the specific driver leg', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ pod_required: true }] })
+      .mockResolvedValueOnce({ rows: [] })
+    await expect(
+      assertPodPresentWhenRequired({
+        supplierId: 'sup-1',
+        orderId: 'order-1',
+        status: 'delivered',
+        driverAssignmentId: 'da-leg-b',
+      })
+    ).rejects.toThrow(/Proof of delivery is required/)
+    expect(query.mock.calls[1][0]).toMatch(/driver_assignment_id/)
+    expect(query.mock.calls[1][1]).toEqual(['order-1', 'da-leg-b'])
   })
 })

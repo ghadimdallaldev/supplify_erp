@@ -4,7 +4,7 @@ Plan feature key: `disputes_returns` (included in the selected trial target and 
 
 ## Overview
 
-Restaurants can open formal disputes on **delivered / received / invoiced / completed** orders when deliveries are wrong, damaged, or billed incorrectly. Disputes can include **per line-item** quantities (e.g. received 1 of 3 SKUs). Suppliers see incoming disputes under **Disputes** (Operations nav) and on the **order timeline**; both sides get notifications. Suppliers review, resolve (optionally issuing a credit note), or reject. Credit notes link to the existing `credit_note` finance table.
+Restaurants can open formal disputes on **delivered / received / invoiced / completed** orders when deliveries are wrong, damaged, or billed incorrectly. Disputes can include **per line-item** quantities (e.g. received 1 of 3 SKUs). Each line must be an item on that order for that supplier, and stored quantities and prices come from the order line. The disputed amount, and any credit or refund, cannot exceed that supplier's line total (or the linked invoice total when it is lower). Suppliers see incoming disputes under **Disputes** (Operations nav) and on the **order timeline**; both sides get notifications. Suppliers review, resolve (optionally issuing a credit note), or reject. Credit notes link to the existing `credit_note` finance table.
 
 ## Workflow
 
@@ -13,11 +13,12 @@ Restaurants can open formal disputes on **delivered / received / invoiced / comp
 3. Supplier marks **under review**, then **resolves** (credit note, replacement, refund, or no action) or **rejects** with notes.
 4. Restaurant is notified on resolution or rejection.
 5. Credit notes can be listed and marked **applied** via the credit-notes API.
-6. **Replacement** resolution automatically creates a new `PLACED` follow-up order (`placement_source = DISPUTE_REPLACEMENT`) for disputed short quantities at **$0** unit price, linked on `disputes.replacement_order_id` and `customer_order.source_*` fields.
+6. **Replacement** resolution automatically creates a new `PLACED` follow-up order (`placement_source = DISPUTE_REPLACEMENT`) for disputed short quantities at **$0** unit price, linked on `disputes.replacement_order_id` and `customer_order.source_*` fields. Repeated lines for the same order item are combined and capped at that line's ordered quantity.
 
 **Rules:**
 
-- Only one active dispute per order (`open`, `under_review`, or `escalated`).
+- Only one active dispute per order (`open`, `under_review`, or `escalated`). Opening a dispute locks the order and checks again, so two requests cannot both create an active dispute.
+- Each order item appears once on a dispute. A replacement sums short quantities for that line and never ships more than the original ordered quantity.
 - Order status must be one of: `DELIVERED`, `RECEIVED_PARTIAL`, `RECEIVED_FULL`, `INVOICED`, `COMPLETED`.
 - When a dispute is opened after receiving, order status becomes **`RECEIVED_WITH_DISPUTE`** (visible on order list and timeline for restaurant and supplier). When the dispute is resolved, rejected, or cancelled, status returns to `RECEIVED_PARTIAL` or `RECEIVED_FULL` based on the receiving report.
 - During receiving, the API automatically opens (or extends) **one active dispute** when any line is short or has non-accepted quality. Dispute creation is part of the same transaction as receiving, inventory, invoice, and order state, so a retry cannot leave a partial receipt.

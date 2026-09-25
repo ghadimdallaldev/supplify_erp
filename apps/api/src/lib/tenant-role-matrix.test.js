@@ -56,8 +56,13 @@ describe('Restaurant default roles', () => {
     expect(can(perms, P.PAYMENTS_VIEW)).toBe(true)
     expect(can(perms, P.ORDERS_CREATE)).toBe(false)
     expect(can(perms, P.RECEIVING_MANAGE)).toBe(false)
+    expect(can(perms, P.RECEIVING_VIEW)).toBe(false)
     expect(can(perms, P.SETTINGS_MANAGE)).toBe(false)
     expect(can(perms, P.STAFF_VIEW)).toBe(false)
+    expect(perms).not.toContain(P.RECIPES_VIEW)
+    expect(perms).not.toContain(P.RECIPES_VIEW_COSTS)
+    expect(perms).not.toContain(P.RECIPES_EDIT)
+    expect(perms).not.toContain(P.RECIPES_MANAGE)
   })
 
   it('Viewer is read-only with broad workspace read access', () => {
@@ -107,6 +112,7 @@ describe('Supplier default roles', () => {
   it('Catalog Manager manages catalog only', () => {
     const perms = role('Catalog Manager', 'SUPPLIER')
     expect(can(perms, P.CATALOG_MANAGE)).toBe(true)
+    expect(can(perms, P.ORDERS_VIEW)).toBe(false)
     expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
     expect(can(perms, P.STAFF_VIEW)).toBe(false)
   })
@@ -124,6 +130,8 @@ describe('Supplier default roles', () => {
     expect(can(perms, P.INVOICES_VIEW)).toBe(true)
     expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
     expect(can(perms, P.ORDERS_EDIT)).toBe(false)
+    expect(perms).not.toContain(P.RECIPES_VIEW)
+    expect(perms).not.toContain(P.RECIPES_VIEW_COSTS)
   })
 
   it('Viewer cannot mutate anything but can read workspace data', () => {

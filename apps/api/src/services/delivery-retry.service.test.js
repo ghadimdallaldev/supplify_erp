@@ -100,4 +100,137 @@ describe('delivery-retry.service', () => {
     ).toBe(true)
     expect(invalidateDispatchCacheMock).toHaveBeenCalledWith('supplier-1')
   })
+
+  it('retries only failed warehouse legs when the driver attempt was not tied to one leg', async () => {
+    const sourceDriver = {
+      id: 'driver-attempt-1',
+      order_id: 'order-1',
+      supplier_id: 'supplier-1',
+      warehouse_assignment_id: null,
+      scheduled_delivery_date: '2026-09-15',
+    }
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'SHIPPED' }] })
+        .mockResolvedValueOnce({ rows: [sourceDriver] })
+        .mockResolvedValueOnce({ rows: [{ id: 'driver-2' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'warehouse-2', supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { id: 'failed-leg', order_item_id: 'item-failed' },
+            { id: 'other-failed', order_item_id: null },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ order_item_id: 'item-delivered' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'item-failed',
+              product_id: 'product-failed',
+              quantity: 2,
+              supplier_id: 'supplier-1',
+            },
+            {
+              id: 'item-delivered',
+              product_id: 'product-delivered',
+              quantity: 5,
+              supplier_id: 'supplier-1',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 'warehouse-attempt-2' }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'driver-attempt-2' }] })
+        .mockResolvedValueOnce({ rows: [] }),
+    }
+    withTransactionMock.mockImplementation(async (handler) => handler(client))
+
+    await retryFailedDelivery({
+      orderId: 'order-1',
+      supplierId: 'supplier-1',
+      sourceDriverAssignmentId: 'driver-attempt-1',
+      driverId: 'driver-2',
+      warehouseId: 'warehouse-2',
+      reason: 'Restaurant was closed',
+    })
+
+    expect(reserveWarehouseStockBatchMock).toHaveBeenCalledWith(
+      client,
+      'warehouse-2',
+      [{ productId: 'product-failed', quantity: 2 }],
+      { supplierId: 'supplier-1' }
+    )
+    const supersede = client.query.mock.calls.find(
+      ([sql]) =>
+        String(sql).includes("status = 'superseded'") && String(sql).includes('ANY($3::uuid[])')
+    )
+    expect(supersede?.[1]?.[2]).toEqual(['failed-leg', 'other-failed'])
+  })
+
+  it('does not reserve a delivered item leg when retrying a whole-order failure', async () => {
+    const sourceDriver = {
+      id: 'driver-attempt-1',
+      order_id: 'order-1',
+      supplier_id: 'supplier-1',
+      warehouse_assignment_id: 'warehouse-attempt-1',
+      scheduled_delivery_date: '2026-09-15',
+    }
+    const sourceWarehouse = {
+      id: 'warehouse-attempt-1',
+      order_id: 'order-1',
+      order_item_id: null,
+      warehouse_id: 'warehouse-1',
+      status: 'failed',
+    }
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'order-1', status: 'SHIPPED' }] })
+        .mockResolvedValueOnce({ rows: [sourceDriver] })
+        .mockResolvedValueOnce({ rows: [{ id: 'driver-2' }] })
+        .mockResolvedValueOnce({ rows: [sourceWarehouse] })
+        .mockResolvedValueOnce({ rows: [{ id: 'warehouse-1', supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({ rows: [{ order_item_id: 'item-delivered' }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'item-failed',
+              product_id: 'product-failed',
+              quantity: 2,
+              supplier_id: 'supplier-1',
+            },
+            {
+              id: 'item-delivered',
+              product_id: 'product-delivered',
+              quantity: 5,
+              supplier_id: 'supplier-1',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'warehouse-attempt-2' }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'driver-attempt-2' }] })
+        .mockResolvedValueOnce({ rows: [] }),
+    }
+    withTransactionMock.mockImplementation(async (handler) => handler(client))
+
+    await retryFailedDelivery({
+      orderId: 'order-1',
+      supplierId: 'supplier-1',
+      sourceDriverAssignmentId: 'driver-attempt-1',
+      driverId: 'driver-2',
+      reason: 'The whole drop failed',
+    })
+
+    expect(reserveWarehouseStockBatchMock).toHaveBeenCalledWith(
+      client,
+      'warehouse-1',
+      [{ productId: 'product-failed', quantity: 2 }],
+      { supplierId: 'supplier-1' }
+    )
+  })
 })

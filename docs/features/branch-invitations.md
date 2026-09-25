@@ -7,6 +7,7 @@ Shareable invite links let org owners onboard branch managers without email deli
 - Caller needs `STAFF_INVITE` / `STAFF_MANAGE` / `SETTINGS_MANAGE` (supplier Settings → Team).
 - **Not** gated by `multi_branch` — Growth / single-branch suppliers can invite teammates including **Driver**.
 - If `supplier.organization_id` is missing, the API auto-creates and links a supplier organization so invites can proceed (common on Railway preprod seed accounts).
+- Platform admins may pass `?organization_id=` only with `ADMIN_TENANTS` or `ADMIN_ACCESS`. While impersonating, a mismatched organization id is rejected (400).
 
 ## Create a branch and invite a manager
 

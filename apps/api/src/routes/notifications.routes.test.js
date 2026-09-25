@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getUserNotifications = vi.fn()
 const getUnreadNotificationCount = vi.fn()
+const getUserPreferences = vi.fn()
+const query = vi.fn()
 
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -32,10 +34,14 @@ vi.mock('../lib/rbac.js', () => ({
   requirePermission: () => (req, res, next) => next(),
 }))
 
+vi.mock('../lib/db.js', () => ({
+  query: (...args) => query(...args),
+}))
+
 vi.mock('../services/notification.service.js', () => ({
   getUserNotifications: (...args) => getUserNotifications(...args),
   getUnreadNotificationCount: (...args) => getUnreadNotificationCount(...args),
-  getUserPreferences: vi.fn(),
+  getUserPreferences: (...args) => getUserPreferences(...args),
   ensureNotificationPreferences: vi.fn(),
   invalidateNotificationPreferencesCache: vi.fn(),
   invalidateUserNotificationsListCache: vi.fn(),
@@ -93,5 +99,22 @@ describe('notifications.routes', () => {
 
     expect(res.body.data).toBe(2)
     expect(getUnreadNotificationCount).toHaveBeenCalledWith('user-1', 'RESTAURANT')
+  })
+
+  it('PATCH /preferences persists the reorder cadence toggle', async () => {
+    query.mockResolvedValueOnce({ rowCount: 1, rows: [{}] })
+    getUserPreferences.mockResolvedValueOnce({ notifyReorderCadence: false })
+
+    const app = buildApp({ id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' })
+    const res = await request(app)
+      .patch('/api/notifications/preferences')
+      .send({ notifyReorderCadence: false })
+      .expect(200)
+
+    expect(res.body.ok).toBe(true)
+    const sql = query.mock.calls[0][0]
+    const params = query.mock.calls[0][1]
+    expect(sql).toContain('notify_reorder_cadence')
+    expect(params).toContain(false)
   })
 })

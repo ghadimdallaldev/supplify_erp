@@ -170,6 +170,54 @@ describe('delivery-routes.service', () => {
     expect(typeof routes[0].stops).toBe('number')
   })
 
+  it('does not add an order that was routed while the request was in flight', async () => {
+    const { addOrdersToPlannedRoute } = await import('./delivery-routes.service.js')
+    const orderId = '11111111-1111-4111-8111-111111111111'
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'r1',
+            route_number: 'R-1',
+            route_label: null,
+            area: null,
+            driver_id: null,
+            driver_name: null,
+            vehicle_info: null,
+            status: 'PLANNED',
+            scheduled_date: '2026-06-07',
+            started_at: null,
+            completed_at: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('MAX(sequence_number)')) return { rows: [{ n: 0 }] }
+      if (text.includes('SELECT id FROM route_stop WHERE route_id')) return { rows: [] }
+      if (text.includes('FOR UPDATE')) return { rows: [{ id: orderId }] }
+      if (text.includes('SELECT dr.id, dr.route_number')) {
+        return { rows: [{ id: 'r-other', route_number: 'R-9', status: 'PLANNED' }] }
+      }
+      return { rows: [] }
+    })
+
+    await expect(
+      addOrdersToPlannedRoute({
+        supplierId: 's1',
+        routeId: 'r1',
+        orderIds: [orderId],
+        userId: 'u1',
+      })
+    ).rejects.toThrow(/already on route R-9/)
+    expect(
+      clientQueryMock.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO route_stop'))
+    ).toBe(false)
+  })
+
   it('getActiveRouteForOrder returns route when on active run', async () => {
     const { getActiveRouteForOrder } = await import('./delivery-routes.service.js')
     queryMock.mockResolvedValueOnce({
@@ -266,13 +314,14 @@ describe('delivery-routes.service', () => {
       },
     ]
 
-    queryMock
-      .mockResolvedValueOnce({ rows: [routeRow] })
-      .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [routeRow] })
-      .mockResolvedValueOnce({ rows: stopRows })
+    queryMock.mockResolvedValueOnce({ rows: [routeRow] }).mockResolvedValueOnce({ rows: stopRows })
 
-    clientQueryMock.mockResolvedValue({ rowCount: 1 })
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('FROM delivery_route')) return { rows: [routeRow] }
+      if (text.includes('FROM route_stop')) return { rows: stopRows }
+      return { rowCount: 1 }
+    })
 
     const result = await reorderRouteStops('s1', 'r1', ['stop-b', 'stop-a'])
     expect(result.stops).toHaveLength(2)
@@ -381,13 +430,14 @@ describe('delivery-routes.service', () => {
       },
     ]
 
-    queryMock
-      .mockResolvedValueOnce({ rows: [routeRow] })
-      .mockResolvedValueOnce({ rows: stopRows })
-      .mockResolvedValueOnce({ rows: [routeRow] })
-      .mockResolvedValueOnce({ rows: stopRows })
+    queryMock.mockResolvedValueOnce({ rows: [routeRow] }).mockResolvedValueOnce({ rows: stopRows })
 
-    clientQueryMock.mockResolvedValue({ rowCount: 1 })
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('FROM delivery_route')) return { rows: [routeRow] }
+      if (text.includes('FROM route_stop')) return { rows: stopRows }
+      return { rowCount: 1 }
+    })
 
     await setNextRouteStop('s1', 'r1', '22222222-2222-4222-8222-222222222222')
     expect(clientQueryMock).toHaveBeenCalled()
@@ -456,9 +506,11 @@ describe('delivery-routes.service', () => {
     expect(releaseCall).toBeDefined()
     expect(releaseCall[1][0]).toBe('s1')
     expect(releaseCall[1][1]).toEqual(['o1', 'o2'])
-    expect(releaseCall[1][2]).toEqual(
+    expect(releaseCall[1][2]).toBe('d1')
+    expect(releaseCall[1][3]).toEqual(
       expect.arrayContaining(['assigned', 'picked_up', 'out_for_delivery', 'rescheduled'])
     )
+    expect(releaseCall[0]).toMatch(/driver_id = \$3/)
     expect(releaseCall[0]).not.toMatch(/status = 'delivered'/)
   })
 
@@ -495,6 +547,8 @@ describe('delivery-routes.service', () => {
 
     clientQueryMock.mockImplementation(async (sql, params) => {
       const text = String(sql)
+      if (text.includes('SELECT dr.id, dr.route_number')) return { rows: [] }
+      if (text.includes('AS date_part')) return { rows: [{ date_part: '20260528', n: 0 }] }
       if (text.includes('COUNT(*)::int AS n')) return { rows: [{ n: 0 }] }
       if (text.includes('INSERT INTO delivery_route')) {
         return {
@@ -564,6 +618,209 @@ describe('delivery-routes.service', () => {
     expect(inserts).toHaveLength(2)
     expect(inserts[0][1][1]).toBe('wh-a')
     expect(inserts[1][1][1]).toBe('wh-b')
+  })
+
+  it('refuses to plan a route over a failed delivery attempt', async () => {
+    const orderId = '11111111-1111-4111-8111-111111111111'
+    const { createDeliveryRoute } = await import('./delivery-routes.service.js')
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('SELECT dr.id, dr.route_number')) return { rows: [] }
+      if (text.includes('AS date_part')) return { rows: [{ date_part: '20260528', n: 0 }] }
+      if (text.includes('COUNT(*)::int AS n')) return { rows: [{ n: 0 }] }
+      if (text.includes('INSERT INTO delivery_route')) {
+        return {
+          rows: [
+            {
+              id: 'r1',
+              route_number: 'R-20260528-001',
+              status: 'PLANNED',
+              driver_id: 'd1',
+              scheduled_date: '2026-05-28',
+            },
+          ],
+        }
+      }
+      if (text.includes('SELECT r.address_json')) return { rows: [{ address_json: {} }] }
+      if (text.includes('INSERT INTO route_stop')) return { rows: [{ id: 'stop-1' }] }
+      if (text.includes('order_warehouse_assignment') && text.includes('status NOT IN')) {
+        return { rows: [{ id: 'wh-a' }] }
+      }
+      if (text.includes('FROM driver_assignments da') && text.includes('warehouse_assignment_id')) {
+        return { rows: [{ id: 'da-failed', driver_id: 'd1', status: 'failed' }] }
+      }
+      return { rows: [] }
+    })
+
+    await expect(
+      createDeliveryRoute({
+        supplierId: 's1',
+        orderIds: [orderId],
+        driverId: 'd1',
+        scheduledDate: '2026-05-28',
+      })
+    ).rejects.toThrow(/Retry that delivery/)
+    expect(committedOps.some((op) => String(op.sql).includes('INSERT INTO delivery_route'))).toBe(
+      false
+    )
+  })
+
+  it('releases a cancelled order on the caller transaction', async () => {
+    const { releaseOrderFromPlannedRoutes } = await import('./delivery-routes.service.js')
+    const clientQuery = vi.fn().mockResolvedValue({ rowCount: 1, rows: [] })
+
+    const result = await releaseOrderFromPlannedRoutes('order-1', 'supplier-1', {
+      query: clientQuery,
+    })
+
+    expect(result.releasedStops).toBe(1)
+    expect(String(clientQuery.mock.calls[0][0])).toMatch(/DELETE FROM route_stop/)
+    expect(String(clientQuery.mock.calls[1][0])).toMatch(/status = 'reassigned'/)
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+
+  it('does not take a warehouse leg that another driver already holds', async () => {
+    const orderId = '11111111-1111-4111-8111-111111111111'
+    const { createDeliveryRoute } = await import('./delivery-routes.service.js')
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('SELECT dr.id, dr.route_number')) return { rows: [] }
+      if (text.includes('AS date_part')) return { rows: [{ date_part: '20260528', n: 0 }] }
+      if (text.includes('COUNT(*)::int AS n')) return { rows: [{ n: 0 }] }
+      if (text.includes('INSERT INTO delivery_route')) {
+        return {
+          rows: [
+            {
+              id: 'r1',
+              route_number: 'R-20260528-001',
+              status: 'PLANNED',
+              driver_id: 'd1',
+              scheduled_date: '2026-05-28',
+            },
+          ],
+        }
+      }
+      if (text.includes('SELECT r.address_json')) return { rows: [{ address_json: {} }] }
+      if (text.includes('INSERT INTO route_stop')) return { rows: [{ id: 'stop-1' }] }
+      if (text.includes('order_warehouse_assignment') && text.includes('status NOT IN')) {
+        return { rows: [{ id: 'wh-a' }] }
+      }
+      if (text.includes('FROM driver_assignments da') && text.includes('warehouse_assignment_id')) {
+        return { rows: [{ id: 'da-other', driver_id: 'd-other', status: 'assigned' }] }
+      }
+      return { rows: [] }
+    })
+
+    await expect(
+      createDeliveryRoute({
+        supplierId: 's1',
+        orderIds: [orderId],
+        driverId: 'd1',
+        scheduledDate: '2026-05-28',
+      })
+    ).rejects.toThrow(/another driver/)
+
+    expect(
+      clientQueryMock.mock.calls.some(
+        ([sql]) =>
+          String(sql).includes('UPDATE driver_assignments SET status') &&
+          String(sql).includes('reassigned')
+      )
+    ).toBe(false)
+  })
+
+  it('keeps a pickup that is already in progress when the order is planned onto that driver', async () => {
+    const orderId = '11111111-1111-4111-8111-111111111111'
+    const { createDeliveryRoute } = await import('./delivery-routes.service.js')
+
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [{ id: 'd1', full_name: 'Alex', vehicle_type: null, vehicle_plate: null }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('SELECT dr.id, dr.route_number')) return { rows: [] }
+      if (text.includes('AS date_part')) return { rows: [{ date_part: '20260528', n: 0 }] }
+      if (text.includes('COUNT(*)::int AS n')) return { rows: [{ n: 0 }] }
+      if (text.includes('INSERT INTO delivery_route')) {
+        return {
+          rows: [
+            {
+              id: 'r1',
+              route_number: 'R-20260528-001',
+              status: 'PLANNED',
+              driver_id: 'd1',
+              driver_name: 'Alex',
+              scheduled_date: '2026-05-28',
+            },
+          ],
+        }
+      }
+      if (text.includes('SELECT r.address_json')) return { rows: [{ address_json: {} }] }
+      if (text.includes('INSERT INTO route_stop')) return { rows: [{ id: 'stop-1' }] }
+      if (text.includes('order_warehouse_assignment') && text.includes('status NOT IN')) {
+        return { rows: [{ id: 'wh-a' }] }
+      }
+      if (text.includes('FROM driver_assignments da') && text.includes('warehouse_assignment_id')) {
+        return { rows: [{ id: 'da-live', driver_id: 'd1', status: 'picked_up' }] }
+      }
+      if (text.includes('FROM route_stop rs')) {
+        return {
+          rows: [
+            {
+              id: 'stop-1',
+              route_id: 'r1',
+              order_id: orderId,
+              sequence_number: 1,
+              status: 'PLANNED',
+              restaurant_name: 'Cafe',
+              address_json: {},
+              total_amount: 10,
+              item_count: 1,
+              notes: null,
+              completed_at: null,
+              assignment_status: 'picked_up',
+              destination_latitude: null,
+              destination_longitude: null,
+              delivery_area: null,
+            },
+          ],
+        }
+      }
+      return { rows: [] }
+    })
+
+    await createDeliveryRoute({
+      supplierId: 's1',
+      orderIds: [orderId],
+      driverId: 'd1',
+      scheduledDate: '2026-05-28',
+    })
+
+    expect(
+      clientQueryMock.mock.calls.some(([sql]) =>
+        String(sql).includes('INSERT INTO driver_assignments')
+      )
+    ).toBe(false)
+    expect(
+      clientQueryMock.mock.calls.some(([sql]) => String(sql).includes("status = 'reassigned'"))
+    ).toBe(false)
   })
 
   it('buildDriverRouteFromAssignments returns existing route when already sufficient', async () => {
@@ -687,8 +944,8 @@ describe('delivery-routes.service', () => {
       const { updateRouteStop } = await import('./delivery-routes.service.js')
 
       listActiveDriverAssignmentsMock.mockResolvedValueOnce([
-        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
-        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
+        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
       ])
 
       updateDeliveryStatusMock
@@ -707,7 +964,7 @@ describe('delivery-routes.service', () => {
       clientQueryMock.mockImplementation(async (sql) => {
         const text = String(sql)
         if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
-          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
         }
         if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
           return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
@@ -733,7 +990,7 @@ describe('delivery-routes.service', () => {
       txShouldFailAfterFn = true
 
       listActiveDriverAssignmentsMock.mockResolvedValueOnce([
-        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
       ])
 
       updateDeliveryStatusMock.mockImplementationOnce(async ({ client, postCommitEffects }) => {
@@ -748,7 +1005,7 @@ describe('delivery-routes.service', () => {
       clientQueryMock.mockImplementation(async (sql) => {
         const text = String(sql)
         if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
-          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
         }
         if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
           return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
@@ -773,8 +1030,8 @@ describe('delivery-routes.service', () => {
       const { updateRouteStop } = await import('./delivery-routes.service.js')
 
       listActiveDriverAssignmentsMock.mockResolvedValueOnce([
-        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
-        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
+        { id: 'da-b', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
       ])
 
       updateDeliveryStatusMock.mockImplementation(
@@ -791,7 +1048,7 @@ describe('delivery-routes.service', () => {
       clientQueryMock.mockImplementation(async (sql) => {
         const text = String(sql)
         if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
-          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
         }
         if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
           return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
@@ -831,14 +1088,14 @@ describe('delivery-routes.service', () => {
       const { updateRouteStop } = await import('./delivery-routes.service.js')
 
       listActiveDriverAssignmentsMock.mockResolvedValueOnce([
-        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1' },
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
       ])
       updateDeliveryStatusMock.mockResolvedValueOnce({ id: 'da-a', status: 'delivered' })
 
       clientQueryMock.mockImplementation(async (sql) => {
         const text = String(sql)
         if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
-          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
         }
         if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
           return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
@@ -867,14 +1124,10 @@ describe('delivery-routes.service', () => {
     it('rejects invalid route-stop transitions before mutating the stop', async () => {
       const { updateRouteStop } = await import('./delivery-routes.service.js')
 
-      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
-        { id: 'da-a', status: 'assigned', supplier_id: 's1' },
-      ])
-
       clientQueryMock.mockImplementation(async (sql) => {
         const text = String(sql)
         if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
-          return { rows: [{ id: routeId, status: 'IN_PROGRESS' }] }
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
         }
         if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
           return { rows: [{ id: stopId, order_id: orderId, status: 'PLANNED', notes: null }] }
@@ -888,6 +1141,37 @@ describe('delivery-routes.service', () => {
 
       expect(updateDeliveryStatusMock).not.toHaveBeenCalled()
       expect(committedOps).toHaveLength(0)
+    })
+
+    it('does not deliver another driver when the route stop is completed', async () => {
+      const { updateRouteStop } = await import('./delivery-routes.service.js')
+
+      listActiveDriverAssignmentsMock.mockResolvedValueOnce([
+        { id: 'da-a', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd1' },
+        { id: 'da-other', status: 'out_for_delivery', supplier_id: 's1', driver_id: 'd2' },
+      ])
+      updateDeliveryStatusMock.mockResolvedValueOnce({ id: 'da-a', status: 'delivered' })
+
+      clientQueryMock.mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('FROM delivery_route') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: routeId, status: 'IN_PROGRESS', driver_id: 'd1' }] }
+        }
+        if (text.includes('FROM route_stop') && text.includes('FOR UPDATE')) {
+          return { rows: [{ id: stopId, order_id: orderId, status: 'IN_TRANSIT', notes: null }] }
+        }
+        if (text.includes('SELECT status FROM route_stop')) {
+          return { rows: [{ status: 'COMPLETED' }, { status: 'PLANNED' }] }
+        }
+        return { rows: [], rowCount: 1 }
+      })
+
+      mockSuccessfulRouteReload({ routeStatus: 'IN_PROGRESS', stopStatus: 'COMPLETED' })
+
+      await updateRouteStop('s1', routeId, stopId, { status: 'DELIVERED', userId: 'u1' })
+
+      expect(updateDeliveryStatusMock).toHaveBeenCalledTimes(1)
+      expect(updateDeliveryStatusMock.mock.calls[0][0].driverAssignmentId).toBe('da-a')
     })
   })
 })

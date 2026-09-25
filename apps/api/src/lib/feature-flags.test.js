@@ -53,6 +53,41 @@ describe('feature-flags', () => {
       expect(featureSources.reports).toBe('global')
     })
 
+    it('keeps the plan tier when an admin forces a feature on', async () => {
+      const { resolveAllFeaturesForTenant } = await import('./feature-flags.js')
+      mockQuery
+        .mockResolvedValueOnce({
+          rows: [{ feature_key: 'notifications', global_override: true }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ feature_key: 'intelligence', is_enabled: true }],
+        })
+
+      const { features, featureSources } = await resolveAllFeaturesForTenant('t1', 'RESTAURANT', {
+        intelligence: 'scale',
+        notifications: 'email_whatsapp_webhook',
+        smart_reorder: false,
+      })
+
+      expect(features.intelligence).toBe('scale')
+      expect(featureSources.intelligence).toBe('tenant_override')
+      expect(features.notifications).toBe('email_whatsapp_webhook')
+      expect(featureSources.notifications).toBe('global')
+    })
+
+    it('forces a missing plan feature on as boolean true', async () => {
+      const { resolveAllFeaturesForTenant } = await import('./feature-flags.js')
+      mockQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
+        rows: [{ feature_key: 'smart_reorder', is_enabled: true }],
+      })
+
+      const { features } = await resolveAllFeaturesForTenant('t1', 'RESTAURANT', {
+        smart_reorder: false,
+      })
+
+      expect(features.smart_reorder).toBe(true)
+    })
+
     it('preserves tier strings on enabled plan features (e.g. quick_lists)', async () => {
       const { resolveAllFeaturesForTenant } = await import('./feature-flags.js')
       mockQuery.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
@@ -109,6 +144,23 @@ describe('feature-flags', () => {
         })
       ).toBe(false)
       expect(shouldResolveFeatureAlias('fulfillment', { fulfillment: false })).toBe(false)
+    })
+
+    it('does not alias after an explicit admin off', async () => {
+      const { shouldAliasAfterResolution } = await import('./feature-flags.js')
+      expect(
+        shouldAliasAfterResolution(
+          { enabled: false, source: 'tenant_override' },
+          'driver_management',
+          { fulfillment_tools: true }
+        )
+      ).toBe(false)
+      expect(
+        shouldAliasAfterResolution({ enabled: false, source: 'global' }, 'fulfillment', {})
+      ).toBe(false)
+      expect(
+        shouldAliasAfterResolution({ enabled: false, source: 'default' }, 'fulfillment', {})
+      ).toBe(true)
     })
 
     it('aliases when primary key is absent from plan JSON', async () => {

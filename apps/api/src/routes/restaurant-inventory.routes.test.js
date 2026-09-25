@@ -244,6 +244,46 @@ describe('restaurant inventory reorder AI routes', () => {
     })
   })
 
+  describe('branch ownership on reorder writes', () => {
+    const foreignBranchId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
+    it('rejects a foreign branchId on explain', async () => {
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/explain')
+        .send({ branchId: foreignBranchId })
+
+      expect(res.status).toBe(400)
+      expect(res.body.error?.message).toMatch(/Branch not found/)
+      expect(mockExplainReorderSuggestions).not.toHaveBeenCalled()
+    })
+
+    it('rejects a foreign branchId on ask', async () => {
+      mockGetTenantSubscription.mockResolvedValue({
+        features: { smart_reorder: 'ai_forecast_seasonality' },
+      })
+
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/ask')
+        .send({ query: 'tomatoes', branchId: foreignBranchId })
+
+      expect(res.status).toBe(400)
+      expect(mockParseReorderIntent).not.toHaveBeenCalled()
+    })
+
+    it('rejects a foreign branchId on ai-recommend', async () => {
+      mockGetTenantSubscription.mockResolvedValue({
+        features: { smart_reorder: 'full_90day_trends' },
+      })
+
+      const res = await request(app)
+        .post('/api/restaurant-inventory/reorder-assistance/ai-recommend')
+        .send({ branchId: foreignBranchId, limit: 3 })
+
+      expect(res.status).toBe(400)
+      expect(mockGetReorderAiRecommendations).not.toHaveBeenCalled()
+    })
+  })
+
   describe('POST /api/restaurant-inventory/reorder-assistance/feedback', () => {
     it('records feedback for a recommendation', async () => {
       const res = await request(app)

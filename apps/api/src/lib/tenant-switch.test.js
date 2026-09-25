@@ -124,3 +124,64 @@ describe('userCanAccessTenant', () => {
     expect(allowed).toBe(true)
   })
 })
+
+describe('getActiveTenantFromRequest', () => {
+  beforeEach(() => {
+    query.mockReset()
+  })
+
+  it('does not bind leftover personal tenant for unscoped ADMIN', async () => {
+    const { getEffectiveTenant, impersonationCanAccessBranch } = await import('./impersonation.js')
+    const { getActiveTenantFromRequest } = await import('./tenant-switch.js')
+
+    getEffectiveTenant.mockReturnValue(null)
+    impersonationCanAccessBranch.mockResolvedValue(true)
+
+    const tenant = await getActiveTenantFromRequest({
+      userData: { id: 'admin-1', role: 'ADMIN', email: 'admin@example.com' },
+      activeTenantContext: {
+        userId: 'admin-1',
+        tenantId: 'leftover-supplier',
+        tenantType: 'SUPPLIER',
+        tenantName: 'Leftover',
+      },
+    })
+
+    expect(tenant).toBeNull()
+    expect(impersonationCanAccessBranch).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('allows ADMIN active tenant only when impersonating a related branch', async () => {
+    const { getEffectiveTenant, impersonationCanAccessBranch } = await import('./impersonation.js')
+    const { getActiveTenantFromRequest } = await import('./tenant-switch.js')
+
+    getEffectiveTenant.mockReturnValue({
+      tenantId: 'supplier-main',
+      tenantType: 'SUPPLIER',
+    })
+    impersonationCanAccessBranch.mockResolvedValueOnce(true)
+
+    const tenant = await getActiveTenantFromRequest({
+      userData: { id: 'admin-1', role: 'ADMIN', email: 'admin@example.com' },
+      activeTenantContext: {
+        userId: 'admin-1',
+        tenantId: 'supplier-branch',
+        tenantType: 'SUPPLIER',
+        tenantName: 'Branch',
+      },
+    })
+
+    expect(tenant).toEqual({
+      tenantId: 'supplier-branch',
+      tenantType: 'SUPPLIER',
+      tenantName: 'Branch',
+    })
+    expect(impersonationCanAccessBranch).toHaveBeenCalledWith(
+      'supplier-main',
+      'SUPPLIER',
+      'supplier-branch',
+      'SUPPLIER'
+    )
+  })
+})

@@ -7,9 +7,11 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { requireRestaurantId } from '../lib/tenant-resolve.js'
+import { requireRestaurantId, requireTenantScope } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
+import { foldInvoiceCurrencyTotals } from '../lib/money.js'
+import { getDefaultTenantTimezone, getRestaurantTimezone } from '../lib/tenant-timezone.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
@@ -17,21 +19,29 @@ import {
   getRestaurantPayables,
   getRestaurantStatementOpeningBalance,
   getRestaurantStatementAdjustments,
-  computeRestaurantStatementClosingBalance,
+  buildSupplierStatementSummary,
 } from '../services/restaurant-payables.service.js'
 import {
   applyCreditToInvoice,
+  assertCreditApplication,
   computeRemainingBalance,
   getInvoiceDetail,
   recordCashPayment,
   INVOICE_CSV_HEADER,
   invoiceToCsvRow,
+  withInvoiceCalendarDates,
 } from '../services/invoice.service.js'
 
 const router = express.Router()
 
 const financeInvoicesGate = requireFeature(
   'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
+const apiIntegrationsGate = requireFeature(
+  'api_integrations',
   (req) => req.tenantContext?.tenantId,
   (req) => req.tenantContext?.tenantType
 )
@@ -76,6 +86,8 @@ router.get(
       const { status, supplier, limit = '100', offset = '0' } = req.query
 
       const restaurantId = await requireRestaurantId(req)
+      const timeZone = await getRestaurantTimezone(restaurantId)
+      const restaurantToday = `(now() AT TIME ZONE $2)::date`
 
       let invoicesQuery = `
       SELECT 
@@ -90,17 +102,17 @@ router.get(
         COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid,
         -- Overdue calculation
         CASE 
-          WHEN i.status NOT IN ('PAID', 'VOID') 
-            AND i.due_date < CURRENT_DATE 
-            AND i.total_amount > COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0)
-          THEN i.total_amount - COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0)
+          WHEN i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+            AND i.due_date < ${restaurantToday}
+            AND i.balance_due > 0
+          THEN i.balance_due
           ELSE 0
         END as overdue_amount,
         -- Days overdue
         CASE 
-          WHEN i.status NOT IN ('PAID', 'VOID') 
-            AND i.due_date < CURRENT_DATE 
-          THEN CURRENT_DATE - i.due_date
+          WHEN i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+            AND i.due_date < ${restaurantToday}
+          THEN ${restaurantToday} - i.due_date
           ELSE 0
         END as days_overdue
       FROM invoice i
@@ -110,7 +122,7 @@ router.get(
       WHERE i.restaurant_id = $1
     `
 
-      const queryParams = [restaurantId]
+      const queryParams = [restaurantId, timeZone]
 
       if (status) {
         invoicesQuery += ` AND i.status = $${queryParams.length + 1}`
@@ -131,10 +143,12 @@ router.get(
       queryParams.push(limit, offset)
 
       const { rows } = await query(invoicesQuery, queryParams)
-      const invoices = rows.map((row) => ({
-        ...row,
-        remaining_balance: computeRemainingBalance(row, row.total_paid),
-      }))
+      const invoices = rows.map((row) =>
+        withInvoiceCalendarDates({
+          ...row,
+          remaining_balance: computeRemainingBalance(row, row.total_paid),
+        })
+      )
 
       res.json({
         ok: true,
@@ -166,6 +180,7 @@ router.get(
   '/invoices/export.csv',
   requireRole(['RESTAURANT', 'ADMIN']),
   requirePermission('INVOICES_VIEW'),
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const { status, supplier, invoiceId } = req.query
@@ -196,7 +211,7 @@ router.get(
         FROM invoice i
         JOIN supplier s ON s.id = i.supplier_id
         JOIN restaurant r ON r.id = i.restaurant_id
-        LEFT JOIN branch b ON b.id = i.branch_id
+        LEFT JOIN branch b ON b.id = i.branch_id AND b.tenant_id = i.restaurant_id
         LEFT JOIN payment p ON p.invoice_id = i.id
         WHERE i.restaurant_id = $1
       `
@@ -239,6 +254,8 @@ router.get(
       const { period = '30' } = req.query
 
       const restaurantId = await requireRestaurantId(req)
+      const timeZone = await getRestaurantTimezone(restaurantId)
+      const restaurantToday = `(now() AT TIME ZONE $3)::date`
 
       const periodDays = parseInt(period) || 30
 
@@ -249,10 +266,11 @@ router.get(
         COUNT(*) FILTER (WHERE i.status = 'PARTIALLY_PAID') as partial_count,
         COUNT(*) FILTER (WHERE i.status = 'PAID') as paid_count,
         COUNT(*) FILTER (WHERE i.status = 'OVERDUE') as overdue_count,
-        COUNT(*) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as overdue_count_alt,
-        SUM(i.total_amount) FILTER (WHERE i.status = 'ISSUED' OR i.status = 'PARTIALLY_PAID') as total_outstanding,
-        SUM(i.total_amount) FILTER (WHERE i.status = 'PAID') as total_paid_amount,
-        SUM(i.total_amount) FILTER (WHERE i.due_date < CURRENT_DATE AND i.status NOT IN ('PAID', 'VOID')) as total_overdue,
+        COUNT(*) FILTER (
+          WHERE i.due_date < ${restaurantToday}
+            AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+            AND i.balance_due > 0
+        ) as overdue_count_alt,
         AVG(
           CASE 
             WHEN i.status = 'PAID' AND i.payment_date IS NOT NULL 
@@ -261,34 +279,69 @@ router.get(
         ) as avg_days_to_pay
       FROM invoice i
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
+        AND i.status <> 'VOID'
+        AND i.invoice_date >= ${restaurantToday} - INTERVAL '1 day' * $2
     `,
-        [restaurantId, periodDays]
+        [restaurantId, periodDays, timeZone]
       )
+      const { rows: moneyRows } = await query(
+        `
+      SELECT
+        i.currency,
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+        ), 0)::numeric AS total_outstanding,
+        COALESCE(SUM(i.total_amount) FILTER (WHERE i.status = 'PAID'), 0)::numeric AS total_paid_amount,
+        COALESCE(SUM(i.balance_due) FILTER (
+          WHERE i.due_date < ${restaurantToday}
+            AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+        ), 0)::numeric AS total_overdue
+      FROM invoice i
+      WHERE i.restaurant_id = $1
+        AND i.status <> 'VOID'
+        AND i.invoice_date >= ${restaurantToday} - INTERVAL '1 day' * $2
+      GROUP BY i.currency
+    `,
+        [restaurantId, periodDays, timeZone]
+      )
+      const folded = foldInvoiceCurrencyTotals(moneyRows, [
+        'total_outstanding',
+        'total_paid_amount',
+        'total_overdue',
+      ])
 
       // Time-series points for Spend Trend chart (daily totals by invoice_date)
       const { rows: pointsRows } = await query(
         `
       SELECT 
         invoice_date::text AS date,
+        i.currency,
         COALESCE(SUM(total_amount), 0)::numeric AS total
       FROM invoice i
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= CURRENT_DATE - INTERVAL '1 day' * $2
-      GROUP BY invoice_date
+        AND i.status NOT IN ('VOID', 'DRAFT')
+        AND i.invoice_date >= ${restaurantToday} - INTERVAL '1 day' * $2
+      GROUP BY invoice_date, i.currency
       ORDER BY invoice_date
     `,
-        [restaurantId, periodDays]
+        [restaurantId, periodDays, timeZone]
       )
       const points = (pointsRows || []).map((r) => ({
         date: r.date,
+        currency: r.currency || 'USD',
         total: parseFloat(r.total) || 0,
       }))
 
       return res.json({
         ok: true,
         data: {
-          analytics: analytics[0] || {},
+          analytics: {
+            ...(analytics[0] || {}),
+            total_outstanding: folded.money.total_outstanding,
+            total_paid_amount: folded.money.total_paid_amount,
+            total_overdue: folded.money.total_overdue,
+            money_by_currency: folded.byCurrency,
+          },
           points,
         },
         error: null,
@@ -316,44 +369,40 @@ router.get(
     try {
       const { orderId } = req.params
 
-      let restaurantId = null
-      let supplierId = null
+      const { tenantId, tenantType } = await requireTenantScope(req)
+      const restaurantId = tenantType === 'RESTAURANT' ? tenantId : null
+      const supplierId = tenantType === 'SUPPLIER' ? tenantId : null
 
-      if (req.userData.role === 'RESTAURANT') {
-        restaurantId = await getRestaurantIdForRequest(req)
-        if (!restaurantId) {
-          throw new ValidationError('Restaurant not found')
-        }
-      } else if (req.userData.role === 'SUPPLIER') {
-        supplierId = await getSupplierIdForRequest(req)
-        if (!supplierId) {
-          throw new ValidationError('Supplier not found')
-        }
+      const params = [orderId]
+      let tenantFilter = ''
+      if (restaurantId) {
+        params.push(restaurantId)
+        tenantFilter = ` AND i.restaurant_id = $${params.length}`
+      } else if (supplierId) {
+        params.push(supplierId)
+        tenantFilter = ` AND i.supplier_id = $${params.length}`
       }
-
-      let invoicesQuery = `
+      params.push(getDefaultTenantTimezone())
+      const restaurantToday = `(now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $${params.length}))::date`
+      const invoicesQuery = `
       SELECT 
         i.*,
         s.name as supplier_name,
-        COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid
+        COALESCE(SUM(p.payment_amount) FILTER (WHERE p.status = 'COMPLETED'), 0) as total_paid,
+        CASE
+          WHEN i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+            AND i.due_date < ${restaurantToday}
+            AND i.balance_due > 0
+          THEN ${restaurantToday} - i.due_date
+          ELSE 0
+        END AS days_overdue
       FROM invoice i
       JOIN supplier s ON s.id = i.supplier_id
+      JOIN restaurant r ON r.id = i.restaurant_id
       LEFT JOIN payment p ON p.invoice_id = i.id
       WHERE i.order_id = $1
-    `
-
-      const params = [orderId]
-
-      if (restaurantId) {
-        invoicesQuery += ` AND i.restaurant_id = $2`
-        params.push(restaurantId)
-      } else if (supplierId) {
-        invoicesQuery += ` AND i.supplier_id = $2`
-        params.push(supplierId)
-      }
-
-      invoicesQuery += `
-      GROUP BY i.id, s.name
+      ${tenantFilter}
+      GROUP BY i.id, s.name, r.timezone
       ORDER BY i.invoice_date DESC
     `
 
@@ -361,7 +410,7 @@ router.get(
 
       res.json({
         ok: true,
-        data: { invoices: rows },
+        data: { invoices: rows.map((row) => withInvoiceCalendarDates(row)) },
         error: null,
         requestId: req.requestId,
       })
@@ -433,7 +482,7 @@ router.get(
 
 // Enhanced payment schema with partial payment and credit/debit support
 const paymentSchemaEnhanced = z.object({
-  paymentAmount: z.number().positive().optional(), // Optional - defaults to full balance if not provided
+  paymentAmount: z.number().nonnegative().optional(), // Omit to pay the remainder; 0 is credit-only
   paymentDate: z.string(),
   paymentMethod: z.enum([
     'CASH',
@@ -498,9 +547,10 @@ router.post(
 
       let creditAmount = parseFloat(paymentData.creditAmount || 0)
       const creditNoteId = paymentData.creditNoteId || null
+      assertCreditApplication({ creditAmount, creditNoteId })
 
       let paymentAmount = paymentData.paymentAmount
-      if (!paymentAmount || paymentAmount === 0) {
+      if (paymentAmount == null) {
         paymentAmount = Math.max(0, remainingBalance - creditAmount)
       }
 
@@ -598,6 +648,15 @@ router.post(
         })
       }
 
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+
       logger.error({
         message: 'Enhanced payment error',
         error: error.message,
@@ -632,7 +691,7 @@ router.get(
       // Get invoice to get supplier_id
       const { rows: invoices } = await query(
         `
-      SELECT supplier_id FROM invoice 
+      SELECT supplier_id, currency FROM invoice 
       WHERE id = $1 AND restaurant_id = $2
     `,
         [id, restaurantId]
@@ -643,6 +702,7 @@ router.get(
       }
 
       const supplierId = invoices[0].supplier_id
+      const timeZone = await getRestaurantTimezone(restaurantId)
 
       // Get available credit notes
       const { rows: creditNotes } = await query(
@@ -654,10 +714,11 @@ router.get(
       FROM credit_note
       WHERE restaurant_id = $1 AND supplier_id = $2
         AND status = 'ISSUED' AND remaining_amount > 0
-        AND (expires_at IS NULL OR expires_at >= CURRENT_DATE)
+        AND upper(COALESCE(currency, 'USD')) = upper($3)
+        AND (expires_at IS NULL OR expires_at >= (now() AT TIME ZONE $4)::date)
       ORDER BY issue_date DESC
     `,
-        [restaurantId, supplierId]
+        [restaurantId, supplierId, invoices[0].currency || 'USD', timeZone]
       )
 
       res.json({
@@ -705,41 +766,56 @@ router.get(
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN payment p ON p.invoice_id = i.id
       WHERE i.restaurant_id = $1 AND i.supplier_id = $2
-        ${startDate ? `AND i.invoice_date >= $3` : ''}
-        ${endDate ? `AND i.invoice_date <= $${startDate ? 4 : 3}` : ''}
+        AND i.status NOT IN ('VOID', 'DRAFT')
+        ${startDate ? `AND i.invoice_date >= $3::date` : ''}
+        ${endDate ? `AND i.invoice_date <= $${startDate ? 4 : 3}::date` : ''}
       GROUP BY i.id, s.name
       ORDER BY i.invoice_date ASC
     `,
         [restaurantId, supplierId, startDate, endDate].filter(Boolean)
       )
 
+      const paymentParams = [restaurantId, supplierId]
+      let paymentDates = ''
+      if (startDate) {
+        paymentParams.push(startDate)
+        paymentDates += ` AND p.payment_date >= $${paymentParams.length}::date`
+      }
+      if (endDate) {
+        paymentParams.push(endDate)
+        paymentDates += ` AND p.payment_date <= $${paymentParams.length}::date`
+      }
+      const { rows: paymentRows } = await query(
+        `
+        SELECT i.currency, COALESCE(SUM(p.payment_amount), 0)::numeric AS total_payments
+        FROM payment p
+        JOIN invoice i ON i.id = p.invoice_id
+        WHERE i.restaurant_id = $1
+          AND i.supplier_id = $2
+          AND p.status = 'COMPLETED'
+          AND i.status NOT IN ('VOID', 'DRAFT')
+          ${paymentDates}
+        GROUP BY i.currency
+        `,
+        paymentParams
+      )
+
       const [openingBalance, totalAdjustments] = await Promise.all([
-        startDate
-          ? getRestaurantStatementOpeningBalance(restaurantId, supplierId, startDate)
-          : Promise.resolve(0),
+        getRestaurantStatementOpeningBalance(restaurantId, supplierId, startDate),
         getRestaurantStatementAdjustments(restaurantId, supplierId, startDate, endDate),
       ])
 
-      const summary = {
-        openingBalance,
-        totalCharges: 0,
-        totalPayments: 0,
-        totalAdjustments,
-        closingBalance: 0,
-        invoiceCount: invoices.length,
-      }
-
-      invoices.forEach((inv) => {
-        summary.totalCharges += parseFloat(inv.total_amount || 0)
-        summary.totalPayments += parseFloat(inv.total_paid || 0)
+      const summary = buildSupplierStatementSummary({
+        invoices,
+        opening: openingBalance,
+        adjustments: totalAdjustments,
+        payments: paymentRows,
       })
-
-      summary.closingBalance = computeRestaurantStatementClosingBalance(summary)
 
       res.json({
         ok: true,
         data: {
-          invoices,
+          invoices: invoices.map((row) => withInvoiceCalendarDates(row)),
           summary,
         },
         error: null,
@@ -777,6 +853,8 @@ router.get(
       const periodDays = Number.isFinite(rawPeriod) ? Math.min(365, Math.max(1, rawPeriod)) : 30
 
       const restaurantId = await requireRestaurantId(req)
+      const timeZone = await getRestaurantTimezone(restaurantId)
+      const restaurantToday = `(now() AT TIME ZONE $3)::date`
 
       // Get expense breakdown by supplier
       const { rows: bySupplier } = await query(
@@ -785,18 +863,25 @@ router.get(
         s.id as supplier_id,
         s.name as supplier_name,
         COUNT(i.id) as invoice_count,
+        i.currency,
         SUM(i.total_amount) as total_spent,
-        SUM(COALESCE(p.payment_amount, 0)) as total_paid,
+        SUM(COALESCE(paid.total_paid, 0)) as total_paid,
         SUM(i.balance_due) as outstanding
       FROM invoice i
       JOIN supplier s ON s.id = i.supplier_id
-      LEFT JOIN payment p ON p.invoice_id = i.id AND p.status = 'COMPLETED'
+      LEFT JOIN (
+        SELECT invoice_id, SUM(payment_amount) AS total_paid
+        FROM payment
+        WHERE status = 'COMPLETED'
+        GROUP BY invoice_id
+      ) paid ON paid.invoice_id = i.id
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
-      GROUP BY s.id, s.name
+        AND i.status NOT IN ('VOID', 'DRAFT')
+        AND i.invoice_date >= ${restaurantToday} - $2::int
+      GROUP BY s.id, s.name, i.currency
       ORDER BY total_spent DESC
     `,
-        [restaurantId, periodDays]
+        [restaurantId, periodDays, timeZone]
       )
 
       // Get expense breakdown by category (from products)
@@ -804,16 +889,19 @@ router.get(
         `
       SELECT 
         COALESCE(p.category, 'Uncategorized') as category,
+        i.currency,
         SUM(ili.quantity * ili.unit_price) as total_spent
       FROM invoice i
       JOIN invoice_line_item ili ON ili.invoice_id = i.id
       LEFT JOIN product p ON p.id = ili.product_id
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '1 day' * $2
-      GROUP BY p.category
+        AND i.status NOT IN ('VOID', 'DRAFT')
+        AND ili.product_id IS NOT NULL
+        AND i.invoice_date >= ${restaurantToday} - $2::int
+      GROUP BY p.category, i.currency
       ORDER BY total_spent DESC
     `,
-        [restaurantId, periodDays]
+        [restaurantId, periodDays, timeZone]
       )
 
       // Get monthly trend
@@ -821,15 +909,17 @@ router.get(
         `
       SELECT 
         DATE_TRUNC('month', i.invoice_date) as month,
+        i.currency,
         COUNT(i.id) as invoice_count,
         SUM(i.total_amount) as total_spent
       FROM invoice i
       WHERE i.restaurant_id = $1
-        AND i.invoice_date >= NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', i.invoice_date)
+        AND i.status NOT IN ('VOID', 'DRAFT')
+        AND i.invoice_date >= (now() AT TIME ZONE $2)::date - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', i.invoice_date), i.currency
       ORDER BY month ASC
     `,
-        [restaurantId]
+        [restaurantId, timeZone]
       )
 
       res.json({
@@ -886,6 +976,8 @@ router.get(
       }
 
       const restaurantId = await requireRestaurantId(req)
+      const timeZone = await getRestaurantTimezone(restaurantId)
+      const restaurantToday = `(now() AT TIME ZONE $2)::date`
 
       const { rows: overdue } = await query(
         `
@@ -894,22 +986,25 @@ router.get(
         s.name as supplier_name,
         s.contact_email as supplier_email,
         o.id as order_id,
-        CURRENT_DATE - i.due_date as days_overdue,
-        i.total_amount - i.paid_amount as amount_due
+        ${restaurantToday} - i.due_date as days_overdue,
+        i.balance_due as amount_due
       FROM invoice i
       JOIN supplier s ON s.id = i.supplier_id
       LEFT JOIN customer_order o ON o.id = i.order_id
       WHERE i.restaurant_id = $1
-        AND i.status NOT IN ('PAID', 'VOID')
-        AND i.due_date < CURRENT_DATE
-        AND i.total_amount > i.paid_amount
+        AND i.status IN ('ISSUED', 'PARTIALLY_PAID', 'OVERDUE')
+        AND i.due_date < ${restaurantToday}
+        AND i.balance_due > 0
       ORDER BY days_overdue DESC, amount_due DESC
     `,
-        [restaurantId]
+        [restaurantId, timeZone]
       )
 
-      // Calculate total overdue amount
-      const totalOverdue = overdue.reduce((sum, inv) => sum + parseFloat(inv.amount_due || 0), 0)
+      const overdueMoney = foldInvoiceCurrencyTotals(
+        overdue.map((inv) => ({ currency: inv.currency, amount_due: inv.amount_due })),
+        ['amount_due']
+      )
+      const totalOverdue = overdueMoney.money.amount_due
 
       res.json({
         ok: true,
@@ -918,6 +1013,10 @@ router.get(
           summary: {
             count: overdue.length,
             totalOverdue,
+            byCurrency: overdueMoney.byCurrency.map((row) => ({
+              currency: row.currency,
+              amount: row.amount_due,
+            })),
           },
         },
         error: null,

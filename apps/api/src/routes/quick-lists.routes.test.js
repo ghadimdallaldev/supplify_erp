@@ -94,4 +94,23 @@ describe('Quick Lists Routes', () => {
       expect(db.query).toHaveBeenCalledTimes(2)
     })
   })
+
+  describe('POST /api/quick-lists', () => {
+    it('rejects a branch that is not owned', async () => {
+      db.query.mockImplementation((sql) => {
+        if (String(sql).includes('FROM branch')) {
+          return Promise.resolve({ rows: [] })
+        }
+        return Promise.resolve({ rows: [] })
+      })
+
+      const response = await request(app).post('/api/quick-lists').send({
+        name: 'Weekly',
+        branchId: '11111111-1111-4111-8111-111111111111',
+      })
+
+      expect(response.status).toBe(400)
+      expect(response.body.error?.message).toMatch(/Branch not found/i)
+    })
+  })
 })

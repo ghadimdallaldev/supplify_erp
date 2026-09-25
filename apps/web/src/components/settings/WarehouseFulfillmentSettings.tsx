@@ -13,6 +13,7 @@ import { Switch } from '../ui/switch'
 import { Input } from '../ui/input'
 import { toast } from 'sonner'
 import { Route, Loader2 } from 'lucide-react'
+import { usePermissions } from '../../hooks/usePermissions'
 
 type Props = {
   enabled: boolean
@@ -20,9 +21,16 @@ type Props = {
 
 export function WarehouseFulfillmentSettings({ enabled }: Props) {
   const { t } = useTranslation('settings')
-  const { data, isLoading } = useGetSupplierFulfillmentQuery(undefined, { skip: !enabled })
+  const { can } = usePermissions()
+  const canManageFulfillment = can('SETTINGS_MANAGE')
+  const canManageWarehouses = can('WAREHOUSES_MANAGE')
+  const { data, isLoading } = useGetSupplierFulfillmentQuery(undefined, {
+    skip: !enabled || !canManageFulfillment,
+  })
   const [updateFulfillment, { isLoading: saving }] = useUpdateSupplierFulfillmentMutation()
-  const { data: rulesData } = useGetWarehouseRoutingRulesQuery(undefined, { skip: !enabled })
+  const { data: rulesData } = useGetWarehouseRoutingRulesQuery(undefined, {
+    skip: !enabled || !canManageWarehouses,
+  })
   const [simulateRouting, { isLoading: simulating }] = useSimulateWarehouseRoutingMutation()
   const [simulateArea, setSimulateArea] = useState('')
 
@@ -55,7 +63,7 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
     }
   }
 
-  if (!enabled) return null
+  if (!enabled || (!canManageFulfillment && !canManageWarehouses)) return null
   if (isLoading) return null
 
   return (
@@ -80,7 +88,7 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
           <Switch
             id="multi-warehouse"
             checked={Boolean(fulfillment?.multi_warehouse_enabled)}
-            disabled={saving}
+            disabled={saving || !canManageFulfillment}
             onCheckedChange={handleToggleMulti}
           />
         </div>
@@ -105,7 +113,11 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
               onChange={(e) => setSimulateArea(e.target.value)}
             />
           </div>
-          <Button variant="outline" disabled={simulating} onClick={handleSimulate}>
+          <Button
+            variant="outline"
+            disabled={simulating || !canManageWarehouses}
+            onClick={handleSimulate}
+          >
             {simulating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Simulate'}
           </Button>
         </div>

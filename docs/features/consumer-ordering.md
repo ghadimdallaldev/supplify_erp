@@ -19,37 +19,44 @@ Guest-facing online ordering for restaurants: menu with modifiers, cart, fulfill
 
 ## Order status (v1)
 
-Single linear lifecycle for all fulfillment types:
+Stored statuses stay the same for every fulfillment type. The kitchen board and guest tracker show a label that matches how the guest is eating:
 
-| Status      | Diner label | Kitchen action                               |
-| ----------- | ----------- | -------------------------------------------- |
-| `RECEIVED`  | Received    | Order placed (default)                       |
-| `PREPARING` | Preparing   | Kitchen started                              |
-| `SHIPPED`   | Shipped     | Out for delivery / ready for pickup          |
-| `DELIVERED` | Delivered   | Complete (triggers loyalty earn for members) |
-| `CANCELLED` | —           | Terminal; tracker shows message only         |
+| Status      | Delivery   | Takeaway         | Dine-in        |
+| ----------- | ---------- | ---------------- | -------------- |
+| `RECEIVED`  | Received   | Received         | Received       |
+| `PREPARING` | Preparing  | Preparing        | Preparing      |
+| `SHIPPED`   | On the way | Ready for pickup | Ready to serve |
+| `DELIVERED` | Delivered  | Picked up        | Served         |
+| `CANCELLED` | Cancelled  | Cancelled        | Cancelled      |
+
+`DELIVERED` still awards member points. Cancelling an open ticket returns redeemed points and removes points earned on that order. A delivered order cannot be cancelled, so those points stay. The kitchen board can cancel a ticket that is not already delivered or cancelled.
 
 ## API
 
-| Area               | Endpoints                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| Public auth        | `POST .../auth/signup`, `login`, `logout`, `GET .../auth/me`                       |
-| Public storefront  | `GET /api/public/consumer/:restaurantSlug/storefront` (home hero, hours, branches) |
-| Public menu        | `GET /api/public/consumer/:restaurantSlug/menu?branchId=`                          |
-| Public fulfillment | `GET /api/public/consumer/:restaurantSlug/fulfillment-options?branchId=`           |
-| Public orders      | `POST .../orders`, `GET .../orders/:receiptToken/receipt`, `POST .../orders/track` |
-| Public loyalty     | `GET .../loyalty/preview` (member session)                                         |
-| Admin menu         | `GET/POST/PATCH/DELETE /api/consumer/menu/*` (incl. modifiers, bulk import)        |
-| Admin orders       | `GET /api/consumer/orders`, `PATCH /api/consumer/orders/:id/status`                |
-| Admin fulfillment  | `GET/PATCH /api/consumer/fulfillment/:branchId`, zone CRUD, live ordering hours    |
+| Area               | Endpoints                                                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public auth        | `POST .../auth/signup`, `login`, `logout`, `GET .../auth/me`                                                                                                |
+| Public storefront  | `GET /api/public/consumer/:restaurantSlug/storefront` (home hero, hours, branches)                                                                          |
+| Public menu        | `GET /api/public/consumer/:restaurantSlug/menu?branchId=`                                                                                                   |
+| Public fulfillment | `GET /api/public/consumer/:restaurantSlug/fulfillment-options?branchId=` (foreign `branchId` → 400)                                                         |
+| Admin menu         | `GET/POST/PATCH/DELETE /api/consumer/menu/*` (incl. modifiers, bulk import). Category/item/import `branchId` must belong to the restaurant (400 otherwise). |
+| Admin orders       | `GET /api/consumer/orders?branchId=` rejects a foreign location (400). `PATCH /api/consumer/orders/:id/status`                                              |
+| Admin fulfillment  | `GET /api/consumer/fulfillment?branchId=` rejects a foreign location (400). `GET/PATCH /api/consumer/fulfillment/:branchId`, zone CRUD, live ordering hours |
+| Public orders      | `POST .../orders`, `GET .../orders/:receiptToken/receipt`, `POST .../orders/track`                                                                          |
+| Public loyalty     | `GET .../loyalty/preview` (member session)                                                                                                                  |
 
 Migrations: `0161_consumer_ordering.sql`, `0163_consumer_b2c_complete.sql`, `0164_consumer_ordering_hours.sql`, `0165_supplier_delivery_zone_columns.sql` (unifies `delivery_zone` for B2C + supplier warehouse zones — required for supplier delivery board after B2C rollout), `0201_menu_item_allergens.sql` (allergen + dietary tags).
 
 ## Menu quality extras
 
 - Admin and public menu expose `allergens` / `dietary_tags`; guest menu filters and item badges.
-- Menu admin shares a storefront QR image (download + share) for the public `/order/:slug` URL.
+- Menu admin shares a storefront QR image (download + share) for the public `/order/:slug` URL. Clearing a dish photo removes it, and a dish cannot be filed under a category from a different branch.
 - Kitchen board can **86** an item (`is_available=false`) from an open ticket when the user has `CATALOG_EDIT`.
+- A modifier group cannot require more choices than its maximum, so a guest is never blocked from ordering an item by an impossible rule. A discount modifier cannot make the line price negative.
+- A branch minimum applies to takeaway and dine-in as well as delivery. A delivery zone with a higher minimum uses that higher amount. The menu cart and checkout show the current menu price, including modifiers, before the guest pays. A dish that is no longer on the menu is marked unavailable in the cart. A dish or modifier that is no longer on the menu blocks the order. The server still prices the committed order. Checkout only prices items that belong to this restaurant, this branch (or a shared menu), and an active category. An item or modifier 86'd before the order commits is rejected. A negative delivery fee is treated as zero.
+- Ticket numbers for a restaurant are taken one at a time from the highest number on the restaurant’s local day, so two guests checking out together do not get the same ticket, and an order just after local midnight is not numbered on the previous day.
+- A scheduled order must fall inside live ordering hours in the restaurant’s timezone. A time after the next opening but outside those hours, such as the middle of the night, is rejected. Checkout reads the picked time as that restaurant clock, using `timeZone` on the fulfillment options, and blocks a time outside those hours before the order is sent.
+- Kitchen status updates lock the ticket. Sending the status it already has does not write another history row or award points again.
 
 ## Infrastructure (Keycloak & Docker)
 

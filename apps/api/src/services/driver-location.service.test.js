@@ -165,6 +165,10 @@ describe('driver-location.service', () => {
     })
 
     expect(result.stored).toBe(true)
+    expect(getActiveDriverAssignment).toHaveBeenCalledWith('o1', null, {
+      driverId: 'd1',
+      assignmentId: null,
+    })
     expect(query.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 

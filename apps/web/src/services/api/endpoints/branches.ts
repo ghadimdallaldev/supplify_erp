@@ -112,8 +112,11 @@ export const branchesApi = api.injectEndpoints({
       {
         kpis: {
           order_count: number
-          total_revenue?: number
-          total_spend?: number
+          total_revenue?: number | null
+          total_spend?: number | null
+          currency?: string | null
+          revenue_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
+          spend_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
           active_branch_accounts: number
         }
         by_branch: Array<Record<string, unknown>>
@@ -383,7 +386,9 @@ export const branchesApi = api.injectEndpoints({
       {
         kpis: {
           order_count: number
-          total_spend: number
+          total_spend: number | null
+          currency?: string | null
+          spend_by_currency?: Array<{ currency: string; amount: number; order_count: number }>
           active_branch_accounts: number
         }
         by_branch: Array<Record<string, unknown>>
@@ -402,10 +407,8 @@ export const branchesApi = api.injectEndpoints({
     }),
     getRestaurantOrgBranchComparison: builder.query<
       {
-        data: {
-          branches: Array<Record<string, any>>
-          coverage: { foodCost: { available: boolean; reason: string } }
-        }
+        branches: Array<Record<string, any>>
+        coverage: { foodCost: { available: boolean; reason: string } }
       },
       void
     >({
@@ -414,28 +417,26 @@ export const branchesApi = api.injectEndpoints({
     }),
     getRestaurantOrgBranchDemandForecast: builder.query<
       {
-        data: {
-          branches: Array<{
-            branchAccountId: string
-            branchAccountName: string
-            coverage: {
-              freshForecasts: number
-              highOrUrgentForecasts: number
-              latestComputedAt: string | null
-            }
-            forecasts: Array<{
-              productId: string
-              productName: string
-              productUnit: string
-              forecastDailyUsage: number | null
-              forecastReorderQty: number | null
-              reorderByDate: string | null
-              confidence: number
-              urgency: string
-            }>
+        branches: Array<{
+          branchAccountId: string
+          branchAccountName: string
+          coverage: {
+            freshForecasts: number
+            highOrUrgentForecasts: number
+            latestComputedAt: string | null
+          }
+          forecasts: Array<{
+            productId: string
+            productName: string
+            productUnit: string
+            forecastDailyUsage: number | null
+            forecastReorderQty: number | null
+            reorderByDate: string | null
+            confidence: number
+            urgency: string
           }>
-          coverage: { scope: string; source: string }
-        }
+        }>
+        coverage: { scope: string; source: string }
       },
       void
     >({
@@ -444,20 +445,19 @@ export const branchesApi = api.injectEndpoints({
     }),
     getRestaurantOrgCrossBranchPurchasingInsights: builder.query<
       {
-        data: {
-          signals: Array<{
-            productId: string
-            productName: string
-            productUnit: string
-            supplierId: string
-            supplierName: string | null
-            branchCount: number
-            minUnitPrice: number
-            maxUnitPrice: number
-            priceSpreadPct: number
-          }>
-          coverage: { source: string; comparableOnly: string }
-        }
+        signals: Array<{
+          productId: string
+          productName: string
+          productUnit: string
+          supplierId: string
+          supplierName: string | null
+          currency?: string
+          branchCount: number
+          minUnitPrice: number
+          maxUnitPrice: number
+          priceSpreadPct: number
+        }>
+        coverage: { source: string; comparableOnly: string }
       },
       void
     >({
@@ -466,17 +466,15 @@ export const branchesApi = api.injectEndpoints({
     }),
     getRestaurantOrgStockTransferSuggestions: builder.query<
       {
-        data: {
-          suggestions: Array<{
-            sourceBranchAccountName: string
-            destinationBranchAccountName: string
-            productId: string
-            productName: string
-            productUnit: string
-            urgency: string
-            suggestedQty: number
-          }>
-        }
+        suggestions: Array<{
+          sourceBranchAccountName: string
+          destinationBranchAccountName: string
+          productId: string
+          productName: string
+          productUnit: string
+          urgency: string
+          suggestedQty: number
+        }>
       },
       void
     >({
@@ -485,16 +483,14 @@ export const branchesApi = api.injectEndpoints({
     }),
     getRestaurantOrgAdvancedAnalytics: builder.query<
       {
-        data: {
-          months: Array<{
-            month: string
-            branchAccountId: string
-            branchAccountName: string
-            orderCount: number
-            spend: number
-          }>
-        }
-        meta: { unrestrictedDateRange: boolean }
+        months: Array<{
+          month: string
+          branchAccountId: string
+          branchAccountName: string
+          currency?: string
+          orderCount: number
+          spend: number
+        }>
       },
       void
     >({

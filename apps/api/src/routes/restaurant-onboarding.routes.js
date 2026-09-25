@@ -2,8 +2,10 @@ import express from 'express'
 import {
   requireAuth,
   requireRole,
-  getRequestTenant,
+  resolveTenantContext,
   getRestaurantIdForRequest,
+  requirePermission,
+  requireAnyPermission,
 } from '../lib/rbac.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -12,6 +14,16 @@ import { checkLimit } from '../lib/subscription.js'
 import { z } from 'zod'
 
 const router = express.Router()
+
+router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
+
+async function restaurantIdOrNotFound(req) {
+  const restaurantId = await getRestaurantIdForRequest(req)
+  if (!restaurantId) {
+    throw new NotFoundError('Restaurant not found')
+  }
+  return restaurantId
+}
 
 // Validation schemas
 const updateProfileSchema = z.object({
@@ -31,20 +43,21 @@ const addTeamMemberSchema = z.object({
   isPrimary: z.boolean().optional(),
 })
 
-// Get restaurant profile
-router.get('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+// Get restaurant profile (tenant-scoped; not contact-email only)
+router.get('/profile', requirePermission('SETTINGS_VIEW'), async (req, res) => {
   try {
+    const restaurantId = await restaurantIdOrNotFound(req)
     const { rows } = await query(
       `
       SELECT 
         r.*,
         COUNT(DISTINCT b.id) as branch_count
       FROM restaurant r
-      LEFT JOIN branch b ON b.restaurant_id = r.id
-      WHERE r.contact_email = $1
+      LEFT JOIN branch b ON b.tenant_id = r.id
+      WHERE r.id = $1
       GROUP BY r.id
     `,
-      [req.userData.email]
+      [restaurantId]
     )
 
     if (rows.length === 0) {
@@ -77,8 +90,9 @@ router.get('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
 })
 
 // Update restaurant profile
-router.patch('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.patch('/profile', requirePermission('SETTINGS_EDIT'), async (req, res) => {
   try {
+    const restaurantId = await restaurantIdOrNotFound(req)
     const data = updateProfileSchema.parse(req.body)
 
     const updateFields = []
@@ -118,17 +132,21 @@ router.patch('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
     }
 
     updateFields.push(`updated_at = now()`)
-    updateValues.push(req.userData.email)
+    updateValues.push(restaurantId)
 
     const { rows } = await query(
       `
       UPDATE restaurant 
       SET ${updateFields.join(', ')}
-      WHERE contact_email = $${paramIndex}
+      WHERE id = $${paramIndex}
       RETURNING *
     `,
       updateValues
     )
+
+    if (rows.length === 0) {
+      throw new NotFoundError('Restaurant not found')
+    }
 
     logger.info('Profile updated', {
       email: req.userData.email,
@@ -161,12 +179,9 @@ router.patch('/profile', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), asyn
 })
 
 // Get team members
-router.get('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.get('/team', requirePermission('STAFF_VIEW'), async (req, res) => {
   try {
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      throw new NotFoundError('Restaurant not found')
-    }
+    const restaurantId = await restaurantIdOrNotFound(req)
 
     const { rows } = await query(
       `
@@ -174,7 +189,7 @@ router.get('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
         rt.*,
         b.name as branch_name
       FROM restaurant_team rt
-      LEFT JOIN branch b ON b.id = rt.branch_id
+      LEFT JOIN branch b ON b.id = rt.branch_id AND b.tenant_id = rt.restaurant_id
       WHERE rt.restaurant_id = $1
       ORDER BY rt.is_primary DESC, rt.created_at
     `,
@@ -207,22 +222,10 @@ router.get('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (re
 })
 
 // Add team member
-router.post('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.post('/team', requireAnyPermission('STAFF_INVITE', 'STAFF_MANAGE'), async (req, res) => {
   try {
     const data = addTeamMemberSchema.parse(req.body)
-
-    const requestTenant = await getRequestTenant(req)
-    let restaurantId
-    if (requestTenant?.tenantType === 'RESTAURANT') {
-      restaurantId = requestTenant.tenantId
-    } else {
-      const { rows: restaurants } = await query(
-        'SELECT id FROM restaurant WHERE contact_email = $1',
-        [req.userData.email]
-      )
-      if (restaurants.length === 0) throw new NotFoundError('Restaurant not found')
-      restaurantId = restaurants[0].id
-    }
+    const restaurantId = await restaurantIdOrNotFound(req)
 
     // Enforce plan user limit (1 primary + team members)
     const userLimit = await checkLimit(restaurantId, 'RESTAURANT', 'users')
@@ -293,12 +296,9 @@ router.post('/team', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
 })
 
 // Remove team member
-router.delete('/team/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
+router.delete('/team/:id', requirePermission('STAFF_MANAGE'), async (req, res) => {
   try {
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      throw new NotFoundError('Restaurant not found')
-    }
+    const restaurantId = await restaurantIdOrNotFound(req)
 
     const { rowCount } = await query(
       `DELETE FROM restaurant_team WHERE id = $1 AND restaurant_id = $2`,

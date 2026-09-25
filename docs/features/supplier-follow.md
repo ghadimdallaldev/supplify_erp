@@ -18,24 +18,27 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
 
 Following a supplier affects:
 
-| Area                        | Behavior                                                                            |
-| --------------------------- | ----------------------------------------------------------------------------------- |
-| **Deals feed**              | Organic deal visibility for followed suppliers (plus explicit restaurant targets)   |
-| **New-deals banner**        | Banner includes deals from followed suppliers started in the last 14 days           |
-| **Sponsored deals**         | Boost campaigns can surface deals from non-followed suppliers when audience matches |
-| **Deal promotions service** | `supplier_follow` join determines organic vs sponsored eligibility                  |
-| **Notifications**           | New-deal fan-out queries followers when suppliers publish deals                     |
-| **Usage metering**          | Follow count checked against `suppliers_per_restaurant` on POST follow              |
+| Area                        | Behavior                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| **Deals feed**              | Organic deal visibility for followed suppliers (plus explicit restaurant targets)     |
+| **New-deals banner**        | Banner includes deals from followed suppliers started in the last 14 days             |
+| **Sponsored deals**         | Boost campaigns can surface deals from non-followed suppliers when audience matches   |
+| **Deal promotions service** | `supplier_follow` join determines organic vs sponsored eligibility                    |
+| **Notifications**           | New-deal fan-out queries followers when suppliers publish deals                       |
+| **Usage metering**          | Follow count checked against `suppliers_per_restaurant` on POST follow                |
+| **Best-price comparison**   | Like-for-like current offers are compared across followed supplier organizations      |
+| **AI Assistant**            | Exact follow count/list and common-product comparisons are exposed as read-only tools |
 
 ## API (`/api/suppliers`)
 
-| Method | Path          | Auth                       | Description                                                      |
-| ------ | ------------- | -------------------------- | ---------------------------------------------------------------- |
-| GET    | `/followed`   | Restaurant, `CATALOG_VIEW` | List followed suppliers (newest first)                           |
-| POST   | `/:id/follow` | Restaurant                 | Follow supplier; 403 `SUPPLIER_FOLLOW_LIMIT_REACHED` at plan cap |
-| DELETE | `/:id/follow` | Restaurant                 | Unfollow supplier                                                |
-| POST   | `/:id/block`  | Restaurant                 | Block supplier (optional `reason`)                               |
-| DELETE | `/:id/block`  | Restaurant                 | Unblock supplier                                                 |
+| Method | Path                | Auth                       | Description                                                                |
+| ------ | ------------------- | -------------------------- | -------------------------------------------------------------------------- |
+| GET    | `/followed`         | Restaurant, `CATALOG_VIEW` | List followed suppliers (newest first)                                     |
+| GET    | `/price-comparison` | Restaurant, `CATALOG_VIEW` | Best current prices for products common to at least two followed suppliers |
+| POST   | `/:id/follow`       | Restaurant                 | Follow supplier; 403 `SUPPLIER_FOLLOW_LIMIT_REACHED` at plan cap           |
+| DELETE | `/:id/follow`       | Restaurant                 | Unfollow supplier                                                          |
+| POST   | `/:id/block`        | Restaurant                 | Block supplier (optional `reason`)                                         |
+| DELETE | `/:id/block`        | Restaurant                 | Unblock supplier                                                           |
 
 ## Catalog enrichment
 
@@ -49,6 +52,12 @@ Following a supplier affects:
 | `/app/suppliers/:id` | Follow toggle on supplier detail header                                              |
 
 RTK mutations: `useFollowSupplierMutation`, `useUnfollowSupplierMutation`.
+
+### Best prices for common products (2026-09-25)
+
+The supplier directory on web, Android, and iOS shows a best-price panel backed by `GET /api/suppliers/price-comparison`. The service only considers active, currently effective catalog prices from suppliers the active restaurant organization follows. It groups offers only when normalized product name, unit, brand, and currency match, requires at least two distinct supplier organizations, and returns the cheapest offer plus the alternative offers and savings. This avoids claiming two merely similar products are interchangeable.
+
+The assistant uses the same service for price-comparison questions and reads `supplier_follow` directly for followed-supplier questions, so its count matches the directory rather than catalog visibility.
 
 ## Database
 

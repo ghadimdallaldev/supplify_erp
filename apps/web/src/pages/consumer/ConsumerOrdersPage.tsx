@@ -20,6 +20,8 @@ import { PageShell } from '../../components/ui/page-shell'
 import { formatPrice } from '../../utils/format'
 import {
   getNextConsumerOrderStatus,
+  isConsumerOrderTerminal,
+  labelForConsumerStatus,
   type ConsumerOrderLine,
   type ConsumerOrderTrackingStatus,
 } from '../../lib/consumerOrderTracking'
@@ -38,8 +40,18 @@ const KANBAN_COLUMNS: ConsumerOrderTrackingStatus[] = [
   'DELIVERED',
 ]
 
-function statusLabel(status: string, t: TFunction<'consumer'>): string {
-  return t(`orderStatus.${status}`, { defaultValue: status.replace('_', ' ') })
+function statusLabel(
+  status: string,
+  t: TFunction<'consumer'>,
+  fulfillment?: string | null
+): string {
+  return labelForConsumerStatus((key, options) => t(key, options), status, fulfillment)
+}
+
+function columnLabel(status: string, t: TFunction<'consumer'>): string {
+  return t(`columnStatus.${status}`, {
+    defaultValue: t(`orderStatus.${status}`, { defaultValue: status.replace('_', ' ') }),
+  })
 }
 
 function fulfillmentLabel(type: string, t: TFunction<'consumer'>) {
@@ -72,6 +84,7 @@ function OrderCard({
   order,
   updating,
   onAdvance,
+  onCancel,
   on86Item,
   onRestoreItem,
   t,
@@ -81,7 +94,8 @@ function OrderCard({
 }: {
   order: ConsumerOrderSummary
   updating: boolean
-  onAdvance: (id: string, current: string) => void
+  onAdvance: (id: string, current: string, fulfillmentType: string) => void
+  onCancel: (id: string) => void
   on86Item: (menuItemId: string, itemName: string) => void
   onRestoreItem: (menuItemId: string, itemName: string) => void
   t: TFunction<'consumer'>
@@ -105,7 +119,7 @@ function OrderCard({
           variant={order.status === 'CANCELLED' ? 'destructive' : 'secondary'}
           className="shrink-0 text-[10px]"
         >
-          {statusLabel(order.status, t)}
+          {statusLabel(order.status, t, order.fulfillment_type)}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -170,16 +184,32 @@ function OrderCard({
               })}
             </p>
           </div>
-          {canManageOrders && nextStatus && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              disabled={updating}
-              onClick={() => onAdvance(order.id, order.status)}
-            >
-              {t('orders.advanceTo', { status: statusLabel(nextStatus, t) })}
-            </Button>
+          {canManageOrders && !isConsumerOrderTerminal(order.status) && (
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs text-destructive hover:text-destructive"
+                disabled={updating}
+                onClick={() => onCancel(order.id)}
+              >
+                {t('orders.cancelOrder')}
+              </Button>
+              {nextStatus && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={updating}
+                  onClick={() => onAdvance(order.id, order.status, order.fulfillment_type)}
+                >
+                  {t('orders.advanceTo', {
+                    status: statusLabel(nextStatus, t, order.fulfillment_type),
+                  })}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </CardContent>
@@ -277,12 +307,27 @@ export function ConsumerOrdersPage() {
     seenIdsRef.current = currentIds
   }, [orders, soundEnabled, t])
 
-  const advanceStatus = async (id: string, current: string) => {
+  const advanceStatus = async (id: string, current: string, fulfillmentType: string) => {
     const next = getNextConsumerOrderStatus(current)
     if (!next) return
     try {
       await updateStatus({ id, status: next }).unwrap()
-      toast.success(t('orders.markedStatus', { status: statusLabel(next, t).toLowerCase() }))
+      toast.success(
+        t('orders.markedStatus', {
+          status: statusLabel(next, t, fulfillmentType).toLowerCase(),
+        })
+      )
+      refetch()
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || t('orders.unableToUpdate'))
+    }
+  }
+
+  const cancelOrder = async (id: string) => {
+    if (!window.confirm(t('orders.confirmCancel'))) return
+    try {
+      await updateStatus({ id, status: 'CANCELLED' }).unwrap()
+      toast.success(t('orders.cancelledToast'))
       refetch()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || t('orders.unableToUpdate'))
@@ -343,7 +388,7 @@ export function ConsumerOrdersPage() {
               <TabsTrigger value="ALL">{t('orders.filterAll')}</TabsTrigger>
               <TabsTrigger value="RECEIVED">{t('orderStatus.RECEIVED')}</TabsTrigger>
               <TabsTrigger value="PREPARING">{t('orderStatus.PREPARING')}</TabsTrigger>
-              <TabsTrigger value="SHIPPED">{t('orderStatus.SHIPPED')}</TabsTrigger>
+              <TabsTrigger value="SHIPPED">{t('columnStatus.SHIPPED')}</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button
@@ -387,7 +432,7 @@ export function ConsumerOrdersPage() {
             {KANBAN_COLUMNS.map((columnStatus) => (
               <section key={columnStatus} className="space-y-2">
                 <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                  <h3 className="text-sm font-medium">{statusLabel(columnStatus, t)}</h3>
+                  <h3 className="text-sm font-medium">{columnLabel(columnStatus, t)}</h3>
                   <Badge variant="secondary">{ordersByStatus[columnStatus]?.length ?? 0}</Badge>
                 </div>
                 <div className="space-y-2">
@@ -397,6 +442,7 @@ export function ConsumerOrdersPage() {
                       order={order}
                       updating={updating}
                       onAdvance={advanceStatus}
+                      onCancel={cancelOrder}
                       on86Item={handle86Item}
                       onRestoreItem={handleRestoreItem}
                       t={t}
@@ -424,6 +470,7 @@ export function ConsumerOrdersPage() {
                 order={order}
                 updating={updating}
                 onAdvance={advanceStatus}
+                onCancel={cancelOrder}
                 on86Item={handle86Item}
                 onRestoreItem={handleRestoreItem}
                 t={t}
@@ -455,6 +502,7 @@ export function ConsumerOrdersPage() {
                   order={order}
                   updating={updating}
                   onAdvance={advanceStatus}
+                  onCancel={cancelOrder}
                   on86Item={handle86Item}
                   onRestoreItem={handleRestoreItem}
                   t={t}

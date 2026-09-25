@@ -152,8 +152,8 @@ export const SUPPLIER_PROFILES = {
       description: 'Track orders and deliveries you are responsible for.',
       kpiKeys: ['orders', 'pending'],
       kpiLabels: {
-        orders: { label: 'Assigned orders', meta: 'Your queue' },
-        pending: { label: 'In progress', meta: 'Needs update' },
+        orders: { label: 'Assigned deliveries', meta: 'Open dispatch queue' },
+        pending: { label: 'Out for delivery', meta: 'Picked up or en route' },
       },
     },
     promotionsCopy: DEFAULT_PROMOTIONS_COPY,
@@ -177,28 +177,11 @@ export const SUPPLIER_PROFILES = {
     id: 'supplier_catalog',
     homePath: '/app/products',
     primaryNavHref: '/app/products',
-    overviewNav: {
-      label: 'Catalog Hub',
-      labelKey: 'catalogHub',
-      href: '/app/command-center',
-      gate: 'command_center',
-    },
-    analyticsNav: {
-      label: 'Catalog analytics',
-      labelKey: 'catalogAnalytics',
-      href: '/app/dashboard',
-    },
-    showGlobalReports: true,
-    commandCenterMode: 'catalog',
-    dashboard: {
-      title: 'Catalog analytics',
-      description: 'Product catalog health, order context, and stock coverage.',
-      kpiKeys: ['orders', 'counterpart'],
-      kpiLabels: {
-        orders: { label: 'Related orders', meta: 'Catalog demand' },
-        counterpart: { label: 'Restaurants', meta: 'Buying your SKUs' },
-      },
-    },
+    overviewNav: null,
+    analyticsNav: null,
+    showGlobalReports: false,
+    commandCenterMode: null,
+    dashboard: null,
     promotionsCopy: DEFAULT_PROMOTIONS_COPY,
     readOnly: false,
     roleLabel: 'Catalog Manager',
@@ -477,14 +460,7 @@ export function supplierOverviewNavAllowed(
 ): boolean {
   if (!profile.overviewNav) return false
   if (profile.overviewNav.gate === 'promotions') return can('PROMOTIONS_VIEW')
-  return canAny(
-    'ORDERS_MANAGE',
-    'INVOICES_VIEW',
-    'CATALOG_EDIT',
-    'FULFILLMENT_VIEW',
-    'PROMOTIONS_MANAGE',
-    'PROMOTIONS_VIEW'
-  )
+  return canAny('ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW')
 }
 
 export function supplierAnalyticsNavAllowed(

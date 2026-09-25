@@ -26,12 +26,30 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { ensureNamespace } from '../i18n'
 
-function formatMoney(n: number) {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n || 0)
+function formatMoney(n: number, currency = 'USD') {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    }).format(n || 0)
+  } catch {
+    return `${currency} ${n || 0}`
+  }
+}
+
+function formatCurrencyTotals(
+  rows: Array<{ currency?: string | null; amount?: number | null }> | undefined,
+  fallbackAmount: number | null | undefined,
+  fallbackCurrency: string | null | undefined
+) {
+  if (rows?.length) {
+    return rows
+      .map((row) => formatMoney(Number(row.amount || 0), row.currency || 'USD'))
+      .join(' · ')
+  }
+  if (fallbackAmount == null) return '—'
+  return formatMoney(Number(fallbackAmount), fallbackCurrency || 'USD')
 }
 
 export function RestaurantOrgOverviewPage() {
@@ -99,7 +117,12 @@ export function RestaurantOrgOverviewPage() {
   const kpis = reports?.kpis
   const byBranch = reports?.by_branch ?? []
   const spendById = new Map(
-    byBranch.map((row) => [String(row.branch_account_id), Number(row.total_spend || 0)])
+    byBranch.map((row) => [
+      String(row.branch_account_id),
+      row.total_spend == null
+        ? null
+        : formatMoney(Number(row.total_spend), String(row.currency || 'USD')),
+    ])
   )
 
   const handleOpenBranch = async (restaurantId: string) => {
@@ -157,7 +180,7 @@ export function RestaurantOrgOverviewPage() {
           <div className="rounded-lg border border-[var(--app-border)] p-4">
             <p className="text-xs text-[var(--text-muted)]">Spend (period)</p>
             <p className="text-2xl font-semibold mt-1">
-              {formatMoney(Number(kpis.total_spend || 0))}
+              {formatCurrencyTotals(kpis.spend_by_currency, kpis.total_spend, kpis.currency)}
             </p>
           </div>
           <div className="rounded-lg border border-[var(--app-border)] p-4">
@@ -167,30 +190,35 @@ export function RestaurantOrgOverviewPage() {
         </div>
       ) : null}
 
-      {advancedAnalytics?.data?.months?.length ? (
+      {advancedAnalytics?.months?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Advanced branch analytics</h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Monthly stored order trends; the API accepts any valid historical date range.
           </p>
           <ul className="mt-3 space-y-1 text-sm">
-            {advancedAnalytics.data.months.slice(-6).map((row) => (
-              <li key={`${row.month}-${row.branchAccountId}`}>
-                {row.month}: {row.branchAccountName} · {row.orderCount} orders ·{' '}
-                {formatMoney(row.spend)}
-              </li>
-            ))}
+            {advancedAnalytics.months
+              .filter((row) => {
+                const months = [...new Set(advancedAnalytics.months.map((item) => item.month))]
+                return months.slice(-6).includes(row.month)
+              })
+              .map((row) => (
+                <li key={`${row.month}-${row.branchAccountId}`}>
+                  {row.month}: {row.branchAccountName} · {row.orderCount} orders ·{' '}
+                  {formatMoney(row.spend, row.currency || 'USD')}
+                </li>
+              ))}
           </ul>
         </section>
       ) : null}
-      {transferSuggestions?.data?.suggestions?.length ? (
+      {transferSuggestions?.suggestions?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Stock-transfer suggestions</h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
             Review-only: no stock is reserved or moved.
           </p>
           <ul className="mt-3 space-y-1 text-sm">
-            {transferSuggestions.data.suggestions.slice(0, 6).map((s) => (
+            {transferSuggestions.suggestions.slice(0, 6).map((s) => (
               <li
                 key={`${s.sourceBranchAccountName}-${s.destinationBranchAccountName}-${s.productId}`}
               >
@@ -201,7 +229,7 @@ export function RestaurantOrgOverviewPage() {
           </ul>
         </section>
       ) : null}
-      {purchasingInsights?.data?.signals?.length ? (
+      {purchasingInsights?.signals?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Cross-branch purchase price ranges</h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -209,7 +237,7 @@ export function RestaurantOrgOverviewPage() {
             comparison only; it does not create or recommend purchases.
           </p>
           <ul className="mt-3 space-y-2 text-sm">
-            {purchasingInsights.data.signals.slice(0, 6).map((signal) => (
+            {purchasingInsights.signals.slice(0, 6).map((signal) => (
               <li
                 key={`${signal.productId}-${signal.supplierId}`}
                 className="rounded border border-[var(--app-border)] p-3"
@@ -218,7 +246,8 @@ export function RestaurantOrgOverviewPage() {
                   {signal.productName} · {signal.supplierName ?? 'Supplier'}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {formatMoney(signal.minUnitPrice)}–{formatMoney(signal.maxUnitPrice)} per{' '}
+                  {formatMoney(signal.minUnitPrice, signal.currency || 'USD')}–
+                  {formatMoney(signal.maxUnitPrice, signal.currency || 'USD')} per{' '}
                   {signal.productUnit} across {signal.branchCount} Branch Accounts ·{' '}
                   {signal.priceSpreadPct.toFixed(1)}% range
                 </p>
@@ -227,7 +256,7 @@ export function RestaurantOrgOverviewPage() {
           </ul>
         </section>
       ) : null}
-      {demandForecast?.data?.branches?.length ? (
+      {demandForecast?.branches?.length ? (
         <section className="mb-6 rounded-lg border border-[var(--app-border)] p-4">
           <h2 className="font-semibold">Branch demand forecasts</h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -235,7 +264,7 @@ export function RestaurantOrgOverviewPage() {
             forecasts are excluded.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {demandForecast.data.branches.map((branch) => (
+            {demandForecast.branches.map((branch) => (
               <div
                 key={branch.branchAccountId}
                 className="rounded border border-[var(--app-border)] p-3 text-sm"
@@ -264,23 +293,29 @@ export function RestaurantOrgOverviewPage() {
           </div>
         </section>
       ) : null}
-      {comparison?.data?.coverage?.foodCost?.available === false ? (
+      {comparison?.coverage?.foodCost?.available === false ? (
         <p className="mb-4 text-xs text-[var(--text-muted)]">
           Food-cost comparison is unavailable because branch accounts do not share a comparable
           recipe/menu identity.
         </p>
       ) : null}
-      {comparison?.data?.branches?.length ? (
+      {comparison?.branches?.length ? (
         <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          {comparison.data.branches.map((branch) => (
+          {comparison.branches.map((branch) => (
             <div
               key={String(branch.branchAccountId)}
               className="rounded-lg border border-[var(--app-border)] p-4 text-sm"
             >
               <p className="font-medium">{String(branch.branchAccountName)}</p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                Spend {formatMoney(Number(branch.purchasing?.spend || 0))} ·{' '}
-                {Number(branch.purchasing?.orderCount || 0)} orders ·{' '}
+                Spend{' '}
+                {branch.purchasing?.spend == null
+                  ? '—'
+                  : formatMoney(
+                      Number(branch.purchasing.spend),
+                      branch.purchasing.currency || 'USD'
+                    )}{' '}
+                · {Number(branch.purchasing?.orderCount || 0)} orders ·{' '}
                 {Number(branch.inventory?.outOfStockProducts || 0)} out of stock ·{' '}
                 {Number(branch.waste?.incidents || 0)} waste incidents
               </p>
@@ -306,8 +341,8 @@ export function RestaurantOrgOverviewPage() {
                     staff: Number(branch.staff_count ?? 0),
                     orders: Number(branch.orders_this_month ?? 0),
                   })}
-                  {spendById.has(String(branch.id))
-                    ? ` · ${formatMoney(Number(spendById.get(String(branch.id)) ?? 0))} spend`
+                  {spendById.get(String(branch.id))
+                    ? ` · ${spendById.get(String(branch.id))} spend`
                     : ''}
                 </p>
               </div>

@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
 
 const DEFAULT_DAYS = 90
 const MAX_DAYS = 365
@@ -60,7 +61,12 @@ export async function listInvoiceAnomalies(restaurantId, opts = {}, dbQuery = qu
       LEFT JOIN order_item oi ON oi.id = ili.order_item_id
       WHERE i.restaurant_id = $1
         AND i.status <> 'VOID'
-        AND i.invoice_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
+        AND i.invoice_date >= (
+          (now() AT TIME ZONE COALESCE(
+            (SELECT NULLIF(TRIM(timezone), '') FROM restaurant WHERE id = $1),
+            $3
+          ))::date - $2::int
+        )
         AND ili.product_id IS NOT NULL
     ),
     prior_prices AS (
@@ -109,7 +115,7 @@ export async function listInvoiceAnomalies(restaurantId, opts = {}, dbQuery = qu
       AND dli.supplier_id = il.supplier_id
     ORDER BY il.invoice_date DESC, il.invoice_number ASC, il.invoice_line_id ASC
     `,
-    [restaurantId, days]
+    [restaurantId, days, getDefaultTenantTimezone()]
   )
 
   const byInvoice = new Map()

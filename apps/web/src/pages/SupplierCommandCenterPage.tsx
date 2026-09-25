@@ -252,6 +252,20 @@ function formatOrderDate(iso: string | undefined) {
   }
 }
 
+function formatReceivablesAmount(
+  value: number | null | undefined,
+  byCurrency?: Array<{ currency?: string; unpaidTotal?: number; overdueTotal?: number }>,
+  field: 'unpaidTotal' | 'overdueTotal' = 'unpaidTotal'
+) {
+  if (byCurrency && byCurrency.length > 1) {
+    return byCurrency
+      .map((row) => formatCurrency(row[field] ?? 0, { currency: row.currency || 'USD' }))
+      .join(' · ')
+  }
+  if (value == null) return '—'
+  return formatCurrency(value, { currency: byCurrency?.[0]?.currency || 'USD' })
+}
+
 export function SupplierCommandCenterPage() {
   const { t } = useTranslation('supplierOps')
 
@@ -313,14 +327,7 @@ export function SupplierCommandCenterPage() {
     hubMode === 'sales'
       ? { anyOf: ['PROMOTIONS_VIEW'] as const, title: t('commandCenter.gateTitle.sales') }
       : {
-          anyOf: [
-            'ORDERS_MANAGE',
-            'INVOICES_VIEW',
-            'CATALOG_EDIT',
-            'FULFILLMENT_VIEW',
-            'PROMOTIONS_MANAGE',
-            'PROMOTIONS_VIEW',
-          ] as const,
+          anyOf: ['ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW'] as const,
           title: t('commandCenter.gateTitle.default'),
         }
   const quickActions = useMemo(
@@ -608,12 +615,20 @@ export function SupplierCommandCenterPage() {
               >
                 <div className="text-[13px] font-bold">
                   {t('commandCenter.previews.unpaid', {
-                    amount: formatCurrency(previews?.receivables?.unpaidTotal ?? 0),
+                    amount: formatReceivablesAmount(
+                      previews?.receivables?.unpaidTotal,
+                      previews?.receivables?.byCurrency,
+                      'unpaidTotal'
+                    ),
                   })}
                 </div>
                 <div className="text-xs text-[var(--text-muted)] mt-0.5">
                   {t('commandCenter.previews.overdue', {
-                    amount: formatCurrency(previews?.receivables?.overdueTotal ?? 0),
+                    amount: formatReceivablesAmount(
+                      previews?.receivables?.overdueTotal,
+                      previews?.receivables?.byCurrency,
+                      'overdueTotal'
+                    ),
                   })}
                 </div>
                 {(previews?.receivables?.topDebtors || []).length === 0 ? (

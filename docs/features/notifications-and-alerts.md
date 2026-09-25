@@ -12,10 +12,17 @@ How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture,
 - Opening a thread calls `PATCH /api/chat/conversations/:conversationId/read`; the cached badge is cleared immediately and reconciled on the next server refresh.
 - The socket connection carries the same active-tenant token as REST requests, preventing branch/workspace mismatch after tenant switching.
 
+## Human chat attachments (2026-09-25)
+
+- The normal restaurant/supplier chat composer supports JPEG, PNG, WebP, and PDF attachments on web, Android, and iOS; this is separate from the AI Assistant attachment composer.
+- A message accepts up to five files, each no larger than 10 MB. Attachment-only messages use a client fallback caption so the existing message-content contract remains valid.
+- Clients upload through `POST /api/files/presign` and the authenticated upload gateway before sending the message. The send route verifies caller ownership and a completed clean malware scan before creating `message_attachment` rows.
+- Message reads return camelCase `fileUrl`, `fileType`, `fileName`, and `fileSize` fields consistently for newly sent and reloaded messages.
+
 ## Native Expo push delivery (2026-09-13)
 
-- `POST /api/push/devices` and `DELETE /api/push/devices` are authenticated user-level registration endpoints. They intentionally do not require tenant resolution or mutate `push_enabled`.
-- A push endpoint belongs to exactly one user. Re-registering transfers it to the authenticated account; logout removes the stored device while the access token is still valid.
+- `POST /api/push/devices` requires auth, tenant context, and the `push_notifications` plan feature (same as web `POST /subscribe`). `DELETE /api/push/devices` stays auth-only so logout can unregister after a downgrade.
+- A push endpoint belongs to exactly one user. Same-user re-register refreshes keys; registering an endpoint already owned by another account returns 409. Logout should `DELETE /devices` while the access token is still valid.
 - Native registration requires an installed development/preview/production build. It retries transient failures and exposes its state in mobile Notification settings instead of failing silently.
 - Native payloads include `notificationId`, `notificationType`, `notificationCategory`, `referenceId`, `referenceType`, their snake_case equivalents, metadata, and the resolved web URL. Chat uses `referenceType: CONVERSATION` with `conversationId` metadata.
 - Expo ticket acceptance is not treated as delivery. The API reconciles Expo receipts, marks `notification_log.push_sent` only after FCM/APNs returns success, and removes stale `DeviceNotRegistered` subscriptions.

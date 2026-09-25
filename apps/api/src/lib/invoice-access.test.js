@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { assertInvoiceTenantAccess } from './invoice-access.js'
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError } from '../middlewares/errorHandler.js'
 
 vi.mock('./tenant-resolve.js', () => ({
   requireSupplierId: vi.fn().mockResolvedValue('sup-1'),
@@ -12,10 +12,11 @@ describe('invoice-access', () => {
     vi.clearAllMocks()
   })
 
-  it('allows admin without tenant check', async () => {
+  it('rejects admin without impersonation', async () => {
     const req = { userData: { role: 'ADMIN' } }
-    await expect(assertInvoiceTenantAccess(req, { supplier_id: 'x', restaurant_id: 'y' })).resolves
-      .toBeUndefined
+    await expect(
+      assertInvoiceTenantAccess(req, { supplier_id: 'x', restaurant_id: 'y' })
+    ).rejects.toThrow(ForbiddenError)
   })
 
   it('scopes an impersonating admin to the effective tenant', async () => {

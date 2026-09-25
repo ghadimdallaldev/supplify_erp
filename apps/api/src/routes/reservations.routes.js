@@ -23,11 +23,31 @@ import {
   parseTimeToHour,
   summarizeBookingHours,
 } from '../lib/reservation-booking-hours.js'
-import { readBookingMeta } from '../lib/reservation-availability.js'
-import { getLocalDayBounds, parseBoardDateParam } from '../lib/reservation-board-date.js'
+import {
+  CAPACITY_CONSUMING_STATUSES,
+  assignTablesForParty,
+  getTableAssignmentError,
+  readBookingMeta,
+  toCalendarDateString,
+} from '../lib/reservation-availability.js'
+import {
+  entersCapacity,
+  getReservationStatusChange,
+  getReservationTransitionError,
+  leavesNoShow,
+  resolveHostBookingStatus,
+} from '../lib/reservation-status.js'
+import { getZonedDayBounds, parseBoardDateParam } from '../lib/reservation-board-date.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
+import {
+  assertLegacyBranchOwnedByRestaurant,
+  assertLegacyBranchesOwnedByRestaurant,
+} from '../lib/branch-scope.js'
 import {
   upsertReservationGuest,
   recordGuestVisit,
+  reverseGuestNoShow,
+  summarizeGuestIntelligence,
   listRestaurantReservationReviews,
   replyToReservationReview,
 } from '../services/reservation-guest-reviews.service.js'
@@ -134,6 +154,7 @@ const guestIntelQuerySchema = z.object({
 })
 
 async function fetchTables(restaurantId, branchId) {
+  await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
   const params = [restaurantId]
   let branchFilter = ''
   if (branchId) {
@@ -154,7 +175,9 @@ async function fetchTables(restaurantId, branchId) {
 }
 
 async function fetchReservations(restaurantId, branchId, dayYmd) {
-  const { start, end } = getLocalDayBounds(dayYmd)
+  await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
+  const timeZone = await getRestaurantTimezone(restaurantId)
+  const { start, end } = getZonedDayBounds(dayYmd, timeZone)
   const params = [restaurantId, start.toISOString(), end.toISOString()]
   let branchFilter = ''
   if (branchId) {
@@ -332,13 +355,26 @@ router.patch('/public-booking-settings', requireRole(['RESTAURANT', 'ADMIN']), a
         ?.operating_hours
     )
     const existingMeta = readBookingMeta(existing)
+    const minPartySize = payload.minPartySize ?? existingMeta.minPartySize
+    const maxPartySize = payload.maxPartySize ?? existingMeta.maxPartySize
+    if (Number(minPartySize) > Number(maxPartySize)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'BOOKING_SETTINGS_ERROR',
+          message: 'Minimum party size cannot be greater than the maximum',
+        },
+        requestId: req.requestId,
+      })
+    }
     const operatingHours = {
       ...buildUniformOperatingHours(payload.openTime, payload.closeTime),
       _booking: {
         durationMinutes: payload.durationMinutes ?? existingMeta.durationMinutes,
         slotIntervalMinutes: payload.slotIntervalMinutes ?? existingMeta.slotIntervalMinutes,
-        minPartySize: payload.minPartySize ?? existingMeta.minPartySize,
-        maxPartySize: payload.maxPartySize ?? existingMeta.maxPartySize,
+        minPartySize,
+        maxPartySize,
         maxCoversPerSlot:
           payload.maxCoversPerSlot !== undefined
             ? payload.maxCoversPerSlot
@@ -380,6 +416,10 @@ router.post('/tables', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
   try {
     const payload = upsertTablesSchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchesOwnedByRestaurant(
+      payload.tables.map((table) => table.branchId),
+      restaurantId
+    )
 
     const result = await withTransaction(async (client) => {
       const upserted = []
@@ -474,8 +514,8 @@ async function calculateAvailability(restaurantId, branchId, scheduledAt, durati
       FROM reservation
       WHERE restaurant_id = $1
         AND status IN ('PENDING','CONFIRMED','SEATED')
-        AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
-            tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
+        AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[)') &&
+            tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[)')
         ${overlapBranchFilter}
     `,
     overlapParams
@@ -497,8 +537,49 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
     const payload = reservationCreateSchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
     const scheduledAt = new Date(payload.scheduledAt)
+    if (Number.isNaN(scheduledAt.getTime())) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_DATE', message: 'Invalid scheduled time' },
+        requestId: req.requestId,
+      })
+    }
+    if (scheduledAt.getTime() < Date.now() - 2 * 60 * 1000) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_DATE', message: 'Cannot book a time in the past' },
+        requestId: req.requestId,
+      })
+    }
 
     const reservation = await withTransaction(async (client) => {
+      const calendarDate = toCalendarDateString(scheduledAt)
+      const blackoutParams = [restaurantId, calendarDate]
+      let blackoutBranchSql = 'AND branch_id IS NULL'
+      if (payload.branchId) {
+        blackoutParams.push(payload.branchId)
+        blackoutBranchSql = 'AND (branch_id IS NULL OR branch_id = $3)'
+      }
+      const { rows: blackoutRows } = await client.query(
+        `
+          SELECT reason
+          FROM reservation_blackout
+          WHERE restaurant_id = $1
+            AND blackout_date = $2::date
+            ${blackoutBranchSql}
+          LIMIT 1
+        `,
+        blackoutParams
+      )
+      if (blackoutRows.length) {
+        const reason = blackoutRows[0].reason
+        throw new Error(
+          reason ? `This date is closed: ${reason}` : 'This date is closed for reservations'
+        )
+      }
+
       const { totalSeats, utilization, tables } = await calculateAvailability(
         restaurantId,
         payload.branchId,
@@ -511,43 +592,67 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
         throw new Error('Please configure tables before creating reservations')
       }
 
-      let assignedTables = payload.tableIds || []
-      if (!assignedTables.length) {
-        const availableTables = tables
-          .filter((table) => table.is_active)
-          .sort((a, b) => Number(a.capacity) - Number(b.capacity))
+      const conflictParams = [restaurantId, scheduledAt.toISOString(), payload.durationMinutes]
+      let conflictBranchFilter = ''
+      if (payload.branchId) {
+        conflictParams.push(payload.branchId)
+        conflictBranchFilter = 'AND (branch_id = $4 OR branch_id IS NULL)'
+      }
 
-        const conflictParams = [restaurantId, scheduledAt.toISOString(), payload.durationMinutes]
-        let conflictBranchFilter = ''
-        if (payload.branchId) {
-          conflictParams.push(payload.branchId)
-          conflictBranchFilter = 'AND (branch_id = $4 OR branch_id IS NULL)'
-        }
-
-        const { rows: conflictRows } = await client.query(
-          `
+      const { rows: conflictRows } = await client.query(
+        `
               SELECT unnest(tables) as table_id
               FROM reservation
               WHERE restaurant_id = $1
                 AND status IN ('PENDING','CONFIRMED','SEATED')
-                AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[]') &&
-                    tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[]')
+                AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[)') &&
+                    tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[)')
                 ${conflictBranchFilter}
             `,
-          conflictParams
-        )
-        const conflictingTableIds = new Set(conflictRows.map((row) => row.table_id))
-        let seatsAccumulated = 0
-        for (const table of availableTables) {
-          if (conflictingTableIds.has(table.id)) continue
-          assignedTables.push(table.id)
+        conflictParams
+      )
+      const conflictingTableIds = new Set(conflictRows.map((row) => row.table_id))
+      const activeTables = tables
+        .filter((table) => table.is_active)
+        .sort((a, b) => Number(a.capacity) - Number(b.capacity))
+      const tablesById = new Map(activeTables.map((table) => [table.id, table]))
+
+      let assignedTables = [...(payload.tableIds || [])]
+      let seatsAccumulated = 0
+      if (assignedTables.length) {
+        for (const tableId of assignedTables) {
+          const table = tablesById.get(tableId)
+          if (!table) {
+            throw new Error('One or more tables are invalid or inactive')
+          }
+          if (conflictingTableIds.has(tableId)) {
+            throw new Error('One of these tables is already booked for this time')
+          }
           seatsAccumulated += Number(table.capacity)
-          if (seatsAccumulated >= payload.partySize) break
         }
+        if (seatsAccumulated < payload.partySize) {
+          throw new Error('These tables do not seat this party')
+        }
+      } else {
+        const autoAssigned = assignTablesForParty(
+          activeTables,
+          payload.partySize,
+          conflictingTableIds
+        )
+        assignedTables = autoAssigned.tableIds
+        seatsAccumulated = autoAssigned.seats
       }
 
-      const autoConfirm = utilization < 0.9
-      const status = autoConfirm ? 'CONFIRMED' : payload.allowWaitlist ? 'WAITLIST' : 'PENDING'
+      const seated = seatsAccumulated >= payload.partySize && assignedTables.length > 0
+      if (!seated) {
+        if (!payload.allowWaitlist) {
+          throw new Error('Not enough free tables for this party')
+        }
+        assignedTables = []
+      }
+
+      const status = resolveHostBookingStatus({ seated, utilization })
+      const autoConfirm = status === 'CONFIRMED'
       const waitlist = status === 'WAITLIST'
 
       const guest = await upsertReservationGuest(client, {
@@ -604,7 +709,7 @@ router.post('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, 
           guest?.id || null,
           waitlist,
           autoConfirm,
-          req.user?.id || null,
+          req.userData?.id || null,
         ]
       )
 
@@ -694,16 +799,55 @@ router.patch('/:id/tables', requireRole(['RESTAURANT', 'ADMIN']), async (req, re
     const restaurantId = await requireRestaurantId(req)
 
     const tables = await fetchTables(restaurantId)
-    const validIds = new Set(tables.filter((t) => t.is_active).map((t) => t.id))
-    for (const tableId of payload.tableIds) {
-      if (!validIds.has(tableId)) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: { name: 'INVALID_TABLE', message: 'One or more tables are invalid or inactive' },
-          requestId: req.requestId,
-        })
-      }
+    const { rows: currentRows } = await query(
+      `
+        SELECT id, party_size, scheduled_at, duration_minutes, status
+        FROM reservation
+        WHERE id = $1 AND restaurant_id = $2
+      `,
+      [id, restaurantId]
+    )
+    if (!currentRows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Reservation not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const current = currentRows[0]
+    let others = []
+    if (payload.tableIds.length) {
+      const { rows: otherRows } = await query(
+        `
+          SELECT id, status, scheduled_at, duration_minutes, tables
+          FROM reservation
+          WHERE restaurant_id = $1
+            AND id <> $2
+            AND status = ANY($3::text[])
+            AND tables && $4::uuid[]
+        `,
+        [restaurantId, id, CAPACITY_CONSUMING_STATUSES, payload.tableIds]
+      )
+      others = otherRows
+    }
+
+    const assignmentError = getTableAssignmentError({
+      partySize: current.party_size,
+      tableIds: payload.tableIds,
+      tables,
+      scheduledAt: current.scheduled_at,
+      durationMinutes: current.duration_minutes,
+      otherReservations: others,
+    })
+    if (assignmentError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_TABLE', message: assignmentError },
+        requestId: req.requestId,
+      })
     }
 
     const { rows } = await query(
@@ -743,11 +887,98 @@ router.patch('/:id/tables', requireRole(['RESTAURANT', 'ADMIN']), async (req, re
   }
 })
 
+async function getRestoreCapacityError(restaurantId, reservation) {
+  const tableIds = normalizeUuidArray(reservation.tables)
+  const duration = Number(reservation.duration_minutes) || 90
+  const params = [restaurantId, reservation.scheduled_at, duration, reservation.id]
+  let branchSql = ''
+  if (reservation.branch_id) {
+    params.push(reservation.branch_id)
+    branchSql = 'AND (branch_id = $5 OR branch_id IS NULL)'
+  }
+  const { rows: others } = await query(
+    `
+      SELECT id, status, tables, scheduled_at, duration_minutes, party_size
+      FROM reservation
+      WHERE restaurant_id = $1
+        AND id <> $4
+        AND status IN ('PENDING','CONFIRMED','SEATED')
+        AND tstzrange(scheduled_at, scheduled_at + make_interval(mins => duration_minutes), '[)') &&
+            tstzrange($2::timestamptz, $2::timestamptz + make_interval(mins => $3), '[)')
+        ${branchSql}
+    `,
+    params
+  )
+  const floor = await fetchTables(restaurantId, reservation.branch_id || undefined)
+  const othersNormalized = others.map((row) => ({
+    ...row,
+    tables: normalizeUuidArray(row.tables),
+  }))
+  if (tableIds.length) {
+    const tableError = getTableAssignmentError({
+      partySize: reservation.party_size,
+      tableIds,
+      tables: floor,
+      scheduledAt: reservation.scheduled_at,
+      durationMinutes: duration,
+      otherReservations: othersNormalized,
+    })
+    if (tableError) return tableError
+  }
+  const totalSeats = floor
+    .filter((table) => table.is_active !== false)
+    .reduce((sum, table) => sum + Number(table.capacity || 0), 0)
+  const reserved = othersNormalized.reduce((sum, row) => sum + Number(row.party_size || 0), 0)
+  if (totalSeats > 0 && reserved + Number(reservation.party_size || 0) > totalSeats) {
+    return 'Not enough seats left at this time'
+  }
+  return null
+}
+
 router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
     const { id } = req.params
     const payload = reservationStatusSchema.parse(req.body)
     const restaurantId = await requireRestaurantId(req)
+
+    const { rows: currentRows } = await query(
+      `
+        SELECT id, status, scheduled_at, duration_minutes, tables, party_size, branch_id, guest_id
+        FROM reservation
+        WHERE id = $1 AND restaurant_id = $2
+      `,
+      [id, restaurantId]
+    )
+    if (!currentRows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Reservation not found' },
+        requestId: req.requestId,
+      })
+    }
+
+    const transitionError = getReservationTransitionError(currentRows[0].status, payload.status)
+    if (transitionError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'INVALID_STATUS', message: transitionError },
+        requestId: req.requestId,
+      })
+    }
+    const statusChange = getReservationStatusChange(currentRows[0].status, payload.status)
+    if (entersCapacity(currentRows[0].status, payload.status)) {
+      const capacityError = await getRestoreCapacityError(restaurantId, currentRows[0])
+      if (capacityError) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_UNAVAILABLE', message: capacityError },
+          requestId: req.requestId,
+        })
+      }
+    }
 
     const { rows } = await query(
       `
@@ -782,22 +1013,29 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
 
     const reservation = rows[0]
 
-    if (payload.status === 'COMPLETED' && reservation.guest_id) {
+    if (statusChange.recordVisit && reservation.guest_id) {
       try {
         await recordGuestVisit({ query }, reservation.guest_id, { noShow: false })
       } catch (guestError) {
         logger.warn('Guest visit update failed', { error: guestError.message })
       }
     }
-    if (payload.status === 'NO_SHOW' && reservation.guest_id) {
+    if (statusChange.recordNoShow && reservation.guest_id) {
       try {
         await recordGuestVisit({ query }, reservation.guest_id, { noShow: true })
       } catch (guestError) {
         logger.warn('Guest no-show update failed', { error: guestError.message })
       }
     }
+    if (leavesNoShow(currentRows[0].status, payload.status) && reservation.guest_id) {
+      try {
+        await reverseGuestNoShow({ query }, reservation.guest_id)
+      } catch (guestError) {
+        logger.warn('Guest no-show reversal failed', { error: guestError.message })
+      }
+    }
 
-    if (payload.status === 'CANCELLED') {
+    if (statusChange.promoteWaitlist) {
       try {
         await handleReservationCancelled(reservation, {
           cancellationReason: payload.cancellationReason || payload.notes || null,
@@ -810,7 +1048,7 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
       }
     }
 
-    if (payload.status === 'CONFIRMED' || payload.status === 'WAITLIST') {
+    if (statusChange.notifyGuest) {
       try {
         const { rows: restaurantRows } = await query('SELECT name FROM restaurant WHERE id = $1', [
           restaurantId,
@@ -824,7 +1062,7 @@ router.patch('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (r
       }
     }
 
-    if (payload.status === 'CANCELLED') {
+    if (statusChange.notifyStaffCancel) {
       void notifyReservationStaffEvent(reservation, 'cancelled').catch((err) =>
         logger.warn('Reservation cancel notification failed', { error: err.message })
       )
@@ -873,6 +1111,7 @@ router.get('/waitlist', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async
   try {
     const params = waitlistQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(params.branchId, restaurantId)
     const waitlistParams = [restaurantId]
     let waitlistBranchFilter = ''
     if (params.branchId) {
@@ -945,6 +1184,7 @@ router.get(
     try {
       const { branchId } = guestIntelQuerySchema.parse(req.query)
       const restaurantId = await requireRestaurantId(req)
+      await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
 
       const params = [restaurantId]
       let branchFilter = ''
@@ -959,44 +1199,31 @@ router.get(
             customer_name,
             customer_phone,
             customer_email,
-            COUNT(*) FILTER (WHERE status NOT IN ('CANCELLED')) AS visit_count,
-            MAX(scheduled_at) FILTER (WHERE status NOT IN ('CANCELLED')) AS last_visit,
-            SUM(party_size) FILTER (WHERE status NOT IN ('CANCELLED')) AS total_covers,
-            COUNT(*) FILTER (WHERE status = 'CONFIRMED' AND scheduled_at >= now()) AS upcoming_count
+            COUNT(*) FILTER (WHERE status = 'COMPLETED') AS visit_count,
+            MAX(scheduled_at) FILTER (WHERE status = 'COMPLETED') AS last_visit,
+            SUM(party_size) FILTER (WHERE status = 'COMPLETED') AS total_covers,
+            COUNT(*) FILTER (
+              WHERE status IN ('PENDING', 'CONFIRMED') AND scheduled_at >= now()
+            ) AS upcoming_count,
+            COUNT(*) FILTER (WHERE status = 'NO_SHOW') AS no_show_count
           FROM reservation
           WHERE restaurant_id = $1
             ${branchFilter}
           GROUP BY customer_name, customer_phone, customer_email
-          HAVING COUNT(*) FILTER (WHERE status NOT IN ('CANCELLED')) > 0
+          HAVING COUNT(*) FILTER (WHERE status = 'COMPLETED') > 0
+            OR COUNT(*) FILTER (
+              WHERE status IN ('PENDING', 'CONFIRMED') AND scheduled_at >= now()
+            ) > 0
+            OR COUNT(*) FILTER (WHERE status = 'NO_SHOW') > 0
           ORDER BY visit_count DESC, last_visit DESC NULLS LAST
           LIMIT 25
         `,
         params
       )
 
-      const repeatGuests = guests.filter((g) => Number(g.visit_count) >= 2)
-      const vipGuests = guests.filter((g) => Number(g.visit_count) >= 3)
-      const followUps = guests
-        .filter((g) => Number(g.upcoming_count) > 0 || Number(g.visit_count) >= 2)
-        .slice(0, 8)
-        .map((g) => ({
-          ...g,
-          suggestion:
-            Number(g.visit_count) >= 3
-              ? 'VIP — consider a welcome perk or priority seating.'
-              : Number(g.upcoming_count) > 0
-                ? 'Upcoming visit — send a confirmation reminder.'
-                : 'Repeat guest — thank them on their next visit.',
-        }))
-
       res.json({
         ok: true,
-        data: {
-          recentGuests: guests.slice(0, 10),
-          repeatGuests: repeatGuests.slice(0, 10),
-          vipGuests: vipGuests.slice(0, 5),
-          followUps,
-        },
+        data: summarizeGuestIntelligence(guests),
         error: null,
         requestId: req.requestId,
       })
@@ -1016,6 +1243,7 @@ router.get('/analytics', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) 
   try {
     const params = analyticsQuerySchema.parse(req.query)
     const restaurantId = await requireRestaurantId(req)
+    await assertLegacyBranchOwnedByRestaurant(params.branchId, restaurantId)
 
     const rangeMultiplier = {
       day: 1,
@@ -1123,7 +1351,7 @@ router.post('/reviews/:id/reply', requireRole(['RESTAURANT', 'ADMIN']), async (r
     const review = await replyToReservationReview({
       reviewId: req.params.id,
       restaurantId,
-      userId: req.user?.id || req.userData?.id || null,
+      userId: req.userData?.id || null,
       reply: payload.reply,
     })
     res.json({
@@ -1171,6 +1399,7 @@ router.post('/blackouts', requireRole(['RESTAURANT', 'ADMIN']), async (req, res)
   try {
     const restaurantId = await requireRestaurantId(req)
     const payload = blackoutSchema.parse(req.body)
+    await assertLegacyBranchOwnedByRestaurant(payload.branchId, restaurantId)
     const { rows } = await query(
       `
       INSERT INTO reservation_blackout (restaurant_id, branch_id, blackout_date, reason)

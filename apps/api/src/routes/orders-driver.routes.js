@@ -25,7 +25,7 @@ import {
   submitProofOfDelivery,
   completeDeliveryWithProof,
   confirmProofOfDelivery,
-  getProofOfDelivery,
+  listProofsOfDelivery,
 } from '../services/driver-fulfillment.service.js'
 import {
   recordDriverLocation,
@@ -62,10 +62,7 @@ const fulfillmentFeature = requireFeature(
 const supplierFulfillmentGate = [requireRole(['SUPPLIER', 'ADMIN']), fulfillmentFeature]
 
 async function resolveSupplierId(req) {
-  return (
-    (await getSupplierIdForRequest(req)) ||
-    (req.userData.role === 'ADMIN' ? req.query.supplier_id : null)
-  )
+  return getSupplierIdForRequest(req)
 }
 
 const assignSchema = z.object({
@@ -159,15 +156,17 @@ router.get(
       const supplierId = await resolveSupplierId(req)
       if (!supplierId) throw new ForbiddenError('Supplier not found')
       const permissions = req.tenantContext?.permissions ?? []
+      let driverId = null
       if (isDriverOnlyPermissions(permissions)) {
-        await assertDriverAssignmentAccess({
+        const access = await assertDriverAssignmentAccess({
           userId: req.userData.id,
           supplierId,
           orderId: req.params.id,
           permissions,
         })
+        driverId = access?.driverId ?? null
       }
-      const detail = await getDriverDeliveryDetail(req.params.id, supplierId)
+      const detail = await getDriverDeliveryDetail(req.params.id, supplierId, { driverId })
       res.json({ ok: true, data: detail, error: null, requestId: req.requestId })
     } catch (error) {
       next(error)
@@ -308,6 +307,7 @@ router.patch(
               supplierId,
               orderId: req.params.id,
               deliveryStatus: body.status,
+              driverAssignmentId: body.driver_assignment_id ?? assignment?.id ?? null,
             })
           : null
       res.json({
@@ -693,7 +693,7 @@ router.post(
 router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (req, res) => {
   try {
     const tenant = await getRequestTenant(req)
-    let proof = null
+    let proofs = []
     if (tenant?.tenantType === 'SUPPLIER') {
       const supplierId = await resolveSupplierId(req)
       if (!supplierId) {
@@ -706,7 +706,9 @@ router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (r
       }
       const perms = req.tenantContext?.permissions ?? []
       const canView =
-        hasPermission(perms, P.FULFILLMENT_VIEW) || hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)
+        rolesIncludeOwner(req.tenantContext?.roles) ||
+        hasPermission(perms, P.FULFILLMENT_VIEW) ||
+        hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)
       if (!canView) {
         return res.status(403).json({
           ok: false,
@@ -715,15 +717,18 @@ router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (r
           requestId: req.requestId,
         })
       }
-      if (isDriverOnlyPermissions(perms)) {
-        await assertDriverAssignmentAccess({
-          userId: req.userData.id,
-          supplierId,
-          orderId: req.params.id,
-          permissions: perms,
-        })
-      }
-      proof = await getProofOfDelivery(req.params.id, supplierId)
+      const access = isDriverOnlyPermissions(perms)
+        ? await assertDriverAssignmentAccess({
+            userId: req.userData.id,
+            supplierId,
+            orderId: req.params.id,
+            permissions: perms,
+          })
+        : null
+      proofs = await listProofsOfDelivery(req.params.id, {
+        supplierId,
+        driverId: access?.driverId ?? null,
+      })
     } else if (tenant?.tenantType === 'RESTAURANT') {
       const perms = req.tenantContext?.permissions ?? []
       if (
@@ -738,7 +743,7 @@ router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (r
           requestId: req.requestId,
         })
       }
-      proof = await getProofOfDelivery(req.params.id, null, tenant.tenantId)
+      proofs = await listProofsOfDelivery(req.params.id, { restaurantId: tenant.tenantId })
     } else {
       return res.status(403).json({
         ok: false,
@@ -749,7 +754,7 @@ router.get('/:id/proof-of-delivery', requireAuth, resolveTenantContext, async (r
     }
     res.json({
       ok: true,
-      data: { proof },
+      data: { proof: proofs[0] ?? null, proofs },
       error: null,
       requestId: req.requestId,
     })
@@ -806,7 +811,10 @@ router.post(
           orderId: req.params.id,
           permissions: perms,
         })
-      } else if (hasPermission(perms, P.FULFILLMENT_MANAGE)) {
+      } else if (
+        hasPermission(perms, P.FULFILLMENT_MANAGE) ||
+        rolesIncludeOwner(req.tenantContext?.roles)
+      ) {
         const { getActiveDriverAssignment } = await import(
           '../services/driver-fulfillment.service.js'
         )
@@ -920,6 +928,7 @@ router.get('/:id/tracking', requireAuth, resolveTenantContext, async (req, res) 
           permissions: perms,
         })
       } else if (
+        !rolesIncludeOwner(req.tenantContext?.roles) &&
         !hasPermission(perms, P.FULFILLMENT_VIEW) &&
         !hasPermission(perms, P.DRIVER_DELIVERIES_VIEW) &&
         req.userData?.role !== 'ADMIN'

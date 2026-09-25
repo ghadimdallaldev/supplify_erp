@@ -17,6 +17,7 @@ vi.mock('../lib/rbac.js', () => ({
   requireAnyPermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRequestTenant: vi.fn(),
+  rolesIncludeOwner: (roles) => Array.isArray(roles) && roles.includes('Owner'),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -42,6 +43,7 @@ vi.mock('../services/driver-fulfillment.service.js', () => ({
   submitProofOfDelivery: vi.fn(),
   confirmProofOfDelivery: vi.fn(),
   getProofOfDelivery: vi.fn(),
+  listProofsOfDelivery: vi.fn().mockResolvedValue([]),
   getActiveDriverAssignment: vi.fn().mockResolvedValue({
     driver_id: 'driver-1',
     status: 'out_for_delivery',
@@ -87,6 +89,32 @@ describe('POST /api/orders/:id/location', () => {
         driverId: 'driver-1',
       })
     )
+    expect(res.body.data.stored).toBe(true)
+  })
+
+  it('records location for workspace Owner without fulfillment keys', async () => {
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test-req'
+      req.userData = { id: 'user-1', role: 'SUPPLIER' }
+      req.tenantContext = { permissions: [], roles: ['Owner'] }
+      next()
+    })
+    app.use('/api/orders', ordersDriverRoutes)
+    app.use(errorHandler)
+
+    recordDriverLocationMock.mockResolvedValueOnce({
+      trackingEnabled: true,
+      stored: true,
+    })
+
+    const res = await request(app)
+      .post('/api/orders/order-1/location')
+      .send({ latitude: 33.89, longitude: 35.5 })
+      .expect(200)
+
+    expect(recordDriverLocationMock).toHaveBeenCalled()
     expect(res.body.data.stored).toBe(true)
   })
 

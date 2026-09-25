@@ -51,6 +51,10 @@ describe('reports.service', () => {
       })
       expect(params.granularity).toBe('week')
       expect(params.branchId).toBe('branch-uuid')
+      expect(params.from.getFullYear()).toBe(2026)
+      expect(params.from.getMonth()).toBe(0)
+      expect(params.from.getDate()).toBe(1)
+      expect(params.from.getHours()).toBe(0)
     })
 
     it('rejects date ranges longer than MAX_REPORT_RANGE_DAYS', () => {
@@ -68,6 +72,20 @@ describe('reports.service', () => {
 
     it('rejects invalid granularity', () => {
       expect(() => parseReportQuery({ granularity: 'year' })).toThrow('granularity')
+    })
+
+    it('bounds a calendar day in the tenant timezone', () => {
+      const params = parseReportQuery(
+        { from: '2026-09-25', to: '2026-09-25' },
+        { timeZone: 'Asia/Beirut' }
+      )
+      expect(params.fromDate).toBe('2026-09-25')
+      expect(params.toDate).toBe('2026-09-25')
+      expect(params.from.toISOString()).toBe('2026-09-24T21:00:00.000Z')
+      expect(params.to.toISOString()).toBe('2026-09-25T20:59:59.999Z')
+      expect(dateBucketExpression('co.placed_at', 'day', 'Asia/Beirut')).toContain(
+        "AT TIME ZONE 'Asia/Beirut'"
+      )
     })
   })
 })

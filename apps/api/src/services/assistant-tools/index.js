@@ -22,6 +22,7 @@ import { listSupplierSuggestedDealCandidates } from '../supplier-suggested-deals
 import { listSupplierWarehousePerformance } from '../supplier-warehouse-performance-intelligence.service.js'
 import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-demand-forecast.service.js'
 import { getSupplierWeeklyIntelligenceSummary } from '../supplier-weekly-intelligence-summary.service.js'
+import { listCommonProductBestPrices } from '../supplier-price-comparison.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
 import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
@@ -38,7 +39,6 @@ import {
   restaurantOrgBranchComparison,
   restaurantOrgStockTransferSuggestions,
 } from '../org-reports.service.js'
-import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import {
   getIntelligenceTierForTenant,
   INTELLIGENCE_TIER_ORDER,
@@ -84,9 +84,11 @@ async function getRestaurantOrgScope(ctx) {
   ctx.restaurantOrgScopeResolved = true
   ctx.restaurantOrgScope = null
 
-  if (ctx.tenantType !== 'RESTAURANT' || !ctx.userId) return null
-  const membership = await getUserRestaurantOrgMembership(ctx.userId)
-  const organizationId = membership?.organization_id
+  if (ctx.tenantType !== 'RESTAURANT' || !ctx.tenantId) return null
+  const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+    ctx.tenantId,
+  ])
+  const organizationId = rows[0]?.organization_id
   if (!organizationId) return null
 
   const { rows: mainRows } = await query(
@@ -227,6 +229,50 @@ const TOOLS = {
       )
       return { inventory: inventoryRows[0] || null, orders: orderRows[0] || null }
     },
+  },
+
+  get_followed_suppliers: {
+    definition: {
+      name: 'get_followed_suppliers',
+      description:
+        'List the suppliers the current restaurant follows. Use for followed suppliers, following count, or supplier network questions.',
+      parameters: { type: 'object', properties: {} },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
+    run: async (ctx) => {
+      const { rows } = await query(
+        `SELECT DISTINCT ON (COALESCE(s.organization_id, s.id))
+          COALESCE(s.organization_id, s.id) AS "supplierId",
+          COALESCE(so.name, s.name) AS "supplierName",
+          sf.created_at AS "followedAt"
+         FROM supplier_follow sf
+         JOIN supplier s ON s.id = sf.supplier_id
+         LEFT JOIN supplier_organizations so ON so.id = s.organization_id
+         WHERE sf.restaurant_id = $1
+         ORDER BY COALESCE(s.organization_id, s.id), sf.created_at DESC`,
+        [ctx.tenantId]
+      )
+      return { count: rows.length, suppliers: cap(rows) }
+    },
+  },
+
+  compare_supplier_prices: {
+    definition: {
+      name: 'compare_supplier_prices',
+      description:
+        'Compare current like-for-like prices for products sold by at least two followed suppliers and identify the best price.',
+      parameters: {
+        type: 'object',
+        properties: { search: { type: 'string', description: 'Optional product or brand filter' } },
+      },
+    },
+    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
+    run: async (ctx, args) => ({
+      comparisons: await listCommonProductBestPrices(ctx.tenantId, {
+        search: String(args.search || ''),
+        limit: ROW_CAP,
+      }),
+    }),
   },
 
   get_reorder_need: {

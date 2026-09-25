@@ -3,6 +3,11 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockSupplierUser, clearAllMocks } from '../test/helpers.js'
 
+vi.mock('../lib/tenant-timezone.js', () => ({
+  getRestaurantTimezone: vi.fn(async () => 'Asia/Beirut'),
+  getSupplierTimezone: vi.fn(async () => 'Asia/Beirut'),
+}))
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   return {
@@ -170,7 +175,7 @@ describe('restaurant-pricing routes', () => {
     await request(app).get('/api/restaurant-pricing?status=expired')
 
     const listSql = query.mock.calls[0][0]
-    expect(listSql).toContain('rp.contract_end_date < CURRENT_DATE')
+    expect(listSql).toContain('rp.contract_end_date < (now() AT TIME ZONE $2)::date')
     expect(listSql).not.toMatch(/status = 'expired'.*is_active/)
   })
 

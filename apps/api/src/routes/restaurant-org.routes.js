@@ -3,6 +3,7 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   getRestaurantIdForRequest,
   requirePermission,
 } from '../lib/rbac.js'
@@ -15,6 +16,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
+import { presentRestaurant } from '../lib/tenant-profile-redaction.js'
 import {
   getUserRestaurantOrgMembership,
   listRestaurantOrgBranches,
@@ -86,14 +88,46 @@ async function requireRestaurantOrgContext(req, res, next) {
     })
   }
 
-  const membership = await getUserRestaurantOrgMembership(req.userData.id)
+  const requestedOrgId =
+    req.userData.role === 'ADMIN' && typeof req.query.organization_id === 'string'
+      ? req.query.organization_id.trim() || null
+      : null
+  const effectiveTenant = getEffectiveTenant(req)
 
-  let organizationId = membership?.organization_id
+  if (req.userData.role === 'ADMIN' && !effectiveTenant) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Impersonate a tenant to access this organization' },
+      requestId: req.requestId,
+    })
+  }
+
+  let membership = null
+  if (req.userData.role === 'RESTAURANT') {
+    membership = await getUserRestaurantOrgMembership(req.userData.id)
+    if (!membership) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'No organization membership' },
+        requestId: req.requestId,
+      })
+    }
+  }
+
+  let organizationId = membership?.organization_id || null
   let organizationName = membership?.organization_name || ''
   let primaryRestaurantId = null
 
-  if (req.userData.role === 'ADMIN' && req.query.organization_id) {
-    organizationId = req.query.organization_id
+  if (req.userData.role === 'ADMIN') {
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (restaurantId) {
+      const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
+        restaurantId,
+      ])
+      organizationId = rows[0]?.organization_id || null
+    }
   }
 
   if (organizationId) {
@@ -109,7 +143,7 @@ async function requireRestaurantOrgContext(req, res, next) {
       )
       primaryRestaurantId = anyBranch[0]?.id || null
     }
-  } else if (req.userData.role === 'RESTAURANT' || req.userData.role === 'ADMIN') {
+  } else if (req.userData.role === 'RESTAURANT') {
     const restaurantId = await getRestaurantIdForRequest(req)
     if (restaurantId) {
       const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
@@ -118,6 +152,24 @@ async function requireRestaurantOrgContext(req, res, next) {
       organizationId = rows[0]?.organization_id
       primaryRestaurantId = restaurantId
     }
+  }
+
+  if (requestedOrgId && effectiveTenant && organizationId !== requestedOrgId) {
+    return res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+      requestId: req.requestId,
+    })
+  }
+
+  if (req.userData.role === 'ADMIN' && !organizationId) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Organization context required' },
+      requestId: req.requestId,
+    })
   }
 
   if (organizationId && !organizationName) {
@@ -131,11 +183,12 @@ async function requireRestaurantOrgContext(req, res, next) {
   req.restaurantOrgContext = {
     organizationId,
     organizationName,
-    roleName: membership?.role_name || null,
+    roleName: req.userData.role === 'ADMIN' ? null : membership?.role_name || null,
     primaryRestaurantId,
-    isOrgOwner: membership?.role_name === 'Org Owner',
-    isOrgManager: membership?.role_name === 'Org Manager',
+    isOrgOwner: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Owner',
+    isOrgManager: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Manager',
     canManageAllBranches:
+      req.userData.role === 'ADMIN' ||
       membership?.role_name === 'Org Owner' ||
       membership?.role_name === 'Org Manager' ||
       membership?.role_name === 'Org Viewer',
@@ -166,8 +219,15 @@ async function listBranchesForRequest(req) {
 }
 
 async function assertRestaurantBranchAccess(req, restaurantId) {
-  if (req.userData?.role === 'ADMIN') return true
   if (!req.restaurantOrgContext?.organizationId) return false
+  if (req.userData?.role === 'ADMIN') {
+    if (!getEffectiveTenant(req)) return false
+    const { rows } = await query(
+      `SELECT 1 FROM restaurant WHERE id = $1 AND organization_id = $2`,
+      [restaurantId, req.restaurantOrgContext.organizationId]
+    )
+    return rows.length > 0
+  }
   return userHasRestaurantOrgBranchAccess(
     req.userData.id,
     restaurantId,
@@ -175,10 +235,20 @@ async function assertRestaurantBranchAccess(req, restaurantId) {
   )
 }
 
+function forbiddenBranch(res, req) {
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: { name: 'FORBIDDEN', message: 'Access denied for this branch' },
+    requestId: req.requestId,
+  })
+}
+
 router.use(
   requireAuth,
   requireRole(['RESTAURANT', 'ADMIN']),
   resolveTenantContext,
+  resolveAdminContext,
   requireRestaurantOrgContext,
   orgStructureGuard
 )
@@ -365,6 +435,14 @@ router.post('/branches', requireRestaurantOrgOwner, multiBranchFeature, async (r
 
 router.get('/branches/:restaurantId', async (req, res) => {
   try {
+    if (!req.restaurantOrgContext?.organizationId) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
     const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
     if (!allowed) {
       return res.status(403).json({
@@ -375,9 +453,10 @@ router.get('/branches/:restaurantId', async (req, res) => {
       })
     }
 
-    const { rows } = await query(`SELECT * FROM restaurant WHERE id = $1`, [
-      req.params.restaurantId,
-    ])
+    const { rows } = await query(
+      `SELECT * FROM restaurant WHERE id = $1 AND organization_id = $2`,
+      [req.params.restaurantId, req.restaurantOrgContext.organizationId]
+    )
     if (!rows.length) {
       return res.status(404).json({
         ok: false,
@@ -387,7 +466,16 @@ router.get('/branches/:restaurantId', async (req, res) => {
       })
     }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentRestaurant(req, rows[0], {
+          orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+        }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('GET /api/restaurant-org/branches/:id error:', error)
     res.status(500).json({
@@ -482,10 +570,25 @@ router.patch('/branches/:restaurantId', async (req, res) => {
     }
 
     if (!updates.length) {
-      const { rows } = await query(`SELECT * FROM restaurant WHERE id = $1`, [restaurantId])
+      const { rows } = await query(
+        `SELECT * FROM restaurant WHERE id = $1 AND organization_id = $2`,
+        [restaurantId, req.restaurantOrgContext.organizationId]
+      )
+      if (!rows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Branch not found' },
+          requestId: req.requestId,
+        })
+      }
       return res.json({
         ok: true,
-        data: { branch: rows[0] },
+        data: {
+          branch: presentRestaurant(req, rows[0], {
+            orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+          }),
+        },
         error: null,
         requestId: req.requestId,
       })
@@ -493,12 +596,31 @@ router.patch('/branches/:restaurantId', async (req, res) => {
 
     updates.push('updated_at = NOW()')
     values.push(restaurantId)
+    values.push(req.restaurantOrgContext.organizationId)
     const { rows } = await query(
-      `UPDATE restaurant SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE restaurant SET ${updates.join(', ')}
+       WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
       values
     )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentRestaurant(req, rows[0], {
+          orgOwner: Boolean(req.restaurantOrgContext?.isOrgOwner),
+        }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('PATCH /api/restaurant-org/branches/:id error:', error)
     res.status(500).json({
@@ -512,7 +634,13 @@ router.patch('/branches/:restaurantId', async (req, res) => {
 
 router.delete('/branches/:restaurantId', requireRestaurantOrgOwner, async (req, res) => {
   try {
-    const result = await deactivateRestaurantOrgBranch(req.params.restaurantId)
+    const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+    if (!allowed) return forbiddenBranch(res, req)
+
+    const result = await deactivateRestaurantOrgBranch(
+      req.params.restaurantId,
+      req.restaurantOrgContext.organizationId
+    )
     if (!result.ok) {
       const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
@@ -590,7 +718,13 @@ router.post(
         })
       }
 
-      const result = await reactivateRestaurantOrgBranch(req.params.restaurantId)
+      const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+      if (!allowed) return forbiddenBranch(res, req)
+
+      const result = await reactivateRestaurantOrgBranch(
+        req.params.restaurantId,
+        req.restaurantOrgContext.organizationId
+      )
       if (!result.ok) {
         const messages = {
           NOT_FOUND: 'Branch Account not found',
@@ -643,6 +777,9 @@ router.post(
 
 router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (req, res) => {
   try {
+    const allowed = await assertRestaurantBranchAccess(req, req.params.restaurantId)
+    if (!allowed) return forbiddenBranch(res, req)
+
     const { confirm } = req.body || {}
     if (confirm !== true && confirm !== 'unlink') {
       return res.status(400).json({
@@ -657,7 +794,10 @@ router.post('/branches/:restaurantId/unlink', requireRestaurantOrgOwner, async (
     }
 
     const result = await withTransaction(async (client) => {
-      const unlinked = await unlinkRestaurantFromOrganization(req.params.restaurantId, { client })
+      const unlinked = await unlinkRestaurantFromOrganization(req.params.restaurantId, {
+        client,
+        organizationId: req.restaurantOrgContext.organizationId,
+      })
       if (!unlinked.ok) return unlinked
 
       const billing = await applyOrgBillingOnUnlink(req.params.restaurantId, 'RESTAURANT', {
@@ -929,10 +1069,14 @@ router.post('/users/:userId/branches', requireRestaurantOrgOwner, async (req, re
       .json({ ok: true, data: { granted: true }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('POST restaurant-org user branch access error:', error)
-    res.status(500).json({
+    const status = error.code === 'NOT_FOUND' ? 404 : 500
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to grant branch access' },
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to grant branch access',
+      },
       requestId: req.requestId,
     })
   }
@@ -943,14 +1087,22 @@ router.delete(
   requireRestaurantOrgOwner,
   async (req, res) => {
     try {
-      await revokeRestaurantOrgBranchAccess(req.params.userId, req.params.restaurantId)
+      await revokeRestaurantOrgBranchAccess(
+        req.params.userId,
+        req.params.restaurantId,
+        req.restaurantOrgContext.organizationId
+      )
       res.json({ ok: true, data: { revoked: true }, error: null, requestId: req.requestId })
     } catch (error) {
       logger.error('DELETE restaurant-org user branch access error:', error)
-      res.status(500).json({
+      const status = error.code === 'NOT_FOUND' ? 404 : 500
+      res.status(status).json({
         ok: false,
         data: null,
-        error: { name: 'INTERNAL_ERROR', message: 'Failed to revoke branch access' },
+        error: {
+          name: error.code || 'INTERNAL_ERROR',
+          message: error.message || 'Failed to revoke branch access',
+        },
         requestId: req.requestId,
       })
     }

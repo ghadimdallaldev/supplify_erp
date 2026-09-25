@@ -8,6 +8,8 @@ Supplier create/edit contract-pricing sheets in both mobile apps are safe-area a
 
 End-to-end customer-specific (restaurant) contract pricing for Supplify.
 
+Contract and catalog amounts are shown in the contract currency. Catalog, favorites, quick lists, contract screens, quotes, and warehouse stock value use the current unit price (`min_qty` of 1 or less). A newer bulk tier does not replace that unit price. Contract start and end dates are calendar days (`YYYY-MM-DD`). Checkout and scheduled quick-list orders resolve the price on the delivery date that is stored on the order. An amendment keeps the order currency: a quantity change does not replace the unit price with a contract in another currency, and a substitute whose price is in another currency is rejected. Editing a contract can clear the minimum quantity, start date, discount, and notes. Adding the same restaurant and product again, including a bulk update, keeps those terms when the new request omits them, and the stored currency follows the catalog currency unless a non-USD currency is sent.
+
 ## Previous state
 
 - DB table `restaurant_pricing` existed (migration `0019_restaurant_pricing.sql`)
@@ -52,11 +54,11 @@ A contract applies when **all** are true:
 
 - `restaurant_id`, `supplier_id`, `product_id` match
 - `is_active = true`
-- `contract_start_date` is null or `<= as-of date` (checkout uses requested **delivery date** when present, else today)
+- `contract_start_date` is null or `<= as-of date` (checkout uses the requested **delivery date** when present, otherwise the restaurant's local day)
 - `contract_end_date` is null or `>= as-of date`
 - `min_order_quantity` is null or `<= order/catalog quantity`
 
-An omitted/null `contract_end_date` means the price is valid forever. The supplier editor exposes this explicitly as **Forever (no expiry)** and sends `null` when an existing expiry is cleared. Supplier contract-price rows are returned without the product catalog's default 20-row page limit. The web create dialog product picker searches by name/SKU and paginates (50 per page) so large catalogs are fully selectable.
+Restaurant and supplier contract lists judge active and expired rows against that viewer's local calendar day. An omitted/null `contract_end_date` means the price is valid forever. The supplier editor exposes this explicitly as **Forever (no expiry)** and sends `null` when an existing expiry is cleared. Supplier contract-price rows are returned without the product catalog's default 20-row page limit. The web create dialog product picker searches by name/SKU and paginates (50 per page) so large catalogs are fully selectable.
 
 ### Duplicate contracts
 

@@ -36,6 +36,9 @@ import {
   DEAL_STATUSES,
   PAYMENT_STATUSES,
   resolveScheduledOrActive,
+  resolveInitialDealStatus,
+  resolveResumeStatus,
+  getDealFieldError,
   isPendingAdminReview,
   shouldResetApprovalOnEdit,
 } from '../../services/deal-lifecycle.service.js'
@@ -159,7 +162,20 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
     if (body.submitForReview && !body.pricingKey) {
       throw new ValidationError('Select a boost package before submitting for approval')
     }
+    const fieldError = getDealFieldError({
+      description: body.description,
+      type: body.type,
+      discountValue: body.discountValue,
+      buyQuantity: body.buyQuantity,
+      getQuantity: body.getQuantity,
+      startsAt: body.startsAt,
+      endsAt: body.endsAt,
+      ctaType: body.ctaType ?? 'order_now',
+      couponCode: body.couponCode,
+    })
+    if (fieldError) throw new ValidationError(fieldError)
     const fields = mapPromotionInsertFields(body)
+    const initialStatus = resolveInitialDealStatus(Boolean(body.submitForReview))
     const promotion = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `
@@ -171,14 +187,10 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
           payment_status, submitted_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
-          CASE
-            WHEN $23 THEN 'pending_approval'
-            WHEN $22 THEN 'pending_approval'
-            ELSE 'draft'
-          END,
+          $24,
           $15,$16,$17,$18,$19,$20,$21,$22,
           'not_required',
-          CASE WHEN $23 OR $22 THEN NOW() ELSE NULL END
+          CASE WHEN $23 THEN NOW() ELSE NULL END
         )
         RETURNING *
         `,
@@ -206,6 +218,7 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
           fields.stockQuantity,
           fields.requiresAdminApproval,
           Boolean(body.submitForReview),
+          initialStatus,
         ]
       )
       const created = rows[0]
@@ -262,6 +275,23 @@ router.patch('/:id', async (req, res, next) => {
     if (existing.status === 'active' && body.discountValue !== undefined) {
       throw new ValidationError('Cannot change discount value on an active deal')
     }
+
+    const fieldError = getDealFieldError(
+      {
+        description: body.description !== undefined ? body.description : existing.description,
+        type: body.type ?? existing.type,
+        discountValue:
+          body.discountValue !== undefined ? body.discountValue : existing.discount_value,
+        buyQuantity: body.buyQuantity !== undefined ? body.buyQuantity : existing.buy_quantity,
+        getQuantity: body.getQuantity !== undefined ? body.getQuantity : existing.get_quantity,
+        startsAt: body.startsAt !== undefined ? body.startsAt : existing.starts_at,
+        endsAt: body.endsAt !== undefined ? body.endsAt : existing.ends_at,
+        ctaType: body.ctaType ?? existing.cta_type,
+        couponCode: body.couponCode !== undefined ? body.couponCode : existing.coupon_code,
+      },
+      { requireDescription: body.description !== undefined }
+    )
+    if (fieldError) throw new ValidationError(fieldError)
 
     const needsResubmit = shouldResetApprovalOnEdit(existing, body)
 
@@ -533,11 +563,20 @@ router.post('/:id/activate', async (req, res, next) => {
 router.post('/:id/pause', async (req, res, next) => {
   try {
     const supplierId = await getSupplierId(req)
-    await loadPromotionForSupplier(req.params.id, supplierId)
+    const existing = await loadPromotionForSupplier(req.params.id, supplierId)
+    if (!['active', 'scheduled'].includes(existing.status)) {
+      throw new ValidationError('Only live deals can be paused')
+    }
     const { rows } = await query(
       `UPDATE promotions SET status = 'paused', updated_at = NOW()
-       WHERE id = $1 AND supplier_id = $2 RETURNING *`,
+       WHERE id = $1 AND supplier_id = $2 AND status IN ('active', 'scheduled') RETURNING *`,
       [req.params.id, supplierId]
+    )
+    if (!rows.length) throw new ValidationError('Only live deals can be paused')
+    await query(
+      `UPDATE deal_promotions SET status = 'paused', updated_at = NOW()
+       WHERE deal_id = $1 AND status = 'active'`,
+      [req.params.id]
     )
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
@@ -553,15 +592,26 @@ router.post('/:id/resume', async (req, res, next) => {
     if (![PAYMENT_STATUSES.PAID, PAYMENT_STATUSES.NOT_REQUIRED].includes(existing.payment_status)) {
       throw new ValidationError('Deal cannot resume until activation payment is complete')
     }
-    const next = resolveScheduledOrActive(existing, {
-      payment_status: existing.payment_status || PAYMENT_STATUSES.NOT_REQUIRED,
-    })
+    const nextStatus = resolveResumeStatus(existing)
     const { rows } = await query(
       `UPDATE promotions SET status = $2, updated_at = NOW()
        WHERE id = $1 AND supplier_id = $3 AND status = 'paused' RETURNING *`,
-      [req.params.id, next.status, supplierId]
+      [req.params.id, nextStatus, supplierId]
     )
     if (!rows.length) throw new ValidationError('Deal is not paused')
+    if (nextStatus === DEAL_STATUSES.EXPIRED) {
+      await query(
+        `UPDATE deal_promotions SET status = 'expired', updated_at = NOW()
+         WHERE deal_id = $1 AND status = 'paused'`,
+        [req.params.id]
+      )
+    } else {
+      await query(
+        `UPDATE deal_promotions SET status = 'active', updated_at = NOW()
+         WHERE deal_id = $1 AND status = 'paused'`,
+        [req.params.id]
+      )
+    }
     res.json({ ok: true, data: { promotion: rows[0] }, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)

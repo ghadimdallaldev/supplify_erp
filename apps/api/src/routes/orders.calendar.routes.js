@@ -10,6 +10,8 @@ import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { getCache, setCache } from '../lib/cache.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
 
 const router = express.Router()
 
@@ -184,50 +186,32 @@ router.get(
         })
       }
 
-      // When admin is impersonating, use that tenant; otherwise resolve by role and email
+      // Active tenant only — never resolve another org by contact_email.
       const requestTenant = await getRequestTenant(req)
       let effectiveRole = userRole === 'ADMIN' ? params.role || 'RESTAURANT' : userRole
       let tenant
 
-      if (requestTenant) {
-        effectiveRole = requestTenant.tenantType
-        tenant = {
-          id: requestTenant.tenantId,
-          name: requestTenant.tenantName || requestTenant.tenantId,
-        }
-      } else {
-        const email = req.userData?.email
-        if (!email) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'INVALID_USER',
-              message: 'User email is required to determine organization context',
-            },
-            requestId: req.requestId,
-          })
-        }
-        const tenantQuery =
-          effectiveRole === 'RESTAURANT'
-            ? 'SELECT id, name FROM restaurant WHERE contact_email = $1 LIMIT 1'
-            : 'SELECT id, name FROM supplier WHERE contact_email = $1 LIMIT 1'
-        const tenantResult = await query(tenantQuery, [email])
-        if (tenantResult.rows.length === 0) {
-          return res.status(404).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'TENANT_NOT_FOUND',
-              message:
-                effectiveRole === 'RESTAURANT'
-                  ? 'Restaurant not found for user'
-                  : 'Supplier not found for user',
-            },
-            requestId: req.requestId,
-          })
-        }
-        tenant = tenantResult.rows[0]
+      if (!requestTenant?.tenantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'TENANT_NOT_FOUND',
+            message:
+              effectiveRole === 'RESTAURANT'
+                ? 'Restaurant not found for user'
+                : 'Supplier not found for user',
+          },
+          requestId: req.requestId,
+        })
+      }
+      effectiveRole = requestTenant.tenantType
+      tenant = {
+        id: requestTenant.tenantId,
+        name: requestTenant.tenantName || requestTenant.tenantId,
+      }
+      if (effectiveRole === 'RESTAURANT' && params.branch) {
+        await assertLegacyBranchOwnedByRestaurant(params.branch, tenant.id)
       }
       const startDate = params.start ? new Date(params.start) : null
       const endDate = params.end ? new Date(params.end) : null
@@ -473,7 +457,7 @@ router.get(
             ), ARRAY[]::text[]) AS categories
           FROM customer_order o
           JOIN restaurant r ON r.id = o.restaurant_id
-          ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id' : ''}
+          ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id' : ''}
           WHERE o.id = ANY($1::uuid[])
         `
         const orderDetailResult = await query(orderDetailSql, [orderIds])
@@ -607,6 +591,17 @@ router.get(
             name: 'VALIDATION_ERROR',
             message: 'Invalid calendar parameters',
             details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: error.message,
           },
           requestId: req.requestId,
         })

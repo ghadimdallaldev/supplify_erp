@@ -91,8 +91,8 @@ export function OnboardingNotificationsTab() {
     <>
       <div className="space-y-4">
         <SettingsSection
-          title="Notification preferences"
-          description="Choose how and when Supplify alerts you."
+          title={t('settings:notifications.restaurantPanel.title')}
+          description={t('settings:notifications.restaurantPanel.description')}
           footer={
             <Button onClick={handleSaveNotifications} disabled={isSavingNotificationPrefs}>
               {isSavingNotificationPrefs ? (
@@ -100,20 +100,24 @@ export function OnboardingNotificationsTab() {
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              {isSavingNotificationPrefs ? 'Saving…' : 'Save preferences'}
+              {isSavingNotificationPrefs
+                ? t('settings:notifications.saving')
+                : t('settings:notifications.restaurantPanel.save')}
             </Button>
           }
         >
           <div className="-mx-4 -mt-4 sm:-mx-5">
             <div className="border-b border-[var(--app-border)] px-4 py-3 sm:px-5">
-              <p className="text-xs font-semibold text-[var(--text-mid)]">Delivery methods</p>
+              <p className="text-xs font-semibold text-[var(--text-mid)]">
+                {t('settings:notifications.restaurantPanel.channels')}
+              </p>
             </div>
             <div className="divide-y divide-[var(--app-border)]">
-              {CHANNEL_FIELDS.map(({ key, label, description, icon }) => (
+              {CHANNEL_FIELDS.map(({ key, icon }) => (
                 <PreferenceToggleRow
                   key={key}
-                  label={label}
-                  description={description}
+                  label={t(`settings:notifications.fields.${key}.label`)}
+                  description={t(`settings:notifications.fields.${key}.description`)}
                   icon={icon}
                   checked={notificationPrefs[key]}
                   onCheckedChange={() => handleToggleNotification(key)}
@@ -122,14 +126,16 @@ export function OnboardingNotificationsTab() {
             </div>
 
             <div className="border-y border-[var(--app-border)] px-4 py-3 sm:px-5">
-              <p className="text-xs font-semibold text-[var(--text-mid)]">Notification types</p>
+              <p className="text-xs font-semibold text-[var(--text-mid)]">
+                {t('settings:notifications.restaurantPanel.types')}
+              </p>
             </div>
             <div className="divide-y divide-[var(--app-border)]">
-              {CATEGORY_FIELDS.map(({ key, label, description, icon }) => (
+              {CATEGORY_FIELDS.map(({ key, icon }) => (
                 <PreferenceToggleRow
                   key={key}
-                  label={label}
-                  description={description}
+                  label={t(`settings:notifications.fields.${key}.label`)}
+                  description={t(`settings:notifications.fields.${key}.description`)}
                   icon={icon}
                   checked={notificationPrefs[key]}
                   onCheckedChange={() => handleToggleNotification(key)}
@@ -140,9 +146,11 @@ export function OnboardingNotificationsTab() {
             {pushNotificationsEnabled ? (
               <>
                 <div className="border-b border-t border-[var(--app-border)] px-4 py-3 sm:px-5">
-                  <p className="text-xs font-semibold text-[var(--text-mid)]">Browser push</p>
+                  <p className="text-xs font-semibold text-[var(--text-mid)]">
+                    {t('settings:notifications.restaurantPanel.pushTitle')}
+                  </p>
                   <p className="mt-0.5 text-xs text-[var(--text-mid)]">
-                    Real-time alerts when Supplify is in the background.
+                    {t('settings:notifications.restaurantPanel.pushHint')}
                   </p>
                 </div>
                 <div className="px-4 py-4 sm:px-5">
@@ -150,23 +158,20 @@ export function OnboardingNotificationsTab() {
                     <div className="space-y-3">
                       {push.pushPermissionBlocked ? (
                         <div className="rounded-xl border border-[var(--amber)]/25 bg-[var(--amber-pale)] p-4 text-xs text-[var(--text)]">
-                          <p className="font-medium">Notifications blocked by your browser</p>
+                          <p className="font-medium">
+                            {t('settings:notifications.restaurantPanel.blockedTitle')}
+                          </p>
                           <p className="mt-1">{push.pushPermissionBlockedReason}</p>
                           <ol className="mt-2 list-decimal space-y-1 pl-4">
-                            <li>
-                              Click the <strong>lock / tune icon</strong> left of the address bar
-                            </li>
-                            <li>
-                              Open <strong>Permissions</strong> → set <strong>Notifications</strong>{' '}
-                              to <strong>Allow</strong>
-                            </li>
-                            <li>Reload this page, then click Enable below</li>
+                            <li>{t('settings:notifications.restaurantPanel.blockedStep1')}</li>
+                            <li>{t('settings:notifications.restaurantPanel.blockedStep2')}</li>
+                            <li>{t('settings:notifications.restaurantPanel.blockedStep3')}</li>
                           </ol>
                         </div>
                       ) : null}
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] px-4 py-3">
                         <span className="text-sm font-medium text-[var(--text)]">
-                          Enable push notifications
+                          {t('settings:notifications.restaurantPanel.enable')}
                         </span>
                         <Button
                           type="button"
@@ -189,9 +194,9 @@ export function OnboardingNotificationsTab() {
                           {push.subscribing || push.unsubscribing ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : push.subscribed ? (
-                            'Disable'
+                            t('settings:notifications.restaurantPanel.disableAction')
                           ) : (
-                            'Enable'
+                            t('settings:notifications.restaurantPanel.enableAction')
                           )}
                         </Button>
                       </div>
@@ -199,14 +204,14 @@ export function OnboardingNotificationsTab() {
                   ) : (
                     <p className="text-xs text-[var(--text-mid)]">
                       {push.pushUnavailableReason ||
-                        'Push is not configured on this server. Ask your admin to set VAPID keys on the API.'}
+                        t('settings:notifications.restaurantPanel.unavailable')}
                     </p>
                   )}
                 </div>
               </>
             ) : (
               <p className="border-t border-[var(--app-border)] px-4 py-4 text-xs text-[var(--text-mid)] sm:px-5">
-                Browser push is not included on your plan. Upgrade to enable real-time alerts.
+                {t('settings:notifications.restaurantPanel.notOnPlan')}
               </p>
             )}
           </div>

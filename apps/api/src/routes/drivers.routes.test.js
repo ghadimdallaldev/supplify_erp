@@ -36,6 +36,10 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+  assertWarehouseOwnedBySupplier: vi.fn().mockResolvedValue({ id: 'wh-1' }),
+}))
 
 describe('drivers routes', () => {
   let app
@@ -46,6 +50,8 @@ describe('drivers routes', () => {
     db = setupMocks()
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
+    const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+    vi.mocked(getWarehouseSupplierColumn).mockResolvedValue('supplier_id')
 
     const { driversRoutes } = await import('./drivers.routes.js')
     app = createMockApp(driversRoutes, {
@@ -68,6 +74,7 @@ describe('drivers routes', () => {
     expect(res.status).toBe(200)
     expect(res.body.data.drivers).toHaveLength(1)
     expect(res.body.data.drivers[0].full_name).toBe('Alex Driver')
+    expect(String(db.query.mock.calls[0][0])).toMatch(/w\.supplier_id = d\.supplier_id/)
   })
 
   it('DELETE /:id blocks when active deliveries exist', async () => {

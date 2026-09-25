@@ -74,6 +74,11 @@ vi.mock('../lib/logger.js', () => ({
   },
 }))
 
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+  assertWarehouseOwnedBySupplier: vi.fn().mockResolvedValue({ id: 'wh-1' }),
+}))
+
 vi.mock('../services/notification.service.js', () => ({
   notifyOrderStatusChange: vi.fn(),
   createNotification: vi.fn(),
@@ -186,6 +191,8 @@ describe('Orders Routes', () => {
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
     vi.mocked(dbModule.withTransaction).mockImplementation((handler) => db.withTransaction(handler))
+    const { getWarehouseSupplierColumn } = await import('../lib/warehouse-helpers.js')
+    vi.mocked(getWarehouseSupplierColumn).mockResolvedValue('supplier_id')
 
     app = express()
     app.use(express.json())
@@ -380,45 +387,85 @@ describe('Orders Routes', () => {
       expect(response.body.data.order.items).toHaveLength(1)
       expect(response.body.data.order.appliedPromotion).toBeNull()
     })
+  })
 
-    it('should include applied promotion when promotion_usages exists', async () => {
+  describe('GET /api/orders/:id/warehouses', () => {
+    it('returns warehouse assignments for the restaurant tenant', async () => {
       db.query
         .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'order-1',
-              restaurant_id: 'restaurant-1',
-              status: 'PLACED',
-              total_amount: 90,
-              restaurant_name: 'Test Restaurant',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'item-1',
-              order_id: 'order-1',
-              product_id: 'prod-1',
-              quantity: 10,
-              unit_price: 10,
-              product_name: 'Test Product',
-              product_sku: 'SKU001',
-            },
-          ],
+          rows: [{ id: 'order-1', restaurant_id: 'restaurant-1' }],
         })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              promotion_id: 'promo-1',
-              discount_applied: 10,
-              promotion_name: 'Summer Sale',
-              promotion_type: 'percentage_discount',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
+
+      const response = await request(app).get('/api/orders/order-1/warehouses').expect(200)
+      expect(response.body.data.assignments).toEqual([])
+    })
+
+    it('rejects an unscoped admin', async () => {
+      const adminApp = express()
+      adminApp.use(express.json())
+      adminApp.use((req, _res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+        next()
+      })
+      adminApp.use('/api/orders', ordersRoutes)
+
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'order-1', restaurant_id: 'restaurant-1' }],
+      })
+
+      const response = await request(adminApp).get('/api/orders/order-1/warehouses').expect(403)
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+  })
+
+  describe('GET /api/orders/:id remaining', () => {
+    it('should include applied promotion when promotion_usages exists', async () => {
+      db.query.mockImplementation((sql) => {
+        const text = String(sql)
+        if (text.includes('FROM customer_order o')) {
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'order-1',
+                restaurant_id: 'restaurant-1',
+                status: 'PLACED',
+                total_amount: 90,
+                restaurant_name: 'Test Restaurant',
+              },
+            ],
+          })
+        }
+        if (text.includes('FROM order_item oi')) {
+          return Promise.resolve({
+            rows: [
+              {
+                id: 'item-1',
+                order_id: 'order-1',
+                product_id: 'prod-1',
+                quantity: 10,
+                unit_price: 10,
+                product_name: 'Test Product',
+                product_sku: 'SKU001',
+              },
+            ],
+          })
+        }
+        if (text.includes('FROM promotion_usages')) {
+          return Promise.resolve({
+            rows: [
+              {
+                promotion_id: 'promo-1',
+                discount_applied: 10,
+                promotion_name: 'Summer Sale',
+                promotion_type: 'percentage_discount',
+              },
+            ],
+          })
+        }
+        return Promise.resolve({ rows: [] })
+      })
 
       const response = await request(app).get('/api/orders/order-1').expect(200)
 

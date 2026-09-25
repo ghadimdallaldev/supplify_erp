@@ -39,6 +39,7 @@ import {
   DASHBOARD_CALENDAR_EXTRA_GAP,
   buildOrderSpendTrend,
   dashboardKpiTone,
+  resolvePersonaKpiValue,
   SPEND_TREND_DAYS,
   type KpiCardProps,
   type SpendTrendPeriodDays,
@@ -314,7 +315,18 @@ export function DashboardPage() {
         .filter((kpi) => dashboardConfig.kpiKeys.includes(kpi.kpiKey))
         .map((kpi) => {
           const override = dashboardConfig.kpiLabels[kpi.kpiKey]
-          return override ? { ...kpi, label: override.label, meta: override.meta } : kpi
+          const personaValue = resolvePersonaKpiValue(
+            persona.id,
+            kpi.kpiKey,
+            stats,
+            formatCurrency,
+            t('kpi.zeroCurrency')
+          )
+          return {
+            ...kpi,
+            ...(override ? { label: override.label, meta: override.meta } : {}),
+            ...(personaValue !== undefined ? { value: personaValue } : {}),
+          }
         })
     : baseKpis
 

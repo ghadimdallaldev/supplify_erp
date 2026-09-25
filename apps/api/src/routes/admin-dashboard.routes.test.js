@@ -200,6 +200,7 @@ describe('Admin Dashboard Routes', () => {
     it('allows compatible Scale add-ons with catalog pricing', async () => {
       mockGetEntitlements.mockResolvedValueOnce({
         plan: { code: 'platinum', name: 'Supplier Scale' },
+        features: { feature_flags_access: 'addon_toggles' },
       })
       query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({
         rows: [
@@ -249,6 +250,24 @@ describe('Admin Dashboard Routes', () => {
 
       expect(res.body.ok).toBe(true)
       expect(res.body.data.cancelled).toBe(true)
+    })
+
+    it('rejects a new Scale add-on when feature flag access is off', async () => {
+      mockGetEntitlements.mockResolvedValueOnce({
+        plan: { code: 'platinum', name: 'Supplier Scale' },
+        features: { feature_flags_access: false },
+      })
+
+      const res = await request(app)
+        .put(
+          '/api/admin-dashboard/tenants/SUPPLIER/supplier-1/subscription-addons/supplier_extra_warehouse'
+        )
+        .send({ quantity: 1, reason: 'Admin override off' })
+        .expect(403)
+
+      expect(res.body.error.name).toBe('FEATURE_NOT_AVAILABLE')
+      expect(res.body.error.details.featureKey).toBe('feature_flags_access')
+      expect(query).not.toHaveBeenCalled()
     })
 
     it('rejects a positive restaurant_extra_branch quantity for Restaurant Scale', async () => {

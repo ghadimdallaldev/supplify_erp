@@ -99,6 +99,9 @@ describe('receiving.routes pending-orders', () => {
     expect(sql).toMatch(/status::text = ANY/)
     expect(params[1]).toContain('DELIVERED')
     expect(params[1]).toContain('COMPLETED')
+    expect(params[0]).toBe('rest-1')
+    expect(sql).not.toMatch(/FROM restaurant WHERE[\s\S]*contact_email/)
+    expect(sql).not.toMatch(/contact_email/)
   })
 })
 

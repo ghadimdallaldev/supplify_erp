@@ -2,7 +2,15 @@ import { Link } from 'react-router-dom'
 import { useGetRestaurantPayablesQuery } from '../../services/api'
 import { Skeleton } from '../ui/skeleton'
 import { Button } from '../ui/button'
-import { formatCurrency } from '../../utils/format'
+import { formatCurrency, formatPrice } from '../../utils/format'
+
+function labeledMoney(amount: number, currency?: string | null) {
+  const code = String(currency || '')
+    .trim()
+    .toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) return formatCurrency(amount, { currency: code })
+  return formatPrice(amount)
+}
 import { AlertTriangle } from 'lucide-react'
 
 const AGING_LABELS: Record<string, string> = {
@@ -11,6 +19,23 @@ const AGING_LABELS: Record<string, string> = {
   '8_30': '8–30 days',
   '31_60': '31–60 days',
   '60_plus': '60+ days',
+}
+
+function formatMoneyTotal(
+  value: number | null | undefined,
+  byCurrency?: Array<{
+    currency?: string
+    unpaidTotal?: number
+    overdueTotal?: number
+    dueThisWeekTotal?: number
+  }>,
+  field?: 'unpaidTotal' | 'overdueTotal' | 'dueThisWeekTotal'
+) {
+  if (field && byCurrency && byCurrency.length > 1) {
+    return byCurrency.map((row) => labeledMoney(row[field] ?? 0, row.currency)).join(' · ')
+  }
+  if (value == null) return '—'
+  return labeledMoney(value, byCurrency?.[0]?.currency)
 }
 
 function statusBadge(status: string, isOverdue: boolean) {
@@ -72,17 +97,17 @@ export function RestaurantPayablesPanel() {
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Stat
           label="Unpaid total"
-          value={formatCurrency(summary.unpaidTotal ?? 0)}
+          value={formatMoneyTotal(summary.unpaidTotal, summary.byCurrency, 'unpaidTotal')}
           testId="payables-unpaid"
         />
         <Stat
           label="Due this week"
-          value={formatCurrency(summary.dueThisWeekTotal ?? 0)}
+          value={formatMoneyTotal(summary.dueThisWeekTotal, summary.byCurrency, 'dueThisWeekTotal')}
           testId="payables-due-week"
         />
         <Stat
           label="Overdue"
-          value={formatCurrency(summary.overdueTotal ?? 0)}
+          value={formatMoneyTotal(summary.overdueTotal, summary.byCurrency, 'overdueTotal')}
           testId="payables-overdue"
         />
         <Stat
@@ -100,7 +125,13 @@ export function RestaurantPayablesPanel() {
         {Object.entries(AGING_LABELS).map(([key, label], i) => (
           <span key={key}>
             {i > 0 ? ' · ' : ''}
-            {label} {formatCurrency(aging[key] ?? 0)}
+            {label}{' '}
+            {aging[key] == null
+              ? '—'
+              : labeledMoney(
+                  aging[key],
+                  summary.byCurrency?.length === 1 ? summary.byCurrency[0].currency : null
+                )}
           </span>
         ))}
       </div>
@@ -118,11 +149,12 @@ export function RestaurantPayablesPanel() {
                 (creditor: {
                   supplierId: string
                   supplierName: string
+                  currency?: string
                   balanceDue: number
                   invoiceCount: number
                 }) => (
                   <li
-                    key={creditor.supplierId}
+                    key={`${creditor.supplierId}-${creditor.currency || 'USD'}`}
                     className="flex flex-wrap items-center gap-2 text-xs"
                   >
                     <Link
@@ -132,7 +164,8 @@ export function RestaurantPayablesPanel() {
                       {creditor.supplierName}
                     </Link>
                     <span className="text-[var(--text-muted)]">
-                      {formatCurrency(creditor.balanceDue)} · {creditor.invoiceCount} invoice
+                      {labeledMoney(creditor.balanceDue, creditor.currency)} ·{' '}
+                      {creditor.invoiceCount} invoice
                       {creditor.invoiceCount !== 1 ? 's' : ''}
                     </span>
                   </li>
@@ -165,6 +198,7 @@ export function RestaurantPayablesPanel() {
                     supplierName: string
                     dueDate: string
                     balanceDue: number
+                    currency?: string | null
                     status: string
                     isOverdue: boolean
                   }) => {
@@ -182,7 +216,7 @@ export function RestaurantPayablesPanel() {
                         </td>
                         <td className="px-3 py-2 text-[var(--text-muted)]">{inv.dueDate}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {formatCurrency(inv.balanceDue)}
+                          {labeledMoney(inv.balanceDue, inv.currency)}
                         </td>
                         <td className="px-3 py-2">
                           <span

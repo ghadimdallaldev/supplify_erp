@@ -113,10 +113,18 @@ export async function confirmProofOfDelivery(orderId, userId, restaurantId = nul
   const { rows } = await query(
     `UPDATE proof_of_delivery
      SET confirmed_by = $2, confirmed_at = now()
-     WHERE order_id = $1
+     WHERE order_id = $1 AND confirmed_at IS NULL
      RETURNING *`,
     [orderId, userId]
   )
-  if (!rows.length) throw new NotFoundError('Proof of delivery not found')
-  return rows[0]
+  if (rows.length) return rows[0]
+  const { rows: existing } = await query(
+    `SELECT * FROM proof_of_delivery
+     WHERE order_id = $1
+     ORDER BY delivery_timestamp DESC NULLS LAST, created_at DESC
+     LIMIT 1`,
+    [orderId]
+  )
+  if (!existing.length) throw new NotFoundError('Proof of delivery not found')
+  return existing[0]
 }

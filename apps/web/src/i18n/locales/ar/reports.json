@@ -8,6 +8,7 @@
     "planUnavailable": "التقارير غير متاحة في خطتك الحالية. تواصل مع الدعم إذا كان ذلك يبدو خطأً."
   },
   "reports": {
+    "currency": "العملة",
     "orderVolume": {
       "label": "حجم الطلبات",
       "columns": {
@@ -47,6 +48,74 @@
         "restaurantName": "المطعم",
         "revenue": "الإيرادات",
         "orderCount": "الطلبات"
+      }
+    },
+    "spendByCategory": {
+      "label": "الإنفاق حسب الفئة",
+      "columns": {
+        "category": "الفئة",
+        "totalSpend": "الإنفاق",
+        "orderCount": "الطلبات"
+      }
+    },
+    "cogsTrend": {
+      "label": "تكلفة البضاعة",
+      "columns": {
+        "period": "الفترة",
+        "cogs": "التكلفة"
+      }
+    },
+    "receivingQuality": {
+      "label": "جودة الاستلام",
+      "columns": {
+        "supplierName": "المورد",
+        "reportCount": "إيصالات",
+        "avgQuality": "متوسط الجودة",
+        "fillRate": "نسبة التعبئة %"
+      }
+    },
+    "waste": {
+      "label": "الهدر",
+      "columns": {
+        "period": "الفترة",
+        "category": "الفئة",
+        "incidents": "الحوادث",
+        "quantity": "الكمية",
+        "cost": "التكلفة"
+      }
+    },
+    "invoiceAging": {
+      "label": "أعمار الفواتير",
+      "columns": {
+        "bucket": "الفئة",
+        "invoiceCount": "الفواتير",
+        "balance": "الرصيد"
+      }
+    },
+    "supplierTopProducts": {
+      "label": "أهم المنتجات",
+      "columns": {
+        "productName": "المنتج",
+        "revenue": "الإيرادات",
+        "quantity": "الكمية"
+      }
+    },
+    "fulfillment": {
+      "label": "التنفيذ",
+      "columns": {
+        "status": "الحالة",
+        "orderCount": "الطلبات",
+        "completionRate": "نسبة الاكتمال %"
+      }
+    },
+    "invoiceCollection": {
+      "label": "التحصيل",
+      "columns": {
+        "status": "الحالة",
+        "invoiceCount": "الفواتير",
+        "totalAmount": "المفوتر",
+        "paid": "المدفوع",
+        "balance": "الرصيد"
       }
     }
   },

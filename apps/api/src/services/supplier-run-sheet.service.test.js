@@ -150,6 +150,7 @@ describe('supplier-run-sheet.service', () => {
     }))
     vi.doMock('../lib/db.js', () => ({
       query: vi.fn(async (sql) => {
+        if (/last_order_timezone/i.test(sql)) return { rows: [{ tz: 'UTC' }] }
         if (/FROM pick_list pl2/i.test(sql)) return { rows: [] }
         if (/COUNT\(\*\)::int AS count/i.test(sql)) return { rows: [{ count: 0 }] }
         if (/LIMIT 5/i.test(sql)) return { rows: [] }

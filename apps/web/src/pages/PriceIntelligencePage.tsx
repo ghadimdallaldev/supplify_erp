@@ -19,7 +19,16 @@ import {
   useGetCheaperBuyOptionsQuery,
   useGetPriceChangeAlertsQuery,
 } from '../services/api/endpoints/priceIntelligence'
-import { formatPrice } from '../utils/format'
+import { formatCurrency, formatPrice } from '../utils/format'
+
+function formatObservedPrice(amount: number | null | undefined, currency?: string | null) {
+  if (amount == null) return '—'
+  const code = String(currency || '')
+    .trim()
+    .toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) return formatCurrency(amount, { currency: code })
+  return formatPrice(amount)
+}
 
 const WINDOW_OPTIONS = [30, 90, 180] as const
 
@@ -50,14 +59,6 @@ export function PriceIntelligencePage() {
 
   const changes = useGetPriceChangeAlertsQuery({ days }, { skip: !hasAdvanced })
   const cheaper = useGetCheaperBuyOptionsQuery({ days }, { skip: !hasAdvanced })
-
-  const isLoading = changes.isLoading || cheaper.isLoading
-  const isError = changes.isError || cheaper.isError
-
-  const retry = () => {
-    void changes.refetch()
-    void cheaper.refetch()
-  }
 
   return (
     <RequirePermission permission="CATALOG_VIEW" title={t('priceIntelligence.title')}>
@@ -101,133 +102,147 @@ export function PriceIntelligencePage() {
           />
         )}
 
-        {hasAdvanced && isLoading && (
-          <div className="grid gap-4">
-            <Skeleton className="h-48 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
-          </div>
-        )}
-
-        {hasAdvanced && isError && (
-          <EmptyState
-            title={t('priceIntelligence.loadErrorTitle')}
-            description={t('priceIntelligence.loadErrorDesc')}
-            action={
-              <Button variant="outline" onClick={retry}>
-                {t('priceIntelligence.retry')}
-              </Button>
-            }
-          />
-        )}
-
-        {hasAdvanced && !isLoading && !isError && (
+        {hasAdvanced && (
           <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  {t('priceIntelligence.changes.title')}
-                </CardTitle>
-                <CardDescription>{t('priceIntelligence.changes.description')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!changes.data?.alerts.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t('priceIntelligence.changes.empty')}
-                  </p>
-                ) : (
-                  <TableScroll>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.product')}</th>
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.supplier')}</th>
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.was')}</th>
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.now')}</th>
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.change')}</th>
-                          <th className="py-2 pr-4">{t('priceIntelligence.changes.source')}</th>
-                          <th className="py-2">{t('priceIntelligence.changes.detected')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {changes.data.alerts.map((alert) => (
-                          <tr key={alert.id} className="border-b last:border-0">
-                            <td className="py-2 pr-4 font-medium">{alert.productName ?? '—'}</td>
-                            <td className="py-2 pr-4">{alert.supplierName ?? '—'}</td>
-                            <td className="py-2 pr-4">
-                              {alert.oldPrice != null ? formatPrice(alert.oldPrice) : '—'}
-                            </td>
-                            <td className="py-2 pr-4">
-                              {alert.newPrice != null ? formatPrice(alert.newPrice) : '—'}
-                            </td>
-                            <td className="py-2 pr-4">
-                              <Badge
-                                variant={alert.severity === 'high' ? 'destructive' : 'secondary'}
-                              >
-                                {formatPct(alert.changePct)}
-                              </Badge>
-                            </td>
-                            <td className="py-2 pr-4 text-muted-foreground">{alert.source}</td>
-                            <td className="py-2 text-muted-foreground">
-                              {formatDate(alert.detectedAt)}
-                            </td>
+            {changes.isLoading ? (
+              <Skeleton className="h-48 rounded-xl" />
+            ) : changes.isError ? (
+              <EmptyState
+                title={t('priceIntelligence.loadErrorTitle')}
+                description={t('priceIntelligence.loadErrorDesc')}
+                action={
+                  <Button variant="outline" onClick={() => void changes.refetch()}>
+                    {t('priceIntelligence.retry')}
+                  </Button>
+                }
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    {t('priceIntelligence.changes.title')}
+                  </CardTitle>
+                  <CardDescription>{t('priceIntelligence.changes.description')}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!changes.data?.alerts.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('priceIntelligence.changes.empty')}
+                    </p>
+                  ) : (
+                    <TableScroll>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.product')}</th>
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.supplier')}</th>
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.was')}</th>
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.now')}</th>
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.change')}</th>
+                            <th className="py-2 pr-4">{t('priceIntelligence.changes.source')}</th>
+                            <th className="py-2">{t('priceIntelligence.changes.detected')}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </TableScroll>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('priceIntelligence.cheaper.title')}</CardTitle>
-                <CardDescription>{t('priceIntelligence.cheaper.description')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!cheaper.data?.options.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t('priceIntelligence.cheaper.empty')}
-                  </p>
-                ) : (
-                  <ul className="grid gap-4">
-                    {cheaper.data.options.map((option) => (
-                      <li key={option.productId} className="rounded-lg border p-4">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-medium">{option.productName ?? '—'}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {t('priceIntelligence.cheaper.currentlyPaying')}{' '}
-                            {formatPrice(option.currentPrice)}
-                          </span>
-                        </div>
-                        <ul className="mt-3 grid gap-2">
-                          {option.alternatives.map((alt) => (
-                            <li
-                              key={`${alt.kind}-${alt.productId}`}
-                              className="flex flex-wrap items-center gap-2 text-sm"
-                            >
-                              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <Badge variant="outline">
-                                {alt.kind === 'contract_price'
-                                  ? t('priceIntelligence.cheaper.contractPrice')
-                                  : t('priceIntelligence.cheaper.supplierSubstitute')}
-                              </Badge>
-                              <span>{alt.productName ?? '—'}</span>
-                              <span className="font-medium">{formatPrice(alt.price)}</span>
-                              <span className="text-muted-foreground">
-                                {t('priceIntelligence.cheaper.saving')}{' '}
-                                {formatPrice(alt.savingPerUnit)}
-                              </span>
-                            </li>
+                        </thead>
+                        <tbody>
+                          {changes.data.alerts.map((alert) => (
+                            <tr key={alert.id} className="border-b last:border-0">
+                              <td className="py-2 pr-4 font-medium">{alert.productName ?? '—'}</td>
+                              <td className="py-2 pr-4">{alert.supplierName ?? '—'}</td>
+                              <td className="py-2 pr-4">
+                                {formatObservedPrice(alert.oldPrice, alert.currency)}
+                              </td>
+                              <td className="py-2 pr-4">
+                                {formatObservedPrice(alert.newPrice, alert.currency)}
+                              </td>
+                              <td className="py-2 pr-4">
+                                <Badge
+                                  variant={alert.severity === 'high' ? 'destructive' : 'secondary'}
+                                >
+                                  {formatPct(alert.changePct)}
+                                </Badge>
+                              </td>
+                              <td className="py-2 pr-4 text-muted-foreground">{alert.source}</td>
+                              <td className="py-2 text-muted-foreground">
+                                {formatDate(alert.detectedAt)}
+                              </td>
+                            </tr>
                           ))}
-                        </ul>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+                        </tbody>
+                      </table>
+                    </TableScroll>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {cheaper.isLoading ? (
+              <Skeleton className="h-48 rounded-xl" />
+            ) : cheaper.isError ? (
+              <EmptyState
+                title={t('priceIntelligence.loadErrorTitle')}
+                description={t('priceIntelligence.loadErrorDesc')}
+                action={
+                  <Button variant="outline" onClick={() => void cheaper.refetch()}>
+                    {t('priceIntelligence.retry')}
+                  </Button>
+                }
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('priceIntelligence.cheaper.title')}</CardTitle>
+                  <CardDescription>{t('priceIntelligence.cheaper.description')}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!cheaper.data?.options.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('priceIntelligence.cheaper.empty')}
+                    </p>
+                  ) : (
+                    <ul className="grid gap-4">
+                      {cheaper.data.options.map((option) => (
+                        <li key={option.productId} className="rounded-lg border p-4">
+                          <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <span className="font-medium">{option.productName ?? '—'}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {t('priceIntelligence.cheaper.currentlyPaying')}{' '}
+                              {formatObservedPrice(option.currentPrice, option.currency)}
+                            </span>
+                          </div>
+                          <ul className="mt-3 grid gap-2">
+                            {option.alternatives.map((alt) => (
+                              <li
+                                key={`${alt.kind}-${alt.productId}`}
+                                className="flex flex-wrap items-center gap-2 text-sm"
+                              >
+                                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <Badge variant="outline">
+                                  {alt.kind === 'contract_price'
+                                    ? t('priceIntelligence.cheaper.contractPrice')
+                                    : t('priceIntelligence.cheaper.supplierSubstitute')}
+                                </Badge>
+                                <span>{alt.productName ?? '—'}</span>
+                                <span className="font-medium">
+                                  {formatObservedPrice(alt.price, alt.currency || option.currency)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {t('priceIntelligence.cheaper.saving')}{' '}
+                                  {formatObservedPrice(
+                                    alt.savingPerUnit,
+                                    alt.currency || option.currency
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </PageShell>

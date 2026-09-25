@@ -2,6 +2,7 @@ import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { reservationsRoutes } from './reservations.routes.js'
+import { requireRestaurantId } from '../lib/tenant-resolve.js'
 
 const mockUser = {
   id: 'user-1',
@@ -52,6 +53,8 @@ describe('reservations.routes', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    queryMock.mockReset()
+    requireRestaurantId.mockResolvedValue('restaurant-1')
     app = express()
     app.use(express.json())
     app.use((req, res, next) => {
@@ -64,6 +67,7 @@ describe('reservations.routes', () => {
   it('returns reservation board data', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [] }) // fetchTables
+      .mockResolvedValueOnce({ rows: [{ timezone: 'Asia/Beirut' }] })
       .mockResolvedValueOnce({ rows: [] }) // fetchReservations
       .mockResolvedValueOnce({ rows: [] }) // waitlist
 
@@ -75,6 +79,7 @@ describe('reservations.routes', () => {
   it('creates reservation with auto-confirm when utilisation low', async () => {
     mockUser.role = 'RESTAURANT'
     queryMock
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 't1', capacity: 4, is_active: true }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
@@ -105,8 +110,21 @@ describe('reservations.routes', () => {
     expect(response.body.data.reservation.tables).toEqual(['t1'])
   })
 
+  it('rejects a staff booking on a blackout date', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ reason: 'Private event' }] })
+
+    const response = await request(app).post('/api/reservations').send({
+      customerName: 'Test Guest',
+      partySize: 2,
+      scheduledAt: new Date().toISOString(),
+    })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error.message).toBe('This date is closed: Private event')
+  })
+
   it('returns normalized tables on status update', async () => {
-    queryMock.mockResolvedValueOnce({
+    queryMock.mockResolvedValueOnce({ rows: [{ status: 'CONFIRMED' }] }).mockResolvedValueOnce({
       rows: [
         {
           id: 'res-1',
@@ -126,7 +144,7 @@ describe('reservations.routes', () => {
   })
 
   it('marks reservation NO_SHOW and sets no_show_marked_at', async () => {
-    queryMock.mockResolvedValueOnce({
+    queryMock.mockResolvedValueOnce({ rows: [{ status: 'CONFIRMED' }] }).mockResolvedValueOnce({
       rows: [
         {
           id: 'res-no-show',
@@ -148,6 +166,47 @@ describe('reservations.routes', () => {
       String(call[0]).includes('no_show_marked_at')
     )
     expect(updateCall?.[1]?.[0]).toBe('NO_SHOW')
+  })
+
+  it('refuses to restore a no-show onto a table that is already booked', async () => {
+    const tableId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    queryMock
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'res-no-show',
+            status: 'NO_SHOW',
+            tables: [tableId],
+            scheduled_at: new Date().toISOString(),
+            duration_minutes: 90,
+            party_size: 2,
+            branch_id: null,
+            guest_id: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'res-other',
+            status: 'CONFIRMED',
+            tables: [tableId],
+            scheduled_at: new Date().toISOString(),
+            duration_minutes: 90,
+            party_size: 2,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: tableId, capacity: 4, is_active: true }],
+      })
+
+    const response = await request(app)
+      .patch('/api/reservations/res-no-show')
+      .send({ status: 'CONFIRMED' })
+
+    expect(response.status).toBe(409)
+    expect(response.body.error.message).toMatch(/already booked/i)
   })
 
   it('lists reservation blackouts for the restaurant', async () => {
@@ -206,7 +265,10 @@ describe('reservations.routes', () => {
   it('filters board waitlist by branchId', async () => {
     const branchId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
     queryMock
+      .mockResolvedValueOnce({ rows: [{ id: branchId }] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: branchId }] })
+      .mockResolvedValueOnce({ rows: [{ timezone: 'Asia/Beirut' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
@@ -216,6 +278,19 @@ describe('reservations.routes', () => {
       String(call[0]).includes('reservation_waitlist')
     )
     expect(waitlistCall?.[0]).toContain('branch_id')
+  })
+
+  it('rejects a branchId that does not belong to the restaurant', async () => {
+    const branchId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    queryMock.mockResolvedValueOnce({ rows: [] })
+
+    const response = await request(app)
+      .get('/api/reservations/board')
+      .query({ branchId })
+      .expect(400)
+
+    expect(response.body.ok).toBe(false)
+    expect(response.body.error.message).toMatch(/Branch not found/)
   })
 
   it('returns guest intelligence summary', async () => {

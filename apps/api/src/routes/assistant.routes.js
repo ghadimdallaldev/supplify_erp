@@ -23,6 +23,22 @@ const router = express.Router()
 const messageSchema = z.object({
   conversationId: z.string().uuid().optional().nullable(),
   message: z.string().min(1).max(4000),
+  attachments: z
+    .array(
+      z.object({
+        fileUrl: z.string().url(),
+        fileType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+        fileName: z.string().min(1).max(255),
+        fileSize: z
+          .number()
+          .int()
+          .nonnegative()
+          .max(10 * 1024 * 1024)
+          .optional(),
+      })
+    )
+    .max(5)
+    .optional(),
 })
 
 /** Baseline: any workspace view permission (or Owner) can open the assistant. */

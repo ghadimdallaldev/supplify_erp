@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useStartSupportChatMutation } from '../../services/api'
+import { useEntitlements } from '../../hooks/useEntitlements'
+import { featureEnabled } from '../../lib/planLimits'
 import { Button } from '../ui/button'
 import { AppPanel } from '../ui/app-panel'
 import { Loader2 } from 'lucide-react'
@@ -10,6 +12,8 @@ import { ensureNamespace } from '../../i18n'
 
 export function SupportContactCard() {
   const { t } = useTranslation('settings')
+  const { entitlements, isLoading: entitlementsLoading } = useEntitlements()
+  const supportEnabled = featureEnabled(entitlements?.features?.support_sla)
   const [startSupport, { isLoading }] = useStartSupportChatMutation()
   const [conversationId, setConversationId] = useState<string | null>(null)
 
@@ -32,6 +36,8 @@ export function SupportContactCard() {
       toast.error(e?.data?.error?.message || t('support.toast.startFailed'))
     }
   }
+
+  if (entitlementsLoading || !supportEnabled) return null
 
   return (
     <AppPanel

@@ -1,8 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import {
-  getConsumerStatusLabels,
+  labelForConsumerStatus,
   type ConsumerOrderHistoryEntry,
-  type ConsumerOrderTrackingStatus,
 } from '../../lib/consumerOrderTracking'
 import type { ConsumerFulfillmentType } from '../../services/consumerApi'
 
@@ -17,15 +17,17 @@ export function OrderHistoryTimeline({
   fulfillmentType,
   className,
 }: OrderHistoryTimelineProps) {
+  const { t } = useTranslation('consumer')
   if (!history.length) return null
-
-  const labels = getConsumerStatusLabels(fulfillmentType)
 
   return (
     <ol className={cn('space-y-3', className)}>
       {history.map((entry, idx) => {
-        const label =
-          labels[entry.status as ConsumerOrderTrackingStatus] ?? entry.status.replace('_', ' ')
+        const label = labelForConsumerStatus(
+          (key, options) => t(key, options),
+          entry.status,
+          fulfillmentType
+        )
         return (
           <li key={`${entry.status}-${entry.created_at}-${idx}`} className="flex gap-3">
             <div className="flex flex-col items-center">

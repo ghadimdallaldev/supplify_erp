@@ -39,10 +39,26 @@ describe('consumer-ordering-hours', () => {
     ).toThrow(/schedule/i)
   })
 
+  it('rejects a preorder outside live hours', () => {
+    const now = new Date('2026-06-12T08:00:00')
+    expect(() => validateConsumerOrderSchedule(config, '2026-06-13T02:00:00', now)).toThrow(
+      /live hours/i
+    )
+  })
+
   it('accepts preorder at or after next live opening', () => {
     const now = new Date('2026-06-12T08:00:00')
     const status = validateConsumerOrderSchedule(config, '2026-06-12T12:30:00', now)
     expect(status.mode).toBe('PREORDER_ONLY')
+  })
+
+  it('uses the restaurant timezone instead of the server clock', () => {
+    expect(
+      isWithinLiveOrderWindow(new Date('2026-09-25T10:00:00.000Z'), '12:00', '00:00', 'Asia/Beirut')
+    ).toBe(true)
+    expect(
+      isWithinLiveOrderWindow(new Date('2026-09-25T07:00:00.000Z'), '12:00', '00:00', 'Asia/Beirut')
+    ).toBe(false)
   })
 
   it('allows ASAP during live window', () => {

@@ -55,6 +55,7 @@ vi.mock('../services/driver-fulfillment.service.js', () => ({
   completeDeliveryWithProof: (...args) => completeDeliveryWithProofMock(...args),
   confirmProofOfDelivery: vi.fn(),
   getProofOfDelivery: vi.fn(),
+  listProofsOfDelivery: vi.fn().mockResolvedValue([]),
   getActiveDriverAssignment: vi.fn(),
 }))
 

@@ -86,6 +86,7 @@
     "pay": "دفع",
     "emptyTitle": "لم يتم العثور على فواتير",
     "emptyDescription": "جرّب تعديل عوامل التصفية",
+    "loadMore": "تحميل المزيد من الفواتير",
     "statuses": {
       "ISSUED": "صادرة",
       "PARTIALLY_PAID": "مدفوعة جزئياً",

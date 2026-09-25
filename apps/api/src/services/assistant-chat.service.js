@@ -9,6 +9,12 @@ import { getLinkedDriverId } from '../lib/driver-rbac.js'
 import { isImpersonating } from '../lib/impersonation.js'
 import { hasPermission } from '../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
+import { resolveUploadKeyFromPublicUrl } from '../lib/sanitize-upload.js'
+import { getObjectStream } from './storage/storage.service.js'
+import {
+  assertCleanUploadOwnership,
+  ensureObjectCleanForRead,
+} from './storage/upload-security.service.js'
 
 const HISTORY_LIMIT = 10
 
@@ -92,7 +98,7 @@ export async function resolveAssistantEnabled(ctx) {
     return { enabled: false, reason: 'feature_disabled', quota: null }
   }
 
-  const quota = await getAiUsageSummary(ctx.tenantId, ctx.tenantType)
+  const quota = await getAiUsageSummary(ctx.tenantId, ctx.tenantType, ctx.userId)
   return { enabled: true, reason: null, quota }
 }
 
@@ -170,7 +176,7 @@ export async function listMessages(ctx, conversationId, { limit = 50 } = {}) {
 async function loadHistory(conversationId) {
   const { rows } = await query(
     `
-    SELECT role, content
+    SELECT role, content, tool_payload
     FROM assistant_message
     WHERE conversation_id = $1 AND role IN ('user', 'assistant')
     ORDER BY created_at DESC
@@ -178,7 +184,57 @@ async function loadHistory(conversationId) {
     `,
     [conversationId, HISTORY_LIMIT]
   )
-  return rows.reverse().map((r) => ({ role: r.role, content: r.content }))
+  return rows
+    .reverse()
+    .map((r) => ({ role: r.role, content: r.content, toolPayload: r.tool_payload }))
+}
+
+async function objectBodyToBuffer(body, maxBytes = 10 * 1024 * 1024) {
+  if (Buffer.isBuffer(body)) return body
+  if (body instanceof Uint8Array) return Buffer.from(body)
+  if (!body || typeof body[Symbol.asyncIterator] !== 'function') {
+    throw new ValidationError('Attached file could not be read')
+  }
+  const chunks = []
+  let total = 0
+  for await (const chunk of body) {
+    const value = Buffer.from(chunk)
+    total += value.length
+    if (total > maxBytes) throw new ValidationError('Attached file is too large')
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks, total)
+}
+
+async function prepareAssistantAttachments(ctx, attachments = []) {
+  const safe = []
+  const imageParts = []
+  for (const attachment of attachments) {
+    const fileKey = resolveUploadKeyFromPublicUrl(attachment.fileUrl)
+    await assertCleanUploadOwnership(fileKey, {
+      userId: ctx.userId,
+      tenantId: ctx.tenantId,
+      // Standalone admins do not have a tenant-scoped upload session.
+      tenantType: ctx.tenantId ? ctx.tenantType : null,
+    })
+    const item = {
+      fileUrl: attachment.fileUrl,
+      fileType: attachment.fileType,
+      fileName: attachment.fileName,
+      fileSize: attachment.fileSize || null,
+    }
+    safe.push(item)
+    if (attachment.fileType.startsWith('image/')) {
+      const object = await getObjectStream(fileKey)
+      const cleanObject = await ensureObjectCleanForRead(fileKey, object)
+      const body = await objectBodyToBuffer(cleanObject.body)
+      imageParts.push({
+        type: 'image_url',
+        image_url: { url: `data:${attachment.fileType};base64,${body.toString('base64')}` },
+      })
+    }
+  }
+  return { safe, imageParts }
 }
 
 async function insertMessage(conversationId, role, content, toolPayload = null) {
@@ -197,12 +253,16 @@ async function insertMessage(conversationId, role, content, toolPayload = null) 
 /**
  * Send a user message and get an assistant reply (tool-calling loop).
  */
-export async function sendAssistantMessage(req, { conversationId = null, message }) {
+export async function sendAssistantMessage(
+  req,
+  { conversationId = null, message, attachments = [] }
+) {
   const text = String(message || '').trim()
   if (!text) throw new ValidationError('message is required')
   if (text.length > 4000) throw new ValidationError('message is too long')
 
   const ctx = await buildAssistantContext(req)
+  const preparedAttachments = await prepareAssistantAttachments(ctx, attachments)
   const gate = await resolveAssistantEnabled(ctx)
   if (!gate.enabled) {
     throw new ForbiddenError(
@@ -231,7 +291,12 @@ export async function sendAssistantMessage(req, { conversationId = null, message
     convId = conv.id
   }
 
-  await insertMessage(convId, 'user', text)
+  await insertMessage(
+    convId,
+    'user',
+    text,
+    preparedAttachments.safe.length ? { attachments: preparedAttachments.safe } : null
+  )
 
   // Platform admins are not metered against a tenant plan.
   let usage = null
@@ -239,7 +304,7 @@ export async function sendAssistantMessage(req, { conversationId = null, message
   const meterType = ctx.isAdmin && !ctx.isImpersonating ? null : ctx.tenantType
 
   if (meterTenant && meterType) {
-    usage = await reserveAiUsage(meterTenant, meterType, 1)
+    usage = await reserveAiUsage(meterTenant, meterType, 1, ctx.userId)
     if (!usage.allowed) {
       await insertMessage(
         convId,
@@ -265,6 +330,18 @@ export async function sendAssistantMessage(req, { conversationId = null, message
   const history = await loadHistory(convId)
   // History already includes the just-inserted user message; use it as messages.
   const messages = history.map((m) => ({ role: m.role, content: m.content }))
+  if (preparedAttachments.imageParts.length && messages.length) {
+    messages[messages.length - 1] = {
+      role: 'user',
+      content: [{ type: 'text', text }, ...preparedAttachments.imageParts],
+    }
+  } else if (preparedAttachments.safe.length && messages.length) {
+    const names = preparedAttachments.safe.map((item) => item.fileName).join(', ')
+    messages[messages.length - 1] = {
+      role: 'user',
+      content: `${text}\n\nAttached files: ${names}.`,
+    }
+  }
 
   try {
     const result = await provider.completeWithTools({
@@ -289,7 +366,8 @@ export async function sendAssistantMessage(req, { conversationId = null, message
       latencyMs: result.latencyMs,
     })
 
-    const quota = meterTenant && meterType ? await getAiUsageSummary(meterTenant, meterType) : null
+    const quota =
+      meterTenant && meterType ? await getAiUsageSummary(meterTenant, meterType, ctx.userId) : null
 
     return {
       conversationId: convId,

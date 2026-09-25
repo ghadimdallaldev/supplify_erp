@@ -49,6 +49,11 @@ vi.mock('../lib/rbac.js', () => ({
       })
     },
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
+  resolveAdminContext: (req, res, next) => next(),
+}))
+
+vi.mock('../lib/impersonation.js', () => ({
+  getEffectiveTenant: vi.fn(() => null),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -68,6 +73,7 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 import restaurantInvitationsRoutes from './restaurant-invitations.routes.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 
 describe('restaurant-invitations.routes members', () => {
   let app
@@ -131,5 +137,33 @@ describe('restaurant-invitations.routes members', () => {
       })
       .expect(403)
     expect(res.body.error.name).toBe('FORBIDDEN')
+  })
+})
+
+describe('restaurant-invitations.routes branches', () => {
+  it('rejects an impersonating admin querying another organization', async () => {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+      req.tenantContext = {
+        tenantId: 'restaurant-1',
+        tenantType: 'RESTAURANT',
+        permissions: ['STAFF_INVITE'],
+      }
+      next()
+    })
+    adminApp.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
+
+    getEffectiveTenant.mockReturnValueOnce({
+      tenantId: 'restaurant-1',
+      tenantType: 'RESTAURANT',
+    })
+
+    const res = await request(adminApp)
+      .get('/api/restaurants/invitations/branches?organization_id=org-foreign')
+      .expect(400)
+    expect(res.body.error.name).toBe('BAD_REQUEST')
   })
 })

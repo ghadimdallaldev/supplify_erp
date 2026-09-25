@@ -6,12 +6,10 @@ import { Sidebar } from '../components/Sidebar'
 vi.mock('./usePermissions', () => ({
   usePermissions: () => ({
     can: (key: string) =>
-      ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'ORDERS_VIEW', 'INVENTORY_VIEW'].includes(
-        key
-      ),
+      ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'INVENTORY_VIEW'].includes(key),
     canAny: (...keys: string[]) =>
       keys.some((k) =>
-        ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'ORDERS_VIEW'].includes(k)
+        ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'INVENTORY_VIEW'].includes(k)
       ),
     isViewOnly: () => false,
     isWorkspaceViewer: false,
@@ -24,7 +22,7 @@ vi.mock('./redux', () => ({
       auth: {
         user: {
           role: 'SUPPLIER',
-          tenantPermissions: ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'ORDERS_VIEW'],
+          tenantPermissions: ['CATALOG_VIEW', 'CATALOG_EDIT', 'CATALOG_MANAGE', 'INVENTORY_VIEW'],
           workspace: { roleName: 'Catalog Manager' },
         },
       },
@@ -66,6 +64,7 @@ describe('catalog manager sidebar', () => {
       </MemoryRouter>
     )
     expect(screen.getByTestId('nav-products')).toBeInTheDocument()
+    expect(screen.queryByTestId('nav-command-center')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-invoices')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument()
   })

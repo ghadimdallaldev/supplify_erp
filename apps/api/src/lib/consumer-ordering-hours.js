@@ -4,6 +4,15 @@
  */
 
 import { t, resolveLocale } from '../i18n/index.js'
+import { addCalendarDays, getZonedParts } from './delivery-rollover-time.js'
+import { zonedDateAtHour } from './reservation-board-date.js'
+
+function clockMinutes(now, timeZone) {
+  if (!timeZone) return now.getHours() * 60 + now.getMinutes()
+  const parts = getZonedParts(now, timeZone)
+  const hour = parts.hour === 24 ? 0 : parts.hour
+  return hour * 60 + parts.minute
+}
 
 /** @param {string | undefined | null} timeStr */
 export function parseTimeToMinutes(timeStr) {
@@ -49,9 +58,9 @@ export function normalizeOrderingHoursConfig(config) {
  * @param {string} startTime HH:mm
  * @param {string} endTime HH:mm (00:00 = until midnight when start > morning)
  */
-export function isWithinLiveOrderWindow(now, startTime, endTime) {
+export function isWithinLiveOrderWindow(now, startTime, endTime, timeZone) {
   const startMin = parseTimeToMinutes(startTime) ?? 12 * 60
-  const currentMin = now.getHours() * 60 + now.getMinutes()
+  const currentMin = clockMinutes(now, timeZone)
 
   if (endTimeIsEndOfDay(endTime) && startMin > 0) {
     return currentMin >= startMin
@@ -74,8 +83,16 @@ export function isWithinLiveOrderWindow(now, startTime, endTime) {
  * @param {Date} now
  * @param {string} startTime
  */
-export function getNextLiveOrderStart(now, startTime) {
+export function getNextLiveOrderStart(now, startTime, timeZone) {
   const startMin = parseTimeToMinutes(startTime) ?? 12 * 60
+  if (timeZone) {
+    const parts = getZonedParts(now, timeZone)
+    const hour = parts.hour === 24 ? 0 : parts.hour
+    const currentMin = hour * 60 + parts.minute
+    const clock = Math.floor(startMin / 60) + (startMin % 60) / 60
+    const day = currentMin < startMin ? parts.calendarDate : addCalendarDays(parts.calendarDate, 1)
+    return zonedDateAtHour(day, clock, timeZone)
+  }
   const next = new Date(now)
   next.setSeconds(0, 0)
   next.setMilliseconds(0)
@@ -97,12 +114,12 @@ export function getNextLiveOrderStart(now, startTime) {
  * @param {Date} [now]
  * @param {string} [locale]
  */
-export function resolveConsumerOrderingStatus(config, now = new Date(), locale = 'en') {
+export function resolveConsumerOrderingStatus(config, now = new Date(), locale = 'en', timeZone) {
   const lng = resolveLocale(locale)
   const { liveOrderStart, liveOrderEnd, allowPreordersOutsideLiveHours } =
     normalizeOrderingHoursConfig(config)
 
-  const isLive = isWithinLiveOrderWindow(now, liveOrderStart, liveOrderEnd)
+  const isLive = isWithinLiveOrderWindow(now, liveOrderStart, liveOrderEnd, timeZone)
   const endLabel = endTimeIsEndOfDay(liveOrderEnd)
     ? t('consumer.ordering.midnight', lng)
     : liveOrderEnd
@@ -121,7 +138,7 @@ export function resolveConsumerOrderingStatus(config, now = new Date(), locale =
     }
   }
 
-  const nextLiveOrderAt = getNextLiveOrderStart(now, liveOrderStart)
+  const nextLiveOrderAt = getNextLiveOrderStart(now, liveOrderStart, timeZone)
 
   if (allowPreordersOutsideLiveHours) {
     return {
@@ -154,14 +171,24 @@ export function resolveConsumerOrderingStatus(config, now = new Date(), locale =
  * @param {Date} [now]
  * @param {string} [locale]
  */
+function assertScheduledInsideLiveHours(scheduled, status, lng, startLabel, timeZone) {
+  if (isWithinLiveOrderWindow(scheduled, status.liveOrderStart, status.liveOrderEnd, timeZone))
+    return
+  throw Object.assign(
+    new Error(t('consumer.ordering.scheduleOutsideHours', lng, { start: startLabel })),
+    { name: 'ORDERING_SCHEDULE_OUTSIDE_HOURS', code: 'scheduleOutsideHours' }
+  )
+}
+
 export function validateConsumerOrderSchedule(
   config,
   scheduledFor,
   now = new Date(),
-  locale = 'en'
+  locale = 'en',
+  timeZone
 ) {
   const lng = resolveLocale(locale)
-  const status = resolveConsumerOrderingStatus(config, now, lng)
+  const status = resolveConsumerOrderingStatus(config, now, lng, timeZone)
   const startLabel = formatMinutesToTime(parseTimeToMinutes(status.liveOrderStart) ?? 12 * 60)
 
   if (status.mode === 'LIVE') {
@@ -175,6 +202,7 @@ export function validateConsumerOrderSchedule(
         code: 'scheduleInvalid',
       })
     }
+    assertScheduledInsideLiveHours(scheduled, status, lng, startLabel, timeZone)
     return status
   }
 
@@ -196,6 +224,7 @@ export function validateConsumerOrderSchedule(
         { name: 'ORDERING_SCHEDULE_TOO_EARLY', code: 'scheduleTooEarly' }
       )
     }
+    assertScheduledInsideLiveHours(scheduled, status, lng, startLabel, timeZone)
     return status
   }
 

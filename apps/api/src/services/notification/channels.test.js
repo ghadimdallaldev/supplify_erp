@@ -23,6 +23,11 @@ describe('resolveAllowedChannels', () => {
     expect(channels.has('webhook')).toBe(true)
   })
 
+  it('explicit off disables every channel', () => {
+    expect([...resolveAllowedChannels(false)]).toEqual([])
+    expect([...resolveAllowedChannels('disabled')]).toEqual([])
+  })
+
   it('unknown/undefined → safe default of in-app only', () => {
     expect([...resolveAllowedChannels(undefined)]).toEqual(['in_app'])
     expect([...resolveAllowedChannels('bogus')]).toEqual(['in_app'])

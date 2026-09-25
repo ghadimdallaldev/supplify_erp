@@ -1,5 +1,6 @@
 import { query, withTransaction } from '../lib/db.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { assertLegacyBranchesOwnedByRestaurant } from '../lib/branch-scope.js'
 import {
   calculateRecipeCost,
   persistRecipeCalculation,
@@ -256,7 +257,10 @@ async function insertIngredients(client, recipeId, ingredients) {
   }
 }
 
-async function syncBranches(client, recipeId, branchIds = []) {
+async function syncBranches(client, restaurantId, recipeId, branchIds = []) {
+  await assertLegacyBranchesOwnedByRestaurant(branchIds, restaurantId, {
+    db: (sql, params) => client.query(sql, params),
+  })
   await client.query(`DELETE FROM recipe_branches WHERE recipe_id = $1`, [recipeId])
   for (const branchId of branchIds) {
     if (!branchId) continue
@@ -298,7 +302,7 @@ export async function createRecipe(restaurantId, input, userId = null) {
       ]
     )
     const recipe = rows[0]
-    await syncBranches(client, recipe.id, input.branchIds || [])
+    await syncBranches(client, restaurantId, recipe.id, input.branchIds || [])
     if (input.ingredients?.length) {
       await insertIngredients(client, recipe.id, input.ingredients)
     }
@@ -365,7 +369,7 @@ export async function updateRecipe(restaurantId, recipeId, input, userId = null)
     }
 
     if (input.branchIds !== undefined) {
-      await syncBranches(client, recipeId, input.branchIds)
+      await syncBranches(client, restaurantId, recipeId, input.branchIds)
     }
 
     if (input.ingredients !== undefined) {

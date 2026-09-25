@@ -50,7 +50,8 @@ Usage counters update automatically when:
 
 ### Reset Schedule
 
-- **Daily counters** (orders, chats, `ai_requests_per_day`): reset at midnight UTC
+- **Daily counters** (orders, chats): reset at midnight UTC and are shared by the tenant
+- **`ai_requests_per_day`**: same midnight UTC reset, counted separately for each user
 - **Daily limits**: reset at midnight UTC
 - **Period counters** (branches, warehouses, products): never reset (cumulative)
 
@@ -101,7 +102,7 @@ When usage reaches **100% of limit**:
 
 ### AI assist (`ai_requests_per_day`)
 
-Restaurant-only meter (migration `0167`). Counts successful LLM attempts on `POST /reorder-assistance/explain` and `ask`; heuristic fallbacks when `ai_platform` is off or env has no provider do **not** increment.
+Each user gets the plan limit on their own (migration `0217_ai_usage_per_user.sql`, table `user_ai_request_usage`). A Scale allowance of 300 means user A can use 300 and user B can use 300 on the same tenant. The assistant and reorder LLM share that per-user pool. Counts successful LLM attempts on the assistant and on `POST /reorder-assistance/explain` and `ask`; heuristic fallbacks when `ai_platform` is off or env has no provider do **not** increment.
 
 - **80%:** Entitlements / usage UI shows warning badge (same pattern as other daily meters).
 - **100%:** `explain` returns heuristic summary with `usageLimited: true` (200). `ask` returns **400** `VALIDATION_ERROR` (“Daily AI assist limit reached for your plan”). Core reorder assistance and forecasts remain available.

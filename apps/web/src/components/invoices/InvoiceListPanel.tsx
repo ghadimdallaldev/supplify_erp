@@ -6,8 +6,12 @@ import { Button } from '../ui/button'
 import { StatusBadge } from '../ui/status-badge'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { TableScroll } from '../ui/table-scroll'
-import { formatPrice } from '../../utils/format'
-import { invoiceRemainingBalance } from '../../lib/invoiceBalance'
+import { formatCurrency } from '../../utils/format'
+import {
+  formatCalendarDate,
+  invoiceRemainingBalance,
+  invoiceIsOverdue,
+} from '../../lib/invoiceBalance'
 import { CardActionGrid, cardActionBtnClass, splitRowClass } from '../ui/card-layout'
 
 type InvoiceListPanelProps = {
@@ -94,9 +98,7 @@ export function InvoiceListPanel({
             <div className="space-y-4 lg:hidden">
               {filteredInvoices.map((invoice: any) => {
                 const remaining = invoiceRemainingBalance(invoice)
-                const isOverdue =
-                  invoice.days_overdue > 0 ||
-                  (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)
+                const isOverdue = invoiceIsOverdue(invoice)
 
                 return (
                   <div
@@ -136,22 +138,24 @@ export function InvoiceListPanel({
                         </p>
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
                           <span>
-                            {t('list.invoiceDate')}:{' '}
-                            {new Date(invoice.invoice_date).toLocaleDateString()}
+                            {t('list.invoiceDate')}: {formatCalendarDate(invoice.invoice_date)}
                           </span>
                           <span>
-                            {t('list.dueDate')}: {new Date(invoice.due_date).toLocaleDateString()}
+                            {t('list.dueDate')}: {formatCalendarDate(invoice.due_date)}
                           </span>
                         </div>
                       </div>
                       <div className="shrink-0 text-start sm:text-end">
                         <p className="text-lg font-semibold tabular-nums">
-                          {formatPrice(invoice.total_amount)}
+                          {formatCurrency(invoice.total_amount, {
+                            currency: invoice.currency || 'USD',
+                          })}
                         </p>
                         <p
                           className={`text-sm ${remaining > 0 ? 'font-semibold text-[var(--red)]' : 'text-[var(--mint)]'}`}
                         >
-                          {t('list.balance')}: {formatPrice(remaining)}
+                          {t('list.balance')}:{' '}
+                          {formatCurrency(remaining, { currency: invoice.currency || 'USD' })}
                         </p>
                       </div>
                     </div>
@@ -230,9 +234,7 @@ export function InvoiceListPanel({
                 <tbody>
                   {filteredInvoices.map((invoice: any) => {
                     const remaining = invoiceRemainingBalance(invoice)
-                    const isOverdue =
-                      invoice.days_overdue > 0 ||
-                      (invoice.due_date && new Date(invoice.due_date) < new Date() && remaining > 0)
+                    const isOverdue = invoiceIsOverdue(invoice)
 
                     return (
                       <tr
@@ -255,17 +257,19 @@ export function InvoiceListPanel({
                           />
                         </td>
                         <td className="hidden px-4 py-3 xl:table-cell">
-                          {new Date(invoice.due_date).toLocaleDateString()}
+                          {formatCalendarDate(invoice.due_date)}
                         </td>
                         <td
                           className={`hidden px-4 py-3 text-end tabular-nums lg:table-cell ${
                             remaining > 0 ? 'font-semibold text-[var(--red)]' : 'text-[var(--mint)]'
                           }`}
                         >
-                          {formatPrice(remaining)}
+                          {formatCurrency(remaining, { currency: invoice.currency || 'USD' })}
                         </td>
                         <td className="px-4 py-3 text-end tabular-nums font-semibold">
-                          {formatPrice(invoice.total_amount)}
+                          {formatCurrency(invoice.total_amount, {
+                            currency: invoice.currency || 'USD',
+                          })}
                         </td>
                         <td
                           className="px-4 py-3 pr-5 text-end"

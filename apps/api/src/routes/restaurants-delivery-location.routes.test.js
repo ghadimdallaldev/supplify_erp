@@ -20,7 +20,9 @@ vi.mock('../lib/rbac.js', () => ({
     }
     next()
   },
+  resolveAdminContext: (_req, _res, next) => next(),
   requirePermission: () => (_req, _res, next) => next(),
+  requireAnyPermission: () => (_req, _res, next) => next(),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
 }))
 

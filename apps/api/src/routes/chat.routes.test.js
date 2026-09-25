@@ -29,6 +29,7 @@ vi.mock('../lib/rbac.js', () => ({
     next()
   },
   requirePermission: () => (req, res, next) => next(),
+  resolveAdminContext: (_req, _res, next) => next(),
   requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue({
     tenantId: 'rest-1',
@@ -176,10 +177,28 @@ describe('Chat Routes', () => {
       expect(response.body.data.messages).toBeDefined()
       expect(response.body.data.messages).toHaveLength(1)
       expect(response.body.data.messages[0].content).toBe('Hi')
+      expect(String(db.query.mock.calls[2][0])).toContain('file_url AS "fileUrl"')
     })
   })
 
   describe('POST /api/chat/conversations/:conversationId/messages', () => {
+    it('rejects more than five attachments', async () => {
+      const response = await request(app)
+        .post('/api/chat/conversations/conv-1/messages')
+        .send({
+          content: 'Files',
+          attachments: Array.from({ length: 6 }, (_, index) => ({
+            fileUrl: `https://files.example/uploads/${mockUser.id}/file-${index}.pdf`,
+            fileType: 'application/pdf',
+            fileName: `file-${index}.pdf`,
+            fileSize: 100,
+          })),
+        })
+        .expect(400)
+
+      expect(response.body.error?.name).toBe('VALIDATION_ERROR')
+    })
+
     it('should send a message', async () => {
       // Sync db mocks for this test
       const dbModule = await import('../lib/db.js')

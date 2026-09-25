@@ -32,6 +32,7 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
   requireOwnership: () => (req, res, next) => next(),
@@ -115,6 +116,8 @@ describe('Prices Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.prices).toHaveLength(1)
+      const sql = String(db.query.mock.calls[0][0])
+      expect(sql).not.toMatch(/contact_email/)
     })
   })
 
@@ -144,6 +147,48 @@ describe('Prices Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.price.amount).toBe(10.5)
+    })
+
+    it('allows catalog staff whose email is not the supplier contact', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: productId, supplier_id: 'supplier-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'price-2', product_id: productId, amount: 12, currency: 'USD' }],
+        })
+
+      const response = await request(app)
+        .post('/api/prices')
+        .send({
+          productId,
+          amount: 12,
+          currency: 'USD',
+          minQty: 1,
+        })
+        .expect(201)
+
+      expect(response.body.data.price.amount).toBe(12)
+    })
+
+    it('rejects creating a price for another supplier product', async () => {
+      const productId = '550e8400-e29b-41d4-a716-446655440000'
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: productId, supplier_id: 'supplier-other' }],
+      })
+
+      const response = await request(app)
+        .post('/api/prices')
+        .send({
+          productId,
+          amount: 12,
+          currency: 'USD',
+          minQty: 1,
+        })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
     })
   })
 })

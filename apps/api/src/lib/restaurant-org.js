@@ -222,6 +222,12 @@ export async function userHasRestaurantOrgBranchAccess(userId, restaurantId, org
   const membership = await getUserRestaurantOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return false
 
+  const { rows: tenantRows } = await query(
+    `SELECT 1 FROM restaurant WHERE id = $1 AND organization_id = $2`,
+    [restaurantId, organizationId]
+  )
+  if (!tenantRows.length) return false
+
   const { rows: roleRows } = await query(
     `
     SELECT rorp.branch_scope, ror.name
@@ -338,6 +344,15 @@ export async function grantRestaurantOrgBranchAccess({
   organizationId,
   grantedBy = null,
 }) {
+  const { rows: owned } = await query(
+    `SELECT 1 FROM restaurant WHERE id = $1 AND organization_id = $2`,
+    [restaurantId, organizationId]
+  )
+  if (!owned.length) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
+  }
   await query(
     `
     INSERT INTO restaurant_org_user_branch_access (user_id, restaurant_id, organization_id, granted_by)
@@ -349,17 +364,27 @@ export async function grantRestaurantOrgBranchAccess({
   await invalidateRestaurantOrgPermissionCaches(userId, organizationId)
 }
 
-export async function revokeRestaurantOrgBranchAccess(userId, restaurantId) {
-  const { rows } = await query(`SELECT organization_id FROM restaurant WHERE id = $1`, [
-    restaurantId,
-  ])
-  await query(
-    `DELETE FROM restaurant_org_user_branch_access WHERE user_id = $1 AND restaurant_id = $2`,
-    [userId, restaurantId]
-  )
-  if (rows[0]?.organization_id) {
-    await invalidateRestaurantOrgPermissionCaches(userId, rows[0].organization_id)
+export async function revokeRestaurantOrgBranchAccess(userId, restaurantId, organizationId) {
+  if (!organizationId) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
   }
+  const { rows: owned } = await query(
+    `SELECT 1 FROM restaurant WHERE id = $1 AND organization_id = $2`,
+    [restaurantId, organizationId]
+  )
+  if (!owned.length) {
+    const error = new Error('Branch is not part of this organization')
+    error.code = 'NOT_FOUND'
+    throw error
+  }
+  await query(
+    `DELETE FROM restaurant_org_user_branch_access
+     WHERE user_id = $1 AND restaurant_id = $2 AND organization_id = $3`,
+    [userId, restaurantId, organizationId]
+  )
+  await invalidateRestaurantOrgPermissionCaches(userId, organizationId)
 }
 
 export async function invalidateRestaurantOrgPermissionCaches(userId, organizationId) {
@@ -445,12 +470,15 @@ export async function restaurantBranchHasPendingOrders(restaurantId) {
   return Number(rows[0]?.count || 0) > 0
 }
 
-export async function deactivateRestaurantOrgBranch(restaurantId) {
+export async function deactivateRestaurantOrgBranch(restaurantId, organizationId = null) {
   const { rows } = await query(
     `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1`,
     [restaurantId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (organizationId && rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
 
   const { getRestaurantDeactivationBlockers, invalidateCachesForRestaurantBranchLifecycle } =
@@ -474,12 +502,15 @@ export async function deactivateRestaurantOrgBranch(restaurantId) {
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
-export async function reactivateRestaurantOrgBranch(restaurantId) {
+export async function reactivateRestaurantOrgBranch(restaurantId, organizationId = null) {
   const { rows } = await query(
     `SELECT is_main_branch, organization_id, is_branch_active FROM restaurant WHERE id = $1`,
     [restaurantId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (organizationId && rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
   if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
   await query(
@@ -499,10 +530,16 @@ export async function reactivateRestaurantOrgBranch(restaurantId) {
  * Unlink a Branch Account from its organization. Retains the tenant and history.
  * Clears org branch access rows for this restaurant.
  */
-export async function unlinkRestaurantFromOrganization(restaurantId, { client = null } = {}) {
+export async function unlinkRestaurantFromOrganization(
+  restaurantId,
+  { client = null, organizationId = null } = {}
+) {
   if (!client)
     return withTransaction((transactionClient) =>
-      unlinkRestaurantFromOrganization(restaurantId, { client: transactionClient })
+      unlinkRestaurantFromOrganization(restaurantId, {
+        client: transactionClient,
+        organizationId,
+      })
     )
   const db = (sql, params) => client.query(sql, params)
   const { rows } = await db(
@@ -510,10 +547,12 @@ export async function unlinkRestaurantFromOrganization(restaurantId, { client = 
     [restaurantId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
+  if (!organizationId || rows[0].organization_id !== organizationId) {
+    return { ok: false, reason: 'NOT_FOUND' }
+  }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
 
-  const organizationId = rows[0].organization_id
   await db(`DELETE FROM restaurant_org_user_branch_access WHERE restaurant_id = $1`, [restaurantId])
   await db(
     `UPDATE restaurant

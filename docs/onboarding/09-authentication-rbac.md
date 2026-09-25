@@ -233,6 +233,7 @@ Platform admins (`app_user.role = 'ADMIN'`) use the **legacy `role` / `permissio
 | `/plans`, `/subscriptions`, `/usage`, limits | `ADMIN_PLANS`       |
 | `/tenants`                                   | `ADMIN_TENANTS`     |
 | `/users`, `/impersonate`                     | `ADMIN_SUPPORT`     |
+| `/api/chat/admin/*`, support admin-join      | `ADMIN_SUPPORT`     |
 | `/feature-flags`, overrides                  | `ADMIN_GROWTH`      |
 | default                                      | `ADMIN_ACCESS`      |
 
@@ -295,7 +296,7 @@ sequenceDiagram
 | Permissions | View-as role permissions, or Owner fallback — **no blanket bypass** in `requirePermission` |
 | Cleared on  | logout, login, successful OAuth callback                                                   |
 
-Frontend: `useImpersonation()` + `usePermissions()` — impersonating admin uses `tenantPermissions` from `/auth/me` when hydrated.
+Frontend: `useImpersonation()` + `usePermissions()` — impersonating admin uses `tenantPermissions` from `/auth/me` when hydrated. `/api/org` and `/api/restaurant-org` bind organization from the impersonated tenant, not leftover personal org membership on the admin user. Unscoped ADMIN cannot use `active_tenant_token` leftover membership to become a supplier/restaurant tenant.
 
 ---
 

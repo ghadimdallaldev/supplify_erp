@@ -8,7 +8,7 @@ The session API is disabled by default. Enable `GPS_TRACKING_SESSIONS_ENABLED=tr
 
 ## Driver flow
 
-1. Start `POST /api/driver/tracking-sessions` from an assigned driver account.
+1. Start `POST /api/driver/tracking-sessions` from an assigned driver account (`DRIVER_DELIVERIES_MANAGE`, or workspace Owner with a linked driver profile).
 2. Send points to `POST /api/driver/tracking-sessions/:sessionId/locations` or batch them at `/locations/batch`.
 3. Send a heartbeat when no location point is available.
 4. Stop with `POST /api/driver/tracking-sessions/:sessionId/stop` when the run ends.
@@ -25,4 +25,4 @@ See `apps/api/src/config/env.js` for server defaults and the deployment environm
 
 ## Compatibility
 
-The legacy `POST /api/orders/:id/location` endpoint remains available. Existing status transitions, supplier/restaurant visibility rules, Leaflet maps, and route/stop records are unchanged.
+The legacy `POST /api/orders/:id/location` endpoint remains available. Workspace Owner may ping it without `FULFILLMENT_MANAGE` in the permission list (same as `requireAnyPermission`). Existing status transitions, supplier/restaurant visibility rules, Leaflet maps, and route/stop records are unchanged.

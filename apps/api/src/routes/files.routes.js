@@ -10,7 +10,7 @@ import {
   getRequestTenant,
 } from '../lib/rbac.js'
 import { verifyObjectAccess } from '../lib/object-download-auth.js'
-import { filesUploadGuard } from '../lib/route-permissions.js'
+import { filesUploadGuard, filesPresignGuard } from '../lib/route-permissions.js'
 import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
@@ -240,7 +240,7 @@ router.post(
   uploadPresignLimiter,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
   resolveTenantContext,
-  filesUploadGuard,
+  filesPresignGuard,
   async (req, res) => {
     try {
       const { fileName, fileType, fileSize } = req.body
@@ -430,19 +430,17 @@ router.post(
         })
       }
 
-      if (req.userData.role === 'SUPPLIER') {
-        const ownSupplierId = await getSupplierIdForRequest(req)
-        if (!ownSupplierId || products[0].supplier_id !== ownSupplierId) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied. You can only attach files to your own products',
-            },
-            requestId: req.requestId,
-          })
-        }
+      const ownSupplierId = await getSupplierIdForRequest(req)
+      if (!ownSupplierId || products[0].supplier_id !== ownSupplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied. You can only attach files to your own products',
+          },
+          requestId: req.requestId,
+        })
       }
 
       const supplierId = products[0].supplier_id

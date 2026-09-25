@@ -2,6 +2,235 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-25 — Admin org context follows impersonation (server + web)
+
+- **API:** Platform ADMIN `/api/org` and `/api/restaurant-org` bind organization from the impersonated supplier/restaurant, not leftover personal org membership. Unscoped ADMIN cannot bind a leftover personal tenant from `active_tenant_token` (REST or sockets). Assistant restaurant org tools use the current restaurant’s `organization_id`.
+- **Web:** Warehouse list queries skip without `WAREHOUSES_VIEW` (pick lists, warehouse/zones settings, order transfer picker). Catalog Adjust Stock is shown only with `INVENTORY_EDIT`.
+- **Mobile:** Skipped — native apps do not mount org admin impersonation or these warehouse/catalog settings tabs.
+
+---
+
+## 2026-09-25 — Profile save buttons match SETTINGS_EDIT (web-only)
+
+- **Web:** Restaurant onboarding profile save, supplier profile save, and supplier contacts save are disabled without `SETTINGS_EDIT` (same as the PATCH APIs).
+- **Mobile:** Skipped — native apps do not mount these web settings tabs.
+
+---
+
+## 2026-09-25 — Checkout delivery-location GET and warehouse UI permission match (web + API)
+
+- **API:** `GET /api/restaurants/me/delivery-locations` accepts `SETTINGS_VIEW`, `ORDERS_VIEW`, or `ORDERS_CREATE` so Purchaser checkout can list branch pins. PATCH remains `SETTINGS_EDIT`.
+- **Web:** Inventory adjust/settings actions require `INVENTORY_EDIT`. Supplier settings delivery/drivers tabs and warehouse fulfillment simulate/toggle skip APIs the role cannot call.
+- **Mobile:** Skipped for UI — Android/iOS cart already calls the same GET; Purchaser no longer 403s. Delivery-location save still needs `SETTINGS_EDIT` (unchanged).
+
+---
+
+## 2026-09-25 — Restaurant and supplier settings fields that did not save
+
+- **API:** `PATCH /api/restaurants/:id` accepts `taxId`, `vatNumber`, and `deliveryInstructions`. `PATCH /api/suppliers/:id` accepts `legalName` and `tradeLicenseNo`. These map to columns that already existed.
+- **Web:** Restaurant and supplier settings now send those values on save. Website and description inputs were removed because those columns do not exist. The legacy branch dialog no longer asks for delivery instructions that the linked-account create path does not store. Restaurant notification settings use the settings translations, and the reorder-cadence toggle is accepted by `PATCH /api/notifications/preferences` so it persists to `notify_reorder_cadence`.
+- **Mobile:** Skipped — Android and iOS do not edit these profile fields. The new keys are optional on existing PATCH bodies.
+
+---
+
+## 2026-09-25 — Warehouse-mode inventory adjustments (server-only)
+
+- **API:** Warehouse-mode product PATCH and IN/OUT adjustments apply to `warehouse_inventory` (default or named warehouse) and then mirror the aggregate into legacy `inventory`. A stale legacy row can no longer wipe warehouse stock. Order amendments require a restaurant or supplier tenant.
+- **Mobile:** Skipped — same endpoints and payloads. Native inventory clients keep sending `warehouseId` optionally; insufficient stock at that warehouse now returns 400 instead of clamping another warehouse’s qty.
+
+---
+
+## 2026-09-25 — Command center, analytics, run sheet, and reports correctness
+
+- **API:** Command-center “orders to prepare today” and the run sheet’s default date use the supplier last-order timezone. Run sheet access matches the web page (`ORDERS_MANAGE`, `FULFILLMENT_VIEW`, `INVOICES_VIEW`, or driver deliveries). Dashboard summary `v2` adds role metrics: orders today, open receivables, debtor and overdue counts, assigned and in-progress deliveries, 30-day spend, recent invoice spend, and billed-order count. Supplier fulfillment performance reports an overall completion rate instead of 0/100 per status.
+- **Web:** Analytics KPI cards use those role metrics (finance balance, warehouse orders today, 30-day spend, assigned deliveries). The supplier order-status chart labels the residual bucket “Other”. Reports shows the full restaurant and supplier set, with receiving, waste, and invoice tabs gated by permission or feature, and product quantity reads `total_qty`. The run sheet date picker uses the local calendar day.
+- **Mobile:** Skipped — Android and iOS do not call command center, run sheet, dashboard summary, or `/api/reports`. Extra summary fields are additive if a client appears later.
+
+---
+
+## 2026-09-25 — Restaurant price intelligence, invoices, contract prices, and reports
+
+- **API:** Cheaper-buy options only quote a contract that applies at quantity 1 and a substitute price that is already in effect, and they are not dropped before a saving is known. Price-history totals use the full window, not the page. Contract dates are returned as calendar days. Checkout and scheduled orders price on the delivery date that will be stored. Quantity amendments reprice against that delivery date and update `pricing_source`. A payment cannot revive a void or draft invoice, an omitted cash amount still pays the remainder, and an explicit `0` does not invent a cash payment. Expense totals no longer multiply by the number of payments. Cash-on-delivery terms are due immediately. Report date filters use the calendar day, invoice aging is open balance as of the end date, supplier order volume includes line revenue, and supplier branch revenue respects the period and status filters. Migration `0220` keeps void invoices void and keeps past-due partial payments overdue.
+- **Web:** Credit notes show `credit_amount`. Credit-only payment no longer sends the leftover cash amount. Invoice due dates use the calendar day. Supplier addresses render as text. Contract edits can clear a minimum, a start date, a discount, and notes. Scheduled contracts stay visible as scheduled and can be deactivated. Price-intelligence cards fail independently. Org overview analytics read the unwrapped report payload. Report presets use the local calendar day.
+- **Mobile:** Skipped. Native clients do not mount price intelligence, contract-price management, org analytics, or the invoice payment dialog. Existing invoice and report list calls keep the same paths; supplier order volume adds `total_amount`, report rows include `currency` and are no longer summed across currencies, and contract date fields are still `YYYY-MM-DD`. Partial-receive invoices prorate promotions from accepted quantity at the ordered price. Manual invoices reject a zero total, keep tax-included prices from being taxed again, and use the order currency. Overdue notices quote the open balance and are stamped only after the notification is sent. Cheaper-buy suggestions skip a contract or substitute priced in a different currency from the latest order. Invoice outstanding, overdue, receivables, payables, and supplier statements stay split by currency. A statement opening balance is what was still owed before the start date, and an applied credit is not subtracted twice. A credit note or cash payment cannot pay an invoice in another currency. Price history does not average a currency change into a percentage move. Price alerts and cheaper buys show that currency. An order amendment does not apply a contract or substitute price from another currency. Supplier fulfillment reports leave out orders that are still waiting for approval. Catalog and price-comparison screens use the current unit price, and a bulk tier is not ranked against a unit price. Supplier invoice collection leaves out void and draft invoices. Invoice, due, and payment dates are calendar days (`YYYY-MM-DD`) on list, detail, payables, receivables, statements, and CSV. A credit payment requires a credit note. Invoice and contract amounts display in their own currency. Price-history summaries include that currency, and report money cells use the row currency. A contract end date defaults to the local calendar day. Restaurant and supplier reports use the tenant timezone for order windows and date buckets. Organization reports count each branch on that branch's own calendar day. Invoice overdue days, expense windows, and the overdue job use the restaurant's local calendar day. Credit notes offered on an invoice match that invoice's currency. Payables and receivables aging uses the restaurant or supplier local day. Contract lists treat a price as active or expired on that viewer's local day. Cheaper-buy contracts and invoice-anomaly windows use the restaurant's local day. A contract price with no delivery date is judged on that same local day. Report summary totals do not label a cost that has no currency as USD. Invoice overdue and statement totals are one amount per currency, and a missing currency is not shown as USD. Overdue badges follow the restaurant's day count. A price-intelligence amount with no currency stays a plain number. A new invoice uses the tax rate in effect on the supplier's local day. Payment lists return the payment date as a calendar day.
+
+---
+
+## 2026-09-25 — Supplier–restaurant fulfillment correctness
+
+- **API:** A dispute invoice must belong to that order. Route creation locks the order and allocates the route number from the day's highest suffix. Driver-built routes follow `scheduled_delivery_date`. Driver delivery detail uses that driver's live stop and returns the order reference and requested time. Zone routing matches the rule's zone. Completing a pick wave packs only that list's warehouse leg. Warehouse assignment locks stock before choosing a location. A substitution amendment and its fulfillment issue commit together; notifications go out after that commit. Accepting an amendment supersedes the warehouse leg released for that change, so the replacement reservation is the one that can be delivered. Dispute lines must belong to the order, and credit amounts cannot exceed that supplier's total. An untied driver delivery cannot mark every warehouse leg delivered. Dispatch `has_pod` and the live route follow the driver assignment on that card. Adding an order to a route locks it so a concurrent route cannot take the same order. Planning that route does not take a warehouse leg another driver already holds, and it does not reset a leg this driver has already picked up. Removing a stop or cancelling a route releases only that route's driver, so another warehouse leg stays assigned. Retrying a failed delivery that was not tied to one warehouse leg replaces only the failed legs and leaves delivered lines reserved where they already succeeded. Postal-code zones match after spacing and case are normalized, and rings-format polygon holes stay outside the zone. Dispatch and route area labels use a zone only when the delivery destination is inside it, using the order snapshot, then the branch, then the restaurant. Branch zones use that same match. Delivery-status `hasPod` follows the driver leg named on the update. Restaurant confirmation leaves already-confirmed proofs unchanged. Route overview delivered-today counts skip an order that still has an open driver leg. Reassign locks the order and the driver leg before inserting the replacement. Receiving an order with an expiry date stores the order branch on the inventory lot. Opening a dispute locks the order so a second active dispute cannot be created, and each order item can appear only once. Replacement quantities for the same line are combined and capped at the ordered quantity. Warehouse transfer allows acknowledged and processing orders, and zone eligibility uses the delivery snapshot's nested address, then the branch, then the restaurant. An untied driver dispatch or failure with several open warehouse legs requires `warehouse_assignment_id` and does not commit or release every leg. A whole-order warehouse leg no longer commits or releases lines that already belong to their own warehouse assignment. Completing a route stop updates only that route's driver, and a route with no driver cannot change its stops. A stop leaving the warehouse moves only that driver's live tracking session. Mobile request fields are unchanged. Proof of delivery is one row per driver leg (migration `0219`); a retry updates that leg and cannot replace another leg's proof. The proof GET returns every leg in `proofs` and keeps `proof` as the latest; a driver account only sees that driver's proofs. Marking a leg delivered checks that leg's proof. Live tracking moves `current_stop_id` when a stop goes in transit. GPS pings attach to the caller's assignment and driver. Credit-note numbers take the next numeric suffix under a transaction lock. The exceptions list `openCount` is a full count of open rows, not the latest page. An open exception is kept per driver leg and warehouse, so a second failed delivery on the same order is still recorded. Going out for delivery commits stock for that warehouse leg only. A failed dispatched leg restores on-hand quantity, and an order whose every leg failed returns from `SHIPPED` to `PROCESSING`. Cancelling an order removes it from planned and in-progress routes and releases the driver. Accepting or rejecting an amendment closes the linked fulfillment issue. The shortage endpoint no longer opens a substitution amendment. Reschedule no longer writes `notes` twice. A dispute opened before receiving leaves the order `DELIVERED` until a receiving report exists; closing a dispute with no receipt returns it to `DELIVERED`, and accepted quantity (not rejected arrivals) decides partial vs full. Auto receiving disputes no longer set a credit amount for units the invoice already excluded, and credit notes use the order or invoice currency. Multi-warehouse driver assign fans out only when `assign_all_warehouse_legs` is true; otherwise the caller must send `warehouse_assignment_id`. Reassign drops stops only on the previous driver's route. Rescheduled legs stay unique (migration `0218`). Zone create and update store one coverage type and clear the other geometry; a postal zone needs codes and a radius zone needs a center. Native apps do not write warehouse zones. Reassign accepts a rescheduled driver leg, which the dispatch board already offers. Postal zones match a district prefix such as SW1 or E1, and they still require an exact numeric code. Retrying a whole-order warehouse failure does not reserve lines that already have their own live warehouse leg. Native retry requests are unchanged. Rollover removes incomplete stops only from routes dated before the new delivery day, so a route already planned for that day keeps the order. The rollover request is unchanged. Planning a route rejects a failed delivery attempt until it is retried. Native apps do not build routes from the dispatch board. Cancelling an order releases its route stops and live driver legs in that same transaction. The cancel request is unchanged. A signed-in driver's delivery detail returns that driver's assignment when an order has several legs. The detail response fields are unchanged. Polygon matching ignores leftover radius fields and respects holes. Route reads inside a transaction use the same connection.
+- **Web:** Dispatch shows “Ready to dispatch” on the assigned column for rescheduled legs, and assign/reassign send the card’s warehouse and driver assignment ids.
+- **Mobile:** Android and iOS assign and reassign send `warehouse_assignment_id` and, on reassign, `driver_assignment_id`. `DispatchOrderCard.assignment` includes `warehouse_assignment_id`. Native apps submit proof and do not read the proof list. The GET adds `proofs` beside the existing `proof` field. GPS, credit notes, and exception counts keep the same request fields; native clients already send `driver_assignment_id` on proof and location when they have it.
+
+---
+
+## 2026-09-25 — Hospitality guest orders, reservations, and shifts
+
+- **API:** Cancelling a guest order returns redeemed rewards points and removes points earned on that order. A completed reservation cannot change status, and visit or no-show counts run only when the status changes. Assigned tables must seat the party and cannot already be booked at that time. A public booking outside the party-size range, or while the restaurant is closed, returns that reason. A zero deposit does not require acknowledgment. Staff reservation create will not confirm a party the free tables cannot seat, and will not book a time in the past. Auto-assignment uses one free table that fits before combining smaller tables. Public bookings and accepted waitlist offers keep the restaurant’s seating duration. A blackout date also blocks a new host booking. The same guest cannot hold two overlapping reservations, including a waitlist offer, and only a pending or confirmed booking can be moved online. Accepting a waitlist offer rechecks the live floor. The host booking form starts from the restaurant’s seating duration and shows the server’s reason when a booking is rejected. A staff shift whose end clock time is earlier than the start finishes the next day. The request fields are unchanged. The reservation board day, guest time slots, and guest ordering hours use the restaurant’s local timezone. A guest cannot cancel a seated booking. Clearing a dish photo removes it. An inactive or archived person cannot be scheduled, clocked in, or given time off. A cancelled booking does not receive a reminder. Guest rewards cannot be redeemed against a zero food bill, and a modifier 86'd before commit is rejected. An hourly rate of zero stays zero. An approved shift swap will not overlap another shift for the person covering it. Staff shifts must end after they start and cannot overlap another shift for the same person. Clock-out must be after clock-in, and payroll preview counts an open shift only up to now. Time off cannot end before it starts or overlap another open request. Guest checkout only prices this restaurant’s available menu for the selected branch, and an item 86’d before commit is rejected. Ticket numbers are issued one at a time from the highest number that day. A scheduled guest order must fall inside live ordering hours. Guest-order rewards preview earns on the bill after a redemption. A modifier group cannot require more choices than its maximum, and a line price cannot go below zero. Restoring a cancelled or no-show booking is refused when that table or the remaining seats are already taken, and restoring a no-show removes it from the guest count. Payroll hours use the restaurant’s local pay period, so a punch after local midnight stays on that day. Guest checkout shows the current menu price and blocks a dish that is no longer available. The order request still sends item ids, not prices. Takeaway and dine-in orders must meet the branch minimum, and a delivery zone uses the higher of the branch and zone minimums. A shift swap can be requested only by the person on that shift, and it can be decided only once. Approved time off blocks a shift, a clock-in, and a swap onto that person, and time off cannot be approved over an existing shift or a time punch on those days. A host booking with a free table stays pending when the room is already 90% full, and is waitlisted only when no table fits. A public booking and an accepted waitlist offer hold a free table instead of confirming with no table assigned. Moving a booking online holds a free table at the new time. The guest menu cart shows the current menu price, and a dish that left the menu is marked unavailable. The order request still sends item ids, not prices. Public availability now includes `depositRequired`, `depositAmount`, and `depositPercent`. A zero amount does not set `depositRequired`. A person can have only one open time punch (migration `0222`); a second clock-in returns the existing open-entry error. Guest fulfillment options include `timeZone`. Checkout treats the scheduled time as that restaurant clock. The order request still sends `scheduledFor` as an instant. Guest ticket numbers use the restaurant’s local day. Guest intelligence counts a completed visit only; a no-show is not a visit and does not make the guest a VIP. Cancelling a guest order removes only the earned points still on the account, and lifetime totals keep points already spent on another order. A delivered guest order cannot be cancelled.
+- **Web:** Guest-order board labels follow delivery, takeaway, or dine-in, and open tickets can be cancelled.
+- **Mobile:** Skipped. Stored guest-order statuses are unchanged, so native clients keep the same request fields. New failures use the existing error JSON (`INVALID_STATUS`, `SHIFT_CREATE_ERROR`, `SHIFT_UPDATE_ERROR`).
+
+---
+
+## 2026-09-25 — Order warehouse GET and inventory mutation tenant scope (server-only)
+
+- **API:** `GET /api/orders/:id/warehouses` uses the same `assertOrderReadAccess` gate as order detail. Inventory settings PATCH and alert acknowledge require the supplier tenant (no unscoped admin or cross-supplier updates). Product inventory GET falls back to the catalog row when only warehouse stock exists.
+- **Mobile:** Skipped — same endpoints and payloads. Native clients receive 403 instead of cross-tenant warehouse assignments or inventory mutations when the caller has no matching tenant.
+
+---
+
+## 2026-09-25 — Org branch impersonation and support-chat ADMIN_SUPPORT (server-only)
+
+- **API:** `/api/org` and `/api/restaurant-org` reject unscoped admins (impersonation required). Org branch GET is scoped with `organization_id` (no `IS NULL` bypass). Socket chat no longer treats ADMIN as access to every conversation; support threads require `ADMIN_SUPPORT`. Duplicate unscoped admin-join on the tenant support router was removed.
+- **Mobile:** Skipped — native apps do not mount platform admin support inbox or unscoped org-admin APIs. Tenant org/branch clients keep the same payloads; admins without impersonation now receive 403.
+
+---
+
+## 2026-09-25 — Unscoped admin tenant query overrides (server-only)
+
+- **API:** Driver assignment no longer accepts `?supplier_id=` without impersonation. Branch/org/invitation APIs require impersonation instead of `ADMIN_TENANTS` query overrides. Chat ADMIN access is limited to support threads or the impersonated tenant. Restaurant/supplier/product/price GETs and product object downloads require a matching tenant. Warehouse/driver feature gates use tenant context only.
+- **Mobile:** Skipped — same endpoints. Native clients receive 403/404 instead of cross-tenant rows when an admin is not impersonating.
+
+---
+
+## 2026-09-25 — Supplier deal draft, validation, and pause
+
+- **API:** Saving a deal without `submitForReview` stays `draft`. Create and edit reject an empty description, a percentage outside 1–100, a non-positive fixed discount, Buy X Get Y without quantities, a coupon CTA without a code, and an end date that is not after the start. Pause applies only to active or scheduled deals and pauses the live boost campaign. Resume marks the deal expired when the boost or offer window has already ended.
+- **Web:** The supplier create dialog collects the description and Buy X Get Y quantities, and only sends a discount value for percentage and fixed deals.
+- **Mobile:** Skipped — Android and iOS create-deal screens already send a description, keep drafts until submit, and enforce the same percentage and fixed-discount rules. No new request field.
+
+---
+
+## 2026-09-25 — Order packing slip and admin tenant scope (server-only)
+
+- **API:** Packing slip JSON/PDF require the same tenant order access as order detail. Unscoped admins cannot list or PATCH orders. Finance invoices-by-order, catalog price/product PATCH, and product file attach require impersonation or native supplier/restaurant tenant. Warehouse/driver `?supplier_id=` must match that tenant. Warehouse owner joins use `getWarehouseSupplierColumn()`.
+- **Mobile:** Skipped — same endpoints and payloads. Native order and warehouse clients now receive 403 instead of cross-tenant rows when the caller has no tenant.
+
+---
+
+## 2026-09-25 — Admin flags gate support, exports, and add-ons
+
+- **API:** Tenant support chat requires `support_sla` as well as `chat`. Supplier and restaurant accounting CSV downloads require `api_integrations` as well as `finance_invoices`. A positive admin add-on quantity requires `feature_flags_access`. `requireFeature` no longer re-enables `fulfillment` or `driver_management` after an explicit admin off.
+- **Mobile:** Skipped — native apps do not call support chat, accounting CSV export, or admin add-on routes. Existing entitlements payloads are unchanged.
+
+---
+
+## 2026-09-25 — Invoice and inventory tenant scope (server-only)
+
+- **API:** Invoice list/detail/create/PDF and cash payments no longer allow unscoped platform-admin access; admins must impersonate. Inventory list, alerts, product GET/PATCH, adjustments, and adjustment history require the supplier tenant. Product `initialStock` mirrors into warehouse inventory. Restaurant invoice list is filtered by restaurant, not emptied.
+- **Mobile:** Skipped — same endpoints and payloads. Native invoice/inventory clients now receive 403/404 instead of cross-tenant rows when an admin is not impersonating or a caller is on the wrong tenant.
+
+---
+
+## 2026-09-25 — Admin feature flags keep plan tiers
+
+- **API:** Forcing a feature flag on keeps the subscription plan’s tier string instead of replacing it with boolean `true`. Forcing `fulfillment` or `driver_management` off is not re-enabled by the `fulfillment_tools` alias. `notifications: false` sends no channels. Restaurant deal redemption also requires `supplier_deals_redeem`.
+- **Mobile:** Skipped — no new endpoint, payload field, permission, or feature flag. Native clients already read resolved entitlements; Scale intelligence, notification channels, and deal redemption now follow the admin override without a client change.
+
+---
+
+## 2026-09-25 — Push endpoint ownership and Assistant nav gates
+
+- **API:** Web and Expo push upserts no longer steal `user_id` on `ON CONFLICT (endpoint)` (409 if another account owns the endpoint). `POST /api/push/devices` now uses tenant context + `push_notifications` like `/subscribe`. `DELETE /api/push/devices` stays auth-only for logout. Single-warehouse routing verifies `default_warehouse_id` is owned by the supplier.
+- **Mobile:** Android and iOS Assistant stack screens, Settings rows, and restaurant/supplier dashboard rows require `ai_assistant` plus the same baseline view permissions as `/api/assistant`.
+
+---
+
+## 2026-09-25 — Supplier Owner fulfillment/GPS inline checks (server-only)
+
+- **API:** Workspace Owner now passes inline `hasPermission` gates on `GET /api/orders/:id/tracking`, POD, `POST /api/orders/:id/location`, fulfillment route reorder access, and driver-self `/routes/today|active|build-from-assignments`. Driver-self routes still need a linked driver. Restaurant onboarding profile `branch_count` joins `branch.tenant_id`. Route depot lookup uses `getWarehouseSupplierColumn` (`tenant_id` or `supplier_id`).
+- **Mobile:** Skipped — no client contract change. Native GPS and tracking clients keep the same routes; Owner accounts no longer 403 on those inline checks.
+
+---
+
+## 2026-09-25 — Driver GPS tracking owner bypass (server-only)
+
+- **API:** `/api/driver/tracking-sessions*` already required a linked driver profile plus `DRIVER_DELIVERIES_VIEW` / `_MANAGE`. Workspace Owner now matches other tenant routes (`rolesIncludeOwner`) instead of 403 when those keys are missing from the permission list. Delivery-zone lookups join `branch` with `tenant_id`.
+- **Mobile:** Skipped — no payload or endpoint change. Native driver GPS clients keep the same routes; Owner accounts with a linked driver profile no longer receive a permission 403.
+
+---
+
+## 2026-09-25 — Consumer menu and quick-list branch ownership (server-only)
+
+- **API:** Consumer menu category/item create and update, menu import, public/admin menu `branchId` filters, `POST /api/quick-lists`, consumer kitchen-order list, public/admin fulfillment-options `branchId`, and restaurant `GET /api/orders/calendar?branch=` reject a legacy `branch` id that is not an active location of the restaurant (400). Previously those writes stored a foreign `branch_id` on the caller’s tenant row. Web menu admin is gated with `CATALOG_VIEW` only (same as the API). Route-level `RequirePermission` now wraps the remaining `/app` cockpit pages (orders, reports, disputes, recipes, staff, settings, org, chat, invoices, cart, onboarding, receiving, and related).
+- **Mobile:** Skipped — web router guards only. Native apps keep their own navigation permission checks. Quick-list create and menu clients keep the same request shape; a foreign `branchId` now returns 400 instead of persisting.
+
+---
+
+## 2026-09-25 — Mobile tenant owner bypass aligned with API
+
+- **API / web:** Unchanged owner-name list (`Owner`, `RESTAURANT_OWNER`, `SUPPLIER_OWNER`). `POST /api/files/presign` now accepts `CHAT_SEND` / `CHAT_MANAGE` in addition to catalog/settings/staff/receiving/invoice keys; product-image attach does not. Warehouse routing stock and product lookups are scoped to the active supplier. Delivery-board branch joins require `branch.tenant_id`.
+- **Mobile:** Android and iOS `isTenantOwner` / `userHasPermission` no longer treat a tenant role named `Org Owner` as a full-permission bypass. Manage keys now imply `_IMPORT` and `_VIEW_COSTS`, matching web.
+
+---
+
+## 2026-09-25 — AI request allowance is per user
+
+- **API:** `ai_requests_per_day` and the trial AI pool are stored per authenticated user in `user_ai_request_usage` (migration `0217_ai_usage_per_user.sql`). Each user receives the full plan limit. `GET /api/subscriptions/entitlements` overlays `usage.ai_requests_per_day` and `aiUsage` for the caller. Assistant capabilities and reorder LLM reservations use the same per-user row. Response fields are unchanged.
+- **Mobile:** Skipped — no new endpoint, payload field, permission, or feature flag. Native clients that display the existing entitlements or assistant quota now receive that user's own count.
+
+---
+
+## 2026-09-25 — Tenant RBAC follow-up (restaurants directory, calendar, webhooks)
+
+- **API:** `GET /api/restaurants` and `GET /api/restaurants/:id` now require `ORDERS_VIEW` for suppliers and `ADMIN_TENANTS`/`ADMIN_ACCESS` for admins. `POST /api/restaurants/:id/logo` requires `SETTINGS_EDIT` and the active restaurant tenant. Order calendar and receiving no longer resolve tenants by `contact_email`. Notification webhook GET/PUT require `SETTINGS_VIEW`/`SETTINGS_MANAGE`. Restaurant receiving-quality reports also require `RECEIVING_VIEW`. Restaurant Accountant no longer includes `RECIPES_*`. Supplier Catalog Manager no longer has `ORDERS_VIEW`. Command center and run-sheet gates match the web permission checks. Supplier `GET /:id` requires a workspace view key; receiving pending-orders omits `contact_email`.
+- **Web:** `/app/restaurants` and `/app/restaurants/:id` now use `RequirePermission ORDERS_VIEW` (same key as the supplier sidebar).
+- **Mobile:** Skipped — no new endpoints, permission keys, payloads, or mobile-facing types. Native restaurant-directory and notification-preference clients keep the same routes; drivers without `ORDERS_VIEW` and staff without settings/receiving keys now receive 403 (stricter server enforcement). Catalog Manager native order lists now receive 403 (same keys as web). Seeded Accountant rows need `pnpm db:sync-roles` to drop `RECIPES_*`.
+
+---
+
+## 2026-09-25 — Warehouse/branch IDOR and dual-write stock hardening (server-only)
+
+- **API:** Legacy inventory list/detail/adjustment reads join warehouse names only when `warehouse.supplier_id` matches the product supplier. `GET /api/inventory/product/:id/adjustments` now requires the same product ownership (or restaurant follow) as product inventory reads and returns an explicit column list. Warehouse inventory list joins products by `supplier_id`. Product create rejects a foreign `warehouse_id`. Legacy→warehouse stock mirror applies a delta to an owned warehouse instead of overwriting that row with the product aggregate. Restaurant reorder explain/ask/apply/ai-recommend/forecast-refresh reject a foreign `branchId`; restaurant inventory list/reorder SQL joins `branch` only when `tenant_id` matches the restaurant. Pick-list, driver, routing-rule, fulfillment-board, and order warehouse-assignment names join warehouses only for the same supplier. Order calendar, order detail, invoice CSV, onboarding team, invoices, delivery board/ETA/routes/driver detail, destination lookup, and consumer receipts join `branch` only when `tenant_id` matches the restaurant. Supplier dashboard low-stock sums `warehouse_inventory` only for owned active warehouses. Fulfillment/driver `warehouse_id` filters and pick-wave generation reject a warehouse that is not an active warehouse of the caller supplier (400).
+- **Mobile:** Skipped — no new endpoints, permission keys, or required payload fields. Native inventory/warehouse/product clients keep the same routes; foreign warehouse names now come back null, unowned adjustment history returns 404, and an invalid `warehouse_id` on product create returns 400.
+
+---
+
+## 2026-09-25 — Inventory alerts and catalog price read scoping (server-only)
+
+- **API:** Supplier inventory alerts join warehouse names only when `warehouse.supplier_id` matches the product supplier, and no longer return `contact_email`. Restaurant low-stock notifications no longer insert into the supplier `inventory_alert` table. `GET /api/prices/product/:productId` requires `CATALOG_VIEW`, `ORDERS_VIEW`, or `INVENTORY_VIEW` and looks up products by id without joining `supplier.contact_email`.
+- **Mobile:** Skipped — no new endpoints, permission keys, or payloads. Native inventory/price clients keep the same routes; alert rows simply omit `contact_email` if they previously relied on it.
+
+---
+
+## 2026-09-25 — Org branch access IDOR and warehouse simulate scoping (server-only)
+
+- **API:** Revoking org branch access and unlinking a branch now require the target supplier/restaurant to belong to the caller organization. `?organization_id=` on `/api/org` and `/api/restaurant-org` is limited to admins with `ADMIN_TENANTS` or `ADMIN_ACCESS`, and a mismatched org during impersonation returns 400. The same admin org-query rules apply to `/api/org/invitations` and `/api/restaurants/invitations/branches`. Warehouse routing simulate looks up products by supplier id. Web Add Warehouse requires `WAREHOUSES_MANAGE` (same as `POST /api/warehouses`).
+- **Mobile:** Skipped — no new endpoints, payloads, permission keys, or mobile warehouse-create UI. Native create still hits the same API and already received 403 without `WAREHOUSES_MANAGE`.
+
+---
+
+## 2026-09-25 — Restaurant onboarding RBAC (server-only)
+
+- **API:** `/api/restaurant-onboarding` now requires tenant context. Profile is loaded and updated by restaurant id, not contact email. Team mutations require `STAFF_INVITE` / `STAFF_MANAGE`; profile mutations require `SETTINGS_EDIT`. Restaurant delivery-location GET/PATCH requires `SETTINGS_VIEW` / `SETTINGS_EDIT`. Restaurant and org-branch profile reads omit tax/VAT/license fields except for platform admin, Org Owner, or the owning tenant with `SETTINGS_VIEW`. Public supplier catalog and followed lists omit VAT/license; supplier `GET /:id` is tenant-id scoped rather than contact-email. Price create/update and order-detail fallback access use the active supplier tenant, not contact email.
+- **Mobile:** Skipped — restaurant onboarding wizard is web-only. Delivery-location endpoints are unchanged; native clients keep the same payloads and now receive 403 when the user lacks settings permissions (stricter server enforcement, no new keys).
+
+---
+
+## 2026-09-25 — Branch and warehouse scoping hardening (server-only)
+
+- **API:** Org Owner deactivate / reactivate / unlink / PATCH now require the target restaurant or supplier to belong to the caller's organization. Warehouse PATCH, routing-rule reassignment, inventory upserts, and routing simulation stay inside the supplier tenant. Legacy operational `branch_id` writes (reservations, recipes, expiry lots) reject foreign branch IDs. Restaurant report / reorder / forecast / recipe-list / quick-list `branchId` query params now reject foreign IDs with 400 instead of returning empty tenant-scoped rows. Warehouse PATCH and set-default require `WAREHOUSES_EDIT` (Warehouse Manager); deactivation still requires `WAREHOUSES_MANAGE`. Web Settings → Warehouses can edit and deactivate existing locations through those endpoints.
+- **Mobile:** Skipped — no new mobile endpoints or payloads. Native apps keep the same warehouse list/create/default calls; edit/deactivate remains a web settings surface.
+- **Mobile:** Skipped — no API contract, payload, permission key, feature flag, or mobile-facing type change. Existing branch-switch and warehouse clients keep the same endpoints; the server now fail-closes previously unscoped IDs.
+
+---
+
+## 2026-09-25 — RBAC hardening (owner bypass, accountant matrix, permission wildcards)
+
+- **API:** Tenant `requirePermission` owner bypass is only `Owner` / `RESTAURANT_OWNER` / `SUPPLIER_OWNER`. A custom tenant role named `Org Owner` no longer grants full API access. Org role names are reserved on tenant-role create/rename. Supplier Accountant no longer inherits restaurant `RECIPES_*`. Restaurant Viewer no longer receives supplier-only `GROWTH_VIEW`. Standalone tenant Owners can assign the Owner role without an organization id. Web `hasPermission` now matches API wildcards for `_IMPORT` and `_VIEW_COSTS`. Supplier `/api/inventory` mutations (including alert acknowledge) require `INVENTORY_EDIT` or `INVENTORY_MANAGE`, not view-only.
+- **Mobile:** Skipped — no API contract, payload, permission key, or mobile client helper change. Native apps continue to send the same auth/tenant headers; server enforcement is stricter for a previously invalid tenant role name.
+
+---
+
+## 2026-09-25 — Featured review, best supplier prices, and chat attachments
+
+- **Featured suppliers:** Web, Android, and iOS now open a payment UI when a supplier selects a placement package. Purchase/payment creates a paid (or explicitly waived in allowed non-live environments) `pending` request; it no longer activates immediately. Platform admins approve or reject the request, paid rejections are refunded, and the placement duration begins at approval. Migration `0216_featured_placement_admin_approval.sql` records approval/rejection audit data.
+- **Supplier best prices:** Added a restaurant-only `GET /api/suppliers/price-comparison` contract and matching web/native panels. Results use current catalog prices from followed supplier organizations and compare only exact normalized name + unit + brand + currency groups with at least two suppliers.
+- **Assistant correctness:** Added tenant-scoped `get_followed_suppliers` and `compare_supplier_prices` tools, fixing follow-count answers that previously relied on no authoritative follow tool.
+- **Attachments:** Assistant messages now accept up to five JPEG/PNG/WebP/PDF attachments (10 MB each) through the existing authenticated, scanned upload gateway. Images are model-visible; PDF metadata is retained on the message. The ordinary human chat composer has attachment selection/upload on web, Android, and iOS as well.
+- **Mobile synchronization:** Updated API contracts, supplier comparison UI, featured payment/review UX, both chat composers, and installed the Expo Document Picker module in `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`.
+- **Verification:** Focused API suites pass (5 files, 46 tests), the Assistant web suite passes (1 file, 6 tests), Android and iOS `npm run typecheck` pass, and root `pnpm typecheck` passes.
+
 ## 2026-09-25 — Reorder Ask box routed to the conversational assistant + AI quota counter fix
 
 **Change (web + API):** The inventory / reorder-assistance "Ask" box previously called `POST /api/restaurant-inventory/reorder-assistance/ask` → `parseReorderIntent`, an intent-to-product matcher whose response shape (`{intent, matchedProducts[], clarifyingQuestion}`) has no answer field and whose allowlist was restricted to products with a current reorder suggestion. Any question outside that narrow set returned "Which items did you mean?". When the `ai_assistant` entitlement is present, the box now sends the question to the conversational assistant (`POST /api/assistant/messages`) and renders the prose answer; the legacy product matcher is retained as the fallback for tenants that have reorder seasonality but not `ai_assistant`, so no existing behaviour is lost.

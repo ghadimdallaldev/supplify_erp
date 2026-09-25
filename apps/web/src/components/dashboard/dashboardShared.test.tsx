@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { buildOrderSpendTrend } from './dashboardShared'
+import { buildOrderSpendTrend, resolvePersonaKpiValue } from './dashboardShared'
 
 describe('buildOrderSpendTrend', () => {
   beforeEach(() => {
@@ -31,5 +31,47 @@ describe('buildOrderSpendTrend', () => {
     ]
 
     expect(buildOrderSpendTrend(orders).reduce((sum, p) => sum + p.value, 0)).toBe(150)
+  })
+})
+
+describe('resolvePersonaKpiValue', () => {
+  const formatMoney = (amount: number) => `$${amount}`
+
+  it('uses role-specific metrics instead of all-time totals', () => {
+    const stats = {
+      totalRevenue: 9000,
+      totalOrders: 40,
+      pendingOrders: 8,
+      totalRestaurants: 12,
+      ordersToday: 3,
+      outstandingBalance: 250,
+      overdueAccountCount: 2,
+      debtorCount: 4,
+      assignedDeliveries: 5,
+      deliveriesInProgress: 1,
+      spendLast30Days: 600,
+      invoiceSpendLast30Days: 180,
+      billedOrderCount: 7,
+    }
+
+    expect(resolvePersonaKpiValue('supplier_owner', 'revenue', stats, formatMoney, '$0')).toBe(
+      undefined
+    )
+    expect(resolvePersonaKpiValue('supplier_warehouse', 'orders', stats, formatMoney, '$0')).toBe(3)
+    expect(resolvePersonaKpiValue('supplier_accountant', 'revenue', stats, formatMoney, '$0')).toBe(
+      '$250'
+    )
+    expect(resolvePersonaKpiValue('supplier_accountant', 'pending', stats, formatMoney, '$0')).toBe(
+      2
+    )
+    expect(resolvePersonaKpiValue('supplier_fulfillment', 'orders', stats, formatMoney, '$0')).toBe(
+      5
+    )
+    expect(resolvePersonaKpiValue('restaurant_manager', 'revenue', stats, formatMoney, '$0')).toBe(
+      '$600'
+    )
+    expect(
+      resolvePersonaKpiValue('restaurant_accountant', 'orders', stats, formatMoney, '$0')
+    ).toBe(7)
   })
 })

@@ -5,12 +5,13 @@ import {
   resolveTenantContext,
   requirePermission,
   getSupplierIdForRequest,
+  getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
 import { invoicesMutationGuard } from '../lib/route-permissions.js'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
-import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyInvoiceIssued } from '../services/notification.service.js'
 import { requireFeature } from '../lib/subscription.js'
@@ -22,6 +23,7 @@ import {
   createInvoiceManual,
   getInvoiceDetail,
   updateInvoiceStatus,
+  withInvoiceCalendarDates,
 } from '../services/invoice.service.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../lib/orders-calendar-cache.js'
 
@@ -45,9 +47,10 @@ async function resolveInvoiceDetailContext(req) {
   const role = req.userData?.role
   if (role === 'ADMIN') {
     const effectiveTenant = getEffectiveTenant(req)
-    return effectiveTenant
-      ? { tenantId: effectiveTenant.tenantId, tenantType: effectiveTenant.tenantType }
-      : { adminBypass: true }
+    if (!effectiveTenant) {
+      throw new ForbiddenError('Impersonate a tenant to access invoices')
+    }
+    return { tenantId: effectiveTenant.tenantId, tenantType: effectiveTenant.tenantType }
   }
   if (role === 'SUPPLIER') {
     return { tenantId: await requireSupplierId(req), tenantType: 'SUPPLIER' }
@@ -59,10 +62,12 @@ async function resolveInvoiceDetailContext(req) {
 }
 
 function enrichInvoiceRows(rows) {
-  return rows.map((row) => ({
-    ...row,
-    remaining_balance: computeRemainingBalance(row, row.total_paid),
-  }))
+  return rows.map((row) =>
+    withInvoiceCalendarDates({
+      ...row,
+      remaining_balance: computeRemainingBalance(row, row.total_paid),
+    })
+  )
 }
 
 // Validation schemas
@@ -77,6 +82,7 @@ const invoiceCreateSchema = z.object({
   due_date: z.string(),
   tax_rate: z.number().default(0),
   tax_included: z.boolean().default(false),
+  currency: z.string().trim().length(3).optional(),
   payment_terms_days: z.number().int().default(30),
   notes: z.string().optional(),
 })
@@ -84,18 +90,6 @@ const invoiceCreateSchema = z.object({
 router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), async (req, res) => {
   try {
     const params = invoiceListSchema.parse(req.query)
-
-    if (req.userData.role && !['SUPPLIER', 'ADMIN'].includes(req.userData.role)) {
-      return res.json({
-        ok: true,
-        data: {
-          invoices: [],
-          pagination: { total: 0, limit: params.limit, offset: params.offset },
-        },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
 
     const invoiceSelect = `
       SELECT 
@@ -117,33 +111,20 @@ router.get('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN', 'RESTAURANT']), a
 
     const effectiveTenant = req.userData.role === 'ADMIN' ? getEffectiveTenant(req) : null
     if (req.userData.role === 'ADMIN' && !effectiveTenant) {
-      const countSql = `SELECT COUNT(*)::int AS total FROM invoice i`
-      const listSql = `
-        ${invoiceSelect}
-        ORDER BY i.issue_date DESC, i.invoice_number DESC
-        LIMIT $1 OFFSET $2
-      `
-      const [{ rows }, { rows: countRows }] = await Promise.all([
-        query(listSql, [params.limit, params.offset]),
-        query(countSql),
-      ])
-      return res.json({
-        ok: true,
-        data: {
-          invoices: enrichInvoiceRows(rows),
-          pagination: {
-            total: parseInt(countRows[0].total, 10),
-            limit: params.limit,
-            offset: params.offset,
-          },
-        },
-        error: null,
-        requestId: req.requestId,
-      })
+      throw new ForbiddenError('Impersonate a tenant to list invoices')
     }
 
-    const tenantId = effectiveTenant?.tenantId || (await getSupplierIdForRequest(req))
-    const tenantType = effectiveTenant?.tenantType || 'SUPPLIER'
+    let tenantId = effectiveTenant?.tenantId || null
+    let tenantType = effectiveTenant?.tenantType || null
+    if (!tenantId) {
+      if (req.userData.role === 'RESTAURANT') {
+        tenantId = await getRestaurantIdForRequest(req)
+        tenantType = 'RESTAURANT'
+      } else {
+        tenantId = await getSupplierIdForRequest(req)
+        tenantType = 'SUPPLIER'
+      }
+    }
     if (!tenantId) {
       return res.json({
         ok: true,
@@ -226,9 +207,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     const { id } = req.params
     const ctx = await resolveInvoiceDetailContext(req)
     const detail = await getInvoiceDetail(id, { ...ctx, includePayments: true })
-    if (!ctx.adminBypass) {
-      await assertInvoiceTenantAccess(req, detail.invoice)
-    }
+    await assertInvoiceTenantAccess(req, detail.invoice)
 
     res.json({
       ok: true,
@@ -254,8 +233,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
   try {
     const invoiceData = invoiceCreateSchema.parse(req.body)
 
-    const supplierId =
-      req.userData.role === 'ADMIN' ? req.body.supplier_id : await getSupplierIdForRequest(req)
+    const supplierId = await getSupplierIdForRequest(req)
 
     if (!supplierId) {
       throw new ValidationError('Supplier record not found for user')
@@ -304,6 +282,22 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
     notifyInvoiceIssued(invoice).catch((notifError) => {
       logger.error('Failed to send invoice notification', { error: notifError.message })
     })
+
+    const { hookRecipeCostingAfterInvoice } = await import(
+      '../services/recipe-purchasing-hooks.service.js'
+    )
+    hookRecipeCostingAfterInvoice(
+      invoice.restaurant_id,
+      orderItems.map((item) => ({
+        productId: item.product_id,
+        supplierId,
+        productName: item.product_name,
+        unitPrice: item.unit_price,
+        unit: item.unit || 'unit',
+        lineItemId: item.id,
+      })),
+      { currency: invoice.currency || 'USD', recordPriceEvent: true }
+    )
 
     scheduleOrdersCalendarCacheInvalidation([invoice.restaurant_id, invoice.supplier_id], {
       reason: 'invoice.created',

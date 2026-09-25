@@ -13,13 +13,24 @@ import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifySupplierLowStock, notifyOutOfStock } from '../services/notification.service.js'
 import { requireFeature } from '../lib/subscription.js'
+import { inventoryMutationGuard } from '../lib/route-permissions.js'
 import {
   computeSupplierStockFlags,
   DEFAULT_SUPPLIER_LOW_STOCK_THRESHOLD,
 } from '../lib/supplier-stock-status.js'
-import { supplierUsesWarehouseInventory } from '../services/supplier-stock.service.js'
-import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
-import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
+import {
+  getSupplierProductAvailableQty,
+  supplierUsesWarehouseInventory,
+} from '../services/supplier-stock.service.js'
+import {
+  applyWarehouseInventoryAdjustment,
+  syncLegacyMirrorFromWarehouse,
+  syncWarehouseMirrorFromLegacy,
+} from '../services/supplier-order-stock.service.js'
+import {
+  assertWarehouseOwnedBySupplier,
+  getWarehouseSupplierColumn,
+} from '../lib/warehouse-helpers.js'
 
 const router = express.Router()
 
@@ -29,7 +40,12 @@ const inventoryManagementGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
-router.use(requireAuth, resolveTenantContext, requirePermission('INVENTORY_VIEW'))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requirePermission('INVENTORY_VIEW'),
+  inventoryMutationGuard
+)
 
 const inventoryListSchema = z.object({
   limit: z.coerce.number().min(1).max(500).default(100),
@@ -41,24 +57,33 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
     const params = inventoryListSchema.parse(req.query)
 
-    // For suppliers on warehouse SoT: product-anchored list (includes WH-only SKUs)
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
-        return res.json({
-          ok: true,
-          data: {
-            inventory: [],
-            pagination: { total: 0, limit: params.limit, offset: params.offset },
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      if (req.userData.role === 'ADMIN') {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to list inventory',
           },
-          error: null,
           requestId: req.requestId,
         })
       }
+      return res.json({
+        ok: true,
+        data: {
+          inventory: [],
+          pagination: { total: 0, limit: params.limit, offset: params.offset },
+        },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
 
-      if (await supplierUsesWarehouseInventory(supplierId)) {
-        const supplierCol = await getWarehouseSupplierColumn()
-        const listSql = `
+    if (await supplierUsesWarehouseInventory(supplierId)) {
+      const supplierCol = await getWarehouseSupplierColumn()
+      const listSql = `
           SELECT
             p.id,
             p.id AS product_id,
@@ -90,49 +115,49 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
           ORDER BY p.name
           LIMIT $2 OFFSET $3
         `
-        const countSql = `
+      const countSql = `
           SELECT COUNT(*)::int AS total
           FROM product p
           WHERE p.supplier_id = $1
         `
-        const [{ rows }, { rows: countRows }] = await Promise.all([
-          query(listSql, [supplierId, params.limit, params.offset]),
-          query(countSql, [supplierId]),
-        ])
+      const [{ rows }, { rows: countRows }] = await Promise.all([
+        query(listSql, [supplierId, params.limit, params.offset]),
+        query(countSql, [supplierId]),
+      ])
 
-        const formattedInventory = rows.map((row) => {
-          const availableQty = Number(row.available_qty || 0)
-          const reservedQty = Number(row.reserved_qty || 0)
-          const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
-          return {
-            ...row,
-            available_qty: availableQty,
-            reserved_qty: reservedQty,
-            stock_source: 'warehouse_inventory',
-            low_stock_threshold: flags.lowStockThreshold,
-            isLowStock: flags.isLowStock,
-            isOutOfStock: flags.isOutOfStock,
-            isInStock: flags.isInStock,
-            stockStatus: flags.stockStatus,
-          }
-        })
+      const formattedInventory = rows.map((row) => {
+        const availableQty = Number(row.available_qty || 0)
+        const reservedQty = Number(row.reserved_qty || 0)
+        const flags = computeSupplierStockFlags(availableQty, row.low_stock_threshold)
+        return {
+          ...row,
+          available_qty: availableQty,
+          reserved_qty: reservedQty,
+          stock_source: 'warehouse_inventory',
+          low_stock_threshold: flags.lowStockThreshold,
+          isLowStock: flags.isLowStock,
+          isOutOfStock: flags.isOutOfStock,
+          isInStock: flags.isInStock,
+          stockStatus: flags.stockStatus,
+        }
+      })
 
-        return res.json({
-          ok: true,
-          data: {
-            inventory: formattedInventory,
-            pagination: {
-              total: countRows[0]?.total ?? 0,
-              limit: params.limit,
-              offset: params.offset,
-            },
+      return res.json({
+        ok: true,
+        data: {
+          inventory: formattedInventory,
+          pagination: {
+            total: countRows[0]?.total ?? 0,
+            limit: params.limit,
+            offset: params.offset,
           },
-          error: null,
-          requestId: req.requestId,
-        })
-      }
+        },
+        error: null,
+        requestId: req.requestId,
+      })
     }
 
+    const supplierCol = await getWarehouseSupplierColumn()
     let inventoryQuery = `
       SELECT 
         i.product_id as id,
@@ -152,7 +177,7 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
-      LEFT JOIN warehouse w ON w.id = i.warehouse_id
+      LEFT JOIN warehouse w ON w.id = i.warehouse_id AND w.${supplierCol} = p.supplier_id
     `
 
     const countQueryBase = `
@@ -162,26 +187,8 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
       JOIN supplier s ON s.id = p.supplier_id
     `
 
-    const queryParams = []
-    let whereClause = ''
-
-    // For suppliers, only show their active workspace products
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
-        return res.json({
-          ok: true,
-          data: {
-            inventory: [],
-            pagination: { total: 0, limit: params.limit, offset: params.offset },
-          },
-          error: null,
-          requestId: req.requestId,
-        })
-      }
-      whereClause = ` WHERE p.supplier_id = $1`
-      queryParams.push(supplierId)
-    }
+    const queryParams = [supplierId]
+    const whereClause = ` WHERE p.supplier_id = $1`
 
     inventoryQuery += `${whereClause} ORDER BY p.name LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`
     const listParams = [...queryParams, params.limit, params.offset]
@@ -294,7 +301,7 @@ async function checkProductOwnership(productId, supplierId) {
     throw new NotFoundError('Product not found')
   }
 
-  if (supplierId && rows[0].supplier_id !== supplierId) {
+  if (!supplierId || rows[0].supplier_id !== supplierId) {
     throw new ValidationError('You can only manage inventory for your own products')
   }
 
@@ -305,6 +312,7 @@ async function checkProductOwnership(productId, supplierId) {
 router.get('/product/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params
+    const supplierCol = await getWarehouseSupplierColumn()
 
     const { rows } = await query(
       `
@@ -327,11 +335,44 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
       JOIN product p ON p.id = i.product_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
-      LEFT JOIN warehouse w ON w.id = i.warehouse_id
+      LEFT JOIN warehouse w ON w.id = i.warehouse_id AND w.${supplierCol} = p.supplier_id
       WHERE i.product_id = $1
     `,
       [productId]
     )
+
+    if (rows.length === 0) {
+      const { rows: catalogRows } = await query(
+        `
+        SELECT
+          NULL::uuid AS id,
+          p.id AS product_id,
+          NULL::uuid AS warehouse_id,
+          0::numeric AS available_qty,
+          0::numeric AS reserved_qty,
+          p.updated_at,
+          p.name AS product_name,
+          p.sku,
+          p.supplier_id,
+          s.name AS supplier_name,
+          pis.moq,
+          pis.order_multiple,
+          pis.lead_time_days,
+          pis.delivery_windows,
+          pis.low_stock_threshold,
+          pis.backorder_allowed,
+          pis.backorder_eta_days,
+          NULL::text AS warehouse_name,
+          NULL::text AS warehouse_code
+        FROM product p
+        JOIN supplier s ON s.id = p.supplier_id
+        LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
+        WHERE p.id = $1
+        `,
+        [productId]
+      )
+      rows.push(...catalogRows)
+    }
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -347,20 +388,7 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
 
     const inventory = rows[0]
 
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || inventory.supplier_id !== supplierId) {
-        return res.status(404).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'NOT_FOUND',
-            message: 'Inventory not found for this product',
-          },
-          requestId: req.requestId,
-        })
-      }
-    } else if (req.userData.role === 'RESTAURANT') {
+    if (req.userData.role === 'RESTAURANT') {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         return res.status(404).json({
@@ -398,6 +426,30 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
           requestId: req.requestId,
         })
       }
+      if (await supplierUsesWarehouseInventory(inventory.supplier_id)) {
+        inventory.available_qty = await getSupplierProductAvailableQty(
+          inventory.supplier_id,
+          productId
+        )
+        inventory.stock_source = 'warehouse_inventory'
+      }
+    } else {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || inventory.supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Inventory not found for this product',
+          },
+          requestId: req.requestId,
+        })
+      }
+      if (await supplierUsesWarehouseInventory(supplierId)) {
+        inventory.available_qty = await getSupplierProductAvailableQty(supplierId, productId)
+        inventory.stock_source = 'warehouse_inventory'
+      }
     }
 
     res.json({
@@ -432,16 +484,42 @@ router.patch(
       const { productId } = req.params
       const updateData = inventoryUpdateSchema.parse(req.body)
 
-      // Verify product ownership for suppliers
-      let supplierId = null
-      if (req.userData.role === 'SUPPLIER') {
-        supplierId = await getSupplierIdForRequest(req)
-        await checkProductOwnership(productId, supplierId)
-      } else if (req.userData.role === 'ADMIN') {
-        const { rows: productRows } = await query(`SELECT supplier_id FROM product WHERE id = $1`, [
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to update inventory',
+          },
+          requestId: req.requestId,
+        })
+      }
+      await checkProductOwnership(productId, supplierId)
+
+      if (await supplierUsesWarehouseInventory(supplierId)) {
+        await syncWarehouseMirrorFromLegacy(query, {
+          supplierId,
           productId,
-        ])
-        supplierId = productRows[0]?.supplier_id || null
+          availableQty: updateData.availableQty,
+        })
+        await syncLegacyMirrorFromWarehouse(query, { supplierId, productId })
+        const { rows } = await query(`SELECT * FROM inventory WHERE product_id = $1`, [productId])
+        logger.info('Inventory updated', {
+          productId,
+          availableQty: updateData.availableQty,
+          actor: req.userData.id,
+          stockSource: 'warehouse_inventory',
+        })
+        return res.json({
+          ok: true,
+          data: {
+            inventory: rows[0] || { product_id: productId, available_qty: updateData.availableQty },
+          },
+          error: null,
+          requestId: req.requestId,
+        })
       }
 
       // Update or insert inventory
@@ -457,15 +535,6 @@ router.patch(
     `,
         [productId, updateData.availableQty]
       )
-
-      if (supplierId) {
-        await syncWarehouseMirrorFromLegacy(query, {
-          supplierId,
-          productId,
-          availableQty: updateData.availableQty,
-          reservedQty: rows[0]?.reserved_qty || 0,
-        })
-      }
 
       logger.info('Inventory updated', {
         productId,
@@ -519,65 +588,72 @@ router.post(
       const { productId } = req.params
       const adjustmentData = adjustmentSchema.parse(req.body)
 
-      // Verify product ownership for suppliers
-      let supplierId = null
-      if (req.userData.role === 'SUPPLIER') {
-        supplierId = await getSupplierIdForRequest(req)
-        await checkProductOwnership(productId, supplierId)
-      }
-
-      // Get current inventory
-      const { rows: inventory } = await query('SELECT * FROM inventory WHERE product_id = $1', [
-        productId,
-      ])
-
-      if (inventory.length === 0) {
-        throw new NotFoundError('Inventory not found for this product')
-      }
-
+      const supplierId = await getSupplierIdForRequest(req)
       if (!supplierId) {
-        const { rows: productRows } = await query(`SELECT supplier_id FROM product WHERE id = $1`, [
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to adjust inventory',
+          },
+          requestId: req.requestId,
+        })
+      }
+      await checkProductOwnership(productId, supplierId)
+
+      if (adjustmentData.warehouseId) {
+        await assertWarehouseOwnedBySupplier(adjustmentData.warehouseId, supplierId)
+      }
+
+      const useWarehouseStock = await supplierUsesWarehouseInventory(supplierId)
+      if (!useWarehouseStock) {
+        const { rows: inventory } = await query('SELECT * FROM inventory WHERE product_id = $1', [
           productId,
         ])
-        supplierId = productRows[0]?.supplier_id || null
-      }
-      if (adjustmentData.warehouseId && supplierId) {
-        const supplierColumn = await getWarehouseSupplierColumn()
-        const { rows: warehouseRows } = await query(
-          `SELECT id FROM warehouse WHERE id = $1 AND ${supplierColumn} = $2`,
-          [adjustmentData.warehouseId, supplierId]
-        )
-        if (!warehouseRows.length) {
-          throw new ValidationError('Warehouse not found for this supplier')
+        if (inventory.length === 0) {
+          throw new NotFoundError('Inventory not found for this product')
         }
       }
-
-      const currentQty = Number(inventory[0].available_qty)
 
       // Stock move, warehouse mirror, and the audit row are one business action:
       // a failure after the quantity change would leave stock moved with no
       // adjustment record and a stale mirror. The conditional UPDATE also keeps
       // the decrement safe under concurrency instead of clamping at zero.
       const { updatedInventory, adjustmentRecord } = await withTransaction(async (client) => {
-        const { rows: updatedRows } = await client.query(
-          `UPDATE inventory
+        let updatedRows
+        if (useWarehouseStock) {
+          const applied = await applyWarehouseInventoryAdjustment(client, {
+            supplierId,
+            productId,
+            adjustmentType: adjustmentData.adjustmentType,
+            quantity: adjustmentData.quantity,
+            warehouseId: adjustmentData.warehouseId || null,
+          })
+          const { rows } = await client.query(`SELECT * FROM inventory WHERE product_id = $1`, [
+            productId,
+          ])
+          updatedRows = rows.length
+            ? rows
+            : [
+                {
+                  product_id: productId,
+                  available_qty: applied.availableQty,
+                  reserved_qty: applied.reservedQty,
+                },
+              ]
+        } else {
+          const result = await client.query(
+            `UPDATE inventory
              SET available_qty = available_qty + CASE WHEN $1 = 'IN' THEN $2 ELSE -$2 END,
                  updated_at = now()
              WHERE product_id = $3
                AND ($1 = 'IN' OR available_qty >= $2)
              RETURNING *`,
-          [adjustmentData.adjustmentType, adjustmentData.quantity, productId]
-        )
-        if (!updatedRows.length) throw new ValidationError('Insufficient available inventory')
-
-        if (supplierId) {
-          await syncWarehouseMirrorFromLegacy(client, {
-            supplierId,
-            productId,
-            availableQty: Number(updatedRows[0].available_qty),
-            reservedQty: updatedRows[0]?.reserved_qty || 0,
-            warehouseId: adjustmentData.warehouseId || null,
-          })
+            [adjustmentData.adjustmentType, adjustmentData.quantity, productId]
+          )
+          updatedRows = result.rows
+          if (!updatedRows.length) throw new ValidationError('Insufficient available inventory')
         }
 
         const { rows: adjustmentRows } = await client.query(
@@ -602,6 +678,10 @@ router.post(
       })
 
       const newQty = Number(updatedInventory[0].available_qty)
+      const previousQty =
+        adjustmentData.adjustmentType === 'OUT'
+          ? newQty + Number(adjustmentData.quantity)
+          : newQty - Number(adjustmentData.quantity)
 
       // Check and create low stock alert
       const { rows: settings } = await query(
@@ -632,7 +712,7 @@ router.post(
         }).catch((err) => logger.warn('Low-stock notification failed', { err: err.message }))
       }
 
-      if (newQty <= 0 && currentQty > 0) {
+      if (newQty <= 0 && previousQty > 0) {
         const { rows: pRow } = await query('SELECT name FROM product WHERE id = $1', [productId])
         notifyOutOfStock({
           productId,
@@ -702,16 +782,91 @@ router.get('/product/:productId/adjustments', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params
 
+    const { rows: products } = await query(`SELECT id, supplier_id FROM product WHERE id = $1`, [
+      productId,
+    ])
+    if (!products.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Inventory not found for this product' },
+        requestId: req.requestId,
+      })
+    }
+
+    if (req.userData.role === 'SUPPLIER') {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || products[0].supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Inventory not found for this product' },
+          requestId: req.requestId,
+        })
+      }
+    } else if (req.userData.role === 'RESTAURANT') {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Inventory not found for this product' },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: connected } = await query(
+        `
+        SELECT 1
+        FROM supplier_follow sf
+        WHERE sf.supplier_id = $1
+          AND sf.restaurant_id = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM supplier_blocklist sb
+            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
+          )
+        LIMIT 1
+      `,
+        [products[0].supplier_id, restaurantId]
+      )
+      if (!connected.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Inventory not found for this product' },
+          requestId: req.requestId,
+        })
+      }
+    } else {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId || products[0].supplier_id !== supplierId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Inventory not found for this product' },
+          requestId: req.requestId,
+        })
+      }
+    }
+
+    const supplierCol = await getWarehouseSupplierColumn()
     const { rows } = await query(
       `
       SELECT 
-        ia.*,
+        ia.id,
+        ia.product_id,
+        ia.warehouse_id,
+        ia.adjustment_type,
+        ia.quantity,
+        ia.reason,
+        ia.notes,
+        ia.actor_sub,
+        ia.created_at,
         p.name as product_name,
         p.sku,
         w.name as warehouse_name
       FROM inventory_adjustment ia
       JOIN product p ON p.id = ia.product_id
-      LEFT JOIN warehouse w ON w.id = ia.warehouse_id
+      LEFT JOIN warehouse w ON w.id = ia.warehouse_id AND w.${supplierCol} = p.supplier_id
       WHERE ia.product_id = $1
       ORDER BY ia.created_at DESC
       LIMIT 100
@@ -751,11 +906,19 @@ router.patch(
       const { productId } = req.params
       const settings = inventorySettingsSchema.parse(req.body)
 
-      // Verify product ownership for suppliers
-      if (req.userData.role === 'SUPPLIER') {
-        const supplierId = await getSupplierIdForRequest(req)
-        await checkProductOwnership(productId, supplierId)
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to update inventory settings',
+          },
+          requestId: req.requestId,
+        })
       }
+      await checkProductOwnership(productId, supplierId)
 
       const { rows } = await query(
         `
@@ -830,37 +993,43 @@ router.patch(
 // Get active inventory alerts for supplier
 router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
   try {
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      if (req.userData.role === 'ADMIN') {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to list inventory alerts',
+          },
+          requestId: req.requestId,
+        })
+      }
+      return res.json({
+        ok: true,
+        data: { alerts: [] },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
+    const supplierCol = await getWarehouseSupplierColumn()
     let alertsQuery = `
       SELECT 
         ia.*,
         p.name as product_name,
         p.sku,
         p.supplier_id,
-        s.contact_email,
         w.name as warehouse_name
       FROM inventory_alert ia
       JOIN product p ON p.id = ia.product_id
-      JOIN supplier s ON s.id = p.supplier_id
-      LEFT JOIN warehouse w ON w.id = ia.warehouse_id
+      LEFT JOIN warehouse w ON w.id = ia.warehouse_id AND w.${supplierCol} = p.supplier_id
       WHERE ia.is_acknowledged = false
+        AND p.supplier_id = $1
     `
 
-    const queryParams = []
-
-    // For suppliers, only show their active workspace products
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
-        return res.json({
-          ok: true,
-          data: { alerts: [] },
-          error: null,
-          requestId: req.requestId,
-        })
-      }
-      alertsQuery += ` AND p.supplier_id = $1`
-      queryParams.push(supplierId)
-    }
+    const queryParams = [supplierId]
 
     alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`
 
@@ -891,38 +1060,47 @@ router.patch(
   '/alerts/:alertId/acknowledge',
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
+  requirePermission('INVENTORY_EDIT'),
   async (req, res) => {
     try {
       const { alertId } = req.params
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Impersonate a supplier to acknowledge alerts',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-      // Verify ownership for suppliers
-      if (req.userData.role === 'SUPPLIER') {
-        const supplierId = await getSupplierIdForRequest(req)
-        const { rows: alerts } = await query(
-          `
+      const { rows: alerts } = await query(
+        `
         SELECT ia.*, p.supplier_id
         FROM inventory_alert ia
         JOIN product p ON p.id = ia.product_id
         WHERE ia.id = $1
       `,
-          [alertId]
-        )
+        [alertId]
+      )
 
-        if (alerts.length === 0) {
-          throw new NotFoundError('Alert not found')
-        }
+      if (alerts.length === 0) {
+        throw new NotFoundError('Alert not found')
+      }
 
-        if (!supplierId || alerts[0].supplier_id !== supplierId) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied',
-            },
-            requestId: req.requestId,
-          })
-        }
+      if (alerts[0].supplier_id !== supplierId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
       }
 
       const { rows } = await query(

@@ -16,15 +16,16 @@ Supplier tenants can operate as a **multi-branch organization**: one parent org 
 
 ## Lifecycle (current)
 
-| Action                                    | Status                                                                           |
-| ----------------------------------------- | -------------------------------------------------------------------------------- |
-| Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`                                         |
-| Deactivation guards                       | Blocks main branch; open orders; WH reservations; open invoices                  |
-| Permission cache fan-out                  | Deactivate / reactivate / unlink clear caches for all affected users             |
-| Unlink billing policy                     | Block on OPEN invoices; review flags for prepaid/credits/org PAST_DUE; no refund |
-| Link existing standalone supplier         | `branch_account_link_invitations`                                                |
-| Consolidated reporting                    | `GET /api/org/reports/overview`                                                  |
-| Warehouse stock                           | Prefer `warehouse_inventory` when warehouses enabled; see supplier-stock service |
+| Action                                    | Status                                                                                                            |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`; target must belong to the caller's org                                  |
+| Grant / revoke branch access              | Org Owner only; supplier must belong to the caller organization                                                   |
+| Deactivation guards                       | Blocks main branch; open orders; WH reservations; open invoices                                                   |
+| Permission cache fan-out                  | Deactivate / reactivate / unlink clear caches for all affected users                                              |
+| Unlink billing policy                     | Block on OPEN invoices; review flags for prepaid/credits/org PAST_DUE; no refund                                  |
+| Link existing standalone supplier         | `branch_account_link_invitations`                                                                                 |
+| Consolidated reporting                    | `GET /api/org/reports/overview`                                                                                   |
+| Warehouse stock                           | Prefer `warehouse_inventory` when warehouses enabled; legacy adjustments apply a delta to an owned warehouse only |
 
 Existing single-location suppliers are migrated automatically: one org per primary supplier, main branch flagged, contact users receive **Org Owner**.
 

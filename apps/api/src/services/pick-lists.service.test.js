@@ -8,6 +8,14 @@ vi.mock('../lib/db.js', () => ({
   withTransaction: (fn) => fn({ query: (...args) => clientQueryMock(...args) }),
 }))
 
+vi.mock('../lib/warehouse-helpers.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+  }
+})
+
 describe('pick-lists.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -164,6 +172,8 @@ describe('pick-lists.service', () => {
     expect(wave.pickLists).toHaveLength(1)
     expect(wave.pickLists[0].items).toHaveLength(1)
     expect(wave.pickLists[0].items[0].productName).toBe('Rice')
+    const sql = queryMock.mock.calls.map(([s]) => String(s)).join('\n')
+    expect(sql).toMatch(/w\.supplier_id = dw\.supplier_id/)
   })
 
   it('updates pick list item quantity', async () => {
@@ -253,5 +263,9 @@ describe('pick-lists.service', () => {
 
     const wave = await completeWave('w1', 's1')
     expect(wave.status).toBe('PICKED')
+    const packedUpdate = clientQueryMock.mock.calls.find(([sql]) =>
+      String(sql).includes("status = 'packed'")
+    )
+    expect(String(packedUpdate[0])).toMatch(/owa\.warehouse_id = pl\.warehouse_id/)
   })
 })

@@ -213,7 +213,11 @@ Updated Product,SKU2,20,3`
     it('returns priority KPI cards', async () => {
       const count = (n) => ({ rows: [{ count: n }] })
       db.query.mockImplementation(async (sql) => {
-        if (/date_trunc\('day', now\(\)\)/i.test(sql) && /COUNT\(DISTINCT o\.id\)/i.test(sql)) {
+        if (
+          /AT TIME ZONE/i.test(sql) &&
+          /ACKNOWLEDGED/i.test(sql) &&
+          /COUNT\(DISTINCT o\.id\)/i.test(sql)
+        ) {
           return count(3)
         }
         if (

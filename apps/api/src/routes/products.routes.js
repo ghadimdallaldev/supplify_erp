@@ -29,7 +29,9 @@ import {
   getSupplierProductAvailableQty,
   overlayProductRowsWithAuthoritativeStock,
 } from '../services/supplier-stock.service.js'
+import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
 import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
 
@@ -660,8 +662,8 @@ router.get('/', async (req, res) => {
         SELECT amount, currency
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true
       ${whereClause}
@@ -679,8 +681,8 @@ router.get('/', async (req, res) => {
         SELECT amount
         FROM price
         WHERE price.product_id = p.id
-          AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-        ORDER BY valid_from DESC
+          AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+        ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
         LIMIT 1
       ) pr ON true`
           : ''
@@ -872,8 +874,8 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
           SELECT amount, currency
           FROM price
           WHERE price.product_id = p.id
-            AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-          ORDER BY valid_from DESC
+            AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+          ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
           LIMIT 1
         ) pr ON true
         WHERE pf.restaurant_id = $1 AND pf.user_id = $2
@@ -1154,6 +1156,16 @@ router.get('/:id', async (req, res) => {
       }
       const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
       product = enriched
+    } else {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'NOT_FOUND',
+          message: 'Product not found',
+        },
+        requestId: req.requestId,
+      })
     }
 
     product.available_qty = await getSupplierProductAvailableQty(product.supplier_id, product.id)
@@ -1186,49 +1198,71 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
   try {
     const productData = productCreateSchema.parse(req.body)
 
-    // For suppliers, ensure they can only create products for their own supplier record
-    let supplierId = req.body.supplier_id
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'VALIDATION_ERROR',
+          message: 'Supplier record not found for user',
+        },
+        requestId: req.requestId,
+      })
+    }
 
-    if (req.userData.role === 'SUPPLIER') {
-      supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
+    const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
+    if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
+      const [subscription, recommendedPlans] = await Promise.all([
+        getTenantSubscription(supplierId, 'SUPPLIER'),
+        getRecommendedPlanNames('SUPPLIER'),
+      ])
+      const err = buildLimitExceededPayload(
+        limitCheck,
+        'supplier_products_skus',
+        subscription?.plan_name || subscription?.plan_display_name,
+        recommendedPlans,
+        undefined,
+        'SUPPLIER'
+      )
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: err,
+        requestId: req.requestId,
+      })
+    }
+
+    const requestedWarehouseId =
+      typeof req.body.warehouse_id === 'string' && req.body.warehouse_id.trim()
+        ? req.body.warehouse_id.trim()
+        : null
+    if (requestedWarehouseId) {
+      const parsedWarehouseId = z.string().uuid().safeParse(requestedWarehouseId)
+      if (!parsedWarehouseId.success) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: 'Invalid warehouse_id' },
+          requestId: req.requestId,
+        })
+      }
+      const supplierColumn = await getWarehouseSupplierColumn()
+      const { rows: warehouseRows } = await query(
+        `SELECT id FROM warehouse WHERE id = $1 AND ${supplierColumn} = $2 AND is_active = TRUE`,
+        [parsedWarehouseId.data, supplierId]
+      )
+      if (!warehouseRows.length) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'Supplier record not found for user',
+            message: 'Warehouse not found for this supplier',
           },
           requestId: req.requestId,
         })
       }
-
-      // Check plan limits for suppliers
-      const limitCheck = await checkLimit(supplierId, 'SUPPLIER', 'supplier_products_skus')
-      if (limitCheck.isOverLimit && !limitCheck.isUnlimited) {
-        const [subscription, recommendedPlans] = await Promise.all([
-          getTenantSubscription(supplierId, 'SUPPLIER'),
-          getRecommendedPlanNames('SUPPLIER'),
-        ])
-        const err = buildLimitExceededPayload(
-          limitCheck,
-          'supplier_products_skus',
-          subscription?.plan_name || subscription?.plan_display_name,
-          recommendedPlans,
-          undefined,
-          'SUPPLIER'
-        )
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: err,
-          requestId: req.requestId,
-        })
-      }
-    }
-
-    if (!supplierId) {
-      throw new ValidationError('supplier_id is required')
     }
 
     const selectedCategory = await assertCategoryAvailable(productData.category_id, supplierId)
@@ -1292,8 +1326,15 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
           INSERT INTO inventory (product_id, warehouse_id, available_qty, reserved_qty, on_order_qty)
           VALUES ($1, $2, $3, 0, 0)
         `,
-          [product.id, req.body.warehouse_id || null, req.body.initialStock]
+          [product.id, requestedWarehouseId, req.body.initialStock]
         )
+        await syncWarehouseMirrorFromLegacy(client, {
+          supplierId,
+          productId: product.id,
+          availableQty: Number(req.body.initialStock),
+          reservedQty: 0,
+          warehouseId: requestedWarehouseId || null,
+        })
       }
 
       return product
@@ -1370,20 +1411,17 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
 
     const product = existingProducts[0]
 
-    // Check ownership for suppliers
-    if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId || product.supplier_id !== supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied. You can only update your own products',
-          },
-          requestId: req.requestId,
-        })
-      }
+    const supplierId = await getSupplierIdForRequest(req)
+    if (!supplierId || product.supplier_id !== supplierId) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'FORBIDDEN',
+          message: 'Access denied. You can only update your own products',
+        },
+        requestId: req.requestId,
+      })
     }
 
     const selectedCategory =

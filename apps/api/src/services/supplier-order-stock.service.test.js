@@ -23,7 +23,16 @@ vi.mock('./supplier-stock.service.js', () => ({
   ensureDefaultWarehouseForSupplier: vi.fn().mockResolvedValue({ id: 'wh-1' }),
 }))
 
-import { reserveStockForPlacedOrder, releaseStockForOrder } from './supplier-order-stock.service.js'
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+}))
+
+import {
+  applyWarehouseInventoryAdjustment,
+  reserveStockForPlacedOrder,
+  releaseStockForOrder,
+  syncWarehouseMirrorFromLegacy,
+} from './supplier-order-stock.service.js'
 import { assertAndDeductSupplierStockBatch } from './supplier-inventory.service.js'
 import { assignWarehousesToOrder } from './warehouseRouting.js'
 import { releaseInventoryForOrder } from './warehouseInventory.js'
@@ -128,5 +137,111 @@ describe('supplier-order-stock.service', () => {
         legacyLineItems: [{ productId: 'p-1', quantity: 2 }],
       })
     ).rejects.toBeInstanceOf(ValidationError)
+  })
+
+  it('rejects mirroring legacy stock onto another supplier warehouse', async () => {
+    supplierUsesWarehouseInventory.mockResolvedValue(true)
+    const client = {
+      query: vi.fn().mockResolvedValueOnce({ rows: [] }),
+    }
+
+    await expect(
+      syncWarehouseMirrorFromLegacy(client, {
+        supplierId: 'sup-1',
+        productId: 'p-1',
+        availableQty: 10,
+        warehouseId: 'foreign-wh',
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(false)
+  })
+
+  it('applies a delta instead of overwriting multi-warehouse stock', async () => {
+    supplierUsesWarehouseInventory.mockResolvedValue(true)
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'wh-1' }] })
+        .mockResolvedValueOnce({ rows: [{ available_qty: 80, reserved_qty: 0 }] })
+        .mockResolvedValueOnce({}),
+    }
+
+    const result = await syncWarehouseMirrorFromLegacy(client, {
+      supplierId: 'sup-1',
+      productId: 'p-1',
+      availableQty: 90,
+      reservedQty: 0,
+      warehouseId: 'wh-1',
+    })
+
+    expect(result).toEqual({ warehouseId: 'wh-1', available: 90, reserved: 0 })
+    const upsert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO warehouse_inventory')
+    )
+    expect(upsert?.[1]?.[2]).toBe(10)
+    expect(upsert?.[0]).toMatch(/warehouse_inventory\.quantity_available \+ \$3/)
+  })
+
+  it('applies warehouse adjustments from warehouse totals, not a stale inventory row', async () => {
+    supplierUsesWarehouseInventory.mockResolvedValue(true)
+    const client = {
+      query: vi.fn().mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('SELECT id FROM warehouse')) return { rows: [{ id: 'wh-1' }] }
+        if (text.includes('COALESCE(SUM')) {
+          return { rows: [{ available_qty: 100, reserved_qty: 0 }] }
+        }
+        if (text.includes('FROM warehouse_inventory') && text.includes('warehouse_id = $1')) {
+          return { rows: [{ available_qty: 100 }] }
+        }
+        return { rows: [] }
+      }),
+    }
+
+    const result = await applyWarehouseInventoryAdjustment(client, {
+      supplierId: 'sup-1',
+      productId: 'p-1',
+      adjustmentType: 'OUT',
+      quantity: 10,
+      warehouseId: 'wh-1',
+    })
+
+    expect(result.applied).toBe(true)
+    const upsert = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO warehouse_inventory')
+    )
+    expect(upsert?.[1]?.[2]).toBe(-10)
+    const legacyMirror = client.query.mock.calls.find(([sql]) =>
+      String(sql).includes('INSERT INTO inventory')
+    )
+    expect(legacyMirror).toBeTruthy()
+  })
+
+  it('rejects a warehouse OUT that exceeds that warehouse quantity', async () => {
+    supplierUsesWarehouseInventory.mockResolvedValue(true)
+    const client = {
+      query: vi.fn().mockImplementation(async (sql) => {
+        const text = String(sql)
+        if (text.includes('SELECT id FROM warehouse')) return { rows: [{ id: 'wh-1' }] }
+        if (text.includes('COALESCE(SUM')) {
+          return { rows: [{ available_qty: 100, reserved_qty: 0 }] }
+        }
+        if (text.includes('FROM warehouse_inventory') && text.includes('warehouse_id = $1')) {
+          return { rows: [{ available_qty: 5 }] }
+        }
+        return { rows: [] }
+      }),
+    }
+
+    await expect(
+      applyWarehouseInventoryAdjustment(client, {
+        supplierId: 'sup-1',
+        productId: 'p-1',
+        adjustmentType: 'OUT',
+        quantity: 10,
+        warehouseId: 'wh-1',
+      })
+    ).rejects.toBeInstanceOf(ValidationError)
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(false)
   })
 })

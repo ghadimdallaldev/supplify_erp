@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   resolveStatusAfterApproval,
   resolveScheduledOrActive,
+  resolveInitialDealStatus,
+  resolveResumeStatus,
+  getDealFieldError,
   isRestaurantVisibleDeal,
   getRestaurantIneligibilityMessage,
   getDealDiscountDisplayLabel,
@@ -96,6 +99,60 @@ describe('deal-lifecycle.service', () => {
 
   it('isPendingAdminReview accepts legacy pending_approval', () => {
     expect(isPendingAdminReview({ status: 'pending_approval' })).toBe(true)
+  })
+
+  it('saving a deal keeps it a draft until submit', () => {
+    expect(resolveInitialDealStatus(false)).toBe('draft')
+    expect(resolveInitialDealStatus(true)).toBe('pending_approval')
+  })
+
+  it('rejects discounts that would not apply', () => {
+    const base = {
+      description: 'Weekend produce special',
+      startsAt: '2026-09-25T10:00:00.000Z',
+      ctaType: 'order_now',
+    }
+    expect(getDealFieldError({ ...base, type: 'percentage_discount', discountValue: 0 })).toMatch(
+      /100/
+    )
+    expect(getDealFieldError({ ...base, type: 'percentage_discount', discountValue: 150 })).toMatch(
+      /100/
+    )
+    expect(getDealFieldError({ ...base, type: 'percentage_discount', discountValue: 10 })).toBe(
+      null
+    )
+    expect(getDealFieldError({ ...base, type: 'fixed_discount', discountValue: 0 })).toMatch(
+      /greater than zero/
+    )
+    expect(
+      getDealFieldError({
+        ...base,
+        type: 'buy_x_get_y',
+        buyQuantity: 2,
+        getQuantity: 1,
+      })
+    ).toBe(null)
+    expect(getDealFieldError({ ...base, type: 'free_shipping' })).toBe(null)
+    expect(
+      getDealFieldError({
+        ...base,
+        type: 'percentage_discount',
+        discountValue: 10,
+        description: '  ',
+      })
+    ).toMatch(/Describe/)
+  })
+
+  it('expires a paused deal whose boost window has ended', () => {
+    expect(
+      resolveResumeStatus({
+        status: 'paused',
+        payment_status: 'paid',
+        starts_at: '2026-01-01T00:00:00.000Z',
+        ends_at: null,
+        boost_end_at: '2026-01-02T00:00:00.000Z',
+      })
+    ).toBe('expired')
   })
 
   it('active deal without boost window is not restaurant-visible', () => {

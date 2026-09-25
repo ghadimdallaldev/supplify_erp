@@ -34,10 +34,11 @@ Mounted at `/api/orders/:orderId/amendments` (requires `ORDERS_VIEW` / `ORDERS_M
 - `item_removal` — deletes line
 - `item_substitution` — replaces product on line
 - `delivery_date_change` / `other` — status only (no line changes unless items provided)
+- Stock is released and reserved again for the new lines. Warehouse legs released by that accept are marked `superseded`, not left `failed`, so they do not block a later delivery.
 
 Notifications are sent to the **counterparty tenant team** via `notifyTenantUsers` (not only the primary contact email).
 
-Supplier fulfillment issues may report a shortage alone or suggest a configured replacement. A replacement suggestion creates an `item_substitution` amendment and waits for restaurant approval before changing the order line. Android and iOS render amendment history defensively even when optional product information is absent.
+Supplier fulfillment issues may report a shortage alone or suggest a configured replacement. A replacement suggestion creates an `item_substitution` amendment and the fulfillment issue in one transaction, then notifies the restaurant. A failure rolls both back, so a restaurant never sees an amendment without its issue. The suggestion waits for restaurant approval before changing the order line. The line's supplier owns the substitution; the order is not limited to the first line's supplier. Android and iOS render amendment history defensively even when optional product information is absent.
 
 ## Database
 

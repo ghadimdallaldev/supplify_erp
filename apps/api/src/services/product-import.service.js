@@ -474,6 +474,17 @@ export async function executeProductImport(
       summary.created = creates.length
       summary.updated = updates.length
 
+      const { hookRecipeCostingAfterCatalogPriceChange } = await import(
+        './recipe-purchasing-hooks.service.js'
+      )
+      for (const { raw } of validatedRows) {
+        const amount = parseOptionalNumber(raw.price)
+        if (amount == null) continue
+        const productId = skuToProductId.get(String(raw.sku).toLowerCase())
+        if (!productId) continue
+        hookRecipeCostingAfterCatalogPriceChange(productId, amount, 'CATALOG')
+      }
+
       for (const { rowNumber, raw } of validatedRows) {
         const imageUrl = raw.image_url?.trim()
         if (!imageUrl) continue

@@ -55,7 +55,7 @@ export function OnboardingTeamTab() {
           renderInviteForm={() => (
             <Button className="mt-2" onClick={() => setShowAddMemberDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Invite via Link
+              {t('restaurantTeam.inviteViaLink')}
             </Button>
           )}
         />

@@ -108,4 +108,20 @@ describe('assistant routes', () => {
   it('POST /messages rejects empty message', async () => {
     await request(app).post('/api/assistant/messages').send({ message: '' }).expect(400)
   })
+
+  it('POST /messages validates attachment types', async () => {
+    await request(app)
+      .post('/api/assistant/messages')
+      .send({
+        message: 'Review this',
+        attachments: [
+          {
+            fileUrl: 'https://files.example/uploads/user-1/file.exe',
+            fileType: 'application/octet-stream',
+            fileName: 'file.exe',
+          },
+        ],
+      })
+      .expect(400)
+  })
 })

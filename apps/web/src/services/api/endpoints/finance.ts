@@ -139,12 +139,20 @@ export type SupplierSlowMovingInventoryResponse = {
 }
 
 export type SupplierStatementSummary = {
-  openingBalance: number
-  totalCharges: number
-  totalPayments: number
-  totalAdjustments: number
-  closingBalance: number
+  openingBalance: number | null
+  totalCharges: number | null
+  totalPayments: number | null
+  totalAdjustments: number | null
+  closingBalance: number | null
   invoiceCount?: number
+  byCurrency?: Array<{
+    currency: string
+    openingBalance: number
+    totalCharges: number
+    totalPayments: number
+    totalAdjustments: number
+    closingBalance: number
+  }>
 }
 
 export type SupplierStatementInvoice = {
@@ -155,6 +163,7 @@ export type SupplierStatementInvoice = {
   total_paid?: string | number
   supplier_name?: string
   status?: string
+  currency?: string | null
 }
 
 export type SupplierStatementResponse = {

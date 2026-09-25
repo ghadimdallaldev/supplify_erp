@@ -53,9 +53,83 @@ export function normalizeOrderingHoursConfig(
   }
 }
 
-export function isWithinLiveOrderWindow(now: Date, startTime: string, endTime: string): boolean {
+function zonedParts(date: Date, timeZone: string) {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]))
+  return {
+    calendarDate: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+  }
+}
+
+function addCalendarDays(ymd: string, days: number) {
+  const [year, month, day] = ymd.split('-').map(Number)
+  const next = new Date(Date.UTC(year, month - 1, day))
+  next.setUTCDate(next.getUTCDate() + days)
+  return next.toISOString().slice(0, 10)
+}
+
+function wallClockToUtc(ymd: string, hour: number, minute: number, timeZone: string) {
+  const [year, month, day] = ymd.split('-').map(Number)
+  let utc = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0))
+  for (let pass = 0; pass < 3; pass += 1) {
+    const got = zonedParts(utc, timeZone)
+    let gotHour = got.hour
+    let gotDate = got.calendarDate
+    if (gotHour === 24) {
+      gotHour = 0
+      gotDate = addCalendarDays(gotDate, 1)
+    }
+    const [gy, gm, gd] = gotDate.split('-').map(Number)
+    const gotUtc = Date.UTC(gy, gm - 1, gd, gotHour, got.minute, 0, 0)
+    const wanted = Date.UTC(year, month - 1, day, hour, minute, 0, 0)
+    const delta = gotUtc - wanted
+    if (delta === 0) break
+    utc = new Date(utc.getTime() - delta)
+  }
+  return utc
+}
+
+function clockMinutes(now: Date, timeZone?: string | null) {
+  if (!timeZone) return now.getHours() * 60 + now.getMinutes()
+  const parts = zonedParts(now, timeZone)
+  const hour = parts.hour === 24 ? 0 : parts.hour
+  return hour * 60 + parts.minute
+}
+
+/** A datetime-local value is the restaurant's wall clock when a timezone is known. */
+export function scheduledInstant(localValue: string, timeZone?: string | null): Date {
+  const match = localValue.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/)
+  if (!match || !timeZone) return new Date(localValue)
+  return wallClockToUtc(match[1], Number(match[2]), Number(match[3]), timeZone)
+}
+
+export function toDatetimeLocalValueInZone(date: Date, timeZone?: string | null): string {
+  if (!timeZone) return toDatetimeLocalValue(date)
+  const parts = zonedParts(date, timeZone)
+  const hour = parts.hour === 24 ? 0 : parts.hour
+  const day = parts.hour === 24 ? addCalendarDays(parts.calendarDate, 1) : parts.calendarDate
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${day}T${pad(hour)}:${pad(parts.minute)}`
+}
+
+export function isWithinLiveOrderWindow(
+  now: Date,
+  startTime: string,
+  endTime: string,
+  timeZone?: string | null
+): boolean {
   const startMin = parseTimeToMinutes(startTime) ?? 12 * 60
-  const currentMin = now.getHours() * 60 + now.getMinutes()
+  const currentMin = clockMinutes(now, timeZone)
 
   if (endTimeIsEndOfDay(endTime) && startMin > 0) {
     return currentMin >= startMin

@@ -1,5 +1,5 @@
 import { Badge } from './ui/badge'
-import { formatPrice } from '../utils/format'
+import { formatCurrency } from '../utils/format'
 
 type ContractPriceDisplayProps = {
   currentPrice?: number | null
@@ -39,7 +39,7 @@ export function ContractPriceDisplay({
               : 'text-3xl font-bold text-[var(--brand-mid)]'
           }
         >
-          {formatPrice(currentPrice)}
+          {formatCurrency(currentPrice, { currency })}
         </p>
         {isContract && (
           <Badge variant="secondary" className="text-xs">
@@ -49,7 +49,7 @@ export function ContractPriceDisplay({
       </div>
       {showStrikethrough && (
         <p className="text-xs text-[var(--text-mid)] line-through tabular-nums">
-          {formatPrice(catalogPrice)}
+          {formatCurrency(catalogPrice, { currency })}
         </p>
       )}
       {!compact && unit && (

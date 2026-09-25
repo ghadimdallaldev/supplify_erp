@@ -41,12 +41,14 @@ describe('checkOverdueInvoices', () => {
             id: 'inv-1',
             invoice_number: 'INV-1',
             total_amount: 10,
+            balance_due: 4,
             due_date: '2026-05-01',
             restaurant_id: 'r1',
             supplier_id: 's1',
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [{ id: 'inv-1' }] })
       .mockResolvedValueOnce({ rows: [] })
 
     const result = await checkOverdueInvoices()
@@ -57,6 +59,8 @@ describe('checkOverdueInvoices', () => {
     expect(String(query.mock.calls[0][0])).toContain('sub.account_locked_at IS NULL')
     expect(String(query.mock.calls[0][0])).toContain('sub.tenant_id = invoice.supplier_id')
     expect(String(query.mock.calls[0][0])).toContain('sub.tenant_id = invoice.restaurant_id')
+    expect(String(query.mock.calls[0][0])).toContain('AT TIME ZONE')
+    expect(String(query.mock.calls[0][0])).toContain('r.timezone')
   })
   it('skips overdue update and notification when either tenant locks after scan', async () => {
     const { query } = await import('../lib/db.js')

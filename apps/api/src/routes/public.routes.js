@@ -40,9 +40,12 @@ import { evaluateCancelWindow, assertDepositAcknowledged } from '../lib/reservat
 import {
   getRestaurantSlotAvailability,
   assertSlotBookable,
+  assertNoDuplicateGuestBooking,
+  holdTablesForParty,
   toCalendarDateString,
   CAPACITY_CONSUMING_STATUSES,
   DEFAULT_DURATION_MINUTES,
+  readBookingMeta,
 } from '../lib/reservation-availability.js'
 import {
   getPublicSupplierProfile,
@@ -175,35 +178,6 @@ async function fetchReservationByToken(token) {
     [token]
   )
   return rows[0] ?? null
-}
-
-async function assertNoDuplicateGuestBooking(client, restaurantId, scheduledAt, email, phone) {
-  const { rows } = await client.query(
-    `
-      SELECT id FROM reservation
-      WHERE restaurant_id = $1
-        AND status = ANY($2::text[])
-        AND scheduled_at = $3::timestamptz
-        AND (
-          (customer_email IS NOT NULL AND customer_email = $4)
-          OR (customer_phone IS NOT NULL AND customer_phone = $5)
-        )
-      LIMIT 1
-    `,
-    [
-      restaurantId,
-      CAPACITY_CONSUMING_STATUSES,
-      new Date(scheduledAt).toISOString(),
-      email || null,
-      phone || null,
-    ]
-  )
-  if (rows.length) {
-    const err = new Error('You already have a reservation at this time.')
-    err.name = 'DUPLICATE_RESERVATION'
-    err.statusCode = 409
-    throw err
-  }
 }
 
 function isUuid(str) {
@@ -466,7 +440,6 @@ router.post('/reservations', async (req, res) => {
     }
 
     const calendarDate = toCalendarDateString(scheduledAt)
-    const durationMinutes = payload.durationMinutes || DEFAULT_DURATION_MINUTES
 
     const reservation = await withTransaction(async (client) => {
       await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [
@@ -485,13 +458,17 @@ router.post('/reservations', async (req, res) => {
       }
 
       assertDepositAcknowledged(restaurantRows[0].operating_hours, payload.depositAcknowledged)
+      const durationMinutes =
+        readBookingMeta(restaurantRows[0].operating_hours).durationMinutes ||
+        DEFAULT_DURATION_MINUTES
 
       await assertNoDuplicateGuestBooking(
         client,
         payload.restaurantId,
         scheduledAt,
         payload.customerEmail,
-        payload.customerPhone
+        payload.customerPhone,
+        durationMinutes
       )
 
       const availability = await getRestaurantSlotAvailability(
@@ -516,6 +493,12 @@ router.post('/reservations', async (req, res) => {
       }
 
       assertSlotBookable(availability, scheduledAt, payload.partySize)
+      const tableIds = await holdTablesForParty((text, params) => client.query(text, params), {
+        restaurantId: payload.restaurantId,
+        scheduledAt,
+        durationMinutes,
+        partySize: payload.partySize,
+      })
 
       const guest = await upsertReservationGuest(client, {
         restaurantId: payload.restaurantId,
@@ -553,7 +536,7 @@ router.post('/reservations', async (req, res) => {
       `,
         [
           payload.restaurantId,
-          [],
+          tableIds,
           payload.customerName,
           payload.customerPhone ?? null,
           payload.customerEmail ?? null,
@@ -1306,6 +1289,17 @@ router.post('/reservations/manage/cancel', async (req, res) => {
         requestId: req.requestId,
       })
     }
+    if (!['PENDING', 'CONFIRMED', 'WAITLIST'].includes(reservation.status)) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'RESERVATION_NOT_CANCELLABLE',
+          message: 'This reservation can no longer be cancelled online',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const { rows: restaurantPolicyRows } = await query(
       `SELECT operating_hours FROM restaurant WHERE id = $1`,
@@ -1335,10 +1329,22 @@ router.post('/reservations/manage/cancel', async (req, res) => {
             cancelled_at = now(),
             cancellation_reason = 'Guest cancelled'
         WHERE id = $1
+          AND status = ANY($2::text[])
         RETURNING *
       `,
-      [reservation.id]
+      [reservation.id, ['PENDING', 'CONFIRMED', 'WAITLIST']]
     )
+    if (!rows.length) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'RESERVATION_NOT_CANCELLABLE',
+          message: 'This reservation can no longer be cancelled online',
+        },
+        requestId: req.requestId,
+      })
+    }
 
     const cancelled = rows[0]
 
@@ -1408,16 +1414,87 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
       })
     }
 
+    if (!['PENDING', 'CONFIRMED'].includes(reservation.status)) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'RESERVATION_RESCHEDULE_ERROR',
+          message: 'This reservation can no longer be moved',
+        },
+        requestId: req.requestId,
+      })
+    }
+
     const calendarDate = toCalendarDateString(newDate)
-    const availability = await loadSlotAvailability(
-      reservation.restaurant_id,
-      calendarDate,
-      reservation.party_size,
-      reservation.id
-    )
-    let bookedSlot
+    const durationMinutes = reservation.duration_minutes ?? DEFAULT_DURATION_MINUTES
+
+    let rows
     try {
-      bookedSlot = assertSlotBookable(availability, newDate, reservation.party_size)
+      rows = await withTransaction(async (client) => {
+        await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [
+          reservation.restaurant_id,
+        ])
+        const { rows: currentRows } = await client.query(
+          `SELECT status FROM reservation WHERE id = $1 FOR UPDATE`,
+          [reservation.id]
+        )
+        if (!['PENDING', 'CONFIRMED'].includes(currentRows[0]?.status)) {
+          const err = new Error('This reservation can no longer be moved')
+          err.name = 'RESERVATION_RESCHEDULE_ERROR'
+          err.statusCode = 400
+          throw err
+        }
+
+        const { rows: restaurantRows } = await client.query(
+          `SELECT operating_hours FROM restaurant WHERE id = $1`,
+          [reservation.restaurant_id]
+        )
+        const availability = await getRestaurantSlotAvailability(
+          (text, params) => client.query(text, params),
+          {
+            restaurantId: reservation.restaurant_id,
+            dateInput: calendarDate,
+            partySize: reservation.party_size,
+            excludeReservationId: reservation.id,
+            operatingHours: restaurantRows[0]?.operating_hours,
+          }
+        )
+        const bookedSlot = assertSlotBookable(availability, newDate, reservation.party_size)
+        const canonicalStart = new Date(bookedSlot.startTime)
+        await assertNoDuplicateGuestBooking(
+          client,
+          reservation.restaurant_id,
+          canonicalStart,
+          reservation.customer_email,
+          reservation.customer_phone,
+          durationMinutes,
+          reservation.id
+        )
+        const tableIds = await holdTablesForParty((text, params) => client.query(text, params), {
+          restaurantId: reservation.restaurant_id,
+          scheduledAt: canonicalStart,
+          durationMinutes,
+          partySize: reservation.party_size,
+          branchId: reservation.branch_id,
+          excludeReservationId: reservation.id,
+        })
+
+        const { rows: updated } = await client.query(
+          `
+            UPDATE reservation
+            SET scheduled_at = $2,
+                duration_minutes = $3,
+                tables = $4::uuid[],
+                updated_at = now(),
+                public_token_expires_at = COALESCE(public_token_expires_at, now() + interval '180 days')
+            WHERE id = $1
+            RETURNING *
+          `,
+          [reservation.id, canonicalStart.toISOString(), durationMinutes, tableIds]
+        )
+        return updated
+      })
     } catch (slotError) {
       return res.status(slotError.statusCode || 409).json({
         ok: false,
@@ -1429,22 +1506,6 @@ router.post('/reservations/manage/reschedule', async (req, res) => {
         requestId: req.requestId,
       })
     }
-
-    const canonicalStart = new Date(bookedSlot.startTime)
-    const durationMinutes = reservation.duration_minutes ?? 90
-
-    const { rows } = await query(
-      `
-        UPDATE reservation
-        SET scheduled_at = $2,
-            duration_minutes = $3,
-            updated_at = now(),
-            public_token_expires_at = COALESCE(public_token_expires_at, now() + interval '180 days')
-        WHERE id = $1
-        RETURNING *
-      `,
-      [reservation.id, canonicalStart.toISOString(), durationMinutes]
-    )
 
     void notifyReservationStaffEvent(rows[0], 'rescheduled').catch((err) =>
       logger.warn('Reservation reschedule notification failed', { error: err.message })

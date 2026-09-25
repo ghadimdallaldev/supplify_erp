@@ -144,6 +144,32 @@ describe('rbac-guards', () => {
       )
     })
 
+    it('allows a tenant Owner to assign Owner when the restaurant has no organization', async () => {
+      mockQueryBySql([
+        [
+          'FROM tenant_roles WHERE id',
+          {
+            rows: [
+              {
+                id: 'role-owner',
+                name: 'Owner',
+                tenant_id: 'tenant-1',
+                tenant_type: 'RESTAURANT',
+                is_system: true,
+              },
+            ],
+          },
+        ],
+        ["tr.name = 'Owner'", { rows: [{ is_owner: true }] }],
+      ])
+      const role = await assertCanAssignRole({
+        ...baseArgs,
+        roleId: 'role-owner',
+        organizationId: null,
+      })
+      expect(role.name).toBe('Owner')
+    })
+
     it('rejects self-promotion to a role with more access', async () => {
       queryMock.mockImplementation((sql, params) => {
         const text = String(sql)

@@ -71,19 +71,19 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 ## API — Supplier (`CATALOG_MANAGE`, feature `promotions`)
 
-| Method | Path                            | Description                                                      |
-| ------ | ------------------------------- | ---------------------------------------------------------------- |
-| GET    | `/api/promotions`               | List deals (`?status=`)                                          |
-| POST   | `/api/promotions`               | Create draft (supports `productIds`, `categoryIds`, CTA, coupon) |
-| PATCH  | `/api/promotions/:id`           | Edit (not discount value when active)                            |
-| POST   | `/api/promotions/:id/activate`  | Active or `pending_approval` if admin approval required          |
-| POST   | `/api/promotions/:id/pause`     | Pause                                                            |
-| POST   | `/api/promotions/:id/resume`    | Resume paused deal                                               |
-| POST   | `/api/promotions/:id/promote`   | Create paid boost campaign                                       |
-| DELETE | `/api/promotions/:id`           | Delete draft only                                                |
-| GET    | `/api/promotions/:id/analytics` | Views, clicks, orders, messages, coupon uses, conversion         |
-| GET    | `/api/promotions/:id/preview`   | Supplier preview with targets                                    |
-| GET    | `/api/promotions/pricing`       | Active boost packages (supplier boost picker)                    |
+| Method | Path                            | Description                                                                                                                                                                                                                                       |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/promotions`               | List deals (`?status=`)                                                                                                                                                                                                                           |
+| POST   | `/api/promotions`               | Create a draft unless `submitForReview` is true. Requires a description. Percentage discounts must be greater than 0 and at most 100. Fixed discounts must be positive. Buy X Get Y requires buy and free quantities. Coupon CTAs require a code. |
+| PATCH  | `/api/promotions/:id`           | Edit (not discount value when active)                                                                                                                                                                                                             |
+| POST   | `/api/promotions/:id/activate`  | Active or `pending_approval` if admin approval required                                                                                                                                                                                           |
+| POST   | `/api/promotions/:id/pause`     | Pause an active or scheduled deal and its live boost campaign                                                                                                                                                                                     |
+| POST   | `/api/promotions/:id/resume`    | Resume a paused deal, or mark it expired when the boost or offer window has ended                                                                                                                                                                 |
+| POST   | `/api/promotions/:id/promote`   | Create paid boost campaign                                                                                                                                                                                                                        |
+| DELETE | `/api/promotions/:id`           | Delete draft only                                                                                                                                                                                                                                 |
+| GET    | `/api/promotions/:id/analytics` | Views, clicks, orders, messages, coupon uses, conversion                                                                                                                                                                                          |
+| GET    | `/api/promotions/:id/preview`   | Supplier preview with targets                                                                                                                                                                                                                     |
+| GET    | `/api/promotions/pricing`       | Active boost packages (supplier boost picker)                                                                                                                                                                                                     |
 
 ## API — Restaurant (feature `supplier_deals`)
 
@@ -163,7 +163,7 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 - **Disputes / chargebacks:** `POST /webhooks/stripe` (raw body + `Stripe-Signature`) uses `PAYMENTS_WEBHOOK_SECRET` / `STRIPE_WEBHOOK_SECRET`. On `charge.dispute.*`, marks invoice disputed, sets `payment_status=disputed`, pauses active boost / cancels featured (migration `0203`)
 - **Idempotency:** clients should send `idempotencyKey` on `POST /api/promotions/:id/pay-activation` and featured purchase/pay
 - Admin: `POST /api/promotions/admin/:id/mark-boost-paid`, `POST /api/promotions/admin/:id/refund-boost`; insights include `total_ad_spend` / `boost_ad_spend` / `featured_ad_spend`
-- Featured: `POST /api/suppliers/featured-placement/purchase`, `.../:id/pay`, admin `.../:id/refund`
+- Featured: `POST /api/suppliers/featured-placement/purchase` opens/charges through the client payment flow but always creates a `pending` review request; `.../:id/pay` pays an unpaid request without activating it. Admin `.../:id/approve` starts the placement term, `.../:id/reject` declines it (and refunds a paid request), and `.../:id/refund` refunds an active placement.
 - Feature gates: supplier `promotions`, restaurant `supplier_deals` (Silver+ on paid tiers)
 
 ## Background job
@@ -172,13 +172,14 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 
 ## Database
 
-| Migration                         | Tables                                                                                            |
-| --------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `0074_promotions.sql`             | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`             |
-| `0095_deal_promotions_system.sql` | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config`    |
-| `0123_deal_boost_packages.sql`    | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing                  |
-| `0197_promotion_ad_billing.sql`   | `billing_invoice_id` on promotions, deal_promotions, featured placements; refunded payment status |
-| `0203_promotion_ad_disputed.sql`  | `disputed` payment_status for promotions + featured; `DISPUTED` on billing_payment                |
+| Migration                                    | Tables                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `0074_promotions.sql`                        | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`             |
+| `0095_deal_promotions_system.sql`            | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config`    |
+| `0123_deal_boost_packages.sql`               | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing                  |
+| `0197_promotion_ad_billing.sql`              | `billing_invoice_id` on promotions, deal_promotions, featured placements; refunded payment status |
+| `0203_promotion_ad_disputed.sql`             | `disputed` payment_status for promotions + featured; `DISPUTED` on billing_payment                |
+| `0216_featured_placement_admin_approval.sql` | Featured placement approval/rejection audit fields and pending-review index                       |
 
 ## Frontend
 

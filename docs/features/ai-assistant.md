@@ -7,15 +7,15 @@ Conversational, **read-only** chatbot for restaurant, supplier, driver, and plat
 - The released conversational assistant is read-only and available only to Restaurant Scale, Supplier Scale, and platform admins with `ADMIN_ACCESS`.
 - Tenant access requires `ai_assistant`; it is not granted by `ai_platform`. The latter remains the LLM gate for Smart Reorder.
 - Drivers are denied assistant endpoints and use the existing guided delivery screens and status actions instead.
-- Android and iOS gate restaurant and supplier assistant screens on `ai_assistant`; driver navigation intentionally has no assistant entry.
+- Android and iOS gate restaurant and supplier assistant screens on `ai_assistant` plus the same baseline view permissions as `assistantAccessGuard`; driver navigation intentionally has no assistant entry.
 - The tool table below describes permitted read-only data domains. Driver-only tools are not exposed while the driver conversational surface is disabled.
 
 ## Behaviour
 
 Users ask natural-language questions (e.g. “how many tomato kilos do we still have?”). The API:
 
-1. Gates on `AI_ENABLED` + provider credentials + tenant feature `ai_platform` (admins: env + `ADMIN_ACCESS` only).
-2. Reserves **one** `ai_requests_per_day` unit per user turn (tool hops do not extra-meter).
+1. Gates on `AI_ENABLED` + provider credentials + tenant feature `ai_assistant` (admins: env + `ADMIN_ACCESS` only).
+2. Reserves **one** `ai_requests_per_day` unit per user turn (tool hops do not extra-meter). The plan allowance (for example 300 on Scale) is counted separately for each user. Staff on the same restaurant or supplier do not share one counter.
 3. Runs an OpenAI tool-calling loop (max 8 rounds) against allowlisted **read-only** tools.
 4. Answers using tool JSON only — quantities, ETAs, and totals must not be invented.
 5. Refuses mutations (place order, adjust stock, assign driver) and points users to the right screen.
@@ -48,6 +48,8 @@ Middleware: `requireAuth` → `resolveTenantContext` → `resolveAdminContext` (
 | -------------------------- | ---------------------------- | ------------------------------------------------------------------ |
 | `get_inventory`            | Restaurant                   | `INVENTORY_VIEW`, `inventory_management`                           |
 | `get_account_overview`     | Restaurant                   | `INVENTORY_VIEW` (order figures also need `ORDERS_VIEW`)           |
+| `get_followed_suppliers`   | Restaurant                   | `CATALOG_VIEW`; active restaurant organization scope               |
+| `compare_supplier_prices`  | Restaurant                   | `CATALOG_VIEW`; current offers from followed suppliers only        |
 | `get_reorder_need`         | Restaurant                   | `INVENTORY_VIEW`, `smart_reorder`                                  |
 | `get_orders` / `get_order` | Restaurant, supplier         | `ORDERS_VIEW`                                                      |
 | `get_deliveries`           | Restaurant, supplier, driver | `ORDERS_VIEW` or `DRIVER_DELIVERIES_VIEW`                          |
@@ -70,6 +72,15 @@ The system prompt instructs the model to call a listing tool and answer from the
 
 The inventory / reorder-assistance Ask box routes to this assistant (`POST /api/assistant/messages`) whenever the tenant holds `ai_assistant`, and renders the prose answer. Tenants with reorder seasonality but **without** `ai_assistant` keep the legacy `POST /api/restaurant-inventory/reorder-assistance/ask` product matcher, which maps a phrase onto products in the current suggestion list for "add to ordering list" — it answers no questions by design and returns `clarifyingQuestion` when nothing matches.
 
+## Attachments and supplier sourcing (2026-09-25)
+
+- `POST /api/assistant/messages` accepts optional `attachments` alongside `conversationId` and `message`.
+- Web, Android, and iOS assistant composers accept up to five JPEG, PNG, WebP, or PDF files, with a 10 MB limit per file. Files use the authenticated presign/upload gateway and are persisted on the user message.
+- Image attachments are supplied to the multimodal model. PDF attachments remain available on the message and are identified to the assistant by filename and type; this release does not extract arbitrary PDF text.
+- Follow questions use `get_followed_suppliers`, which reads the exact active restaurant/organization follow scope instead of inferring follows from catalog results.
+- Common-product price questions use `compare_supplier_prices`. Comparison is deliberately conservative: normalized product name, unit, brand, and currency must match, and at least two followed supplier organizations must have a current offer.
+- Human B2B chat remains separate from the assistant, but its normal message composer also supports the same image/PDF file rules on web, Android, and iOS.
+
 ## Storage
 
 Migration `0195_assistant_conversations.sql`:
@@ -80,7 +91,7 @@ Migration `0195_assistant_conversations.sql`:
 ## UI
 
 - **Web:** floating FAB + Sheet in `Layout` (covers tenant shell and `AdminShell`). i18n namespace `assistant` (en/ar).
-- **Mobile (Android + iOS):** `Assistant` screen gated by `ai_platform`, linked from More / driver Tools. Admin mobile remains deferred — admin tools are web-only.
+- **Mobile (Android + iOS):** restaurant and supplier `Assistant` screens are gated by `ai_assistant` and a workspace view permission (`ORDERS_VIEW`, `INVENTORY_VIEW`, `INVOICES_VIEW`, `FULFILLMENT_VIEW`, `CATALOG_VIEW`, `SETTINGS_VIEW`, `RESERVATIONS_VIEW`, or `CHAT_VIEW`; Owner bypasses). Linked from More. Drivers remain intentionally excluded. Admin mobile remains deferred; admin tools are web-only.
 
 ## Honest labeling
 
@@ -93,4 +104,4 @@ Reuses existing AI vars: `AI_ENABLED`, `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_MODE
 ## Related
 
 - [ai-smart-reorder.md](./ai-smart-reorder.md) — reorder LLM (not this chatbot)
-- Feature flag `ai_platform` — “AI platform (assistant + reorder LLM)”
+- Feature flag `ai_assistant` for this chatbot; `ai_platform` remains the separate Smart Reorder LLM flag.

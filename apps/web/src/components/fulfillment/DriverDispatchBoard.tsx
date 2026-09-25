@@ -107,7 +107,11 @@ export function DriverDispatchBoard({
           reason,
         }).unwrap()
       } else {
-        await assignDriver({ orderId: assignOrder.id, driver_id: selectedDriverId }).unwrap()
+        await assignDriver({
+          orderId: assignOrder.id,
+          driver_id: selectedDriverId,
+          warehouse_assignment_id: assignOrder.assignment?.warehouse_assignment_id ?? undefined,
+        }).unwrap()
       }
       toast.success(t('dispatch.toast.driverAssigned'))
       setAssignOrder(null)
@@ -130,6 +134,8 @@ export function DriverDispatchBoard({
         orderId: reassignOrder.id,
         driver_id: selectedDriverId,
         reason: reassignReason.trim(),
+        driver_assignment_id: reassignOrder.assignment?.id,
+        warehouse_assignment_id: reassignOrder.assignment?.warehouse_assignment_id ?? undefined,
       }).unwrap()
       toast.success(t('dispatch.toast.driverReassigned'))
       setReassignOrder(null)
@@ -401,14 +407,30 @@ export function DriverDispatchBoard({
                   >
                     {canManage && (
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={updatingStatus}
-                          onClick={() => advanceStatus(order, 'picked_up')}
-                        >
-                          {t('dispatch.markPickedUp')}
-                        </Button>
+                        {order.assignment?.status === 'rescheduled' ? (
+                          <>
+                            <Badge variant="outline" className="border-amber-400 text-amber-700">
+                              {t('dispatch.rescheduled')}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={updatingStatus}
+                              onClick={() => advanceStatus(order, 'assigned')}
+                            >
+                              {t('dispatch.readyToDispatch')}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={updatingStatus}
+                            onClick={() => advanceStatus(order, 'picked_up')}
+                          >
+                            {t('dispatch.markPickedUp')}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -448,21 +470,6 @@ export function DriverDispatchBoard({
                 >
                   {canManage && (
                     <div className="flex flex-wrap gap-2">
-                      {order.assignment?.status === 'rescheduled' && (
-                        <>
-                          <Badge variant="outline" className="border-amber-400 text-amber-700">
-                            {t('dispatch.rescheduled')}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={updatingStatus}
-                            onClick={() => advanceStatus(order, 'assigned')}
-                          >
-                            {t('dispatch.readyToDispatch')}
-                          </Button>
-                        </>
-                      )}
                       {order.assignment?.status === 'picked_up' && (
                         <Button
                           size="sm"

@@ -103,3 +103,29 @@ describe('inventory-expiry notification dedup', () => {
     ).toBe(false)
   })
 })
+
+describe('createExpiryLot branch scoping', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('rejects a branch_id that does not belong to the restaurant', async () => {
+    const queryMock = vi.fn().mockResolvedValue({ rows: [] })
+    vi.doMock('../lib/db.js', () => ({ query: queryMock }))
+    vi.doMock('./notification.service.js', () => ({ notifyTenantUsers: vi.fn() }))
+
+    const { createExpiryLot } = await import('./inventory-expiry.service.js')
+    await expect(
+      createExpiryLot('r1', {
+        itemName: 'Milk',
+        expiryDate: '2026-10-01',
+        branchId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      })
+    ).rejects.toMatchObject({ message: 'Branch not found for this restaurant' })
+    expect(
+      queryMock.mock.calls.some(([sql]) =>
+        String(sql).includes('INSERT INTO restaurant_inventory_lot')
+      )
+    ).toBe(false)
+  })
+})

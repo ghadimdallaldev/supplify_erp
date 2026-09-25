@@ -100,7 +100,9 @@
     "createReservationFailed": "تعذّر إنشاء الحجز",
     "enterNameForWaitlist": "أدخل اسمك للانضمام لقائمة الانتظار",
     "waitlistJoined": "أنت في قائمة الانتظار. سنتواصل معك عند توفر طاولة.",
-    "joinWaitlistFailed": "تعذّر الانضمام لقائمة الانتظار"
+    "joinWaitlistFailed": "تعذّر الانضمام لقائمة الانتظار",
+    "depositFixed": "عربون: {{amount}}. هذا تأكيد للسياسة وليس عملية دفع.",
+    "depositPercent": "عربون: {{percent}}% من الحجز. هذا تأكيد للسياسة وليس عملية دفع."
   },
   "manage": {
     "linkRequiredTitle": "الرابط مطلوب",
@@ -214,7 +216,8 @@
       "cancel": "إلغاء",
       "seat": "جلوس",
       "complete": "إكمال",
-      "noShow": "??? ????"
+      "noShow": "لم يحضر",
+      "restore": "استعادة"
     },
     "statusLower": {
       "PENDING": "قيد الانتظار",

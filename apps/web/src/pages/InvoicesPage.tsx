@@ -42,7 +42,7 @@ import {
 } from '../components/invoices/lazyInvoiceDialogs'
 import { apiUrl } from '../lib/apiBase'
 import { applyReportDatePreset } from '../components/reports/ReportFiltersBar'
-import { invoiceRemainingBalance } from '../lib/invoiceBalance'
+import { invoiceRemainingBalance, localDateKey } from '../lib/invoiceBalance'
 
 type SupplierExportType = 'standard' | 'quickbooks' | 'payments'
 
@@ -69,7 +69,7 @@ export function InvoicesPage() {
   const [exportFrom, setExportFrom] = useState(() => defaultExportRange().from)
   const [exportTo, setExportTo] = useState(() => defaultExportRange().to)
   const [supplierExportType, setSupplierExportType] = useState<SupplierExportType>('standard')
-  const [listLimit] = useState(100)
+  const [listLimit, setListLimit] = useState(100)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Payment form state
@@ -130,10 +130,14 @@ export function InvoicesPage() {
   const isLoadingDetail = isRestaurant ? isLoadingRestaurantDetail : isLoadingSupplierDetail
   const refetchDetail = isRestaurant ? refetchRestaurantDetail : refetchSupplierDetail
   const { data: creditsData } = useGetInvoiceCreditsQuery(selectedInvoice?.id || '', {
-    skip: !selectedInvoice?.id || paymentMode !== 'credit',
+    skip: !selectedInvoice?.id || !isRestaurant,
   })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const financeInvoicesEnabled = canUseFinanceInvoices(entitlementsData?.entitlements)
+  const apiIntegrationsEnabled = isEntitlementFeatureEnabled(
+    entitlementsData?.entitlements,
+    'api_integrations'
+  )
   const { data: analyticsData } = useGetInvoiceAnalyticsQuery(
     { period: 30 },
     { skip: !isRestaurant || !financeInvoicesEnabled }
@@ -200,20 +204,47 @@ export function InvoicesPage() {
     ).values()
   ).filter((s: any) => s.id && s.name) as Array<{ id: string; name: string }>
 
+  const openInvoices = invoices.filter((i: any) =>
+    ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(i.status)
+  )
+  const outstandingByCurrency = new Map<string, number>()
+  for (const invoice of openInvoices) {
+    const code = String(invoice.currency || '')
+      .trim()
+      .toUpperCase()
+    const currency = /^[A-Z]{3}$/.test(code) ? code : ''
+    const balance = parseFloat(invoice.balance_due ?? invoice.total_amount ?? 0) || 0
+    outstandingByCurrency.set(currency, (outstandingByCurrency.get(currency) || 0) + balance)
+  }
+  const paidByCurrency = new Map<string, number>()
+  for (const invoice of invoices.filter((i: any) => i.status === 'PAID')) {
+    const code = String(invoice.currency || '')
+      .trim()
+      .toUpperCase()
+    const currency = /^[A-Z]{3}$/.test(code) ? code : ''
+    const total = parseFloat(invoice.total_amount || 0) || 0
+    paidByCurrency.set(currency, (paidByCurrency.get(currency) || 0) + total)
+  }
   const stats = {
     total: invoices.length,
-    unpaid: invoices.filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID').length,
+    unpaid: openInvoices.length,
     paidCount: invoices.filter((i: any) => i.status === 'PAID').length,
     overdue: invoices.filter(
-      (i: any) => i.status === 'OVERDUE' || (i.days_overdue && i.days_overdue > 0)
+      (i: any) =>
+        i.status === 'OVERDUE' ||
+        (['ISSUED', 'PARTIALLY_PAID'].includes(i.status) && Number(i.days_overdue) > 0)
     ).length,
-    totalAmount: invoices.reduce((sum: number, i: any) => sum + parseFloat(i.total_amount || 0), 0),
-    totalOutstanding: invoices
-      .filter((i: any) => i.status !== 'PAID' && i.status !== 'VOID')
-      .reduce((sum: number, i: any) => sum + parseFloat(i.balance_due || i.total_amount || 0), 0),
-    totalPaid: invoices
-      .filter((i: any) => i.status === 'PAID')
-      .reduce((sum: number, i: any) => sum + parseFloat(i.total_amount || 0), 0),
+    totalOutstanding:
+      outstandingByCurrency.size === 1 ? [...outstandingByCurrency.values()][0] : null,
+    outstandingByCurrency: [...outstandingByCurrency.entries()].map(([currency, amount]) => ({
+      currency,
+      amount,
+    })),
+    totalPaid: paidByCurrency.size === 1 ? [...paidByCurrency.values()][0] : null,
+    paidByCurrency: [...paidByCurrency.entries()].map(([currency, amount]) => ({
+      currency,
+      amount,
+    })),
   }
 
   const handleOpenPaymentDialog = (invoice: any) => {
@@ -236,7 +267,9 @@ export function InvoicesPage() {
     if (!selectedInvoice) return
 
     let finalPaymentAmount = paymentAmount
-    if (paymentMode === 'full') {
+    if (paymentMode === 'credit') {
+      finalPaymentAmount = 0
+    } else if (paymentMode === 'full') {
       finalPaymentAmount = remainingBalance
     } else if (paymentMode === 'partial' && paymentAmount <= 0) {
       toast.error(t('toasts.invalidPaymentAmount'))
@@ -262,7 +295,7 @@ export function InvoicesPage() {
         await recordSupplierPayment({
           invoice_id: selectedInvoice.id,
           payment_amount: finalPaymentAmount,
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: localDateKey(),
           payment_method: paymentMethod,
           payment_reference: paymentReference || undefined,
           bank_name: bankName || undefined,
@@ -272,8 +305,8 @@ export function InvoicesPage() {
         await markPaid({
           invoiceId: selectedInvoice.id,
           data: {
-            paymentAmount: finalPaymentAmount > 0 ? finalPaymentAmount : undefined,
-            paymentDate: new Date().toISOString().split('T')[0],
+            paymentAmount: paymentMode === 'credit' ? 0 : finalPaymentAmount,
+            paymentDate: localDateKey(),
             paymentMethod: paymentMethod as any,
             paymentReference: paymentReference || undefined,
             bankName: bankName || undefined,
@@ -376,7 +409,7 @@ export function InvoicesPage() {
           title={invoicesTitle}
           description={invoicesDescription}
           actions={
-            isRestaurant ? (
+            !apiIntegrationsEnabled ? null : isRestaurant ? (
               <Button variant="outline" onClick={handleExportCsv} disabled={exportingCsv}>
                 {exportingCsv ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -469,6 +502,13 @@ export function InvoicesPage() {
           onSelectInvoice={handleSelectInvoice}
           onPayInvoice={handleOpenPaymentDialog}
         />
+        {invoices.length >= listLimit ? (
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => setListLimit((current) => current + 100)}>
+              {t('list.loadMore')}
+            </Button>
+          </div>
+        ) : null}
 
         <Suspense fallback={null}>
           {showInvoiceDetail && (

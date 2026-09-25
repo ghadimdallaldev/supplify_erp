@@ -22,14 +22,15 @@ Restaurants configure a **diner-facing rewards program**. Only **signed-up membe
 
 ## Earn rules (members only)
 
-| Rule         | Value                                                                          |
-| ------------ | ------------------------------------------------------------------------------ |
-| Eligibility  | Order has `consumer_member_id` from valid session                              |
-| Basis        | **Subtotal** (excl. delivery fee), after redeem discount                       |
-| Multipliers  | `TAKEAWAY` 1×, `DELIVERY` 1.25×, `DINE_IN` 1.5× (configurable in `rules_json`) |
-| Signup bonus | `welcome_bonus_points` on program (awarded once on signup)                     |
-| Trigger      | Order status → `DELIVERED`                                                     |
-| Receipt      | Tracker shows points earned banner when complete                               |
+| Rule         | Value                                                                                                                                                                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Eligibility  | Order has `consumer_member_id` from valid session                                                                                                                                                                                                                                                                   |
+| Basis        | **Subtotal** (excl. delivery fee), after redeem discount. Checkout preview uses the same basis, so promised points match the points awarded at delivery. Points cannot be redeemed against a zero food bill, and the suggested amount is the largest redemption whose rounded discount still fits the percent cap.  |
+| Multipliers  | `TAKEAWAY` 1×, `DELIVERY` 1.25×, `DINE_IN` 1.5× (configurable in `rules_json`)                                                                                                                                                                                                                                      |
+| Signup bonus | `welcome_bonus_points` on program (awarded once on signup)                                                                                                                                                                                                                                                          |
+| Trigger      | Order status → `DELIVERED` (dine-in “served”, takeaway “picked up”)                                                                                                                                                                                                                                                 |
+| Cancel       | Status → `CANCELLED` writes `REVERSAL` rows: redeemed points return, earned points are removed up to the balance still on the account. Lifetime earned drops only by the points actually removed, so points already spent on another order stay in the lifetime totals. A second cancel does not move points again. |
+| Receipt      | Tracker shows points earned banner when complete                                                                                                                                                                                                                                                                    |
 
 ## Redeem at checkout
 

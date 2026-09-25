@@ -144,6 +144,16 @@ describe('permissions resolution', () => {
     expect(hasPermission(['ORDERS_VIEW'], 'ORDERS_MANAGE')).toBe(false)
   })
 
+  it('hasPermission treats CUSTOMERS_MANAGE as superset of CUSTOMERS_IMPORT', () => {
+    expect(hasPermission(['CUSTOMERS_MANAGE'], 'CUSTOMERS_IMPORT')).toBe(true)
+    expect(hasPermission(['CUSTOMERS_IMPORT'], 'CUSTOMERS_MANAGE')).toBe(false)
+  })
+
+  it('hasPermission treats RECIPES_MANAGE as superset of RECIPES_VIEW_COSTS', () => {
+    expect(hasPermission(['RECIPES_MANAGE'], 'RECIPES_VIEW_COSTS')).toBe(true)
+    expect(hasPermission(['RECIPES_VIEW'], 'RECIPES_VIEW_COSTS')).toBe(false)
+  })
+
   it('does not expand supplier tenant role with org Regional Manager permissions', async () => {
     getOrgRolePermissionsMock.mockResolvedValue([
       'FULFILLMENT_VIEW',

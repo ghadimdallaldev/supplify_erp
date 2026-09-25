@@ -63,7 +63,53 @@
       "notifyLowStock": {
         "label": "تحذيرات انخفاض المخزون",
         "description": "ابقَ على اطلاع بالأصناف التي أوشكت على النفاد."
+      },
+      "notifyInvoiceIssued": {
+        "label": "تذكيرات الفواتير",
+        "description": "الفواتير الصادرة والمتأخرة."
+      },
+      "notifyReorderCadence": {
+        "label": "تذكيرات إعادة الطلب",
+        "description": "اقتراحات إعادة الطلب حسب نمط طلباتك."
+      },
+      "notifyReservationCreated": {
+        "label": "حجوزات جديدة",
+        "description": "الحجوزات التي يسجلها الضيوف أو الفريق."
+      },
+      "notifyReservationWaitlist": {
+        "label": "تغييرات قائمة الانتظار",
+        "description": "إضافة الضيوف أو نقلهم في قائمة الانتظار."
+      },
+      "notifyStaffPto": {
+        "label": "طلبات الإجازة",
+        "description": "طلبات إجازة الفريق بانتظار المراجعة."
+      },
+      "notifyStaffSwap": {
+        "label": "طلبات تبديل الورديات",
+        "description": "موافقات التغطية وتبديل الورديات."
+      },
+      "notifyScheduledOrder": {
+        "label": "الطلبات المجدولة",
+        "description": "الطلبات المتكررة التي تُنفَّذ تلقائياً."
       }
+    },
+    "restaurantPanel": {
+      "title": "تفضيلات الإشعارات",
+      "description": "اختر كيف ومتى يرسل Supplify التنبيهات.",
+      "channels": "طرق التسليم",
+      "types": "أنواع الإشعارات",
+      "pushTitle": "إشعارات المتصفح",
+      "pushHint": "تنبيهات فورية عندما يكون Supplify في الخلفية.",
+      "blockedTitle": "حظر المتصفح للإشعارات",
+      "blockedStep1": "انقر أيقونة القفل أو الضبط على يسار شريط العنوان",
+      "blockedStep2": "افتح الأذونات واضبط الإشعارات على السماح",
+      "blockedStep3": "أعد تحميل الصفحة ثم انقر تفعيل أدناه",
+      "enable": "تفعيل إشعارات الدفع",
+      "enableAction": "تفعيل",
+      "disableAction": "إيقاف",
+      "save": "حفظ التفضيلات",
+      "unavailable": "الدفع غير مهيأ على هذا الخادم. اطلب من المسؤول ضبط مفاتيح VAPID في واجهة البرمجة.",
+      "notOnPlan": "إشعارات المتصفح غير مشمولة في خطتك. رقِّ الخطة لتفعيل التنبيهات الفورية."
     },
     "comingSoon": {
       "systemAlerts": {

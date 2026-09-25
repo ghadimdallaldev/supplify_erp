@@ -11,6 +11,7 @@ import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { formatPrice } from '../../utils/format'
 import { cn } from '../../lib/utils'
 import { useGetOrdersQuery, useGetWarehousesQuery } from '../../services/api'
+import { usePermissions } from '../../hooks/usePermissions'
 import { useMemo, useState } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
@@ -20,7 +21,10 @@ export function FulfillmentPickListsTab() {
   const { t } = useTranslation('fulfillment')
   const [search, setSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL')
-  const { data: warehousesData } = useGetWarehousesQuery()
+  const { can } = usePermissions()
+  const { data: warehousesData } = useGetWarehousesQuery(undefined, {
+    skip: !can('WAREHOUSES_VIEW'),
+  })
   const {
     data: ordersData,
     isLoading,

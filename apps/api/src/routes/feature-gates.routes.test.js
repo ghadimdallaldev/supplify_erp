@@ -215,6 +215,22 @@ describe('Feature gate routes', () => {
         })
       expect(res.status).toBe(201)
     })
+
+    it('blocks device register when flag is off', async () => {
+      setFeatureEnabled('push_notifications', false)
+      const res = await request(app)
+        .post('/api/push/devices')
+        .send({ token: 'ExponentPushToken[abc]', platform: 'ios' })
+      expect(res.status).toBe(403)
+    })
+
+    it('allows device unregister when flag is off', async () => {
+      setFeatureEnabled('push_notifications', false)
+      const res = await request(app)
+        .delete('/api/push/devices')
+        .send({ token: 'ExponentPushToken[abc]', platform: 'ios' })
+      expect(res.status).toBe(200)
+    })
   })
 
   describe('order_amendments', () => {

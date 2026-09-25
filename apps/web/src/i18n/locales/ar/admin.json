@@ -1206,6 +1206,14 @@
     "saveButton": "حفظ إعدادات النمو"
   },
   "placements": {
+    "awaitingReview": "مدفوع — بانتظار مراجعة الإدارة",
+    "awaitingPayment": "بانتظار دفع المورد",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "approveSuccess": "تمت الموافقة على الظهور المميز",
+    "rejectSuccess": "تم رفض الظهور المميز",
+    "rejectReasonPrompt": "سبب الرفض (اختياري)",
+    "reviewFailed": "تعذرت مراجعة الظهور المميز",
     "title": "الظهور المميز النشط",
     "empty": "لا ظهور مميز نشط",
     "until": "حتى {{date}}",

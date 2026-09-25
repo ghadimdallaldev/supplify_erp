@@ -19,6 +19,7 @@ import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import {
   listExpiryLots,
   getExpirySummary,
@@ -69,15 +70,6 @@ async function maybeNotifyRestaurantLowStock({
 }) {
   if (threshold == null || Number(threshold) <= 0) return
   if (Number(currentQty) > Number(threshold)) return
-
-  await query(
-    `
-    INSERT INTO inventory_alert (product_id, warehouse_id, alert_type, threshold_value, current_value)
-    VALUES ($1, NULL, 'LOW_STOCK', $2, $3)
-    ON CONFLICT DO NOTHING
-    `,
-    [productId, threshold, currentQty]
-  ).catch(() => {})
 
   notifyLowStock(
     { restaurant_id: restaurantId, product_id: productId, name: productName || 'Product' },
@@ -249,7 +241,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       LEFT JOIN product_category pc ON pc.id = p.category_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
-      LEFT JOIN branch b ON b.id = ri.branch_id
+      LEFT JOIN branch b ON b.id = ri.branch_id AND b.tenant_id = ri.restaurant_id
       LEFT JOIN usage u
         ON u.restaurant_id = ri.restaurant_id AND u.product_id = ri.product_id
       WHERE ri.restaurant_id = $1
@@ -1108,7 +1100,7 @@ router.get(
       JOIN product p ON p.id = c.product_id
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
-      LEFT JOIN branch b ON b.id = c.branch_id
+      LEFT JOIN branch b ON b.id = c.branch_id AND b.tenant_id = c.restaurant_id
       LEFT JOIN usage_stats us ON us.product_id = c.product_id AND us.restaurant_id = c.restaurant_id
       LEFT JOIN restock_gaps rg ON rg.product_id = c.product_id
       LEFT JOIN last_add la ON la.product_id = c.product_id
@@ -1506,6 +1498,7 @@ router.get(
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
       const branchId = req.query.branchId ? String(req.query.branchId) : null
+      await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
       const data = await getReorderAssistance(restaurantId, {
         smartReorderFeatureValue,
         branchId,
@@ -1529,6 +1522,8 @@ router.get(
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
+      const branchId = req.query.branchId ? String(req.query.branchId) : null
+      await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
       const featureValue = await getSmartReorderFeatureValue(req)
       const caps = resolveSmartReorderCapabilities(featureValue)
       if (!caps.capabilities.forecast) {
@@ -1539,7 +1534,6 @@ router.get(
           requestId: req.requestId,
         })
       }
-      const branchId = req.query.branchId ? String(req.query.branchId) : null
       const forecasts = await getCachedForecasts(restaurantId, { branchId })
       res.json({
         ok: true,
@@ -1568,6 +1562,7 @@ router.post(
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const featureValue = await getSmartReorderFeatureValue(req)
       const branchId = req.body?.branchId ?? req.query?.branchId ?? null
+      await assertLegacyBranchOwnedByRestaurant(branchId ? String(branchId) : null, restaurantId)
       const result = await refreshRestaurantForecasts(restaurantId, {
         featureValue,
         branchId: branchId ? String(branchId) : null,
@@ -1630,10 +1625,11 @@ router.post(
         )
       }
       const body = reorderExplainSchema.parse(req.body ?? {})
+      await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
       const data = await explainReorderSuggestions(restaurantId, {
         smartReorderFeatureValue,
         branchId: body.branchId ?? null,
-        userId: req.user?.id,
+        userId: req.userData?.id,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -1659,11 +1655,12 @@ router.post(
         throw new ForbiddenError('Natural-language reorder ask requires a Scale smart reorder plan')
       }
       const body = reorderAskSchema.parse(req.body)
+      await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
       const data = await parseReorderIntent(restaurantId, {
         query: body.query,
         smartReorderFeatureValue,
         branchId: body.branchId ?? null,
-        userId: req.user?.id,
+        userId: req.userData?.id,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -1708,6 +1705,7 @@ router.post(
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
       const body = reorderApplySchema.parse(req.body ?? {})
+      await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
       const smartReorderFeatureValue = await getSmartReorderFeatureValue(req)
       const data = await applyReorderAssistance(restaurantId, {
         items: body.items,
@@ -1757,12 +1755,13 @@ router.post(
         )
       }
       const body = reorderAiRecommendSchema.parse(req.body ?? {})
+      await assertLegacyBranchOwnedByRestaurant(body.branchId ?? null, restaurantId)
       const data = await getReorderAiRecommendations(restaurantId, {
         smartReorderFeatureValue,
         branchId: body.branchId ?? null,
         productIds: body.productIds,
         limit: body.limit,
-        userId: req.user?.id,
+        userId: req.userData?.id,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {

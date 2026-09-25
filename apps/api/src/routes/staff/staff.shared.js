@@ -14,8 +14,11 @@ import {
   staffListCacheInvalidationMiddleware,
 } from '../../lib/staff-list-cache.js'
 import { query, withTransaction } from '../../lib/db.js'
+import { getZonedParts } from '../../lib/delivery-rollover-time.js'
+import { getZonedDayBounds } from '../../lib/reservation-board-date.js'
+import { getRestaurantTimezone } from '../../lib/tenant-timezone.js'
 import { logger } from '../../lib/logger.js'
-import { getRestaurantIdByEmail } from '../../lib/tenant.js'
+import { ValidationError } from '../../middlewares/errorHandler.js'
 import { assertPresignedFileUrl } from '../../lib/sanitize-upload.js'
 import {
   notifyStaffPtoRequest,
@@ -78,6 +81,170 @@ const updateStaffSchema = createStaffSchema
   })
 
 const shiftStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'COMPLETED', 'CANCELLED'])
+
+/**
+ * @param {string | Date} clockInAt
+ * @param {string | Date} clockOutAt
+ * @param {number | null | undefined} breakMinutes
+ * @param {Date} [now]
+ * @returns {string | null}
+ */
+function getTimeEntryCloseError(clockInAt, clockOutAt, breakMinutes, now = new Date()) {
+  const start = new Date(clockInAt)
+  const end = new Date(clockOutAt)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 'Clock-in and clock-out must be valid times'
+  }
+  if (end.getTime() <= start.getTime()) {
+    return 'Clock-out must be after clock-in'
+  }
+  if (end.getTime() > now.getTime() + 2 * 60 * 1000) {
+    return 'Clock-out cannot be in the future'
+  }
+  if (breakMinutes != null && Number(breakMinutes) > (end.getTime() - start.getTime()) / 60000) {
+    return 'Break cannot be longer than the shift'
+  }
+  return null
+}
+
+/** @param {string | Date} startsAt @param {string | Date} endsAt @returns {string | null} */
+/** @param {string} startDate @param {string} endDate @returns {string | null} */
+function getInactiveStaffError(status) {
+  if (status === 'ACTIVE') return null
+  return 'This person is no longer on the active team'
+}
+
+function timeOffOverlapsShift(ptoStart, ptoEnd, shiftStart, shiftEnd) {
+  const a0 = String(ptoStart).slice(0, 10)
+  const a1 = String(ptoEnd).slice(0, 10)
+  const b0 = String(shiftStart).slice(0, 10)
+  const b1 = String(shiftEnd).slice(0, 10)
+  return a0 <= b1 && a1 >= b0
+}
+
+function shiftLocalDates(startsAt, endsAt, timeZone) {
+  const start = getZonedParts(new Date(startsAt), timeZone).calendarDate
+  const end = getZonedParts(new Date(new Date(endsAt).getTime() - 1), timeZone).calendarDate
+  return { start, end: end < start ? start : end }
+}
+
+async function findApprovedTimeOffError(restaurantId, staffId, startsAt, endsAt) {
+  if (!staffId || !startsAt || !endsAt) return null
+  const timeZone = await getRestaurantTimezone(restaurantId)
+  const { start, end } = shiftLocalDates(startsAt, endsAt, timeZone)
+  const { rows } = await query(
+    `
+      SELECT id
+      FROM staff_pto_request
+      WHERE restaurant_id = $1
+        AND staff_id = $2
+        AND status = 'APPROVED'
+        AND start_date <= $4::date
+        AND end_date >= $3::date
+      LIMIT 1
+    `,
+    [restaurantId, staffId, start, end]
+  )
+  if (rows.length) return 'This person is on approved time off for that day'
+  return null
+}
+
+async function findShiftDuringTimeOffError(restaurantId, staffId, startDate, endDate) {
+  if (!staffId || !startDate || !endDate) return null
+  const timeZone = await getRestaurantTimezone(restaurantId)
+  const windowStart = getZonedDayBounds(String(startDate).slice(0, 10), timeZone).start
+  const windowEnd = getZonedDayBounds(String(endDate).slice(0, 10), timeZone).end
+  const { rows } = await query(
+    `
+      SELECT id
+      FROM staff_shift
+      WHERE restaurant_id = $1
+        AND staff_id = $2
+        AND status <> 'CANCELLED'
+        AND starts_at <= $4
+        AND ends_at > $3
+      LIMIT 1
+    `,
+    [restaurantId, staffId, windowStart.toISOString(), windowEnd.toISOString()]
+  )
+  if (rows.length) return 'This person already has a shift during this time off'
+  const { rows: punches } = await query(
+    `
+      SELECT id
+      FROM staff_time_entry
+      WHERE restaurant_id = $1
+        AND staff_id = $2
+        AND clock_in_at <= $4
+        AND (clock_out_at IS NULL OR clock_out_at > $3)
+      LIMIT 1
+    `,
+    [restaurantId, staffId, windowStart.toISOString(), windowEnd.toISOString()]
+  )
+  if (punches.length) return 'This person already has hours worked during this time off'
+  return null
+}
+
+function openTimeEntryConflictError(error) {
+  if (error?.code !== '23505') return null
+  const err = new Error('You already have an open time entry. Clock out first.')
+  err.name = 'TIME_ENTRY_OPEN_EXISTS'
+  err.status = 409
+  return err
+}
+
+function getSwapCreateError({
+  shiftStatus,
+  shiftStaffId,
+  requestedBy,
+  proposedCoverId,
+  coverStatus,
+}) {
+  if (String(shiftStatus || '').toUpperCase() === 'CANCELLED') return 'This shift is cancelled'
+  if (shiftStaffId && requestedBy && String(shiftStaffId) !== String(requestedBy)) {
+    return 'Only the person on this shift can request a swap'
+  }
+  if (proposedCoverId && requestedBy && String(proposedCoverId) === String(requestedBy)) {
+    return 'You cannot propose yourself as cover'
+  }
+  if (proposedCoverId && coverStatus != null) {
+    const inactive = getInactiveStaffError(coverStatus)
+    if (inactive) return inactive
+  }
+  return null
+}
+
+function getSwapDecisionError(swap, nextStatus) {
+  if (!swap) return 'Shift swap not found'
+  if (String(swap.status || '').toUpperCase() !== 'REQUESTED') {
+    return 'This swap has already been decided'
+  }
+  if (String(nextStatus || '').toUpperCase() === 'APPROVED' && !swap.proposed_cover_id) {
+    return 'Choose who will cover this shift'
+  }
+  return null
+}
+
+function getPtoDateError(startDate, endDate) {
+  const start = String(startDate || '').slice(0, 10)
+  const end = String(endDate || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return 'Time off needs a start date and an end date'
+  }
+  if (end < start) return 'Time off cannot end before it starts'
+  return null
+}
+
+function getShiftWindowError(startsAt, endsAt) {
+  const start = new Date(startsAt)
+  const end = new Date(endsAt)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 'Shift start and end must be valid times'
+  }
+  if (end.getTime() <= start.getTime()) {
+    return 'Shift end must be after the start'
+  }
+  return null
+}
 
 const createShiftSchema = z.object({
   staffId: z.string().uuid().optional(),
@@ -218,59 +385,7 @@ const updatePayrollExportSchema = z.object({
 async function resolveRestaurantId(req) {
   const fromTenant = await getRestaurantIdForRequest(req)
   if (fromTenant) return fromTenant
-
-  const role = req.userData?.role
-
-  if (role === 'ADMIN') {
-    if (req.query.restaurantId && typeof req.query.restaurantId === 'string') {
-      return req.query.restaurantId
-    }
-    const { rows } = await query(
-      `
-        SELECT id
-        FROM restaurant
-        ORDER BY created_at
-        LIMIT 1
-      `
-    )
-    if (rows.length) {
-      return rows[0].id
-    }
-    throw new Error('No restaurants available for admin context')
-  }
-
-  const email = req.userData?.email
-  if (!email) {
-    const { rows } = await query(
-      `
-        SELECT id
-        FROM restaurant
-        ORDER BY created_at
-        LIMIT 1
-      `
-    )
-    if (rows.length) {
-      return rows[0].id
-    }
-    throw new Error('Unable to resolve restaurant context')
-  }
-
-  try {
-    return await getRestaurantIdByEmail(email)
-  } catch (error) {
-    const { rows } = await query(
-      `
-        SELECT id
-        FROM restaurant
-        ORDER BY created_at
-        LIMIT 1
-      `
-    )
-    if (rows.length) {
-      return rows[0].id
-    }
-    throw error
-  }
+  throw new ValidationError('Restaurant not found')
 }
 
 function mapStaffRow(row) {
@@ -295,7 +410,7 @@ function mapStaffRow(row) {
     phone: row.phone,
     role: row.role,
     wageType: row.wage_type,
-    wageRate: row.wage_rate ? Number(row.wage_rate) : null,
+    wageRate: row.wage_rate != null && row.wage_rate !== '' ? Number(row.wage_rate) : null,
     hireDate: row.hire_date,
     profileColor: row.profile_color,
     portalAccess: {
@@ -530,6 +645,16 @@ export {
   createStaffSchema,
   updateStaffSchema,
   shiftStatusEnum,
+  getShiftWindowError,
+  getTimeEntryCloseError,
+  getPtoDateError,
+  getInactiveStaffError,
+  timeOffOverlapsShift,
+  findApprovedTimeOffError,
+  findShiftDuringTimeOffError,
+  openTimeEntryConflictError,
+  getSwapCreateError,
+  getSwapDecisionError,
   createShiftSchema,
   updateShiftSchema,
   checkInSchema,

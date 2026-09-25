@@ -7,6 +7,9 @@ import {
   ordersRouterMutationGuard,
   chatSendGuard,
   notificationsMutationGuard,
+  inventoryMutationGuard,
+  filesUploadGuard,
+  filesPresignGuard,
   resolveAdminDashboardPermission,
   adminDashboardPermissionGuard,
 } from './route-permissions.js'
@@ -244,6 +247,40 @@ describe('adminDashboardPermissionGuard', () => {
   })
 })
 
+describe('files upload vs presign guards', () => {
+  beforeEach(() => next.mockReset())
+
+  it('blocks chat-only users from product attach uploads', () => {
+    const req = {
+      ...mockReq('POST', '/product/p1/attach'),
+      tenantContext: { permissions: [P.CHAT_SEND, P.CHAT_VIEW] },
+    }
+    const r = mockResWithPerms([P.CHAT_SEND, P.CHAT_VIEW])
+    filesUploadGuard(req, r, next)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows chat-only users to presign attachments', () => {
+    const req = {
+      ...mockReq('POST', '/presign'),
+      tenantContext: { permissions: [P.CHAT_SEND, P.CHAT_VIEW] },
+    }
+    const r = mockResWithPerms([P.CHAT_SEND, P.CHAT_VIEW])
+    filesPresignGuard(req, r, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('allows catalog editors to presign', () => {
+    const req = {
+      ...mockReq('POST', '/presign'),
+      tenantContext: { permissions: [P.CATALOG_EDIT] },
+    }
+    const r = mockResWithPerms([P.CATALOG_EDIT])
+    filesPresignGuard(req, r, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
 describe('restaurantSupplierMutationGuard', () => {
   beforeEach(() => next.mockReset())
 
@@ -338,6 +375,39 @@ describe('role matrix write restrictions', () => {
   })
 })
 
+describe('inventoryMutationGuard', () => {
+  beforeEach(() => next.mockReset())
+
+  it('allows GET with INVENTORY_VIEW only', () => {
+    const req = {
+      ...mockReq('GET', '/'),
+      tenantContext: { permissions: [P.INVENTORY_VIEW] },
+    }
+    inventoryMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks PATCH acknowledge for viewer', () => {
+    const req = {
+      ...mockReq('PATCH', '/alerts/a1/acknowledge'),
+      tenantContext: { permissions: [P.INVENTORY_VIEW] },
+    }
+    const r = mockResWithPerms([P.INVENTORY_VIEW])
+    inventoryMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows PATCH acknowledge with INVENTORY_EDIT', () => {
+    const req = {
+      ...mockReq('PATCH', '/alerts/a1/acknowledge'),
+      tenantContext: { permissions: [P.INVENTORY_VIEW, P.INVENTORY_EDIT] },
+    }
+    inventoryMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+})
+
 describe('notificationsMutationGuard', () => {
   beforeEach(() => {
     next.mockReset()
@@ -368,6 +438,26 @@ describe('notificationsMutationGuard', () => {
       ...mockReq('PATCH', '/preferences'),
       userData: { role: 'RESTAURANT' },
       tenantContext: { permissions: [P.DRIVER_DELIVERIES_VIEW] },
+    }
+    notificationsMutationGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it('blocks webhook writes without SETTINGS_MANAGE', () => {
+    const req = {
+      ...mockReq('PUT', '/webhook'),
+      tenantContext: { permissions: [P.SETTINGS_VIEW] },
+    }
+    const r = mockResWithPerms([P.SETTINGS_VIEW])
+    notificationsMutationGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+
+  it('allows webhook writes with SETTINGS_MANAGE', () => {
+    const req = {
+      ...mockReq('PUT', '/webhook'),
+      tenantContext: { permissions: [P.SETTINGS_MANAGE] },
     }
     notificationsMutationGuard(req, res, next)
     expect(next).toHaveBeenCalled()

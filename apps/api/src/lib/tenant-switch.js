@@ -244,7 +244,8 @@ export async function getActiveTenantFromRequest(req) {
   if (ctx.userId !== req.userData.id) return null
 
   const effective = getEffectiveTenant(req)
-  if (effective && req.userData.role === 'ADMIN') {
+  if (req.userData.role === 'ADMIN') {
+    if (!effective) return null
     const allowed = await impersonationCanAccessBranch(
       effective.tenantId,
       effective.tenantType,
@@ -279,7 +280,8 @@ export async function getActiveTenantFromRequest(req) {
 /** Allow branch/account switch when impersonating (same org or linked account). */
 export async function canSwitchActiveTenant(req, tenantId, tenantType) {
   const effective = getEffectiveTenant(req)
-  if (effective && req.userData?.role === 'ADMIN') {
+  if (req.userData?.role === 'ADMIN') {
+    if (!effective) return false
     return impersonationCanAccessBranch(
       effective.tenantId,
       effective.tenantType,

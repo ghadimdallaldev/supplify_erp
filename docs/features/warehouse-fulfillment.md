@@ -19,6 +19,16 @@ Both flags appear in **Admin → Features** (global + per-tenant override).
 
 Configure under **Settings → Warehouses** (toggle) or `PATCH /api/suppliers/me/fulfillment`.
 
+## Permissions
+
+- `WAREHOUSES_VIEW` — list warehouses, inventory, zones, routing preview
+- `WAREHOUSES_EDIT` — update warehouse metadata and set default (Warehouse Manager)
+- `WAREHOUSES_MANAGE` — create warehouses, deactivate, and manage delivery zones
+
+`PATCH /api/warehouses/:id` uses `WAREHOUSES_EDIT`. Setting `is_active: false` additionally requires `WAREHOUSES_MANAGE`.
+
+Platform admins must impersonate a supplier to list or mutate warehouses, drivers, and inventory (including adjustments, alerts, settings, and alert acknowledge). Warehouse-mode product PATCH and adjustments update `warehouse_inventory` first, then mirror the aggregate into legacy `inventory`. `GET /api/orders/:id/warehouses` requires the same tenant order access as order detail. `?supplier_id=` is accepted only when it matches that tenant. Product `initialStock` writes the legacy `inventory` row and mirrors into `warehouse_inventory` for warehouse-mode suppliers. Warehouse joins use `getWarehouseSupplierColumn()` (`tenant_id` preferred over `supplier_id`). Product inventory GET uses warehouse totals when the supplier is in warehouse mode, including products that have no legacy `inventory` row.
+
 ## Single vs multi-warehouse
 
 - **Single** (`fulfillment_mode = 'single'`): one `order_warehouse_assignment` row per order (`order_item_id` null), using `default_warehouse_id` or first active warehouse.
@@ -32,12 +42,14 @@ Priority (lowest number wins within same rule type ordering in `warehouseRouting
 
 1. **product** — exact `product_id`
 2. **category** — product `category_id`
-3. **zone** — restaurant address matches a warehouse `delivery_zone`
+3. **zone** — restaurant address matches the rule's `delivery_zone`, not merely some other zone of the same warehouse. Radius is used only when `zone_type` is `radius`. Polygon holes do not count as inside, including rings-format coverage. Postal codes match after trimming, removing spaces, and ignoring case. A shorter code also matches a longer one at a district boundary, so SW1 covers SW1A 1AA and E1 covers E1 6AN, while SW1 does not cover SW10 and a numeric code such as 11 does not cover 1100. Dispatch and route area labels use a postal or radius zone only when the delivery destination matches it (order snapshot, then branch, then restaurant). Branch zones use that same destination match. Otherwise they show the city. `PATCH /api/warehouses/:id/zones/:zoneId` stores one coverage type. A postal zone clears radius and center, and a radius zone clears postal codes, so a later edit cannot flip the match. A name-only update leaves coverage as it is. A radius zone needs a positive radius and a center; a postal zone needs at least one code.
 4. **stock_available** — `warehouse_inventory.quantity_available` ≥ line qty
 5. **default** — explicit default rule or supplier default warehouse
 6. **fallback** — first active warehouse
 
-On assignment in multi mode, stock is reserved: `quantity_available` decreases, `quantity_reserved` increases.
+A product rule aimed at an inactive warehouse does not block the active warehouses. Listing the same product twice on an order does not fail tenant ownership. Stock used to choose the warehouse is locked in that transaction before the choice, in a stable warehouse and product order. Completing a pick wave marks packed only the warehouse leg that pick list belongs to.
+
+On assignment in multi mode, stock is reserved: `quantity_available` decreases, `quantity_reserved` increases. Route optimization loads the depot warehouse using `getWarehouseSupplierColumn` so `tenant_id` and `supplier_id` schema variants both resolve.
 
 ## Inventory source of truth (P0-1)
 
@@ -48,7 +60,7 @@ Order place / cancel / reject / dispatch use **one** stock path via `supplier-or
 | `warehouse` | `warehouses` or `multi_warehouse` plan feature + ≥1 active WH | Reserve `warehouse_inventory` only | Release WH reservations | Commit reserved → on-hand |
 | `legacy`    | No warehouses feature / no active warehouses                  | Deduct `inventory` only            | Restore `inventory`     | N/A                       |
 
-Legacy `inventory` is kept for UI/compatibility. Adjustments mirror into default warehouse stock when in warehouse mode. Ops tooling:
+Legacy `inventory` is kept for UI/compatibility. When warehouse mode is on, a legacy product-level adjustment applies a **delta** to one owned warehouse (the requested `warehouseId` or the supplier default). It does not overwrite that warehouse with the full product aggregate, which would inflate multi-warehouse stock. Warehouse names and product rows are joined only when `warehouse.supplier_id` / `product.supplier_id` match the tenant (including pick lists, drivers, routing rules, auto-routing context, fulfillment board, and order warehouse assignments). Delivery-board branch name/coord joins require `branch.tenant_id` to match the order restaurant. Dashboard low-stock previews sum `warehouse_inventory` only through owned active warehouses. Creating a product with `warehouse_id` rejects IDs that are not an active warehouse of the same supplier. Single-warehouse assign also requires `default_warehouse_id` to be an active warehouse of that supplier. Fulfillment `warehouse_id` query filters, driver list filters, and pick-wave generation reject a foreign warehouse with 400 instead of returning an empty scoped set. Ops tooling:
 
 - `node apps/api/scripts/seed-warehouse-inventory-from-inventory.js [--apply]`
 - `node apps/api/scripts/reconcile-inventory-sources.js [--apply-seed-missing-wh] [--apply-mirror-legacy]`
@@ -59,29 +71,29 @@ Design: `docs/superpowers/specs/2026-07-23-inventory-source-of-truth-design.md`.
 
 All warehouse routes: `requireAuth` → `requireFeature('warehouses')` → `requirePermission(...)`.
 
-| Method                | Path                                                | Notes                                                  |
-| --------------------- | --------------------------------------------------- | ------------------------------------------------------ |
-| GET                   | `/api/warehouses`                                   | List + summary counts                                  |
-| POST                  | `/api/warehouses`                                   | First warehouse auto-default                           |
-| PATCH                 | `/api/warehouses/:id`                               | Update                                                 |
-| DELETE                | `/api/warehouses/:id`                               | Soft deactivate                                        |
-| POST                  | `/api/warehouses/:id/set-default`                   | Atomic default swap                                    |
-| GET/PATCH             | `/api/warehouses/:id/inventory`                     | Per-warehouse stock                                    |
-| GET                   | `/api/warehouses/:id/orders`                        | Open assignments                                       |
-| GET/POST/PATCH/DELETE | `/api/warehouses/:id/zones`                         | `delivery_zone` rows                                   |
-| GET/POST/PATCH/DELETE | `/api/warehouses/routing/rules`                     | `requireFeature('multi_warehouse')`                    |
-| POST                  | `/api/warehouses/routing/simulate`                  | Preview only, no writes                                |
-| GET/PATCH             | `/api/suppliers/me/fulfillment`                     | Toggle + mode                                          |
-| GET                   | `/api/orders/:id/warehouses`                        | Assignments (all modes)                                |
-| PATCH                 | `/api/orders/:id/warehouses/:assignmentId`          | Atomic reassign (`warehouse_id`); pending/picking only |
-| POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched + commit reserved stock                |
+| Method                | Path                                                | Notes                                                   |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------- |
+| GET                   | `/api/warehouses`                                   | List + summary counts                                   |
+| POST                  | `/api/warehouses`                                   | First warehouse auto-default                            |
+| PATCH                 | `/api/warehouses/:id`                               | Update                                                  |
+| DELETE                | `/api/warehouses/:id`                               | Soft deactivate                                         |
+| POST                  | `/api/warehouses/:id/set-default`                   | Atomic default swap                                     |
+| GET/PATCH             | `/api/warehouses/:id/inventory`                     | Per-warehouse stock; PATCH is partial and product-owned |
+| GET                   | `/api/warehouses/:id/orders`                        | Open assignments                                        |
+| GET/POST/PATCH/DELETE | `/api/warehouses/:id/zones`                         | `delivery_zone` rows                                    |
+| GET/POST/PATCH/DELETE | `/api/warehouses/routing/rules`                     | `requireFeature('multi_warehouse')`                     |
+| POST                  | `/api/warehouses/routing/simulate`                  | Preview only; stock is supplier-warehouse scoped        |
+| GET/PATCH             | `/api/suppliers/me/fulfillment`                     | Toggle + mode                                           |
+| GET                   | `/api/orders/:id/warehouses`                        | Assignments (all modes)                                 |
+| PATCH                 | `/api/orders/:id/warehouses/:assignmentId`          | Atomic reassign (`warehouse_id`); pending/picking only  |
+| POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched + commit reserved stock                 |
 
 Order creation (`POST /api/orders`, supplier manual create) calls `reserveStockForPlacedOrder` in the **same transaction** (warehouse reserve XOR legacy deduct); failure rolls back the order.
 
 ## Frontend
 
 - **Settings → Warehouses**: gated by `entitlements.features.warehouses` (`useGetEntitlementsQuery`).
-- **Warehouse delivery zones**: **Settings → Warehouses → Manage zones** — `WarehouseZonesPanel` (radius, postal codes, min order, delivery fee). Uses `listZones` / `createZone` / `updateZone` / `deleteZone` RTK endpoints.
+- **Warehouse delivery zones**: **Settings → Warehouses → Manage zones** — `WarehouseZonesPanel` saves an explicit coverage type (postal codes or radius). Editing a postal zone does not turn it into a radius because leftover coordinates are still stored. Polygon zones keep their drawn area until the type changes. Uses `listZones` / `createZone` / `updateZone` / `deleteZone` RTK endpoints.
 - Multi-warehouse toggle: gated by `multi_warehouse` plan flag; calls fulfillment API.
 - **Order detail**: shows per-item warehouse badges when `multiLocationFulfillment` is true.
 - **Fulfillment → Pick lists**: `PickListsTab` on `/app/fulfillment` — generate waves, view pick lists, complete picking. API: `/api/fulfillment/waves/*` (`fulfillment/waves.js`, `pick-lists.service.js`). Migration `0177_pick_lists_hardening.sql` adds `order_item_id` on `pick_list_item`.
@@ -128,6 +140,6 @@ Fulfillment transfer is transactional and preserves financial snapshots. It is l
 
 ## Per-leg transfer and failed retry (2026-09-15)
 
-Transfers are presented for each pending/picking warehouse assignment, including item-level legs. A transfer never moves unrelated supplier or warehouse lines. The transaction locks the order and assignment, validates supplier organization and delivery-zone eligibility, releases the old reservation, reserves the target stock, and records the transfer reason.
+A whole-order warehouse leg commits and releases only lines that do not have their own warehouse assignment, so those lines are not moved twice. Transfers are presented for each pending/picking warehouse assignment, including item-level legs. A transfer never moves unrelated supplier or warehouse lines. The transaction locks the order and assignment, and it allows the move while the order is placed, pending approval, acknowledged, or processing. Zone eligibility uses the same destination as routing: the order snapshot (including a postal code nested on the address), then the branch, then the restaurant. The transaction validates supplier organization, releases the old reservation, reserves the target stock, and records the transfer reason.
 
-A failed delivery is history, not an active assignment. POST /api/orders/:id/delivery-retry requires a failed driver assignment, target driver, and reason. Pre-dispatch warehouse legs reserve stock again transactionally; dispatched legs do not restore consumed stock. New warehouse/driver attempts link to the superseded records, while active boards hide superseded attempts. Migration 0208_delivery_retry_provenance.sql adds provenance fields, status, and active-assignment uniqueness.
+A failed delivery is history, not an active assignment. POST /api/orders/:id/delivery-retry requires a failed driver assignment, target driver, and reason. Pre-dispatch warehouse legs reserve stock again transactionally; dispatched legs do not restore consumed stock. New warehouse/driver attempts link to the superseded records, while active boards hide superseded attempts. A retry whose driver attempt was not tied to one warehouse leg replaces the failed legs only: already-delivered lines are not reserved again, and those failed legs are superseded so a later delivery can complete the order. A retry tied to a whole-order warehouse leg also leaves lines that still have their own live warehouse assignment out of the new reservation. Migration 0208_delivery_retry_provenance.sql adds provenance fields, status, and active-assignment uniqueness.

@@ -17,7 +17,7 @@
 /**
  * @typedef {object} AiChatMessage
  * @property {'system'|'user'|'assistant'|'tool'} role
- * @property {string} [content]
+ * @property {string|Array<Record<string, unknown>>} [content]
  * @property {string} [name]
  * @property {string} [tool_call_id]
  * @property {Array<{ id: string, type: 'function', function: { name: string, arguments: string } }>} [tool_calls]

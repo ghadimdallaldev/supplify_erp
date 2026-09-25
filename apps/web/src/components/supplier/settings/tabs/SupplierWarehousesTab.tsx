@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '../../../ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../../ui/sheet'
-import { Warehouse, MapPin, Loader2, MapPinned } from 'lucide-react'
+import { Warehouse, MapPin, Loader2, MapPinned, Pencil } from 'lucide-react'
 import { WarehouseZonesPanel } from '../WarehouseZonesPanel'
 import { toast } from 'sonner'
 import { WarehouseFulfillmentSettings } from '../../../settings/WarehouseFulfillmentSettings'
@@ -33,6 +33,7 @@ import {
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
   useSetDefaultWarehouseMutation,
+  useUpdateWarehouseMutation,
   useGetSupplierFulfillmentQuery,
 } from '../../../../services/api'
 import { ensureNamespace } from '../../../../i18n'
@@ -41,9 +42,12 @@ export function SupplierWarehousesTab() {
   const { t } = useTranslation('suppliers')
   const dispatch = useAppDispatch()
   const { user } = useAppSelector((state) => state.auth)
-  const { canAny } = usePermissions()
+  const { can, canAny } = usePermissions()
   const canWriteWarehouses = canAny('WAREHOUSES_EDIT', 'WAREHOUSES_MANAGE')
+  const canCreateWarehouse = can('WAREHOUSES_MANAGE')
+  const canDeactivateWarehouse = can('WAREHOUSES_MANAGE')
   const canManageZones = canAny('WAREHOUSES_MANAGE')
+  const canManageFulfillment = can('SETTINGS_MANAGE')
 
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
@@ -51,17 +55,21 @@ export function SupplierWarehousesTab() {
   const multiWarehousePlan = multiWarehousePlanEnabled(entitlements)
 
   const { data: warehousesData, refetch: refetchWarehouses } = useGetWarehousesQuery(undefined, {
-    skip: !warehousesEnabled,
+    skip: !warehousesEnabled || !can('WAREHOUSES_VIEW'),
   })
-  useGetSupplierFulfillmentQuery(undefined, { skip: !multiWarehousePlan })
+  useGetSupplierFulfillmentQuery(undefined, {
+    skip: !multiWarehousePlan || !canManageFulfillment,
+  })
   const [createWarehouse, { isLoading: isCreatingWarehouse }] = useCreateWarehouseMutation()
   const [setDefaultWarehouse, { isLoading: isSettingDefault }] = useSetDefaultWarehouseMutation()
+  const [updateWarehouse, { isLoading: isUpdatingWarehouse }] = useUpdateWarehouseMutation()
 
   const warehouseCount = warehousesData?.warehouses?.length ?? 0
   const warehouseGate = getWarehouseAddGate(entitlements, warehouseCount)
   const canAddWarehouse = warehouseGate.canAdd
 
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
+  const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null)
   const [zonesWarehouse, setZonesWarehouse] = useState<{ id: string; name: string } | null>(null)
   const [warehouseForm, setWarehouseForm] = useState({
     name: '',
@@ -107,6 +115,71 @@ export function SupplierWarehousesTab() {
       setWarehouseForm({ name: '', code: '', address: '', city: '', country: '', isMain: false })
     } catch (err: any) {
       toast.error(err?.data?.error?.message || t('warehouses.toast.addFailed'))
+    }
+  }
+
+  const resetWarehouseForm = () => {
+    setWarehouseForm({ name: '', code: '', address: '', city: '', country: '', isMain: false })
+    setEditingWarehouseId(null)
+    setShowAddWarehouse(false)
+  }
+
+  const openEditWarehouse = (wh: {
+    id: string
+    name?: string
+    code?: string
+    address?: unknown
+  }) => {
+    setEditingWarehouseId(wh.id)
+    setWarehouseForm({
+      name: wh.name || '',
+      code: wh.code || '',
+      address: formatAddressLine(wh.address) || (typeof wh.address === 'string' ? wh.address : ''),
+      city: '',
+      country: '',
+      isMain: false,
+    })
+    setShowAddWarehouse(true)
+  }
+
+  const handleSaveWarehouse = async () => {
+    if (editingWarehouseId) {
+      if (!warehouseForm.name.trim()) {
+        toast.error(t('warehouses.toast.nameRequired'))
+        return
+      }
+      try {
+        const address = [warehouseForm.address, warehouseForm.city, warehouseForm.country]
+          .filter(Boolean)
+          .join(', ')
+        await updateWarehouse({
+          id: editingWarehouseId,
+          name: warehouseForm.name,
+          code: warehouseForm.code || undefined,
+          address: address || undefined,
+        }).unwrap()
+        toast.success(t('warehouses.toast.updated'))
+        await refetchWarehouses()
+        resetWarehouseForm()
+      } catch (err: any) {
+        toast.error(err?.data?.error?.message || t('warehouses.toast.updateFailed'))
+      }
+      return
+    }
+    await handleAddWarehouse()
+  }
+
+  const handleDeactivateWarehouse = async (warehouseId: string) => {
+    if (!canDeactivateWarehouse) {
+      toast.error(t('warehouses.toast.noPermission'))
+      return
+    }
+    try {
+      await updateWarehouse({ id: warehouseId, is_active: false }).unwrap()
+      toast.success(t('warehouses.toast.deactivated'))
+      await refetchWarehouses()
+    } catch (err: any) {
+      toast.error(err?.data?.error?.message || t('warehouses.toast.deactivateFailed'))
     }
   }
 
@@ -161,9 +234,9 @@ export function SupplierWarehousesTab() {
               <CardDescription>{t('warehouses.description')}</CardDescription>
             </div>
             <Button
-              disabled={!canAddWarehouse || !canWriteWarehouses}
+              disabled={!canAddWarehouse || !canCreateWarehouse}
               onClick={() => {
-                if (!canWriteWarehouses) {
+                if (!canCreateWarehouse) {
                   toast.error(t('warehouses.toast.noPermission'))
                   return
                 }
@@ -211,6 +284,9 @@ export function SupplierWarehousesTab() {
                         {(wh.is_default || wh.is_main) && (
                           <Badge variant="secondary">{t('warehouses.default')}</Badge>
                         )}
+                        {wh.is_active === false && (
+                          <Badge variant="outline">{t('warehouses.inactive')}</Badge>
+                        )}
                       </div>
                       {formatAddressLine(wh.address) && (
                         <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
@@ -220,14 +296,32 @@ export function SupplierWarehousesTab() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {!(wh.is_default || wh.is_main) && canWriteWarehouses && (
+                      {!(wh.is_default || wh.is_main) &&
+                        canWriteWarehouses &&
+                        wh.is_active !== false && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isSettingDefault}
+                            onClick={() => handleSetDefault(wh.id)}
+                          >
+                            {t('warehouses.default')}
+                          </Button>
+                        )}
+                      {canWriteWarehouses && (
+                        <Button variant="outline" size="sm" onClick={() => openEditWarehouse(wh)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          {t('warehouses.editWarehouse')}
+                        </Button>
+                      )}
+                      {canDeactivateWarehouse && wh.is_active !== false && (
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={isSettingDefault}
-                          onClick={() => handleSetDefault(wh.id)}
+                          disabled={isUpdatingWarehouse}
+                          onClick={() => handleDeactivateWarehouse(wh.id)}
                         >
-                          {t('warehouses.default')}
+                          {t('warehouses.deactivateWarehouse')}
                         </Button>
                       )}
                       <Button
@@ -273,11 +367,25 @@ export function SupplierWarehousesTab() {
         </SheetContent>
       </Sheet>
 
-      <Dialog open={showAddWarehouse} onOpenChange={setShowAddWarehouse}>
+      <Dialog
+        open={showAddWarehouse}
+        onOpenChange={(open) => {
+          if (!open) resetWarehouseForm()
+          else setShowAddWarehouse(true)
+        }}
+      >
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>{t('warehouses.addDialog.title')}</DialogTitle>
-            <DialogDescription>{t('warehouses.addDialog.description')}</DialogDescription>
+            <DialogTitle>
+              {editingWarehouseId
+                ? t('warehouses.addDialog.editTitle')
+                : t('warehouses.addDialog.title')}
+            </DialogTitle>
+            <DialogDescription>
+              {editingWarehouseId
+                ? t('warehouses.addDialog.editDescription')
+                : t('warehouses.addDialog.description')}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -327,26 +435,37 @@ export function SupplierWarehousesTab() {
                 />
               </div>
               <div className="flex items-center space-x-2 md:col-span-2">
-                <input
-                  type="checkbox"
-                  id="isMain"
-                  checked={warehouseForm.isMain}
-                  onChange={(e) => setWarehouseForm({ ...warehouseForm, isMain: e.target.checked })}
-                  className="rounded"
-                />
-                <Label htmlFor="isMain" className="text-sm font-medium">
-                  {t('warehouses.addDialog.setMain')}
-                </Label>
+                {!editingWarehouseId && (
+                  <>
+                    <input
+                      type="checkbox"
+                      id="isMain"
+                      checked={warehouseForm.isMain}
+                      onChange={(e) =>
+                        setWarehouseForm({ ...warehouseForm, isMain: e.target.checked })
+                      }
+                      className="rounded"
+                    />
+                    <Label htmlFor="isMain" className="text-sm font-medium">
+                      {t('warehouses.addDialog.setMain')}
+                    </Label>
+                  </>
+                )}
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddWarehouse(false)}>
+            <Button variant="outline" onClick={resetWarehouseForm}>
               {t('warehouses.addDialog.cancel')}
             </Button>
-            <Button onClick={handleAddWarehouse} disabled={isCreatingWarehouse}>
-              {isCreatingWarehouse ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              {t('warehouses.addWarehouse')}
+            <Button
+              onClick={() => void handleSaveWarehouse()}
+              disabled={isCreatingWarehouse || isUpdatingWarehouse}
+            >
+              {isCreatingWarehouse || isUpdatingWarehouse ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {editingWarehouseId ? t('warehouses.addDialog.save') : t('warehouses.addWarehouse')}
             </Button>
           </DialogFooter>
         </DialogContent>

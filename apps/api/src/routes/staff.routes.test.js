@@ -182,19 +182,32 @@ describe('staff.routes', () => {
         rows: [
           {
             id: 'swap-1',
+            status: 'REQUESTED',
+            shift_id: 'shift-1',
+            proposed_cover_id: 'staff-2',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ status: 'ACTIVE' }] })
+      .mockResolvedValueOnce({
+        rows: [{ starts_at: '2026-06-11T09:00:00.000Z', ends_at: '2026-06-11T17:00:00.000Z' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'swap-1',
             restaurant_id: 'rest-1',
             shift_id: 'shift-1',
             requested_by: 'staff-1',
             proposed_cover_id: 'staff-2',
             status: 'COMPLETED',
-            reason: null,
-            manager_note: null,
-            created_at: '2026-06-01T00:00:00.000Z',
-            updated_at: '2026-06-01T00:00:00.000Z',
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {

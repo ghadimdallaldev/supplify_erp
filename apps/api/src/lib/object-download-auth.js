@@ -76,7 +76,13 @@ async function restaurantHasCatalogAccess(restaurantId, supplierId) {
 
 async function userHasProductImageCatalogAccess(req, supplierId) {
   if (!req.userData) return false
-  if (req.userData.role === 'ADMIN') return true
+  if (req.userData.role === 'ADMIN') {
+    const ownSupplierId = await getSupplierIdForRequest(req)
+    if (ownSupplierId && ownSupplierId === supplierId) return true
+    const restaurantId = await getRestaurantIdForRequest(req)
+    if (!restaurantId) return false
+    return restaurantHasCatalogAccess(restaurantId, supplierId)
+  }
   if (req.userData.role === 'SUPPLIER') {
     const ownSupplierId = await getSupplierIdForRequest(req)
     return Boolean(ownSupplierId && ownSupplierId === supplierId)

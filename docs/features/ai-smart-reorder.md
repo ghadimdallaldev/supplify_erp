@@ -90,7 +90,7 @@ Gating layers all must pass for a genuine model call. Forecasts and heuristics s
 3. **Quota** - effective daily plan allowance or trial pool has remaining genuine LLM calls
 4. **Env** - `AI_ENABLED=true` and provider credentials, such as `OPENAI_API_KEY` when `AI_PROVIDER=openai`
 
-Usage metering uses `ai_requests_per_day` for paid plans and the trial AI pool for trial tenants. Only genuine provider/model calls consume allowance. Heuristic forecasts, deterministic calculations, cached AI responses, and validation retries caused solely by internal provider errors do not consume quota unless the cost policy changes.
+Usage metering uses `ai_requests_per_day` for paid plans and the trial AI pool for trial tenants. Each authenticated user has their own allowance equal to the plan limit; usage is stored in `user_ai_request_usage` (migration `0217_ai_usage_per_user.sql`) and is not shared across logins on the same tenant. Only genuine provider/model calls consume allowance. Heuristic forecasts, deterministic calculations, cached AI responses, and validation retries caused solely by internal provider errors do not consume quota unless the cost policy changes.
 
 | Endpoint       | Genuine LLM behavior                                                    | Forecast / rule fallback                                                         |
 | -------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |

@@ -106,6 +106,7 @@ describe('Suppliers Routes', () => {
               name: 'Test Supplier',
               contact_email: 'supplier@example.com',
               phone: '1234567890',
+              vat_no: 'secret-vat',
               product_count: 5,
               avg_price: 10.5,
               is_followed: false,
@@ -121,6 +122,7 @@ describe('Suppliers Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.suppliers).toHaveLength(1)
+      expect(response.body.data.suppliers[0].vat_no).toBeUndefined()
     })
 
     it('includes store-wide deal badges on supplier list', async () => {
@@ -183,6 +185,7 @@ describe('Suppliers Routes', () => {
             contact_email: 'supplier@example.com',
             phone: '1234567890',
             address: '123 Main St',
+            vat_no: 'secret-vat',
             product_count: 5,
             avg_price: 10.5,
           },
@@ -193,6 +196,7 @@ describe('Suppliers Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.supplier.id).toBe('supplier-1')
+      expect(response.body.data.supplier.vat_no).toBeUndefined()
     })
   })
 })

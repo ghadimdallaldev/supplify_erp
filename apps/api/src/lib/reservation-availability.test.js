@@ -5,8 +5,14 @@ import {
   computeSeatsLeft,
   intervalsOverlap,
   reservationOverlapsSlot,
+  assertSlotBookable,
   findBookableSlot,
+  assignTablesForParty,
+  holdTablesForParty,
+  publicDepositFields,
+  getTableAssignmentError,
   toCalendarDateString,
+  dateAtHour,
   CAPACITY_CONSUMING_STATUSES,
 } from './reservation-availability.js'
 
@@ -217,5 +223,153 @@ describe('reservation-availability', () => {
 
   it('toCalendarDateString accepts YYYY-MM-DD', () => {
     expect(toCalendarDateString('2026-05-27')).toBe('2026-05-27')
+  })
+
+  it('seats a party at one table that fits instead of several smaller ones', () => {
+    const assigned = assignTablesForParty(
+      [
+        { id: 'two-a', capacity: 2, is_active: true },
+        { id: 'two-b', capacity: 2, is_active: true },
+        { id: 'four', capacity: 4, is_active: true },
+      ],
+      4
+    )
+    expect(assigned.tableIds).toEqual(['four'])
+  })
+
+  it('combines small tables when no single table fits', () => {
+    const assigned = assignTablesForParty(
+      [
+        { id: 'two-a', capacity: 2, is_active: true },
+        { id: 'two-b', capacity: 2, is_active: true },
+      ],
+      4
+    )
+    expect(assigned.tableIds).toEqual(['two-a', 'two-b'])
+    expect(assigned.seats).toBe(4)
+  })
+
+  it('rejects a table assignment that cannot seat the party', () => {
+    expect(
+      getTableAssignmentError({
+        partySize: 6,
+        tableIds: ['t1'],
+        tables: [{ id: 't1', capacity: 2, is_active: true }],
+        scheduledAt: '2026-06-15T18:00:00.000Z',
+        durationMinutes: 90,
+        otherReservations: [],
+      })
+    ).toMatch(/do not seat/)
+  })
+
+  it('tells the guest when the party size is not allowed', () => {
+    expect(() =>
+      assertSlotBookable(
+        { partySizeRejected: true, minPartySize: 2, maxPartySize: 8, slots: [] },
+        '2026-06-15T18:00:00.000Z',
+        12
+      )
+    ).toThrow(/between 2 and 8/)
+  })
+
+  it('rejects a table that is already booked at the same time', () => {
+    expect(
+      getTableAssignmentError({
+        partySize: 2,
+        tableIds: ['t1'],
+        tables: [{ id: 't1', capacity: 4, is_active: true }],
+        scheduledAt: '2026-06-15T18:00:00.000Z',
+        durationMinutes: 90,
+        otherReservations: [
+          {
+            status: 'CONFIRMED',
+            tables: ['t1'],
+            scheduled_at: '2026-06-15T18:30:00.000Z',
+            duration_minutes: 90,
+          },
+        ],
+      })
+    ).toMatch(/already booked/)
+  })
+})
+
+describe('holdTablesForParty', () => {
+  it('holds a free table that fits the party', async () => {
+    const calls = []
+    const queryFn = async (sql) => {
+      calls.push(sql)
+      if (String(sql).includes('unnest')) return { rows: [] }
+      return { rows: [{ id: 't1', capacity: 4, is_active: true }] }
+    }
+    const tableIds = await holdTablesForParty(queryFn, {
+      restaurantId: 'rest-1',
+      scheduledAt: '2026-09-25T16:00:00.000Z',
+      durationMinutes: 90,
+      partySize: 2,
+    })
+    expect(tableIds).toEqual(['t1'])
+  })
+
+  it('ignores the booking being moved when that table is otherwise free', async () => {
+    const queryFn = async (sql, params) => {
+      if (String(sql).includes('unnest')) {
+        expect(String(sql)).toContain('id <>')
+        expect(params).toContain('res-1')
+        return { rows: [] }
+      }
+      return { rows: [{ id: 't1', capacity: 4, is_active: true }] }
+    }
+    const tableIds = await holdTablesForParty(queryFn, {
+      restaurantId: 'rest-1',
+      scheduledAt: '2026-09-25T16:00:00.000Z',
+      durationMinutes: 90,
+      partySize: 2,
+      excludeReservationId: 'res-1',
+    })
+    expect(tableIds).toEqual(['t1'])
+  })
+
+  it('refuses the booking when the fitting table is already held', async () => {
+    const queryFn = async (sql) => {
+      if (String(sql).includes('unnest')) return { rows: [{ table_id: 't1' }] }
+      return { rows: [{ id: 't1', capacity: 4, is_active: true }] }
+    }
+    await expect(
+      holdTablesForParty(queryFn, {
+        restaurantId: 'rest-1',
+        scheduledAt: '2026-09-25T16:00:00.000Z',
+        durationMinutes: 90,
+        partySize: 2,
+      })
+    ).rejects.toThrow(/free tables/)
+  })
+})
+
+describe('public deposit fields', () => {
+  it('asks for acknowledgment only when the amount or percent is above zero', () => {
+    expect(
+      publicDepositFields({
+        depositMode: 'percent',
+        depositAmount: 0,
+        depositPercent: 0,
+        depositPolicyText: 'Card hold at the door',
+      }).depositRequired
+    ).toBe(false)
+    expect(
+      publicDepositFields({
+        depositMode: 'fixed',
+        depositAmount: 25,
+        depositPercent: 0,
+        depositPolicyText: '',
+      })
+    ).toMatchObject({ depositRequired: true, depositAmount: 25 })
+  })
+})
+
+describe('reservation slot timezone', () => {
+  it('places a 7:00 p.m. Beirut opening at 16:00 UTC', () => {
+    expect(dateAtHour('2026-09-25', 19, 'Asia/Beirut').toISOString()).toBe(
+      '2026-09-25T16:00:00.000Z'
+    )
   })
 })

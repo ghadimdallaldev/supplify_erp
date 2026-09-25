@@ -58,4 +58,14 @@ describe('runFulfillmentExceptionChecks', () => {
     expect(String(mockQuery.mock.calls[0][0])).toContain('FROM subscription sub')
     expect(String(mockQuery.mock.calls[0][0])).toContain('sub.account_locked_at IS NULL')
   })
+
+  it('looks for proof on the delivered driver leg', async () => {
+    mockQuery.mockResolvedValue({ rows: [] })
+    const { runFulfillmentExceptionChecks } = await import('./fulfillment-exceptions.job.js')
+    await runFulfillmentExceptionChecks()
+    const podSql = mockQuery.mock.calls
+      .map((call) => String(call[0]))
+      .find((sql) => sql.includes('proof_of_delivery'))
+    expect(podSql).toMatch(/pod\.driver_assignment_id = da\.id/)
+  })
 })

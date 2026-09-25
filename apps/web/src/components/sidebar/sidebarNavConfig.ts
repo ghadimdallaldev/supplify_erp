@@ -556,14 +556,7 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
           anyOf:
             persona.overviewNav.gate === 'promotions'
               ? ['PROMOTIONS_VIEW']
-              : [
-                  'ORDERS_MANAGE',
-                  'INVOICES_VIEW',
-                  'CATALOG_EDIT',
-                  'FULFILLMENT_VIEW',
-                  'PROMOTIONS_MANAGE',
-                  'PROMOTIONS_VIEW',
-                ],
+              : ['ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW'],
           testId: 'nav-command-center',
         })
       }

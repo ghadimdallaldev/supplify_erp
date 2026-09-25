@@ -107,4 +107,49 @@ export function pctChange(oldVal, newVal) {
   return moneyDiv(moneySub(newVal, oldVal), oldVal).times(100)
 }
 
+/**
+ * Sum money fields only when every row shares one currency.
+ * Counts are always added. A missing currency is treated as USD.
+ *
+ * @param {Array<Record<string, unknown>>} rows
+ * @param {string[]} moneyKeys
+ * @param {string[]} [countKeys]
+ */
+function invoiceCurrencyCode(value) {
+  const code = String(value || '')
+    .trim()
+    .toUpperCase()
+  return /^[A-Z]{3}$/.test(code) ? code : null
+}
+
+export function foldInvoiceCurrencyTotals(rows, moneyKeys, countKeys = []) {
+  const list = Array.isArray(rows) ? rows : []
+  const groups = new Map()
+  for (const row of list) {
+    const currency = invoiceCurrencyCode(row.currency)
+    const key = currency || ''
+    if (!groups.has(key)) {
+      const bucket = { currency }
+      for (const moneyKey of moneyKeys) bucket[moneyKey] = 0
+      for (const countKey of countKeys) bucket[countKey] = 0
+      groups.set(key, bucket)
+    }
+    const bucket = groups.get(key)
+    for (const moneyKey of moneyKeys) bucket[moneyKey] += Number(row[moneyKey]) || 0
+    for (const countKey of countKeys) bucket[countKey] += Number(row[countKey]) || 0
+  }
+  const byCurrency = [...groups.values()]
+  const labeled = new Set(byCurrency.map((row) => row.currency).filter(Boolean))
+  const mixed = labeled.size > 1 || (labeled.size > 0 && byCurrency.some((row) => !row.currency))
+  const money = {}
+  for (const key of moneyKeys) {
+    money[key] = mixed ? null : list.reduce((sum, row) => sum + (Number(row[key]) || 0), 0)
+  }
+  const counts = {}
+  for (const key of countKeys) {
+    counts[key] = list.reduce((sum, row) => sum + (Number(row[key]) || 0), 0)
+  }
+  return { mixed, money, counts, byCurrency }
+}
+
 export { Decimal }

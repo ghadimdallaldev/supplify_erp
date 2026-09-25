@@ -51,7 +51,9 @@ describe('listInvoiceAnomalies', () => {
     expect(dbQuery).toHaveBeenCalledWith(expect.stringContaining('invoice_line_item'), [
       'restaurant-1',
       365,
+      expect.any(String),
     ])
+    expect(dbQuery.mock.calls[0][0]).toContain('AT TIME ZONE')
     expect(dbQuery.mock.calls[0][0]).toContain('duplicate_linked_invoices')
   })
 })

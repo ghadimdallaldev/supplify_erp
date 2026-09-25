@@ -18,11 +18,18 @@ const RESTAURANT_ACCOUNTANT = [
   P.PAYMENTS_MANAGE,
   P.ORDERS_VIEW,
   P.SUBSCRIPTIONS_VIEW,
-  P.RECIPES_VIEW,
-  P.RECIPES_VIEW_COSTS,
 ]
 
-const SUPPLIER_ACCOUNTANT = [...RESTAURANT_ACCOUNTANT]
+const SUPPLIER_ACCOUNTANT = [
+  P.INVOICES_VIEW,
+  P.INVOICES_CREATE,
+  P.INVOICES_EDIT,
+  P.INVOICES_MANAGE,
+  P.PAYMENTS_VIEW,
+  P.PAYMENTS_MANAGE,
+  P.ORDERS_VIEW,
+  P.SUBSCRIPTIONS_VIEW,
+]
 
 const DRIVER_DELIVERIES = [P.DRIVER_DELIVERIES_VIEW, P.DRIVER_DELIVERIES_MANAGE]
 
@@ -175,14 +182,13 @@ export const SUPPLIER_SYSTEM_ROLES = [
   {
     name: 'Catalog Manager',
     legacyNames: ['Catalog Manager', 'Catalog/Product Manager'],
-    description: 'Products, catalog, pricing, import; no receivables or team admin',
+    description: 'Products, catalog, pricing, import; no orders, receivables, or team admin',
     permissions: [
       P.CATALOG_VIEW,
       P.CATALOG_EDIT,
       P.CATALOG_MANAGE,
       P.INVENTORY_VIEW,
       P.INVENTORY_EDIT,
-      P.ORDERS_VIEW,
     ],
   },
   {

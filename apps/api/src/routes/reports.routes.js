@@ -7,6 +7,8 @@ import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { parseReportQuery } from '../services/reports.service.js'
 import * as reports from '../services/reports.service.js'
+import { getRestaurantTimezone, getSupplierTimezone } from '../lib/tenant-timezone.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 
 const router = express.Router()
 
@@ -34,9 +36,10 @@ function sendReport(res, result, requestId) {
   })
 }
 
-const handle = (fn) => async (req, res) => {
+const handle = (fn, zoneFor) => async (req, res) => {
   try {
-    const params = parseReportQuery(req.query)
+    const timeZone = zoneFor ? await zoneFor(req) : null
+    const params = parseReportQuery(req.query, timeZone ? { timeZone } : {})
     const result = await fn(req, params)
     sendReport(res, result, req.requestId)
   } catch (error) {
@@ -52,79 +55,77 @@ const handle = (fn) => async (req, res) => {
   }
 }
 
+function restaurantReport(fn) {
+  return handle(
+    async (req, params) => {
+      const restaurantId = await requireRestaurantId(req)
+      await assertLegacyBranchOwnedByRestaurant(params.branchId, restaurantId)
+      return fn(restaurantId, params)
+    },
+    async (req) => getRestaurantTimezone(await requireRestaurantId(req))
+  )
+}
+
+async function supplierZone(req) {
+  return getSupplierTimezone(await requireSupplierId(req))
+}
+
 // Restaurant reports
 router.get(
   '/restaurant/spend-by-supplier',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantSpendBySupplier(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) =>
+    reports.restaurantSpendBySupplier(restaurantId, params)
+  )
 )
 
 router.get(
   '/restaurant/spend-by-category',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantSpendByCategory(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) =>
+    reports.restaurantSpendByCategory(restaurantId, params)
+  )
 )
 
 router.get(
   '/restaurant/order-volume',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantOrderVolume(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) => reports.restaurantOrderVolume(restaurantId, params))
 )
 
 router.get(
   '/restaurant/cogs-trend',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantCogsTrend(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) => reports.restaurantCogsTrend(restaurantId, params))
 )
 
 router.get(
   '/restaurant/top-products',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantTopProducts(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) => reports.restaurantTopProducts(restaurantId, params))
 )
 
 router.get(
   '/restaurant/receiving-quality',
   requireRole(['RESTAURANT', 'ADMIN']),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantReceivingQuality(restaurantId, params)
-  })
+  requirePermission('RECEIVING_VIEW'),
+  restaurantReport((restaurantId, params) =>
+    reports.restaurantReceivingQuality(restaurantId, params)
+  )
 )
 
 router.get(
   '/restaurant/waste',
   requireRole(['RESTAURANT', 'ADMIN']),
   wasteFeature,
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantWaste(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) => reports.restaurantWaste(restaurantId, params))
 )
 
 router.get(
   '/restaurant/invoice-aging',
   requireRole(['RESTAURANT', 'ADMIN']),
   requirePermission('INVOICES_VIEW'),
-  handle(async (req, params) => {
-    const restaurantId = await requireRestaurantId(req)
-    return reports.restaurantInvoiceAging(restaurantId, params)
-  })
+  restaurantReport((restaurantId, params) => reports.restaurantInvoiceAging(restaurantId, params))
 )
 
 // Supplier reports
@@ -134,7 +135,7 @@ router.get(
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierRevenueTrend(supplierId, params)
-  })
+  }, supplierZone)
 )
 
 router.get(
@@ -143,7 +144,7 @@ router.get(
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierTopRestaurants(supplierId, params)
-  })
+  }, supplierZone)
 )
 
 router.get(
@@ -152,7 +153,7 @@ router.get(
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierTopProducts(supplierId, params)
-  })
+  }, supplierZone)
 )
 
 router.get(
@@ -161,7 +162,7 @@ router.get(
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierFulfillmentPerformance(supplierId, params)
-  })
+  }, supplierZone)
 )
 
 router.get(
@@ -169,20 +170,20 @@ router.get(
   requireRole(['SUPPLIER', 'ADMIN']),
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
-    const bucket = reports.dateBucketExpression('co.placed_at', params.granularity)
+    const bucket = reports.dateBucketExpression('co.placed_at', params.granularity, params.timeZone)
     const { rows } = await query(
       `
       SELECT
         ${bucket} AS period,
-        COUNT(DISTINCT co.id)::int AS order_count
+        co.currency,
+        COUNT(DISTINCT co.id)::int AS order_count,
+        COALESCE(SUM(oi.line_total), 0)::numeric AS total_amount
       FROM customer_order co
-      WHERE EXISTS (
-        SELECT 1 FROM order_item oi WHERE oi.order_id = co.id AND oi.supplier_id = $1
-      )
-        AND co.placed_at >= $2
+      JOIN order_item oi ON oi.order_id = co.id AND oi.supplier_id = $1
+      WHERE co.placed_at >= $2
         AND co.placed_at <= $3
-        AND co.status NOT IN ('DRAFT', 'CANCELLED')
-      GROUP BY period
+        AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+      GROUP BY period, co.currency
       ORDER BY period
       `,
       [supplierId, params.from, params.to]
@@ -190,13 +191,13 @@ router.get(
     return {
       data: rows,
       meta: {
-        from: params.from.toISOString().slice(0, 10),
-        to: params.to.toISOString().slice(0, 10),
+        from: params.fromDate || reports.formatReportDate(params.from),
+        to: params.toDate || reports.formatReportDate(params.to),
         granularity: params.granularity,
         rowCount: rows.length,
       },
     }
-  })
+  }, supplierZone)
 )
 
 router.get(
@@ -206,7 +207,7 @@ router.get(
   handle(async (req, params) => {
     const supplierId = await requireSupplierId(req)
     return reports.supplierInvoiceCollection(supplierId, params)
-  })
+  }, supplierZone)
 )
 
 export { router as reportsRoutes }

@@ -86,7 +86,7 @@ export function ReportPanel({
   const chartData = useMemo(
     () =>
       rows.map((row) => ({
-        name: String(row[def.xKey] ?? '').slice(0, 14),
+        name: [String(row[def.xKey] ?? '').slice(0, 14), row.currency].filter(Boolean).join(' '),
         value: Number(row[def.yKey] ?? 0),
         full: row,
       })),

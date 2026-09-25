@@ -246,7 +246,12 @@ export async function applyBestPromotionToOrder({
 }) {
   if (!skipDealPreflight) {
     const dealsEnabled = await isFeatureEnabled(restaurantId, 'RESTAURANT', 'supplier_deals')
-    if (!dealsEnabled) return null
+    const redeemEnabled = await isFeatureEnabled(
+      restaurantId,
+      'RESTAURANT',
+      'supplier_deals_redeem'
+    )
+    if (!dealsEnabled || !redeemEnabled) return null
 
     const hasDeals = await hasActiveSupplierOrderPromotions(client, supplierId, restaurantId)
     if (!hasDeals) return null

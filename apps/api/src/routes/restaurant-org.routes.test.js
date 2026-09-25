@@ -14,6 +14,16 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
   const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
   return loadRbacRouteMock(importOriginal, {
     getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-main'),
+    resolveAdminContext: (req, _res, next) => {
+      if (req.userData?.role === 'ADMIN') {
+        req.adminContext = req.adminContext || {
+          permissions: ['ADMIN_TENANTS', 'ADMIN_ACCESS'],
+        }
+      } else {
+        req.adminContext = null
+      }
+      next()
+    },
   })
 })
 
@@ -146,6 +156,7 @@ vi.mock('../lib/impersonation.js', () => ({
 
 import restaurantOrgRoutes from './restaurant-org.routes.js'
 import * as restaurantOrg from '../lib/restaurant-org.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import { getResolvedFeatureValue } from '../lib/feature-flags.js'
 import {
   restaurantOrgBranchComparison,
@@ -161,10 +172,23 @@ describe('restaurant-org.routes', () => {
 
   beforeEach(() => {
     clearAllMocks()
+    getEffectiveTenant.mockReturnValue(null)
     getResolvedFeatureValue.mockResolvedValue('ai_forecast_seasonality')
+    restaurantOrg.getUserRestaurantOrgMembership.mockReset()
+    restaurantOrg.getUserRestaurantOrgMembership.mockResolvedValue({
+      organization_id: 'org-1',
+      organization_name: 'Test Rest Org',
+      role_name: 'Org Owner',
+    })
     queryMock.mockReset()
     queryMock.mockImplementation(async (sql) => {
       const text = typeof sql === 'string' ? sql : ''
+      if (text.includes('SELECT organization_id FROM restaurant WHERE id = $1')) {
+        return { rows: [{ organization_id: 'org-1' }] }
+      }
+      if (text.includes('SELECT name FROM restaurant_organizations WHERE id = $1')) {
+        return { rows: [{ name: 'Test Rest Org' }] }
+      }
       if (text.includes('is_main_branch')) {
         return { rows: [{ id: 'restaurant-main' }] }
       }
@@ -236,12 +260,43 @@ describe('restaurant-org.routes', () => {
     expect(res.body.error.name).toBe('MAIN_BRANCH')
   })
 
+  it('DELETE /branches/:id rejects Branch Accounts outside the organization', async () => {
+    restaurantOrg.userHasRestaurantOrgBranchAccess.mockResolvedValueOnce(false)
+    const res = await request(app)
+      .delete('/api/restaurant-org/branches/foreign-restaurant')
+      .expect(403)
+    expect(res.body.error.name).toBe('FORBIDDEN')
+    expect(restaurantOrg.deactivateRestaurantOrgBranch).not.toHaveBeenCalled()
+  })
+
   it('POST /branches/:id/reactivate delegates to reactivateRestaurantOrgBranch', async () => {
     const res = await request(app)
       .post('/api/restaurant-org/branches/restaurant-2/reactivate')
       .expect(200)
-    expect(restaurantOrg.reactivateRestaurantOrgBranch).toHaveBeenCalledWith('restaurant-2')
+    expect(restaurantOrg.reactivateRestaurantOrgBranch).toHaveBeenCalledWith(
+      'restaurant-2',
+      'org-1'
+    )
     expect(res.body.data.reactivated).toBe(true)
+  })
+
+  it('POST /branches/:id/reactivate rejects Branch Accounts outside the organization', async () => {
+    restaurantOrg.userHasRestaurantOrgBranchAccess.mockResolvedValueOnce(false)
+    const res = await request(app)
+      .post('/api/restaurant-org/branches/foreign-restaurant/reactivate')
+      .expect(403)
+    expect(res.body.error.name).toBe('FORBIDDEN')
+    expect(restaurantOrg.reactivateRestaurantOrgBranch).not.toHaveBeenCalled()
+  })
+
+  it('POST /branches/:id/unlink rejects Branch Accounts outside the organization', async () => {
+    restaurantOrg.userHasRestaurantOrgBranchAccess.mockResolvedValueOnce(false)
+    const res = await request(app)
+      .post('/api/restaurant-org/branches/foreign-restaurant/unlink')
+      .send({ confirm: true })
+      .expect(403)
+    expect(res.body.error.name).toBe('FORBIDDEN')
+    expect(restaurantOrg.unlinkRestaurantFromOrganization).not.toHaveBeenCalled()
   })
 
   it('GET /reports/overview returns consolidated KPIs', async () => {
@@ -287,6 +342,121 @@ describe('restaurant-org.routes', () => {
       .get('/api/restaurant-org/reports/advanced-analytics?from=2001-01-01&to=2026-01-01')
       .expect(200)
     expect(restaurantOrgAdvancedAnalytics).toHaveBeenCalled()
+  })
+
+  it('DELETE /users/:userId/branches/:restaurantId scopes revoke to the organization', async () => {
+    const res = await request(app)
+      .delete('/api/restaurant-org/users/user-2/branches/restaurant-2')
+      .expect(200)
+    expect(restaurantOrg.revokeRestaurantOrgBranchAccess).toHaveBeenCalledWith(
+      'user-2',
+      'restaurant-2',
+      'org-1'
+    )
+    expect(res.body.data.revoked).toBe(true)
+  })
+
+  it('DELETE /users/:userId/branches/:restaurantId rejects a branch outside the organization', async () => {
+    restaurantOrg.revokeRestaurantOrgBranchAccess.mockRejectedValueOnce(
+      Object.assign(new Error('Branch is not part of this organization'), { code: 'NOT_FOUND' })
+    )
+    const res = await request(app)
+      .delete('/api/restaurant-org/users/user-2/branches/foreign-restaurant')
+      .expect(404)
+    expect(res.body.error.name).toBe('NOT_FOUND')
+  })
+
+  it('POST /branches/:id/unlink passes the caller organization id', async () => {
+    await request(app)
+      .post('/api/restaurant-org/branches/restaurant-2/unlink')
+      .send({ confirm: true })
+      .expect(200)
+    expect(restaurantOrg.unlinkRestaurantFromOrganization).toHaveBeenCalledWith('restaurant-2', {
+      client: expect.anything(),
+      organizationId: 'org-1',
+    })
+  })
+
+  it('rejects an unscoped admin without impersonation', async () => {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, _res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+      next()
+    })
+    adminApp.use('/api/restaurant-org', restaurantOrgRoutes)
+
+    getEffectiveTenant.mockReturnValue(null)
+    restaurantOrg.getUserRestaurantOrgMembership.mockResolvedValue(null)
+
+    const res = await request(adminApp).get('/api/restaurant-org').expect(403)
+    expect(res.body.error.message).toMatch(/Impersonate/)
+  })
+
+  it('rejects an impersonating admin querying another organization', async () => {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, _res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+      next()
+    })
+    adminApp.use('/api/restaurant-org', restaurantOrgRoutes)
+
+    getEffectiveTenant.mockReturnValueOnce({
+      tenantId: 'restaurant-main',
+      tenantType: 'RESTAURANT',
+    })
+    const res = await request(adminApp)
+      .get('/api/restaurant-org?organization_id=org-foreign')
+      .expect(400)
+    expect(res.body.error.name).toBe('BAD_REQUEST')
+  })
+
+  it('binds impersonating admin restaurant org from the tenant, not leftover membership', async () => {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, _res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+      next()
+    })
+    adminApp.use('/api/restaurant-org', restaurantOrgRoutes)
+
+    getEffectiveTenant.mockReturnValue({
+      tenantId: 'restaurant-main',
+      tenantType: 'RESTAURANT',
+    })
+    restaurantOrg.getUserRestaurantOrgMembership.mockResolvedValue({
+      organization_id: 'org-leftover',
+      organization_name: 'Leftover Org',
+      role_name: 'Org Owner',
+    })
+    queryMock.mockImplementation(async (sql) => {
+      const text = typeof sql === 'string' ? sql : ''
+      if (text.includes('SELECT organization_id FROM restaurant WHERE id = $1')) {
+        return { rows: [{ organization_id: 'org-impersonated' }] }
+      }
+      if (text.includes('SELECT name FROM restaurant_organizations WHERE id = $1')) {
+        return { rows: [{ name: 'Impersonated Rest Org' }] }
+      }
+      if (
+        text.includes('is_main_branch') ||
+        text.includes('SELECT id FROM restaurant WHERE organization_id')
+      ) {
+        return { rows: [{ id: 'restaurant-main' }] }
+      }
+      return { rows: [] }
+    })
+    restaurantOrg.listRestaurantOrgBranches.mockResolvedValueOnce([
+      { id: 'restaurant-main', name: 'Main', is_main_branch: true },
+    ])
+
+    const res = await request(adminApp).get('/api/restaurant-org').expect(200)
+    expect(res.body.data.organization.id).toBe('org-impersonated')
+    expect(res.body.data.organization.name).toBe('Impersonated Rest Org')
+    expect(restaurantOrg.getUserRestaurantOrgMembership).not.toHaveBeenCalled()
   })
 
   it('POST /users/:userId/role returns 403 for non Org Owner', async () => {

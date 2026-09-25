@@ -16,6 +16,15 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
+function denyMissingPermission(res, req, key) {
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: { name: 'FORBIDDEN', message: `Missing permission: ${key}` },
+    requestId: req.requestId,
+  })
+}
+
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: vi.fn(async (req, res, next) => {
     req.userData = req.userData || { ...mockUser }
@@ -23,9 +32,38 @@ vi.mock('../lib/rbac.js', () => ({
   }),
   requireRole: () => (req, res, next) => next(),
   requireOwnership: () => (req, res, next) => next(),
-  resolveTenantContext: (req, res, next) => next(),
-  resolveAdminContext: (req, res, next) => next(),
-  requirePermission: () => (req, res, next) => next(),
+  resolveTenantContext: (req, res, next) => {
+    req.tenantContext = req.tenantContext || {
+      tenantId: 'restaurant-1',
+      tenantType: req.userData?.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT',
+      permissions: req.userData?.permissions || ['ORDERS_VIEW', 'SETTINGS_EDIT', 'ADMIN_ACCESS'],
+    }
+    next()
+  },
+  resolveAdminContext: (req, res, next) => {
+    req.adminContext = req.adminContext || {
+      permissions: req.userData?.adminPermissions || ['ADMIN_ACCESS'],
+    }
+    next()
+  },
+  requirePermission: (key) => (req, res, next) => {
+    const perms = [
+      ...(req.tenantContext?.permissions || []),
+      ...(req.adminContext?.permissions || []),
+    ]
+    if (perms.includes(key) || perms.includes(key.replace(/_VIEW$/, '_MANAGE'))) return next()
+    return denyMissingPermission(res, req, key)
+  },
+  requireAnyPermission:
+    (...keys) =>
+    (req, res, next) => {
+      const perms = [
+        ...(req.tenantContext?.permissions || []),
+        ...(req.adminContext?.permissions || []),
+      ]
+      if (keys.some((key) => perms.includes(key))) return next()
+      return denyMissingPermission(res, req, keys.join('|'))
+    },
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
   checkPermission: vi.fn().mockResolvedValue(true),
@@ -66,13 +104,16 @@ describe('Restaurants Routes', () => {
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
     vi.mocked(dbModule.withTransaction).mockImplementation((handler) => db.withTransaction(handler))
+    const { getSupplierIdForRequest, getRestaurantIdForRequest } = await import('../lib/rbac.js')
+    vi.mocked(getSupplierIdForRequest).mockResolvedValue('supplier-1')
+    vi.mocked(getRestaurantIdForRequest).mockResolvedValue('restaurant-1')
 
     app = express()
     app.use(express.json())
     app.use((req, res, next) => {
       req.requestId = 'test-request-id'
       req.user = mockUser
-      req.userData = { ...mockUser, role: 'ADMIN' } // Use ADMIN to see all restaurants
+      req.userData = { ...mockUser, role: 'ADMIN' }
       next()
     })
     app.use('/api/restaurants', restaurantsRoutes)
@@ -81,8 +122,28 @@ describe('Restaurants Routes', () => {
   })
 
   describe('GET /api/restaurants', () => {
+    it('denies supplier drivers without ORDERS_VIEW', async () => {
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = {
+          ...mockUser,
+          role: 'SUPPLIER',
+          permissions: ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
+        }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      localApp.use(errorHandler)
+
+      const response = await request(localApp).get('/api/restaurants').expect(403)
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+
     it('should return list of restaurants', async () => {
-      // For ADMIN role, it queries restaurants with count
+      // Admin impersonating a supplier lists linked restaurants only
       db.query
         .mockResolvedValueOnce({
           rows: [
@@ -104,6 +165,28 @@ describe('Restaurants Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.restaurants).toHaveLength(1)
+    })
+  })
+
+  describe('POST /api/restaurants/:id/logo', () => {
+    it('denies logo updates without SETTINGS_EDIT', async () => {
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'RESTAURANT', permissions: ['SETTINGS_VIEW'] }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      localApp.use(errorHandler)
+
+      const response = await request(localApp)
+        .post('/api/restaurants/restaurant-1/logo')
+        .send({ logoUrl: 'https://cdn.example/logo.png' })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
     })
   })
 
@@ -167,10 +250,41 @@ describe('Restaurants Routes', () => {
       expect(response.body.error.name).toBe('FORBIDDEN')
     })
 
+    it('denies SUPPLIER without ORDERS_VIEW', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+      })
+
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = {
+          ...mockUser,
+          role: 'SUPPLIER',
+          permissions: ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
+        }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      localApp.use(errorHandler)
+
+      const response = await request(localApp).get('/api/restaurants/restaurant-1').expect(403)
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+
     it('allows SUPPLIER when restaurant has active connection', async () => {
       db.query
         .mockResolvedValueOnce({
-          rows: [{ id: 'restaurant-1', name: 'Test Restaurant' }],
+          rows: [
+            {
+              id: 'restaurant-1',
+              name: 'Test Restaurant',
+              tax_id: 'secret-tax',
+              vat_number: 'secret-vat',
+            },
+          ],
         })
         .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
 
@@ -188,6 +302,8 @@ describe('Restaurants Routes', () => {
       const response = await request(localApp).get('/api/restaurants/restaurant-1').expect(200)
 
       expect(response.body.data.restaurant.id).toBe('restaurant-1')
+      expect(response.body.data.restaurant.tax_id).toBeUndefined()
+      expect(response.body.data.restaurant.vat_number).toBeUndefined()
     })
   })
 })

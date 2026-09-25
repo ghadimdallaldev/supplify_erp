@@ -19,6 +19,7 @@ vi.mock('../lib/socket.js', () => ({
 import { query } from '../lib/db.js'
 import { ConflictError, ValidationError } from '../middlewares/errorHandler.js'
 import {
+  advanceTrackingSessionStop,
   getActiveTrackingSession,
   ingestTrackingLocations,
   startTrackingSession,
@@ -62,5 +63,18 @@ describe('driver tracking sessions', () => {
     await expect(
       getActiveTrackingSession({ supplierId: 'supplier-1', driverId: 'driver-1' })
     ).resolves.toBeNull()
+  })
+
+  it('moves the active session onto the stop that just departed', async () => {
+    query.mockResolvedValueOnce({ rowCount: 1 })
+    await advanceTrackingSessionStop({
+      supplierId: 'supplier-1',
+      routeId: 'route-1',
+      stopId: 'stop-2',
+      driverId: 'driver-1',
+    })
+    expect(query.mock.calls[0][0]).toMatch(/current_stop_id = \$3/)
+    expect(query.mock.calls[0][0]).toMatch(/driver_id = \$4/)
+    expect(query.mock.calls[0][1]).toEqual(['supplier-1', 'route-1', 'stop-2', 'driver-1'])
   })
 })

@@ -191,6 +191,8 @@ describe('public.routes – staff portal time entries', () => {
     it('creates time entry and returns 201', async () => {
       mockStaffSession()
       queryMock.mockResolvedValueOnce({ rows: [] })
+      queryMock.mockResolvedValueOnce({ rows: [{ timezone: 'Asia/Beirut' }] })
+      queryMock.mockResolvedValueOnce({ rows: [] })
       const clockInAt = new Date().toISOString()
       queryMock.mockResolvedValueOnce({
         rows: [
@@ -340,5 +342,28 @@ describe('POST /api/public/reservations/manage/cancel', () => {
     const updateSql = String(queryMock.mock.calls[2][0])
     expect(updateSql).toContain('cancelled_at')
     expect(updateSql).toContain('cancellation_reason')
+    expect(updateSql).toContain('status = ANY')
+  })
+
+  it('does not cancel a reservation the host has already seated', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'res-seated-1',
+          status: 'SEATED',
+          public_token: RESERVATION_PUBLIC_TOKEN,
+          restaurant_id: RESTAURANT_ID,
+          scheduled_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        },
+      ],
+    })
+
+    const res = await request(app)
+      .post('/api/public/reservations/manage/cancel')
+      .send({ token: RESERVATION_PUBLIC_TOKEN })
+      .expect(409)
+
+    expect(res.body.error.name).toBe('RESERVATION_NOT_CANCELLABLE')
+    expect(queryMock).toHaveBeenCalledTimes(1)
   })
 })

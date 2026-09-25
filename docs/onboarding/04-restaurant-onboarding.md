@@ -319,7 +319,7 @@ End-to-end onboarding for a **restaurant** tenant: registration, profile, procur
 | **Navigation path**      | **Reports** → `/app/reports` (entitled); `/app/onboarding?tab=reviews`; hospitality: `/app/reservations`, `/app/staff`, `/app/consumer-menu`, `/app/consumer-orders`, `/app/consumer-loyalty`          |
 | **Required data**        | Report date range; review responses; guest-facing slug for `/order/:restaurantSlug` consumer storefront.                                                                                               |
 | **Expected result**      | Reports export on entitled plans; reviews tab shows supplier ratings you can respond to; reservations and guest ordering modules work when respective permissions enabled.                             |
-| **Possible errors**      | Reports feature off; reservations/staff plan gates; consumer routes need published menu.                                                                                                               |
+| **Possible errors**      | Reports feature off; missing `RESERVATIONS_VIEW`, `STAFF_VIEW`, `CATALOG_VIEW`, or `ORDERS_VIEW` (hospitality is permission-gated, not a plan feature); consumer routes need a published menu.         |
 | **Validation checklist** | [ ] Reports page loads or shows upgrade CTA. [ ] Reviews tab lists recent supplier reviews. [ ] Guest menu admin saves (`/app/consumer-menu`). [ ] Public guest order path `/order/{slug}/menu` works. |
 
 ### Troubleshooting reference

@@ -30,7 +30,7 @@ Source of truth for default roles: `apps/api/src/lib/role-matrix.js`.
 | **Owner**                   | Full                             | Full        | Full    | Full  | Full         | Full               |
 | **Supplier Manager**        | View, edit, **manage (decline)** | Full        | Full    | View  | —            | View settings only |
 | **Order Fulfillment Staff** | View, edit (status)              | Full        | —       | —     | —            | —                  |
-| **Catalog Manager**         | View                             | —           | Full    | —     | —            | —                  |
+| **Catalog Manager**         | —                                | —           | Full    | —     | —            | —                  |
 | **Promotions Manager**      | View                             | —           | View    | Full  | —            | —                  |
 | **Accountant**              | View                             | —           | —       | —     | —            | Finance only       |
 | **Viewer**                  | View                             | View        | View    | —     | —            | —                  |

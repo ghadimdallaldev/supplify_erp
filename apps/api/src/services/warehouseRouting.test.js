@@ -5,6 +5,7 @@ import {
   buildSimulationFromPayload,
   restaurantMatchesZone,
   resolveSingleWarehouseForOrder,
+  assignWarehousesToOrder,
 } from './warehouseRouting.js'
 
 const warehouses = [
@@ -129,6 +130,31 @@ describe('warehouseRouting', () => {
     it('matches postal codes and fails closed without a code', () => {
       const zone = { zone_type: 'postal_codes', postal_codes: ['1100', '1200'] }
       expect(restaurantMatchesZone(zone, { postalCode: '1100' })).toBe(true)
+      expect(restaurantMatchesZone(zone, { postalCode: ' 1100 ' })).toBe(true)
+      expect(
+        restaurantMatchesZone(
+          { zone_type: 'postal_codes', postal_codes: 'sw1a 1aa, 1100' },
+          { postalCode: 'SW1A1AA' }
+        )
+      ).toBe(true)
+      expect(
+        restaurantMatchesZone(
+          { zone_type: 'postal_codes', postal_codes: ['SW1', 'E1'] },
+          { postalCode: 'SW1A 1AA' }
+        )
+      ).toBe(true)
+      expect(
+        restaurantMatchesZone(
+          { zone_type: 'postal_codes', postal_codes: ['E1'] },
+          { postalCode: 'E1 6AN' }
+        )
+      ).toBe(true)
+      expect(
+        restaurantMatchesZone(
+          { zone_type: 'postal_codes', postal_codes: ['SW1'] },
+          { postalCode: 'SW10 1AA' }
+        )
+      ).toBe(false)
       expect(restaurantMatchesZone(zone, { zip: '9999' })).toBe(false)
       expect(restaurantMatchesZone(zone, {})).toBe(false)
     })
@@ -141,6 +167,9 @@ describe('warehouseRouting', () => {
         radius_km: 5,
       }
       expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.51 })).toBe(true)
+      expect(
+        restaurantMatchesZone(zone, { deliveryLatitude: 33.9, deliveryLongitude: 35.51 })
+      ).toBe(true)
       expect(restaurantMatchesZone(zone, { lat: 34.5, lng: 36.5 })).toBe(false)
       expect(restaurantMatchesZone(zone, {})).toBe(false)
     })
@@ -164,6 +193,81 @@ describe('warehouseRouting', () => {
       expect(restaurantMatchesZone(zone, {})).toBe(false)
       expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.5 })).toBe(true)
       expect(restaurantMatchesZone(zone, { lat: 32.0, lng: 35.5 })).toBe(false)
+    })
+
+    it('uses polygon geometry when a polygon zone also has radius fields', () => {
+      const zone = {
+        zone_type: 'polygon',
+        radius_km: 1,
+        center_lat: 33.89,
+        center_lng: 35.5,
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [35.4, 33.8],
+              [35.6, 33.8],
+              [35.6, 34.0],
+              [35.4, 34.0],
+              [35.4, 33.8],
+            ],
+          ],
+        },
+      }
+      expect(restaurantMatchesZone(zone, { lat: 33.95, lng: 35.55 })).toBe(true)
+    })
+
+    it('excludes points that sit in a polygon hole', () => {
+      const zone = {
+        zone_type: 'polygon',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [35.4, 33.8],
+              [35.6, 33.8],
+              [35.6, 34.0],
+              [35.4, 34.0],
+              [35.4, 33.8],
+            ],
+            [
+              [35.48, 33.88],
+              [35.52, 33.88],
+              [35.52, 33.92],
+              [35.48, 33.92],
+              [35.48, 33.88],
+            ],
+          ],
+        },
+      }
+      expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.5 })).toBe(false)
+      expect(restaurantMatchesZone(zone, { lat: 33.85, lng: 35.45 })).toBe(true)
+    })
+
+    it('excludes points that sit in a rings-format hole', () => {
+      const zone = {
+        zone_type: 'polygon',
+        geometry: {
+          rings: [
+            [
+              [35.4, 33.8],
+              [35.6, 33.8],
+              [35.6, 34.0],
+              [35.4, 34.0],
+              [35.4, 33.8],
+            ],
+            [
+              [35.48, 33.88],
+              [35.52, 33.88],
+              [35.52, 33.92],
+              [35.48, 33.92],
+              [35.48, 33.88],
+            ],
+          ],
+        },
+      }
+      expect(restaurantMatchesZone(zone, { lat: 33.9, lng: 35.5 })).toBe(false)
+      expect(restaurantMatchesZone(zone, { lat: 33.85, lng: 35.45 })).toBe(true)
     })
   })
 
@@ -248,5 +352,90 @@ describe('warehouseRouting', () => {
         })
       ).toThrowError(expect.objectContaining({ code: 'NO_SINGLE_FULFILLMENT_LOCATION' }))
     })
+
+    it('ignores a product rule whose warehouse is inactive', () => {
+      const result = resolveSingleWarehouseForOrder([{ product_id: 'p1', quantity: 1 }], {
+        warehouses: [{ id: 'wh-east', is_active: true }],
+        rules: [
+          {
+            id: 'r-old',
+            rule_type: 'product',
+            product_id: 'p1',
+            warehouse_id: 'wh-closed',
+            is_active: true,
+          },
+        ],
+        warehouseStock: new Map([['wh-east:p1', { quantity_available: 5 }]]),
+      })
+      expect(result.warehouseId).toBe('wh-east')
+    })
+  })
+
+  it('zone rule matches only the rule zone, not any zone of the warehouse', () => {
+    const result = resolveWarehouseForItem(
+      { product_id: 'p1', quantity: 1 },
+      baseContext({
+        rules: [
+          {
+            id: 'r-zone-b',
+            rule_type: 'zone',
+            zone_id: 'zone-b',
+            warehouse_id: 'wh-east',
+            is_active: true,
+          },
+        ],
+        restaurantInZoneByWarehouse: new Map([['wh-east', true]]),
+        restaurantZoneIds: new Set(['zone-a']),
+        defaultWarehouseId: 'wh-default',
+      })
+    )
+    expect(result.warehouseId).toBe('wh-default')
+    expect(result.ruleType).toBe('default')
+  })
+})
+
+describe('assignWarehousesToOrder stock lock', () => {
+  it('locks inventory rows before choosing the warehouse', async () => {
+    const calls = []
+    const client = {
+      query: async (sql) => {
+        const text = String(sql)
+        calls.push(text)
+        if (text.includes('information_schema')) return { rows: [{ column_name: 'supplier_id' }] }
+        if (text.includes('warehouse_inventory') && text.includes('FOR UPDATE OF wi')) {
+          return { rows: [{ warehouse_id: 'wh-1', product_id: 'p1', quantity_available: 5 }] }
+        }
+        if (text.includes('warehouse_inventory') && text.includes('FOR UPDATE')) {
+          return { rows: [{ product_id: 'p1', quantity_available: 5 }] }
+        }
+        if (text.includes('UPDATE warehouse_inventory')) return { rowCount: 1, rows: [] }
+        if (text.includes('warehouse_routing_rule')) return { rows: [] }
+        if (text.includes('FROM product')) {
+          return { rows: [{ id: 'p1', supplier_id: 's1', category_id: null }] }
+        }
+        if (text.includes('FROM warehouse')) {
+          return { rows: [{ id: 'wh-1', is_active: true, is_default: true }] }
+        }
+        if (text.includes('delivery_zone')) return { rows: [] }
+        if (text.includes('INSERT INTO order_warehouse_assignment')) {
+          return { rows: [{ id: 'owa-1', warehouse_id: 'wh-1' }] }
+        }
+        return { rows: [] }
+      },
+    }
+
+    await assignWarehousesToOrder(client, {
+      order: { id: 'o1', restaurant_id: 'r1' },
+      orderItems: [{ product_id: 'p1', quantity: 2 }],
+      supplier: { id: 's1' },
+    })
+
+    const choiceAt = calls.findIndex((sql) => sql.includes('FOR UPDATE OF wi'))
+    const reserveAt = calls.findIndex(
+      (sql, index) =>
+        index > choiceAt && sql.includes('FOR UPDATE') && !sql.includes('FOR UPDATE OF wi')
+    )
+    expect(choiceAt).toBeGreaterThanOrEqual(0)
+    expect(reserveAt).toBeGreaterThan(choiceAt)
   })
 })

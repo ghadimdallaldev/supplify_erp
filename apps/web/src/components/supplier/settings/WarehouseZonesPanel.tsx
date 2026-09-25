@@ -25,6 +25,7 @@ type Props = {
 
 type ZoneFormState = {
   name: string
+  zone_type: 'postal_codes' | 'radius' | 'polygon'
   postal_codes: string
   min_order_amount: string
   delivery_fee: string
@@ -35,6 +36,7 @@ type ZoneFormState = {
 
 const EMPTY_FORM: ZoneFormState = {
   name: '',
+  zone_type: 'postal_codes',
   postal_codes: '',
   min_order_amount: '0',
   delivery_fee: '0',
@@ -55,40 +57,62 @@ function formatPostalCodes(codes: string[] | null | undefined): string {
   return codes?.join(', ') ?? ''
 }
 
-function inferZoneType(form: ZoneFormState): WarehouseZoneInput['zone_type'] {
-  const hasRadius = form.radius_km.trim() && form.center_lat.trim() && form.center_lng.trim()
-  if (hasRadius) return 'radius'
-  if (parsePostalCodes(form.postal_codes)) return 'postal_codes'
-  return 'postal_codes'
-}
-
 function buildZoneBody(form: ZoneFormState): WarehouseZoneInput {
-  const postal_codes = parsePostalCodes(form.postal_codes)
-  const radius_km = form.radius_km.trim() ? Number(form.radius_km) : undefined
-  const center_lat = form.center_lat.trim() ? Number(form.center_lat) : undefined
-  const center_lng = form.center_lng.trim() ? Number(form.center_lng) : undefined
+  const postal_codes = parsePostalCodes(form.postal_codes) ?? null
+  const radius_km = form.radius_km.trim() ? Number(form.radius_km) : null
+  const center_lat = form.center_lat.trim() ? Number(form.center_lat) : null
+  const center_lng = form.center_lng.trim() ? Number(form.center_lng) : null
+
+  if (form.zone_type === 'radius') {
+    return {
+      name: form.name.trim(),
+      zone_type: 'radius',
+      postal_codes: null,
+      min_order_amount: Number(form.min_order_amount || 0),
+      delivery_fee: Number(form.delivery_fee || 0),
+      radius_km,
+      center_lat,
+      center_lng,
+    }
+  }
+
+  if (form.zone_type === 'polygon') {
+    return {
+      name: form.name.trim(),
+      zone_type: 'polygon',
+      postal_codes: null,
+      min_order_amount: Number(form.min_order_amount || 0),
+      delivery_fee: Number(form.delivery_fee || 0),
+      radius_km: null,
+      center_lat: null,
+      center_lng: null,
+    }
+  }
 
   return {
     name: form.name.trim(),
-    zone_type: inferZoneType(form),
+    zone_type: 'postal_codes',
     postal_codes,
     min_order_amount: Number(form.min_order_amount || 0),
     delivery_fee: Number(form.delivery_fee || 0),
-    radius_km,
-    center_lat,
-    center_lng,
+    radius_km: null,
+    center_lat: null,
+    center_lng: null,
   }
 }
 
 function zoneToForm(zone: WarehouseDeliveryZone): ZoneFormState {
+  const zoneType =
+    zone.zone_type === 'radius' || zone.zone_type === 'polygon' ? zone.zone_type : 'postal_codes'
   return {
     name: zone.name,
-    postal_codes: formatPostalCodes(zone.postal_codes),
+    zone_type: zoneType,
+    postal_codes: zoneType === 'postal_codes' ? formatPostalCodes(zone.postal_codes) : '',
     min_order_amount: String(zone.min_order_amount ?? 0),
     delivery_fee: String(zone.delivery_fee ?? 0),
-    radius_km: zone.radius_km != null ? String(zone.radius_km) : '',
-    center_lat: zone.center_lat != null ? String(zone.center_lat) : '',
-    center_lng: zone.center_lng != null ? String(zone.center_lng) : '',
+    radius_km: zoneType === 'radius' && zone.radius_km != null ? String(zone.radius_km) : '',
+    center_lat: zoneType === 'radius' && zone.center_lat != null ? String(zone.center_lat) : '',
+    center_lng: zoneType === 'radius' && zone.center_lng != null ? String(zone.center_lng) : '',
   }
 }
 
@@ -132,6 +156,17 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
     }
     if (!form.name.trim()) {
       toast.error(t('zones.nameRequired'))
+      return
+    }
+    if (form.zone_type === 'postal_codes' && !parsePostalCodes(form.postal_codes)) {
+      toast.error(t('zones.postalCodesRequired'))
+      return
+    }
+    if (
+      form.zone_type === 'radius' &&
+      (!form.radius_km.trim() || !form.center_lat.trim() || !form.center_lng.trim())
+    ) {
+      toast.error(t('zones.radiusRequired'))
       return
     }
 
@@ -197,15 +232,37 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="zone-postal-codes">{t('zones.postalCodes')}</Label>
-              <Input
-                id="zone-postal-codes"
-                placeholder={t('zones.postalCodesPlaceholder')}
-                value={form.postal_codes}
-                onChange={(e) => setForm({ ...form, postal_codes: e.target.value })}
-              />
-              <p className="text-xs text-[var(--text-muted)]">{t('zones.postalCodesHint')}</p>
+              <Label htmlFor="zone-type">{t('zones.type')}</Label>
+              <select
+                id="zone-type"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={form.zone_type}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    zone_type: e.target.value as ZoneFormState['zone_type'],
+                  })
+                }
+              >
+                <option value="postal_codes">{t('zones.typePostal')}</option>
+                <option value="radius">{t('zones.typeRadius')}</option>
+                {form.zone_type === 'polygon' ? (
+                  <option value="polygon">{t('zones.typePolygon')}</option>
+                ) : null}
+              </select>
             </div>
+            {form.zone_type === 'postal_codes' && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="zone-postal-codes">{t('zones.postalCodes')}</Label>
+                <Input
+                  id="zone-postal-codes"
+                  placeholder={t('zones.postalCodesPlaceholder')}
+                  value={form.postal_codes}
+                  onChange={(e) => setForm({ ...form, postal_codes: e.target.value })}
+                />
+                <p className="text-xs text-[var(--text-muted)]">{t('zones.postalCodesHint')}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="zone-min-order">{t('zones.minOrder')}</Label>
               <Input
@@ -228,40 +285,49 @@ export function WarehouseZonesPanel({ warehouseId, canWrite = false }: Props) {
                 onChange={(e) => setForm({ ...form, delivery_fee: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="zone-radius">{t('zones.radius')}</Label>
-              <Input
-                id="zone-radius"
-                type="number"
-                min="0"
-                step="0.1"
-                placeholder="10"
-                value={form.radius_km}
-                onChange={(e) => setForm({ ...form, radius_km: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zone-center-lat">{t('zones.centerLat')}</Label>
-              <Input
-                id="zone-center-lat"
-                type="number"
-                step="any"
-                placeholder="51.5074"
-                value={form.center_lat}
-                onChange={(e) => setForm({ ...form, center_lat: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zone-center-lng">{t('zones.centerLng')}</Label>
-              <Input
-                id="zone-center-lng"
-                type="number"
-                step="any"
-                placeholder="-0.1278"
-                value={form.center_lng}
-                onChange={(e) => setForm({ ...form, center_lng: e.target.value })}
-              />
-            </div>
+            {form.zone_type === 'radius' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="zone-radius">{t('zones.radius')}</Label>
+                  <Input
+                    id="zone-radius"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="10"
+                    value={form.radius_km}
+                    onChange={(e) => setForm({ ...form, radius_km: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zone-center-lat">{t('zones.centerLat')}</Label>
+                  <Input
+                    id="zone-center-lat"
+                    type="number"
+                    step="any"
+                    placeholder="51.5074"
+                    value={form.center_lat}
+                    onChange={(e) => setForm({ ...form, center_lat: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zone-center-lng">{t('zones.centerLng')}</Label>
+                  <Input
+                    id="zone-center-lng"
+                    type="number"
+                    step="any"
+                    placeholder="-0.1278"
+                    value={form.center_lng}
+                    onChange={(e) => setForm({ ...form, center_lng: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+            {form.zone_type === 'polygon' && (
+              <p className="text-xs text-[var(--text-muted)] sm:col-span-2">
+                {t('zones.polygonKept')}
+              </p>
+            )}
           </div>
           <Button type="submit" disabled={isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

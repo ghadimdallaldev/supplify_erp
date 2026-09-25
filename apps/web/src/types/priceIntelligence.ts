@@ -20,6 +20,7 @@ export interface PriceEvent {
   newPrice: number | null
   changePct: number | null
   source: PriceEventSource
+  currency: string | null
   detectedAt: string
 }
 
@@ -33,6 +34,7 @@ export interface PriceHistorySummary {
   changePct: number | null
   direction: PriceDirection
   lastChangedAt: string | null
+  currency: string | null
 }
 
 export interface ProductPriceHistory {
@@ -63,6 +65,7 @@ export interface CheaperBuyAlternative {
   productId: string
   productName: string | null
   price: number
+  currency: string | null
   savingPerUnit: number
   reason: string
 }
@@ -73,6 +76,7 @@ export interface CheaperBuyOption {
   supplierId: string | null
   supplierName: string | null
   previousPrice: number | null
+  currency: string | null
   currentPrice: number
   detectedAt: string
   alternatives: CheaperBuyAlternative[]

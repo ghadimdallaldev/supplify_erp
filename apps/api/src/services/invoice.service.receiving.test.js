@@ -4,6 +4,8 @@ import {
   calculateInvoiceTotals,
   assertNoDuplicateInvoice,
   prorateOrderDiscount,
+  supplierShareOfDiscount,
+  getAcceptedOrderedValue,
 } from './invoice.service.js'
 import { ConflictError } from '../middlewares/errorHandler.js'
 
@@ -51,6 +53,17 @@ describe('invoice receiving helpers', () => {
     expect(prorateOrderDiscount(20, 50, 100)).toBe(10)
     expect(prorateOrderDiscount(20, 100, 100)).toBe(20)
     expect(prorateOrderDiscount(20, 0, 100)).toBe(0)
+  })
+
+  it('keeps the full discount when accepted quantity matches the order even if the billed price changed', async () => {
+    const supplierDiscount = supplierShareOfDiscount(20, 100, 100)
+    const client = {
+      query: vi.fn().mockResolvedValue({ rows: [{ ordered_value: 100 }] }),
+    }
+    const acceptedOrderedValue = await getAcceptedOrderedValue(client, 'report-1')
+    expect(prorateOrderDiscount(supplierDiscount, acceptedOrderedValue, 100)).toBe(20)
+    expect(client.query.mock.calls[0][0]).toContain('expected_unit_price')
+    expect(supplierShareOfDiscount(20, 40, 100)).toBe(8)
   })
 
   it('calculateInvoiceTotals applies prorated discount on partial subtotal', () => {

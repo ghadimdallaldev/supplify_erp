@@ -33,9 +33,6 @@ vi.mock('../org-reports.service.js', () => ({
   restaurantOrgBranchComparison: vi.fn(),
   restaurantOrgStockTransferSuggestions: vi.fn(),
 }))
-vi.mock('../../lib/restaurant-org.js', () => ({
-  getUserRestaurantOrgMembership: vi.fn(async () => null),
-}))
 vi.mock('../../lib/intelligence-tier.js', () => ({
   getIntelligenceTierForTenant: vi.fn(async () => ({ tier: 'basic' })),
   INTELLIGENCE_TIER_ORDER: ['none', 'basic', 'advanced', 'scale'],
@@ -134,7 +131,6 @@ import {
   restaurantOrgBranchComparison,
   restaurantOrgStockTransferSuggestions,
 } from '../org-reports.service.js'
-import { getUserRestaurantOrgMembership } from '../../lib/restaurant-org.js'
 import { resolveAvailableTools, executeAssistantTool } from './index.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
 import { getIntelligenceTierForTenant } from '../../lib/intelligence-tier.js'
@@ -165,6 +161,8 @@ function restaurantCtx(overrides = {}) {
 describe('assistant tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    query.mockReset()
+    query.mockResolvedValue({ rows: [] })
   })
 
   it('offers inventory tool for restaurant with INVENTORY_VIEW', async () => {
@@ -172,6 +170,23 @@ describe('assistant tools', () => {
     expect(names).toContain('get_inventory')
     expect(names).not.toContain('get_fulfillment_board')
     expect(names).not.toContain('get_admin_overview')
+  })
+
+  it('lists the authenticated restaurant followed suppliers from live records', async () => {
+    query.mockResolvedValueOnce({
+      rows: [
+        { supplierId: 'supplier-1', supplierName: 'Fresh One' },
+        { supplierId: 'supplier-2', supplierName: 'Fresh Two' },
+      ],
+    })
+    const ctx = restaurantCtx({ permissions: [P.CATALOG_VIEW] })
+
+    expect((await resolveAvailableTools(ctx)).names).toContain('get_followed_suppliers')
+    const result = await executeAssistantTool(ctx, 'get_followed_suppliers', {})
+
+    expect(result.count).toBe(2)
+    expect(result.suppliers).toHaveLength(2)
+    expect(query.mock.calls.at(-1)[1]).toEqual(['rest-1'])
   })
 
   it('offers and runs price history only with catalog permission and intelligence', async () => {
@@ -278,8 +293,9 @@ describe('assistant tools', () => {
     expect(result.invoices).toHaveLength(1)
   })
   it('runs branch comparison with matching org source gates and scale intelligence', async () => {
-    getUserRestaurantOrgMembership.mockResolvedValue({ organization_id: 'org-1' })
-    query.mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
+    query
+      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
     getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
     restaurantOrgBranchComparison.mockResolvedValue({
       data: { branches: [{ branchAccountId: 'branch-1' }] },
@@ -299,8 +315,9 @@ describe('assistant tools', () => {
     expect(result.data.branches).toHaveLength(1)
   })
   it('runs transfer suggestions with multi-branch and forecast gates', async () => {
-    getUserRestaurantOrgMembership.mockResolvedValue({ organization_id: 'org-1' })
-    query.mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
+    query
+      .mockResolvedValueOnce({ rows: [{ organization_id: 'org-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'rest-main' }] })
     getIntelligenceTierForTenant.mockResolvedValueOnce({ tier: 'scale' })
     restaurantOrgStockTransferSuggestions.mockResolvedValue({
       data: { suggestions: [{ productId: 'p1' }] },
@@ -369,7 +386,6 @@ describe('assistant tools', () => {
   })
 
   it('exposes broad lookup tools without requiring a product name', async () => {
-    getUserRestaurantOrgMembership.mockResolvedValue(null)
     const { names, definitions } = await resolveAvailableTools(restaurantCtx())
     const inventory = definitions.find((d) => d.name === 'get_inventory')
     expect(inventory.parameters.required).toBeUndefined()

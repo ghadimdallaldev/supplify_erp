@@ -15,7 +15,8 @@ import { Textarea } from '../ui/textarea'
 import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { useTranslation } from 'react-i18next'
 import { Loader2, CreditCard, CheckCircle } from 'lucide-react'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
+import { formatCalendarDate } from '../../lib/invoiceBalance'
 
 const PAYMENT_METHODS = [
   'BANK_TRANSFER',
@@ -60,6 +61,9 @@ export function InvoicePaymentDialog(props: any) {
   } = props
 
   const { t } = useTranslation('invoices')
+  const invoiceCurrency = selectedInvoice?.currency || 'USD'
+  const money = (amount: number | string | null | undefined) =>
+    formatCurrency(amount, { currency: invoiceCurrency })
 
   const paymentMethodOptions = PAYMENT_METHODS.map((method) => (
     <SelectItem key={method} value={method}>
@@ -89,7 +93,7 @@ export function InvoicePaymentDialog(props: any) {
                     </p>
                     <p className="text-sm text-[var(--brand-mid)]">
                       {t('payment.due', {
-                        date: new Date(selectedInvoice.due_date).toLocaleDateString(),
+                        date: formatCalendarDate(selectedInvoice.due_date),
                       })}
                     </p>
                   </div>
@@ -98,7 +102,7 @@ export function InvoicePaymentDialog(props: any) {
                       {t('payment.remainingBalance')}
                     </p>
                     <p className="text-2xl font-bold text-[var(--text)]">
-                      {formatPrice(remainingBalance)}
+                      {money(remainingBalance)}
                     </p>
                   </div>
                 </div>
@@ -125,7 +129,7 @@ export function InvoicePaymentDialog(props: any) {
                 <div className="bg-[var(--mint-pale)] border border-[var(--mint)]/35 rounded-lg p-4">
                   <p className="text-sm text-[var(--mint)]">
                     <CheckCircle className="h-4 w-4 inline mr-2" />
-                    {t('payment.fullBalanceNote')} <strong>{formatPrice(remainingBalance)}</strong>
+                    {t('payment.fullBalanceNote')} <strong>{money(remainingBalance)}</strong>
                   </p>
                 </div>
 
@@ -184,7 +188,7 @@ export function InvoicePaymentDialog(props: any) {
                     step="0.01"
                     min="0.01"
                     max={remainingBalance}
-                    placeholder={t('payment.maxAmount', { amount: formatPrice(remainingBalance) })}
+                    placeholder={t('payment.maxAmount', { amount: money(remainingBalance) })}
                     value={paymentAmount || ''}
                     onChange={(e) => {
                       const val = parseFloat(e.target.value)
@@ -197,7 +201,7 @@ export function InvoicePaymentDialog(props: any) {
                   />
                   <p className="text-xs text-[var(--text-muted)] mt-1">
                     {t('payment.remainingAfter', {
-                      amount: formatPrice(remainingBalance - paymentAmount),
+                      amount: money(remainingBalance - paymentAmount),
                     })}
                   </p>
                 </div>
@@ -255,7 +259,7 @@ export function InvoicePaymentDialog(props: any) {
                           <SelectItem key={cn.id} value={cn.id}>
                             {t('payment.creditAvailable', {
                               number: cn.credit_note_number,
-                              amount: formatPrice(cn.remaining_amount),
+                              amount: money(cn.remaining_amount),
                             })}
                           </SelectItem>
                         ))}
@@ -322,7 +326,7 @@ export function InvoicePaymentDialog(props: any) {
                             <SelectItem key={cn.id} value={cn.id}>
                               {t('payment.creditAvailable', {
                                 number: cn.credit_note_number,
-                                amount: formatPrice(cn.remaining_amount),
+                                amount: money(cn.remaining_amount),
                               })}
                               {cn.reason && ` (${cn.reason})`}
                             </SelectItem>
@@ -358,7 +362,7 @@ export function InvoicePaymentDialog(props: any) {
                         />
                         <p className="text-xs text-[var(--text-muted)] mt-1">
                           {t('payment.available', {
-                            amount: formatPrice(
+                            amount: money(
                               creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
                                 ?.remaining_amount
                             ),
@@ -427,7 +431,7 @@ export function InvoicePaymentDialog(props: any) {
                     {paymentAmount > 0 && (
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">{t('payment.cashPayment')}</span>
-                        <span className="font-medium">{formatPrice(paymentAmount)}</span>
+                        <span className="font-medium">{money(paymentAmount)}</span>
                       </div>
                     )}
                     {creditAmount > 0 && (
@@ -436,14 +440,14 @@ export function InvoicePaymentDialog(props: any) {
                           {t('payment.creditApplied')}
                         </span>
                         <span className="font-medium text-[var(--mint)]">
-                          {formatPrice(creditAmount)}
+                          {money(creditAmount)}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between font-semibold text-lg border-t pt-2">
                       <span>{t('payment.totalPayment')}</span>
                       <span className="text-[var(--mint)]">
-                        {formatPrice(paymentAmount + creditAmount)}
+                        {money(paymentAmount + creditAmount)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm border-t pt-2">
@@ -455,7 +459,7 @@ export function InvoicePaymentDialog(props: any) {
                             : 'text-[var(--mint)]'
                         }
                       >
-                        {formatPrice(remainingBalance - paymentAmount - creditAmount)}
+                        {money(remainingBalance - paymentAmount - creditAmount)}
                       </span>
                     </div>
                   </div>

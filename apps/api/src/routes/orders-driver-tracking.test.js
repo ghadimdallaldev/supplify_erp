@@ -17,6 +17,7 @@ vi.mock('../lib/rbac.js', () => ({
   requireAnyPermission: () => (req, res, next) => next(),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRequestTenant: vi.fn(),
+  rolesIncludeOwner: (roles) => Array.isArray(roles) && roles.includes('Owner'),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -41,6 +42,7 @@ vi.mock('../services/driver-fulfillment.service.js', () => ({
   submitProofOfDelivery: vi.fn(),
   confirmProofOfDelivery: vi.fn(),
   getProofOfDelivery: vi.fn(),
+  listProofsOfDelivery: vi.fn().mockResolvedValue([]),
 }))
 
 import { getRequestTenant } from '../lib/rbac.js'
@@ -130,6 +132,33 @@ describe('GET /api/orders/:id/tracking', () => {
     )
     expect(res.body.data.assignment).toBeDefined()
     expect(res.body.data.routeNumber).toBe('R-42')
+  })
+
+  it('lets a workspace Owner view supplier tracking without fulfillment keys', async () => {
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test-req'
+      req.userData = { id: 'user-1', role: 'SUPPLIER' }
+      req.tenantContext = { permissions: [], roles: ['Owner'] }
+      next()
+    })
+    app.use('/api/orders', ordersDriverRoutes)
+    app.use(errorHandler)
+
+    vi.mocked(getRequestTenant).mockResolvedValueOnce({
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+    })
+    getOrderTrackingMock.mockResolvedValueOnce({
+      orderId: 'order-1',
+      tracking: { enabled: true, hasLocation: false },
+    })
+
+    await request(app).get('/api/orders/order-1/tracking').expect(200)
+    expect(getOrderTrackingMock).toHaveBeenCalledWith(
+      expect.objectContaining({ supplierId: 'supplier-1' })
+    )
   })
 
   it('returns 403 for admin without supplier context', async () => {

@@ -142,6 +142,8 @@ describe('orders.calendar.routes', () => {
     const response = await request(app).get('/api/orders/calendar').expect(200)
 
     expect(response.body.ok).toBe(true)
+    const sql = queryMock.mock.calls.map(([s]) => String(s)).join('\n')
+    expect(sql).toMatch(/b\.tenant_id = o\.restaurant_id/)
     expect(response.body.data.events).toHaveLength(2)
     expect(response.body.data.filters.statuses).toEqual(
       expect.arrayContaining(['DELIVERED', 'ISSUED'])
@@ -239,6 +241,20 @@ describe('orders.calendar.routes', () => {
     })
   })
 
+  it('does not resolve tenant by contact_email when request tenant is missing', async () => {
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce(null)
+
+    mockUser.role = 'RESTAURANT'
+    mockUser.email = 'shared@example.com'
+    getCacheMock.mockResolvedValue(null)
+
+    const response = await request(app).get('/api/orders/calendar').expect(404)
+
+    expect(response.body.error.name).toBe('TENANT_NOT_FOUND')
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes('contact_email'))).toBe(false)
+  })
+
   it('uses local invoice count parameters for the standalone invoice count query', async () => {
     const rbac = await import('../lib/rbac.js')
     vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
@@ -275,5 +291,29 @@ describe('orders.calendar.routes', () => {
     expect(invoiceCountCall).toBeTruthy()
     expect(invoiceCountCall[0]).toMatch(/i\.supplier_id = \$1/)
     expect(invoiceCountCall[1]).toHaveLength(3)
+  })
+
+  it('rejects a restaurant branch filter that is not owned', async () => {
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+      tenantId: 'restaurant-1',
+      tenantType: 'RESTAURANT',
+      tenantName: 'Golden Fork Restaurant',
+    })
+    mockUser.role = 'RESTAURANT'
+    getCacheMock.mockResolvedValue(null)
+    queryMock.mockImplementation((sql) => {
+      if (String(sql).includes('FROM branch')) {
+        return Promise.resolve({ rows: [] })
+      }
+      return Promise.resolve({ rows: [{ exists: true }] })
+    })
+
+    const response = await request(app)
+      .get('/api/orders/calendar')
+      .query({ branch: '11111111-1111-4111-8111-111111111111' })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error?.message).toMatch(/Branch not found/i)
   })
 })

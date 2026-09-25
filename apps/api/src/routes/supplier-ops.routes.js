@@ -110,6 +110,12 @@ const financeGate = requireFeature(
   (req) => req.tenantContext?.tenantType
 )
 
+const apiIntegrationsGate = requireFeature(
+  'api_integrations',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
+
 const fulfillmentGate = requireFeature(
   'fulfillment',
   (req) => req.tenantContext?.tenantId,
@@ -226,12 +232,13 @@ const imageImportPresignSchema = z.object({
   jobId: z.string().uuid().optional(),
 })
 
-const commandCenterGate = requireAnyPermission(
+const commandCenterGate = requireAnyPermission('ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW')
+
+const runSheetGate = requireAnyPermission(
   'ORDERS_MANAGE',
-  'INVOICES_VIEW',
-  'CATALOG_EDIT',
   'FULFILLMENT_VIEW',
-  'PROMOTIONS_MANAGE'
+  'INVOICES_VIEW',
+  'DRIVER_DELIVERIES_VIEW'
 )
 
 router.get('/command-center', commandCenterGate, async (req, res, next) => {
@@ -249,7 +256,7 @@ const runSheetDateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
   .optional()
 
-router.get('/run-sheet', commandCenterGate, async (req, res, next) => {
+router.get('/run-sheet', runSheetGate, async (req, res, next) => {
   try {
     const supplierId = await resolveSupplier(req)
     const parsedDate = runSheetDateSchema.safeParse(req.query.date)
@@ -600,6 +607,7 @@ router.get(
   '/invoices/receivables/statement/:restaurantId',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -627,6 +635,7 @@ router.get(
   '/invoices/export.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -644,6 +653,7 @@ router.get(
   '/invoices/export/quickbooks.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -660,6 +670,7 @@ router.get(
   '/payments/export.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -676,6 +687,7 @@ router.get(
   '/accounting/summary.csv',
   requirePermission('INVOICES_VIEW'),
   financeGate,
+  apiIntegrationsGate,
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
@@ -1391,15 +1403,13 @@ router.post(
         replacementUnit: body.replacementUnit,
         message: body.message,
       }
-      const result = body.replacementProductId
-        ? await createSubstitutionIssue({
-            ...common,
-            substituteProductId: body.replacementProductId,
-          })
-        : await createShortageIssue({
-            ...common,
-            shortageQuantity: body.shortageQuantity,
-          })
+      if (body.replacementProductId) {
+        throw new ValidationError('Report a substitution on the substitution endpoint')
+      }
+      const result = await createShortageIssue({
+        ...common,
+        shortageQuantity: body.shortageQuantity,
+      })
       res.status(201).json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

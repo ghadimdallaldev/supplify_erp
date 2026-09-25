@@ -3,7 +3,9 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   requirePermission,
+  requireAnyPermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
@@ -24,8 +26,31 @@ import {
 } from '../services/branding.service.js'
 import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
 import { normalizeBusinessType } from '../lib/restaurant-targeting.js'
+import { presentRestaurant } from '../lib/tenant-profile-redaction.js'
 
 const router = express.Router()
+
+function restaurantsDirectoryGuard(req, res, next) {
+  const role = req.userData?.role
+  if (role === 'ADMIN') {
+    return requireAnyPermission('ADMIN_TENANTS', 'ADMIN_ACCESS')(req, res, next)
+  }
+  if (role === 'SUPPLIER') {
+    return requirePermission('ORDERS_VIEW')(req, res, next)
+  }
+  return next()
+}
+
+function restaurantByIdGuard(req, res, next) {
+  const role = req.userData?.role
+  if (role === 'ADMIN') {
+    return requireAnyPermission('ADMIN_TENANTS', 'ADMIN_ACCESS')(req, res, next)
+  }
+  if (role === 'SUPPLIER') {
+    return requirePermission('ORDERS_VIEW')(req, res, next)
+  }
+  return next()
+}
 
 // Validation schemas
 const restaurantCreateSchema = z.object({
@@ -50,7 +75,11 @@ const restaurantCreateSchema = z.object({
     .optional(),
 })
 
-const restaurantUpdateSchema = restaurantCreateSchema.partial()
+const restaurantUpdateSchema = restaurantCreateSchema.partial().extend({
+  taxId: z.string().max(50).optional(),
+  vatNumber: z.string().max(50).optional(),
+  deliveryInstructions: z.string().max(2000).optional(),
+})
 
 const restaurantListSchema = z.object({
   q: z.string().optional(),
@@ -66,31 +95,31 @@ const restaurantListSchema = z.object({
 })
 
 // List restaurants (admin sees all; suppliers see customers who ordered or follow them)
-router.get('/', requireAuth, async (req, res) => {
-  try {
-    const params = restaurantListSchema.parse(req.query)
+router.get(
+  '/',
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  restaurantsDirectoryGuard,
+  async (req, res) => {
+    try {
+      const params = restaurantListSchema.parse(req.query)
 
-    const whereConditions = []
-    const queryParams = []
-    let paramIndex = 1
-    let supplierParamIndex = null
+      const whereConditions = []
+      const queryParams = []
+      let paramIndex = 1
+      let supplierParamIndex = null
 
-    // Role-based filtering
-    if (req.userData.role === 'SUPPLIER') {
+      // Role-based filtering
       const supplierId = await getSupplierIdForRequest(req)
-
       if (!supplierId) {
-        return res.json({
-          ok: true,
-          data: {
-            restaurants: [],
-            pagination: {
-              total: 0,
-              limit: params.limit,
-              offset: params.offset,
-            },
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
           },
-          error: null,
           requestId: req.requestId,
         })
       }
@@ -115,39 +144,26 @@ router.get('/', requireAuth, async (req, res) => {
       queryParams.push(supplierId)
       supplierParamIndex = paramIndex
       paramIndex++
-    } else if (req.userData.role !== 'ADMIN') {
-      // Other roles (RESTAURANT) have no access
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied',
-        },
-        requestId: req.requestId,
-      })
-    }
-    // Admin sees all (no additional filter)
 
-    // Text search
-    if (params.q) {
-      whereConditions.push(`LOWER(name) LIKE $${paramIndex}`)
-      queryParams.push(`%${params.q.toLowerCase()}%`)
-      paramIndex++
-    }
+      // Text search
+      if (params.q) {
+        whereConditions.push(`LOWER(name) LIKE $${paramIndex}`)
+        queryParams.push(`%${params.q.toLowerCase()}%`)
+        paramIndex++
+      }
 
-    // City filter
-    if (params.city) {
-      whereConditions.push(`address_json->>'city' = $${paramIndex}`)
-      queryParams.push(params.city)
-      paramIndex++
-    }
+      // City filter
+      if (params.city) {
+        whereConditions.push(`address_json->>'city' = $${paramIndex}`)
+        queryParams.push(params.city)
+        paramIndex++
+      }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+      const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
 
-    const statsSelect =
-      supplierParamIndex != null
-        ? `
+      const statsSelect =
+        supplierParamIndex != null
+          ? `
         (SELECT COUNT(DISTINCT o.id)::int
          FROM customer_order o
          JOIN order_item oi ON oi.order_id = o.id
@@ -181,7 +197,7 @@ router.get('/', requireAuth, async (req, res) => {
           ORDER BY COALESCE(o.placed_at, o.created_at) DESC
           LIMIT 1
         ) as latest_order`
-        : `
+          : `
         (SELECT COUNT(*) FROM customer_order WHERE restaurant_id = r.id) as total_orders,
         (SELECT COALESCE(SUM(total_amount), 0) FROM customer_order WHERE restaurant_id = r.id AND ${deliveredOrderStatusInSql()}) as total_spent,
         (
@@ -198,7 +214,7 @@ router.get('/', requireAuth, async (req, res) => {
           LIMIT 1
         ) as latest_order`
 
-    const sql = `
+      const sql = `
       SELECT 
         r.*,
         ${statsSelect}
@@ -208,119 +224,128 @@ router.get('/', requireAuth, async (req, res) => {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
-    queryParams.push(params.limit, params.offset)
+      queryParams.push(params.limit, params.offset)
 
-    const { rows } = await query(sql, queryParams)
+      const { rows } = await query(sql, queryParams)
 
-    // Parse latest_order JSON and format the response
-    const restaurantsWithLatestOrder = rows.map((row) => ({
-      ...row,
-      totalOrders: parseInt(row.total_orders || 0),
-      totalSpent: parseFloat(row.total_spent || 0),
-      latestOrder: row.latest_order
-        ? {
-            ...row.latest_order,
-            total_amount: parseFloat(row.latest_order.total_amount || 0),
-          }
-        : null,
-    }))
+      // Parse latest_order JSON and format the response
+      const restaurantsWithLatestOrder = rows.map((row) => {
+        const restaurant = presentRestaurant(req, row)
+        return {
+          ...restaurant,
+          totalOrders: parseInt(row.total_orders || 0),
+          totalSpent: parseFloat(row.total_spent || 0),
+          latestOrder: row.latest_order
+            ? {
+                ...row.latest_order,
+                total_amount: parseFloat(row.latest_order.total_amount || 0),
+              }
+            : null,
+        }
+      })
 
-    // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM restaurant ${whereClause}`
-    const countParams = queryParams.slice(0, -2)
-    const { rows: countRows } = await query(countSql, countParams)
+      // Get total count
+      const countSql = `SELECT COUNT(*) as total FROM restaurant ${whereClause}`
+      const countParams = queryParams.slice(0, -2)
+      const { rows: countRows } = await query(countSql, countParams)
 
-    res.json({
-      ok: true,
-      data: {
-        restaurants: restaurantsWithLatestOrder,
-        pagination: {
-          total: parseInt(countRows[0].total),
-          limit: params.limit,
-          offset: params.offset,
+      res.json({
+        ok: true,
+        data: {
+          restaurants: restaurantsWithLatestOrder,
+          pagination: {
+            total: parseInt(countRows[0].total),
+            limit: params.limit,
+            offset: params.offset,
+          },
         },
-      },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid query parameters',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('List restaurants error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid query parameters',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to list restaurants',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('List restaurants error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to list restaurants',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Get current restaurant (for settings page) — must be before /:id so "me" is not treated as an id
-router.get('/me', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      return res.status(404).json({
+router.get(
+  '/me',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant workspace not found for user',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
+        restaurantId,
+      ])
+
+      if (restaurants.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      res.json({
+        ok: true,
+        data: { restaurant: presentRestaurant(req, restaurants[0]) },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get restaurant error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant workspace not found for user',
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get restaurant',
         },
         requestId: req.requestId,
       })
     }
-    const { rows: restaurants } = await query('SELECT * FROM restaurant WHERE id = $1', [
-      restaurantId,
-    ])
-
-    if (restaurants.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    res.json({
-      ok: true,
-      data: { restaurant: restaurants[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get restaurant error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get restaurant',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 router.get(
   '/me/branding',
@@ -371,49 +396,56 @@ router.patch(
 )
 
 // Delivery destination coordinates (ETA readiness)
-router.get('/me/delivery-locations', requireAuth, requireRole(['RESTAURANT']), async (req, res) => {
-  try {
-    const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      return res.status(404).json({
+router.get(
+  '/me/delivery-locations',
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  requireAnyPermission('SETTINGS_VIEW', 'ORDERS_VIEW', 'ORDERS_CREATE'),
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Restaurant workspace not found for user' },
+          requestId: req.requestId,
+        })
+      }
+      const { listRestaurantDeliveryLocations } = await import(
+        '../services/restaurant-delivery-location.service.js'
+      )
+      const data = await listRestaurantDeliveryLocations(restaurantId)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('GET /api/restaurants/me/delivery-locations error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'NOT_FOUND', message: 'Restaurant workspace not found for user' },
+        error: { name: 'INTERNAL_ERROR', message: 'Failed to load delivery locations' },
         requestId: req.requestId,
       })
     }
-    const { listRestaurantDeliveryLocations } = await import(
-      '../services/restaurant-delivery-location.service.js'
-    )
-    const data = await listRestaurantDeliveryLocations(restaurantId)
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'NOT_FOUND', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-    logger.error('GET /api/restaurants/me/delivery-locations error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to load delivery locations' },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 router.patch(
   '/me/delivery-location',
   requireAuth,
+  resolveTenantContext,
   requireRole(['RESTAURANT']),
+  requirePermission('SETTINGS_EDIT'),
   async (req, res) => {
     try {
-      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         return res.status(404).json({
@@ -459,10 +491,11 @@ router.patch(
 router.patch(
   '/branches/:branchId/delivery-location',
   requireAuth,
+  resolveTenantContext,
   requireRole(['RESTAURANT']),
+  requirePermission('SETTINGS_EDIT'),
   async (req, res) => {
     try {
-      const { getRestaurantIdForRequest } = await import('../lib/rbac.js')
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) {
         return res.status(404).json({
@@ -510,56 +543,60 @@ router.patch(
 )
 
 // Get restaurant by ID
-router.get('/:id', requireAuth, async (req, res) => {
-  try {
-    const { id } = req.params
+router.get(
+  '/:id',
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  restaurantByIdGuard,
+  async (req, res) => {
+    try {
+      const { id } = req.params
 
-    const { rows } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
+      const { rows } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
 
-    if (rows.length === 0) {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'NOT_FOUND',
-          message: 'Restaurant not found',
-        },
-        requestId: req.requestId,
-      })
-    }
+      if (rows.length === 0) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'NOT_FOUND',
+            message: 'Restaurant not found',
+          },
+          requestId: req.requestId,
+        })
+      }
 
-    const restaurant = rows[0]
+      const restaurant = rows[0]
 
-    if (req.userData.role === 'ADMIN') {
-      // Admin may read any restaurant
-    } else if (req.userData.role === 'RESTAURANT') {
       const restaurantId = await getRestaurantIdForRequest(req)
-      if (!restaurantId || restaurantId !== id) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        })
-      }
-    } else if (req.userData.role === 'SUPPLIER') {
-      const supplierId = await getSupplierIdForRequest(req)
-      if (!supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        })
-      }
-      const { rows: linked } = await query(
-        `
+      if (restaurantId) {
+        if (restaurantId !== id) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
+      } else {
+        const supplierId = await getSupplierIdForRequest(req)
+        if (!supplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
+        const { rows: linked } = await query(
+          `
         SELECT 1
         FROM supplier_follow sf
         WHERE sf.supplier_id = $1
@@ -576,50 +613,41 @@ router.get('/:id', requireAuth, async (req, res) => {
           AND oi.supplier_id = $1
         LIMIT 1
       `,
-        [supplierId, id]
-      )
-      if (!linked.length) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        })
+          [supplierId, id]
+        )
+        if (!linked.length) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Access denied',
+            },
+            requestId: req.requestId,
+          })
+        }
       }
-    } else {
-      return res.status(403).json({
+
+      res.json({
+        ok: true,
+        data: { restaurant: presentRestaurant(req, restaurant) },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get restaurant error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'FORBIDDEN',
-          message: 'Access denied',
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get restaurant',
         },
         requestId: req.requestId,
       })
     }
-
-    res.json({
-      ok: true,
-      data: { restaurant },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get restaurant error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get restaurant',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Create restaurant (admin only)
 router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
@@ -695,6 +723,7 @@ router.post(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  requirePermission('SETTINGS_EDIT'),
   requireFeature(
     'custom_branding',
     (req) => req.params.id,
@@ -709,11 +738,9 @@ router.post(
         throw new ValidationError('logoUrl is required')
       }
 
-      if (req.userData.role === 'RESTAURANT') {
-        const restaurantId = await getRestaurantIdForRequest(req)
-        if (restaurantId !== id) {
-          throw new ForbiddenError('Access denied. You can only update your own logo')
-        }
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId || restaurantId !== id) {
+        throw new ForbiddenError('Access denied. You can only update your own logo')
       }
 
       const restaurant = await updateTenantLogo(id, 'RESTAURANT', logoUrl)
@@ -792,6 +819,9 @@ router.patch(
           phone: 'phone',
           businessType: 'business_type',
           address: 'address_json',
+          taxId: 'tax_id',
+          vatNumber: 'vat_number',
+          deliveryInstructions: 'delivery_instructions',
         },
         {
           valueTransform: (dbField, value) => {

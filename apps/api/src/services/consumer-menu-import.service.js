@@ -1,4 +1,5 @@
 import { query, withTransaction } from '../lib/db.js'
+import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import { invalidateMenuCache } from './consumer-menu.service.js'
 
 const FIELD_ALIASES = {
@@ -185,6 +186,7 @@ export async function executeMenuImport(
   csvText,
   { branchId = null, updateExisting = true } = {}
 ) {
+  await assertLegacyBranchOwnedByRestaurant(branchId, restaurantId)
   const { rows } = parseMenuImportCsv(csvText)
   const summary = { categoriesCreated: 0, itemsCreated: 0, itemsUpdated: 0, skipped: 0, failed: 0 }
   const rowErrors = []

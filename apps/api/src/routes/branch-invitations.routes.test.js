@@ -39,6 +39,7 @@ vi.mock('../lib/rbac.js', () => ({
     }
     next()
   },
+  resolveAdminContext: (req, res, next) => next(),
   requireAnyPermission:
     (...keys) =>
     (req, res, next) => {
@@ -49,6 +50,10 @@ vi.mock('../lib/rbac.js', () => ({
         error: { name: 'FORBIDDEN', message: `Missing one of: ${keys.join(', ')}` },
       })
     },
+}))
+
+vi.mock('../lib/impersonation.js', () => ({
+  getEffectiveTenant: vi.fn(() => null),
 }))
 
 vi.mock('../lib/subscription.js', () => ({
@@ -76,6 +81,7 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 import { query } from '../lib/db.js'
+import { getEffectiveTenant } from '../lib/impersonation.js'
 import branchInvitationsRoutes from './branch-invitations.routes.js'
 
 function defaultQueryMock(sql) {
@@ -285,5 +291,31 @@ describe('branch-invitations.routes', () => {
       .expect(409)
     expect(res.body.error.name).toBe('WORKSPACE_MEMBERSHIP_CONFLICT')
     expect(res.body.error.message).toMatch(/already linked/i)
+  })
+
+  it('rejects an impersonating admin listing another organization', async () => {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, res, next) => {
+      req.requestId = 'test'
+      req.userData = { id: 'admin-1', email: 'admin@example.com', role: 'ADMIN' }
+      req.tenantContext = {
+        tenantId: 'branch-1',
+        tenantType: 'SUPPLIER',
+        permissions: ['STAFF_INVITE'],
+      }
+      next()
+    })
+    adminApp.use('/api/org/invitations', branchInvitationsRoutes)
+
+    getEffectiveTenant.mockReturnValueOnce({
+      tenantId: 'branch-1',
+      tenantType: 'SUPPLIER',
+    })
+
+    const res = await request(adminApp)
+      .get('/api/org/invitations?organization_id=org-foreign')
+      .expect(400)
+    expect(res.body.error.name).toBe('BAD_REQUEST')
   })
 })

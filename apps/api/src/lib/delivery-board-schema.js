@@ -1,4 +1,5 @@
 import { query } from './db.js'
+import { buildZoneAddressExprs, warehouseZoneLateralSql } from './delivery-zone-join.js'
 import { ensureDeliverySchema } from './ensure-delivery-schema.js'
 
 /** @type {null | Awaited<ReturnType<typeof loadBoardSqlFragments>>} */
@@ -14,7 +15,7 @@ async function loadBoardSqlFragments() {
         (table_name = 'customer_order' AND column_name IN ('placed_at', 'branch_id', 'requested_delivery_date', 'delivery_location_snapshot'))
         OR (table_name = 'delivery_zone' AND column_name IN ('warehouse_id', 'branch_id', 'supplier_id', 'name', 'is_active'))
         OR (table_name = 'restaurant' AND column_name IN ('delivery_latitude', 'delivery_longitude', 'delivery_location_label', 'address_json'))
-        OR (table_name = 'branch' AND column_name IN ('name', 'address', 'delivery_latitude', 'delivery_longitude', 'delivery_location_label'))
+        OR (table_name = 'branch' AND column_name IN ('name', 'address', 'delivery_latitude', 'delivery_longitude', 'delivery_location_label', 'tenant_id'))
         OR (table_name = 'drivers' AND column_name IN ('full_name'))
       )
     `
@@ -54,8 +55,24 @@ async function loadBoardSqlFragments() {
         ? ' AND dz.supplier_id = $1'
         : ''
       // Tie zone to the warehouse leg on each driver assignment row (multi-WH board).
-      zoneJoinSql = `LEFT JOIN order_warehouse_assignment owa ON owa.id = da.warehouse_assignment_id AND owa.status <> 'superseded'
-    LEFT JOIN delivery_zone dz ON dz.warehouse_id = owa.warehouse_id${supplierClause}`
+      const activeClause = colKey('delivery_zone', 'is_active')
+        ? ' AND COALESCE(dz.is_active, TRUE) = TRUE'
+        : ''
+      const canJoinBranch =
+        hasTable('branch') && colKey('customer_order', 'branch_id') && colKey('branch', 'tenant_id')
+      const zoneAddress = buildZoneAddressExprs({
+        hasSnapshot: colKey('customer_order', 'delivery_location_snapshot'),
+        hasBranchAddress: canJoinBranch && colKey('branch', 'address'),
+        hasBranchCoords:
+          canJoinBranch &&
+          colKey('branch', 'delivery_latitude') &&
+          colKey('branch', 'delivery_longitude'),
+        hasRestaurantAddress: colKey('restaurant', 'address_json'),
+        hasRestaurantCoords:
+          colKey('restaurant', 'delivery_latitude') && colKey('restaurant', 'delivery_longitude'),
+      })
+      zoneJoinSql = `LEFT JOIN order_warehouse_assignment owa ON owa.id = da.warehouse_assignment_id AND owa.status NOT IN ('failed', 'superseded')
+    ${warehouseZoneLateralSql({ supplierClause, activeClause, ...zoneAddress })}`
       deliveryAreaExpr = colKey('delivery_zone', 'name')
         ? `COALESCE(dz.name, ${cityArea})`
         : cityArea
@@ -71,8 +88,8 @@ async function loadBoardSqlFragments() {
   }
 
   const branchJoinSql =
-    hasTable('branch') && colKey('customer_order', 'branch_id')
-      ? 'LEFT JOIN branch b ON b.id = o.branch_id'
+    hasTable('branch') && colKey('customer_order', 'branch_id') && colKey('branch', 'tenant_id')
+      ? 'LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id'
       : ''
 
   const hasCoords =
@@ -128,9 +145,27 @@ async function loadBoardSqlFragments() {
     : 'NULL::date'
   const scheduledAtExpr = `COALESCE(${assignmentDateExpr}, ${routeDateExpr}, ${requestedDateExpr}, ${hasDriverAssignments ? 'da.assigned_at::date' : 'NULL::date'}, o.created_at::date)`
 
-  const hasPodExpr = hasTable('proof_of_delivery')
-    ? `EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id)`
-    : 'FALSE'
+  const hasPodExpr =
+    hasTable('proof_of_delivery') && hasTable('driver_assignments')
+      ? `EXISTS (
+          SELECT 1 FROM proof_of_delivery pod
+          WHERE pod.order_id = o.id
+            AND (
+              pod.driver_assignment_id = da.id
+              OR (
+                pod.driver_assignment_id IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM driver_assignments sibling
+                  WHERE sibling.order_id = o.id
+                    AND sibling.id IS DISTINCT FROM da.id
+                    AND sibling.status NOT IN ('reassigned', 'superseded')
+                )
+              )
+            )
+        )`
+      : hasTable('proof_of_delivery')
+        ? `EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id)`
+        : 'FALSE'
 
   const driverAssignmentJoinSql =
     hasTable('driver_assignments') && hasTable('drivers')

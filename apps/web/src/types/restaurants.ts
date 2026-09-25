@@ -38,6 +38,9 @@ export interface UpdateRestaurantRequest {
   name?: string
   slug?: string
   tradeLicenseNo?: string
+  taxId?: string
+  vatNumber?: string
+  deliveryInstructions?: string
   contactEmail?: string
   phone?: string
   businessType?: string

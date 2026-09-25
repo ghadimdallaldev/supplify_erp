@@ -4,6 +4,10 @@ vi.mock('../lib/db.js', () => ({
   query: vi.fn(),
 }))
 
+vi.mock('../lib/tenant-timezone.js', () => ({
+  getRestaurantTimezone: vi.fn(async () => 'Asia/Beirut'),
+}))
+
 describe('restaurant-payables.service', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -68,6 +72,8 @@ describe('restaurant-payables.service', () => {
     expect(result.summary.dueThisWeekTotal).toBe(200)
     expect(result.topCreditors[0].supplierName).toBe('Fresh Farms')
     expect(result.invoices[0].invoiceNumber).toBe('INV-001')
+    expect(db.query.mock.calls[0][0]).toContain('AT TIME ZONE $3')
+    expect(db.query.mock.calls[0][1][2]).toBe('Asia/Beirut')
   })
 
   it('getRestaurantStatementOpeningBalance sums prior balance', async () => {
@@ -81,7 +87,7 @@ describe('restaurant-payables.service', () => {
     )
     const balance = await getRestaurantStatementOpeningBalance('rest-1', 'sup-1', '2026-06-01')
 
-    expect(balance).toBe(1250.5)
+    expect(balance.total).toBe(1250.5)
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining('invoice_date <'), [
       'rest-1',
       'sup-1',
@@ -94,7 +100,7 @@ describe('restaurant-payables.service', () => {
       './restaurant-payables.service.js'
     )
     const balance = await getRestaurantStatementOpeningBalance('rest-1', 'sup-1', null)
-    expect(balance).toBe(0)
+    expect(balance.total).toBe(0)
   })
 
   it('getRestaurantStatementAdjustments sums credit notes in date range', async () => {
@@ -111,7 +117,7 @@ describe('restaurant-payables.service', () => {
       '2026-06-30'
     )
 
-    expect(adjustments).toBe(175.25)
+    expect(adjustments.total).toBe(175.25)
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining('FROM credit_note cn'), [
       'rest-1',
       'sup-1',
@@ -141,7 +147,7 @@ describe('restaurant-payables.service', () => {
     const { getRestaurantStatementAdjustments } = await import('./restaurant-payables.service.js')
     const adjustments = await getRestaurantStatementAdjustments('rest-1', 'sup-1', null, null)
 
-    expect(adjustments).toBe(50)
+    expect(adjustments.total).toBe(50)
     expect(db.query).toHaveBeenCalledWith(expect.not.stringContaining('issue_date >='), [
       'rest-1',
       'sup-1',
@@ -161,5 +167,26 @@ describe('restaurant-payables.service', () => {
         totalAdjustments: 75,
       })
     ).toBe(1125)
+  })
+
+  it('keeps a supplier statement split when invoices use two currencies', async () => {
+    const { buildSupplierStatementSummary } = await import('./restaurant-payables.service.js')
+    const summary = buildSupplierStatementSummary({
+      invoices: [
+        { currency: 'USD', total_amount: 100 },
+        { currency: 'JOD', total_amount: 20 },
+      ],
+      opening: { byCurrency: [] },
+      adjustments: {
+        byCurrency: [{ currency: 'USD', amount: 5 }],
+      },
+      payments: [{ currency: 'USD', total_payments: 40 }],
+    })
+
+    expect(summary.totalCharges).toBeNull()
+    expect(summary.byCurrency).toEqual([
+      expect.objectContaining({ currency: 'USD', totalCharges: 100, closingBalance: 55 }),
+      expect.objectContaining({ currency: 'JOD', totalCharges: 20, closingBalance: 20 }),
+    ])
   })
 })

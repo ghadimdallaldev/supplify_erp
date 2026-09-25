@@ -138,15 +138,16 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 
 ### Edge cases
 
-- **Cancelled order:** removed from planned routes (`releaseOrderFromPlannedRoutes`)
+- **Cancelled order:** the same transaction removes incomplete stops and releases the live driver legs (`releaseOrderFromPlannedRoutes`). The dispatch cache refreshes after that commit.
 - **Non-ready stops on activate:** route still moves to `IN_PROGRESS`; waiting stops keep `assigned` until order reaches `PROCESSING`/`SHIPPED`
 - **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
 - **Dispatch board selection:** checkbox disabled when order is already on a route, or status is not eligible for planning
-- **Un-routing releases the driver:** removing a stop, cancelling a route (via `DELETE`
-  or `PATCH status=CANCELLED`) and `releaseOrderFromPlannedRoutes` all flip the order's
-  still-`assigned` driver leg to `reassigned`. Without this the dispatch board keeps
-  the order in the **Assigned** bucket under a driver who no longer has a route for it.
-  Legs already `picked_up` / `out_for_delivery` are deliberately left alone.
+- **Un-routing releases the driver:** removing a stop or cancelling a route (via `DELETE`
+  or `PATCH status=CANCELLED`) sets that route's driver to `reassigned` on the orders
+  that left the route (`assigned`, `picked_up`, `out_for_delivery`, `rescheduled`).
+  A driver on another warehouse leg of the same order stays assigned. Cancelling the
+  order still releases every live leg.
+- **Another driver's leg stays put:** planning a route assigns this driver only to warehouse legs that are free or already theirs. A leg held by a different driver blocks the route instead of being taken over. A leg this driver has already picked up or taken out for delivery is left in progress. A failed attempt is not reused: retry that delivery before putting the order on a route.
 - **Route date wins over today:** `syncDriverAssignment` stamps
   `driver_assignments.scheduled_delivery_date` from the route's `scheduled_date`, not
   `CURRENT_DATE`. A route planned for tomorrow must not be swept up by tonight's
@@ -154,6 +155,7 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 - **Reassignment:** `reassignDriver` carries `scheduled_delivery_date` onto the new leg
   (a NULL there drops the order out of the rollover partial index and the driver's
   today list) and deletes the now-stale stop from the previous driver's live route.
+  A rescheduled leg can be reassigned; it still occupies the warehouse until that happens.
 
 ### Dispatch cache invalidation
 
@@ -174,6 +176,12 @@ Unassigned orders still appear once as `deliveryStatus: pending`. Board `stats` 
 delivery legs, so multi-WH orders can contribute multiple rows. Clients must pass
 `driver_assignment_id` (or `warehouse_assignment_id`) when updating status on
 multi-leg orders — omitting them makes the API reject the update as ambiguous.
+`POST /api/orders/:id/assign-driver` assigns one open warehouse leg unless
+`warehouse_assignment_id` or `assign_all_warehouse_legs: true` is sent. A
+`rescheduled` leg still occupies that slot (migration `0218`) and returns to
+dispatch with status `assigned`. Sending one warehouse leg out for delivery
+commits that leg’s reserved stock. Cancelling an order removes open stops on
+planned and in-progress routes and releases the driver assignment.
 
 `deliveryStatus` reports the assignment status faithfully, including `picked_up`. It used
 to be collapsed into `out_for_delivery`, which hid a real state: the driver's primary
@@ -197,9 +205,15 @@ location is being shared when it is not.
 
 ### Proof of delivery
 
-One POD row per order is enforced by a unique index on `proof_of_delivery(order_id)`
-(migration `0200`). The completion service upserts with `ON CONFLICT (order_id) DO UPDATE`
-and `COALESCE`, so a flaky-network retry enriches the same proof instead of stacking duplicates.
+A driver assignment that is not tied to a warehouse leg can dispatch, complete, or fail the order only when there is at most one open warehouse leg. Several open legs require `warehouse_assignment_id`, so one driver cannot commit or release every warehouse. Completing a route stop updates only that route driver's legs, and the route must have a driver before its stops can change. When a stop leaves the warehouse, only that driver's live tracking session moves to the stop. The dispatch board's proof flag and live route follow that driver assignment. A single legacy proof with no assignment still covers an order that has only one driver assignment. `GET /api/orders/:id/proof-of-delivery` returns every proof for the order (`proof` remains the latest). A driver account only receives proofs for that driver's legs. The missing-proof check uses the same rule. An open fulfillment exception is one per driver leg and warehouse, so a second failed or missing-proof leg is still listed.
+
+Route numbers are the next suffix for that UTC day, taken under a transaction lock, and creating or extending a route locks each order so it cannot land on two live routes. A driver-built route uses the same lock before it adds a stop. A driver building a route includes assignments scheduled for that date (unscheduled assignments still follow the requested or placed date). Driver delivery detail for a signed-in driver shows that driver's assignment, not the newest leg on the order, plus the stop on that driver's live route, the `ORD-` reference, and the requested delivery time.
+
+One proof per driver leg is enforced by a unique index on `proof_of_delivery(driver_assignment_id)`
+when an assignment is recorded (migration `0219`, replacing the order-wide unique index from `0200`).
+Proofs with no assignment stay unique per order. The completion service upserts that leg with
+`COALESCE`, so a flaky-network retry enriches the same proof and cannot replace another warehouse
+leg's proof. When proof is required, marking a leg delivered checks that leg's proof.
 A POD must carry a photo (`file_key`), a signature (`signature_file_key`) or a recipient name;
 the native driver flow requires a photo as the primary evidence.
 
@@ -217,7 +231,7 @@ timeout, or unavailable location never blocks completion.
 POD capture is controlled by `supplier.pod_required` (default `false`). When enabled via
 Supplier Settings -> Business (`PATCH /api/suppliers/me/business` `{ podRequired: true }`),
 `isPodRequiredForSupplier` rejects delivery without a proof record. API responses expose
-`podRequired` (policy) and `hasPod` (record exists) separately via `resolveDeliveryPodFlags`.
+`podRequired` (policy) and `hasPod` (a proof for that driver leg, when the status update names one) separately via `resolveDeliveryPodFlags`. Restaurant confirmation stamps only proofs that are still unconfirmed, so a second leg does not rewrite an earlier confirmation. Reassign locks the order and the driver leg before replacing it, so two reassigns cannot both insert a live assignment for the same leg. Route overview "delivered today" leaves out an order that still has a driver leg assigned, picked up, out for delivery, or rescheduled.
 
 Moving an assignment from `assigned` or `picked_up` to `out_for_delivery` atomically promotes a
 parent `PROCESSING` order to `SHIPPED`. Delivery can then promote `SHIPPED` to `DELIVERED`

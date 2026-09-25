@@ -74,16 +74,30 @@ export async function recalculateOrderTotal(orderId, client) {
  */
 async function resolveAmendmentUnitPrice(
   client,
-  { restaurantId, supplierId, productId, quantity }
+  { restaurantId, supplierId, productId, quantity, date }
 ) {
   const resolved = await resolveProductPrice(
-    { restaurantId, supplierId, productId, quantity },
+    { restaurantId, supplierId, productId, quantity, date },
     client.query.bind(client)
   )
-  if (resolved?.unitPrice != null) {
-    return Number(resolved.unitPrice)
+  if (resolved?.unitPrice == null) return null
+  return {
+    unitPrice: Number(resolved.unitPrice),
+    pricingSource: resolved.source || 'DEFAULT_PRICE',
+    contractPriceId: resolved.contractPriceId || null,
+    currency: resolved.currency || 'USD',
   }
-  return null
+}
+
+function sameOrderCurrency(orderCurrency, priceCurrency) {
+  return (
+    String(orderCurrency || 'USD')
+      .trim()
+      .toUpperCase() ===
+    String(priceCurrency || 'USD')
+      .trim()
+      .toUpperCase()
+  )
 }
 
 export async function applyAmendmentItems(client, orderId, amendmentId) {
@@ -99,10 +113,12 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
   const changeType = amendments[0]?.change_type
 
   const { rows: orderRows } = await client.query(
-    `SELECT restaurant_id FROM customer_order WHERE id = $1`,
+    `SELECT restaurant_id, requested_delivery_date, currency FROM customer_order WHERE id = $1`,
     [orderId]
   )
   const restaurantId = orderRows[0]?.restaurant_id
+  const pricingDate = orderRows[0]?.requested_delivery_date || null
+  const orderCurrency = orderRows[0]?.currency || 'USD'
 
   for (const item of items) {
     if (changeType === 'quantity_change' && item.order_item_id && item.requested_quantity != null) {
@@ -111,18 +127,37 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
 
       if (restaurantId) {
         const { rows: orderItems } = await client.query(
-          `SELECT product_id, supplier_id FROM order_item WHERE id = $1 AND order_id = $2`,
+          `SELECT product_id, supplier_id, pricing_source FROM order_item WHERE id = $1 AND order_id = $2`,
           [item.order_item_id, orderId]
         )
-        if (orderItems.length) {
+        if (orderItems.length && orderItems[0].pricing_source !== 'QUOTE_PRICE') {
           const resolvedPrice = await resolveAmendmentUnitPrice(client, {
             restaurantId,
             supplierId: orderItems[0].supplier_id,
             productId: orderItems[0].product_id,
             quantity: qty,
+            date: pricingDate,
           })
-          if (resolvedPrice != null) {
-            unitPrice = resolvedPrice
+          if (resolvedPrice != null && sameOrderCurrency(orderCurrency, resolvedPrice.currency)) {
+            unitPrice = resolvedPrice.unitPrice
+            await client.query(
+              `
+              UPDATE order_item
+              SET quantity = $1, line_total = $2, unit_price = $3,
+                  pricing_source = $4, contract_price_id = $5
+              WHERE id = $6 AND order_id = $7
+              `,
+              [
+                qty,
+                qty * unitPrice,
+                unitPrice,
+                resolvedPrice.pricingSource,
+                resolvedPrice.contractPriceId,
+                item.order_item_id,
+                orderId,
+              ]
+            )
+            continue
           }
         }
       }
@@ -160,9 +195,34 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
           supplierId: products[0].supplier_id,
           productId: item.substitute_product_id,
           quantity: qty,
+          date: pricingDate,
         })
+        if (resolvedPrice != null && !sameOrderCurrency(orderCurrency, resolvedPrice.currency)) {
+          throw new ValidationError('Substitute price currency does not match this order')
+        }
         if (resolvedPrice != null) {
-          unitPrice = resolvedPrice
+          unitPrice = resolvedPrice.unitPrice
+          const lineTotal = qty * unitPrice
+          await client.query(
+            `
+            UPDATE order_item
+            SET product_id = $1, supplier_id = $2, quantity = $3, unit_price = $4, line_total = $5,
+                pricing_source = $6, contract_price_id = $7
+            WHERE id = $8 AND order_id = $9
+            `,
+            [
+              item.substitute_product_id,
+              products[0].supplier_id,
+              qty,
+              unitPrice,
+              lineTotal,
+              resolvedPrice.pricingSource,
+              resolvedPrice.contractPriceId,
+              item.order_item_id,
+              orderId,
+            ]
+          )
+          continue
         }
       }
 
@@ -298,9 +358,17 @@ export async function acceptAmendment(amendmentId, orderId, responderUserId, res
     }
 
     // Release pre-amendment reservations, apply line changes, then reserve for new quantities.
+    // The release marks the previous warehouse leg failed. That was not a delivery
+    // failure, so supersede it or a later delivery can never complete the order.
     await releaseStockForOrder(client, orderId)
     const newTotal = await applyAmendmentItems(client, orderId, amendmentId)
     await rereserveOrderStock(client, orderId)
+    await client.query(
+      `UPDATE order_warehouse_assignment
+       SET status = 'superseded', superseded_at = now()
+       WHERE order_id = $1 AND status = 'failed'`,
+      [orderId]
+    )
 
     const { rows: updated } = await client.query(
       `
@@ -310,6 +378,14 @@ export async function acceptAmendment(amendmentId, orderId, responderUserId, res
       RETURNING *
       `,
       [responderUserId, responseNotes || null, amendmentId]
+    )
+
+    await client.query(
+      `UPDATE order_fulfillment_issue
+       SET status = 'accepted', updated_at = now()
+       WHERE amendment_id = $1
+         AND status IN ('shortage_reported', 'substitution_suggested', 'waiting_restaurant_approval')`,
+      [amendmentId]
     )
 
     return { amendment: updated[0], newTotal }

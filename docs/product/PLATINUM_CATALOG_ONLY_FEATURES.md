@@ -17,16 +17,16 @@ The historical `platinum` catalog JSON includes feature **strings** that describ
 
 ## Still catalog-only (not differentiated in code yet)
 
-| Feature key            | Platinum value                        | Notes                                                                              |
-| ---------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| `reports`              | `advanced_forecasting_custom_reports` | Same `reports` route gate as Gold                                                  |
-| `api_integrations`     | `full_api_webhooks`                   | No read API + order/invoice webhook platform (distinct from notification webhooks) |
-| `chat`                 | `real_time_media_read_receipts`       | Chat not tier-string aware                                                         |
-| `multi_branch`         | `central_purchasing`                  | Same multi-branch gate as Gold                                                     |
-| `finance_invoices`     | `advanced_finance_dashboard`          | Same finance route gate as Gold                                                    |
-| `receiving_quality`    | `supplier_performance_reports`        | Same receiving gate as Gold                                                        |
-| `inventory_management` | `lot_expiry_tracking`                 | Not gated separately from Gold                                                     |
-| `fulfillment_tools`    | `routing_full_suite` (supplier)       | Fulfillment alias; same family as Gold                                             |
+| Feature key            | Platinum value                        | Notes                                                                                                               |
+| ---------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `reports`              | `advanced_forecasting_custom_reports` | Same `reports` route gate as Gold                                                                                   |
+| `api_integrations`     | `full_api_webhooks`                   | Accounting CSV export is gated. No read API or order/invoice webhook platform (distinct from notification webhooks) |
+| `chat`                 | `real_time_media_read_receipts`       | Chat not tier-string aware                                                                                          |
+| `multi_branch`         | `central_purchasing`                  | Same multi-branch gate as Gold                                                                                      |
+| `finance_invoices`     | `advanced_finance_dashboard`          | Same finance route gate as Gold                                                                                     |
+| `receiving_quality`    | `supplier_performance_reports`        | Same receiving gate as Gold                                                                                         |
+| `inventory_management` | `lot_expiry_tracking`                 | Not gated separately from Gold                                                                                      |
+| `fulfillment_tools`    | `routing_full_suite` (supplier)       | Fulfillment alias; same family as Gold                                                                              |
 
 ## Enforced differentiation vs Gold (operational)
 

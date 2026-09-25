@@ -28,6 +28,7 @@ vi.mock('../../lib/subscription.js', () => ({
 
 vi.mock('../../lib/warehouse-helpers.js', () => ({
   isMultiWarehouseFulfillmentActive: vi.fn().mockResolvedValue(false),
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
 }))
 
 vi.mock('../../lib/logger.js', () => ({
@@ -43,7 +44,7 @@ vi.mock('./fulfillment.helpers.js', () => ({
   loadStopsForRoutes: vi.fn().mockResolvedValue(new Map()),
 }))
 
-import boardRouter from './board.js'
+import boardRouter, { buildDispatchBaseSelect } from './board.js'
 
 describe('fulfillment board driver_id mapping', () => {
   let app
@@ -87,5 +88,12 @@ describe('fulfillment board driver_id mapping', () => {
 
     const routesSql = db.query.mock.calls[0][0]
     expect(routesSql).toMatch(/driver_id/)
+  })
+
+  it('ties dispatch proof and the live route to the driver assignment', () => {
+    const sql = buildDispatchBaseSelect('supplier_id')
+    expect(sql).toMatch(/pod\.driver_assignment_id = da\.id/)
+    expect(sql).toMatch(/dr\.driver_id = da\.driver_id/)
+    expect(sql).not.toMatch(/SELECT DISTINCT order_id FROM proof_of_delivery/)
   })
 })

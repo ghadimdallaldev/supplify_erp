@@ -11,6 +11,8 @@ For each feature key (e.g. `chat`, `smart_reorder`, `reports`):
 3. **Plan** — `subscription_plan.features` JSON on the tenant’s active subscription
 4. **Default** — disabled
 
+Forcing a flag **on** keeps the plan’s tier string when that plan value is already enabled (`intelligence: "scale"`, `notifications: "email_whatsapp_webhook"`, `smart_reorder: "ai_forecast_seasonality"`). It becomes boolean `true` only when the plan had the feature off. Forcing **off** disables the feature. An explicit off on `fulfillment` or `driver_management` is not turned back on by the `fulfillment_tools` alias, including the `requireFeature` middleware.
+
 Runtime checks use `requireFeature('feature_key')` on API routes, which calls `isFeatureEnabled()` in `subscription.js` (delegates to `feature-flags.js`).
 
 ## Database
@@ -83,7 +85,13 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 `fulfillment_tools` — dispatch board, pick lists, GPS tracking, driver management. Canonical key for `fulfillment` and `driver_management` aliases (see Feature aliases below).
 
-`supplier_deals_redeem` — legacy migration-only key; restaurants redeeming deals. Not shown in admin UI.
+`supplier_deals_redeem` — restaurants redeeming supplier deals. Shown with the other restaurant keys. Redemption requires both `supplier_deals` and `supplier_deals_redeem`.
+
+`support_sla` — tenant support chat (`POST /api/chat/support/start` and `GET /api/chat/support/conversations`) requires both `chat` and `support_sla`. Paid plans use tier strings (`standard_72h`, `priority_24h`, `dedicated_same_day`); any enabled value opens the same support conversation. Response-time clocks are not a separate engine. Platform admin support tools stay on the admin role.
+
+`api_integrations` — accounting file exports. Supplier invoice, payment, statement, QuickBooks, and AR-summary CSV downloads, and the restaurant invoice CSV download, require this flag in addition to `finance_invoices`. In-app invoice and payment screens stay on `finance_invoices`. Growth plans keep the flag off. There is no developer API-key or order/invoice webhook product; `api_key_access` and `full_api_webhooks` grant the same shipped export. Notification webhooks stay on `notifications: email_whatsapp_webhook`.
+
+`feature_flags_access` — admin add-on grants. A positive add-on quantity requires an enabled value (`addon_toggles` or `all_experimental`) and a plan that prices that add-on. Setting the quantity to zero still cancels a historical add-on when the flag is off. Tenants do not self-serve feature flags.
 
 **Removed:** `approvals_budgets` (not shown in admin UI)
 
@@ -93,7 +101,7 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 
 `ai_platform` — same LLM gate as restaurant side; supplier Smart Reorder AI paths.
 
-`finance_invoices` — supplier invoice management and accounting export.
+`finance_invoices` — supplier invoice management. Accounting CSV downloads also require `api_integrations`.
 
 `supplier_growth` — customer import, referral invites, sponsored onboarding, growth dashboard.
 
@@ -106,7 +114,7 @@ DELETE /api/admin-dashboard/tenants/RESTAURANT/{restaurantId}/feature-overrides/
 | `fulfillment`       | `fulfillment_tools` |
 | `driver_management` | `fulfillment_tools` |
 
-This means calling `requireFeature('driver_management')` or `requireFeature('fulfillment')` is equivalent to checking `fulfillment_tools` on the plan. Alias logic lives in `FEATURE_ALIASES` in `feature-flags.js`.
+When the plan omits `fulfillment` or `driver_management`, `requireFeature` checks `fulfillment_tools` instead. An explicit admin off is not replaced by that alias. Alias logic lives in `FEATURE_ALIASES` in `feature-flags.js`.
 
 ## Real-time refresh
 

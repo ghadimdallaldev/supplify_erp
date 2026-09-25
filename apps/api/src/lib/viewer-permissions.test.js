@@ -18,6 +18,7 @@ describe('viewer-permissions', () => {
     expect(views).toContain(P.SUBSCRIPTIONS_VIEW)
     expect(views).not.toContain(P.WAREHOUSES_VIEW)
     expect(views).not.toContain(P.FULFILLMENT_VIEW)
+    expect(views).not.toContain(P.GROWTH_VIEW)
   })
 
   it('supplier viewer includes supplier-only views', () => {
@@ -25,6 +26,7 @@ describe('viewer-permissions', () => {
     assertNoWritePermissions(views, 'SUPPLIER viewer')
     expect(views).toContain(P.FULFILLMENT_VIEW)
     expect(views).toContain(P.WAREHOUSES_VIEW)
+    expect(views).toContain(P.GROWTH_VIEW)
     expect(views).not.toContain(P.RESERVATIONS_VIEW)
   })
 

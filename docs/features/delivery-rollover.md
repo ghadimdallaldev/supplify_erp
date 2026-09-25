@@ -49,7 +49,7 @@ For each eligible assignment:
 1. `driver_assignments.status` → `rescheduled`
 2. `scheduled_delivery_date` → next calendar day
 3. `rolled_over_at` set; `rollover_count` incremented
-4. Incomplete stops removed from today’s `PLANNED` / `IN_PROGRESS` routes
+4. Incomplete stops removed from `PLANNED` / `IN_PROGRESS` routes dated before the new delivery day. A route already planned for that new day keeps its stop.
 5. If `DELIVERY_ROLLOVER_KEEP_DRIVER=true`, order appended to a planned route `Rollover {date}` for that driver
 6. Audit log: `delivery.rollover` — _Delivery rolled over to next day because it was not delivered before cutoff._
 7. **Order status unchanged** (stays `PROCESSING` / `SHIPPED`, etc.)

@@ -25,6 +25,7 @@ vi.mock('../lib/rbac.js', () => ({
   requireOwnership: () => (req, res, next) => next(),
   resolveTenantContext: (req, res, next) => next(),
   requirePermission: () => (req, res, next) => next(),
+  requireAnyPermission: () => (req, res, next) => next(),
   getRequestTenant: vi.fn().mockResolvedValue(null),
   getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   getRestaurantIdForRequest: vi.fn().mockResolvedValue('restaurant-1'),
@@ -61,11 +62,24 @@ vi.mock('../services/notification.service.js', () => ({
 vi.mock('../services/supplier-stock.service.js', () => ({
   listSupplierStockDisplay: vi.fn().mockResolvedValue([]),
   supplierUsesWarehouseInventory: vi.fn().mockResolvedValue(false),
+  getSupplierProductAvailableQty: vi.fn().mockResolvedValue(0),
   transferWarehouseInventory: vi.fn().mockResolvedValue({ transferred: 0 }),
+}))
+
+vi.mock('../lib/warehouse-helpers.js', () => ({
+  getWarehouseSupplierColumn: vi.fn().mockResolvedValue('supplier_id'),
+  assertWarehouseOwnedBySupplier: vi.fn().mockResolvedValue({ id: 'warehouse-1' }),
 }))
 
 vi.mock('../services/supplier-order-stock.service.js', () => ({
   syncWarehouseMirrorFromLegacy: vi.fn().mockResolvedValue(null),
+  syncLegacyMirrorFromWarehouse: vi.fn().mockResolvedValue({ available: 150, reserved: 0 }),
+  applyWarehouseInventoryAdjustment: vi.fn().mockResolvedValue({
+    applied: true,
+    warehouseId: 'warehouse-1',
+    availableQty: 110,
+    reservedQty: 0,
+  }),
 }))
 
 // Import routes after mocks
@@ -102,6 +116,18 @@ describe('Inventory Routes', () => {
     db = setupMocks()
     const dbModule = await import('../lib/db.js')
     vi.mocked(dbModule.query).mockImplementation((...args) => db.query(...args))
+    vi.mocked(dbModule.withTransaction).mockImplementation((handler) => db.withTransaction(handler))
+
+    const { getSupplierIdForRequest, getRestaurantIdForRequest } = await import('../lib/rbac.js')
+    vi.mocked(getSupplierIdForRequest).mockResolvedValue('supplier-1')
+    vi.mocked(getRestaurantIdForRequest).mockResolvedValue('restaurant-1')
+    const { supplierUsesWarehouseInventory } = await import('../services/supplier-stock.service.js')
+    vi.mocked(supplierUsesWarehouseInventory).mockResolvedValue(false)
+    const { getWarehouseSupplierColumn, assertWarehouseOwnedBySupplier } = await import(
+      '../lib/warehouse-helpers.js'
+    )
+    vi.mocked(getWarehouseSupplierColumn).mockResolvedValue('supplier_id')
+    vi.mocked(assertWarehouseOwnedBySupplier).mockResolvedValue({ id: 'warehouse-1' })
 
     app = express()
     app.use(express.json())
@@ -145,6 +171,7 @@ describe('Inventory Routes', () => {
 
       const listSql = String(db.query.mock.calls[0][0])
       expect(listSql).toContain('WHERE p.supplier_id = $1')
+      expect(listSql).toMatch(/w\.id = i\.warehouse_id AND w\.supplier_id = p\.supplier_id/)
       expect(db.query.mock.calls[0][1]).toEqual(['supplier-1', 100, 0])
     })
 
@@ -201,6 +228,65 @@ describe('Inventory Routes', () => {
     })
   })
 
+  describe('GET /api/inventory/alerts', () => {
+    it('scopes warehouse names to the product supplier and omits contact_email', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'alert-1',
+            product_name: 'Flour',
+            warehouse_name: 'Main',
+            supplier_id: 'supplier-1',
+          },
+        ],
+      })
+
+      const response = await request(app).get('/api/inventory/alerts').expect(200)
+
+      expect(response.body.data.alerts).toHaveLength(1)
+      expect(response.body.data.alerts[0].contact_email).toBeUndefined()
+      const sql = String(db.query.mock.calls[0][0])
+      expect(sql).toMatch(/w\.supplier_id = p\.supplier_id/)
+      expect(sql).not.toMatch(/contact_email/)
+    })
+  })
+
+  describe('GET /api/inventory/product/:productId/adjustments', () => {
+    it('hides another supplier product and scopes warehouse names', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'prod-foreign', supplier_id: 'supplier-other' }],
+      })
+
+      const response = await request(app)
+        .get('/api/inventory/product/prod-foreign/adjustments')
+        .expect(404)
+
+      expect(response.body.error.name).toBe('NOT_FOUND')
+      expect(
+        db.query.mock.calls.some(([sql]) => String(sql).includes('FROM inventory_adjustment'))
+      ).toBe(false)
+    })
+
+    it('scopes warehouse names to the product supplier', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'prod-1', supplier_id: 'supplier-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'adj-1', product_id: 'prod-1', warehouse_name: 'Main' }],
+        })
+
+      const response = await request(app)
+        .get('/api/inventory/product/prod-1/adjustments')
+        .expect(200)
+
+      expect(response.body.data.adjustments).toHaveLength(1)
+      const sql = String(db.query.mock.calls[1][0])
+      expect(sql).toMatch(/w\.supplier_id = p\.supplier_id/)
+      expect(sql).not.toMatch(/ia\.\*/)
+    })
+  })
+
   describe('PATCH /api/inventory/product/:productId', () => {
     it('should update inventory quantity', async () => {
       db.query
@@ -222,6 +308,62 @@ describe('Inventory Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.inventory.available_qty).toBe(150)
+    })
+  })
+
+  describe('POST /api/inventory/product/:productId/adjustment', () => {
+    it('adjusts warehouse-mode stock without a legacy inventory row', async () => {
+      const { supplierUsesWarehouseInventory } = await import(
+        '../services/supplier-stock.service.js'
+      )
+      const { applyWarehouseInventoryAdjustment } = await import(
+        '../services/supplier-order-stock.service.js'
+      )
+      vi.mocked(supplierUsesWarehouseInventory).mockResolvedValueOnce(true)
+
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'prod-1', supplier_id: 'supplier-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ id: 'adj-1' }] })
+        .mockResolvedValueOnce({ rows: [] })
+
+      const response = await request(app)
+        .post('/api/inventory/product/prod-1/adjustment')
+        .send({ adjustmentType: 'IN', quantity: 10, reason: 'cycle-count' })
+        .expect(201)
+
+      expect(applyWarehouseInventoryAdjustment).toHaveBeenCalled()
+      expect(response.body.data.adjustment.id).toBe('adj-1')
+    })
+  })
+
+  describe('PATCH /api/inventory/product/:productId/settings', () => {
+    it('rejects callers without a supplier tenant', async () => {
+      const { getSupplierIdForRequest } = await import('../lib/rbac.js')
+      vi.mocked(getSupplierIdForRequest).mockResolvedValueOnce(null)
+
+      const response = await request(app)
+        .patch('/api/inventory/product/prod-1/settings')
+        .send({ moq: 2, orderMultiple: 1, leadTimeDays: 1, lowStockThreshold: 5 })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+    })
+  })
+
+  describe('PATCH /api/inventory/alerts/:alertId/acknowledge', () => {
+    it('rejects alerts owned by another supplier', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'alert-1', product_id: 'prod-1', supplier_id: 'supplier-other' }],
+      })
+
+      const response = await request(app)
+        .patch('/api/inventory/alerts/alert-1/acknowledge')
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
     })
   })
 })

@@ -40,6 +40,7 @@ import {
   supplierUpdateSchema,
   supplierListSchema,
 } from './suppliers.helpers.js'
+import { presentPublicSupplier } from '../../lib/tenant-profile-redaction.js'
 
 const log = createModuleLogger('suppliers.routes')
 
@@ -189,11 +190,14 @@ router.get('/', optionalAuth, async (req, res) => {
 
     const suppliersWithReviews = await attachReviewFields(rows)
     const suppliersWithDeals = await attachStoreDealFields(suppliersWithReviews, { restaurantId })
-    const publicSuppliers = suppliersWithDeals.map(({ supplier_ids, ...supplier }) => ({
-      ...supplier,
-      id: supplier.supplier_organization_id || supplier.id,
-      tenant_id: supplier.id,
-    }))
+    const publicSuppliers = suppliersWithDeals.map(({ supplier_ids, ...supplier }) => {
+      const presented = presentPublicSupplier(supplier)
+      return {
+        ...presented,
+        id: presented.supplier_organization_id || presented.id,
+        tenant_id: supplier.id,
+      }
+    })
 
     // Get total count
     // Build count params separately - exclude is_followed param and limit/offset

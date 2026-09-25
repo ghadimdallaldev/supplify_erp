@@ -44,6 +44,11 @@ describe('restaurantOrgBranchComparison', () => {
     })
 
     expect(queryMock.mock.calls[0][1][0]).toEqual(['branch-1'])
+    expect(queryMock.mock.calls[0][0]).toContain('AT TIME ZONE')
+    expect(queryMock.mock.calls[0][0]).toContain('r.timezone')
+    expect(queryMock.mock.calls[0][1][1]).toBe('2026-09-01')
+    expect(queryMock.mock.calls[0][1][2]).toBe('2026-09-07')
+    expect(queryMock.mock.calls[0][1][3]).toBe('2026-08-25')
     expect(result.data.branches[0]).toMatchObject({
       branchAccountId: 'branch-1',
       purchasing: { orderCount: 4, spend: 120, previousSpend: 100 },
@@ -199,7 +204,8 @@ describe('restaurantOrgAdvancedAnalytics', () => {
       to: '2026-01-01',
     })
     expect(result.meta.unrestrictedDateRange).toBe(true)
-    expect(queryMock.mock.calls[0][1][1]).toBeInstanceOf(Date)
+    expect(queryMock.mock.calls[0][1][1]).toBe('2001-01-01')
+    expect(queryMock.mock.calls[0][0]).toContain('AT TIME ZONE')
     expect(result.data.months[0].spend).toBe(10)
   })
 })

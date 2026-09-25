@@ -222,6 +222,11 @@ describe('delivery-rollover.service', () => {
       String(c[0]).includes("status = 'rescheduled'")
     )
     expect(updateCall).toBeTruthy()
+    const detachCall = clientQuery.mock.calls.find((c) =>
+      String(c[0]).includes('DELETE FROM route_stop')
+    )
+    expect(String(detachCall?.[0])).toMatch(/scheduled_date < \$3::date/)
+    expect(detachCall?.[1]?.[2]).toBe('2026-06-09')
     expect(writeSystemAuditLog).toHaveBeenCalled()
   })
 

@@ -18,6 +18,7 @@ import {
 import { PublicPageLayout, PublicPanel } from '../components/public/PublicPageLayout'
 import { ReservationTimeSlotGrid, formatTime } from '../components/public/ReservationTimeSlotGrid'
 import { cn } from '../lib/utils'
+import { localDateKey } from '../lib/invoiceBalance'
 import { CalendarDays, Clock3, Sparkles, Users } from 'lucide-react'
 
 export function PublicReservationPortal() {
@@ -43,7 +44,7 @@ export function PublicReservationPortal() {
 
   const [form, setForm] = useState({
     partySize: 2,
-    date: new Date().toISOString().slice(0, 10),
+    date: localDateKey(),
     selectedSlot: '',
     customerName: '',
     customerEmail: '',
@@ -98,8 +99,7 @@ export function PublicReservationPortal() {
     form.customerName.trim().length > 0 &&
     form.customerEmail.trim().length > 0 &&
     form.customerPhone.trim().length > 0
-  const depositRequired =
-    availabilityData?.depositMode === 'fixed' || availabilityData?.depositMode === 'percent'
+  const depositRequired = Boolean(availabilityData?.depositRequired)
   const canConfirm = Boolean(
     form.selectedSlot && guestContactComplete && (!depositRequired || depositAcknowledged)
   )
@@ -483,16 +483,24 @@ export function PublicReservationPortal() {
               </div>
             </div>
 
-            {availabilityData?.depositPolicyText ||
-            availabilityData?.depositMode === 'fixed' ||
-            availabilityData?.depositMode === 'percent' ? (
+            {depositRequired ? (
               <div className="space-y-2 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2 text-xs text-[var(--text-muted)]">
                 <p>
-                  {availabilityData.depositPolicyText ||
-                    t('portal.depositNotice', {
-                      defaultValue: 'This restaurant may require a deposit for your reservation.',
-                    })}
+                  {availabilityData?.depositMode === 'percent'
+                    ? t('portal.depositPercent', {
+                        percent: availabilityData.depositPercent,
+                        defaultValue:
+                          'Deposit: {{percent}}% of the booking. This confirms the policy and is not a payment.',
+                      })
+                    : t('portal.depositFixed', {
+                        amount: availabilityData?.depositAmount,
+                        defaultValue:
+                          'Deposit: {{amount}}. This confirms the policy and is not a payment.',
+                      })}
                 </p>
+                {availabilityData?.depositPolicyText ? (
+                  <p>{availabilityData.depositPolicyText}</p>
+                ) : null}
                 <label className="flex items-start gap-2 text-[var(--text)]">
                   <input
                     type="checkbox"

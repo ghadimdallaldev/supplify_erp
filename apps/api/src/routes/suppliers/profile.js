@@ -5,6 +5,7 @@ import {
   optionalAuth,
   resolveTenantContext,
   requirePermission,
+  requireAnyPermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
   getRequestTenant,
@@ -17,7 +18,7 @@ import { invalidateTenantProfileCache } from '../../lib/tenant-profile-cache.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../../lib/tenant-roles.js'
-import { restaurantSupplierMutationGuard } from '../../lib/route-permissions.js'
+import { presentSupplier } from '../../lib/tenant-profile-redaction.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../../lib/safe-update.js'
 import {
@@ -42,8 +43,10 @@ import {
   purchaseAndActivateFeaturedPlacement,
   payFeaturedPlacement,
   refundFeaturedPlacement,
+  approveFeaturedPlacement,
+  rejectFeaturedPlacement,
   listPlacementsForSupplier,
-  listAllActivePlacementsForAdmin,
+  listFeaturedPlacementsForAdmin,
 } from '../../services/featured-supplier-placement.service.js'
 
 import {
@@ -210,7 +213,7 @@ router.get(
 
       res.json({
         ok: true,
-        data: { supplier: suppliers[0] },
+        data: { supplier: presentSupplier(req, suppliers[0]) },
         error: null,
         requestId: req.requestId,
       })
@@ -610,8 +613,43 @@ router.get(
   requireRole(['ADMIN']),
   async (req, res, next) => {
     try {
-      const placements = await listAllActivePlacementsForAdmin()
+      const placements = await listFeaturedPlacementsForAdmin()
       res.json({ ok: true, data: { placements }, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/approve',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const result = await approveFeaturedPlacement({
+        placementId: req.params.id,
+        approvedBy: req.userData.id,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
+  }
+)
+
+router.post(
+  '/featured-placement/:id/reject',
+  requireAuth,
+  requireRole(['ADMIN']),
+  async (req, res, next) => {
+    try {
+      const result = await rejectFeaturedPlacement({
+        placementId: req.params.id,
+        rejectedBy: req.userData.id,
+        reason: req.body?.reason ? String(req.body.reason).slice(0, 500) : null,
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
     }
@@ -705,6 +743,11 @@ router.get(
   async (req, res) => {
     if (req.userData?.role === 'RESTAURANT') {
       return requirePermission('CATALOG_VIEW')(req, res, () => handleGetSupplierById(req, res))
+    }
+    if (req.userData?.role === 'SUPPLIER') {
+      return requireAnyPermission('SETTINGS_VIEW', 'CATALOG_VIEW', 'ORDERS_VIEW')(req, res, () =>
+        handleGetSupplierById(req, res)
+      )
     }
     return handleGetSupplierById(req, res)
   }
@@ -807,8 +850,21 @@ async function handleGetSupplierById(req, res) {
       recent_reviews: recentReviews.slice(0, 5),
     }
 
-    // Check access permissions
-    if (req.userData.role === 'SUPPLIER' && supplier.contact_email !== req.userData.email) {
+    // Check access permissions: supplier staff may only read their own tenant row.
+    const ownSupplierId = await getSupplierIdForRequest(req)
+    if (ownSupplierId) {
+      if (ownSupplierId !== supplier.id) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+    } else if (!restaurantId) {
       return res.status(403).json({
         ok: false,
         data: null,
@@ -820,9 +876,16 @@ async function handleGetSupplierById(req, res) {
       })
     }
 
+    const presented = presentSupplier(req, { ...enriched, id: supplier.id })
     res.json({
       ok: true,
-      data: { supplier: enriched },
+      data: {
+        supplier: {
+          ...presented,
+          id: enriched.id,
+          tenant_id: supplier.id,
+        },
+      },
       error: null,
       requestId: req.requestId,
     })

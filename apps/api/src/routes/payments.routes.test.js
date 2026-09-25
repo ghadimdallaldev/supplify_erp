@@ -81,6 +81,26 @@ describe('Payments Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.payments).toHaveLength(1)
+      expect(response.body.data.payments[0].payment_date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    })
+
+    it('rejects a restaurant caller for another restaurant invoice', async () => {
+      app = express()
+      app.use(express.json())
+      app.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'rest@example.com' }
+        next()
+      })
+      app.use('/api/payments', paymentsRoutes)
+      const { errorHandler } = await import('../middlewares/errorHandler.js')
+      app.use(errorHandler)
+
+      db.query.mockResolvedValueOnce({
+        rows: [{ supplier_id: 'supplier-1', restaurant_id: 'other-rest' }],
+      })
+
+      await request(app).get('/api/payments/invoice/invoice-1').expect(403)
     })
   })
 

@@ -80,6 +80,7 @@ describe('role-matrix access expectations', () => {
   it('catalog manager can import but not receivables or settings', () => {
     const perms = supplierRole('Catalog Manager').permissions
     expect(hasPermission(perms, P.CATALOG_EDIT)).toBe(true)
+    expect(hasPermission(perms, P.ORDERS_VIEW)).toBe(false)
     expect(hasPermission(perms, P.INVOICES_VIEW)).toBe(false)
     expect(hasPermission(perms, P.SETTINGS_VIEW)).toBe(false)
   })

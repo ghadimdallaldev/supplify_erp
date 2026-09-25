@@ -3,6 +3,7 @@ import {
   requireAuth,
   requireRole,
   resolveTenantContext,
+  resolveAdminContext,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
 import { orgStructureGuard } from '../lib/route-permissions.js'
@@ -11,6 +12,7 @@ import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkLinkedAccountLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { getEffectiveTenant } from '../lib/impersonation.js'
+import { presentSupplier } from '../lib/tenant-profile-redaction.js'
 import {
   getUserOrgMembership,
   listOrgBranches,
@@ -63,31 +65,55 @@ async function requireSupplierOrgContext(req, res, next) {
     })
   }
 
-  let membership = await getUserOrgMembership(req.userData.id)
-  if (!membership && req.userData.role === 'SUPPLIER') {
-    const supplierId = await getSupplierIdForRequest(req)
-    if (supplierId) {
-      const repaired = await ensureOrgAccessForBranchStaff(req.userData.id, supplierId)
-      if (repaired) {
-        membership = await getUserOrgMembership(req.userData.id)
-      }
-    }
-  }
-  if (!membership && req.userData.role !== 'ADMIN') {
+  const requestedOrgId =
+    req.userData.role === 'ADMIN' && typeof req.query.organization_id === 'string'
+      ? req.query.organization_id.trim() || null
+      : null
+  const effectiveTenant = getEffectiveTenant(req)
+
+  if (req.userData.role === 'ADMIN' && !effectiveTenant) {
     return res.status(403).json({
       ok: false,
       data: null,
-      error: { name: 'FORBIDDEN', message: 'No organization membership' },
+      error: { name: 'FORBIDDEN', message: 'Impersonate a tenant to access this organization' },
       requestId: req.requestId,
     })
   }
 
-  let organizationId = membership?.organization_id
+  let membership = null
+  if (req.userData.role === 'SUPPLIER') {
+    membership = await getUserOrgMembership(req.userData.id)
+    if (!membership) {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (supplierId) {
+        const repaired = await ensureOrgAccessForBranchStaff(req.userData.id, supplierId)
+        if (repaired) {
+          membership = await getUserOrgMembership(req.userData.id)
+        }
+      }
+    }
+    if (!membership) {
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: 'No organization membership' },
+        requestId: req.requestId,
+      })
+    }
+  }
+
+  let organizationId = membership?.organization_id || null
   let organizationName = membership?.organization_name || ''
   let primarySupplierId = null
 
-  if (req.userData.role === 'ADMIN' && req.query.organization_id) {
-    organizationId = req.query.organization_id
+  if (req.userData.role === 'ADMIN') {
+    const supplierId = await getSupplierIdForRequest(req)
+    if (supplierId) {
+      const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
+        supplierId,
+      ])
+      organizationId = rows[0]?.organization_id || null
+    }
   }
 
   if (organizationId) {
@@ -103,7 +129,7 @@ async function requireSupplierOrgContext(req, res, next) {
       )
       primarySupplierId = anyBranch[0]?.id || null
     }
-  } else if (req.userData.role === 'SUPPLIER' || req.userData.role === 'ADMIN') {
+  } else if (req.userData.role === 'SUPPLIER') {
     const supplierId = await getSupplierIdForRequest(req)
     if (supplierId) {
       const { rows } = await query(`SELECT organization_id FROM supplier WHERE id = $1`, [
@@ -112,6 +138,24 @@ async function requireSupplierOrgContext(req, res, next) {
       organizationId = rows[0]?.organization_id
       primarySupplierId = supplierId
     }
+  }
+
+  if (requestedOrgId && effectiveTenant && organizationId !== requestedOrgId) {
+    return res.status(400).json({
+      ok: false,
+      data: null,
+      error: { name: 'BAD_REQUEST', message: 'Tenant context required' },
+      requestId: req.requestId,
+    })
+  }
+
+  if (req.userData.role === 'ADMIN' && !organizationId) {
+    return res.status(403).json({
+      ok: false,
+      data: null,
+      error: { name: 'FORBIDDEN', message: 'Organization context required' },
+      requestId: req.requestId,
+    })
   }
 
   if (organizationId && !organizationName) {
@@ -124,11 +168,12 @@ async function requireSupplierOrgContext(req, res, next) {
   req.orgContext = {
     organizationId,
     organizationName,
-    roleName: membership?.role_name || null,
+    roleName: req.userData.role === 'ADMIN' ? null : membership?.role_name || null,
     primarySupplierId,
-    isOrgOwner: membership?.role_name === 'Org Owner',
-    isOrgManager: membership?.role_name === 'Org Manager',
+    isOrgOwner: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Owner',
+    isOrgManager: req.userData.role === 'ADMIN' ? false : membership?.role_name === 'Org Manager',
     canManageAllBranches:
+      req.userData.role === 'ADMIN' ||
       membership?.role_name === 'Org Owner' ||
       membership?.role_name === 'Org Manager' ||
       membership?.role_name === 'Org Viewer',
@@ -159,15 +204,32 @@ async function listBranchesForRequest(req) {
 }
 
 async function assertBranchAccess(req, supplierId) {
-  if (req.userData?.role === 'ADMIN') return true
   if (!req.orgContext?.organizationId) return false
+  if (req.userData?.role === 'ADMIN') {
+    if (!getEffectiveTenant(req)) return false
+    const { rows } = await query(`SELECT 1 FROM supplier WHERE id = $1 AND organization_id = $2`, [
+      supplierId,
+      req.orgContext.organizationId,
+    ])
+    return rows.length > 0
+  }
   return userHasOrgBranchAccess(req.userData.id, supplierId, req.orgContext.organizationId)
+}
+
+function forbiddenBranch(res, req) {
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: { name: 'FORBIDDEN', message: 'Access denied for this branch' },
+    requestId: req.requestId,
+  })
 }
 
 router.use(
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   resolveTenantContext,
+  resolveAdminContext,
   requireSupplierOrgContext,
   orgStructureGuard
 )
@@ -344,6 +406,14 @@ router.post('/branches', requireOrgOwner, multiBranchFeature, async (req, res) =
  */
 router.get('/branches/:supplierId', async (req, res) => {
   try {
+    if (!req.orgContext?.organizationId) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
     const allowed = await assertBranchAccess(req, req.params.supplierId)
     if (!allowed) {
       return res.status(403).json({
@@ -354,7 +424,10 @@ router.get('/branches/:supplierId', async (req, res) => {
       })
     }
 
-    const { rows } = await query(`SELECT * FROM supplier WHERE id = $1`, [req.params.supplierId])
+    const { rows } = await query(`SELECT * FROM supplier WHERE id = $1 AND organization_id = $2`, [
+      req.params.supplierId,
+      req.orgContext.organizationId,
+    ])
     if (!rows.length) {
       return res.status(404).json({
         ok: false,
@@ -364,7 +437,14 @@ router.get('/branches/:supplierId', async (req, res) => {
       })
     }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentSupplier(req, rows[0], { orgOwner: Boolean(req.orgContext?.isOrgOwner) }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('GET /api/org/branches/:id error:', error)
     res.status(500).json({
@@ -435,12 +515,29 @@ router.patch('/branches/:supplierId', async (req, res) => {
     }
     updates.push('updated_at = NOW()')
     values.push(supplierId)
+    values.push(req.orgContext.organizationId)
     const { rows } = await query(
-      `UPDATE supplier SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+      `UPDATE supplier SET ${updates.join(', ')}
+       WHERE id = $${idx} AND organization_id = $${idx + 1} RETURNING *`,
       values
     )
+    if (!rows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Branch not found' },
+        requestId: req.requestId,
+      })
+    }
 
-    res.json({ ok: true, data: { branch: rows[0] }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: {
+        branch: presentSupplier(req, rows[0], { orgOwner: Boolean(req.orgContext?.isOrgOwner) }),
+      },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (error) {
     logger.error('PATCH /api/org/branches/:id error:', error)
     res.status(500).json({
@@ -457,7 +554,10 @@ router.patch('/branches/:supplierId', async (req, res) => {
  */
 router.delete('/branches/:supplierId', requireOrgOwner, async (req, res) => {
   try {
-    const result = await deactivateOrgBranch(req.params.supplierId)
+    const allowed = await assertBranchAccess(req, req.params.supplierId)
+    if (!allowed) return forbiddenBranch(res, req)
+
+    const result = await deactivateOrgBranch(req.params.supplierId, req.orgContext.organizationId)
     if (!result.ok) {
       const { deactivationBlockerMessage } = await import('../lib/branch-lifecycle-guards.js')
       const messages = {
@@ -534,7 +634,10 @@ router.post(
         })
       }
 
-      const result = await reactivateOrgBranch(req.params.supplierId)
+      const allowed = await assertBranchAccess(req, req.params.supplierId)
+      if (!allowed) return forbiddenBranch(res, req)
+
+      const result = await reactivateOrgBranch(req.params.supplierId, req.orgContext.organizationId)
       if (!result.ok) {
         const messages = {
           NOT_FOUND: 'Branch Account not found',
@@ -587,6 +690,9 @@ router.post(
 
 router.post('/branches/:supplierId/unlink', requireOrgOwner, async (req, res) => {
   try {
+    const allowed = await assertBranchAccess(req, req.params.supplierId)
+    if (!allowed) return forbiddenBranch(res, req)
+
     const { confirm } = req.body || {}
     if (confirm !== true && confirm !== 'unlink') {
       return res.status(400).json({
@@ -601,7 +707,10 @@ router.post('/branches/:supplierId/unlink', requireOrgOwner, async (req, res) =>
     }
 
     const result = await withTransaction(async (client) => {
-      const unlinked = await unlinkSupplierFromOrganization(req.params.supplierId, { client })
+      const unlinked = await unlinkSupplierFromOrganization(req.params.supplierId, {
+        client,
+        organizationId: req.orgContext.organizationId,
+      })
       if (!unlinked.ok) return unlinked
 
       const billing = await applyOrgBillingOnUnlink(req.params.supplierId, 'SUPPLIER', {
@@ -868,10 +977,14 @@ router.post('/users/:userId/branches', requireOrgOwner, async (req, res) => {
       .json({ ok: true, data: { granted: true }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('POST org user branch access error:', error)
-    res.status(500).json({
+    const status = error.code === 'NOT_FOUND' ? 404 : 500
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to grant branch access' },
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to grant branch access',
+      },
       requestId: req.requestId,
     })
   }
@@ -879,14 +992,22 @@ router.post('/users/:userId/branches', requireOrgOwner, async (req, res) => {
 
 router.delete('/users/:userId/branches/:supplierId', requireOrgOwner, async (req, res) => {
   try {
-    await revokeOrgBranchAccess(req.params.userId, req.params.supplierId)
+    await revokeOrgBranchAccess(
+      req.params.userId,
+      req.params.supplierId,
+      req.orgContext.organizationId
+    )
     res.json({ ok: true, data: { revoked: true }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('DELETE org user branch access error:', error)
-    res.status(500).json({
+    const status = error.code === 'NOT_FOUND' ? 404 : 500
+    res.status(status).json({
       ok: false,
       data: null,
-      error: { name: 'INTERNAL_ERROR', message: 'Failed to revoke branch access' },
+      error: {
+        name: error.code || 'INTERNAL_ERROR',
+        message: error.message || 'Failed to revoke branch access',
+      },
       requestId: req.requestId,
     })
   }

@@ -69,4 +69,18 @@ describe('Reports Routes', () => {
     expect(res.body.data).toHaveLength(1)
     expect(res.body.meta.granularity).toBe('day')
   })
+
+  it('GET /restaurant/spend-by-supplier rejects a branch that is not owned', async () => {
+    db.query.mockImplementation((sql) => {
+      if (String(sql).includes('FROM branch')) {
+        return Promise.resolve({ rows: [] })
+      }
+      return Promise.resolve({ rows: [{ id: 'restaurant-1' }] })
+    })
+    const res = await request(app).get(
+      '/api/reports/restaurant/spend-by-supplier?from=2026-01-01&to=2026-01-31&branchId=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    )
+    expect(res.status).toBe(400)
+    expect(res.body.error.message).toMatch(/Branch not found/)
+  })
 })

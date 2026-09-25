@@ -5,6 +5,9 @@ import {
   RESTAURANT_SYSTEM_ROLES,
   SUPPLIER_SYSTEM_ROLES,
   getAllPermissionsForTenantType,
+  rolesIncludeOwner,
+  TENANT_OWNER_ROLE_NAMES,
+  RESERVED_SYSTEM_ROLE_NAMES,
 } from './tenant-roles.js'
 
 describe('tenant-roles definitions', () => {
@@ -42,5 +45,13 @@ describe('tenant-roles definitions', () => {
     expect(perms).toContain('GROWTH_VIEW')
     expect(perms).toContain('CUSTOMERS_IMPORT')
     expect(perms).toContain('CUSTOMERS_MANAGE')
+  })
+
+  it('does not treat Org Owner as a tenant-role owner bypass', () => {
+    expect(rolesIncludeOwner(['Org Owner'])).toBe(false)
+    expect(rolesIncludeOwner(['Owner'])).toBe(true)
+    expect(TENANT_OWNER_ROLE_NAMES).not.toContain('Org Owner')
+    expect(RESERVED_SYSTEM_ROLE_NAMES).toContain('Org Owner')
+    expect(RESERVED_SYSTEM_ROLE_NAMES).toContain('Regional Manager')
   })
 })

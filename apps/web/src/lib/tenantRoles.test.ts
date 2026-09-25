@@ -51,4 +51,15 @@ describe('tenantRoles', () => {
     expect(TENANT_OWNER_ROLE_NAMES).toContain('Owner')
     expect(TENANT_OWNER_ROLE_NAMES).toContain('RESTAURANT_OWNER')
   })
+
+  it('does not treat a tenant role named Org Owner as workspace owner', () => {
+    const user = {
+      id: '1',
+      email: 'o@example.com',
+      displayName: 'Staff',
+      role: 'SUPPLIER',
+      tenantRoles: ['Org Owner'],
+    } as User
+    expect(isTenantOwner(user)).toBe(false)
+  })
 })

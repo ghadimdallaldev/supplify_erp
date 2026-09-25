@@ -157,6 +157,14 @@ export function resolvePreferenceKey(notificationCategory) {
  * Resolve which notification channels are allowed for a given plan feature value.
  */
 export function resolveAllowedChannels(notificationsFeatureValue) {
+  if (
+    notificationsFeatureValue === false ||
+    notificationsFeatureValue === 'false' ||
+    notificationsFeatureValue === 'disabled' ||
+    notificationsFeatureValue === ''
+  ) {
+    return new Set()
+  }
   switch (notificationsFeatureValue) {
     case 'in_app_and_email':
       return new Set(['in_app', 'email'])
@@ -978,7 +986,7 @@ export async function notifyInvoiceOverdue(invoice, locale = DEFAULT_LOCALE) {
         title: nt('invoice.overdueRestaurantTitle', userLocale),
         message: nt('invoice.overdueRestaurantMessage', userLocale, {
           invoiceNumber: invoice.invoice_number,
-          amount: invoice.total_amount,
+          amount: invoice.balance_due ?? invoice.total_amount,
           dueDate: invoice.due_date,
         }),
       }),
@@ -991,7 +999,7 @@ export async function notifyInvoiceOverdue(invoice, locale = DEFAULT_LOCALE) {
         title: nt('invoice.overdueSupplierTitle', userLocale),
         message: nt('invoice.overdueSupplierMessage', userLocale, {
           invoiceNumber: invoice.invoice_number,
-          amount: invoice.total_amount,
+          amount: invoice.balance_due ?? invoice.total_amount,
           dueDate: invoice.due_date,
         }),
       }),

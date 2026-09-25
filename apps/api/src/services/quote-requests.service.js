@@ -532,8 +532,8 @@ export async function getSupplierQuoteRequestDetail(
     LEFT JOIN LATERAL (
       SELECT currency FROM price
       WHERE product_id = p.id
-        AND (valid_to IS NULL OR now() BETWEEN valid_from AND valid_to)
-      ORDER BY valid_from DESC
+        AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
+      ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
       LIMIT 1
     ) pr ON true
     WHERE qri.quote_request_id = $1 AND pr.currency IS NOT NULL

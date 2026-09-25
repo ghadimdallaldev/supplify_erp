@@ -18,6 +18,7 @@ const historyRows = [
     new_price: '26.40',
     change_pct: '20.0000',
     source: 'RECEIVING',
+    currency: 'JOD',
     detected_at: '2026-09-20T00:00:00Z',
   },
   {
@@ -60,6 +61,7 @@ describe('getProductPriceHistory', () => {
     expect(result.summary.changePct).toBeCloseTo(32, 5)
     expect(result.summary.direction).toBe('up')
     expect(result.summary.lastChangedAt).toBe('2026-09-20T00:00:00Z')
+    expect(result.summary.currency).toBe('JOD')
   })
 
   it('recomputes changePct rather than trusting a null stored column', async () => {
@@ -78,6 +80,7 @@ describe('getProductPriceHistory', () => {
     expect(result.summary.currentPrice).toBeNull()
     expect(result.summary.changePct).toBeNull()
     expect(result.summary.direction).toBe('unknown')
+    expect(result.summary.currency).toBeNull()
   })
 
   it('clamps the window and page size instead of trusting client input', async () => {
@@ -111,6 +114,7 @@ describe('getProductPriceHistory', () => {
 
     const [sql, params] = dbQuery.mock.calls[0]
     expect(sql).toContain('spe.restaurant_id = $1')
+    expect(sql).toContain('upper(we.currency) = upper(lc.currency)')
     expect(params[0]).toBe('r1')
   })
 })
@@ -171,13 +175,16 @@ describe('listCheaperBuyOptions', () => {
   }
 
   it('surfaces an active contract price below what was last paid', async () => {
-    const dbQuery = vi.fn(async () => ({ rows: [{ ...risenRow, contract_price: '21.00' }] }))
+    const dbQuery = vi.fn(async () => ({
+      rows: [{ ...risenRow, contract_price: '21.00', contract_currency: 'JOD' }],
+    }))
     const { options } = await listCheaperBuyOptions('r1', {}, dbQuery)
 
     expect(options).toHaveLength(1)
     expect(options[0].alternatives).toHaveLength(1)
     expect(options[0].alternatives[0].kind).toBe('contract_price')
     expect(options[0].alternatives[0].savingPerUnit).toBeCloseTo(5.4, 5)
+    expect(options[0].alternatives[0].currency).toBe('JOD')
   })
 
   it('surfaces a supplier-declared substitute that is cheaper', async () => {
@@ -241,5 +248,12 @@ describe('listCheaperBuyOptions', () => {
     expect(params[0]).toBe('r1')
     expect(sql).toContain('spe.restaurant_id = $1')
     expect(sql).toContain('rp.restaurant_id = $1')
+    expect(sql).toContain('rp.min_order_quantity IS NULL OR rp.min_order_quantity <= 1')
+    expect(sql).toContain('p.valid_from <= now()')
+    expect(sql).toContain('contract.price < r.new_price')
+    expect(sql).toContain('AT TIME ZONE')
+    expect(sql).toContain('upper(rp.currency) = upper(observed.currency)')
+    expect(params[4]).toBeTruthy()
+    expect(sql).toContain('upper(p.currency) = upper(observed.currency)')
   })
 })

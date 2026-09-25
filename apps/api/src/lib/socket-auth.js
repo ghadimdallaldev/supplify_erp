@@ -86,7 +86,7 @@ export async function resolveSocketUserFromCookieHeader(cookieHeader) {
   let tenantId = null
 
   const activeToken = cookies[getActiveTenantCookieName()]
-  if (activeToken) {
+  if (activeToken && user.role !== 'ADMIN') {
     const ctx = await verifyActiveTenantToken(activeToken)
     if (ctx?.userId === user.id) {
       const allowed = await userCanAccessTenant(user.id, user.email, ctx.tenantId, ctx.tenantType)

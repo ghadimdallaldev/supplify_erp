@@ -65,6 +65,54 @@ describe('dispute-replacement-order', () => {
       })
     })
 
+    it('combines repeated lines for one order item and caps the total', () => {
+      const cappedItems = new Map([
+        [
+          'oi-1',
+          {
+            id: 'oi-1',
+            product_id: 'p-1',
+            supplier_id: 's-1',
+            quantity: 4,
+            unit_price: '12.50',
+            product_name: 'Tomatoes',
+            product_sku: 'TOM-1',
+          },
+        ],
+      ])
+      const lines = buildReplacementLineItems(
+        [
+          { order_item_id: 'oi-1', quantity_ordered: 4, quantity_received: 1 },
+          { order_item_id: 'oi-1', quantity_ordered: 4, quantity_received: 0 },
+        ],
+        cappedItems
+      )
+      expect(lines).toHaveLength(1)
+      expect(lines[0].quantity).toBe(4)
+    })
+
+    it('caps replacement quantity at the original order line', () => {
+      const cappedItems = new Map([
+        [
+          'oi-1',
+          {
+            id: 'oi-1',
+            product_id: 'p-1',
+            supplier_id: 's-1',
+            quantity: 2,
+            unit_price: '12.50',
+            product_name: 'Tomatoes',
+            product_sku: 'TOM-1',
+          },
+        ],
+      ])
+      const lines = buildReplacementLineItems(
+        [{ order_item_id: 'oi-1', quantity_ordered: 5000, quantity_received: 0 }],
+        cappedItems
+      )
+      expect(lines[0].quantity).toBe(2)
+    })
+
     it('returns empty when no valid lines', () => {
       expect(
         buildReplacementLineItems([{ quantity_ordered: 5, quantity_received: 5 }], orderItemsById)

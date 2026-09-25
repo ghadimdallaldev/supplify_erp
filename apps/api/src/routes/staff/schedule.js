@@ -69,6 +69,13 @@ import {
   shiftStatusEnum,
   createShiftSchema,
   updateShiftSchema,
+  getShiftWindowError,
+  getTimeEntryCloseError,
+  getInactiveStaffError,
+  findApprovedTimeOffError,
+  openTimeEntryConflictError,
+  getSwapCreateError,
+  getSwapDecisionError,
   checkInSchema,
   checkOutSchema,
   ptoTypeEnum,
@@ -87,6 +94,53 @@ import {
 } from './staff.shared.js'
 
 const router = express.Router()
+
+async function findShiftOverlapError({
+  restaurantId,
+  staffId,
+  startsAt,
+  endsAt,
+  status,
+  excludeShiftId,
+}) {
+  const windowError = getShiftWindowError(startsAt, endsAt)
+  if (windowError) return windowError
+  if (!staffId || status === 'CANCELLED') return null
+
+  const params = [restaurantId, staffId, startsAt, endsAt]
+  let exclusion = ''
+  if (excludeShiftId) {
+    params.push(excludeShiftId)
+    exclusion = `AND id <> $${params.length}`
+  }
+
+  const { rows } = await query(
+    `
+      SELECT id FROM staff_shift
+      WHERE restaurant_id = $1
+        AND staff_id = $2
+        AND status <> 'CANCELLED'
+        AND starts_at < $4::timestamptz
+        AND ends_at > $3::timestamptz
+        ${exclusion}
+      LIMIT 1
+    `,
+    params
+  )
+  if (rows.length) {
+    return 'This staff member already has a shift that overlaps this time'
+  }
+  return null
+}
+
+function shiftScheduleErrorResponse(res, req, name, message) {
+  return res.status(400).json({
+    ok: false,
+    data: null,
+    error: { name, message },
+    requestId: req.requestId,
+  })
+}
 
 router.get('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
   try {
@@ -132,7 +186,7 @@ router.post('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
 
     if (payload.staffId) {
       const ownershipCheck = await query(
-        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
         [payload.staffId, restaurantId]
       )
       if (!ownershipCheck.rowCount) {
@@ -146,6 +200,41 @@ router.post('/shifts', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async 
           requestId: req.requestId,
         })
       }
+      const inactiveError = getInactiveStaffError(ownershipCheck.rows[0].status)
+      if (inactiveError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'SHIFT_CREATE_ERROR', message: inactiveError },
+          requestId: req.requestId,
+        })
+      }
+    }
+
+    const scheduleError = await findShiftOverlapError({
+      restaurantId,
+      staffId: payload.staffId,
+      startsAt: payload.startsAt,
+      endsAt: payload.endsAt,
+      status: payload.status ?? 'PUBLISHED',
+    })
+    const timeOffError =
+      scheduleError ||
+      (payload.status === 'CANCELLED'
+        ? null
+        : await findApprovedTimeOffError(
+            restaurantId,
+            payload.staffId,
+            payload.startsAt,
+            payload.endsAt
+          ))
+    if (scheduleError || timeOffError) {
+      return shiftScheduleErrorResponse(
+        res,
+        req,
+        'SHIFT_CREATE_ERROR',
+        scheduleError || timeOffError
+      )
     }
 
     const { rows } = await query(
@@ -223,6 +312,73 @@ router.patch('/shifts/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), a
     const payload = updateShiftSchema.parse(req.body)
     const restaurantId = await resolveRestaurantId(req)
 
+    const { rows: existingRows } = await query(
+      `SELECT * FROM staff_shift WHERE id = $1 AND restaurant_id = $2`,
+      [req.params.id, restaurantId]
+    )
+    if (!existingRows.length) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Shift not found' },
+        requestId: req.requestId,
+      })
+    }
+    const existingShift = existingRows[0]
+    const nextStaffId = payload.staffId !== undefined ? payload.staffId : existingShift.staff_id
+    const nextStatus = payload.status ?? existingShift.status
+    if (nextStaffId && nextStatus !== 'CANCELLED') {
+      const roster = await query(
+        `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        [nextStaffId, restaurantId]
+      )
+      if (!roster.rowCount) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'SHIFT_UPDATE_ERROR',
+            message: 'Staff member does not belong to this restaurant',
+          },
+          requestId: req.requestId,
+        })
+      }
+      const inactiveError = getInactiveStaffError(roster.rows[0].status)
+      if (inactiveError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'SHIFT_UPDATE_ERROR', message: inactiveError },
+          requestId: req.requestId,
+        })
+      }
+    }
+    const scheduleError = await findShiftOverlapError({
+      restaurantId,
+      staffId: nextStaffId,
+      startsAt: payload.startsAt ?? existingShift.starts_at,
+      endsAt: payload.endsAt ?? existingShift.ends_at,
+      status: nextStatus,
+      excludeShiftId: req.params.id,
+    })
+    const timeOffError =
+      scheduleError || nextStatus === 'CANCELLED'
+        ? null
+        : await findApprovedTimeOffError(
+            restaurantId,
+            nextStaffId,
+            payload.startsAt ?? existingShift.starts_at,
+            payload.endsAt ?? existingShift.ends_at
+          )
+    if (scheduleError || timeOffError) {
+      return shiftScheduleErrorResponse(
+        res,
+        req,
+        'SHIFT_UPDATE_ERROR',
+        scheduleError || timeOffError
+      )
+    }
+
     const fields = []
     const values = []
     let index = 2
@@ -230,7 +386,7 @@ router.patch('/shifts/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), a
     if (payload.staffId !== undefined) {
       if (payload.staffId) {
         const ownershipCheck = await query(
-          `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+          `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
           [payload.staffId, restaurantId]
         )
         if (!ownershipCheck.rowCount) {
@@ -412,7 +568,7 @@ router.post(
       const restaurantId = await resolveRestaurantId(req)
 
       const ownershipCheck = await query(
-        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
         [payload.staffId, restaurantId]
       )
       if (!ownershipCheck.rowCount) {
@@ -423,6 +579,15 @@ router.post(
             name: 'TIME_ENTRY_CREATE_ERROR',
             message: 'Staff member does not belong to this restaurant',
           },
+          requestId: req.requestId,
+        })
+      }
+      const inactiveError = getInactiveStaffError(ownershipCheck.rows[0].status)
+      if (inactiveError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_ENTRY_CREATE_ERROR', message: inactiveError },
           requestId: req.requestId,
         })
       }
@@ -451,9 +616,38 @@ router.post(
         })
       }
 
-      const clockInAt = payload.clockInAt
-        ? new Date(payload.clockInAt).toISOString()
-        : new Date().toISOString()
+      const clockInDate = payload.clockInAt ? new Date(payload.clockInAt) : new Date()
+      if (Number.isNaN(clockInDate.getTime())) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_ENTRY_CREATE_ERROR', message: 'Clock-in time is invalid' },
+          requestId: req.requestId,
+        })
+      }
+      if (clockInDate.getTime() > Date.now() + 2 * 60 * 1000) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_ENTRY_CREATE_ERROR', message: 'Clock-in cannot be in the future' },
+          requestId: req.requestId,
+        })
+      }
+      const clockInAt = clockInDate.toISOString()
+      const timeOffError = await findApprovedTimeOffError(
+        restaurantId,
+        payload.staffId,
+        clockInAt,
+        new Date(clockInDate.getTime() + 1).toISOString()
+      )
+      if (timeOffError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_ENTRY_CREATE_ERROR', message: timeOffError },
+          requestId: req.requestId,
+        })
+      }
 
       const { rows } = await query(
         `
@@ -498,6 +692,15 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      const conflict = openTimeEntryConflictError(error)
+      if (conflict) {
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: conflict.name, message: conflict.message },
+          requestId: req.requestId,
+        })
+      }
       logger.error('Failed to create time entry (check-in)', { error: error.message })
       res.status(400).json({
         ok: false,
@@ -518,9 +721,49 @@ router.post(
       const payload = checkOutSchema.parse(req.body)
       const restaurantId = await resolveRestaurantId(req)
 
-      const clockOutAt = payload.clockOutAt
-        ? new Date(payload.clockOutAt).toISOString()
-        : new Date().toISOString()
+      const { rows: openRows } = await query(
+        `
+          SELECT clock_in_at, clock_out_at
+          FROM staff_time_entry
+          WHERE id = $1 AND restaurant_id = $2
+        `,
+        [req.params.id, restaurantId]
+      )
+      if (!openRows.length) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: 'Time entry not found' },
+          requestId: req.requestId,
+        })
+      }
+      if (openRows[0].clock_out_at) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'TIME_ENTRY_UPDATE_ERROR',
+            message: 'This time entry is already closed',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      const clockOutDate = payload.clockOutAt ? new Date(payload.clockOutAt) : new Date()
+      const closeError = getTimeEntryCloseError(
+        openRows[0].clock_in_at,
+        clockOutDate,
+        payload.breakMinutes
+      )
+      if (closeError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'TIME_ENTRY_UPDATE_ERROR', message: closeError },
+          requestId: req.requestId,
+        })
+      }
+      const clockOutAt = clockOutDate.toISOString()
 
       const { rows } = await query(
         `
@@ -534,6 +777,7 @@ router.post(
               updated_by = $2
           WHERE id = $1
             AND restaurant_id = $8
+            AND clock_out_at IS NULL
           RETURNING *
         `,
         [
@@ -750,7 +994,7 @@ router.post('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
     const restaurantId = await resolveRestaurantId(req)
 
     const shiftCheck = await query(
-      `SELECT 1 FROM staff_shift WHERE id = $1 AND restaurant_id = $2`,
+      `SELECT staff_id, status FROM staff_shift WHERE id = $1 AND restaurant_id = $2`,
       [payload.shiftId, restaurantId]
     )
     if (!shiftCheck.rowCount) {
@@ -781,9 +1025,10 @@ router.post('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
       })
     }
 
+    let coverStatus = null
     if (payload.proposedCoverId) {
       const coverCheck = await query(
-        `SELECT 1 FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+        `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
         [payload.proposedCoverId, restaurantId]
       )
       if (!coverCheck.rowCount) {
@@ -797,6 +1042,23 @@ router.post('/swaps', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (
           requestId: req.requestId,
         })
       }
+      coverStatus = coverCheck.rows[0].status
+    }
+
+    const swapError = getSwapCreateError({
+      shiftStatus: shiftCheck.rows[0].status,
+      shiftStaffId: shiftCheck.rows[0].staff_id,
+      requestedBy: payload.requestedBy,
+      proposedCoverId: payload.proposedCoverId,
+      coverStatus,
+    })
+    if (swapError) {
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: { name: 'SHIFT_SWAP_CREATE_ERROR', message: swapError },
+        requestId: req.requestId,
+      })
     }
 
     const { rows } = await query(
@@ -874,13 +1136,84 @@ router.post(
       const restaurantId = await resolveRestaurantId(req)
 
       const swapResult = await withTransaction(async (client) => {
+        const { rows: lockedRows } = await client.query(
+          `
+          SELECT *
+          FROM staff_shift_swap
+          WHERE id = $1 AND restaurant_id = $2
+          FOR UPDATE
+        `,
+          [req.params.id, restaurantId]
+        )
+        if (!lockedRows.length) return null
+        const locked = lockedRows[0]
+        const decisionError = getSwapDecisionError(locked, payload.status)
+        if (decisionError) throw new Error(decisionError)
+
+        if (payload.status === 'APPROVED' && locked.proposed_cover_id) {
+          const { rows: coverRows } = await client.query(
+            `SELECT status FROM staff_member WHERE id = $1 AND restaurant_id = $2`,
+            [locked.proposed_cover_id, restaurantId]
+          )
+          const inactiveError = getInactiveStaffError(coverRows[0]?.status)
+          if (inactiveError) throw new Error(inactiveError)
+          const { rows: shiftRows } = await client.query(
+            `
+              SELECT starts_at, ends_at
+              FROM staff_shift
+              WHERE id = $1 AND restaurant_id = $2
+            `,
+            [locked.shift_id, restaurantId]
+          )
+          const shift = shiftRows[0]
+          if (shift) {
+            const { rows: clashRows } = await client.query(
+              `
+                SELECT id FROM staff_shift
+                WHERE restaurant_id = $1
+                  AND staff_id = $2
+                  AND status <> 'CANCELLED'
+                  AND id <> $3
+                  AND starts_at < $5::timestamptz
+                  AND ends_at > $4::timestamptz
+                LIMIT 1
+              `,
+              [
+                restaurantId,
+                locked.proposed_cover_id,
+                locked.shift_id,
+                shift.starts_at,
+                shift.ends_at,
+              ]
+            )
+            if (clashRows.length) {
+              throw new Error('The person covering this shift is already booked at that time')
+            }
+            const timeOffError = await findApprovedTimeOffError(
+              restaurantId,
+              locked.proposed_cover_id,
+              shift.starts_at,
+              shift.ends_at
+            )
+            if (timeOffError) throw new Error(timeOffError)
+          }
+          await client.query(
+            `
+              UPDATE staff_shift
+              SET staff_id = $3, updated_at = now()
+              WHERE id = $1 AND restaurant_id = $2
+            `,
+            [locked.shift_id, restaurantId, locked.proposed_cover_id]
+          )
+        }
+
         const { rows } = await client.query(
           `
           UPDATE staff_shift_swap
           SET status = $3,
               manager_note = COALESCE($4, manager_note),
               updated_at = now()
-          WHERE id = $1 AND restaurant_id = $2
+          WHERE id = $1 AND restaurant_id = $2 AND status = 'REQUESTED'
           RETURNING *
         `,
           [
@@ -892,23 +1225,10 @@ router.post(
         )
 
         if (!rows.length) {
-          return null
+          throw new Error('This swap has already been decided')
         }
 
-        const swapRow = rows[0]
-
-        if (payload.status === 'APPROVED' && swapRow.proposed_cover_id) {
-          await client.query(
-            `
-              UPDATE staff_shift
-              SET staff_id = $3, updated_at = now()
-              WHERE id = $1 AND restaurant_id = $2
-            `,
-            [swapRow.shift_id, restaurantId, swapRow.proposed_cover_id]
-          )
-        }
-
-        return swapRow
+        return rows[0]
       })
 
       if (!swapResult) {

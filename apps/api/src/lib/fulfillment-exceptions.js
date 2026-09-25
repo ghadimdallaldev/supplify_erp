@@ -15,8 +15,10 @@ export async function createFulfillmentException(
   const { rows: existing } = await q(
     `SELECT id FROM fulfillment_exceptions
      WHERE order_id = $1 AND type = $2 AND status = 'open'
+       AND driver_assignment_id IS NOT DISTINCT FROM $3::uuid
+       AND warehouse_id IS NOT DISTINCT FROM $4::uuid
      LIMIT 1`,
-    [orderId, type]
+    [orderId, type, driverAssignmentId, warehouseId]
   )
   if (existing.length) return null
 

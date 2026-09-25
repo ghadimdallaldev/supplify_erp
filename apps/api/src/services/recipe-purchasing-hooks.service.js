@@ -22,16 +22,16 @@ export function hookRecipeCostingAfterReceiving(restaurantId, items = []) {
         const unitPrice = Number(item.unitPrice)
         if (!Number.isFinite(unitPrice)) continue
         const { rows: cached } = await query(
-          `SELECT unit_price FROM restaurant_ingredient_costs
+          `SELECT unit_price, currency FROM restaurant_ingredient_costs
            WHERE restaurant_id = $1 AND product_id = $2
              AND cost_source = 'LAST_RECEIVED'
            ORDER BY effective_at DESC LIMIT 1`,
           [restaurantId, item.productId]
         )
-        previousPriceByProduct.set(
-          item.productId,
-          cached[0]?.unit_price != null ? Number(cached[0].unit_price) : null
-        )
+        previousPriceByProduct.set(item.productId, {
+          price: cached[0]?.unit_price != null ? Number(cached[0].unit_price) : null,
+          currency: cached[0]?.currency || null,
+        })
       }
       await upsertIngredientCostsFromReceiving(restaurantId, items)
       const seen = new Set()
@@ -40,14 +40,22 @@ export function hookRecipeCostingAfterReceiving(restaurantId, items = []) {
         seen.add(item.productId)
         const unitPrice = Number(item.unitPrice)
         if (Number.isFinite(unitPrice)) {
-          const oldPrice = previousPriceByProduct.get(item.productId) ?? null
-          if (oldPrice == null || Math.abs(oldPrice - unitPrice) > 0.0001) {
+          const previous = previousPriceByProduct.get(item.productId) || {}
+          const oldPrice = previous.price ?? null
+          const nextCurrency = item.currency || null
+          const sameCurrency =
+            previous.currency == null ||
+            nextCurrency == null ||
+            String(previous.currency).toUpperCase() === String(nextCurrency).toUpperCase()
+          if (!sameCurrency || oldPrice == null || Math.abs(oldPrice - unitPrice) > 0.0001) {
             await recordSupplierPriceEvent({
               restaurantId,
               productId: item.productId,
               supplierId: item.supplierId || null,
               oldPrice,
+              oldCurrency: previous.currency,
               newPrice: unitPrice,
+              currency: nextCurrency,
               source: 'RECEIVING',
             })
           }
@@ -71,20 +79,50 @@ export function hookRecipeCostingAfterReceiving(restaurantId, items = []) {
  * @param {string} restaurantId
  * @param {Array<{ productId: string, supplierId?: string, unitPrice: number, unit?: string, lineItemId?: string }>} lines
  */
-export function hookRecipeCostingAfterInvoice(restaurantId, lines = []) {
+export function hookRecipeCostingAfterInvoice(restaurantId, lines = [], options = {}) {
+  const currency = options.currency || 'USD'
+  const recordPriceEvent = options.recordPriceEvent === true
   void (async () => {
     try {
       if (!restaurantId || !lines.length) return
       for (const line of lines) {
         if (!line.productId) continue
+        const unitPrice = Number(line.unitPrice)
+        if (!Number.isFinite(unitPrice)) continue
+        if (recordPriceEvent) {
+          const { rows: prior } = await query(
+            `SELECT new_price, currency FROM supplier_price_events
+             WHERE restaurant_id = $1 AND product_id = $2
+             ORDER BY detected_at DESC LIMIT 1`,
+            [restaurantId, line.productId]
+          )
+          const oldPrice = prior[0]?.new_price != null ? Number(prior[0].new_price) : null
+          const sameCurrency =
+            prior[0]?.currency == null ||
+            !currency ||
+            String(prior[0].currency).toUpperCase() === String(currency).toUpperCase()
+          if (!sameCurrency || oldPrice == null || Math.abs(oldPrice - unitPrice) > 0.0001) {
+            await recordSupplierPriceEvent({
+              restaurantId,
+              productId: line.productId,
+              supplierId: line.supplierId || null,
+              productName: line.productName || null,
+              oldPrice,
+              oldCurrency: prior[0]?.currency || null,
+              newPrice: unitPrice,
+              currency,
+              source: 'INVOICE',
+            })
+          }
+        }
         await upsertIngredientCostCache({
           restaurantId,
           productId: line.productId,
           supplierId: line.supplierId || null,
           branchId: null,
-          unitPrice: Number(line.unitPrice),
+          unitPrice,
           unit: line.unit || 'unit',
-          currency: 'USD',
+          currency,
           costSource: 'INVOICE',
           sourceRefType: 'invoice_line_item',
           sourceRefId: line.lineItemId || null,
