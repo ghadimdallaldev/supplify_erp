@@ -70,7 +70,9 @@ export function TenantBrandingPanel({
         <CardContent className="space-y-4">
           {!brandingAllowed && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <span>{customBrandingUpgradeMessage(entitlements?.plan?.name)}</span>
+              <span>
+                {customBrandingUpgradeMessage(entitlements?.plan?.name, entitlements?.plan?.code)}
+              </span>
               <Button
                 type="button"
                 variant="outline"
@@ -103,7 +105,7 @@ export function TenantBrandingPanel({
               />
             ) : (
               <p className="text-sm text-[var(--text-muted)]">
-                Upgrade to Scale to upload your logo.
+                {customBrandingUpgradeMessage(entitlements?.plan?.name, entitlements?.plan?.code)}
               </p>
             )
           ) : (
@@ -116,7 +118,11 @@ export function TenantBrandingPanel({
         <>
           <BrandingSettingsSection tenantType={tenantType} canEdit={canEditBranding} />
           {tenantType === 'SUPPLIER' && (
-            <CustomDomainCard allowed={hasBrandingCapability(entitlements, 'customDomain')} />
+            <CustomDomainCard
+              allowed={hasBrandingCapability(entitlements, 'customDomain')}
+              planName={entitlements?.plan?.name}
+              planCode={entitlements?.plan?.code}
+            />
           )}
         </>
       )}

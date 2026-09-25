@@ -9,6 +9,9 @@ import {
   getSupplierPromotionGate,
   canBrowseSupplierDeals,
   getPlanLimitGate,
+  isTopTierPlanCode,
+  customBrandingUpgradeMessage,
+  customDomainUpgradeMessage,
   featureEnabled,
   evaluatePlanFeatureValue,
   isEntitlementFeatureEnabled,
@@ -390,5 +393,31 @@ describe('smartReorderHasForecast', () => {
     expect(smartReorderHasForecast(undefined)).toBe(false)
     expect(smartReorderHasForecast('disabled')).toBe(false)
     expect(smartReorderHasForecast('')).toBe(false)
+  })
+})
+
+describe('top-tier upgrade copy', () => {
+  it('treats Scale and bespoke codes as the top of the ladder', () => {
+    expect(isTopTierPlanCode('platinum')).toBe(true)
+    expect(isTopTierPlanCode('Platinum')).toBe(true)
+    expect(isTopTierPlanCode('enterprise')).toBe(true)
+    expect(isTopTierPlanCode('gold')).toBe(false)
+    expect(isTopTierPlanCode('silver')).toBe(false)
+    expect(isTopTierPlanCode(undefined)).toBe(false)
+  })
+
+  it('never tells a Scale tenant to upgrade to Scale', () => {
+    const branding = customBrandingUpgradeMessage('Supplier Scale', 'platinum')
+    expect(branding).not.toMatch(/upgrade to scale/i)
+    expect(branding).toMatch(/not part of Supplier Scale/)
+
+    const domain = customDomainUpgradeMessage('Supplier Scale', 'platinum')
+    expect(domain).not.toMatch(/available on Scale/i)
+    expect(domain).toMatch(/not part of Supplier Scale/)
+  })
+
+  it('still points lower tiers at Scale', () => {
+    expect(customBrandingUpgradeMessage('Supplier Growth', 'gold')).toMatch(/Upgrade to Scale/)
+    expect(customDomainUpgradeMessage('Supplier Growth', 'gold')).toMatch(/available on Scale/)
   })
 })

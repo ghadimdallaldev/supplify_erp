@@ -387,9 +387,36 @@ export function canUseCustomBranding(entitlements: Entitlements | null | undefin
   return isEntitlementFeatureEnabled(entitlements, 'custom_branding')
 }
 
-export function customBrandingUpgradeMessage(planName?: string | null): string {
+/**
+ * Scale (`platinum`) and bespoke plans sit at the top of the self-serve ladder,
+ * so upgrade copy must never tell these tenants to buy the plan they are on.
+ */
+export function isTopTierPlanCode(planCode?: string | null): boolean {
+  const code = (planCode || '').trim().toLowerCase()
+  return code === 'platinum' || code === 'enterprise' || code === 'custom'
+}
+
+export function customBrandingUpgradeMessage(
+  planName?: string | null,
+  planCode?: string | null
+): string {
   const plan = planName ?? 'your current plan'
+  if (isTopTierPlanCode(planCode)) {
+    return `Custom branding is not part of ${plan}. Contact support to have brand controls enabled for your account.`
+  }
   return `Custom branding is not included on ${plan}. Upgrade to Scale for advanced branding controls.`
+}
+
+/** Copy for the white-label/custom-domain capability, which Scale may still omit. */
+export function customDomainUpgradeMessage(
+  planName?: string | null,
+  planCode?: string | null
+): string {
+  const plan = planName ?? 'your current plan'
+  if (isTopTierPlanCode(planCode)) {
+    return `Custom domains are not part of ${plan}. Contact support about white-label catalog hosting.`
+  }
+  return `Custom domains are available on Scale. Your plan is ${plan}.`
 }
 
 export type OrderPlaceGate = {
