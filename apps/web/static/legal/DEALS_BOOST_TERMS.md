@@ -1,7 +1,7 @@
 # Supplify Deals and Boost Terms
 
-**Effective Date:** [Effective Date]  
-**Last Updated:** [Last Updated]
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026
 
 > **Legal review required:** This document is a business/legal draft for Supplify. It is not legal advice. Before using it with real users, have it reviewed and adapted by a qualified lawyer in Lebanon and in every market where Supplify operates.
 

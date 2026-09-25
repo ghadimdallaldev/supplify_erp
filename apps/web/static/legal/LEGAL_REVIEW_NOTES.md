@@ -4,7 +4,7 @@ This folder is a draft legal pack for Supplify. It should be reviewed by qualifi
 
 ## Context
 
-Supplify is a B2B SaaS platform for restaurants and suppliers. It includes restaurant ordering, supplier catalogs, invoices, receivables, delivery dispatch, route planning, public reservations, waitlists, deals/boosts, branches, warehouses, user roles, admin impersonation, notifications, and future mobile apps.
+Supplify is a B2B SaaS platform for restaurants and suppliers. It includes restaurant ordering, supplier catalogs, invoices, receivables, delivery dispatch, driver GPS during active delivery sessions, route planning, public reservations, waitlists, optional consumer menus and guest orders, deals/boosts, branches, warehouses, user roles, staff portal labour features, admin impersonation, notifications, and native mobile apps (Android and iOS).
 
 ## Legal review focus areas
 
@@ -13,11 +13,14 @@ Supplify is a B2B SaaS platform for restaurants and suppliers. It includes resta
 3. B2B platform liability versus seller/supplier liability.
 4. Food safety and product listing obligations.
 5. Guest reservation data processing.
-6. Driver/staff data, mobile app permissions, and future location tracking.
-7. WhatsApp/SMS/email marketing and notification consent.
-8. Paid boosts and no guaranteed results language.
-9. Refund, subscription, and add-on billing terms.
-10. Admin impersonation and support access language.
+6. Driver/staff data, mobile app permissions, and background location during active driver delivery sessions.
+7. Consumer guest ordering, loyalty, and diner accounts (B2C channel separate from B2B supplier orders).
+8. Staff portal labour data (shifts, time punches, time-off).
+9. WhatsApp/SMS/email marketing and notification consent.
+10. Paid boosts and no guaranteed results language.
+11. Refund, subscription, and add-on billing terms (including Growth/Scale marketing names versus legacy Silver/Gold/Platinum codes).
+12. Admin impersonation and support access language.
+13. Read-only AI assistant output versus user-confirmed actions.
 
 ## Product assumptions reflected in drafts
 
@@ -27,4 +30,5 @@ Supplify is a B2B SaaS platform for restaurants and suppliers. It includes resta
 - Boosts increase platform visibility but do not guarantee results.
 - Free Trial is time-limited and may become read-only after expiry.
 - Branches and warehouses may be monetized with add-ons.
-- Mobile app permissions will need additional disclosures when location/camera/push features are enabled.
+- Mobile app permissions (push, camera, background location for drivers) are disclosed in the Mobile App Terms and Privacy Policy; counsel should confirm store-listing parity.
+- Consumer ordering may trigger additional consumer-protection disclosures for restaurants operating public menus.

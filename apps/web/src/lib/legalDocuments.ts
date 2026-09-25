@@ -1,4 +1,7 @@
-export const LEGAL_PACK_VERSION = '2026-09-12'
+import legalPack from '../../../../legal-pack-version.json'
+
+/** Must match `apps/api/src/lib/legal-documents.js` (single source: `legal-pack-version.json`). */
+export const LEGAL_PACK_VERSION = legalPack.version
 
 export const LEGAL_OPERATOR = {
   companyLegalName: 'Supplify',
@@ -6,7 +9,7 @@ export const LEGAL_OPERATOR = {
   privacyEmail: 'privacy@supplify.com',
   website: 'https://supplify.com',
   effectiveDate: 'September 12, 2026',
-  lastUpdated: 'September 12, 2026',
+  lastUpdated: 'September 26, 2026',
 }
 
 export type LegalDocumentSlug =

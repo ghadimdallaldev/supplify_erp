@@ -1,7 +1,7 @@
 # Supplify Terms and Conditions
 
-**Effective Date:** September 12, 2026  
-**Last Updated:** September 12, 2026  
+**Effective Date:** September 26, 2026  
+**Last Updated:** September 26, 2026  
 **Platform:** Supplify  
 **Operator:** [Company Legal Name]  
 **Address:** [Company Address]  
@@ -29,7 +29,10 @@ Supplify is a business-to-business software platform that helps restaurants and 
 **Supplier** means a distributor, wholesaler, vendor, manufacturer, importer, service provider, or authorized supplier user.  
 **User** means any person using Supplify, including owners, admins, staff, drivers, finance users, and platform admins.  
 **Guest** means a person using a public reservation or waitlist page without a registered Supplify account.  
-**Order** means a purchase, supplier-created order, restaurant-created order, replacement order, imported order, or related transaction created or managed through Supplify.  
+**Diner** means a person using a restaurant’s public consumer menu or guest-order flow, with or without a restaurant-scoped diner account.  
+**Consumer order** means a business-to-consumer food order placed through a restaurant’s public menu, separate from B2B supplier purchase orders.  
+**Staff portal user** means operational staff (for example, front-of-house or kitchen staff) who use the dedicated staff portal for shifts, time punches, and related labour features, not the main tenant ERP workspace.  
+**Order** means a purchase, supplier-created order, restaurant-created order, replacement order, imported order, consumer order, or related transaction created or managed through Supplify.  
 **Deal** means a supplier-created offer, discount, visibility-only offer, or coupon-backed offer made available to restaurants through Supplify.  
 **Boost** means an optional paid visibility or sponsored placement campaign associated with a deal.  
 **Coupon code** means an optional code attached to a deal that a restaurant may apply during checkout when eligible.  
@@ -110,6 +113,16 @@ Restaurants are responsible for availability, capacity, honoring reservations, m
 
 Guests may use public pages without a Supplify account. Reservation and waitlist tokens may expire or be revoked.
 
+## 12a. Consumer Menu, Guest Orders, and Loyalty
+
+Restaurants may optionally offer a public consumer menu, modifiers, scheduled or immediate guest orders, takeaway or delivery to diners, cash-on-delivery or other payment methods configured by the restaurant, diner accounts, reviews, and loyalty or rewards programs.
+
+Consumer orders are a separate channel from B2B supplier purchase orders. Supplify provides software to manage consumer orders; unless expressly agreed, Supplify is not the restaurant, food preparer, delivery provider, or payment collector for consumer sales.
+
+Restaurants are responsible for menu accuracy, pricing, allergens and dietary information, availability, ordering hours, delivery zones and minimums, food safety, guest communication, honoring consumer orders, loyalty rules, and compliance with consumer-protection and advertising laws applicable to their sales.
+
+Diners must provide accurate contact and delivery details and must not abuse promotions, loyalty balances, or ordering limits.
+
 ## 13. Deals and Boosts
 
 Suppliers are responsible for the accuracy and legality of all deal and boost content. Supplify may require admin approval before a deal becomes visible.
@@ -142,9 +155,11 @@ Existing data may remain readable after downgrade or expiry, while new creation 
 
 ## 17. Subscriptions, Free Trial, Billing, and Locks
 
-Supplify may offer Free Trial, Silver, Gold, Platinum, Enterprise, or other plans. Each plan may include different limits and features.
+Supplify may offer a time-limited Free Trial (commonly a 30-day evaluation), paid self-serve plans, Enterprise or custom plans, and add-ons. Customer-facing plan names may differ by tenant type—for example Restaurant Growth, Restaurant Intelligence, and Restaurant Scale for restaurants, and Supplier Growth and Supplier Scale for suppliers. Legacy or internal labels such as Silver, Gold, or Platinum may still appear in billing records or APIs.
 
-The Free Trial is time-limited, may include broad demo access, and may become read-only after expiry. Paid subscriptions may renew monthly or yearly. Failure to pay may result in warnings, locked access, read-only mode, suspension, or termination.
+Each plan may include different limits and features. Published pricing, limits, and feature lists may change for future billing periods as described in the Subscription & Add-on Terms.
+
+The Free Trial is time-limited, may include broad demo access with low limits, and may become read-only after expiry. Paid subscriptions may renew monthly or yearly. Billing may be processed manually, by invoice, or through a payment provider where enabled. Failure to pay may result in warnings, locked access, read-only mode, suspension, or termination.
 
 Unless stated otherwise, subscription fees for periods already used are non-refundable.
 
@@ -170,9 +185,11 @@ Supplify is not responsible for failed or delayed notifications caused by third-
 
 ## 20. AI-Assisted Tools and WhatsApp Order Conversion
 
-Supplify may provide AI-assisted tools for parsing WhatsApp messages, importing orders, matching products, suggesting substitutions, drafting reminders, or generating insights.
+Supplify may provide AI-assisted tools for parsing WhatsApp messages, importing orders, matching products, suggesting substitutions, drafting reminders, answering operational questions, or generating insights.
 
-AI output may be inaccurate. Users must review and confirm AI-assisted output before creating orders, sending messages, issuing invoices, or taking business actions.
+AI output may be inaccurate. Unless a feature explicitly states otherwise, AI assistants are informational and do not place orders, change inventory, send messages, or take binding business actions without a user’s review and confirmation.
+
+Users must review and confirm AI-assisted output before creating orders, sending messages, issuing invoices, or taking business actions.
 
 ## 21. Data Ownership and License
 
@@ -214,9 +231,15 @@ No system is completely secure. You are responsible for passwords, devices, staf
 
 ## 28. Beta, Experimental, and Catalog-Only Features
 
-Some features may be beta, preview, experimental, catalog-only, planned, or partially implemented, including AI features, webhooks, white-label domains, advanced reporting, route optimization, live tracking, and integrations.
+Some features may be beta, preview, experimental, catalog-only, planned, or partially implemented, including certain AI capabilities, webhooks, white-label domains, advanced reporting, full central purchasing, live payment-provider automation, and selected third-party integrations.
+
+Operational delivery tracking, driver GPS during active delivery sessions, and core order workflows may be generally available but can still be affected by device permissions, connectivity, maps providers, or third-party outages.
 
 Supplify may change, limit, remove, or make these features paid later and does not guarantee that catalog-only features will become generally available.
+
+## 28a. Staff Portal
+
+Operational staff portal users may access a separate staff experience for schedules, time punches, time-off, shift swaps, announcements, and personal documents. Staff portal access does not grant access to the main restaurant or supplier ERP workspace unless the user also holds an authorized tenant role.
 
 ## 29. Suspension and Termination
 
