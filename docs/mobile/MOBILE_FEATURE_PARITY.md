@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-26 — Mobile UI/UX polish pass (native only)
+
+- **Mobile (Android + iOS):** Senior polish on the operational redesign. Restored the branded Keycloak sign-in screen (structure from before the first redesign; auth flow unchanged). Tightened Home/Orders/Suppliers/Messages/Driver rows, compacted Best Prices into a horizontal strip, and regrouped More into Today + Tools hubs so every previous destination stays reachable. No API, RBAC, entitlement, or workflow changes.
+- **ERP web:** Skipped — web UI unchanged.
+- **Verification:** `npx tsc --noEmit` in both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios`.
+
+---
+
 ## 2026-09-26 — Mobile UI/UX revamp (native only)
 
 - **Mobile (Android + iOS):** Operational UI redesign — shared design system, persona-specific tabs and task-focused home screens (Restaurant, Supplier, Driver). All existing features remain reachable via tabs, stacks, and More. No API, RBAC, entitlement, or workflow changes.
@@ -1559,3 +1567,10 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Feature-flag reflection:** the API persists and resolves global/tenant overrides before returning entitlements. Web tests prove resolved `false` values cannot be re-enabled by raw plan JSON. Android and iOS already read that resolved feature map through `useEntitlements`; Assistant navigation, dashboard, and settings entry points all use `ai_assistant` rather than plan-code checks.
 - **Mobile implementation:** no native source change was required. The API contract, feature keys, permission keys, and payload shapes are unchanged; the add-on correction is admin-only. Focused Android and iOS entitlement tests pass, and both full native verification blocks are included in the final pre-merge gate.
 - **Deliberately unchanged:** no central purchasing or purchasing budget was introduced. The web plan-comparison “Operational intelligence” row remains unchanged pending the explicit product-owner decision.
+
+## 2026-09-26 - Printable product and investor documentation (documentation-only)
+
+- Audited the ERP web/API monorepo and both Expo repositories for the complete product/technical and investor guides.
+- Added editable Markdown and print-ready PDF collateral under `docs/printable/` covering current workflows, RBAC, plans, intelligence/AI boundaries, architecture, integrations, and native coverage.
+- No API, authentication, RBAC, type, feature-key, notification payload, or runtime behavior changed.
+- No Android or iOS code update was required; this entry documents the mobile-parity review and documentation-only exception.
