@@ -96,6 +96,10 @@ function requireFulfillmentAccess(req, res, next) {
     return requirePermission('FULFILLMENT_VIEW')(req, res, next)
   }
 
+  if (req.method === 'POST' && /^\/routes\/[^/]+\/optimize$/.test(path)) {
+    if (hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)) return next()
+  }
+
   return requirePermission('FULFILLMENT_VIEW')(req, res, next)
 }
 

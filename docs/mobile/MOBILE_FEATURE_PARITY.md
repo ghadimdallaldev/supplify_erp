@@ -2,6 +2,15 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-26 — Driver can optimize their own route and finish proof when the scanner is down
+
+- **API:** `POST /api/fulfillment/routes/:id/optimize` now accepts `DRIVER_DELIVERIES_MANAGE`. The driver is scoped to their linked driver id, so they can reorder only their own route. Warehouse staff still use `FULFILLMENT_MANAGE`. Drivers are not granted `FULFILLMENT_VIEW`.
+- **API:** A proof photo whose bytes match JPEG, PNG, WebP, or PDF is stored when ClamAV cannot be reached. The scan status is `scan_unavailable`, which proof submission accepts. Infected files and files that fail the magic-byte check are still rejected.
+- **Mobile (Android + iOS):** Proof upload sends the captured file as a raw PUT through `expo-file-system` instead of a Blob body. The installed app needs a new build before this client change is on the device. The scanner fallback is server-side and applies to the current app after the API deploy.
+- **ERP web:** No client change. Web uploads already send raw bytes and will use the same scanner fallback.
+
+---
+
 ## 2026-09-26 — Dispatch board updates as soon as a driver is assigned
 
 - **API:** Assigning a driver already cleared `fulfillment:dispatch:v1:…`, while the board reads `fulfillment:dispatch:v2:…`. The Assigned column stayed on the previous snapshot for up to 45 seconds, and a second assign reported that every warehouse leg was already assigned. Invalidation now uses the same versioned key as the board.

@@ -65,7 +65,7 @@ Set secrets only in Railway — never commit real values.
 | `MALWARE_SCAN_MAX_SIGNATURE_AGE_HOURS`    | API     | hosted        | `72`              | Maximum accepted age when ClamAV reports a signature date.                                                                                                                             |
 | `MALWARE_SCAN_REQUIRE_SIGNATURE_DATE`     | API     | hosted        | `true`            | Fail readiness if the scanner cannot report signature freshness.                                                                                                                       |
 
-ClamAV must be ready before hosted API traffic is accepted. Docker Compose provides a private `clamav` service. On Railway, deploy the same image as a private service in each environment and set `MALWARE_SCAN_HOST` to that service's private DNS name; never publish port 3310 publicly. See [`deploy/railway/clamav/README.md`](../../deploy/railway/clamav/README.md).
+ClamAV must be ready before hosted API traffic is accepted. Docker Compose provides a private `clamav` service. On Railway, deploy the same image as a private service in each environment and set `MALWARE_SCAN_HOST` to that service's private DNS name; never publish port 3310 publicly. See [`deploy/railway/clamav/README.md`](../../deploy/railway/clamav/README.md). If a single upload cannot reach ClamAV, the API still stores magic-byte-valid bytes and records `scan_unavailable`. Infected files are rejected. Startup still refuses traffic when the scanner is not configured.
 
 See [../operations/storage-uploads.md](../operations/storage-uploads.md) for where file bytes are stored, the presign → PUT flow, bulk image import dual path, and Railway volume / R2 setup.
 

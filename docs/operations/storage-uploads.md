@@ -100,14 +100,14 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
    - Plan **storage_mb** quota ([`storage-upload.js`](../../apps/api/src/lib/storage-upload.js)) when `fileSize` is provided (skipped for `ADMIN`)
 3. API creates a short-lived, single-use database session and returns `presignedUrl`, `url`, `publicUrl`, `fileKey`; both upload URL fields are gateway URLs.
 4. Client sends an authenticated `PUT` with the exact `Content-Type`. Web includes credentials; mobile includes the bearer and active-tenant tokens.
-5. Gateway spools bytes in a private `0700` directory, scans them with ClamAV before parsing or optimization, validates magic signatures/CSV text, then writes private storage.
+5. Gateway spools bytes in a private `0700` directory, scans them with ClamAV before parsing or optimization, validates magic signatures/CSV text, then writes private storage. If ClamAV cannot be reached for that file, a magic-byte-valid upload is still stored and marked `scan_unavailable` so delivery proof can finish. Infected files are still rejected and are not stored.
 6. Feature persists the reference:
    - **Chat** → `message_attachment.file_url` ([`ChatPage`](../../apps/web/src/pages/ChatPage.tsx))
    - **Products** → `POST /api/files/product/:productId/attach`
    - **Logos / onboarding / settings** → tenant/org logo URL ([`LogoUpload.tsx`](../../apps/web/src/components/LogoUpload.tsx))
    - **Disputes** → `dispute_attachments.file_key`
 
-**Ownership:** attach/import/POD/dispute-attachment endpoints require a completed, clean database session owned by the authenticated user and tenant; prefix checks remain defense in depth.
+**Ownership:** attach/import/POD/dispute-attachment endpoints require a completed database session owned by the authenticated user and tenant, with scan status `clean` or `scan_unavailable`. Prefix checks remain defense in depth.
 
 ### Security controls
 
@@ -196,4 +196,4 @@ Or use full Docker (`pnpm dev:docker`) for MinIO + `STORAGE_DRIVER=s3` automatic
 
 ## POD binary upload contract (2026-09-18)
 
-POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Web, Android, and iOS upload through the authenticated API gateway; ClamAV rejection asks for a replacement photo, while scanner outages keep the selected photo for retry. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed.
+POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Web, Android, and iOS upload through the authenticated API gateway. ClamAV rejection asks for a replacement photo. A scanner outage still accepts a magic-byte-valid photo so the driver can mark the order delivered; the scan row is `scan_unavailable`, not `clean`. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed. Mobile sends the photo as raw file bytes.

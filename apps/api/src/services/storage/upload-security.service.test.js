@@ -209,4 +209,63 @@ describe('upload security sessions', () => {
     expect(putObjectMock).not.toHaveBeenCalled()
     expect(securelyDeleteQuarantineFileMock).toHaveBeenCalledWith('quarantine/file.spool')
   })
+
+  it('stores a valid image when the scanner is unavailable', async () => {
+    const body = Buffer.from([0xff, 0xd8, 0xff])
+    queryMock
+      .mockResolvedValueOnce({ rows: [session()] })
+      .mockResolvedValueOnce({ rows: [session({ state: 'processing' })] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValue({ rows: [], rowCount: 1 })
+    scanQuarantineFileMock.mockRejectedValue(
+      Object.assign(new Error('scanner down'), { name: 'MALWARE_SCAN_UNAVAILABLE' })
+    )
+
+    await expect(
+      completeUploadSession({
+        token: 'opaque-token',
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        tenantType: 'SUPPLIER',
+        body,
+        contentType: 'image/jpeg',
+      })
+    ).resolves.toMatchObject({
+      fileKey: 'uploads/user-1/photo.jpg',
+      idempotent: false,
+      scanBypassed: true,
+    })
+
+    expect(putObjectMock).toHaveBeenCalledWith({
+      fileKey: 'uploads/user-1/photo.jpg',
+      body,
+      contentType: 'image/jpeg',
+    })
+    expect(queryMock.mock.calls.some((call) => String(call[0]).includes('scan_unavailable'))).toBe(
+      true
+    )
+  })
+
+  it('does not store invalid bytes when the scanner is unavailable', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [session()] })
+      .mockResolvedValueOnce({ rows: [session({ state: 'processing' })] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValue({ rows: [], rowCount: 1 })
+    scanQuarantineFileMock.mockRejectedValue(
+      Object.assign(new Error('scanner down'), { name: 'MALWARE_SCAN_UNAVAILABLE' })
+    )
+
+    await expect(
+      completeUploadSession({
+        token: 'opaque-token',
+        userId: 'user-1',
+        tenantId: 'tenant-1',
+        tenantType: 'SUPPLIER',
+        body: Buffer.from('not-a-jpeg'),
+        contentType: 'image/jpeg',
+      })
+    ).rejects.toMatchObject({ name: 'UPLOAD_INVALID_FILE' })
+    expect(putObjectMock).not.toHaveBeenCalled()
+  })
 })

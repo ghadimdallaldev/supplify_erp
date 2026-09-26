@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import { config } from '../../config/env.js'
 import { query, withTransaction } from '../../lib/db.js'
+import { logger } from '../../lib/logger.js'
 import {
   MAX_IMPORT_ZIP_BYTES,
   MAX_UPLOAD_BYTES,
@@ -213,6 +214,40 @@ async function recordScanFailure(session, bodyHash, errorCode) {
 }
 
 /**
+ * ClamAV was unreachable. Keep a magic-byte-valid file so a driver can finish
+ * delivery, and record that it was not scanned. Infected and invalid bytes
+ * never reach storage.
+ */
+async function acceptUploadWhenScannerUnavailable({ session, bodyHash, mime, spool, body }) {
+  assertUploadFileBytes(body, mime)
+  const { getStorageProvider } = await import('./storage.service.js')
+  const promoted = await getStorageProvider().putObject({
+    fileKey: session.destination_key,
+    body: await fs.readFile(spool.filePath),
+    contentType: mime,
+  })
+  await query(
+    `UPDATE file_security_scan
+     SET status = 'scan_unavailable', scanner = 'unavailable',
+         error_code = 'MALWARE_SCAN_UNAVAILABLE', stored_etag = $2,
+         stored_version_id = $3, scanned_at = now()
+     WHERE upload_session_id = $1 AND sha256 = $4`,
+    [session.id, promoted.etag || null, promoted.versionId || null, bodyHash]
+  )
+  await query(
+    `UPDATE file_upload_session
+     SET state = 'completed', completed_sha256 = $2, stored_etag = $3,
+         stored_version_id = $4, completed_at = now(), error_code = 'MALWARE_SCAN_UNAVAILABLE'
+     WHERE id = $1`,
+    [session.id, bodyHash, promoted.etag || null, promoted.versionId || null]
+  )
+  logger.warn('storage.upload.scan_unavailable_accepted', {
+    fileKey: session.destination_key,
+  })
+  return { fileKey: session.destination_key, idempotent: false, scanBypassed: true }
+}
+
+/**
  * Authenticate, atomically claim, spool, scan, and promote one upload. A
  * claimed session is never allowed to replace an existing object on replay.
  */
@@ -321,6 +356,27 @@ export async function completeUploadSession({
     return { fileKey: session.destination_key, idempotent: false }
   } catch (error) {
     if (error?.name === 'UPLOAD_MALWARE_DETECTED') throw error
+    if (error?.name === 'MALWARE_SCAN_UNAVAILABLE' && spool) {
+      try {
+        return await acceptUploadWhenScannerUnavailable({ session, bodyHash, mime, spool, body })
+      } catch (promoteError) {
+        const promoteCode = promoteError?.name || 'MALWARE_SCAN_UNAVAILABLE'
+        await recordScanFailure(
+          session,
+          bodyHash,
+          promoteCode === 'UPLOAD_INVALID_FILE' || promoteCode === 'UPLOAD_INVALID_IMAGE'
+            ? promoteCode
+            : 'MALWARE_SCAN_UNAVAILABLE'
+        )
+        if (promoteCode === 'UPLOAD_INVALID_FILE' || promoteCode === 'UPLOAD_INVALID_IMAGE') {
+          throw promoteError
+        }
+        throw uploadError(
+          'MALWARE_SCAN_UNAVAILABLE',
+          'Upload security scanning is temporarily unavailable'
+        )
+      }
+    }
     const code =
       error?.name === 'MALWARE_SCAN_UNAVAILABLE'
         ? 'MALWARE_SCAN_UNAVAILABLE'
@@ -351,7 +407,7 @@ export async function assertCleanUploadOwnership(
      WHERE fus.destination_key = $1
        AND fus.user_id = $2
        AND fus.state = 'completed'
-       AND fss.status = 'clean'
+       AND fss.status IN ('clean', 'scan_unavailable')
        AND fss.file_key = fus.destination_key
        AND ($3::uuid IS NULL OR fus.tenant_id = $3)
        AND ($4::text IS NULL OR fus.tenant_type = $4)

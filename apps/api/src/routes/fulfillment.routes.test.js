@@ -192,6 +192,62 @@ describe('Fulfillment routes — delivery route planning', () => {
     expect(getDriverActiveRoute).toHaveBeenCalledWith('supplier-1', 'driver-a')
   })
 
+  it('POST /routes/:id/optimize works for a driver without FULFILLMENT_VIEW', async () => {
+    const routeId = '33333333-3333-4333-8333-333333333333'
+    getDeliveryRouteMock.mockResolvedValue({
+      id: routeId,
+      status: 'IN_PROGRESS',
+      stops: [
+        {
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          sequenceNumber: 1,
+          status: 'PENDING',
+          destinationCoordinatesAvailable: true,
+          destinationLatitude: 33.8,
+          destinationLongitude: 35.5,
+        },
+        {
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          sequenceNumber: 2,
+          status: 'PENDING',
+          destinationCoordinatesAvailable: true,
+          destinationLatitude: 33.9,
+          destinationLongitude: 35.6,
+        },
+      ],
+    })
+    const { reorderRouteStops } = await import('../services/delivery-routes.service.js')
+    reorderRouteStops.mockResolvedValue({ id: routeId, stops: [] })
+
+    const driverApp = express()
+    driverApp.use(express.json())
+    driverApp.use((req, res, next) => {
+      req.requestId = 'test-req'
+      req.userData = { id: 'driver-user', email: 'd@test.com', role: 'SUPPLIER' }
+      req.tenantContext = {
+        tenantId: 'supplier-1',
+        tenantType: 'SUPPLIER',
+        permissions: ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
+      }
+      next()
+    })
+    driverApp.use('/api/fulfillment', fulfillmentRoutes)
+    driverApp.use(errorHandler)
+
+    const res = await request(driverApp)
+      .post(`/api/fulfillment/routes/${routeId}/optimize`)
+      .send({ apply: true })
+      .expect(200)
+
+    expect(res.body.ok).toBe(true)
+    expect(getDeliveryRouteMock).toHaveBeenCalledWith('supplier-1', routeId, {
+      driverIdScope: 'driver-a',
+    })
+    expect(reorderRouteStops).toHaveBeenCalledWith('supplier-1', routeId, expect.any(Array), {
+      driverIdScope: 'driver-a',
+    })
+  })
+
   it('GET /routes lists only scoped routes for driver-only users', async () => {
     listDeliveryRoutesMock.mockResolvedValueOnce([])
 

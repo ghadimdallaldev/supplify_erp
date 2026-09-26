@@ -282,14 +282,14 @@ Completed or failed stops stay fixed; active stops can be reordered.
 
 ### APIs
 
-| Method | Path                                        | Body / notes                                                            |
-| ------ | ------------------------------------------- | ----------------------------------------------------------------------- |
-| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today                        |
-| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route                                |
-| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)                             |
-| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`                                |
-| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot                       |
-| POST   | `/api/fulfillment/routes/:id/optimize`      | `{ apply?: boolean }` — nearest-neighbor from depot; preview or persist |
+| Method | Path                                        | Body / notes                                                                                                                                    |
+| ------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/fulfillment/routes/today`             | Alias of `/routes/active` — driver’s route today                                                                                                |
+| GET    | `/api/fulfillment/routes/active`            | `IN_PROGRESS` or today’s `PLANNED` route                                                                                                        |
+| POST   | `/api/fulfillment/routes/:id/stops/reorder` | `{ stop_ids: uuid[] }` — full list (legacy)                                                                                                     |
+| PATCH  | `/api/fulfillment/routes/:id/stops/reorder` | `{ stops: [{ orderId, stopSequence }] }`                                                                                                        |
+| PATCH  | `/api/fulfillment/routes/:id/next-stop`     | `{ orderId }` — move one stop to next active slot                                                                                               |
+| POST   | `/api/fulfillment/routes/:id/optimize`      | `{ apply?: boolean }` — nearest-neighbor from depot; preview or persist. `DRIVER_DELIVERIES_MANAGE` can optimize only the linked driver’s route |
 
 Stop payloads include `sequenceNumber`, `isNext`, `isCompleted`, `orderNumber`, and `destinationCoordinatesAvailable`.
 
@@ -304,7 +304,7 @@ When an order is on an active route, ETA uses the stop order — see [delivery-e
 
 ### Route optimization (v1)
 
-`POST /api/fulfillment/routes/:id/optimize` reorders **PLANNED** stops with coordinates using nearest-neighbor from the route depot. `apply: true` persists `sequence_number` updates.
+`POST /api/fulfillment/routes/:id/optimize` reorders stops with coordinates using nearest-neighbor from the route depot. `apply: true` persists `sequence_number` updates. A driver with `DRIVER_DELIVERIES_MANAGE` can optimize only their own route. Warehouse staff still need `FULFILLMENT_MANAGE`. Drivers do not need `FULFILLMENT_VIEW`.
 
 Service: `route-optimization.service.js`. **Mapbox/Google Directions** (traffic, time windows) is optional future work behind env flags.
 
