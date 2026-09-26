@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-26 — Order detail no longer crashes on open
+
+- **Mobile (Android + iOS):** `GET /api/orders/:id` returns `{ order }`. `useOrder` now unwraps that payload before screens read `id`, `status`, and `items`. Opening an order from Home, Orders, supplier order detail, receiving, or dispute creation was crashing because the screen called methods on the wrapper. Failed loads show an error state instead of spinning forever.
+- **ERP web:** Skipped — web already reads `data.order`. No API change.
+- **Verification:** `npx jest src/services/api/queries/orders.test.ts` and `npx tsc --noEmit` in both mobile repos.
+
+---
+
 ## 2026-09-26 — Mobile UI/UX polish pass (native only)
 
 - **Mobile (Android + iOS):** Senior polish on the operational redesign. Restored the branded Keycloak sign-in screen (structure from before the first redesign; auth flow unchanged). Tightened Home/Orders/Suppliers/Messages/Driver rows, compacted Best Prices into a horizontal strip, and regrouped More into Today + Tools hubs so every previous destination stays reachable. No API, RBAC, entitlement, or workflow changes.
