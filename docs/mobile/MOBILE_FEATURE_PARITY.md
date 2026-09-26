@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-26 — Dispatch board updates as soon as a driver is assigned
+
+- **API:** Assigning a driver already cleared `fulfillment:dispatch:v1:…`, while the board reads `fulfillment:dispatch:v2:…`. The Assigned column stayed on the previous snapshot for up to 45 seconds, and a second assign reported that every warehouse leg was already assigned. Invalidation now uses the same versioned key as the board.
+- **Mobile:** Skipped — no client contract change. Android and iOS dispatch screens already refetch after assign; they were waiting on this server cache.
+- **ERP web:** No client change. The dispatch board refetch now sees the new assignment immediately.
+
+---
+
 ## 2026-09-26 — Order detail no longer crashes on open
 
 - **Mobile (Android + iOS):** `GET /api/orders/:id` returns `{ order }`. `useOrder` now unwraps that payload before screens read `id`, `status`, and `items`. Opening an order from Home, Orders, supplier order detail, receiving, or dispute creation was crashing because the screen called methods on the wrapper. Failed loads show an error state instead of spinning forever.
