@@ -86,8 +86,12 @@ async function getSupplierDepot(supplierId) {
 /**
  * Preview or apply optimized stop order for a delivery route.
  */
-export async function optimizeDeliveryRoute(supplierId, routeId, { apply = false } = {}) {
-  const route = await getDeliveryRoute(supplierId, routeId)
+export async function optimizeDeliveryRoute(
+  supplierId,
+  routeId,
+  { apply = false, driverIdScope = null } = {}
+) {
+  const route = await getDeliveryRoute(supplierId, routeId, { driverIdScope })
   if (!route.stops?.length) {
     throw new ValidationError('Route has no stops to optimize')
   }
@@ -128,6 +132,8 @@ export async function optimizeDeliveryRoute(supplierId, routeId, { apply = false
     return { preview, route: null }
   }
 
-  const updatedRoute = await reorderRouteStops(supplierId, routeId, proposedStopIds)
+  const updatedRoute = await reorderRouteStops(supplierId, routeId, proposedStopIds, {
+    driverIdScope,
+  })
   return { preview, route: updatedRoute }
 }

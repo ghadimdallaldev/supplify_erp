@@ -362,33 +362,32 @@ router.delete('/routes/:id', requirePermission('FULFILLMENT_MANAGE'), async (req
   }
 })
 
-router.post(
-  '/routes/:id/optimize',
-  requirePermission('FULFILLMENT_MANAGE'),
-  async (req, res, next) => {
-    try {
-      const supplierId = await resolveSupplierId(req)
-      if (!supplierId) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: { name: 'FORBIDDEN', message: 'Supplier not found' },
-          requestId: req.requestId,
-        })
-      }
-      const apply = req.body?.apply === true || req.query.apply === 'true'
-      const result = await optimizeDeliveryRoute(supplierId, req.params.id, { apply })
-      res.json({
-        ok: true,
-        data: { preview: result.preview, route: result.route },
-        error: null,
+router.post('/routes/:id/optimize', async (req, res, next) => {
+  try {
+    const access = await resolveRouteReorderAccess(req, req.params.id)
+    if (access.error) {
+      return res.status(access.error.status).json({
+        ok: false,
+        data: null,
+        error: { name: 'FORBIDDEN', message: access.error.message },
         requestId: req.requestId,
       })
-    } catch (err) {
-      next(err)
     }
+    const apply = req.body?.apply === true || req.query.apply === 'true'
+    const result = await optimizeDeliveryRoute(access.supplierId, req.params.id, {
+      apply,
+      driverIdScope: access.driverScope,
+    })
+    res.json({
+      ok: true,
+      data: { preview: result.preview, route: result.route },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (err) {
+    next(err)
   }
-)
+})
 
 router.post('/routes/:id/stops/reorder', async (req, res, next) => {
   try {
