@@ -43,7 +43,7 @@ import {
 import { rolloverAssignmentToNextDay } from '../../services/delivery-rollover.service.js'
 import { invalidateUserAuthCaches } from '../../lib/access-cache.js'
 import { getCache, setCache } from '../../lib/cache.js'
-import { invalidateDispatchCacheForSupplier } from '../../lib/dispatch-cache.js'
+import { dispatchCacheKey, invalidateDispatchCacheForSupplier } from '../../lib/dispatch-cache.js'
 
 import {
   resolveRouteReorderAccess,
@@ -317,10 +317,6 @@ function mapDispatchOrder(row) {
 
 const DISPATCH_BUCKET_LIMIT = 200
 const DISPATCH_CACHE_TTL_SECONDS = 45
-
-function dispatchCacheKey(supplierId, days, warehouseId) {
-  return `fulfillment:dispatch:v2:${supplierId}:${days}:${warehouseId || 'all'}`
-}
 
 export { invalidateDispatchCacheForSupplier }
 
