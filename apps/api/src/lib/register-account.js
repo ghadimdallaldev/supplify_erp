@@ -18,10 +18,17 @@ import {
   notifyBillingTrialStarted,
 } from '../services/notification.service.js'
 import { recordRegistrationLegalAcceptances } from './legal-acceptance.js'
+import { recordConsumerRegistrationLegalAcceptances } from './legal-acceptance.js'
 import { logger } from './logger.js'
 import { normalizeIdentityEmail } from './identity-normalize.js'
+import { buildAppUrl } from './app-url.js'
 
-const KC_ROLE = { RESTAURANT: 'restaurant', SUPPLIER: 'supplier', ADMIN: 'admin' }
+const KC_ROLE = {
+  RESTAURANT: 'restaurant',
+  SUPPLIER: 'supplier',
+  CONSUMER: 'consumer',
+  ADMIN: 'admin',
+}
 
 function createRegistrationPhaseTimer() {
   let lapStart = performance.now()
@@ -62,7 +69,7 @@ async function uniqueSlug(client, table, baseSlug) {
  * sent to organization setup even though they are not the tenant contact_email.
  */
 export async function userNeedsTenantSetup(user) {
-  if (!user || user.role === 'ADMIN') return false
+  if (!user || user.role === 'ADMIN' || user.role === 'CONSUMER') return false
 
   // Invite accept / branch join binds membership before the user is an owner.
   if (user.id) {
@@ -79,6 +86,80 @@ export async function userNeedsTenantSetup(user) {
     query('SELECT id FROM supplier WHERE LOWER(TRIM(contact_email)) = $1 LIMIT 1', [email]),
   ])
   return restaurants.length === 0 && suppliers.length === 0
+}
+
+export async function completeConsumerRegistration({
+  userId,
+  keycloakSub,
+  email,
+  name,
+  phone,
+  legalAcceptance,
+  ipAddress,
+  userAgent,
+}) {
+  const normalizedEmail = normalizeIdentityEmail(email)
+  const displayName = String(name || '').trim()
+  if (!displayName) throw new ValidationError('Name is required')
+
+  const existingUser = await query('SELECT id, role FROM app_user WHERE id = $1', [userId])
+  if (!existingUser.rows.length) throw new ValidationError('User not found')
+  if (existingUser.rows[0].role === 'ADMIN') {
+    throw new ValidationError('Admin accounts cannot be converted to consumer accounts')
+  }
+  const membership = await getUserWorkspaceMembership(userId)
+  if (membership) {
+    throw new ConflictError('Business workspace users cannot be converted to consumer accounts')
+  }
+
+  const profile = await withTransaction(async (client) => {
+    await client.query(
+      `UPDATE app_user
+       SET role = 'CONSUMER', display_name = $2,
+           keycloak_sub = COALESCE(keycloak_sub, $3), updated_at = now()
+       WHERE id = $1`,
+      [userId, displayName, keycloakSub]
+    )
+    const { rows } = await client.query(
+      `INSERT INTO consumer_profile (app_user_id, phone)
+       VALUES ($1, $2)
+       ON CONFLICT (app_user_id) DO UPDATE SET phone = EXCLUDED.phone, updated_at = now()
+       RETURNING *`,
+      [userId, phone || null]
+    )
+    await recordConsumerRegistrationLegalAcceptances(
+      {
+        userId,
+        acceptedDocuments: legalAcceptance.acceptedDocuments,
+        electronicSignatureAttestation: legalAcceptance.electronicSignatureAttestation,
+        packVersion: legalAcceptance.packVersion,
+        ipAddress,
+        userAgent,
+      },
+      client
+    )
+    return { ...rows[0], displayName, email: normalizedEmail }
+  })
+
+  await invalidateUserAuthCaches({ userId, keycloakSub })
+  void ensureKeycloakRealmRole(normalizedEmail, KC_ROLE.CONSUMER)
+  void (async () => {
+    const { sendTemplateEmail } = await import('../services/email/email.service.js')
+    await sendTemplateEmail({
+      to: normalizedEmail,
+      template: 'auth.welcome',
+      data: {
+        tenantName: displayName,
+        tenantType: 'CONSUMER',
+        message: 'Your Supplify consumer account is ready.',
+        ctaUrl: buildAppUrl('/shop'),
+      },
+      eventType: 'auth.welcome',
+      eventKey: `welcome:consumer:${userId}`,
+      entityId: userId,
+    })
+  })().catch(() => {})
+  return profile
 }
 
 async function completeSupplierRegistration(

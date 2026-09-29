@@ -89,12 +89,13 @@ router.get('/board', async (req, res) => {
           o.status,
           o.total_amount,
           COALESCE(o.placed_at, o.created_at) AS created_at,
-          r.name AS restaurant_name,
+          COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
           (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $1) AS item_count
         FROM customer_order o
         JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-        JOIN restaurant r ON r.id = o.restaurant_id
+        LEFT JOIN restaurant r ON r.id = o.restaurant_id
         WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
+          AND UPPER(COALESCE(o.requested_delivery_method, 'DELIVERY')) <> 'PICKUP'
           AND NOT EXISTS (
             SELECT 1
             FROM route_stop rs
@@ -329,7 +330,7 @@ export function buildDispatchBaseSelect(supplierCol) {
         o.status AS order_status,
         o.total_amount,
         COALESCE(o.placed_at, o.created_at) AS created_at,
-        r.name AS restaurant_name,
+        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
         COALESCE(oic.item_count, 0) AS item_count,
         da.id AS assignment_id,
         da.status AS assignment_status,
@@ -353,7 +354,7 @@ export function buildDispatchBaseSelect(supplierCol) {
         owa_sum.warehouse_count
       FROM customer_order o
       JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       LEFT JOIN (
         SELECT order_id, COUNT(*)::int AS item_count
         FROM order_item

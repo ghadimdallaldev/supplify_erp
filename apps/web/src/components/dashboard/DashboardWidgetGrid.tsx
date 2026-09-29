@@ -179,7 +179,8 @@ export function DashboardWidgetGrid(props: any) {
                         }}
                       >
                         {isSupplier
-                          ? o.restaurant_name ||
+                          ? o.customer_display_name ||
+                            o.restaurant_name ||
                             o.restaurantName ||
                             t('widgets.recentOrders.customerFallback')
                           : t('widgets.recentOrders.fromSupplier', {

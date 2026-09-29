@@ -31,6 +31,8 @@ import {
 } from 'lucide-react'
 import type { PublicSupplierProduct } from '../types'
 import { ensureNamespace } from '../i18n'
+import { PublicSalesCheckout } from '../components/public/PublicSalesCheckout'
+import { readPublicCart, writePublicCart, type PublicCart } from '../lib/publicSalesCart'
 
 function ProductCard({
   product,
@@ -240,12 +242,18 @@ export function PublicSupplierCatalogPage({
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
   const isRestaurant = user?.role === 'RESTAURANT'
+  const isConsumer = user?.role === 'CONSUMER'
   const { addItem } = useCartActions()
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [page, setPage] = useState(1)
   const [linkCopied, setLinkCopied] = useState(false)
+  const [publicCart, setPublicCart] = useState<PublicCart>(() => readPublicCart())
+
+  useEffect(() => {
+    writePublicCart(publicCart)
+  }, [publicCart])
 
   useEffect(() => {
     void ensureNamespace('public')
@@ -300,6 +308,28 @@ export function PublicSupplierCatalogPage({
 
   const handleAddToCart = (product: PublicSupplierProduct) => {
     if (!supplier) return
+    if (!isRestaurant) {
+      const supplierLocationId = product.supplierId || supplier.id
+      if (publicCart.supplierLocationId && publicCart.supplierLocationId !== supplierLocationId) {
+        toast.error(
+          'Your cart uses another fulfillment location. Clear it before adding this item.'
+        )
+        return
+      }
+      setPublicCart((cart) => {
+        const existing = cart.lines.find((line) => line.product.id === product.id)
+        const step = Math.max(1, product.orderMultiple || 1)
+        const minimum = Math.max(step, product.moq || 1)
+        const lines = existing
+          ? cart.lines.map((line) =>
+              line.product.id === product.id ? { ...line, quantity: line.quantity + step } : line
+            )
+          : [...cart.lines, { product, quantity: minimum, supplierLocationId }]
+        return { supplierLocationId, lines }
+      })
+      toast.success('Added to your cart')
+      return
+    }
     addItem({
       productId: product.id,
       quantity: 1,
@@ -321,6 +351,22 @@ export function PublicSupplierCatalogPage({
       },
     })
     toast.success(t('catalog.toast.addedToCart'))
+  }
+
+  const updatePublicQuantity = (productId: string, quantity: number) => {
+    setPublicCart((cart) => {
+      const lines = cart.lines
+        .map((line) => {
+          if (line.product.id !== productId) return line
+          const minimum = Math.max(1, line.product.moq || 1)
+          return quantity < minimum ? null : { ...line, quantity }
+        })
+        .filter((line): line is NonNullable<typeof line> => Boolean(line))
+      return {
+        supplierLocationId: lines[0]?.supplierLocationId || null,
+        lines,
+      }
+    })
   }
 
   const handleRequestQuote = (product: PublicSupplierProduct) => {
@@ -435,7 +481,9 @@ export function PublicSupplierCatalogPage({
         minimumOrderAmount={supplier.minimumOrderAmount}
       />
 
-      {!user && !whiteLabel && <GuestAccessPanel loginHref={loginHref} />}
+      {!user && !whiteLabel && !supplier.publicSalesEnabled && (
+        <GuestAccessPanel loginHref={loginHref} />
+      )}
 
       <div className="mb-4">
         <div className="relative">
@@ -535,8 +583,11 @@ export function PublicSupplierCatalogPage({
               <ProductCard
                 key={product.id}
                 product={product}
-                showPrice={isRestaurant}
-                canOrder={isRestaurant}
+                showPrice={isRestaurant || Boolean(supplier.publicSalesEnabled)}
+                canOrder={
+                  isRestaurant ||
+                  (Boolean(supplier.publicSalesEnabled) && product.orderable === true)
+                }
                 loginHref={loginHref}
                 onAdd={handleAddToCart}
                 onRequestQuote={handleRequestQuote}
@@ -572,6 +623,17 @@ export function PublicSupplierCatalogPage({
             </nav>
           )}
         </>
+      )}
+
+      {!isRestaurant && supplier.publicSalesEnabled && publicCart.lines.length > 0 && (
+        <PublicSalesCheckout
+          idOrSlug={idOrSlug || supplier.id}
+          supplier={supplier}
+          lines={publicCart.lines}
+          authenticatedConsumer={isConsumer}
+          onQuantity={updatePublicQuantity}
+          onClear={() => setPublicCart({ supplierLocationId: null, lines: [] })}
+        />
       )}
 
       <PublicPanel className="mt-8">

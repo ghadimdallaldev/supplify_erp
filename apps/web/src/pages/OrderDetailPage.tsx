@@ -241,7 +241,7 @@ export function OrderDetailPage() {
             </Button>
           }
           title={t('detail.orderNumber', { id: orderShortId(order.id) })}
-          description={order.restaurant_name}
+          description={order.customer_display_name || order.restaurant_name}
           actions={
             <>
               {isReplacementOrder && (

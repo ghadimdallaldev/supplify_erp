@@ -171,7 +171,10 @@ router.patch('/:id', async (req, res) => {
     // Add supplier_id to order object for notification logic
     order.supplier_id = supplier_id
 
-    if (requiresDriverAssignment(updateData.status)) {
+    if (
+      requiresDriverAssignment(updateData.status) &&
+      String(order.requested_delivery_method || '').toUpperCase() !== 'PICKUP'
+    ) {
       const assignment = await getActiveDriverAssignment(id)
       if (!assignment) {
         return res.status(400).json({
@@ -480,14 +483,21 @@ router.patch('/:id', async (req, res) => {
     }
 
     if (updateData.status && updateData.status !== order.status) {
-      scheduleOrdersCalendarCacheInvalidation([rows[0].restaurant_id, order.supplier_id], {
-        reason: 'order.updated',
-        requestId: req.requestId,
-      })
-      void invalidateDashboardSummaryCache([
-        { tenantType: 'RESTAURANT', tenantId: rows[0].restaurant_id },
-        { tenantType: 'SUPPLIER', tenantId: order.supplier_id },
-      ])
+      scheduleOrdersCalendarCacheInvalidation(
+        [rows[0].restaurant_id, order.supplier_id].filter(Boolean),
+        {
+          reason: 'order.updated',
+          requestId: req.requestId,
+        }
+      )
+      void invalidateDashboardSummaryCache(
+        [
+          rows[0].restaurant_id
+            ? { tenantType: 'RESTAURANT', tenantId: rows[0].restaurant_id }
+            : null,
+          order.supplier_id ? { tenantType: 'SUPPLIER', tenantId: order.supplier_id } : null,
+        ].filter(Boolean)
+      )
     }
 
     res.json({

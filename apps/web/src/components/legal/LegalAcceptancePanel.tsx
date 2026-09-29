@@ -14,7 +14,7 @@ import {
 
 type Props = {
   variant: 'registration' | 'invite'
-  accountType?: 'RESTAURANT' | 'SUPPLIER' | null
+  accountType?: 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER' | null
   value: Set<LegalDocumentSlug>
   onChange: (next: Set<LegalDocumentSlug>) => void
   electronicSigned: boolean
@@ -50,14 +50,16 @@ export function LegalAcceptancePanel({
   }, [variant, accountType])
 
   const roleDoc = accountType === 'SUPPLIER' ? 'supplier_agreement' : 'restaurant_agreement'
+  const isConsumer = accountType === 'CONSUMER'
 
   const platformOk = value.has('terms_and_conditions') && value.has('privacy_policy')
   const policiesOk =
-    value.has('acceptable_use_policy') &&
-    value.has('data_processing_addendum') &&
-    value.has('cookie_policy')
-  const roleOk = variant === 'invite' || !accountType || value.has(roleDoc)
-  const mobileOk = variant === 'registration' ? value.has('mobile_app_terms') : true
+    isConsumer ||
+    (value.has('acceptable_use_policy') &&
+      value.has('data_processing_addendum') &&
+      value.has('cookie_policy'))
+  const roleOk = variant === 'invite' || !accountType || isConsumer || value.has(roleDoc)
+  const mobileOk = variant === 'registration' && !isConsumer ? value.has('mobile_app_terms') : true
 
   const allRequiredAccepted = requiredSlugs.length > 0 && requiredSlugs.every((s) => value.has(s))
   const canSubmit = allRequiredAccepted && electronicSigned
@@ -159,22 +161,24 @@ export function LegalAcceptancePanel({
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand-pale)]/40">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--app-border)]"
-                checked={policiesOk}
-                disabled={checkboxesDisabled}
-                onChange={(e) => setAttestation('policies', e.target.checked)}
-                data-testid="legal-accept-policies"
-              />
-              <span className="text-sm text-[var(--text)]">
-                I agree to the <DocLink slug="acceptable_use_policy" />,{' '}
-                <DocLink slug="data_processing_addendum" />, and <DocLink slug="cookie_policy" />.
-              </span>
-            </label>
+            {!isConsumer && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand-pale)]/40">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--app-border)]"
+                  checked={policiesOk}
+                  disabled={checkboxesDisabled}
+                  onChange={(e) => setAttestation('policies', e.target.checked)}
+                  data-testid="legal-accept-policies"
+                />
+                <span className="text-sm text-[var(--text)]">
+                  I agree to the <DocLink slug="acceptable_use_policy" />,{' '}
+                  <DocLink slug="data_processing_addendum" />, and <DocLink slug="cookie_policy" />.
+                </span>
+              </label>
+            )}
 
-            {variant === 'registration' && accountType && (
+            {variant === 'registration' && accountType && !isConsumer && (
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand-pale)]/40">
                 <input
                   type="checkbox"
@@ -190,7 +194,7 @@ export function LegalAcceptancePanel({
               </label>
             )}
 
-            {variant === 'registration' && (
+            {variant === 'registration' && !isConsumer && (
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--app-border)] p-3 has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand-pale)]/40">
                 <input
                   type="checkbox"
@@ -217,8 +221,9 @@ export function LegalAcceptancePanel({
                 data-testid="legal-accept-electronic"
               />
               <span className="text-sm font-medium text-[var(--text)]">
-                I confirm I am authorized to bind my organization and consent to electronic
-                signature of these agreements.
+                {isConsumer
+                  ? 'I consent to the electronic acceptance of these agreements.'
+                  : 'I confirm I am authorized to bind my organization and consent to electronic signature of these agreements.'}
               </span>
             </label>
           </div>
@@ -236,7 +241,7 @@ export function LegalAcceptancePanel({
 
 export function isLegalAcceptanceComplete(
   variant: 'registration' | 'invite',
-  accountType: 'RESTAURANT' | 'SUPPLIER' | null,
+  accountType: 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER' | null,
   accepted: Set<LegalDocumentSlug>,
   electronicSigned: boolean
 ): boolean {

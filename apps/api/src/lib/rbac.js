@@ -213,6 +213,8 @@ export async function upsertUser(userInfo, roles = []) {
       explicitRole = 'SUPPLIER'
     } else if (hasRole('restaurant')) {
       explicitRole = 'RESTAURANT'
+    } else if (hasRole('consumer')) {
+      explicitRole = 'CONSUMER'
     } else if (hasRole('staff_portal') || hasRole('staff_portal_user')) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
@@ -229,7 +231,7 @@ export async function upsertUser(userInfo, roles = []) {
     }
     const insertRole = explicitRole || 'PENDING'
 
-    const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT'])
+    const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT', 'CONSUMER'])
     const existingLookup = await query(
       `SELECT role, is_active FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
       [sub, normalizedEmail]

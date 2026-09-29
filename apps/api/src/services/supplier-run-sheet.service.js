@@ -177,13 +177,13 @@ async function queryOrdersToPickWithPickLists(sql, supplierId, date) {
     SELECT DISTINCT ON (o.id)
       o.id AS order_id,
       o.status AS order_status,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       ${sql.scheduledAtExpr} AS scheduled_at,
       pl.id AS pick_list_id,
       pl.status AS pick_list_status
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT pl2.id, pl2.status
       FROM pick_list pl2
@@ -208,13 +208,13 @@ async function queryOrdersToPickWithoutPickLists(sql, supplierId, date) {
     SELECT DISTINCT ON (o.id)
       o.id AS order_id,
       o.status AS order_status,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       ${sql.scheduledAtExpr} AS scheduled_at,
       NULL::uuid AS pick_list_id,
       NULL::text AS pick_list_status
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     WHERE o.status = ANY($3::order_status[])
       AND ${sql.scheduledAtExpr}::date = $2::date
     ORDER BY o.id, o.created_at DESC

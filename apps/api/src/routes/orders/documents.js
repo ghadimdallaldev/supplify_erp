@@ -239,10 +239,13 @@ router.get(
       const { id } = req.params
       const { rows: orders } = await query(
         `
-      SELECT o.*, r.name as restaurant_name, r.contact_email, r.phone,
-        r.address_json as restaurant_address
+      SELECT o.*,
+        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') as restaurant_name,
+        COALESCE(r.contact_email, o.customer_contact_snapshot->>'email') as contact_email,
+        COALESCE(r.phone, o.customer_contact_snapshot->>'phone') as phone,
+        COALESCE(r.address_json, o.delivery_location_snapshot) as restaurant_address
       FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1
     `,
         [id]
@@ -320,10 +323,13 @@ router.get(
       // Get order with items
       const { rows: orders } = await query(
         `
-      SELECT o.*, r.name as restaurant_name, r.contact_email, r.phone,
-        r.address_json as restaurant_address
+      SELECT o.*,
+        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') as restaurant_name,
+        COALESCE(r.contact_email, o.customer_contact_snapshot->>'email') as contact_email,
+        COALESCE(r.phone, o.customer_contact_snapshot->>'phone') as phone,
+        COALESCE(r.address_json, o.delivery_location_snapshot) as restaurant_address
       FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1
     `,
         [id]

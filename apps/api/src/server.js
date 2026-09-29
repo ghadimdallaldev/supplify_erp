@@ -56,6 +56,10 @@ import { billingRoutes } from './routes/billing.routes.js'
 import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
+import { publicSalesRoutes } from './routes/public-sales.routes.js'
+import { supplierPublicSalesRoutes } from './routes/supplier-public-sales.routes.js'
+import { consumerAccountRoutes } from './routes/consumer-account.routes.js'
+import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driverTrackingRoutes } from './routes/driver-tracking.routes.js'
 import { driversRoutes } from './routes/drivers.routes.js'
@@ -507,9 +511,11 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
+app.use('/api/public', publicSalesRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api/internal', internalAuthRoutes)
 app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
+app.use('/api/consumer', consumerAccountRoutes)
 app.use('/api/consumer', consumerRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
 if (allowE2eRoutes()) {
@@ -525,6 +531,7 @@ app.use('/api/warehouses', warehousesRoutes)
 app.use('/api/fulfillment', fulfillmentRoutes)
 app.use('/api/driver', driverTrackingRoutes)
 app.use('/api/drivers', driversRoutes)
+app.use('/api/supplier', supplierPublicSalesRoutes)
 app.use('/api/supplier', supplierOpsRoutes)
 app.use('/api/supplier/growth', supplierGrowthRoutes)
 app.use('/api/growth', growthPublicRoutes)

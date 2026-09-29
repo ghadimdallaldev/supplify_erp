@@ -18,9 +18,41 @@ import { PageLoading } from './components/ui/page-loading'
 import { CustomDomainCatalogHost } from './components/public/CustomDomainCatalogHost'
 import { RequirePermission } from './components/RequirePermission'
 import { NotFoundPage, RouteErrorPage } from './pages/ErrorPages'
+import { ConsumerRoleGuard } from './components/public/ConsumerRoleGuard'
 
 const ConsumerShell = lazy(() =>
   import('./components/consumer/ConsumerShell').then((m) => ({ default: m.ConsumerShell }))
+)
+const ConsumerShopShell = lazy(() =>
+  import('./components/public/ConsumerShopShell').then((m) => ({ default: m.ConsumerShopShell }))
+)
+const ConsumerDiscoverPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'ConsumerDiscoverPage'
+)
+const GuestOrderTrackingPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'GuestOrderTrackingPage'
+)
+const GuestOrderReceiptPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'GuestOrderReceiptPage'
+)
+const SupplierShopOrdersPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'ConsumerOrdersPage'
+)
+const ConsumerOrderDetailPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'ConsumerOrderDetailPage'
+)
+const SupplierShopAccountPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'ConsumerAccountPage'
+)
+const ConsumerNotificationsPage = lazyNamedPage(
+  () => import('./pages/publicSales/ConsumerShopPages'),
+  'ConsumerNotificationsPage'
 )
 const RegisterCompletePage = lazyNamedPage(
   () => import('./pages/RegisterCompletePage'),
@@ -341,6 +373,68 @@ const router = createBrowserRouter([
             <PublicSupplierCatalogPage />
           </LazyPage>
         ),
+      },
+      {
+        path: '/order/track/:trackingToken',
+        element: (
+          <LazyPage>
+            <GuestOrderTrackingPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: '/order/receipt',
+        element: (
+          <LazyPage>
+            <GuestOrderReceiptPage />
+          </LazyPage>
+        ),
+      },
+      {
+        path: '/shop',
+        element: (
+          <LazyPage>
+            <ConsumerShopShell />
+          </LazyPage>
+        ),
+        children: [
+          {
+            index: true,
+            element: <ConsumerDiscoverPage />,
+          },
+          {
+            path: 'orders',
+            element: (
+              <ConsumerRoleGuard>
+                <SupplierShopOrdersPage />
+              </ConsumerRoleGuard>
+            ),
+          },
+          {
+            path: 'orders/:orderId',
+            element: (
+              <ConsumerRoleGuard>
+                <ConsumerOrderDetailPage />
+              </ConsumerRoleGuard>
+            ),
+          },
+          {
+            path: 'notifications',
+            element: (
+              <ConsumerRoleGuard>
+                <ConsumerNotificationsPage />
+              </ConsumerRoleGuard>
+            ),
+          },
+          {
+            path: 'account',
+            element: (
+              <ConsumerRoleGuard>
+                <SupplierShopAccountPage />
+              </ConsumerRoleGuard>
+            ),
+          },
+        ],
       },
       {
         path: '/order/:restaurantSlug',

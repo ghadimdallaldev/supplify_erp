@@ -9,6 +9,7 @@ export type DashboardSummary = {
     total_amount: number
     created_at: string
     restaurant_name?: string
+    customer_display_name?: string
     supplier_name?: string
   }>
   spendTrend: Array<{ name: string; value: number }>

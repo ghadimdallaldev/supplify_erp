@@ -89,6 +89,21 @@ export async function getUserPreferences(userId, userType) {
  * Get user contact information (syncs from tenant profile when missing)
  */
 export async function getUserContactInfo(userId, userType) {
+  if (userType === 'CONSUMER') {
+    const { rows } = await query(
+      `SELECT u.email, p.phone
+       FROM app_user u LEFT JOIN consumer_profile p ON p.app_user_id = u.id
+       WHERE u.id = $1 AND u.role = 'CONSUMER'`,
+      [userId]
+    )
+    const contact = rows[0]
+    return {
+      email: contact?.email || null,
+      phone: contact?.phone || null,
+      email_verified: Boolean(contact?.email),
+      phone_verified: false,
+    }
+  }
   const idTable = userType === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const idColumn = userType === 'SUPPLIER' ? 'supplier_id' : 'restaurant_id'
   const contactTable = userType === 'SUPPLIER' ? 'supplier_contact_info' : 'restaurant_contact_info'
@@ -152,6 +167,7 @@ export async function getUserContactInfo(userId, userType) {
  * Look up the tenant (restaurant/supplier) ID for a given app_user ID.
  */
 async function getTenantIdForUser(userId, userType) {
+  if (userType === 'CONSUMER') return null
   const table = userType === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const { rows } = await query(
     `SELECT s.id AS tenant_id
@@ -306,8 +322,12 @@ export async function sendNotification({
     let tenantId = notificationTenantId
     let pushFeatureEnabled = false
     try {
+      if (userType === 'CONSUMER') {
+        allowedChannels = new Set(['in_app', 'email'])
+        pushFeatureEnabled = true
+      }
       if (!tenantId) tenantId = await getTenantIdForUser(userId, userType)
-      if (tenantId) {
+      if (tenantId && userType !== 'CONSUMER') {
         const entitlements = await getEntitlements(tenantId, userType)
         allowedChannels = resolveAllowedChannels(entitlements?.features?.notifications)
         pushFeatureEnabled = await isFeatureEnabled(tenantId, userType, 'push_notifications')
@@ -523,7 +543,9 @@ export function notificationUnreadCacheKey(userId, userType) {
 
 export async function invalidateUserNotificationsListCache(userId, userType = null) {
   if (!userId) return
-  const userTypes = userType ? [userType] : ['RESTAURANT', 'SUPPLIER', 'ADMIN', 'PENDING']
+  const userTypes = userType
+    ? [userType]
+    : ['RESTAURANT', 'SUPPLIER', 'CONSUMER', 'ADMIN', 'PENDING']
   await Promise.all(
     userTypes.flatMap((type) => [
       deleteCache(notificationUnreadCacheKey(userId, type)).catch(() => {}),

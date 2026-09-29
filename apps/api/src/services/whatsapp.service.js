@@ -40,6 +40,7 @@ function redact(recipient) {
  * @param {string|null} [params.tenantId] - For delivery-log attribution.
  * @param {string} [params.eventType] - For delivery-log attribution.
  * @param {string|null} [params.eventKey] - For delivery-log attribution.
+ * @param {boolean} [params.sensitive] - Redact message previews from logs.
  * @returns {Promise<{ sent: boolean, reason?: string, messageId?: string, provider?: string, logOnly?: boolean, skipped?: boolean, error?: string }>}
  */
 export async function sendWhatsAppMessage({
@@ -48,6 +49,7 @@ export async function sendWhatsAppMessage({
   tenantId = null,
   eventType = 'notification',
   eventKey = null,
+  sensitive = false,
 }) {
   if (!to) return { sent: false, reason: 'NO_PHONE' }
   if (!message || !String(message).trim()) {
@@ -74,7 +76,7 @@ export async function sendWhatsAppMessage({
     logger.info('WhatsApp (log only)', {
       to: redact(recipient),
       eventType,
-      preview: String(message).slice(0, 200),
+      preview: sensitive ? '[redacted]' : String(message).slice(0, 200),
     })
     await logWhatsAppDelivery({
       tenantId,

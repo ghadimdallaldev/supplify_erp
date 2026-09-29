@@ -180,8 +180,8 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
     `
     SELECT
       rs.*,
-      r.name AS restaurant_name,
-      r.address_json,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
+      COALESCE(o.delivery_location_snapshot, r.address_json, rs.address_json) AS address_json,
       o.total_amount,
       o.delivery_location_snapshot,
       b.name AS branch_name,
@@ -192,12 +192,17 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
       r.delivery_latitude AS restaurant_delivery_latitude,
       r.delivery_longitude AS restaurant_delivery_longitude,
       r.delivery_location_label AS restaurant_delivery_location_label,
-      COALESCE(dz.name, r.address_json->>'city', 'Unassigned area') AS delivery_area,
+      COALESCE(
+        dz.name,
+        o.delivery_location_snapshot->>'city',
+        r.address_json->>'city',
+        'Unassigned area'
+      ) AS delivery_area,
       (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id) AS item_count,
       da.status AS assignment_status
     FROM route_stop rs
     JOIN customer_order o ON o.id = rs.order_id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT da2.status FROM driver_assignments da2
@@ -500,6 +505,9 @@ export async function createDeliveryRoute({
 
   for (const orderId of uniqueOrderIds) {
     const order = await assertSupplierOwnsOrder(supplierId, orderId)
+    if (String(order.requested_delivery_method || '').toUpperCase() === 'PICKUP') {
+      throw new ValidationError(`Order ${orderId.slice(0, 8)} is pickup-only`)
+    }
     const ineligible = plannedRouteIneligibleReason(order.status)
     if (ineligible) {
       throw new ValidationError(`Order ${orderId.slice(0, 8)}: ${ineligible}`)
@@ -548,8 +556,9 @@ export async function createDeliveryRoute({
     let seq = 1
     for (const orderId of uniqueOrderIds) {
       const { rows: orderRows } = await client.query(
-        `SELECT r.address_json FROM customer_order o
-         JOIN restaurant r ON r.id = o.restaurant_id
+        `SELECT COALESCE(o.delivery_location_snapshot, r.address_json) AS address_json
+         FROM customer_order o
+         LEFT JOIN restaurant r ON r.id = o.restaurant_id
          WHERE o.id = $1`,
         [orderId]
       )
@@ -625,6 +634,9 @@ export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, u
   const uniqueOrderIds = [...new Set(orderIds)]
   for (const orderId of uniqueOrderIds) {
     const order = await assertSupplierOwnsOrder(supplierId, orderId)
+    if (String(order.requested_delivery_method || '').toUpperCase() === 'PICKUP') {
+      throw new ValidationError(`Order ${orderId.slice(0, 8)} is pickup-only`)
+    }
     const ineligible = plannedRouteIneligibleReason(order.status)
     if (ineligible) {
       throw new ValidationError(`Order ${orderId.slice(0, 8)}: ${ineligible}`)
@@ -653,8 +665,9 @@ export async function addOrdersToPlannedRoute({ supplierId, routeId, orderIds, u
       await assertOrderAvailableForRoute(client, orderId, supplierId, routeId)
 
       const { rows: orderRows } = await client.query(
-        `SELECT r.address_json FROM customer_order o
-         JOIN restaurant r ON r.id = o.restaurant_id
+        `SELECT COALESCE(o.delivery_location_snapshot, r.address_json) AS address_json
+         FROM customer_order o
+         LEFT JOIN restaurant r ON r.id = o.restaurant_id
          WHERE o.id = $1`,
         [orderId]
       )
@@ -1230,15 +1243,16 @@ async function findEligibleStandaloneAssignments(supplierId, driverId, routeDate
       da.status AS assignment_status,
       da.created_at,
       o.status AS order_status,
-      r.address_json
+      COALESCE(o.delivery_location_snapshot, r.address_json) AS address_json
     FROM driver_assignments da
     JOIN customer_order o ON o.id = da.order_id
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     WHERE da.supplier_id = $1
       AND da.driver_id = $2
       AND da.status = ANY($3::text[])
       AND o.status NOT IN ('CANCELLED', 'COMPLETED', 'DELIVERED')
+      AND UPPER(COALESCE(o.requested_delivery_method, 'DELIVERY')) <> 'PICKUP'
       AND (
         da.scheduled_delivery_date = $4::date
         OR (
