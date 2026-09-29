@@ -14,7 +14,7 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
       UPPER(LEFT(o.id::text, 8)) AS order_reference,
       o.created_at AS order_created_at,
       o.delivery_location_snapshot,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       r.address_json AS restaurant_address,
       b.id AS branch_id,
       b.name AS branch_name,
@@ -44,7 +44,7 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
           AND (da.id IS NULL OR pod.driver_assignment_id IS NULL OR pod.driver_assignment_id = da.id)
       ) AS pod_available
     FROM customer_order o
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT da2.*

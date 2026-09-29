@@ -106,6 +106,44 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
           </CardContent>
         </Card>
 
+        {order.customer_type && order.customer_type !== 'RESTAURANT' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Public customer</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-muted-foreground">Customer type</p>
+                <p className="font-medium">{order.customer_type}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Customer</p>
+                <p className="font-medium">
+                  {order.customer_contact_snapshot?.name || order.customer_display_name}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Phone</p>
+                <p className="font-medium">{order.customer_contact_snapshot?.phone}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Email</p>
+                <p className="font-medium">
+                  {order.customer_contact_snapshot?.email || 'Not provided'}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Fulfillment</p>
+                <p className="font-medium">{order.requested_delivery_method}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Payment</p>
+                <p className="font-medium">{order.checkout_payment_method?.replace(/_/g, ' ')}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {order.notes && (
           <Card>
             <CardHeader>
@@ -244,9 +282,11 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
               <span>
                 $
                 {formatPrice(
-                  promotionDiscount > 0
-                    ? Number(order.total_amount) + promotionDiscount
-                    : order.total_amount
+                  order.subtotal_amount != null
+                    ? Number(order.subtotal_amount)
+                    : promotionDiscount > 0
+                      ? Number(order.total_amount) + promotionDiscount
+                      : order.total_amount
                 )}
               </span>
             </div>
@@ -264,7 +304,7 @@ export function OrderDetailsTab({ orderId }: OrderDetailsTabProps) {
             ) : null}
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--text-muted)]">{t('detailsTab.shipping')}</span>
-              <span>$0.00</span>
+              <span>${formatPrice(order.delivery_fee || 0)}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--text-muted)]">{t('detailsTab.tax')}</span>

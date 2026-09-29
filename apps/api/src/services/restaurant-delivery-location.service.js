@@ -12,7 +12,7 @@ const ORDER_DESTINATION_SQL = `
     o.branch_id,
     o.restaurant_id,
     o.delivery_location_snapshot,
-    r.name AS restaurant_name,
+    COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
     r.delivery_latitude AS restaurant_delivery_latitude,
     r.delivery_longitude AS restaurant_delivery_longitude,
     r.delivery_location_label AS restaurant_delivery_location_label,
@@ -23,7 +23,7 @@ const ORDER_DESTINATION_SQL = `
     b.delivery_location_label AS branch_delivery_location_label,
     b.address AS branch_address
   FROM customer_order o
-  JOIN restaurant r ON r.id = o.restaurant_id
+  LEFT JOIN restaurant r ON r.id = o.restaurant_id
   LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
   WHERE o.id = $1
 `

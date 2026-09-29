@@ -14,6 +14,14 @@ import type {
   PublicReservationSummary,
   PublicReservationDetails,
   PublicReservationManagePayload,
+  PublicOrderPreview,
+  PublicOrder,
+  PublicFulfillmentMethod,
+  PublicPaymentMethod,
+  PublicDeliveryAddress,
+  SupplierPublicSalesConfig,
+  ConsumerAddress,
+  ConsumerReorderPreview,
 } from '../../../types'
 export const publicApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -57,6 +65,162 @@ export const publicApi = api.injectEndpoints({
         url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/products/priced`,
         params: { page, limit, q, category },
       }),
+    }),
+    getPublicSalesSuppliers: builder.query<
+      {
+        suppliers: Array<{ id: string; name: string; slug: string; logoUrl?: string | null }>
+        pagination: { page: number; limit: number; total: number }
+      },
+      { page?: number; limit?: number; q?: string } | void
+    >({
+      query: (params) => ({
+        url: '/api/public/suppliers',
+        params: params || undefined,
+        credentials: 'omit',
+      }),
+    }),
+    previewPublicOrder: builder.mutation<
+      PublicOrderPreview,
+      {
+        idOrSlug: string
+        items: Array<{ productId: string; quantity: number }>
+        fulfillmentMethod: PublicFulfillmentMethod
+        deliveryAddress?: PublicDeliveryAddress
+        paymentMethod: PublicPaymentMethod
+      }
+    >({
+      query: ({ idOrSlug, ...body }) => ({
+        url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/orders/preview`,
+        method: 'POST',
+        body,
+        credentials: 'omit',
+      }),
+    }),
+    placePublicOrder: builder.mutation<
+      {
+        order: PublicOrder
+        supplierName?: string
+        trackingToken?: string | null
+        replay: boolean
+        bankTransferInstructions?: string | null
+      },
+      {
+        idOrSlug: string
+        idempotencyKey: string
+        authenticated: boolean
+        items: Array<{ productId: string; quantity: number }>
+        fulfillmentMethod: PublicFulfillmentMethod
+        deliveryAddress?: PublicDeliveryAddress
+        paymentMethod: PublicPaymentMethod
+        customer: { name: string; phone: string; email?: string; whatsappConsent?: boolean }
+        deliveryNotes?: string
+      }
+    >({
+      query: ({ idOrSlug, idempotencyKey, authenticated, ...body }) => ({
+        url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/orders`,
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': idempotencyKey },
+        ...(authenticated ? {} : { credentials: 'omit' as const }),
+      }),
+    }),
+    getGuestPublicOrder: builder.query<PublicOrder, string>({
+      query: (token) => ({
+        url: `/api/public/orders/${encodeURIComponent(token)}`,
+        credentials: 'omit',
+      }),
+    }),
+    getSupplierPublicSales: builder.query<
+      {
+        config: SupplierPublicSalesConfig
+        warehouses: Array<{
+          id: string
+          name: string
+          code: string
+          address?: Record<string, unknown>
+          hasActiveDeliveryZone: boolean
+        }>
+      },
+      void
+    >({ query: () => '/api/supplier/public-sales' }),
+    updateSupplierPublicSales: builder.mutation<
+      {
+        config: SupplierPublicSalesConfig
+        warehouses: Array<{
+          id: string
+          name: string
+          code: string
+          address?: Record<string, unknown>
+          hasActiveDeliveryZone: boolean
+        }>
+      },
+      {
+        enabled: boolean
+        deliveryWarehouseIds: string[]
+        pickupWarehouseId?: string | null
+        paymentMethods: PublicPaymentMethod[]
+        bankTransferInstructions?: string | null
+      }
+    >({
+      query: (body) => ({ url: '/api/supplier/public-sales', method: 'PATCH', body }),
+    }),
+    getConsumerProfile: builder.query<
+      {
+        profile: { id: string; email: string; display_name: string; phone?: string | null } | null
+      },
+      void
+    >({
+      query: () => '/api/consumer/profile',
+      providesTags: ['User'],
+    }),
+    updateConsumerProfile: builder.mutation<
+      { profile: unknown },
+      { name?: string; phone?: string | null }
+    >({
+      query: (body) => ({ url: '/api/consumer/profile', method: 'PATCH', body }),
+      invalidatesTags: ['User'],
+    }),
+    getConsumerAddresses: builder.query<{ addresses: ConsumerAddress[] }, void>({
+      query: () => '/api/consumer/addresses',
+    }),
+    createConsumerAddress: builder.mutation<
+      { address: ConsumerAddress },
+      Omit<ConsumerAddress, 'id' | 'recipient_name' | 'address_json' | 'is_default'> & {
+        recipientName: string
+        address: PublicDeliveryAddress
+        isDefault?: boolean
+      }
+    >({
+      query: (body) => ({ url: '/api/consumer/addresses', method: 'POST', body }),
+    }),
+    updateConsumerAddress: builder.mutation<
+      { address: ConsumerAddress },
+      {
+        id: string
+        label?: string | null
+        recipientName?: string
+        phone?: string
+        address?: PublicDeliveryAddress
+        isDefault?: boolean
+      }
+    >({
+      query: ({ id, ...body }) => ({
+        url: `/api/consumer/addresses/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+    }),
+    deleteConsumerAddress: builder.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/api/consumer/addresses/${id}`, method: 'DELETE' }),
+    }),
+    getConsumerPublicOrders: builder.query<{ orders: PublicOrder[] }, void>({
+      query: () => '/api/consumer/orders',
+    }),
+    getConsumerPublicOrder: builder.query<{ order: PublicOrder }, string>({
+      query: (id) => `/api/consumer/orders/${id}`,
+    }),
+    getConsumerReorderPreview: builder.mutation<ConsumerReorderPreview, string>({
+      query: (id) => ({ url: `/api/consumer/orders/${id}/reorder-preview`, method: 'POST' }),
     }),
 
     getQuoteRequests: builder.query<

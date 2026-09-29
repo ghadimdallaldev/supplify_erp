@@ -8,6 +8,7 @@ import {
   fetchUserLocales,
 } from '../../i18n/index.js'
 import { sendTemplateEmail } from '../email/email.service.js'
+import { isWhatsAppConfigured, sendWhatsAppMessage } from '../whatsapp.service.js'
 import { getUpgradePathForTenant } from '../../lib/subscription/plans.js'
 import { notifyTenantUsers, sendNotification, listTenantUserIds } from './in-app.js'
 import { getIO } from '../../lib/socket.js'
@@ -362,11 +363,77 @@ export async function notifyOrderStatusChange(order, status) {
     (order.cancelled_by === 'SUPPLIER' || order.cancelledBy === 'SUPPLIER')
 
   if (status === 'PLACED') {
-    return notifyTenantUsers({
+    const supplierDelivery = notifyTenantUsers({
       tenantId: order.supplier_id,
       tenantType: 'SUPPLIER',
       ...payload,
     })
+    if (order.customer_type === 'CONSUMER' && order.consumer_user_id) {
+      const consumerDelivery = sendNotification({
+        userId: order.consumer_user_id,
+        userType: 'CONSUMER',
+        notificationType: payload.notificationType,
+        notificationCategory: payload.notificationCategory,
+        title: msg.title,
+        message: msg.message,
+        referenceId: order.id,
+        referenceType: 'ORDER',
+        metadata: { ...payload.metadata, ctaUrl: `/shop/orders/${order.id}` },
+      })
+      return Promise.all([supplierDelivery, consumerDelivery])
+    }
+    return supplierDelivery
+  }
+
+  if (order.customer_type === 'CONSUMER' && order.consumer_user_id) {
+    return sendNotification({
+      userId: order.consumer_user_id,
+      userType: 'CONSUMER',
+      notificationType: payload.notificationType,
+      notificationCategory: payload.notificationCategory,
+      title: msg.title,
+      message: msg.message,
+      referenceId: order.id,
+      referenceType: 'ORDER',
+      metadata: { ...payload.metadata, ctaUrl: `/shop/orders/${order.id}` },
+    })
+  }
+
+  if (order.customer_type === 'GUEST') {
+    const contact = order.customer_contact_snapshot || {}
+    const deliveries = []
+    if (contact.email) {
+      deliveries.push(
+        sendTemplateEmail({
+          to: contact.email,
+          template: `order.${String(status).toLowerCase()}`,
+          data: {
+            orderNumber: `ORD-${String(order.id).slice(0, 8).toUpperCase()}`,
+            status,
+            total: order.total_amount,
+            tenantName: order.supplier_name,
+          },
+          tenantId: order.supplier_id,
+          entityId: order.id,
+          eventType: `public_order.${String(status).toLowerCase()}`,
+          eventKey: `public-order:${order.id}:${status}:email`,
+          sensitive: true,
+        })
+      )
+    }
+    if (contact.whatsappConsent && contact.phone && isWhatsAppConfigured()) {
+      deliveries.push(
+        sendWhatsAppMessage({
+          to: contact.phone,
+          message: `Supplify order ORD-${String(order.id).slice(0, 8).toUpperCase()} is now ${String(status).toLowerCase().replaceAll('_', ' ')}.`,
+          tenantId: order.supplier_id,
+          eventType: `public_order.${String(status).toLowerCase()}`,
+          eventKey: `public-order:${order.id}:${status}:whatsapp`,
+          sensitive: true,
+        })
+      )
+    }
+    return Promise.all(deliveries)
   }
 
   if (String(status).startsWith('RECEIVED_')) {

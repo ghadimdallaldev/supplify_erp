@@ -191,6 +191,7 @@
       { "name": "admin", "description": "Administrator role" },
       { "name": "supplier", "description": "Supplier role" },
       { "name": "restaurant", "description": "Restaurant role" },
+      { "name": "consumer", "description": "Personal consumer role" },
       { "name": "staff_portal", "description": "Operational staff portal (no admin app access)" }
     ]
   },

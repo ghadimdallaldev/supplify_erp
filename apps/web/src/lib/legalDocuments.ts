@@ -126,8 +126,11 @@ const REGISTRATION_CORE: LegalDocumentSlug[] = [
 ]
 
 export function requiredRegistrationSlugs(
-  accountType: 'RESTAURANT' | 'SUPPLIER'
+  accountType: 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER'
 ): LegalDocumentSlug[] {
+  if (accountType === 'CONSUMER') {
+    return ['terms_and_conditions', 'privacy_policy']
+  }
   const roleSlug: LegalDocumentSlug =
     accountType === 'SUPPLIER' ? 'supplier_agreement' : 'restaurant_agreement'
   return [...REGISTRATION_CORE, roleSlug]

@@ -9,7 +9,7 @@ export type LegalAcceptanceStatus = {
   requiredDocuments: string[]
   missingDocuments: string[]
   variant: 'registration' | 'invite'
-  accountType: 'RESTAURANT' | 'SUPPLIER' | null
+  accountType: 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER' | null
 }
 
 export interface User {
@@ -18,7 +18,7 @@ export interface User {
   /** From Keycloak access token; false until email OTP verification completes */
   emailVerified?: boolean
   displayName: string
-  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'PENDING' | 'STAFF_PORTAL'
+  role: 'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'CONSUMER' | 'PENDING' | 'STAFF_PORTAL'
   /** platform = main app; staff_portal = operational staff only */
   accessType?: 'platform' | 'staff_portal'
   staffPortal?: {

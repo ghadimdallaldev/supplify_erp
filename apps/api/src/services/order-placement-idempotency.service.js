@@ -41,8 +41,18 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
-export async function lookupOrderPlacementKey(dbQuery, { restaurantId, key, requestHash }) {
+function placementActorScope({ actorScope, restaurantId }) {
+  if (actorScope) return String(actorScope).trim()
+  if (restaurantId) return `RESTAURANT:${restaurantId}`
+  throw new IdempotencyConflictError('Order placement actor scope is required')
+}
+
+export async function lookupOrderPlacementKey(
+  dbQuery,
+  { actorScope, restaurantId = null, key, requestHash }
+) {
   if (!key) return null
+  const scope = placementActorScope({ actorScope, restaurantId })
   const normalizedKey = String(key).trim()
   if (normalizedKey.length < 8 || normalizedKey.length > 200) {
     throw new IdempotencyConflictError(
@@ -53,8 +63,8 @@ export async function lookupOrderPlacementKey(dbQuery, { restaurantId, key, requ
   const { rows } = await dbQuery(
     `SELECT id, request_hash, status, response_json
      FROM order_placement_idempotency
-     WHERE restaurant_id = $1 AND idempotency_key = $2`,
-    [restaurantId, normalizedKey]
+     WHERE actor_scope = $1 AND idempotency_key = $2`,
+    [scope, normalizedKey]
   )
   const row = rows[0]
   if (!row) return null
@@ -79,8 +89,12 @@ export async function lookupOrderPlacementKey(dbQuery, { restaurantId, key, requ
  * rolled-back order also rolls back its IN_PROGRESS claim, so retries remain
  * possible after failed placement.
  */
-export async function claimOrderPlacementKey(client, { restaurantId, key, requestHash }) {
+export async function claimOrderPlacementKey(
+  client,
+  { actorScope, restaurantId = null, key, requestHash }
+) {
   if (!key) return { enabled: false, replay: null }
+  const scope = placementActorScope({ actorScope, restaurantId })
 
   const normalizedKey = String(key).trim()
   if (normalizedKey.length < 8 || normalizedKey.length > 200) {
@@ -100,11 +114,11 @@ export async function claimOrderPlacementKey(client, { restaurantId, key, reques
 
   const { rows: inserted } = await client.query(
     `INSERT INTO order_placement_idempotency
-       (restaurant_id, idempotency_key, request_hash, status)
-     VALUES ($1, $2, $3, 'IN_PROGRESS')
-     ON CONFLICT (restaurant_id, idempotency_key) DO NOTHING
+       (restaurant_id, actor_scope, idempotency_key, request_hash, status)
+     VALUES ($1, $2, $3, $4, 'IN_PROGRESS')
+     ON CONFLICT (actor_scope, idempotency_key) DO NOTHING
      RETURNING id, status`,
-    [restaurantId, normalizedKey, requestHash]
+    [restaurantId, scope, normalizedKey, requestHash]
   )
   if (inserted.length) {
     return { enabled: true, replay: null, id: inserted[0].id, key: normalizedKey }
@@ -113,9 +127,9 @@ export async function claimOrderPlacementKey(client, { restaurantId, key, reques
   const { rows: existing } = await client.query(
     `SELECT id, request_hash, status, response_json
      FROM order_placement_idempotency
-     WHERE restaurant_id = $1 AND idempotency_key = $2
+     WHERE actor_scope = $1 AND idempotency_key = $2
      FOR UPDATE`,
-    [restaurantId, normalizedKey]
+    [scope, normalizedKey]
   )
   const row = existing[0]
   if (!row) {

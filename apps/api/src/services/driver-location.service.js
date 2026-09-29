@@ -430,8 +430,8 @@ export async function getOrderTracking({
 
   const owned = await assertSupplierOwnsOrder(supplierId, orderId)
   const { rows: restRows } = await query(
-    `SELECT r.name AS restaurant_name FROM customer_order o
-     JOIN restaurant r ON r.id = o.restaurant_id WHERE o.id = $1`,
+    `SELECT COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name
+     FROM customer_order o LEFT JOIN restaurant r ON r.id = o.restaurant_id WHERE o.id = $1`,
     [orderId]
   )
   const orderRow = { ...owned, restaurant_name: restRows[0]?.restaurant_name }

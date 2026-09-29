@@ -276,6 +276,13 @@ export interface PublicSupplier {
   minimumOrderAmount?: number | null
   paymentTerms?: string | null
   publicCatalogEnabled?: boolean
+  publicSalesEnabled?: boolean
+  salesLocations?: Array<{
+    supplierId: string
+    paymentMethods: import('./publicSales').PublicPaymentMethod[]
+    deliveryEnabled: boolean
+    pickupEnabled: boolean
+  }>
   productCount?: number
 }
 
@@ -292,6 +299,9 @@ export interface PublicSupplierProduct {
   currentPrice?: number | null
   currency?: string
   pricingSource?: string | null
+  orderable?: boolean
+  moq?: number
+  orderMultiple?: number
 }
 
 export interface PublicSupplierProductsResponse {

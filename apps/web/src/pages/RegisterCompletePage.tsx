@@ -15,7 +15,7 @@ import {
 } from '../services/api'
 import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { useAppDispatch } from '../hooks/redux'
-import { Building2, Loader2, Store, Truck } from 'lucide-react'
+import { Building2, Loader2, Store, Truck, UserRound } from 'lucide-react'
 import type { FetchBaseQueryError } from '@reduxjs/toolkit/query'
 import {
   LegalAcceptancePanel,
@@ -26,7 +26,7 @@ import { clearReferralToken } from '../lib/referralToken'
 import { redirectToLogout } from '../lib/authRedirect'
 import { ensureNamespace } from '../i18n'
 
-type AccountType = 'RESTAURANT' | 'SUPPLIER'
+type AccountType = 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER'
 
 function isUnauthorized(error: unknown): boolean {
   return (
@@ -125,16 +125,25 @@ export function RegisterCompletePage() {
       return
     }
     try {
-      await completeRegistration({
-        accountType,
-        businessName: businessName.trim(),
-        phone: phone.trim() || undefined,
-        referralToken,
-        legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
-      }).unwrap()
+      await completeRegistration(
+        accountType === 'CONSUMER'
+          ? {
+              accountType,
+              name: user.name || user.email.split('@')[0],
+              phone: phone.trim() || undefined,
+              legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
+            }
+          : {
+              accountType,
+              businessName: businessName.trim(),
+              phone: phone.trim() || undefined,
+              referralToken,
+              legalAcceptance: buildLegalAcceptancePayload(acceptedLegal),
+            }
+      ).unwrap()
       clearReferralToken()
       void refetchAppSession(dispatch)
-      navigate('/app/activate', { replace: true })
+      navigate(accountType === 'CONSUMER' ? '/shop' : '/app/activate', { replace: true })
     } catch (err: unknown) {
       const fetchErr = err as FetchBaseQueryError
       const isNetworkError =
@@ -234,7 +243,7 @@ export function RegisterCompletePage() {
 
             <div className="space-y-2">
               <Label>{t('registerComplete.accountTypeLabel')}</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setAccountType('RESTAURANT')}
@@ -259,24 +268,38 @@ export function RegisterCompletePage() {
                   <Truck className="h-6 w-6" />
                   <span className="text-sm font-medium">{t('registerComplete.supplier')}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType('CONSUMER')}
+                  className={
+                    accountType === 'CONSUMER'
+                      ? 'flex flex-col items-center gap-2 rounded-lg border-2 border-[var(--brand)] bg-[var(--brand-pale)] p-4'
+                      : 'flex flex-col items-center gap-2 rounded-lg border-2 border-[var(--app-border)] p-4'
+                  }
+                >
+                  <UserRound className="h-6 w-6" />
+                  <span className="text-sm font-medium">Personal shopper</span>
+                </button>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="businessName">{t('registerComplete.businessNameLabel')}</Label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-3 h-4 w-4 text-[var(--text-muted)]" />
-                <Input
-                  id="businessName"
-                  className="pl-9"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder={t('registerComplete.businessNamePlaceholder')}
-                  required
-                  minLength={2}
-                />
+            {accountType !== 'CONSUMER' && (
+              <div className="space-y-2">
+                <Label htmlFor="businessName">{t('registerComplete.businessNameLabel')}</Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-3 h-4 w-4 text-[var(--text-muted)]" />
+                  <Input
+                    id="businessName"
+                    className="pl-9"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder={t('registerComplete.businessNamePlaceholder')}
+                    required
+                    minLength={2}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="phone">{t('registerComplete.phoneLabel')}</Label>

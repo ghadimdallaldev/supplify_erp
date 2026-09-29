@@ -250,9 +250,11 @@ async function fetchRecentSupplierOrders(supplierId) {
        o.status,
        o.total_amount,
        COALESCE(o.placed_at, o.created_at) AS created_at,
-       r.name AS restaurant_name
+       r.name AS restaurant_name,
+       o.customer_type,
+       COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name
      FROM customer_order o
-     JOIN restaurant r ON r.id = o.restaurant_id
+     LEFT JOIN restaurant r ON r.id = o.restaurant_id
      WHERE EXISTS (
        SELECT 1 FROM order_item oi
        WHERE oi.order_id = o.id AND oi.supplier_id = $1

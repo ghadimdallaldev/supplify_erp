@@ -52,7 +52,11 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
-import { assertOrderReadAccess, loadOrderWarehouseAssignments } from './orders.helpers.js'
+import {
+  assertOrderReadAccess,
+  buildOrderCustomerContract,
+  loadOrderWarehouseAssignments,
+} from './orders.helpers.js'
 
 const router = express.Router()
 
@@ -66,6 +70,7 @@ router.get('/:id', async (req, res, next) => {
       SELECT 
         o.*,
         r.name as restaurant_name,
+        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name,
         r.slug as restaurant_slug,
         r.address_json as restaurant_address,
         r.delivery_instructions as restaurant_delivery_instructions,
@@ -76,7 +81,7 @@ router.get('/:id', async (req, res, next) => {
         b.delivery_instructions as branch_delivery_instructions,
         b.phone as branch_phone
       FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
       WHERE o.id = $1
     `,
@@ -181,6 +186,7 @@ router.get('/:id', async (req, res, next) => {
       data: {
         order: {
           ...order,
+          ...buildOrderCustomerContract(order),
           items,
           warehouseAssignments,
           multiLocationFulfillment: warehouseAssignments.some((a) => a.order_item_id != null),

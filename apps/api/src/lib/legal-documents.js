@@ -60,3 +60,8 @@ export function requiredInviteDocuments() {
     LEGAL_DOCUMENT_SLUGS.COOKIE_POLICY,
   ]
 }
+
+/** Platform agreements for a personal consumer account (no tenant/DPA). */
+export function requiredConsumerRegistrationDocuments() {
+  return [LEGAL_DOCUMENT_SLUGS.TERMS_AND_CONDITIONS, LEGAL_DOCUMENT_SLUGS.PRIVACY_POLICY]
+}

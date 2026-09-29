@@ -486,10 +486,12 @@ router.get('/:id/assignments', requirePermission('FULFILLMENT_VIEW'), async (req
 
     const { rows } = await query(
       `
-      SELECT da.*, r.name AS restaurant_name, o.total_amount
+      SELECT da.*,
+             COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
+             o.total_amount
       FROM driver_assignments da
       JOIN customer_order o ON o.id = da.order_id
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       WHERE da.driver_id = $1 AND da.supplier_id = $2
       ORDER BY da.assigned_at DESC
       LIMIT 100
