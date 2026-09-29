@@ -72,6 +72,9 @@ function scheduleOrderStatusNotification(orderRow, status, supplierId) {
             total_amount: orderRow.total_amount,
             restaurant_id: orderRow.restaurant_id,
             supplier_id: supplierId,
+            customer_type: orderRow.customer_type,
+            consumer_user_id: orderRow.consumer_user_id,
+            customer_contact_snapshot: orderRow.customer_contact_snapshot,
           },
           status
         )
@@ -103,6 +106,9 @@ function scheduleOrderStatusNotification(orderRow, status, supplierId) {
           restaurant_name: restaurantName,
           supplier_id: supplierId,
           supplier_name: supplierName,
+          customer_type: orderRow.customer_type,
+          consumer_user_id: orderRow.consumer_user_id,
+          customer_contact_snapshot: orderRow.customer_contact_snapshot,
           cancelled_by: orderRow.cancelled_by,
           cancel_reason: orderRow.cancel_reason,
         },
@@ -791,6 +797,38 @@ export async function loadOrderWarehouseAssignments(orderId) {
     [orderId]
   )
   return rows
+}
+
+export function buildOrderCustomerContract(order) {
+  const customerType = order.customer_type || 'RESTAURANT'
+  const snapshot = order.customer_contact_snapshot || {}
+  const deliveryFee = Number(order.delivery_fee || 0)
+  const total = Number(order.total_amount || 0)
+
+  const customer =
+    customerType === 'RESTAURANT'
+      ? {
+          type: 'RESTAURANT',
+          id: order.restaurant_id || null,
+          name: order.restaurant_name || order.customer_display_name || null,
+          slug: order.restaurant_slug || null,
+        }
+      : {
+          type: customerType,
+          name: snapshot.name || order.customer_display_name || null,
+          phone: snapshot.phone || null,
+          email: snapshot.email || null,
+        }
+
+  return {
+    customerType,
+    customer,
+    fulfillmentMethod: order.requested_delivery_method || null,
+    paymentMethod: order.checkout_payment_method || null,
+    subtotal: Number(order.subtotal_amount ?? total - deliveryFee),
+    deliveryFee,
+    total,
+  }
 }
 
 export {

@@ -1,19 +1,37 @@
-# Supplify ERP — Full application manual QA checklist
+# Supplify — Full system manual QA checklist (Web ERP + Mobile)
 
-Use this document for **end-to-end manual testing** across **Public**, **Restaurant**, **Supplier**, and **Platform Admin** personas.
+Use this document for **end-to-end manual testing** of the **web ERP** (`apps/web` + `apps/api`) and **native mobile apps** (Android + iOS) across **Public**, **Restaurant**, **Supplier**, **Driver**, **Staff portal**, and **Platform Admin** personas.
 
-**Test order for a fresh database wipe:** Start at Part 0, then Part 1 (restaurant creation), Part 2 (supplier creation), Part 3 (feature gate verification), then Parts 4–12 for full regression.
+**Printable PDF:** From repo root run `pnpm docs:qa:pdf` → `docs/qa/output/Supplify-Manual-QA-Checklist.pdf` (landscape A4). HTML fallback: `docs/qa/output/Supplify-Manual-QA-Checklist.html` (browser → Print → Save as PDF).
+
+**Recommended test order (fresh database wipe):** Part 0 → Part 1 → Part 2 → Part 3 → Parts 4–12 (web ERP) → **Part 13** (mobile, both platforms) → **Part 14** (cross-platform parity spot checks) → Part 10–11 if QA lead runs API/CI smoke.
+
+---
+
+## Surfaces under test
+
+| Surface        | Where to run                                                               | Primary checklist sections            |
+| -------------- | -------------------------------------------------------------------------- | ------------------------------------- |
+| Web ERP        | `http://localhost:5173` (or staging URL) + same-origin API                 | Parts 0–12, Part 14 (web side)        |
+| Android        | `C:/myProjects/supplify-mobile` — Expo dev client or EAS **preview** build | Part 13 (repeat every case) + Part 14 |
+| iOS            | `C:/myProjects/supplify-mobile-ios` — Simulator or TestFlight **preview**  | Part 13 (repeat every case) + Part 14 |
+| API-only smoke | curl / Postman / `pnpm test:api`                                           | Part 10–11                            |
+
+**Web-only (no native screen — verify on web only):** Platform admin console tabs, bulk product image import UI, org overview analytics depth, consumer guest menu admin, staff portal `/staff/*`, most supplier settings tabs (warehouses/zones, branding upload, deal boost admin review), impersonation banner workflows, and responsive web layout polish.
+
+**Mobile-first or mobile-only:** Driver foreground GPS, POD camera/signature capture, Expo push tap deep links, native offline banner + pull-to-refresh, branch/workspace switcher on device.
 
 ---
 
 ## How to use this checklist
 
-1. **Record results:** Pass / Fail / Blocked / N/A in **Pass?**; add tester name, date, build/branch, and notes in the sign-off table.
-2. **Test matrix:** Parts 0–3 must run before anything else on a wiped database. Parts 4–12 can run in parallel across personas once accounts exist.
-3. **Deep links:** Many routes work when typed in the address bar even if not in the sidebar — test those once per persona.
-4. **Delivery GPS:** Restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver **§7.4.2** (`DRV-GPS1–3`). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
+1. **Record results:** Pass / Fail / Blocked / N/A in **Pass?**; add tester name, date, build/branch/app version, API environment, device/OS (mobile), and notes in the sign-off table.
+2. **Test matrix:** Parts 0–3 must run before anything else on a wiped database. Parts 4–12 can run in parallel across web personas once accounts exist. Part 13 requires the same API backend the web tests used (shared entitlements and seed data).
+3. **Deep links:** Many web routes work when typed in the address bar even if not in the sidebar — test those once per persona.
+4. **Delivery GPS:** Web: restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver web **§7.4.2** (`DRV-GPS1–3`). Mobile driver: **Part 13.4** (`MOB-D*`). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
 5. **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
-6. **2026-09-10 delta:** After Parts 0–3, run the **[2026-09-10 release smoke pack](#2026-09-10-release-smoke-pack-run-today)** (hospitality, promotions billing, quote inbox v2, fulfillment/POD). Design specs: [hospitality](../superpowers/specs/2026-09-10-hospitality-excellence-design.md), [promotions](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md).
+6. **Release delta packs:** After Parts 0–3, run the **[2026-09-10 release smoke pack](#2026-09-10-release-smoke-pack-run-today)** on web; re-run the overlapping mobile rows in **Part 13** and **Part 14** (orders, quotes, fulfillment/POD, receiving).
+7. **Mobile preflight (optional, before Part 13):** In each mobile repo: `npx tsc --noEmit`, `npm test -- --runInBand`, `npx expo-doctor` — records build health; does not replace manual Part 13.
 
 ---
 
@@ -61,7 +79,7 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | SETUP-01 | Stop all running services (`Ctrl+C` in each terminal or `pnpm run dev` teardown)                                                                               | No API or web process running on ports 3001/5173                                                                                                                                                          | pass  |
 | SETUP-02 | Drop and recreate the database: run your project's DB reset script (e.g. `pnpm run db:reset` or `psql -c "DROP DATABASE supplify; CREATE DATABASE supplify;"`) | Clean empty database; no tables                                                                                                                                                                           | pass  |
-| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All **~204** migrations apply through **`0203_promotion_ad_disputed`** (incl. `0196`–`0203` for 2026-09-10); no errors                                                                                    | pass  |
+| SETUP-03 | Run all migrations: `pnpm run db:migrate`                                                                                                                      | All **223** migrations apply through **`0222_one_open_staff_time_entry`** (incl. `0196`–`0203` hospitality/promotions/quote inbox); no errors                                                             | pass  |
 | SETUP-04 | Seed the subscription plan catalog: `pnpm run seed:tier-catalog`                                                                                               | Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in `subscription_plan` table; confirm with `SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;`          | pass  |
 | SETUP-05 | Verify plan catalog (post `0117` + `0145`): `pnpm run log:tier-limits` or query `subscription_plan` for `code = 'silver'`                                      | Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no `promotions` limit key; Silver supplier: 1 warehouse, `promotions` 3; Free **`chats_per_day: 3`**; `advanced_roles` false on Silver | pass  |
 | SETUP-06 | Start the API: `pnpm --filter @supplify/api dev`                                                                                                               | API listening; migrations logged; no crash on startup                                                                                                                                                     | pass  |
@@ -307,15 +325,15 @@ Use this document for **end-to-end manual testing** across **Public**, **Restaur
 | AUTH-09 | Finish registration as **Supplier**                          | Same; supplier settings reachable when unlocked            |       |
 | AUTH-10 | User with `needsSetup` from `/api/register/status`           | Forced to `/register/complete` until done                  |       |
 
-## 4.3 Legal re-acceptance (pack `2026-06-09`)
+## 4.3 Legal re-acceptance (pack `2026-09-12`)
 
-> Requires a user whose `legal_acceptance.document_version` ≠ `2026-06-09` (seed or manual DB row). See [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
+> Requires a user whose `legal_acceptance.document_version` ≠ current pack in repo-root `legal-pack-version.json` (**`2026-09-12`** at last doc update). See [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
 
 | ID     | Steps                                                             | Expected                                                                    | Pass? |
 | ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------- | ----- |
 | LEG-01 | Log in as user on stale legal pack → navigate to `/app/dashboard` | Redirect to `/legal/reaccept` before app shell                              |       |
 | LEG-02 | `/legal/reaccept` page                                            | Lists required documents for tenant type; accept-all checkbox required      |       |
-| LEG-03 | Submit acceptance with current pack `2026-06-09`                  | Redirect to `/app`; `GET /auth/me` → `legalStatus.needsReacceptance: false` |       |
+| LEG-03 | Submit acceptance with current pack `2026-09-12`                  | Redirect to `/app`; `GET /auth/me` → `legalStatus.needsReacceptance: false` |       |
 | LEG-04 | Staff portal user on stale pack → `/staff/dashboard`              | Redirect to `/legal/reaccept` first                                         |       |
 | LEG-05 | `PENDING` user during registration                                | `/register/complete`, **not** `/legal/reaccept`                             |       |
 | LEG-06 | POST `/auth/legal-acceptance` with wrong `packVersion`            | 400 validation error                                                        |       |
@@ -1191,18 +1209,182 @@ Migrations: `0197`, `0203`. Spec: [supplier-promotions-excellence](../superpower
 
 # Part 12 — Non-functional & browser matrix
 
-| ID     | Area           | Steps                                      | Expected                                               | Pass? |
-| ------ | -------------- | ------------------------------------------ | ------------------------------------------------------ | ----- |
-| NFR-01 | Browser        | Chrome latest                              | Full pass on critical paths                            |       |
-| NFR-02 | Browser        | Firefox / Safari                           | Layout acceptable                                      |       |
-| NFR-03 | Responsive     | Tablet width                               | Sidebar usable                                         |       |
-| NFR-04 | Performance    | Dashboard with prod-like data              | Loads < 5s                                             |       |
-| NFR-05 | Error handling | Stop API mid-request                       | Toast/error boundary; no white screen                  |       |
-| NFR-06 | Security       | Access other tenant ID in URL              | 403/404                                                |       |
-| NFR-07 | Cache          | Subscription entitlements: call 3× rapidly | Same data; no N+1 to DB                                |       |
-| NFR-08 | WebSocket      | 10-minute idle, then send chat message     | Socket reconnects; message delivers                    |       |
-| NFR-09 | Migration      | Run `db:migrate` on empty DB               | All ~204 migrations apply through `0203` without error |       |
-| NFR-10 | Concurrency    | Two users submit orders simultaneously     | Both orders created; no duplicates                     |       |
+| ID     | Area           | Steps                                      | Expected                                                  | Pass? |
+| ------ | -------------- | ------------------------------------------ | --------------------------------------------------------- | ----- |
+| NFR-01 | Browser        | Chrome latest                              | Full pass on critical paths                               |       |
+| NFR-02 | Browser        | Firefox / Safari                           | Layout acceptable                                         |       |
+| NFR-03 | Responsive     | Tablet width                               | Sidebar usable                                            |       |
+| NFR-04 | Performance    | Dashboard with prod-like data              | Loads < 5s                                                |       |
+| NFR-05 | Error handling | Stop API mid-request                       | Toast/error boundary; no white screen                     |       |
+| NFR-06 | Security       | Access other tenant ID in URL              | 403/404                                                   |       |
+| NFR-07 | Cache          | Subscription entitlements: call 3× rapidly | Same data; no N+1 to DB                                   |       |
+| NFR-08 | WebSocket      | 10-minute idle, then send chat message     | Socket reconnects; message delivers                       |       |
+| NFR-09 | Migration      | Run `db:migrate` on empty DB               | All **223** migrations apply through `0222` without error |       |
+| NFR-10 | Concurrency    | Two users submit orders simultaneously     | Both orders created; no duplicates                        |       |
+
+---
+
+# Part 13 — Mobile apps (Android + iOS)
+
+> Native clients: **`C:/myProjects/supplify-mobile`** (Android) and **`C:/myProjects/supplify-mobile-ios`** (iOS). Both talk to the **same API** as the web ERP. Run **every row on both platforms** unless marked Android-only or iOS-only.
+>
+> **Accounts:** Reuse demo credentials from [Demo credentials](#demo-credentials-for-seeded-environments) — at minimum Gold restaurant (`restaurant-gold@supplify.com`), Gold supplier (`supplier-gold@supplify.com`), a driver user linked to that supplier, and a restricted team member (Purchaser or Manager) for RBAC checks.
+
+## 13.0 Mobile environment & build
+
+| ID         | Steps                                                                                                       | Expected                                                      | Pass? (Android) | Pass? (iOS) |
+| ---------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------- | ----------- |
+| MOB-ENV-01 | Point app `API_URL` / env at the same backend used for web QA (local or staging)                            | App reaches API; no certificate/host errors                   |                 |             |
+| MOB-ENV-02 | Keycloak mobile redirect URI registered (`supplify://auth/callback`)                                        | Login completes and returns to app                            |                 |             |
+| MOB-ENV-03 | Install **dev client** or **EAS preview** build (not production store build unless that is the test target) | Version/build number recorded in sign-off                     |                 |             |
+| MOB-ENV-04 | Optional release gate: `npx tsc --noEmit` in mobile repo                                                    | Exit 0                                                        |                 |             |
+| MOB-ENV-05 | Optional release gate: `npm test -- --runInBand`                                                            | Jest green                                                    |                 |             |
+| MOB-ENV-06 | Optional release gate: `npx expo-doctor`                                                                    | No blocking failures                                          |                 |             |
+| MOB-ENV-07 | Cold start with network on                                                                                  | Splash → login or home within reasonable time; no redbox      |                 |             |
+| MOB-ENV-08 | Toggle airplane mode mid-session → restore network                                                          | Offline banner; lists recover after reconnect/pull-to-refresh |                 |             |
+
+## 13.1 Authentication, session, billing lock, workspace
+
+| ID          | Steps                                                                 | Expected                                                                                 | Pass? (Android) | Pass? (iOS) |
+| ----------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------- | ----------- |
+| MOB-AUTH-01 | Sign in as **restaurant** owner                                       | Restaurant tabs: Home/Orders/Shop/Messages/More (per permissions)                        |                 |             |
+| MOB-AUTH-02 | Sign in as **supplier** owner                                         | Supplier tabs: Dashboard/Orders/Fulfillment/Messages/More                                |                 |             |
+| MOB-AUTH-03 | Sign in as **driver**                                                 | Driver tabs: Deliveries / More only                                                      |                 |             |
+| MOB-AUTH-04 | Sign in as **platform admin**                                         | Admin hub screen; links open web admin URLs in browser (no full admin console in native) |                 |             |
+| MOB-AUTH-05 | Sign in as **restricted** restaurant user (e.g. Purchaser)            | Tabs and actions match permissions; gated screens show upgrade/permission message        |                 |             |
+| MOB-AUTH-06 | Leave app backgrounded 10+ min → foreground                           | Session still valid OR clean re-auth; no stale blank screens                             |                 |             |
+| MOB-AUTH-07 | Force access-token expiry (wait or shorten TTL in dev)                | Silent refresh once; on refresh failure → signed out to login                            |                 |             |
+| MOB-AUTH-08 | Tenant with **billing lock** / activation pending                     | Billing locked screen; cannot reach operational data until unlocked                      |                 |             |
+| MOB-AUTH-09 | Logout from Settings/More                                             | Local session cleared; Keycloak session ended; login screen                              |                 |             |
+| MOB-AUTH-10 | Multi-branch / linked account → switch **primary branch** in settings | Identity refreshes; orders/catalog reflect new branch; no data leak from previous branch |                 |             |
+| MOB-AUTH-11 | User with `PENDING` / incomplete registration                         | Pending/setup screen; cannot access tenant operations                                    |                 |             |
+| MOB-AUTH-12 | Legal re-acceptance required (`legalStatus.needsReacceptance`)        | Blocked from app until accepted (web legal flow or embedded WebView if implemented)      |                 |             |
+
+## 13.2 Restaurant mobile
+
+| ID      | Steps                                                                          | Expected                                                                                 | Pass? (Android) | Pass? (iOS) |
+| ------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | --------------- | ----------- |
+| MOB-R01 | **Home** dashboard loads KPIs/shortcuts                                        | No crash; data matches API entitlements                                                  |                 |             |
+| MOB-R02 | **Shop** → pick supplier → **Catalog** → search/filter                         | Products load; contract/special prices shown when applicable                             |                 |             |
+| MOB-R03 | Add lines to **Cart**; change quantities; remove line                          | Totals update; min order / cutoff warnings if configured                                 |                 |             |
+| MOB-R04 | Place **standard order** from cart                                             | Success; appears in **Orders** list with correct status                                  |                 |             |
+| MOB-R05 | **Orders** → search/filter → open **Order detail**                             | Header, items, status timeline load (no infinite spinner / crash on `{ order }` payload) |                 |             |
+| MOB-R06 | Order detail → **tracking** (when shipped/out for delivery)                    | Map/ETA or status panel; matches web tracking semantics                                  |                 |             |
+| MOB-R07 | **Quick lists** (Gold+): open list → load into cart → order                    | Gated on Free; works on Gold                                                             |                 |             |
+| MOB-R08 | **Deals** feed → apply deal → checkout                                         | Redemption respects plan limits; order shows promotion                                   |                 |             |
+| MOB-R09 | **Quote requests**: create from cart → supplier notified → view detail         | Status updates when supplier responds                                                    |                 |             |
+| MOB-R10 | Open supplier **quote response** → **Add to cart** → place order               | Locked quote price honored at checkout                                                   |                 |             |
+| MOB-R11 | **Receiving** hub → receive delivered order → enter quantities/expiry          | Gated by plan/RBAC; order status moves toward received                                   |                 |             |
+| MOB-R12 | **Disputes**: list → create from order → view detail                           | Gated; links to order lines                                                              |                 |             |
+| MOB-R13 | **Invoices** list → open invoice → **Statement** export/view                   | Gated on Free; currency shown per row                                                    |                 |             |
+| MOB-R14 | **Inventory** / expiry views                                                   | Adjust or view stock per permissions                                                     |                 |             |
+| MOB-R15 | **My prices** / contract price visibility                                      | Matches web contract pricing for restaurant                                              |                 |             |
+| MOB-R16 | **Messages**: list unread badge → open thread → send text                      | Realtime or refresh shows message; gated without `chat` plan                             |                 |             |
+| MOB-R17 | **Messages**: attach image/PDF (if enabled)                                    | Upload succeeds; attachment visible in thread                                            |                 |             |
+| MOB-R18 | **Assistant** (More → Assistant) with `ai_platform`                            | Chat works; without feature → hidden or blocked                                          |                 |             |
+| MOB-R19 | **Reports** (More)                                                             | KPI/report tabs load for entitled plans                                                  |                 |             |
+| MOB-R20 | **Recipes** / recipe costing (Gold+)                                           | Gated; costing fields respect `RECIPES_VIEW_COSTS`                                       |                 |             |
+| MOB-R21 | **Reservations** / Host tab (when host-only or `RESERVATIONS_VIEW`)            | Board loads; create reservation                                                          |                 |             |
+| MOB-R22 | **Staff** list (operational staff management snapshot)                         | Loads for permitted roles                                                                |                 |             |
+| MOB-R23 | **Consumer** menu / guest orders / loyalty (hospitality modules in More)       | Screens load for entitled tenant; ordering hours respected                               |                 |             |
+| MOB-R24 | **Delivery location** save for active branch                                   | PATCH succeeds with `SETTINGS_EDIT`; read works for checkout roles                       |                 |             |
+| MOB-R25 | **Notifications** inbox → tap row                                              | Navigates to order/chat/deal target                                                      |                 |             |
+| MOB-R26 | **Notification preferences** toggles → save → re-open                          | Persists via API                                                                         |                 |             |
+| MOB-R27 | **Subscription / plan** screen                                                 | Shows current plan; upgrade path opens billing WebView/browser if configured             |                 |             |
+| MOB-R28 | Free-tier restaurant: open **Chat** / **Quick lists** / **Invoices** from More | Feature gate or paywall — consistent with Part 3                                         |                 |             |
+
+## 13.3 Supplier mobile
+
+| ID      | Steps                                                                | Expected                                                              | Pass? (Android) | Pass? (iOS) |
+| ------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------- | ----------- |
+| MOB-S01 | **Dashboard** loads command-center style metrics                     | Orders today, receivables, deliveries reflect API v2 summary          |                 |             |
+| MOB-S02 | **Orders** pipeline tabs / filters → open order detail               | Status actions only show allowed transitions                          |                 |             |
+| MOB-S03 | Accept → process → ship flow on test order (from restaurant MOB-R04) | Status matches web ERP; restaurant sees update                        |                 |             |
+| MOB-S04 | **Decline** order with reason                                        | Restaurant notified; decline visible on mobile + web                  |                 |             |
+| MOB-S05 | **Fulfillment** dispatch board → assign driver                       | Sends `warehouse_assignment_id`; driver sees stop                     |                 |             |
+| MOB-S06 | **Reassign** driver on same leg                                      | Sends `driver_assignment_id` + warehouse leg; previous driver dropped |                 |             |
+| MOB-S07 | **Active deliveries map**                                            | Pins/load for in-flight routes (Gold + fulfillment entitlement)       |                 |             |
+| MOB-S08 | **Run sheet** for today                                              | Orders list matches supplier timezone day boundary                    |                 |             |
+| MOB-S09 | **Pick lists** → complete wave                                       | Stock committed for correct warehouse leg only                        |                 |             |
+| MOB-S10 | **Quote inbox** → respond per line (manager)                         | Prices/qty saved; restaurant sees compare view                        |                 |             |
+| MOB-S11 | Quote inbox as **view-only** user                                    | Can read; cannot submit response                                      |                 |             |
+| MOB-S12 | **Promotions / deals** → create draft → submit for review            | Validation matches web (description, discount rules)                  |                 |             |
+| MOB-S13 | **Deal analytics** for active deal                                   | Metrics load                                                          |                 |             |
+| MOB-S14 | **Featured placement** payment sheet (if used)                       | Payment pending until admin approval                                  |                 |             |
+| MOB-S15 | **Products** list (mobile catalog management scope)                  | CRUD within mobile scope; deep admin on web                           |                 |             |
+| MOB-S16 | **Contract pricing** mobile view/edit                                | Dates as `YYYY-MM-DD`; min/discount clears persist                    |                 |             |
+| MOB-S17 | **Warehouses** / **Drivers** lists                                   | Read/manage per RBAC; no cross-tenant rows                            |                 |             |
+| MOB-S18 | **Inventory** adjust at warehouse                                    | Insufficient stock returns error (no silent clamp)                    |                 |             |
+| MOB-S19 | **Receivables** / **Incoming disputes**                              | Gated by finance/disputes features                                    |                 |             |
+| MOB-S20 | **Customer growth** import/connect (if entitled)                     | CSV preview/import; connection request flow                           |                 |             |
+| MOB-S21 | **Customers** list / follow-ups                                      | Loads; reminder actions when permitted                                |                 |             |
+| MOB-S22 | **Messages** + **Assistant**                                         | Same gating as restaurant; supplier context tools work                |                 |             |
+| MOB-S23 | **Reports**                                                          | Supplier report tabs respect permissions                              |                 |             |
+| MOB-S24 | **Notifications** + push tap → order/chat                            | Deep link opens correct screen                                        |                 |             |
+| MOB-S25 | Silver supplier: **Fulfillment** without driver management           | Manual fulfillment OK; driver dispatch hidden/403                     |                 |             |
+
+## 13.4 Driver mobile
+
+| ID      | Steps                                                | Expected                                                                              | Pass? (Android) | Pass? (iOS) |
+| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------- | ----------- |
+| MOB-D01 | **Today** stop list refreshes (pull + auto)          | Shows assigned stops only for logged-in driver                                        |                 |             |
+| MOB-D02 | Open stop → **Navigate** opens external maps         | Correct destination address                                                           |                 |             |
+| MOB-D03 | Mark **Out for delivery** while app foreground       | GPS tracking starts; parent order moves toward `SHIPPED` when applicable              |                 |             |
+| MOB-D04 | Background app during active delivery                | **No false claim** of continued GPS if policy is foreground-only; status honest in UI |                 |             |
+| MOB-D05 | **POD**: photo + signature + receiver name → submit  | Sends `driver_assignment_id` / `warehouse_assignment_id`; idempotent completion       |                 |             |
+| MOB-D06 | POD with **oversize/invalid** image                  | Friendly error; can retry without losing photo                                        |                 |             |
+| MOB-D07 | **Failed delivery** → reason required                | Record saved; supplier dispatch shows exception                                       |                 |             |
+| MOB-D08 | **Run sheet** from driver More                       | Printable list for the day                                                            |                 |             |
+| MOB-D09 | Retry delivery after failure (supplier retried leg)  | New attempt visible; prior POD not overwritten incorrectly                            |                 |             |
+| MOB-D10 | Deliver without prior **SHIPPED** / out-for-delivery | Blocked with clear error (lifecycle integrity)                                        |                 |             |
+| MOB-D11 | Driver **notifications** tap                         | Opens stop or order detail                                                            |                 |             |
+
+## 13.5 Push notifications & deep links
+
+| ID          | Steps                                             | Expected                                                     | Pass? (Android) | Pass? (iOS) |
+| ----------- | ------------------------------------------------- | ------------------------------------------------------------ | --------------- | ----------- |
+| MOB-PUSH-01 | Register device token on login                    | `POST /api/push/register` succeeds (Gold+ / entitled tenant) |                 |             |
+| MOB-PUSH-02 | New order while app backgrounded (supplier)       | Push received; tap opens order detail                        |                 |             |
+| MOB-PUSH-03 | New chat message while backgrounded               | Push received; tap opens conversation                        |                 |             |
+| MOB-PUSH-04 | Mark all read in notifications                    | Badge counts clear                                           |                 |             |
+| MOB-PUSH-05 | Logout                                            | Token deregistered or invalidated; no pushes to old session  |                 |             |
+| MOB-PUSH-06 | Physical device only: camera permission for POD   | Permission prompt; deny → graceful message                   |                 |             |
+| MOB-PUSH-07 | Physical device only: location permission for GPS | Allow/deny paths handled; deny does not crash completion     |                 |             |
+
+## 13.6 Device matrix (minimum)
+
+| Target                               | Required smoke                                      | Pass? |
+| ------------------------------------ | --------------------------------------------------- | ----- |
+| Android emulator                     | MOB-AUTH-01, MOB-R04–R05, MOB-S03, login/navigation |       |
+| Android physical device              | MOB-D03–D07, MOB-PUSH-02–03, camera/GPS             |       |
+| iOS Simulator or EAS simulator build | MOB-AUTH-01, MOB-R04–R05, MOB-S03, login redirect   |       |
+| iOS TestFlight / physical device     | MOB-D03–D07, MOB-PUSH-02–03, camera/GPS             |       |
+
+Record **tester, app version/build, API URL, device/OS, date** on the release ticket and in the sign-off table.
+
+---
+
+# Part 14 — Cross-platform parity (web ↔ mobile spot checks)
+
+> After Parts 4–12 (web) and Part 13 (mobile), run these **paired** checks to catch client drift. Same backend, same accounts, within 15 minutes.
+
+| ID     | Web (ERP) step                             | Mobile step                                        | Expected parity                                        | Pass? |
+| ------ | ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------ | ----- |
+| PAR-01 | Restaurant places order on web             | Supplier sees order on mobile **Orders**           | Same order id, lines, totals                           |       |
+| PAR-02 | Supplier accepts/ships on mobile           | Restaurant **Order detail** on web updates         | Status timeline matches                                |       |
+| PAR-03 | Supplier assigns driver on web fulfillment | Driver **Today** list on mobile                    | Stop appears with correct reference                    |       |
+| PAR-04 | Driver completes POD on mobile             | Web order → POD panel / delivered status           | Proof visible; status `DELIVERED` when rules satisfied |       |
+| PAR-05 | Restaurant sends chat on mobile            | Supplier reads on web `/app/chat`                  | Message content + attachment parity                    |       |
+| PAR-06 | RFQ created on web                         | Supplier **Quote inbox** on mobile                 | Same RFQ id; respond on mobile → web compare works     |       |
+| PAR-07 | Deal redeemed on mobile                    | Web order detail shows `appliedPromotion`          | Discount amount matches                                |       |
+| PAR-08 | Receiving submitted on web                 | Mobile order detail shows received quantities      | Line-level qty match                                   |       |
+| PAR-09 | Dispute opened on mobile                   | Web dispute banner on order                        | Same dispute id                                        |       |
+| PAR-10 | Admin impersonates restaurant on web       | Mobile login as that restaurant **blocked** or N/A | Impersonation is web session; mobile uses real login   |       |
+| PAR-11 | Free-tier gate on web (`/app/chat`)        | Mobile **Messages** tab                            | Both blocked with consistent messaging                 |       |
+| PAR-12 | Branch switch on web header                | Mobile branch switch in settings                   | Same active branch id on `GET /api/auth/me`            |       |
+| PAR-13 | Invoice marked paid on web                 | Mobile invoice list balance                        | Open balance zero                                      |       |
+| PAR-14 | Order amendment accepted on web            | Mobile order detail lines/qty                      | Amended lines match                                    |       |
+| PAR-15 | Push notification for order status         | Web notification bell                              | Same event type; no duplicate wrong-tenant payload     |       |
 
 ---
 
@@ -1292,22 +1474,25 @@ Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an exist
 
 ## Sign-off
 
-| Role                               | Tester | Date | Build/branch | Open defects |
-| ---------------------------------- | ------ | ---- | ------------ | ------------ |
-| Fresh DB setup (Part 0)            |        |      |              |              |
-| Restaurant creation (Part 1)       |        |      |              |              |
-| Supplier creation (Part 2)         |        |      |              |              |
-| Feature gate verification (Part 3) |        |      |              |              |
-| Cross-cutting / Auth (Part 4)      |        |      |              |              |
-| Public / guest flows (Part 5)      |        |      |              |              |
-| Restaurant tenant flows (Part 6)   |        |      |              |              |
-| Supplier tenant flows (Part 7)     |        |      |              |              |
-| Platform admin flows (Part 8)      |        |      |              |              |
-| E2E business flows (Part 9)        |        |      |              |              |
-| API smoke tests (Part 10)          |        |      |              |              |
-| Automated tests (Part 11)          |        |      |              |              |
-| Non-functional (Part 12)           |        |      |              |              |
+| Role / surface                     | Tester | Date | Build / branch / app version | API env & device | Open defects |
+| ---------------------------------- | ------ | ---- | ---------------------------- | ---------------- | ------------ |
+| Fresh DB setup (Part 0)            |        |      |                              |                  |              |
+| Restaurant creation (Part 1)       |        |      |                              |                  |              |
+| Supplier creation (Part 2)         |        |      |                              |                  |              |
+| Feature gate verification (Part 3) |        |      |                              |                  |              |
+| Cross-cutting / Auth (Part 4)      |        |      |                              |                  |              |
+| Public / guest flows (Part 5)      |        |      |                              |                  |              |
+| Restaurant tenant flows (Part 6)   |        |      |                              |                  |              |
+| Supplier tenant flows (Part 7)     |        |      |                              |                  |              |
+| Platform admin flows (Part 8)      |        |      |                              |                  |              |
+| E2E business flows (Part 9)        |        |      |                              |                  |              |
+| API smoke tests (Part 10)          |        |      |                              |                  |              |
+| Automated tests (Part 11)          |        |      |                              |                  |              |
+| Non-functional (Part 12)           |        |      |                              |                  |              |
+| **Mobile Android (Part 13)**       |        |      |                              |                  |              |
+| **Mobile iOS (Part 13)**           |        |      |                              |                  |              |
+| **Web ↔ mobile parity (Part 14)** |        |      |                              |                  |              |
 
 ---
 
-_Full-application checklist for Supplify ERP. For fresh-DB testing start at Part 0 and proceed in order through Part 3 before running any other section._
+_Full-system checklist for Supplify web ERP + native mobile. Fresh DB: Part 0 → Part 3 first. PDF: `pnpm docs:qa:pdf`. Mobile repos: `supplify-mobile`, `supplify-mobile-ios`._

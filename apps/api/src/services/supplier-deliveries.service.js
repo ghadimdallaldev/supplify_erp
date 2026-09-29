@@ -19,6 +19,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
   const conditions = [
     `oi.supplier_id = $1`,
     `o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')`,
+    `COALESCE(o.requested_delivery_method, 'DELIVERY') <> 'PICKUP'`,
   ]
 
   if (date) {
@@ -137,7 +138,7 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
     SELECT DISTINCT ON (COALESCE(da.id, o.id))
       o.id AS order_id,
       o.status AS order_status,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       ${sql.deliveryAreaExpr} AS delivery_area,
       da.id AS assignment_id,
       da.warehouse_assignment_id AS warehouse_assignment_id,
@@ -161,7 +162,7 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
       r.address_json AS restaurant_address
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     ${sql.branchJoinSql}
     ${sql.driverAssignmentJoinSql}
     ${sql.zoneJoinSql}
@@ -182,7 +183,7 @@ async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr
     SELECT DISTINCT ON (o.id)
       o.id AS order_id,
       o.status AS order_status,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       'Unassigned area' AS delivery_area,
       NULL::uuid AS assignment_id,
       NULL::uuid AS warehouse_assignment_id,
@@ -197,7 +198,7 @@ async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr
       o.delivery_location_snapshot
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     WHERE ${safeConditions.join(' AND ')}
     ORDER BY o.id, scheduled_at DESC
     LIMIT 500

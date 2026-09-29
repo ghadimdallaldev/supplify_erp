@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userNeedsTenantSetup = vi.fn()
 const completeTenantRegistration = vi.fn()
+const completeConsumerRegistration = vi.fn()
 const authState = { emailVerified: true }
 
 vi.mock('../lib/rbac.js', () => ({
@@ -22,6 +23,7 @@ vi.mock('../lib/rbac.js', () => ({
 vi.mock('../lib/register-account.js', () => ({
   userNeedsTenantSetup,
   completeTenantRegistration,
+  completeConsumerRegistration,
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -52,6 +54,7 @@ describe('register.routes', () => {
   beforeEach(async () => {
     userNeedsTenantSetup.mockReset()
     completeTenantRegistration.mockReset()
+    completeConsumerRegistration.mockReset()
     authState.emailVerified = true
 
     app = express()
@@ -128,6 +131,33 @@ describe('register.routes', () => {
         businessName: 'My Supply Co',
       })
     )
+  })
+
+  it('POST /complete creates a consumer without tenant fields', async () => {
+    userNeedsTenantSetup.mockResolvedValue(true)
+    completeConsumerRegistration.mockResolvedValue({ id: 'user-1', role: 'CONSUMER' })
+
+    const res = await request(app)
+      .post('/api/register/complete')
+      .send({
+        accountType: 'CONSUMER',
+        name: 'Personal Shopper',
+        phone: '+96170000000',
+        legalAcceptance: {
+          packVersion: '2026-09-12',
+          acceptedDocuments: ['terms_and_conditions', 'privacy_policy'],
+          electronicSignatureAttestation: true,
+        },
+      })
+      .expect(201)
+
+    expect(res.body.data.accountType).toBe('CONSUMER')
+    expect(res.body.data.profile).toMatchObject({ id: 'user-1', role: 'CONSUMER' })
+    expect(res.body.data.tenant).toBeUndefined()
+    expect(completeConsumerRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Personal Shopper', phone: '+96170000000' })
+    )
+    expect(completeTenantRegistration).not.toHaveBeenCalled()
   })
 
   it('POST /complete returns 403 when email is not verified and OTP is enabled', async () => {

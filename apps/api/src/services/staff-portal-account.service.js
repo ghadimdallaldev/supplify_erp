@@ -181,7 +181,7 @@ export async function createStaffPortalAccount(staffId, restaurantId, { invitedB
     [keycloakSub, email]
   )
   const existingUser = existingUsers[0]
-  const platformRoles = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT', 'PENDING'])
+  const platformRoles = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT', 'CONSUMER', 'PENDING'])
   const preservePlatformRole = existingUser && platformRoles.has(existingUser.role)
 
   let appUser

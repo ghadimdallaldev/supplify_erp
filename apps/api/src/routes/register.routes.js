@@ -1,7 +1,11 @@
 import express from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../lib/rbac.js'
-import { completeTenantRegistration, userNeedsTenantSetup } from '../lib/register-account.js'
+import {
+  completeConsumerRegistration,
+  completeTenantRegistration,
+  userNeedsTenantSetup,
+} from '../lib/register-account.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { isUniqueViolation } from '../lib/identity-normalize.js'
@@ -15,13 +19,21 @@ const legalAcceptanceSchema = z.object({
   electronicSignatureAttestation: z.literal(true),
 })
 
-const completeSchema = z.object({
-  accountType: z.enum(['RESTAURANT', 'SUPPLIER']),
-  businessName: z.string().min(2).max(200),
-  phone: z.string().max(30).optional(),
-  referralToken: z.string().max(200).optional(),
-  legalAcceptance: legalAcceptanceSchema,
-})
+const completeSchema = z.discriminatedUnion('accountType', [
+  z.object({
+    accountType: z.enum(['RESTAURANT', 'SUPPLIER']),
+    businessName: z.string().min(2).max(200),
+    phone: z.string().max(30).optional(),
+    referralToken: z.string().max(200).optional(),
+    legalAcceptance: legalAcceptanceSchema,
+  }),
+  z.object({
+    accountType: z.literal('CONSUMER'),
+    name: z.string().min(2).max(160),
+    phone: z.string().max(30).optional(),
+    legalAcceptance: legalAcceptanceSchema,
+  }),
+])
 
 router.get('/status', requireAuth, async (req, res) => {
   try {
@@ -70,6 +82,29 @@ router.post('/complete', requireAuth, async (req, res) => {
       })
     }
 
+    const requestMeta = {
+      ipAddress: req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
+      userAgent: req.headers['user-agent'],
+    }
+    if (body.accountType === 'CONSUMER') {
+      const profile = await completeConsumerRegistration({
+        userId: user.id,
+        keycloakSub: user.keycloak_sub,
+        email: user.email,
+        name: body.name,
+        phone: body.phone,
+        legalAcceptance: body.legalAcceptance,
+        ...requestMeta,
+      })
+      logger.info('Consumer registration completed', { userId: user.id })
+      return res.status(201).json({
+        ok: true,
+        data: { accountType: 'CONSUMER', profile },
+        error: null,
+        requestId: req.requestId,
+      })
+    }
+
     const { tenant, tenantType } = await completeTenantRegistration({
       userId: user.id,
       keycloakSub: user.keycloak_sub,
@@ -79,8 +114,7 @@ router.post('/complete', requireAuth, async (req, res) => {
       phone: body.phone,
       referralToken: body.referralToken,
       legalAcceptance: body.legalAcceptance,
-      ipAddress: req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim(),
-      userAgent: req.headers['user-agent'],
+      ...requestMeta,
     })
 
     logger.info('Tenant registration completed', {

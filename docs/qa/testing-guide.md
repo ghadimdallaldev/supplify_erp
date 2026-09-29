@@ -164,6 +164,15 @@ pnpm --filter @supplify/api test:api src/services/driver-fulfillment.service.tes
 
 Manual regression: [regression-checklist.md](./regression-checklist.md) **2026-09-10 release smoke pack**. Migrations `0196`–`0203`.
 
+## Manual QA (web + mobile)
+
+| Output                | Command            | Path                                               |
+| --------------------- | ------------------ | -------------------------------------------------- |
+| Printable PDF         | `pnpm docs:qa:pdf` | `docs/qa/output/Supplify-Manual-QA-Checklist.pdf`  |
+| HTML (print fallback) | same command       | `docs/qa/output/Supplify-Manual-QA-Checklist.html` |
+
+Source checklist: [regression-checklist.md](./regression-checklist.md) (Parts 0–14). Requires Playwright Chromium (`npx playwright install chromium` once).
+
 ## Related docs
 
 - [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md) — baseline failures, fixes, risks

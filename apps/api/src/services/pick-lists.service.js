@@ -100,12 +100,12 @@ async function loadWavePickLists(waveId) {
     `
     SELECT
       pl.*,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       w.name AS warehouse_name
     FROM pick_list pl
     JOIN delivery_wave dw ON dw.id = pl.wave_id
     JOIN customer_order o ON o.id = pl.order_id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN warehouse w ON w.id = pl.warehouse_id AND w.${supplierCol} = dw.supplier_id
     WHERE pl.wave_id = $1
     ORDER BY pl.created_at

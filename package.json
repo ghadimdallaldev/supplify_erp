@@ -58,6 +58,7 @@
     "docs:onboarding:customer-pptx": "node scripts/generate-customer-presentation-pptx.mjs",
     "docs:onboarding:customer": "node scripts/generate-customer-presentation-pdf.mjs && node scripts/generate-customer-presentation-pptx.mjs",
     "docs:onboarding:all": "node scripts/generate-all-onboarding-docs.mjs",
+    "docs:qa:pdf": "node scripts/generate-qa-checklist-pdf.mjs",
     "seed:audit-backfill": "node apps/api/scripts/seed-audit-backfill.mjs",
     "db:reset": "pnpm --filter @supplify/api db:reset",
     "db:wipe-commercial": "pnpm --filter @supplify/api db:wipe-commercial",

@@ -165,6 +165,16 @@ export async function getPublicSupplierProfile(idOrSlug, dbQuery = query) {
     /* branding columns may be missing on older databases */
   }
 
+  const { rows: salesRows } = await dbQuery(
+    `SELECT c.supplier_id, c.payment_methods, c.pickup_warehouse_id,
+            EXISTS (
+              SELECT 1 FROM supplier_public_delivery_warehouse pdw
+              WHERE pdw.supplier_id = c.supplier_id
+            ) AS delivery_enabled
+     FROM supplier_public_sales_config c
+     WHERE c.supplier_id = ANY($1::uuid[]) AND c.enabled = true`,
+    [row.supplierIds]
+  )
   return {
     id: row.id,
     slug: row.slug,
@@ -176,6 +186,13 @@ export async function getPublicSupplierProfile(idOrSlug, dbQuery = query) {
     minimumOrderAmount: row.minimum_order_amount != null ? Number(row.minimum_order_amount) : null,
     paymentTerms: row.payment_terms || null,
     publicCatalogEnabled: row.public_catalog_enabled === true,
+    publicSalesEnabled: salesRows.length > 0,
+    salesLocations: salesRows.map((sales) => ({
+      supplierId: sales.supplier_id,
+      paymentMethods: sales.payment_methods || [],
+      deliveryEnabled: sales.delivery_enabled === true,
+      pickupEnabled: Boolean(sales.pickup_warehouse_id),
+    })),
   }
 }
 
@@ -217,9 +234,12 @@ export async function listPublicSupplierProducts(
         p.category,
         p.unit,
         p.image_url,
-        p.description
+        p.description,
+        COALESCE(pis.moq, 1) AS moq,
+        COALESCE(pis.order_multiple, 1) AS order_multiple
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       WHERE ${whereClause}
       ORDER BY p.name ASC
       LIMIT ${safeLimit} OFFSET ${offset}
@@ -261,19 +281,42 @@ export async function listPublicSupplierProducts(
   const stockByProductId = new Map(
     stockRows.map((row) => [row.product_id, Number(row.available_qty) > 0])
   )
+  const pricesByProductId = await getDefaultCatalogPricesBatch(
+    rows.map((row) => row.id),
+    dbQuery
+  )
+  const { rows: salesRows } = rows.length
+    ? await dbQuery(
+        `SELECT supplier_id FROM supplier_public_sales_config
+         WHERE supplier_id = ANY($1::uuid[]) AND enabled = true`,
+        [[...new Set(rows.map((row) => row.supplier_id))]]
+      )
+    : { rows: [] }
+  const salesEnabled = new Set(salesRows.map((row) => row.supplier_id))
 
   return {
-    products: rows.map((row) => ({
-      id: row.id,
-      supplierId: row.supplier_id,
-      name: row.name,
-      sku: row.sku,
-      category: row.category,
-      unit: row.unit,
-      imageUrl: row.image_url,
-      description: row.description,
-      inStock: stockByProductId.get(row.id) === true,
-    })),
+    products: rows.map((row) => {
+      const price = pricesByProductId.get(row.id)
+      const canSell = salesEnabled.has(row.supplier_id)
+      const inStock = stockByProductId.get(row.id) === true
+      return {
+        id: row.id,
+        supplierId: row.supplier_id,
+        name: row.name,
+        sku: row.sku,
+        category: row.category,
+        unit: row.unit,
+        imageUrl: row.image_url,
+        description: row.description,
+        moq: Number(row.moq || 1),
+        orderMultiple: Number(row.order_multiple || 1),
+        inStock,
+        orderable: canSell && inStock && Boolean(price),
+        currentPrice: canSell && price ? Number(price.amount) : null,
+        currency: canSell && price ? price.currency || 'USD' : null,
+        pricingSource: canSell && price ? 'DEFAULT_PRICE' : null,
+      }
+    }),
     categories: categories.map((c) => c.category).filter(Boolean),
     pagination: {
       page: Math.max(1, page),

@@ -69,23 +69,25 @@ export const authApi = api.injectEndpoints({
       invalidatesTags: ['User'],
     }),
     completeRegistration: builder.mutation<
-      { tenantType: string; tenant: unknown },
-      {
-        accountType: 'RESTAURANT' | 'SUPPLIER'
-        businessName: string
-        phone?: string
-        referralToken?: string
-        legalAcceptance: LegalAcceptancePayload
-      }
+      { tenantType?: string; tenant?: unknown; accountType?: 'CONSUMER'; profile?: unknown },
+      | {
+          accountType: 'RESTAURANT' | 'SUPPLIER'
+          businessName: string
+          phone?: string
+          referralToken?: string
+          legalAcceptance: LegalAcceptancePayload
+        }
+      | {
+          accountType: 'CONSUMER'
+          name: string
+          phone?: string
+          legalAcceptance: LegalAcceptancePayload
+        }
     >({
       query: (body) => ({
         url: '/api/register/complete',
         method: 'POST',
         body,
-      }),
-      transformResponse: (response: { tenantType?: string; tenant?: unknown }) => ({
-        tenantType: response.tenantType as string,
-        tenant: response.tenant,
       }),
     }),
   }),

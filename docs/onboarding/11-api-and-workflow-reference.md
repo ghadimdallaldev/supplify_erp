@@ -40,6 +40,20 @@ flowchart LR
 
 ---
 
+## Supplier public sales and personal consumers
+
+`/api/public/suppliers` exposes sales-enabled supplier discovery. Storefront profile
+and product reads remain available for browse-only catalogs, but prices and orderability
+are exposed only when public sales are enabled. Public preview and placement share the
+same payload; placement requires `Idempotency-Key` and classifies an optional valid
+`CONSUMER` token without allowing business roles onto the public checkout path.
+
+`/api/consumer` contains owner-scoped profile, address, order history/detail, and
+reorder-preview operations. `/api/supplier/public-sales` uses existing settings
+permissions for fulfillment warehouse and offline payment configuration. Full contracts
+and rollout details are in
+[Supplier public sales](../features/supplier-public-sales.md).
+
 ## Route inventory by mount prefix
 
 Counts from `route-inventory.json` (554 total). Regenerate: `node apps/api/scripts/discover-routes.mjs`.

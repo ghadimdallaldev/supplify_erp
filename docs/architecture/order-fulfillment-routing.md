@@ -1,6 +1,6 @@
 # Order fulfillment routing map
 
-Updated 2026-09-14.
+Updated 2026-09-29.
 
 ## Repository model
 
@@ -39,7 +39,27 @@ Placed financial values are immutable snapshots on the order and lines: quantiti
 
 ## Placement idempotency
 
-`order_placement_idempotency` enforces a unique `(restaurant_id, idempotency_key)` at the database level. The request hash is normalized over the payload (including canonical delivery branch and item identity) and successful responses are replayed. Reusing a key with another payload returns a conflict. The claim is created in the same transaction as order creation, so a rolled-back transaction does not poison the key. Successful keys are retained for 180 days and cleaned opportunistically during placement.
+`order_placement_idempotency` uses an actor scope such as `RESTAURANT:<id>`,
+`CONSUMER:<id>`, or `PUBLIC:<supplierId>` with the idempotency key. Existing restaurant
+records are backfilled to their equivalent scope. The request hash is normalized over
+the placement payload and successful responses are replayed. Reusing a key with another
+payload returns a conflict. The claim is created in the same transaction as order
+creation, so a rolled-back transaction does not poison the key. Successful keys are
+retained for 180 days and cleaned opportunistically during placement.
+
+## Public supplier orders
+
+Supplier storefront orders use the same `customer_order`, item, reservation,
+assignment, cancellation-release, and supplier lifecycle infrastructure as restaurant
+orders. `customer_type` distinguishes `RESTAURANT`, `CONSUMER`, and `GUEST`; account
+ownership and immutable contact snapshots are enforced by migration `0223`.
+
+Public delivery considers only explicitly configured active public-delivery warehouses
+and fails closed when no active zone matches. Pickup reserves at the supplier's
+explicitly selected active pickup warehouse and is never eligible for a driver
+assignment or delivery route. One public order still contains products from exactly one
+underlying supplier tenant. See
+[Supplier public sales](../features/supplier-public-sales.md) for API and client details.
 
 ## Authorization and events
 

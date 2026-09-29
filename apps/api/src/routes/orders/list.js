@@ -59,6 +59,7 @@ import {
   deliveryStatusSchema,
   orderUpdateSchema,
   orderListSchema,
+  buildOrderCustomerContract,
 } from './orders.helpers.js'
 
 const router = express.Router()
@@ -140,6 +141,9 @@ router.get('/', async (req, res) => {
       whereConditions.push(`(
         o.id::text ILIKE $${paramIndex}
         OR r.name ILIKE $${paramIndex}
+        OR o.customer_contact_snapshot->>'name' ILIKE $${paramIndex}
+        OR o.customer_contact_snapshot->>'email' ILIKE $${paramIndex}
+        OR o.customer_contact_snapshot->>'phone' ILIKE $${paramIndex}
         OR EXISTS (
           SELECT 1
           FROM order_item oi_q
@@ -180,9 +184,10 @@ router.get('/', async (req, res) => {
       SELECT
         o.*,
         r.name as restaurant_name,
-        r.slug as restaurant_slug
+        r.slug as restaurant_slug,
+        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name
       FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       ${whereClause}
       ORDER BY o.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -193,7 +198,7 @@ router.get('/', async (req, res) => {
     const countSql = `
       SELECT COUNT(*)::int as total
       FROM customer_order o
-      JOIN restaurant r ON r.id = o.restaurant_id
+      LEFT JOIN restaurant r ON r.id = o.restaurant_id
       ${whereClause}
     `
     const countParams = queryParams.slice(0, -2) // Remove limit and offset
@@ -250,6 +255,11 @@ router.get('/', async (req, res) => {
         items: itemsByOrder[order.id] || [],
       }))
     }
+
+    ordersWithItems = ordersWithItems.map((order) => ({
+      ...order,
+      ...buildOrderCustomerContract(order),
+    }))
 
     res.json({
       ok: true,

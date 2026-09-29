@@ -37,6 +37,20 @@ How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture,
 
 Team members receive the same in-app (and email/push when enabled) alerts as the primary contact.
 
+### Supplier public-order recipients (2026-09-29)
+
+- Supplier tenant users receive the existing `PLACED` notification for restaurant,
+  consumer, and guest `customer_order` records owned by their supplier tenant.
+- Registered consumers receive direct in-app, push, and email status notifications
+  through their `app_user` identity. Links open authenticated `/shop/orders/:id`
+  destinations on web or native.
+- Guests receive the secure confirmation page and optional email. WhatsApp is sent only
+  when the existing provider is configured and explicit checkout consent was captured;
+  no SMS provider is used.
+- Only a SHA-256 tracking-token hash is stored. The raw token is never included in
+  notification metadata or later responses, so later guest status messages cannot
+  reconstruct the original tracking URL.
+
 ## Channels
 
 | Channel     | When                                                                                                     |

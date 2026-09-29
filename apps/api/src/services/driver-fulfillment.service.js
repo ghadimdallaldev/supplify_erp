@@ -47,7 +47,7 @@ const NON_REASSIGNED_STATUSES = ['reassigned', 'superseded']
 
 export async function assertSupplierOwnsOrder(supplierId, orderId) {
   const { rows } = await query(
-    `SELECT o.id, o.status, o.restaurant_id
+    `SELECT o.id, o.status, o.restaurant_id, o.requested_delivery_method
      FROM customer_order o
      JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
      WHERE o.id = $2
@@ -224,7 +224,10 @@ export async function assignDriverToOrder({
   warehouseAssignmentId = null,
   assignAllWarehouseLegs = false,
 }) {
-  await assertSupplierOwnsOrder(supplierId, orderId)
+  const ownedOrder = await assertSupplierOwnsOrder(supplierId, orderId)
+  if (String(ownedOrder.requested_delivery_method || '').toUpperCase() === 'PICKUP') {
+    throw new ValidationError('Pickup orders do not use driver assignments')
+  }
 
   const { rows: drivers } = await query(
     `SELECT id, warehouse_id FROM drivers
@@ -264,13 +267,16 @@ export async function assignDriverToOrder({
 
   const created = await withTransaction(async (client) => {
     const { rows: lockedOrders } = await client.query(
-      `SELECT id, status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, requested_delivery_method FROM customer_order WHERE id = $1 FOR UPDATE`,
       [orderId]
     )
     if (!lockedOrders.length) {
       throw new NotFoundError('Order not found')
     }
     const lockedOrder = lockedOrders[0]
+    if (String(lockedOrder.requested_delivery_method || '').toUpperCase() === 'PICKUP') {
+      throw new ValidationError('Pickup orders do not use driver assignments')
+    }
     if (
       ['CANCELLED', 'REJECTED', 'DELIVERED', 'COMPLETED', 'RECEIVED_FULL', 'INVOICED'].includes(
         lockedOrder.status
@@ -341,9 +347,9 @@ export async function assignDriverToOrder({
 
   try {
     const { rows: orderRows } = await query(
-      `SELECT o.*, r.name AS restaurant_name
+      `SELECT o.*, COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name
        FROM customer_order o
-       JOIN restaurant r ON r.id = o.restaurant_id
+       LEFT JOIN restaurant r ON r.id = o.restaurant_id
        WHERE o.id = $1`,
       [orderId]
     )
@@ -720,11 +726,12 @@ async function applyDeliveryStatusUpdate({
   )
 
   const { rows: orderRows } = await client.query(
-    `SELECT o.*, s.name AS supplier_name, r.name AS restaurant_name
+    `SELECT o.*, s.name AS supplier_name,
+            COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name
      FROM customer_order o
      JOIN order_item oi ON oi.order_id = o.id
      JOIN supplier s ON s.id = oi.supplier_id
-     JOIN restaurant r ON r.id = o.restaurant_id
+     LEFT JOIN restaurant r ON r.id = o.restaurant_id
      WHERE o.id = $1
      LIMIT 1`,
     [orderId]

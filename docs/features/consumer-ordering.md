@@ -1,5 +1,11 @@
 # Consumer ordering (B2C)
 
+> This document describes restaurant-specific diner ordering. Its `consumer_member`
+> identity and `consumer_order` tickets are scoped to one restaurant and remain separate
+> from global Keycloak `CONSUMER` accounts and supplier `customer_order` purchases.
+> Supplier guest/personal-consumer sales are documented in
+> [supplier-public-sales.md](./supplier-public-sales.md).
+
 Guest-facing online ordering for restaurants: menu with modifiers, cart, fulfillment picker (delivery / takeaway / dine-in), COD checkout, and **universal live order tracking** via receipt link (no login required).
 
 ## Web routes

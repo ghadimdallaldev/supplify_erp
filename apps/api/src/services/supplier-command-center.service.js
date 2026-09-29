@@ -314,12 +314,12 @@ async function getDeliveryPreview(supplierId) {
     `
     SELECT DISTINCT ON (o.id)
       o.id,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       COALESCE(da.status, 'pending') AS delivery_status,
       d.full_name AS driver_name
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN LATERAL (
       SELECT * FROM driver_assignments da2
       WHERE da2.order_id = o.id AND da2.status NOT IN ('reassigned', 'superseded')

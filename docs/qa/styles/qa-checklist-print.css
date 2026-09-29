@@ -1,0 +1,160 @@
+@page {
+  size: A4 landscape;
+  margin: 12mm 10mm 16mm 10mm;
+}
+
+:root {
+  --cream: #faf7f2;
+  --caramel: #8b6914;
+  --ink: #1a1a1a;
+  --muted: #4a4a4a;
+  --border: #d8cfc0;
+  --table-stripe: #f3ece2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 8.5pt;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ink);
+  background: #fff;
+  line-height: 1.35;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.cover {
+  min-height: 180mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  page-break-after: always;
+  padding: 2rem;
+  border-bottom: 3px solid var(--caramel);
+}
+
+.cover h1 {
+  font-size: 1.75rem;
+  color: var(--caramel);
+  margin: 0 0 0.35rem;
+}
+
+.cover .subtitle {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 36rem;
+  margin: 0.5rem auto 1.5rem;
+}
+
+.cover .meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.content h1 {
+  font-size: 1.25rem;
+  color: var(--caramel);
+  margin: 1.2rem 0 0.5rem;
+  page-break-after: avoid;
+}
+
+.content h2 {
+  font-size: 1.05rem;
+  color: var(--caramel);
+  margin: 1rem 0 0.4rem;
+  page-break-after: avoid;
+}
+
+.content h3 {
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin: 0.75rem 0 0.35rem;
+  page-break-after: avoid;
+}
+
+.content p,
+.content li {
+  margin: 0.35rem 0;
+}
+
+.content blockquote {
+  margin: 0.5rem 0;
+  padding: 0.35rem 0.75rem;
+  border-left: 3px solid var(--caramel);
+  background: var(--cream);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.content code {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  background: var(--cream);
+  padding: 0.05rem 0.2rem;
+  border-radius: 2px;
+}
+
+.content pre {
+  font-size: 0.8rem;
+  background: var(--cream);
+  padding: 0.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4rem 0 0.75rem;
+  font-size: 0.82rem;
+  page-break-inside: auto;
+}
+
+.content thead {
+  display: table-header-group;
+}
+
+.content tr {
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+.content th,
+.content td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.35rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.content th {
+  background: var(--caramel);
+  color: #fff;
+  font-weight: 600;
+}
+
+.content tbody tr:nth-child(even) {
+  background: var(--table-stripe);
+}
+
+.content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.content a {
+  color: var(--caramel);
+  text-decoration: none;
+}

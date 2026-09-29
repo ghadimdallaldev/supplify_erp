@@ -241,6 +241,52 @@ describe('orders.calendar.routes', () => {
     })
   })
 
+  it('keeps guest orders in the supplier calendar with a customer projection', async () => {
+    const rbac = await import('../lib/rbac.js')
+    vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce({
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      tenantName: 'Fresh Foods Co.',
+    })
+    mockUser.role = 'SUPPLIER'
+    getCacheMock.mockResolvedValue(null)
+
+    mockCalendarQueries({
+      pageRows: [
+        {
+          source: 'order',
+          source_id: 'order-public-1',
+          event_start: '2026-09-29T10:00:00.000Z',
+          event_status: 'PLACED',
+        },
+      ],
+      totalEvents: 1,
+      totalOrders: 1,
+      orderDetails: [
+        {
+          id: 'order-public-1',
+          status: 'PLACED',
+          total_amount: '24.00',
+          currency: 'USD',
+          placed_at: '2026-09-29T10:00:00.000Z',
+          created_at: '2026-09-29T10:00:00.000Z',
+          updated_at: '2026-09-29T10:00:00.000Z',
+          restaurant_id: null,
+          restaurant_name: null,
+          customer_type: 'GUEST',
+          customer_display_name: 'Guest User',
+          suppliers: [{ id: 'supplier-1', name: 'Fresh Foods Co.' }],
+          categories: ['Produce'],
+        },
+      ],
+    })
+
+    const response = await request(app).get('/api/orders/calendar').expect(200)
+    expect(response.body.data.events[0].counterpartName).toBe('Guest User')
+    const sql = queryMock.mock.calls.map(([statement]) => String(statement)).join('\n')
+    expect(sql).toContain('LEFT JOIN restaurant r ON r.id = o.restaurant_id')
+  })
+
   it('does not resolve tenant by contact_email when request tenant is missing', async () => {
     const rbac = await import('../lib/rbac.js')
     vi.mocked(rbac.getRequestTenant).mockResolvedValueOnce(null)

@@ -16,7 +16,10 @@ import {
   useUploadSupplierLogoMutation,
   useGetPresignedUrlMutation,
   useGetEntitlementsQuery,
+  useGetSupplierPublicSalesQuery,
+  useUpdateSupplierPublicSalesMutation,
 } from '../../../../services/api'
+import type { PublicPaymentMethod } from '../../../../types'
 import { ensureNamespace } from '../../../../i18n'
 
 export function SupplierProfileTab() {
@@ -34,6 +37,16 @@ export function SupplierProfileTab() {
   const { data: entitlementsData } = useGetEntitlementsQuery(undefined, { skip: !user?.id })
   const entitlements = entitlementsData?.entitlements
   const supplier = supplierData?.supplier
+  const { data: publicSalesData } = useGetSupplierPublicSalesQuery()
+  const [updatePublicSales, { isLoading: isSavingPublicSales }] =
+    useUpdateSupplierPublicSalesMutation()
+  const [publicSalesForm, setPublicSalesForm] = useState({
+    enabled: false,
+    deliveryWarehouseIds: [] as string[],
+    pickupWarehouseId: '',
+    paymentMethods: [] as PublicPaymentMethod[],
+    bankTransferInstructions: '',
+  })
 
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -74,6 +87,40 @@ export function SupplierProfileTab() {
       })
     }
   }, [supplier])
+
+  useEffect(() => {
+    const config = publicSalesData?.config
+    if (!config) return
+    setPublicSalesForm({
+      enabled: config.enabled,
+      deliveryWarehouseIds: config.deliveryWarehouseIds,
+      pickupWarehouseId: config.pickupWarehouse?.id || '',
+      paymentMethods: config.paymentMethods,
+      bankTransferInstructions: config.bankTransferInstructions || '',
+    })
+  }, [publicSalesData])
+
+  const togglePaymentMethod = (method: PublicPaymentMethod) => {
+    setPublicSalesForm((form) => ({
+      ...form,
+      paymentMethods: form.paymentMethods.includes(method)
+        ? form.paymentMethods.filter((value) => value !== method)
+        : [...form.paymentMethods, method],
+    }))
+  }
+
+  const savePublicSales = async () => {
+    try {
+      await updatePublicSales({
+        ...publicSalesForm,
+        pickupWarehouseId: publicSalesForm.pickupWarehouseId || null,
+        bankTransferInstructions: publicSalesForm.bankTransferInstructions || null,
+      }).unwrap()
+      toast.success('Public sales settings updated')
+    } catch (error: any) {
+      toast.error(error?.data?.error?.message || 'Unable to update public sales settings')
+    }
+  }
 
   const handleCopyCatalogLink = async () => {
     if (!catalogLink) return
@@ -225,6 +272,123 @@ export function SupplierProfileTab() {
                 : t('profile.catalogLink.disabled')}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Public sales</CardTitle>
+          <CardDescription>
+            Configure checkout separately from public catalog visibility.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center justify-between rounded-lg border p-3">
+            <span>
+              <span className="block text-sm font-medium">Accept public orders</span>
+              <span className="block text-xs text-muted-foreground">
+                Sales remain disabled until valid fulfillment and payment options are saved.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={publicSalesForm.enabled}
+              onChange={(event) =>
+                setPublicSalesForm({ ...publicSalesForm, enabled: event.target.checked })
+              }
+            />
+          </label>
+          <div>
+            <Label>Public delivery warehouses</Label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {publicSalesData?.warehouses.map((warehouse) => (
+                <label
+                  key={warehouse.id}
+                  className="flex items-center gap-2 rounded border p-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    disabled={!warehouse.hasActiveDeliveryZone}
+                    checked={publicSalesForm.deliveryWarehouseIds.includes(warehouse.id)}
+                    onChange={(event) =>
+                      setPublicSalesForm((form) => ({
+                        ...form,
+                        deliveryWarehouseIds: event.target.checked
+                          ? [...form.deliveryWarehouseIds, warehouse.id]
+                          : form.deliveryWarehouseIds.filter((id) => id !== warehouse.id),
+                      }))
+                    }
+                  />
+                  {warehouse.name}
+                  {!warehouse.hasActiveDeliveryZone ? ' (no active zone)' : ''}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="public-pickup">Pickup warehouse</Label>
+            <select
+              id="public-pickup"
+              className="mt-2 h-10 w-full rounded-md border bg-background px-3"
+              value={publicSalesForm.pickupWarehouseId}
+              onChange={(event) =>
+                setPublicSalesForm({ ...publicSalesForm, pickupWarehouseId: event.target.value })
+              }
+            >
+              <option value="">Pickup disabled</option>
+              {publicSalesData?.warehouses.map((warehouse) => (
+                <option key={warehouse.id} value={warehouse.id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Offline payment methods</Label>
+            <div className="mt-2 flex flex-wrap gap-4">
+              {(
+                ['CASH_ON_DELIVERY', 'CASH_ON_PICKUP', 'BANK_TRANSFER'] as PublicPaymentMethod[]
+              ).map((method) => (
+                <label key={method} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={publicSalesForm.paymentMethods.includes(method)}
+                    onChange={() => togglePaymentMethod(method)}
+                  />
+                  {method.replace(/_/g, ' ')}
+                </label>
+              ))}
+            </div>
+          </div>
+          {publicSalesForm.paymentMethods.includes('BANK_TRANSFER') && (
+            <div>
+              <Label htmlFor="bank-instructions">Bank transfer instructions</Label>
+              <Input
+                id="bank-instructions"
+                value={publicSalesForm.bankTransferInstructions}
+                onChange={(event) =>
+                  setPublicSalesForm({
+                    ...publicSalesForm,
+                    bankTransferInstructions: event.target.value,
+                  })
+                }
+              />
+            </div>
+          )}
+          {publicSalesData?.config.validationErrors.length ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              {publicSalesData.config.validationErrors.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
+          ) : null}
+          <Button
+            disabled={!can('SETTINGS_EDIT') || isSavingPublicSales}
+            onClick={() => void savePublicSales()}
+          >
+            {isSavingPublicSales && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save public
+            sales
+          </Button>
         </CardContent>
       </Card>
 

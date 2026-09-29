@@ -96,7 +96,7 @@ function buildOrderEvents(order, roleContext) {
   const counterpart =
     roleContext === 'RESTAURANT'
       ? suppliersSummary.primary?.name || 'Supplier'
-      : order.restaurant_name || 'Restaurant'
+      : order.customer_display_name || order.restaurant_name || 'Customer'
 
   events.push({
     id: `${order.id}-order`,
@@ -443,6 +443,8 @@ router.get(
             ${hasBranchColumn ? 'b.name AS branch_name,' : ''}
             o.restaurant_id,
             r.name AS restaurant_name,
+            o.customer_type,
+            COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name,
             COALESCE((
               SELECT json_agg(DISTINCT jsonb_build_object('id', s.id, 'name', s.name))
               FROM order_item oi
@@ -456,7 +458,7 @@ router.get(
               WHERE oi.order_id = o.id
             ), ARRAY[]::text[]) AS categories
           FROM customer_order o
-          JOIN restaurant r ON r.id = o.restaurant_id
+          LEFT JOIN restaurant r ON r.id = o.restaurant_id
           ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id' : ''}
           WHERE o.id = ANY($1::uuid[])
         `

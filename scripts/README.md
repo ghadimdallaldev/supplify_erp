@@ -36,16 +36,17 @@ Dev orchestration, release promotion, Railway secret sync, and onboarding doc ge
 
 ## Onboarding docs
 
-| Script                                    | npm command                          | Purpose                          |
-| ----------------------------------------- | ------------------------------------ | -------------------------------- |
-| `generate-all-onboarding-docs.mjs`        | `pnpm docs:onboarding:all`           | Handbook + PDF + PPTX            |
-| `generate-onboarding-pdf.mjs`             | `pnpm docs:onboarding:pdf`           | Handbook PDF                     |
-| `generate-onboarding-pptx.mjs`            | `pnpm docs:onboarding:pptx`          | Internal demo deck               |
-| `generate-customer-presentation-pdf.mjs`  | `pnpm docs:onboarding:customer-pdf`  | Customer leave-behind PDF        |
-| `generate-customer-presentation-pptx.mjs` | `pnpm docs:onboarding:customer-pptx` | Customer meeting deck            |
-| `onboarding/md-to-html.mjs`               | (internal)                           | Markdown → HTML for PDF pipeline |
-| `onboarding/build-customer-html.mjs`      | (internal)                           | Customer presentation HTML       |
-| `onboarding/customer-brand.mjs`           | (internal)                           | Shared branding constants        |
+| Script                                    | npm command                          | Purpose                             |
+| ----------------------------------------- | ------------------------------------ | ----------------------------------- |
+| `generate-all-onboarding-docs.mjs`        | `pnpm docs:onboarding:all`           | Handbook + PDF + PPTX               |
+| `generate-onboarding-pdf.mjs`             | `pnpm docs:onboarding:pdf`           | Handbook PDF                        |
+| `generate-qa-checklist-pdf.mjs`           | `pnpm docs:qa:pdf`                   | Manual QA checklist PDF (landscape) |
+| `generate-onboarding-pptx.mjs`            | `pnpm docs:onboarding:pptx`          | Internal demo deck                  |
+| `generate-customer-presentation-pdf.mjs`  | `pnpm docs:onboarding:customer-pdf`  | Customer leave-behind PDF           |
+| `generate-customer-presentation-pptx.mjs` | `pnpm docs:onboarding:customer-pptx` | Customer meeting deck               |
+| `onboarding/md-to-html.mjs`               | (internal)                           | Markdown → HTML for PDF pipeline    |
+| `onboarding/build-customer-html.mjs`      | (internal)                           | Customer presentation HTML          |
+| `onboarding/customer-brand.mjs`           | (internal)                           | Shared branding constants           |
 
 See [`docs/onboarding/GENERATION.md`](../docs/onboarding/GENERATION.md) for the full pipeline.
 

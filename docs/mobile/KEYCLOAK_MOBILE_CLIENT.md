@@ -26,6 +26,11 @@ Configure this **once** in Keycloak before running the Supplify mobile app again
 
 Mobile EAS profiles bake the matching realm into `EXPO_PUBLIC_KEYCLOAK_REALM` (see `supplify-mobile/eas.json`).
 
+Each realm must include the `consumer` realm role. Both native clients map it to the
+application `CONSUMER` role and route the account to `ConsumerNavigator`; it must not be
+assigned a tenant role or tenant context. Logged-out supplier browsing does not start an
+OIDC session. See [Guest public shopping](./GUEST_PUBLIC_SHOPPING.md).
+
 ## Mobile environment variables
 
 Set these in `C:/myProjects/supplify-mobile/.env` and `C:/myProjects/supplify-mobile-ios/.env` for **local** Expo:

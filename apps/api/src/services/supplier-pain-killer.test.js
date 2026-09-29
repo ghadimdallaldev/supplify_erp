@@ -186,6 +186,7 @@ Updated Product,SKU2,20,3`
         days_overdue: 10,
       }
       db.query
+        .mockResolvedValueOnce({ rows: [{ tz: 'UTC' }] })
         .mockResolvedValueOnce({ rows: [summaryRow] })
         .mockResolvedValueOnce({ rows: [invoiceRow] })
         .mockResolvedValueOnce({

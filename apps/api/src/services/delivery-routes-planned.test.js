@@ -31,6 +31,9 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock
+      .mockResolvedValueOnce({ rows: [{ id: 'o1' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ n: 0 }] })
       .mockResolvedValueOnce({
         rows: [
@@ -49,8 +52,8 @@ describe('delivery-routes planned assignment', () => {
       })
       .mockResolvedValueOnce({ rows: [{ address_json: {} }] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'wh1' }] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: 'da1', status: 'assigned' }] })
       .mockResolvedValueOnce({ rows: [] })
 
@@ -104,8 +107,6 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [{ ...routeRow }] })
       .mockResolvedValueOnce({ rows: [stopRow] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ ...routeRow, status: 'IN_PROGRESS' }] })
-      .mockResolvedValueOnce({ rows: [stopRow] })
       .mockResolvedValueOnce({ rows: [] })
 
     clientQueryMock
@@ -113,6 +114,8 @@ describe('delivery-routes planned assignment', () => {
       .mockResolvedValueOnce({ rows: [routeRow] })
       .mockResolvedValueOnce({ rows: [stopRow] })
       .mockResolvedValueOnce({ rows: [{ status: 'PLACED' }] })
+      .mockResolvedValueOnce({ rows: [{ ...routeRow, status: 'IN_PROGRESS' }] })
+      .mockResolvedValueOnce({ rows: [stopRow] })
 
     const updated = await updateDeliveryRoute('s1', 'r1', { status: 'IN_PROGRESS', userId: 'u1' })
     expect(updated.status).toBe('IN_PROGRESS')

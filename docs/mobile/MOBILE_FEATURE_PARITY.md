@@ -19,6 +19,14 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 ---
 
+## 2026-09-26 — Manual QA checklist covers web ERP + both mobile apps
+
+- **Docs:** `docs/qa/regression-checklist.md` retitled for full-system QA; added **Part 13** (Android + iOS test matrix) and **Part 14** (web ↔ mobile parity spot checks). Printable PDF via `pnpm docs:qa:pdf` → `docs/qa/output/Supplify-Manual-QA-Checklist.pdf`.
+- **Mobile:** No API/RBAC/type change — QA procedure only. Existing `supplify-mobile/docs/mobile/MOBILE_QA_CHECKLIST.md` remains the mobile-repo release gate; ERP checklist is the handoff doc for QA covering the whole stack.
+- **ERP web:** Checklist references updated migration count (`0222`) and legal pack `2026-09-12`.
+
+---
+
 ## 2026-09-26 — Order detail no longer crashes on open
 
 - **Mobile (Android + iOS):** `GET /api/orders/:id` returns `{ order }`. `useOrder` now unwraps that payload before screens read `id`, `status`, and `items`. Opening an order from Home, Orders, supplier order detail, receiving, or dispute creation was crashing because the screen called methods on the wrapper. Failed loads show an error state instead of spinning forever.
@@ -1599,3 +1607,25 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - Added editable Markdown and print-ready PDF collateral under `docs/printable/` covering current workflows, RBAC, plans, intelligence/AI boundaries, architecture, integrations, and native coverage.
 - No API, authentication, RBAC, type, feature-key, notification payload, or runtime behavior changed.
 - No Android or iOS code update was required; this entry documents the mobile-parity review and documentation-only exception.
+
+## 2026-09-29 - Native supplier public shopping and personal consumers
+
+- **API/auth parity:** added the global `CONSUMER` role, consumer registration and
+  account/order APIs, supplier configuration, public preview/placement/tracking
+  contracts, order projections, and notification destinations to both native clients.
+- **Guest parity:** logged-out Android and iOS roots now open supplier discovery. Both
+  apps share native storefront, search/filter, supplier-isolated cart, authoritative
+  preview, delivery/pickup checkout, idempotent placement, receipt, and SecureStore
+  tracking history. Public calls use `auth: false` and do not refresh or clear sessions.
+- **Consumer parity:** both apps route `CONSUMER` to the same storefront module plus
+  saved addresses, authenticated history/detail, notifications, current-price reorder,
+  and account management.
+- **Supplier parity:** public-sales warehouse/payment settings, share-sheet actions,
+  customer-type/contact/fulfillment/payment order details, and existing accept/reject
+  lifecycle actions are available in both apps.
+- **Links and security:** app-link/universal-link declarations and notification route
+  resolution cover supplier storefronts, consumer orders, and guest tracking. Guest raw
+  tokens remain device-local after the first successful response.
+- **Release follow-up:** physical-device validation of app links, sharing, location
+  permission, SecureStore restoration, timeout retries, and notification opens remains
+  manual. No new environment variable was introduced.

@@ -201,12 +201,12 @@ async function loadStopsForRoutes(routeIds, warehouseId = null) {
       rs.sequence_number,
       rs.estimated_arrival,
       rs.completed_at,
-      r.name AS restaurant_name,
+      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       o.total_amount,
       (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id) AS item_count
     FROM route_stop rs
     JOIN customer_order o ON o.id = rs.order_id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     WHERE rs.route_id = ANY($1::uuid[])${warehouseClause}
     ORDER BY rs.route_id, rs.sequence_number
     `,

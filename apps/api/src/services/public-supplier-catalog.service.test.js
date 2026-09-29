@@ -73,6 +73,7 @@ describe('public-supplier-catalog.service', () => {
         },
       ],
     })
+    queryMock.mockResolvedValueOnce({ rows: [] })
 
     const profile = await getPublicSupplierProfile('fresh-co')
     expect(profile.slug).toBe('fresh-co')
@@ -96,6 +97,7 @@ describe('public-supplier-catalog.service', () => {
         },
       ],
     })
+    queryMock.mockResolvedValueOnce({ rows: [] })
     getTenantBrandingMock.mockResolvedValueOnce({
       logoUrl: 'https://example.com/logo.png',
       brandDisplayName: null,
@@ -146,10 +148,15 @@ describe('public-supplier-catalog.service', () => {
       })
       .mockResolvedValueOnce({ rows: [{ total: 1 }] })
       .mockResolvedValueOnce({ rows: [{ category: 'Poultry' }] })
+      .mockResolvedValueOnce({
+        rows: [{ product_id: 'product-1', amount: '12.50', currency: 'USD' }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
 
     const result = await listPublicSupplierProducts('supplier-1', { page: 1, limit: 24 })
     expect(result.products[0].name).toBe('Chicken')
-    expect(result.products[0]).not.toHaveProperty('currentPrice')
+    expect(result.products[0].currentPrice).toBeNull()
+    expect(result.products[0].orderable).toBe(false)
     expect(result.products[0]).not.toHaveProperty('unit_price')
     expect(result.pagination.total).toBe(1)
     expect(queryMock.mock.calls[0][0]).not.toContain('brand_primary')

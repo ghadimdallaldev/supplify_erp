@@ -53,6 +53,12 @@ Base URL: `http://localhost:4000` (dev). All `/api/*` routes return JSON with sh
 | `/api/supplier`                | `supplier-ops.routes.js`              | Supplier ops: command center, receivables, CSV import, **bulk image import**, substitutes, reorder intelligence                                               |
 | `/api/e2e`                     | `e2e.routes.js`                       | Test-only reset/seed (requires `E2E_SECRET` header)                                                                                                           |
 
+Supplier public-sales additions are mounted at `/api/public` (discovery, catalog,
+preview, placement, and token tracking), `/api/consumer` (owner-scoped profile,
+addresses, orders, and reorder preview), and `/api/supplier/public-sales` (supplier
+fulfillment and offline-payment configuration). See
+[supplier-public-sales.md](../features/supplier-public-sales.md).
+
 Authentication uses session cookies after Keycloak OAuth. Protected routes use `requireAuth`, tenant context, RBAC permissions, and optional `requireFeature()` plan gates.
 
 **Global billing lock:** `billingAccessMiddleware` (in `server.js`) returns **402** `ACCOUNT_LOCKED` when the tenant subscription is locked. Exemptions: `/api/billing/*`, `/api/register/*`, `/auth/*`, `/health/*`, and subscription entitlements GETs. **Free Trial expired** (`free_sandbox_expired`): tenant **GET** routes remain allowed (read-only); writes still **402**. See [free-trial-expiry.md](../features/free-trial-expiry.md).

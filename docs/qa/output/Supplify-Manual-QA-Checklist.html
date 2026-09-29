@@ -1,0 +1,6571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Supplify Manual QA Checklist</title>
+  <style>@page {
+  size: A4 landscape;
+  margin: 12mm 10mm 16mm 10mm;
+}
+
+:root {
+  --cream: #faf7f2;
+  --caramel: #8b6914;
+  --ink: #1a1a1a;
+  --muted: #4a4a4a;
+  --border: #d8cfc0;
+  --table-stripe: #f3ece2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 8.5pt;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ink);
+  background: #fff;
+  line-height: 1.35;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.cover {
+  min-height: 180mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  page-break-after: always;
+  padding: 2rem;
+  border-bottom: 3px solid var(--caramel);
+}
+
+.cover h1 {
+  font-size: 1.75rem;
+  color: var(--caramel);
+  margin: 0 0 0.35rem;
+}
+
+.cover .subtitle {
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 36rem;
+  margin: 0.5rem auto 1.5rem;
+}
+
+.cover .meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.content h1 {
+  font-size: 1.25rem;
+  color: var(--caramel);
+  margin: 1.2rem 0 0.5rem;
+  page-break-after: avoid;
+}
+
+.content h2 {
+  font-size: 1.05rem;
+  color: var(--caramel);
+  margin: 1rem 0 0.4rem;
+  page-break-after: avoid;
+}
+
+.content h3 {
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin: 0.75rem 0 0.35rem;
+  page-break-after: avoid;
+}
+
+.content p,
+.content li {
+  margin: 0.35rem 0;
+}
+
+.content blockquote {
+  margin: 0.5rem 0;
+  padding: 0.35rem 0.75rem;
+  border-left: 3px solid var(--caramel);
+  background: var(--cream);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.content code {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  background: var(--cream);
+  padding: 0.05rem 0.2rem;
+  border-radius: 2px;
+}
+
+.content pre {
+  font-size: 0.8rem;
+  background: var(--cream);
+  padding: 0.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+.content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4rem 0 0.75rem;
+  font-size: 0.82rem;
+  page-break-inside: auto;
+}
+
+.content thead {
+  display: table-header-group;
+}
+
+.content tr {
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+.content th,
+.content td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.35rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.content th {
+  background: var(--caramel);
+  color: #fff;
+  font-weight: 600;
+}
+
+.content tbody tr:nth-child(even) {
+  background: var(--table-stripe);
+}
+
+.content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+.content a {
+  color: var(--caramel);
+  text-decoration: none;
+}
+</style>
+</head>
+<body>
+  <section class="cover">
+    <h1>Supplify Manual QA Checklist</h1>
+    <p class="subtitle">Web ERP, Android, and iOS — end-to-end manual regression</p>
+    <p class="meta">
+      Generated 2026-09-26<br />
+      Repository commit 2611b950<br />
+      Source: docs/qa/regression-checklist.md
+    </p>
+  </section>
+  <main class="content"><h1>Supplify — Full system manual QA checklist (Web ERP + Mobile)</h1>
+<p>Use this document for <strong>end-to-end manual testing</strong> of the <strong>web ERP</strong> (<code>apps/web</code> + <code>apps/api</code>) and <strong>native mobile apps</strong> (Android + iOS) across <strong>Public</strong>, <strong>Restaurant</strong>, <strong>Supplier</strong>, <strong>Driver</strong>, <strong>Staff portal</strong>, and <strong>Platform Admin</strong> personas.</p>
+<p><strong>Printable PDF:</strong> From repo root run <code>pnpm docs:qa:pdf</code> → <code>docs/qa/output/Supplify-Manual-QA-Checklist.pdf</code> (landscape A4). HTML fallback: <code>docs/qa/output/Supplify-Manual-QA-Checklist.html</code> (browser → Print → Save as PDF).</p>
+<p><strong>Recommended test order (fresh database wipe):</strong> Part 0 → Part 1 → Part 2 → Part 3 → Parts 4–12 (web ERP) → <strong>Part 13</strong> (mobile, both platforms) → <strong>Part 14</strong> (cross-platform parity spot checks) → Part 10–11 if QA lead runs API/CI smoke.</p>
+<hr>
+<h2>Surfaces under test</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>Where to run</th>
+<th>Primary checklist sections</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Web ERP</td>
+<td><code>http://localhost:5173</code> (or staging URL) + same-origin API</td>
+<td>Parts 0–12, Part 14 (web side)</td>
+</tr>
+<tr>
+<td>Android</td>
+<td><code>C:/myProjects/supplify-mobile</code> — Expo dev client or EAS <strong>preview</strong> build</td>
+<td>Part 13 (repeat every case) + Part 14</td>
+</tr>
+<tr>
+<td>iOS</td>
+<td><code>C:/myProjects/supplify-mobile-ios</code> — Simulator or TestFlight <strong>preview</strong></td>
+<td>Part 13 (repeat every case) + Part 14</td>
+</tr>
+<tr>
+<td>API-only smoke</td>
+<td>curl / Postman / <code>pnpm test:api</code></td>
+<td>Part 10–11</td>
+</tr>
+</tbody></table>
+<p><strong>Web-only (no native screen — verify on web only):</strong> Platform admin console tabs, bulk product image import UI, org overview analytics depth, consumer guest menu admin, staff portal <code>/staff/*</code>, most supplier settings tabs (warehouses/zones, branding upload, deal boost admin review), impersonation banner workflows, and responsive web layout polish.</p>
+<p><strong>Mobile-first or mobile-only:</strong> Driver foreground GPS, POD camera/signature capture, Expo push tap deep links, native offline banner + pull-to-refresh, branch/workspace switcher on device.</p>
+<hr>
+<h2>How to use this checklist</h2>
+<ol>
+<li><strong>Record results:</strong> Pass / Fail / Blocked / N/A in <strong>Pass?</strong>; add tester name, date, build/branch/app version, API environment, device/OS (mobile), and notes in the sign-off table.</li>
+<li><strong>Test matrix:</strong> Parts 0–3 must run before anything else on a wiped database. Parts 4–12 can run in parallel across web personas once accounts exist. Part 13 requires the same API backend the web tests used (shared entitlements and seed data).</li>
+<li><strong>Deep links:</strong> Many web routes work when typed in the address bar even if not in the sidebar — test those once per persona.</li>
+<li><strong>Delivery GPS:</strong> Web: restaurant <strong>§6.6.1</strong> (<code>GPS-R01–R10</code>); supplier <strong>§7.4.1</strong> (<code>GPS-S01–S09</code>); driver web <strong>§7.4.2</strong> (<code>DRV-GPS1–3</code>). Mobile driver: <strong>Part 13.4</strong> (<code>MOB-D*</code>). Spec: <a href="../features/drivers-and-gps-tracking.md">drivers-and-gps-tracking.md</a>.</li>
+<li><strong>Billing stub card:</strong> <code>4242424242424242</code> (any future expiry/CVC) when <code>BILLING_GATEWAY=stub</code>.</li>
+<li><strong>Release delta packs:</strong> After Parts 0–3, run the <strong><a href="#2026-09-10-release-smoke-pack-run-today">2026-09-10 release smoke pack</a></strong> on web; re-run the overlapping mobile rows in <strong>Part 13</strong> and <strong>Part 14</strong> (orders, quotes, fulfillment/POD, receiving).</li>
+<li><strong>Mobile preflight (optional, before Part 13):</strong> In each mobile repo: <code>npx tsc --noEmit</code>, <code>npm test -- --runInBand</code>, <code>npx expo-doctor</code> — records build health; does not replace manual Part 13.</li>
+</ol>
+<hr>
+<h2>Route map (quick reference)</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Persona</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/login</code></td>
+<td>Public</td>
+</tr>
+<tr>
+<td><code>/legal/reaccept</code></td>
+<td>Authenticated users with stale legal pack</td>
+</tr>
+<tr>
+<td><code>/legal/:slug</code></td>
+<td>Public / authenticated — read-only legal documents</td>
+</tr>
+<tr>
+<td><code>/register/complete</code></td>
+<td>Pending / needs setup</td>
+</tr>
+<tr>
+<td><code>/reserve</code>, <code>/reserve/:slug</code>, <code>/reserve/confirmation</code>, <code>/reserve/manage/:token</code></td>
+<td>Guest</td>
+</tr>
+<tr>
+<td><code>/reserve/waitlist/:token/accept</code>, <code>/reserve/waitlist/:token/decline</code></td>
+<td>Guest (waitlist table offer)</td>
+</tr>
+<tr>
+<td><code>/supplier/:slug</code></td>
+<td>Public mini-store (guest + restaurant when logged in)</td>
+</tr>
+<tr>
+<td><code>/staff</code>, <code>/staff/login</code>, <code>/staff/dashboard</code></td>
+<td>Staff portal (operational staff; not <code>/app</code>)</td>
+</tr>
+<tr>
+<td><code>/app/quote-requests</code>, <code>/app/quote-requests/new</code>, <code>/app/quote-requests/:id</code></td>
+<td>Restaurant — RFQ / compare offers</td>
+</tr>
+<tr>
+<td><code>/app/quote-requests/supplier</code></td>
+<td>Supplier — quote inbox</td>
+</tr>
+<tr>
+<td><code>/app/activate</code></td>
+<td>Locked tenant billing activation</td>
+</tr>
+<tr>
+<td><code>/app/orders</code>, <code>/app/orders/:id</code></td>
+<td>Restaurant &amp; Supplier</td>
+</tr>
+<tr>
+<td><code>/app/products</code>, <code>/app/products/:id</code></td>
+<td>Both (supplier edits catalog)</td>
+</tr>
+<tr>
+<td><code>/app/cart</code>, <code>/app/quick-lists</code>, <code>/app/deals</code></td>
+<td>Restaurant</td>
+</tr>
+<tr>
+<td><code>/app/restaurant-inventory</code></td>
+<td>Restaurant (<code>INVENTORY_VIEW</code>)</td>
+</tr>
+<tr>
+<td><code>/app/receiving</code></td>
+<td>Restaurant</td>
+</tr>
+<tr>
+<td><code>/app/reservations</code></td>
+<td>Restaurant (<code>RESERVATIONS_VIEW</code>)</td>
+</tr>
+<tr>
+<td><code>/app/staff</code></td>
+<td>Restaurant (<code>STAFF_VIEW</code>)</td>
+</tr>
+<tr>
+<td><code>/app/suppliers</code>, <code>/app/suppliers/:id</code></td>
+<td>Restaurant</td>
+</tr>
+<tr>
+<td><code>/app/restaurants</code>, <code>/app/restaurants/:id</code></td>
+<td>Supplier</td>
+</tr>
+<tr>
+<td><code>/app/fulfillment</code></td>
+<td>Supplier</td>
+</tr>
+<tr>
+<td><code>/app/inventory</code></td>
+<td>Supplier (not in sidebar — deep link)</td>
+</tr>
+<tr>
+<td><code>/app/invoices</code></td>
+<td>Both (<code>INVOICES_VIEW</code>)</td>
+</tr>
+<tr>
+<td><code>/app/chat</code></td>
+<td>Both</td>
+</tr>
+<tr>
+<td><code>/app/settings</code>, <code>/app/onboarding</code></td>
+<td>Restaurant → onboarding; Supplier → supplier settings</td>
+</tr>
+<tr>
+<td><code>/app/supplier-settings</code></td>
+<td>Supplier (duplicate of settings — deep link)</td>
+</tr>
+<tr>
+<td><code>/app/admin</code>, <code>/app/admin/suppliers</code>, <code>/app/admin/restaurants</code></td>
+<td>Platform admin</td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 0 — Environment: fresh-database setup</h1>
+<blockquote>
+<p>Run this part whenever you wipe the database and want to start from scratch. Every step must succeed before moving to Part 1.</p>
+</blockquote>
+<h2>0.1 Wipe and rebuild the database</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SETUP-01</td>
+<td>Stop all running services (<code>Ctrl+C</code> in each terminal or <code>pnpm run dev</code> teardown)</td>
+<td>No API or web process running on ports 3001/5173</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-02</td>
+<td>Drop and recreate the database: run your project&#39;s DB reset script (e.g. <code>pnpm run db:reset</code> or <code>psql -c &quot;DROP DATABASE supplify; CREATE DATABASE supplify;&quot;</code>)</td>
+<td>Clean empty database; no tables</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-03</td>
+<td>Run all migrations: <code>pnpm run db:migrate</code></td>
+<td>All <strong>223</strong> migrations apply through <strong><code>0222_one_open_staff_time_entry</code></strong> (incl. <code>0196</code>–<code>0203</code> hospitality/promotions/quote inbox); no errors</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-04</td>
+<td>Seed the subscription plan catalog: <code>pnpm run seed:tier-catalog</code></td>
+<td>Free, Silver, Gold, Platinum plans for RESTAURANT and SUPPLIER in <code>subscription_plan</code> table; confirm with <code>SELECT code, tenant_type FROM subscription_plan ORDER BY tenant_type, display_order;</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-05</td>
+<td>Verify plan catalog (post <code>0117</code> + <code>0145</code>): <code>pnpm run log:tier-limits</code> or query <code>subscription_plan</code> for <code>code = &#39;silver&#39;</code></td>
+<td>Silver restaurant: 1 branch, 20 orders/day, 5 suppliers, 250 SKUs, no <code>promotions</code> limit key; Silver supplier: 1 warehouse, <code>promotions</code> 3; Free <strong><code>chats_per_day: 3</code></strong>; <code>advanced_roles</code> false on Silver</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-06</td>
+<td>Start the API: <code>pnpm --filter @supplify/api dev</code></td>
+<td>API listening; migrations logged; no crash on startup</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-07</td>
+<td>Start the web: <code>pnpm --filter @supplify/web dev</code></td>
+<td>Dev server running at <code>http://localhost:5173</code> (or configured port)</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-08</td>
+<td>Health check: <code>GET /api/health</code></td>
+<td><code>{ status: &quot;ok&quot; }</code></td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-09</td>
+<td>Navigate to <code>/login</code> in browser</td>
+<td>Login page loads; no errors in console</td>
+<td>pass</td>
+</tr>
+</tbody></table>
+<h2>0.2 Seed the platform admin account</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SETUP-10</td>
+<td>Run admin seed: <code>pnpm run seed:demo-users</code> (or equivalent Keycloak user creation)</td>
+<td>Admin user created in Keycloak with <code>ADMIN</code> role</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-11</td>
+<td>Log in as <code>admin@supplify.com</code> / <code>SupplifyAdmin1!</code></td>
+<td>Redirected to <code>/app/admin</code>; admin sidebar visible</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-12</td>
+<td><code>GET /api/auth/me</code></td>
+<td>Returns <code>role: &quot;ADMIN&quot;</code>, no tenantId</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>SETUP-13</td>
+<td>Log out</td>
+<td>Returns to <code>/login</code></td>
+<td>pass</td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 1 — Account creation: Restaurant (fresh start)</h1>
+<blockquote>
+<p>This section walks through the full onboarding journey for a brand-new restaurant account from zero. No pre-seeded demo data.</p>
+</blockquote>
+<h2>1.1 Registration</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRST-01</td>
+<td>Open Keycloak registration (or <code>/login</code> → Register link); create a new user with a unique email (e.g. <code>newresto@test.com</code>)</td>
+<td>User created in Keycloak with <code>PENDING</code> role</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-02</td>
+<td>Log in with the new account</td>
+<td>Redirected to <code>/register/complete</code> (not the app)</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-03</td>
+<td>On <code>/register/complete</code>: enter restaurant name, select <strong>Restaurant</strong> as tenant type, fill required fields, submit</td>
+<td>Form submits; <code>POST /api/register/complete</code> returns 200; user + tenant record created</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-04</td>
+<td>After submit, check redirect destination</td>
+<td>Either <code>/app/activate</code> (activation lock ON) or <code>/app/dashboard</code> (activation lock OFF) — note which</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-05</td>
+<td>Open a second tab, navigate to <code>/app/orders</code></td>
+<td>Either loads (if unlocked) or redirects to <code>/app/activate</code></td>
+<td>Pass</td>
+</tr>
+</tbody></table>
+<h2>1.2 Activation lock &amp; plan selection</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRST-06</td>
+<td>On <code>/app/activate</code>: inspect page</td>
+<td>Activation banner; <strong>Activate free plan</strong> and <strong>Compare plans &amp; pay</strong> visible; no other app sections accessible</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-07</td>
+<td>Click <strong>Activate free plan</strong> (or <strong>Compare plans &amp; pay</strong> → Free → confirm)</td>
+<td>Subscription Free ACTIVE; <code>pending_activation</code> cleared; redirected to dashboard</td>
+<td>Pass</td>
+</tr>
+<tr>
+<td>CRST-08</td>
+<td>(Alt) Use upgrade modal: <strong>Compare plans &amp; pay</strong> → Free tier <strong>Activate free plan</strong> → confirm (no card)</td>
+<td>Same as CRST-07</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-09</td>
+<td>(New session) Repeat CRST-01–CRST-04 with a second account; select <strong>Silver plan</strong>; enter stub card <code>4242424242424242</code>, any future expiry/CVC</td>
+<td>Subscription ACTIVE Silver; redirected to dashboard</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-10</td>
+<td>(New session) Repeat with <strong>Gold plan</strong></td>
+<td>Subscription ACTIVE Gold; redirected to dashboard</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-11</td>
+<td>Verify <code>GET /api/subscriptions/entitlements/current</code> for each account</td>
+<td><code>plan.code</code> matches the selected plan; <code>features</code> object reflects plan tier</td>
+<td>pass</td>
+</tr>
+</tbody></table>
+<h2>1.3 Post-activation state (Free restaurant)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRST-12</td>
+<td>Log in as the Free restaurant; open dashboard</td>
+<td>Dashboard loads; no crash; limited feature set</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-13</td>
+<td>Navigate to <code>/app/orders</code></td>
+<td>Orders list loads (Free allows basic ordering)</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-14</td>
+<td>Navigate to <code>/app/chat</code></td>
+<td><strong>403 or feature-gated paywall</strong> — <code>chat</code> is not a Free feature</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-15</td>
+<td>Navigate to <code>/app/quick-lists</code></td>
+<td><strong>403 or paywall</strong> — <code>quick_lists</code> gated</td>
+<td>pass</td>
+</tr>
+<tr>
+<td>CRST-16</td>
+<td>Open dashboard → Order calendar widget</td>
+<td>Paywall or upgrade CTA shown; calendar does not load</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-17</td>
+<td>Navigate to <code>/app/receiving</code></td>
+<td><strong>403 or paywall</strong> — <code>receiving_quality</code> gated</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-18</td>
+<td>Navigate to <code>/app/invoices</code></td>
+<td><strong>403 or paywall</strong> — <code>finance_invoices</code> gated</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-19</td>
+<td>Navigate to <code>/app/restaurant-inventory</code></td>
+<td><strong>403 or paywall</strong> — <code>inventory_management</code> gated</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>1.4 Post-activation state (Silver restaurant)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRST-20</td>
+<td>Log in as Silver restaurant; navigate to <code>/app/chat</code></td>
+<td>Chat UI loads; can send a message</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-21</td>
+<td>Navigate to <code>/app/quick-lists</code></td>
+<td>Quick lists load; can create a list</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-22</td>
+<td>Navigate to <code>/app/receiving</code></td>
+<td>Receiving page loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-23</td>
+<td>Navigate to <code>/app/invoices</code></td>
+<td>Invoice list loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-24</td>
+<td>Navigate to <code>/app/restaurant-inventory</code></td>
+<td>Inventory page loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-25</td>
+<td>Dashboard → Order calendar</td>
+<td>Calendar loads; can filter by date</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>1.5 Post-activation state (Gold restaurant)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CRST-26</td>
+<td>Log in as Gold restaurant; navigate to Settings → Team → Roles tab</td>
+<td>Advanced role management available (<code>advanced_roles</code> feature)</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-27</td>
+<td>Navigate to Settings → Activity tab</td>
+<td>Audit log shows activity (<code>tenant_audit_log</code> feature)</td>
+<td></td>
+</tr>
+<tr>
+<td>CRST-28</td>
+<td>Check Settings → Subscription → usage meters</td>
+<td>Shows orders/day, SKUs, chat messages with plan limits</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 2 — Account creation: Supplier (fresh start)</h1>
+<blockquote>
+<p>Mirror of Part 1 for the supplier persona.</p>
+</blockquote>
+<h2>2.1 Registration</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSUP-01</td>
+<td>Open Keycloak registration; create new user <code>newsupplier@test.com</code></td>
+<td>User created with <code>PENDING</code> role</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-02</td>
+<td>Log in; redirected to <code>/register/complete</code></td>
+<td>Form loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-03</td>
+<td>Select <strong>Supplier</strong> as tenant type; fill required fields; submit</td>
+<td>Supplier tenant created; <code>POST /api/register/complete</code> 200</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-04</td>
+<td>Observe redirect destination</td>
+<td><code>/app/activate</code> or <code>/app/dashboard</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>2.2 Activation lock &amp; plan selection</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSUP-05</td>
+<td>On <code>/app/activate</code>: inspect page</td>
+<td><strong>Activate free plan</strong> and <strong>Compare plans &amp; pay</strong> visible</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-06</td>
+<td>Click <strong>Activate free plan</strong> (no card required)</td>
+<td>Subscription Free ACTIVE; <code>pending_activation</code> cleared; redirected to dashboard</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-06b</td>
+<td>(Alt) <strong>Compare plans &amp; pay</strong> → Free → <strong>Activate free plan</strong></td>
+<td>Same as CSUP-06</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-07</td>
+<td>(New session) Repeat with <strong>Silver plan</strong> + stub card</td>
+<td>Silver ACTIVE</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-08</td>
+<td>(New session) Repeat with <strong>Gold plan</strong> + stub card</td>
+<td>Gold ACTIVE</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-09</td>
+<td><code>GET /api/subscriptions/entitlements/current</code> for each</td>
+<td><code>plan.code</code> and <code>features</code> correct per plan</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>2.3 Post-activation state (Free supplier)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSUP-10</td>
+<td>Log in as Free supplier; navigate to <code>/app/chat</code></td>
+<td><strong>403 or paywall</strong> — <code>chat</code> gated</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-11</td>
+<td>Navigate to <code>/app/fulfillment</code></td>
+<td><strong>403 or paywall</strong> — <code>fulfillment_tools</code> gated</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-12</td>
+<td>Navigate to Settings → Warehouses tab</td>
+<td>Single warehouse allowed; adding a second warehouse blocked by plan</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-13</td>
+<td>Navigate to <code>/app/invoices</code></td>
+<td><strong>403 or paywall</strong> — <code>finance_invoices</code> gated</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>2.4 Post-activation state (Silver supplier)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSUP-14</td>
+<td>Log in as Silver supplier; navigate to <code>/app/chat</code></td>
+<td>Chat UI loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-15</td>
+<td>Navigate to <code>/app/fulfillment</code></td>
+<td>Fulfillment page loads (manual fulfillment); <strong>Driver dispatch</strong> tab hidden or 403 (<code>driver_management</code> off on Silver)</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-16</td>
+<td>Navigate to <code>/app/invoices</code></td>
+<td>Invoice list loads</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-17</td>
+<td>Settings → Warehouses: add a second warehouse</td>
+<td><strong>Blocked</strong> — Silver allows 1 warehouse (<code>warehouses</code> limit); upgrade CTA</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>2.5 Post-activation state (Gold supplier)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CSUP-18</td>
+<td>Log in as Gold supplier; Settings → Warehouses → enable multi-warehouse routing</td>
+<td>Toggle available (<code>multi_warehouse</code> feature)</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-19</td>
+<td>Settings → Activity tab</td>
+<td>Audit log available (<code>tenant_audit_log</code> feature)</td>
+<td></td>
+</tr>
+<tr>
+<td>CSUP-20</td>
+<td>Settings → Plan: usage meters</td>
+<td>SKUs, orders/day, warehouses shown with limits</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 3 — Feature flag gates &amp; tier progression</h1>
+<blockquote>
+<p>These tests verify that each feature-gated route correctly blocks Free accounts, unblocks on the appropriate paid tier, and that admin overrides work correctly.</p>
+<p><strong>Required accounts:</strong> Free restaurant, Silver restaurant, Gold restaurant, Free supplier, Silver supplier, Gold supplier, Admin.</p>
+<p><strong>Silver catalog reference:</strong> migration <code>0117_silver_tier_limits_features.sql</code> · <a href="../product/subscriptions.md">SUBSCRIPTIONS.md</a></p>
+</blockquote>
+<h2>3.1 Restaurant feature gates</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Feature key</th>
+<th>Free account</th>
+<th>Silver account</th>
+<th>Gold account</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GATE-R01</td>
+<td><code>chat</code></td>
+<td><code>/app/chat</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R02</td>
+<td><code>quick_lists</code></td>
+<td><code>/app/quick-lists</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R03</td>
+<td><code>receiving_quality</code></td>
+<td><code>/app/receiving</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R04</td>
+<td><code>finance_invoices</code></td>
+<td><code>/app/invoices</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R05</td>
+<td><code>inventory_management</code></td>
+<td><code>/app/restaurant-inventory</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R06</td>
+<td><code>order_calendar</code></td>
+<td>Dashboard calendar widget → paywall; <code>GET /api/orders/calendar</code> → 403</td>
+<td>200 + calendar data</td>
+<td>200 + calendar data</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R07</td>
+<td><code>disputes_returns</code></td>
+<td><code>GET /api/disputes</code> → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R08</td>
+<td><code>advanced_roles</code></td>
+<td>Settings → Team: no role management UI</td>
+<td>Hidden/locked (Gold+)</td>
+<td>Available</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R09</td>
+<td><code>reports</code></td>
+<td><code>GET /api/reports</code> → 403</td>
+<td>200 (<code>basic_kpis</code>)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R10</td>
+<td><code>smart_reorder</code></td>
+<td><code>GET /api/restaurant-inventory/reorder-assistance</code> → 403</td>
+<td>403</td>
+<td>200; <code>smartReorder.tier</code> gold</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R10a</td>
+<td><code>smart_reorder</code> tier</td>
+<td><code>POST …/reorder-assistance/explain</code> → 403</td>
+<td>403</td>
+<td>200 (heuristic or LLM)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R10b</td>
+<td><code>smart_reorder</code> tier</td>
+<td><code>POST …/reorder-assistance/ask</code> → 403 (requires Platinum account)</td>
+<td>403</td>
+<td>403</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R10c</td>
+<td><code>ai_requests_per_day</code></td>
+<td>At daily limit: <code>explain</code> → 200 heuristic + <code>usageLimited</code>; <code>ask</code> → 400</td>
+<td>N/A (Silver off)</td>
+<td>Manual on Gold test tenant</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R10d</td>
+<td><code>ai_platform</code></td>
+<td>Admin global off: <code>explain</code>/<code>ask</code> return heuristic (<code>usedLlm: false</code>)</td>
+<td>Same</td>
+<td>Same</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R11</td>
+<td><code>waste_tracking</code></td>
+<td>Inventory → Waste tab; waste analytics</td>
+<td>Manual entry only (<code>manual_entry</code>)</td>
+<td>Analytics dashboard (Gold+)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R12</td>
+<td><code>tenant_audit_log</code></td>
+<td>Settings → Activity tab → hidden or 403</td>
+<td>Hidden/locked (Gold+)</td>
+<td>Visible and loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R13</td>
+<td><code>order_amendments</code></td>
+<td>Order amendment API → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R14</td>
+<td><code>push_notifications</code></td>
+<td>Push endpoint → 403</td>
+<td>200 (if VAPID configured)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R15</td>
+<td><code>supplier_reviews</code></td>
+<td>Reviews API → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R16</td>
+<td><code>custom_branding</code></td>
+<td>Settings branding section → hidden or locked</td>
+<td>Locked (Gold+)</td>
+<td>Branding upload available</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R17</td>
+<td><code>multi_branch</code></td>
+<td>Settings → Branches: cannot add 2nd branch</td>
+<td>1 branch max (cannot add 2nd)</td>
+<td>Up to 3 branches</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R18</td>
+<td><code>feature_flags_access</code></td>
+<td>Tenant flag override API → 403</td>
+<td>403 (Gold+)</td>
+<td>200 (if UI exposed)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R19</td>
+<td><code>supplier_deals</code></td>
+<td><code>/app/deals</code> loads (sandbox); <strong>1 redemption/day</strong> cap</td>
+<td>Loads; 10/day cap</td>
+<td>Loads; 50/day cap</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R20</td>
+<td><code>waitlist_auto_promo</code></td>
+<td>Cancel reservation → no auto-offer to waitlist</td>
+<td>No auto-offer</td>
+<td>Auto-offer on cancel (Gold+)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R21</td>
+<td><code>recipe_costing</code></td>
+<td><code>/app/recipes</code> hidden; <code>GET /api/recipes</code> → 403</td>
+<td>403</td>
+<td>200; sidebar Recipes visible</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R21a</td>
+<td><code>recipe_costing</code></td>
+<td><code>GET /api/recipe-costing/dashboard</code> → 403</td>
+<td>403</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-R21b</td>
+<td><code>RECIPES_VIEW_COSTS</code></td>
+<td>Purchaser: recipes list OK; cost fields hidden/403 on breakdown</td>
+<td>Gold purchaser account</td>
+<td>Accountant sees costs</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>3.2 Supplier feature gates</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Feature key</th>
+<th>Free account</th>
+<th>Silver account</th>
+<th>Gold account</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GATE-S01</td>
+<td><code>chat</code></td>
+<td><code>/app/chat</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S02</td>
+<td><code>fulfillment_tools</code> / <code>fulfillment</code></td>
+<td><code>/app/fulfillment</code> → 403/paywall</td>
+<td>Loads (no drivers)</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S03</td>
+<td><code>driver_management</code></td>
+<td>Driver dispatch tab → 403/hidden</td>
+<td>Hidden/403 (Gold+)</td>
+<td>Available</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S04</td>
+<td><code>finance_invoices</code></td>
+<td><code>/app/invoices</code> → 403/paywall</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S05</td>
+<td><code>order_calendar</code></td>
+<td>Dashboard calendar → paywall; <code>GET /api/orders/calendar</code> → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S06</td>
+<td><code>disputes_returns</code></td>
+<td><code>GET /api/disputes/incoming</code> → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S07</td>
+<td><code>warehouses</code></td>
+<td>Settings → Warehouses: 0 warehouses (Free)</td>
+<td>1 warehouse max</td>
+<td>Up to 3</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S08</td>
+<td><code>multi_warehouse</code></td>
+<td>Settings → multi-warehouse toggle hidden/locked</td>
+<td>Locked (Gold+)</td>
+<td>Toggle available</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S09</td>
+<td><code>inventory_management</code></td>
+<td><code>/app/inventory</code> → 403 or locked</td>
+<td>Loads</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S10</td>
+<td><code>quick_lists</code></td>
+<td>N/A (restaurant-only feature)</td>
+<td>N/A</td>
+<td>N/A</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S11</td>
+<td><code>advanced_roles</code></td>
+<td>Settings → Team: no role management</td>
+<td>Hidden/locked (Gold+)</td>
+<td>Available</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S12</td>
+<td><code>reports</code></td>
+<td>Reports API → 403</td>
+<td>200 (<code>basic_kpis</code>)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S13</td>
+<td><code>promotions</code></td>
+<td>Promotions API → 403</td>
+<td>200 (max 3 active deals)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S14</td>
+<td><code>tenant_audit_log</code></td>
+<td>Settings → Activity tab → hidden</td>
+<td>Hidden/locked (Gold+)</td>
+<td>Visible</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S15</td>
+<td><code>order_amendments</code></td>
+<td>Order amendment API → 403</td>
+<td>200</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S16</td>
+<td><code>push_notifications</code></td>
+<td>Push endpoint → 403</td>
+<td>200 (if configured)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S17</td>
+<td><code>multi_branch</code></td>
+<td>Settings → Branches: 1 branch only</td>
+<td>1 branch max</td>
+<td>Higher limit</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S18</td>
+<td><code>feature_flags_access</code></td>
+<td>Tenant flag override API → 403</td>
+<td>403 (Gold+)</td>
+<td>200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-S19</td>
+<td><code>custom_branding</code></td>
+<td>Branding section locked</td>
+<td>Locked (Gold+)</td>
+<td>Available</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>3.3 Admin feature flag overrides (for gated features)</h2>
+<blockquote>
+<p>Test that admin can force-enable a feature for a Free tenant and force-disable it for a Gold tenant.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GATE-A01</td>
+<td>Admin → Features tab → find <code>chat</code> global flag → disable it</td>
+<td><code>POST /api/feature-flags/global</code> disables chat globally</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A02</td>
+<td>Log in as Gold restaurant; navigate to <code>/app/chat</code></td>
+<td><strong>403</strong> — global disable overrides plan entitlement</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A03</td>
+<td>Admin → re-enable <code>chat</code> globally</td>
+<td>Restored</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A04</td>
+<td>Admin → Features tab → Per-tenant override → select Free restaurant → force-enable <code>chat</code></td>
+<td><code>POST /api/feature-flags/tenant-overrides</code> returns 200</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A05</td>
+<td>Log in as Free restaurant; navigate to <code>/app/chat</code></td>
+<td><strong>Chat loads</strong> — tenant override beats plan restriction</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A06</td>
+<td>Admin → remove the override for that tenant</td>
+<td>Override deleted</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A07</td>
+<td>Log in as Free restaurant again; navigate to <code>/app/chat</code></td>
+<td><strong>403/paywall</strong> — back to plan restriction</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A08</td>
+<td>Admin → Per-tenant override → select Gold restaurant → force-disable <code>reports</code></td>
+<td>Override applied</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A09</td>
+<td>Log in as Gold restaurant; call <code>GET /api/reports</code></td>
+<td><strong>403</strong> — tenant override disables feature even on Gold</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A10</td>
+<td>Admin → remove the override</td>
+<td>Gold restaurant regains <code>reports</code> access</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-A11</td>
+<td><code>entitlements_refresh</code> WebSocket: after admin applies override, logged-in tenant sees toast or UI refresh within ~30s</td>
+<td>Entitlements refresh event received</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>3.4 Plan upgrade &amp; downgrade flow</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GATE-U01</td>
+<td>Free restaurant → Settings → Subscription → upgrade to Silver</td>
+<td>Billing modal opens; stub card accepted; subscription becomes Silver</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-U02</td>
+<td>After upgrade: navigate to <code>/app/chat</code></td>
+<td>Chat now loads (feature unlocked by plan upgrade)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-U03</td>
+<td>Admin → Subscriptions → downgrade that tenant back to Free</td>
+<td>Subscription becomes Free; <code>invalidateTenantSubscriptionCache</code> called</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-U04</td>
+<td>Log in as that restaurant; navigate to <code>/app/chat</code></td>
+<td>403/paywall returns (feature re-locked)</td>
+<td></td>
+</tr>
+<tr>
+<td>GATE-U05</td>
+<td>Free supplier → upgrade to Gold via settings</td>
+<td>All Gold supplier features now available</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 4 — Cross-cutting (all authenticated tenants)</h1>
+<h2>4.1 Authentication &amp; session</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AUTH-01</td>
+<td>Open <code>/login</code>, sign in as restaurant</td>
+<td>Redirect to app shell; sidebar shows restaurant nav</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-02</td>
+<td>Sign in as supplier</td>
+<td>Supplier nav; no restaurant-only items</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-03</td>
+<td>Sign in as admin</td>
+<td>Redirect to <code>/app/admin</code> (not tenant dashboard)</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-04</td>
+<td>Refresh page while logged in</td>
+<td>Session persists; no login loop</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-05</td>
+<td>Log out (header avatar / logout)</td>
+<td>Returns to login; protected routes blocked</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-06</td>
+<td>Open <code>/app/orders</code> while logged out</td>
+<td>Redirect to login</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.2 Registration &amp; first-time setup</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AUTH-07</td>
+<td>New Keycloak user with <code>PENDING</code> role → <code>/register/complete</code></td>
+<td>Form loads; complete profile/tenant type</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-08</td>
+<td>Finish registration as <strong>Restaurant</strong></td>
+<td>Lands in app or <code>/app/activate</code> if activation lock enabled</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-09</td>
+<td>Finish registration as <strong>Supplier</strong></td>
+<td>Same; supplier settings reachable when unlocked</td>
+<td></td>
+</tr>
+<tr>
+<td>AUTH-10</td>
+<td>User with <code>needsSetup</code> from <code>/api/register/status</code></td>
+<td>Forced to <code>/register/complete</code> until done</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.3 Legal re-acceptance (pack <code>2026-09-12</code>)</h2>
+<blockquote>
+<p>Requires a user whose <code>legal_acceptance.document_version</code> ≠ current pack in repo-root <code>legal-pack-version.json</code> (<strong><code>2026-09-12</code></strong> at last doc update). See <a href="../ui/LEGAL_PACK_REACCEPTANCE.md">../ui/LEGAL_PACK_REACCEPTANCE.md</a>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LEG-01</td>
+<td>Log in as user on stale legal pack → navigate to <code>/app/dashboard</code></td>
+<td>Redirect to <code>/legal/reaccept</code> before app shell</td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-02</td>
+<td><code>/legal/reaccept</code> page</td>
+<td>Lists required documents for tenant type; accept-all checkbox required</td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-03</td>
+<td>Submit acceptance with current pack <code>2026-09-12</code></td>
+<td>Redirect to <code>/app</code>; <code>GET /auth/me</code> → <code>legalStatus.needsReacceptance: false</code></td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-04</td>
+<td>Staff portal user on stale pack → <code>/staff/dashboard</code></td>
+<td>Redirect to <code>/legal/reaccept</code> first</td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-05</td>
+<td><code>PENDING</code> user during registration</td>
+<td><code>/register/complete</code>, <strong>not</strong> <code>/legal/reaccept</code></td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-06</td>
+<td>POST <code>/auth/legal-acceptance</code> with wrong <code>packVersion</code></td>
+<td>400 validation error</td>
+<td></td>
+</tr>
+<tr>
+<td>LEG-07</td>
+<td>Read-only <code>/legal/terms_and_conditions</code> while logged out</td>
+<td>Document loads; no re-accept gate on public legal routes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.4 Account activation lock (new tenants)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BIL-01</td>
+<td>New restaurant after register — no payment</td>
+<td><code>/app/activate</code>; pending activation banner</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-02</td>
+<td>On activate page → <strong>Compare plans &amp; pay</strong></td>
+<td>Upgrade/payment modal; <code>/api/billing/</code>* works (no 402)</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-03</td>
+<td>Navigate to Orders/Dashboard while locked</td>
+<td>Redirect to <code>/app/activate</code> or 402 <code>ACCOUNT_LOCKED</code> + <code>pendingActivation</code></td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-04</td>
+<td>Paid checkout (stub card) for Silver/Gold</td>
+<td>Unlock; full app access</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-05</td>
+<td>Admin → Subscriptions → <strong>Activate</strong> on locked tenant</td>
+<td>Unlocked without payment</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.5 Billing, subscriptions &amp; overdue</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BIL-06</td>
+<td>Paid tenant → Settings → Plan / subscription tab</td>
+<td>Current plan, usage meters, <strong>Manage billing</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-07</td>
+<td>Payment modal → add card → checkout monthly/yearly</td>
+<td>Success; subscription ACTIVE</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-08</td>
+<td>Simulate past-due (admin: mark subscription PAST_DUE)</td>
+<td>Grace banner; <strong>Pay now</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-09</td>
+<td>Simulate locked overdue (admin: trigger lock)</td>
+<td>Red lock banner; most APIs 402; billing still works</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-10</td>
+<td>Pay overdue balance</td>
+<td>Lock cleared; app usable</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-11</td>
+<td>Toggle auto-renew in billing UI</td>
+<td>Persists; reflected on reload</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-12</td>
+<td>Free plan tenant</td>
+<td>No payment required; upgrade prompts where applicable</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.6 Plan limits &amp; upgrade UX</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PLN-01</td>
+<td>Free restaurant → Dashboard <strong>Order calendar</strong></td>
+<td>Paywall + upgrade CTA; no broken URL / &quot;Try again&quot;</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-02</td>
+<td>Gold restaurant → Order calendar</td>
+<td>Calendar loads; filters work</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-03</td>
+<td>Hit daily order limit (or seed at limit)</td>
+<td>Block message; upgrade modal with limit label</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-04</td>
+<td>Hit chat limit</td>
+<td>Send blocked; upgrade nudge</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-05</td>
+<td>Add branch over plan limit</td>
+<td>Gate message references <code>multi_branch</code> / branch limit</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-06</td>
+<td>Supplier add warehouse over limit</td>
+<td>Warehouse gate from plan</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-06a</td>
+<td>Silver supplier → add 2nd warehouse</td>
+<td><strong>Blocked</strong> — Silver <code>warehouses</code> limit is 1; upgrade CTA</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-06b</td>
+<td>Gold supplier → enable multi-warehouse</td>
+<td>Settings toggle; routing rules API; split order badges</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-06c</td>
+<td>Supplier org → add branch over plan limit</td>
+<td><code>multi_branch</code> / branch limit message</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-07</td>
+<td>Gold/Platinum → custom branding in settings</td>
+<td>Logo/colors upload (Gold); white-label if Platinum</td>
+<td></td>
+</tr>
+<tr>
+<td>PLN-08</td>
+<td>Header <strong>Plans</strong> button</td>
+<td>Upgrade/browse modal; plan comparison table</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.7 Free Trial expiry (read-only lock)</h2>
+<blockquote>
+<p><strong>Spec:</strong> <a href="../features/free-trial-expiry.md">free-trial-expiry.md</a> · <strong>Audit:</strong> <a href="./FREE_TRIAL_BEHAVIOR_AUDIT.md">FREE_TRIAL_BEHAVIOR_AUDIT.md</a><br><strong>Accounts:</strong> Free restaurant or supplier (<code>restaurant-free@…</code> / <code>supplier-free@…</code>) or any tenant on plan <code>free</code>.<br><strong>Simulate expiry:</strong> run SQL below (replace subscription id) or set <code>free_sandbox_expires_at</code> in the past and wait for / trigger <code>free-sandbox-expiry</code> job.</p>
+</blockquote>
+<pre><code class="language-sql">UPDATE subscription
+SET free_sandbox_expires_at = now() - interval &#39;1 day&#39;,
+    account_locked_at = now(),
+    lock_reason = &#39;free_sandbox_expired&#39;
+WHERE id = &#39;&lt;subscription_id&gt;&#39;;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BIL-FT-01</td>
+<td>Free tenant → log in after expiry SQL</td>
+<td>Login succeeds; amber <strong>Free Trial expired</strong> banner; <strong>Choose a plan</strong> CTA</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-02</td>
+<td>Open <code>/app/orders</code> (list)</td>
+<td>Page loads; existing orders visible (read-only)</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-03</td>
+<td>Open <code>/app/products</code> or supplier catalog</td>
+<td>List/detail <strong>GET</strong> works</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-04</td>
+<td>Try place order / POST cart checkout / create product</td>
+<td><strong>402</strong>; message: <em>Your Free Trial has expired. Upgrade your plan to continue using Supplify.</em></td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-05</td>
+<td><code>GET /api/billing/status</code> while locked</td>
+<td><strong>200</strong>; <code>access.isLocked</code> true; <code>freeSandboxExpired</code> or <code>lockReason === &#39;free_sandbox_expired&#39;</code></td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-06</td>
+<td><code>POST /api/billing/checkout</code> (upgrade to Silver)</td>
+<td>Allowed (billing exempt from lock)</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-07</td>
+<td>Settings → Subscription tab</td>
+<td>Shows <strong>Free Trial</strong> label; expired copy; upgrade path</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-08</td>
+<td>Admin → Platform settings → set trial length <strong>5</strong> or <strong>100</strong></td>
+<td>Validation error; only <strong>7–90</strong> accepted</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-09</td>
+<td>Admin → Platform settings → save <strong>30</strong> days</td>
+<td>Persists; new Free activations use clamped value</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-10</td>
+<td>Admin → Subscriptions → locked free tenant → <strong>Extend trial</strong></td>
+<td>Lock cleared; <code>free_sandbox_expires_at</code> ~30 days ahead; tenant can write again</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-11</td>
+<td>Re-expire tenant; Admin → <strong>Activate</strong> / unlock on <code>free_sandbox_expired</code></td>
+<td>Unlock + trial extended (job should not re-lock immediately)</td>
+<td></td>
+</tr>
+<tr>
+<td>BIL-FT-12</td>
+<td><code>POST …/extend-free-trial</code> with <code>{ &quot;days&quot;: 30 }</code> (API or admin action)</td>
+<td><strong>200</strong>; expiry ≈ now + 30 days</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.9 Supplier customer growth</h2>
+<blockquote>
+<p><strong>Spec:</strong> <a href="../features/supplier-customer-growth.md">supplier-customer-growth.md</a> · <strong>Migration:</strong> <code>0169_supplier_growth_program.sql</code><br><strong>Prereq:</strong> Supplier user with <code>CUSTOMERS_IMPORT</code> / <code>CUSTOMERS_MANAGE</code>; sample CSV with restaurant name + email.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GRW-01</td>
+<td>Supplier → <code>/app/customer-growth</code> → upload CSV → preview</td>
+<td>Valid/error row counts; no server error</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-02</td>
+<td>Run import</td>
+<td>Prospects created; auto-match sets <code>existing_supplify</code> when email matches</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-03</td>
+<td>Matched prospect → <strong>Connect</strong></td>
+<td>Restaurant receives connection request notification</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-03b</td>
+<td>Restaurant → <strong>decline</strong> connection request</td>
+<td>Supplier receives <code>connection_request_declined</code> notification</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-04</td>
+<td>Restaurant → accept connection request</td>
+<td><code>supplier_follow</code> row; prospect <code>lifecycle_status = connected</code></td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-05</td>
+<td>Unmatched prospect → <strong>Invite</strong> (link)</td>
+<td>Invite URL copied; <code>supplier_growth_invitation</code> pending</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-06</td>
+<td>Open <code>/register?ref={token}</code> → complete restaurant registration</td>
+<td>Referral attribution; 30-day Free Trial; auto-follow supplier</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-07</td>
+<td>Referred restaurant → first paid checkout (Silver)</td>
+<td>20% discount on invoice; supplier reward granted per admin config</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-08</td>
+<td>Supplier → <strong>Sponsor</strong> prospect (Silver)</td>
+<td>Respects plan yearly limit; restaurant gets 1 month paid plan</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-09</td>
+<td>Dashboard → Customer Growth widget</td>
+<td>Shows imported / invited / converted counts</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-10</td>
+<td>Admin → Plans → Growth program settings → save discount %</td>
+<td><code>PATCH /api/admin-dashboard/growth-settings</code> persists</td>
+<td></td>
+</tr>
+<tr>
+<td>GRW-11</td>
+<td>Supplier follow-up → reminder draft → <strong>Send reminder</strong></td>
+<td>Restaurant team notified (<code>reorder_reminder</code>); draft status <code>sent</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.8 Shell UI (Layout, Header, Sidebar)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UX-01</td>
+<td>Sidebar: each visible nav item</td>
+<td>Correct route; active state highlight</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-02</td>
+<td>Orders nav badge</td>
+<td>Shows pending count when pending orders exist</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-03</td>
+<td>Header notifications bell</td>
+<td>Panel opens; mark read / mark all read</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-04</td>
+<td>Header search (⌘K)</td>
+<td>Opens search UX if implemented</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-05</td>
+<td>Header settings icon</td>
+<td>Navigates to settings</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-06</td>
+<td>Header avatar → logout</td>
+<td>Session ends</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07</td>
+<td><strong>Branch switcher</strong> (multi-branch tenant)</td>
+<td>Lists linked accounts; switch updates context</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07a</td>
+<td>Supplier with org → <strong>All branches</strong> link</td>
+<td>Navigates to <code>/app/org</code> when <code>multi_branch</code> on</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07b</td>
+<td>Org Owner → add branch on <code>/app/org</code></td>
+<td>Two-step modal: branch details → invite link copy</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07c</td>
+<td>Branch settings → Invitations tab</td>
+<td>List/revoke/resend; copy link works</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07d</td>
+<td>Open <code>/invite/branch?token=…</code> (valid)</td>
+<td>Signup or accept while logged in; lands on dashboard</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-07e</td>
+<td>Expired / revoked invite link</td>
+<td>Correct error state; no account created</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-08</td>
+<td>Plan badge in sidebar footer</td>
+<td>Shows plan name for non-free paid tiers</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-09</td>
+<td>Mobile/narrow viewport</td>
+<td>Sidebar/layout usable; tabs wrap (supplier settings)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.9 Notifications preferences</h2>
+<blockquote>
+<p><strong>Spec:</strong> <a href="../product/notifications-summary.md">notifications-summary.md</a> · <a href="../features/notifications-and-alerts.md">notifications-and-alerts.md</a></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UX-10</td>
+<td>Settings → notifications (restaurant/supplier/admin)</td>
+<td>Toggles: email, WhatsApp, in-app, per-event types</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-11</td>
+<td>Save preferences → reload</td>
+<td>Values persisted</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-12</td>
+<td>Trigger event (e.g. new order) with in-app on</td>
+<td>Notification appears in header</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-12a</td>
+<td>Same event as UX-12 (foreground tab)</td>
+<td>Toast ~10s + short sound; optional browser banner</td>
+<td></td>
+</tr>
+<tr>
+<td>UX-12b</td>
+<td>Log in as <strong>second team user</strong> (not contact_email only)</td>
+<td>Same event visible in bell + toast for that user</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-01</td>
+<td>Gold+ tenant: email + WhatsApp enabled</td>
+<td>Order placed → supplier in-app + email (+ WA)</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-02</td>
+<td>Staff cancels reservation (guest had email/phone)</td>
+<td>Guest cancel email/WhatsApp; staff notified</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-03</td>
+<td>Paid checkout completes</td>
+<td><code>billing_activated</code> notification</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-04</td>
+<td>Admin extends free trial</td>
+<td><code>billing_trial_extended</code> notification</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-05</td>
+<td>Assign tenant role to team user</td>
+<td>Assignee receives <code>auth.role_changed</code> email</td>
+<td></td>
+</tr>
+<tr>
+<td>NOT-06</td>
+<td><code>POST /api/notifications/test</code> with <code>emailTo</code></td>
+<td>Test email delivered or log-only (dev)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.10 Realtime &amp; impersonation</h2>
+<p>Ref: <a href="../features/admin-impersonation.md">features/admin-impersonation.md</a> · <a href="../IMPERSONATION_AUDIT.md">IMPERSONATION_AUDIT.md</a></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-IMP-01</td>
+<td>Admin starts impersonation on restaurant</td>
+<td>Redirect <code>/app/dashboard</code>; sticky banner; restaurant nav</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-02</td>
+<td>Navigate orders, products, settings, inventory</td>
+<td>Pages load with tenant data (not empty/admin-only)</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-03</td>
+<td>Switch branch (multi-branch tenant)</td>
+<td>Branch switch works; data scoped to branch</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-04</td>
+<td>While impersonating, open <code>/app/admin</code></td>
+<td>Redirect to tenant dashboard</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-05</td>
+<td>Refresh browser during impersonation</td>
+<td>Session still active until cookie/JWT expiry</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-06</td>
+<td>Exit impersonation</td>
+<td><code>/app/admin</code>; banner gone; admin nav</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-07</td>
+<td>Impersonate supplier; navigate fulfillment/products</td>
+<td>Supplier nav and APIs work</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-08</td>
+<td>Billing checkout while impersonating</td>
+<td>403 <code>IMPERSONATION_RESTRICTED</code> (or blocked UI)</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-09</td>
+<td>Impersonate suspended tenant without confirm</td>
+<td>403 <code>TENANT_SUSPENDED</code>; confirm allows start</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-10</td>
+<td>Audit log</td>
+<td><code>IMPERSONATION_START</code> / <code>IMPERSONATION_END</code> entries</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-IMP-11</td>
+<td>Plan change while logged in (admin or billing)</td>
+<td><code>entitlements_refresh</code> toast or refetch updates UI</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>4.11 WebSocket connectivity</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WS-01</td>
+<td>Log in as restaurant; open browser DevTools → Network → WS</td>
+<td>Socket.IO connection established; no repeated reconnects</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-02</td>
+<td>Send a chat message</td>
+<td>Message appears in real-time on recipient&#39;s screen without page refresh</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-03</td>
+<td>Type in chat input on one session</td>
+<td>Typing indicator visible on other session</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-04</td>
+<td>Recipient&#39;s typing indicator shows for other party only (not self; not socket connection ID)</td>
+<td>&quot;typing…&quot; indicator; no spurious self-typing</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-05</td>
+<td><code>notification_new</code> over Socket.IO (user on dashboard)</td>
+<td>Toast + sound within ~1s of server event; no 12s poll delay</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-06</td>
+<td>Multi-tab same user</td>
+<td>Single shared socket; duplicate toasts deduped by notification id</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-07</td>
+<td>Mark message as read on one session</td>
+<td>Read receipt updates on sender&#39;s session in real-time</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-08</td>
+<td>Admin changes a tenant&#39;s plan</td>
+<td>Logged-in tenant receives <code>entitlements_refresh</code> event (toast or silent refetch) within ~30s</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-09</td>
+<td>Network briefly disconnected (DevTools → throttle offline then back)</td>
+<td>Socket reconnects; no duplicate messages; connection restored</td>
+<td></td>
+</tr>
+<tr>
+<td>WS-10</td>
+<td>Log out</td>
+<td>WebSocket disconnected cleanly; no 401 errors in console</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 5 — Public &amp; guest (no tenant login)</h1>
+<h2>5.1 Guest reservation portal</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PUB-01</td>
+<td>Open <code>/reserve</code> or <code>/reserve/{restaurant-slug}</code></td>
+<td>Booking UI loads; restaurant name shown</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-02</td>
+<td>Complete booking (party size, date, time)</td>
+<td>Confirmation page <code>/reserve/confirmation</code></td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-03</td>
+<td>Copy manage link from confirmation email/UI</td>
+<td><code>/reserve/manage/:token</code> loads reservation</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-04</td>
+<td>Cancel reservation via manage link</td>
+<td>Status cancelled; reflected on restaurant board; restaurant team notified</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-05</td>
+<td>Reschedule via manage link</td>
+<td>New slot saved; restaurant team notified</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-06</td>
+<td>Invalid/expired token</td>
+<td>Friendly error; no crash</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-14</td>
+<td>Gold+ restaurant: cancel seated reservation → waitlist guest with matching party size gets offer</td>
+<td>Guest receives accept/decline link; board shows offer pending</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-15</td>
+<td>Open <code>/reserve/waitlist/:token/accept</code> from offer email/UI</td>
+<td>Confirmation UI; reservation <code>CONFIRMED</code>; waitlist entry accepted</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-16</td>
+<td>Open <code>/reserve/waitlist/:token/decline</code></td>
+<td>Offer declined; next guest can be offered on expiry/manual promote</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-17</td>
+<td>Public book: fill <strong>occasion</strong> + <strong>allergies</strong></td>
+<td>Confirmation + manage page show the notes; restaurant board shows them</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-18</td>
+<td>Booking policy deposit required</td>
+<td>Guest must acknowledge deposit before confirm</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-19</td>
+<td>Blackout date on restaurant</td>
+<td>Public slot picker shows closed / no slots for that day</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-20</td>
+<td>After completed visit: open review link from invite</td>
+<td>Guest can submit rating/review via manage token</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-21</td>
+<td>Ratings summary on public reserve page (if enabled)</td>
+<td>Aggregate rating visible without login</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>5.2 Staff self-service portal</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PUB-07</td>
+<td>Open <code>/staff/login</code> (or <code>/staff</code>)</td>
+<td>Keycloak sign-in + optional magic-link UI</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-08</td>
+<td>Manager: <code>/app/staff</code> → Team → <strong>Create portal account</strong> for staff</td>
+<td>Account created; status Active; temp password (dev) or invite flow</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-09</td>
+<td>Staff signs in at <code>/staff/login</code> with work email</td>
+<td>Lands on <code>/staff/dashboard</code>; <strong>cannot</strong> open <code>/app</code> (redirect back)</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-10</td>
+<td>Staff: clock in/out, view own shifts, submit PTO/swap</td>
+<td>Only own data; <code>GET /api/staff/members</code> returns 403 if forced</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-11</td>
+<td>Manager: copy login link, send invite, reset, disable portal access</td>
+<td>Link is <code>/staff/login</code>; disable blocks login and magic link</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-12</td>
+<td>Magic link: request link (portal enabled) → <code>/staff/dashboard?token=</code></td>
+<td>Legacy session works; scoped to one staff profile</td>
+<td></td>
+</tr>
+<tr>
+<td>PUB-13</td>
+<td>Session / token expiry</td>
+<td>Prompt re-auth at <code>/staff/login</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 6 — Restaurant tenant</h1>
+<p><strong>Primary accounts:</strong> <code>restaurant@supplify.com</code>, <code>restaurant-gold@supplify.com</code>, <code>restaurant-free@supplify.com</code></p>
+<p><strong>Sidebar:</strong> Dashboard, Orders, Products, Quick Lists, Cart, Reservations, Receiving, Suppliers, Invoices, Chat, Staff, Inventory, Settings<br>Hidden without RBAC permission or feature gate.</p>
+<h2>6.1 Dashboard (<code>/app/dashboard</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-01</td>
+<td>Load dashboard</td>
+<td>KPI cards load (orders, spend, etc.)</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-02</td>
+<td><strong>Recent orders</strong> list</td>
+<td>Links to order detail</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-03</td>
+<td><strong>Spend trend</strong> (30 days)</td>
+<td>Chart matches invoice/order data or empty-state message</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-04</td>
+<td><strong>Reorder alerts</strong></td>
+<td>Suggestions; add to quick list works</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-05</td>
+<td><strong>Order calendar</strong> (Silver+)</td>
+<td>Calendar events; filters</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-06</td>
+<td><strong>Order calendar</strong> (Free)</td>
+<td>Upgrade paywall only</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.2 Orders (<code>/app/orders</code>, <code>/app/orders/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-07</td>
+<td>Orders list tabs: All, New, Processing, Shipped, Completed</td>
+<td>Correct filtering</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-07a</td>
+<td>Orders list <strong>search</strong> (order #, supplier name, SKU text)</td>
+<td>Server-side search narrows list; clearing search restores full list</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-07b</td>
+<td>Orders <strong>inbox filters</strong> (status + date range if shown)</td>
+<td>Combined filters match API; empty state when no matches</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-08</td>
+<td>Open order detail</td>
+<td>Details, Items tabs load</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-09</td>
+<td>Place order from cart (see 6.4)</td>
+<td>New order appears in list</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-10</td>
+<td>Cancel order (if permitted)</td>
+<td>Status cancelled; supplier notified</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-10a</td>
+<td>Supplier declines <code>PLACED</code> order with reason (other session)</td>
+<td><strong>Declined by supplier</strong> + reason on list/detail; timeline shows decline</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-10b</td>
+<td>Supplier decline without reason (API or UI)</td>
+<td><code>400 DECLINE_REASON_REQUIRED</code> or UI blocks submit</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-11</td>
+<td>Order reminders / notifications</td>
+<td>Trigger where applicable</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.3 Products &amp; catalog (<code>/app/products</code>, <code>/app/products/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-12</td>
+<td>Browse supplier products</td>
+<td>List, search, filters</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-13</td>
+<td>Product detail</td>
+<td>SKU, price, pack size, add to cart</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-14</td>
+<td>Categories/tags if shown</td>
+<td>Navigation works</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.4 Cart (<code>/app/cart</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-15</td>
+<td>Add items from products</td>
+<td>Cart persists after navigation</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-16</td>
+<td>Update quantities / remove lines</td>
+<td>Totals recalculate</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-17</td>
+<td>Submit order</td>
+<td>Success; redirects to orders; cart clears</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18</td>
+<td>Empty cart checkout</td>
+<td>Validation prevents submit</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>6.4.1 Supplier last-order cutoff &amp; contract pricing — 2026-09-09/10</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-18a</td>
+<td>Supplier sets <code>last_order_mode=cutoff</code> (absolute time) in Business settings</td>
+<td>Setting saves; restaurant cart shows cutoff / rolled delivery date</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18b</td>
+<td>Place order after cutoff</td>
+<td><code>requested_delivery_date</code> rolls to next allowed day (or blocks per mode)</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18c</td>
+<td>Supplier sets minutes-before-window + rollover days</td>
+<td>Cart countdown / next window matches rule</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18d</td>
+<td>Restaurant with active contract: open cart after rehydrate (reload)</td>
+<td>Lines show <strong>Your price</strong> (contract), not stale catalog list price</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18e</td>
+<td>Scheduled quick-list auto-order with active contract</td>
+<td>Order lines snapshot <code>pricing_source=CONTRACT_PRICE</code> + <code>contract_price_id</code></td>
+<td></td>
+</tr>
+<tr>
+<td>RST-18f</td>
+<td>Supplier detail / catalog card with contract</td>
+<td>Contract badge only when <code>pricing_source === &#39;CONTRACT_PRICE&#39;</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.5 Quick lists (<code>/app/quick-lists</code>) — requires <code>quick_lists</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-19</td>
+<td>Free account → navigate to <code>/app/quick-lists</code></td>
+<td>403 or paywall; not accessible</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-20</td>
+<td>Silver+ account → create quick list</td>
+<td>Saved with name</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-21</td>
+<td>Add/remove SKUs</td>
+<td>Persists</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-22</td>
+<td>Order from quick list</td>
+<td>Creates order with lines</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-23</td>
+<td>Scheduled quick list (if UI filter)</td>
+<td>Scheduled vs unscheduled views</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-23a</td>
+<td>Quick lists page <strong>stat cards</strong> + empty state</td>
+<td>Summary counts load; empty state CTA when no lists</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.6 Restaurant inventory (<code>/app/restaurant-inventory</code>) — requires <code>inventory_management</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-24</td>
+<td>Free account → navigate to <code>/app/restaurant-inventory</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-25</td>
+<td>Silver+ → Tab: Current inventory</td>
+<td>SKU levels, par levels</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-26</td>
+<td>Tab: Movement history</td>
+<td>Events listed</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-27</td>
+<td>Tab: Totals &amp; sources</td>
+<td>Aggregates correct</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-28</td>
+<td>Adjust stock (if UI)</td>
+<td>Quantity updates; audit in history</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-29</td>
+<td>User without <code>INVENTORY_VIEW</code></td>
+<td>Nav hidden; direct URL blocked or 403</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.7 Receiving (<code>/app/receiving</code>) — requires <code>receiving_quality</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-30</td>
+<td>Free account → navigate to <code>/app/receiving</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-31</td>
+<td>Silver+ — supplier marks order <strong>Mark Delivered</strong> (<code>DELIVERED</code>)</td>
+<td>Restaurant pending list shows order; green “Supplier marked as delivered” message</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-32</td>
+<td><strong>Receive Now</strong> on pending order — full quantities</td>
+<td>Order leaves pending; appears in <strong>History</strong> tab; order status <code>RECEIVED_FULL</code></td>
+<td></td>
+</tr>
+<tr>
+<td>RST-33</td>
+<td>Partial receive / discrepancies</td>
+<td><code>RECEIVED_PARTIAL</code> or report status <code>PARTIAL</code>; inventory reflects received qty only</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-34</td>
+<td>Tab: History</td>
+<td>Past <code>receiving_report</code> rows listed (orders not received do not appear here)</td>
+<td></td>
+</tr>
+<tr>
+<td>RECV-01</td>
+<td>Order detail (DELIVERED) → <strong>Receive this order</strong> → <code>/app/receiving?order={id}</code></td>
+<td>Receive dialog opens for that order when still pending</td>
+<td></td>
+</tr>
+<tr>
+<td>RECV-02</td>
+<td>Order timeline tab (DELIVERED, not yet received)</td>
+<td>Delivery step completed; <strong>Confirm receipt</strong> current (not “Order placed” in progress)</td>
+<td></td>
+</tr>
+<tr>
+<td>RECV-03</td>
+<td>Supplier order detail after SHIPPED</td>
+<td>Button reads <strong>Mark Delivered</strong> (not “Complete Order”); sets <code>DELIVERED</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>6.6.1 Restaurant delivery GPS (<code>GPS_ALLOW_RESTAURANT_LIVE_TRACKING</code>)</h3>
+<p>Prereq: supplier assigned driver; active assignment; API <code>GPS_ALLOW_RESTAURANT_LIVE_TRACKING=true</code> (default).</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GPS-R01</td>
+<td>Order detail (no driver yet)</td>
+<td>“Delivery tracking will appear once the supplier assigns a driver.”</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R02</td>
+<td>After driver assigned, before first ping</td>
+<td>“Driver assigned. Waiting for the first GPS update.”</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R03</td>
+<td>Driver en route (recent ping)</td>
+<td>Live message + map or <strong>Open in Google Maps</strong> fallback; badge <strong>Live</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R04</td>
+<td>Stale ping (or lower <code>GPS_STALE_AFTER_SECONDS</code> in dev)</td>
+<td>Stale copy with last update time</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R05</td>
+<td><code>GPS_ALLOW_RESTAURANT_LIVE_TRACKING=false</code> (API restart)</td>
+<td>“Live tracking is not enabled for this order.”</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R06</td>
+<td><code>GPS_RESTAURANT_SHOW_DRIVER_PHONE=false</code> (default)</td>
+<td>No driver phone on panel or API payload</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R07</td>
+<td>Order delivered (<code>DELIVERED</code>)</td>
+<td>“Delivered. You can now receive the order.” + <strong>Receive order</strong> CTA</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R08</td>
+<td>Timeline tab</td>
+<td>Driver milestones without duplicating core order status rows</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R09</td>
+<td>Wrong restaurant tenant → <code>GET /api/orders/:id/tracking</code> (devtools)</td>
+<td>404 — cannot read another restaurant’s tracking</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-R10</td>
+<td>Receiving after GPS deliver</td>
+<td>Receiving still manual — GPS does not auto-receive (RECV-01/02)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.8 Reservations (<code>/app/reservations</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-35</td>
+<td>Reservation board for selected date</td>
+<td>Tables + reservations + waitlist</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-36</td>
+<td>Create reservation (drawer)</td>
+<td>Appears on board</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-37</td>
+<td>Seat / confirm / cancel from board</td>
+<td>Status transitions</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-37a</td>
+<td><strong>Assign table</strong> from board dropdown</td>
+<td>Table shows guest on floor plan until completed/cancelled</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-37b</td>
+<td>Guest <strong>reschedule</strong> via manage link</td>
+<td>Board date/slot updates; staff notification</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-38</td>
+<td><strong>Table builder</strong></td>
+<td>Add/edit floor plan tables</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-39</td>
+<td>Analytics panel (day/week/month)</td>
+<td>Metrics load</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-40</td>
+<td>Guest intelligence panel</td>
+<td>Guest stats load</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-41</td>
+<td>Copy public <strong>booking link</strong></td>
+<td>Link works in incognito (<code>/reserve/...</code>)</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42</td>
+<td>User without <code>RESERVATIONS_VIEW</code></td>
+<td>Nav hidden</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42a</td>
+<td>Multi-branch restaurant: switch branch on reservations board</td>
+<td>Board data scoped to selected branch; waitlist matches branch</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42b</td>
+<td>Guest cancel via manage link (public API parity)</td>
+<td>Same outcome as staff cancel; capacity freed; notifications sent</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42c</td>
+<td>Over-capacity slot attempt (public book or staff create)</td>
+<td>Friendly validation; no double-book beyond capacity guard</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>6.8.1 Reservation excellence (migration <code>0198</code>) — 2026-09-10</h3>
+<p>Spec: <a href="../superpowers/specs/2026-09-10-hospitality-excellence-design.md">hospitality-excellence design</a> · Feature: <a href="../features/reservations-foh.md">reservations-foh.md</a></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-42d</td>
+<td>Mark seated guest <strong>No-show</strong> from board</td>
+<td>Status <code>NO_SHOW</code>; guest CRM no-show count increments</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42e</td>
+<td>Open guest CRM / intelligence for returning guest</td>
+<td>Visit count, tags/VIP, prior occasions visible</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42f</td>
+<td>Settings / booking: set party min/max + cancel window</td>
+<td>Public book enforces limits; late cancel blocked or warned</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42g</td>
+<td>Add blackout date (full day or window)</td>
+<td>Public slots closed for that date; board shows blackout</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42h</td>
+<td>Delete blackout</td>
+<td>Slots reopen</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42i</td>
+<td>Public book with <strong>occasion</strong> + <strong>allergies</strong></td>
+<td>Fields saved; visible on board / detail</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42j</td>
+<td>Deposit policy on: guest books</td>
+<td>Deposit acknowledgment required before confirm</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42k</td>
+<td>Completed reservation → guest receives review invite (or cron dry-run)</td>
+<td>Review invite email/SMS path fires; manage-token review link works</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42l</td>
+<td>Guest submits review via manage token</td>
+<td>Review linked to <code>reservation_id</code>; appears in restaurant reviews inbox</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42m</td>
+<td>Staff reply to reservation-linked review</td>
+<td>Reply saved; guest-facing surface updated if applicable</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-42n</td>
+<td>Analytics: no-show rate / source mix</td>
+<td>Metrics include no-shows and booking sources after sample data</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.9 Staff HR (<code>/app/staff</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-43</td>
+<td>Tab: Team — list members</td>
+<td>Roles shown; portal access status</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-44</td>
+<td>Add staff + create portal account / send invite</td>
+<td>Staff record + portal controls work</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-45</td>
+<td>Tab: Schedule &amp; time</td>
+<td>Shifts; clock events</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-46</td>
+<td>Tab: PTO &amp; availability</td>
+<td>Request/approve PTO</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-47</td>
+<td>Tab: Announcements &amp; swaps</td>
+<td>Post announcement; shift swap flow</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-48</td>
+<td>Tab: Docs &amp; incidents</td>
+<td>Upload/view document; log incident</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-49</td>
+<td>Tab: Payroll &amp; insights</td>
+<td>Reports load</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-50</td>
+<td>User without <code>STAFF_VIEW</code></td>
+<td>Nav hidden</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.10 Suppliers directory (<code>/app/suppliers</code>, <code>/app/suppliers/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-51</td>
+<td>List suppliers</td>
+<td>Search/filter</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-51a</td>
+<td>Suppliers page <strong>stat cards</strong> + empty state</td>
+<td>Followed/active supplier counts; helpful empty state when none</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-52</td>
+<td>Supplier detail</td>
+<td>Catalog preview, follow/block if available</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-53</td>
+<td>Start chat from supplier (requires <code>chat</code> feature)</td>
+<td>Opens conversation if Silver+</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.11 Invoices (<code>/app/invoices</code>) — requires <code>finance_invoices</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-54</td>
+<td>Free account → navigate to <code>/app/invoices</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-55</td>
+<td>Silver+ → Invoice list</td>
+<td>Filter by status/date</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-56</td>
+<td>Open invoice → Details tab</td>
+<td>Line items, totals</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-57</td>
+<td>Payments tab</td>
+<td>Payment history</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-58</td>
+<td>Related order tab</td>
+<td>Links to order</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-59</td>
+<td>Download PDF (if offered)</td>
+<td>PDF opens</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-60</td>
+<td>User without <code>INVOICES_VIEW</code></td>
+<td>Nav hidden</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.12 Chat (<code>/app/chat</code>) — requires <code>chat</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-61</td>
+<td>Free account → navigate to <code>/app/chat</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-62</td>
+<td>Silver+ → Conversation list</td>
+<td>Suppliers/restaurants shown</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-63</td>
+<td>Send message</td>
+<td>Delivered; appears in thread</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-64</td>
+<td>Receive message (second browser/user)</td>
+<td>Message appears in thread within ~1s without manual refresh (Socket.IO)</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-65</td>
+<td>Unread state / read receipts</td>
+<td>Updates correctly</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-66</td>
+<td>Typing indicator</td>
+<td>&quot;typing…&quot; for other party only (not your own); not a socket connection ID</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-67</td>
+<td>Notification toast (other page)</td>
+<td>New order/message notification toast within ~1s; bell count updates</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-68</td>
+<td>Socket reconnect</td>
+<td>Brief API restart: client shows Reconnecting then Live; messages still flow</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-69</td>
+<td>Mobile chat layout</td>
+<td>List full-width; open thread with back; composer usable with keyboard</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.14 Deals (<code>/app/deals</code>) — requires <code>supplier_deals</code> feature</h2>
+<blockquote>
+<p><strong>UI:</strong> page title <strong>Available deals</strong>; card CTA <strong>Order with deal</strong>. See <a href="../ui/DEALS_BOOSTS_WORDING_CLEANUP.md">../ui/DEALS_BOOSTS_WORDING_CLEANUP.md</a>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-74</td>
+<td>Free Trial → <code>/app/deals</code></td>
+<td>Deals feed loads (sandbox <code>supplier_deals</code>); <strong>1 redemption/day</strong> cap (RST-82/83)</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-75</td>
+<td>Silver+ → Deals feed loads</td>
+<td>Cards from followed suppliers; sort/filter works</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-76</td>
+<td>Sponsored deal visible</td>
+<td>Badge &quot;Sponsored&quot; on boosted deal from non-followed supplier</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-77</td>
+<td><strong>Order now</strong> CTA</td>
+<td>Navigates to products; place order; discount on order detail</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-78</td>
+<td><strong>Use coupon</strong> CTA</td>
+<td>Coupon copied; apply at cart checkout; discount applied</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-79</td>
+<td><strong>Message supplier</strong> CTA</td>
+<td>Chat opens with prefilled deal interest message</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-80</td>
+<td><strong>View products</strong> CTA</td>
+<td>Supplier catalog filtered; eligible products highlighted</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-81</td>
+<td>Order detail shows promotion name</td>
+<td><code>GET /api/orders/:id</code> returns <code>appliedPromotion</code> with deal name</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-82</td>
+<td>Free Trial restaurant: redeem deal at checkout (1st today)</td>
+<td>Discount applies; usage meter increments</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-83</td>
+<td>Free Trial restaurant: second deal redemption same day</td>
+<td>Blocked with limit message (<code>deal_redemptions_per_day</code> = 1)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.15 Settings &amp; onboarding (<code>/app/settings</code>, <code>/app/onboarding</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RST-84</td>
+<td>Tab: Profile — edit name, address, logo</td>
+<td>Saves via API</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-85</td>
+<td>Tab: Team — invite users, assign tenant roles</td>
+<td>RBAC roles applied</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-86</td>
+<td>Tab: Branches — add/switch linked accounts</td>
+<td>Respects plan branch limit</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-87</td>
+<td>Tab: Subscription — plan, usage, billing CTA</td>
+<td>Matches entitlements</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-88</td>
+<td>Tab: Notifications</td>
+<td>Same as UX-10</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-89</td>
+<td>Tab: Activity (Gold+, <code>tenant_audit_log</code>)</td>
+<td>Rows show after live actions; Free account sees tab hidden or locked</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-90</td>
+<td>Tab: Activity — Action / Resource dropdowns</td>
+<td>Human-readable labels; filter narrows list</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-91</td>
+<td>Tab: Activity — Clear filters / date range</td>
+<td>Full day included on <strong>To</strong> date</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-92</td>
+<td>Custom branding (Gold+)</td>
+<td>Logo/colors; preview</td>
+<td></td>
+</tr>
+<tr>
+<td>RST-93</td>
+<td><code>/app/onboarding</code></td>
+<td>Same flows as settings (duplicate entry)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>6.16 Restaurant RBAC spot checks</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RBAC-R1</td>
+<td>Log in as <code>RESTAURANT_STAFF</code> (limited role)</td>
+<td>Only permitted nav items; APIs 403 otherwise</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R2</td>
+<td><code>RESTAURANT_MANAGER</code></td>
+<td>Broader access than staff; less than owner</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R3</td>
+<td><code>RESTAURANT_OWNER</code></td>
+<td>Full restaurant permissions</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R4</td>
+<td>Gold restaurant — Settings → Team → role assignment (<code>advanced_roles</code>)</td>
+<td>Can assign/modify roles for team members</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R5</td>
+<td>Free restaurant — no role management section</td>
+<td>Section hidden or locked</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R6</td>
+<td>Invite user already linked to another restaurant/supplier</td>
+<td>Invitation or accept returns clear conflict</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R7</td>
+<td>Creator after <code>/register/complete</code></td>
+<td>Owner role; <code>user_workspace_membership</code> row</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R8</td>
+<td>Manager cannot assign role with permissions they lack (API/UI)</td>
+<td>403 on assign; UI hides over-privileged roles</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-R9</td>
+<td>Cannot remove/downgrade last Owner in org</td>
+<td>400 with clear message</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 7 — Supplier tenant</h1>
+<p><strong>Primary accounts:</strong> <code>supplier@supplify.com</code>, <code>supplier-gold@supplify.com</code>, <code>supplier-free@supplify.com</code></p>
+<p><strong>Sidebar:</strong> Dashboard, Orders, Products, Fulfillment, Restaurants, Invoices, Chat, Settings<br><strong>Deep links:</strong> <code>/app/inventory</code>, <code>/app/supplier-settings</code></p>
+<h2>7.1 Dashboard (<code>/app/dashboard</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-01</td>
+<td>Load dashboard</td>
+<td>Supplier KPIs</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-02</td>
+<td><strong>Low stock</strong> column (not &quot;Reorder alerts&quot;)</td>
+<td>Lists SKUs below threshold; link to inventory</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-03</td>
+<td>Recent orders</td>
+<td>Links work</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-04</td>
+<td>Order calendar (Silver+, <code>order_calendar</code>)</td>
+<td>Same gating as restaurant; paywall on Free</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.2 Orders (<code>/app/orders</code>, <code>/app/orders/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-05</td>
+<td>List tabs</td>
+<td>Filter by status</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-06</td>
+<td>Accept/processing workflow</td>
+<td>Status moves New → Processing</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-06b</td>
+<td><strong>Decline</strong> <code>PLACED</code> order</td>
+<td>Modal requires reason; restaurant sees <strong>Declined by supplier</strong> + reason</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-07</td>
+<td>Mark shipped → <strong>Mark Delivered</strong></td>
+<td>Restaurant sees <code>DELIVERED</code>; can receive</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-08</td>
+<td><strong>Manual order</strong> creation (if UI/API exposed)</td>
+<td>Order created for restaurant</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-09</td>
+<td>Order detail — supplier tabs</td>
+<td>Picking notes, Delivery info, Packing slip</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-10</td>
+<td>Invoice tab on order (if present)</td>
+<td>Linked invoice</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.3 Products &amp; pricing (<code>/app/products</code>, <code>/app/products/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-11</td>
+<td>Create product</td>
+<td>Appears in list</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-12</td>
+<td>Edit product (name, SKU, category, tags)</td>
+<td>Saves</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-13</td>
+<td>Deactivate/delete (if supported)</td>
+<td>Removed from catalog</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-14</td>
+<td>Manage <strong>prices</strong> per SKU</td>
+<td>Price rows CRUD</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15</td>
+<td>Product images/upload (files API)</td>
+<td>Image displays</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15a</td>
+<td><strong>Import Product Images</strong> — ZIP by SKU (<code>CATALOG_EDIT</code>)</td>
+<td>Preview shows matched/unmatched; confirm starts job; poll progress; thumbnails in list</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15b</td>
+<td><strong>Import Product Images</strong> — ZIP + mapping CSV</td>
+<td>Mapping CSV pairs SKU → filename; invalid rows in preview</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15c</td>
+<td><strong>Import Product Images</strong> — replace existing off</td>
+<td>Products with existing <code>image_url</code> skipped (<code>skipped</code> count)</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15d</td>
+<td><strong>Bulk Upload</strong> CSV with <code>image_url</code> column</td>
+<td>Remote HTTP(S) image fetched; product row succeeds even if image fails</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15e</td>
+<td>Failure report after import job</td>
+<td><code>GET .../import/:jobId/report</code> CSV downloads failed rows</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-15f</td>
+<td>Concurrent import blocked</td>
+<td>Second import while job <code>pending</code>/<code>processing</code> returns <strong>409</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-16</td>
+<td>Plan SKU limit</td>
+<td>Block at limit with upgrade message</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.4 Fulfillment (<code>/app/fulfillment</code>) — requires <code>fulfillment_tools</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-17</td>
+<td>Free account → navigate to <code>/app/fulfillment</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-18</td>
+<td>Gold+ → Tab: Driver dispatch (<code>driver_management</code>)</td>
+<td>Assign driver / dispatch list</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-18a</td>
+<td>Silver → Fulfillment → Driver dispatch</td>
+<td>Tab hidden or 403</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-19</td>
+<td>Tab: Pick lists</td>
+<td>Generate pick list from orders</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-20</td>
+<td>Tab: Routes</td>
+<td>Route planning UI</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-21</td>
+<td>Tab: Delivery tracking</td>
+<td>Table with GPS column; <strong>View tracking</strong> opens drawer; refreshes ~30s</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-22</td>
+<td>Tab: Exceptions</td>
+<td>Log/resolve exception</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-23</td>
+<td>Proof of delivery capture</td>
+<td>Notes/signature fields save</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>7.4.3 Dispatch cache, POD, multi-WH — 2026-09-10</h3>
+<p>Migrations: <code>0200</code> (POD one-per-order). Spec: <a href="../features/drivers-and-gps-tracking.md">drivers-and-gps-tracking.md</a></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FUL-01</td>
+<td>Assign driver on dispatch board</td>
+<td>Order leaves <strong>unassigned</strong> within <strong>&lt;45s</strong> (cache invalidated; not stuck until TTL)</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-02</td>
+<td>Create/activate/cancel route; remove stop</td>
+<td>Dispatch board refreshes assignment buckets without waiting full cache TTL</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-03</td>
+<td>Plan route for <strong>tomorrow</strong>; assign stops</td>
+<td><code>scheduled_delivery_date</code> = route date (not forced to today); not treated overdue by tonight job</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-04</td>
+<td>Driver submits POD with photo <strong>or</strong> signature <strong>or</strong> recipient name</td>
+<td>POD saved; dispatch shows <code>has_pod</code></td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-05</td>
+<td>Driver submits empty POD (no photo/signature/name)</td>
+<td><strong>400</strong>; UI save disabled</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-06</td>
+<td>Driver retries POD submit twice (flaky network)</td>
+<td>Still <strong>one</strong> POD row per order (upsert); no duplicate proofs</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-07</td>
+<td>Multi-warehouse order: assign all warehouse legs</td>
+<td>One driver leg per open WH assignment; order stays open until <strong>all</strong> legs terminal</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-08</td>
+<td>Deliver only one WH leg of multi-WH order</td>
+<td>Order not fully <code>DELIVERED</code> until remaining legs delivered/failed</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-09</td>
+<td>Dispatch board warehouse badge</td>
+<td>Assigned warehouse visible on card</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-10</td>
+<td>Silver single-WH supplier → warehouse inventory mode</td>
+<td>Inventory uses warehouse SoT (not blocked awaiting Gold multi-WH)</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-11</td>
+<td>Cancel route / remove stop that had assigned driver</td>
+<td>Driver leg released; order returns to assignable pool (not orphaned under empty route)</td>
+<td></td>
+</tr>
+<tr>
+<td>FUL-12</td>
+<td>Reassign driver</td>
+<td><code>scheduled_delivery_date</code> preserved; old route stop removed</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>7.4.1 Delivery GPS tracking (Gold+, <code>driver_management</code> + <code>GPS_TRACKING_ENABLED</code>)</h3>
+<p>Prereq: migration <code>0137_driver_location_tracking.sql</code>; API env <code>GPS_TRACKING_ENABLED=true</code>; optional <code>VITE_GOOGLE_MAPS_API_KEY</code> for map embed.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GPS-S01</td>
+<td>Command center → deliveries KPI area</td>
+<td><strong>GPS today</strong> widget: Live / Stale / No GPS / Failed; link to fulfillment</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S02</td>
+<td>Fulfillment → Driver dispatch → assign driver → out for delivery</td>
+<td>Each card shows GPS badge: Live, Stale, No GPS yet, or Tracking off</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S03</td>
+<td>Dispatch card → <strong>View tracking</strong></td>
+<td>Drawer: restaurant, driver, status, map or coordinate fallback, no fake ETA</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S04</td>
+<td>Fulfillment → <strong>Delivery tracking</strong> tab</td>
+<td>GPS column; <strong>View tracking</strong> per row</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S05</td>
+<td>Fulfillment → Routes → open route → stop row</td>
+<td>Per-stop GPS label; <strong>View tracking</strong> for that order</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S06</td>
+<td>Supplier order detail (active delivery)</td>
+<td><code>OrderDeliveryTrackingPanel</code> with map/fallback; supplier-only</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S07</td>
+<td>Driver marks delivered → dispatch <strong>Delivered today</strong></td>
+<td>Last known GPS may still show; terminal orders not on active tracking tab</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S08</td>
+<td>Set <code>GPS_STALE_AFTER_SECONDS</code> low (dev) + old ping</td>
+<td>Badge shows <strong>GPS stale</strong> / Stale label</td>
+<td></td>
+</tr>
+<tr>
+<td>GPS-S09</td>
+<td><code>GPS_TRACKING_ENABLED=false</code> (API restart)</td>
+<td>Tracking off / disabled states; no server errors</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>7.4.2 Driver portal GPS (<code>/app/driver/deliveries</code> or driver role)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DRV-GPS1</td>
+<td>Log in as linked driver; open active assignment</td>
+<td>GPS badge (Live / waiting); browser location permission if prompted</td>
+<td></td>
+</tr>
+<tr>
+<td>DRV-GPS2</td>
+<td>Advance to out_for_delivery; wait or simulate location</td>
+<td>Supplier dispatch shows <strong>Live</strong>; restaurant order detail updates (poll)</td>
+<td></td>
+</tr>
+<tr>
+<td>DRV-GPS3</td>
+<td>Mark delivered</td>
+<td>Order <code>DELIVERED</code>; driver stops sending pings; restaurant sees delivered copy</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.5 Supplier inventory (<code>/app/inventory</code>) — requires <code>inventory_management</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-24</td>
+<td>Free → <code>/app/inventory</code> or inventory API</td>
+<td>403 or paywall (<code>inventory_management</code> off)</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-25</td>
+<td>Silver+ → Open <code>/app/inventory</code> (deep link)</td>
+<td>Stock by warehouse loads</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-26</td>
+<td>Low-stock alerts</td>
+<td>Aligns with dashboard</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-27</td>
+<td>Stock adjustment</td>
+<td>Quantity changes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.6 Restaurants (customers) (<code>/app/restaurants</code>, <code>/app/restaurants/:id</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-28</td>
+<td>Restaurant list</td>
+<td>Stats render; <strong>no currency format crash</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-29</td>
+<td>Restaurant detail</td>
+<td>Order history, negotiated pricing if shown</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-30</td>
+<td><strong>Restaurant pricing</strong> / menu tiers</td>
+<td>Create/edit tier; restaurant sees &quot;my pricing&quot;</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.7 Invoices &amp; payments (<code>/app/invoices</code>) — requires <code>finance_invoices</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-31</td>
+<td>Free account → navigate to <code>/app/invoices</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-32</td>
+<td>Silver+ → Issue invoice from order (if workflow)</td>
+<td>Invoice created</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-33</td>
+<td>Record <strong>full payment</strong></td>
+<td>Balance zero</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-34</td>
+<td>Record <strong>partial payment</strong></td>
+<td>Remaining balance correct</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-35</td>
+<td>Apply <strong>credit</strong></td>
+<td>Balance adjusted</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-36</td>
+<td>Payment history tab</td>
+<td>All payments listed</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.8 Chat (<code>/app/chat</code>) — requires <code>chat</code> feature</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-37</td>
+<td>Free account → navigate to <code>/app/chat</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-38</td>
+<td>Silver+ → List conversations with restaurants</td>
+<td>Loads</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-39</td>
+<td><strong>Quick replies</strong> (if enabled)</td>
+<td>Insert template</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-40</td>
+<td>Send/receive messages</td>
+<td>Same as RST-63–66</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.9 Supplier settings (<code>/app/settings</code> — 9 tabs)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-41</td>
+<td>Tab: Profile</td>
+<td>Company info saves</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-42</td>
+<td>Tab: Contacts</td>
+<td>Contact persons CRUD</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-43</td>
+<td>Tab: Business</td>
+<td>Tax, terms, policies</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-44</td>
+<td>Tab: Warehouses</td>
+<td>Add/edit warehouse; plan limit gate</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-44a</td>
+<td>Silver+ → add warehouse within plan limit</td>
+<td>Warehouse created</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-44b</td>
+<td>Exceed warehouse plan limit</td>
+<td>Block with upgrade CTA</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-44c</td>
+<td>Gold+ → multi-warehouse routing toggle</td>
+<td>Toggle available; routing rules configurable</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-45</td>
+<td>Tab: Delivery</td>
+<td>Zones, lead times, fees</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-46</td>
+<td>Tab: Branches</td>
+<td>Multi-account linking; branch limit respected</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-47</td>
+<td>Tab: Notifications</td>
+<td>Preferences save</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-48</td>
+<td>Tab: Plan &amp; billing</td>
+<td>Subscription + payment modal</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-49</td>
+<td>Tab: Activity (Gold+, <code>tenant_audit_log</code>)</td>
+<td>Product/order events; filters work; Free sees tab hidden</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-50</td>
+<td>All tabs visible without overlap</td>
+<td>Tabs wrap on narrow screens</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-51</td>
+<td><code>/app/supplier-settings</code></td>
+<td>Same as <code>/app/settings</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.10 Supplier RBAC spot checks</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RBAC-S1</td>
+<td><code>SUPPLIER_STAFF</code></td>
+<td>Fulfillment-focused; restricted settings</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S2</td>
+<td><code>SUPPLIER_MANAGER</code></td>
+<td>Catalog + orders</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S3</td>
+<td><code>SUPPLIER_OWNER</code></td>
+<td>Full supplier access</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S4</td>
+<td>Gold supplier — Settings → Team → role assignment (<code>advanced_roles</code>)</td>
+<td>Can assign/modify roles</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S5</td>
+<td>Free/Silver supplier — no role management</td>
+<td>Section hidden or locked</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S6</td>
+<td>Settings → <strong>Team &amp; roles</strong> tab (Gold+, <code>advanced_roles</code>)</td>
+<td><code>TeamRolesPanel</code> + branch invite panel</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-S7</td>
+<td>Invite email already on another supplier account</td>
+<td>Blocked at invite or accept</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.11 Deals (<code>/app/promotions</code>) — requires <code>promotions</code> feature</h2>
+<blockquote>
+<p><strong>UI label:</strong> sidebar and page title show <strong>Deals</strong> (route unchanged). See <a href="../ui/DEALS_BOOSTS_WORDING_CLEANUP.md">../ui/DEALS_BOOSTS_WORDING_CLEANUP.md</a>.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-52</td>
+<td>Free account → <code>/app/promotions</code></td>
+<td>403 or paywall</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-53</td>
+<td>Create deal draft with <strong>product targeting</strong></td>
+<td>Select specific products; save draft</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-54</td>
+<td>Create deal with <strong>category targeting</strong></td>
+<td>Select categories; save draft</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-55</td>
+<td>Activate deal</td>
+<td>Status active (or pending approval if configured)</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-56</td>
+<td><strong>Boost</strong> active deal</td>
+<td>Boost dialog; pricing tier; campaign active</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-57</td>
+<td>Deal analytics</td>
+<td>Views, clicks, orders, messages, coupon uses shown</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-58</td>
+<td>Pause / resume deal</td>
+<td>Status toggles correctly</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-59</td>
+<td>Sidebar nav label</td>
+<td><strong>Deals</strong> (not “Promotions”)</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-60</td>
+<td>Settings → Subscription usage</td>
+<td>Limit labeled <strong>Active deals</strong></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>7.11.1 Promotion ad billing, targeting &amp; ROAS — 2026-09-10</h3>
+<p>Migrations: <code>0197</code>, <code>0203</code>. Spec: <a href="../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md">supplier-promotions-excellence</a> · <a href="../features/deals-and-promotions.md">deals-and-promotions.md</a></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SUP-61</td>
+<td>Create deal with <strong>restaurant types</strong> + <strong>areas</strong> targeting</td>
+<td>Saved; publish copies audience to boost <code>target_audience</code></td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-62</td>
+<td>Create-deal dialog <strong>restaurant-facing preview</strong></td>
+<td>Preview matches what restaurants see</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-63</td>
+<td>Pay-activate boost (stub/mock) with idempotency key</td>
+<td><code>billing_invoice</code> (<code>deal_boost</code>) + payment; campaign activates</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-64</td>
+<td>Retry same pay-activation with same idempotency key</td>
+<td>No double charge; same outcome</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-65</td>
+<td>Purchase / pay featured placement</td>
+<td><code>featured_placement</code> invoice; placement pending→active after pay</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-66</td>
+<td>Deal analytics dialog</td>
+<td>Shows <code>adSpend</code>, <code>attributedGmv</code>, <code>roas</code>, <code>costPerOrder</code> when spend exists</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-67</td>
+<td><code>PAYMENTS_MODE=live</code> without payment method (dev toggle carefully)</td>
+<td>Silent waive refused; explicit pay required</td>
+<td></td>
+</tr>
+<tr>
+<td>SUP-68</td>
+<td>Restaurant profile: set <strong>business type</strong> + <strong>area</strong>; matching deal</td>
+<td>Deal appears in restaurant feed for matching audience</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>7.12 Guest menu / kitchen 86 (restaurant consumer board)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MENU-01</td>
+<td>Menu admin: set allergen + dietary tags on item</td>
+<td>Tags persist (<code>0201</code>); guest menu filters work</td>
+<td></td>
+</tr>
+<tr>
+<td>MENU-02</td>
+<td>Download / share menu QR</td>
+<td>QR opens public guest menu</td>
+<td></td>
+</tr>
+<tr>
+<td>MENU-03</td>
+<td>Kitchen board: <strong>86</strong> (mark unavailable) with <code>CATALOG_EDIT</code></td>
+<td>Item unavailable on guest menu until restored</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 8 — Platform admin</h1>
+<p><strong>Primary account:</strong> <code>admin@supplify.com</code></p>
+<p><strong>Sidebar:</strong> Admin Dashboard, Supplier Admin, Restaurant Admin, Settings</p>
+<h2>8.1 Admin dashboard — main (<code>/app/admin</code>)</h2>
+<h3>Overview tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-01</td>
+<td>Open <code>/app/admin</code></td>
+<td>Overview KPIs load</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-02</td>
+<td>Past-due / trial alerts banner</td>
+<td>Shows when any tenant is past-due or locked</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-03</td>
+<td>Charts: orders, revenue, signups</td>
+<td>Render or empty state</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Activity tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-04</td>
+<td>Activity feed</td>
+<td>Recent platform events (registrations, plan changes, logins)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Tenants tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-05</td>
+<td>List all tenants</td>
+<td>Restaurants + suppliers with plan and status shown</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-06</td>
+<td>Search/filter tenants</td>
+<td>Results update</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-07</td>
+<td>Create new <strong>restaurant</strong> tenant</td>
+<td>Tenant + locked subscription created</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-08</td>
+<td>Create new <strong>supplier</strong> tenant</td>
+<td>Same</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-09</td>
+<td>Open tenant detail</td>
+<td>Profile, subscription summary, plan</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Subscriptions tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-10</td>
+<td>List subscriptions</td>
+<td>Status, plan, lock state</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-11</td>
+<td>Change plan (upgrade/downgrade)</td>
+<td>Preview + apply; cache invalidated; entitlements_refresh emitted</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-12</td>
+<td><strong>Activate</strong> pending-activation subscription</td>
+<td>Tenant unlocked immediately</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-13</td>
+<td><strong>Unlock</strong> past-due locked subscription</td>
+<td>Lock cleared; tenant can log in to full app</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-14</td>
+<td><strong>Extend trial</strong> on <code>free_sandbox_expired</code> subscription (or API extend-free-trial)</td>
+<td>Lock cleared; <code>free_sandbox_expires_at</code> extended 7–90 days; see <strong>BIL-FT-10</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-15</td>
+<td>After plan change: logged-in tenant receives <code>entitlements_refresh</code> event</td>
+<td>UI updates features without manual reload</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Plans tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-16</td>
+<td>List plans by tenant type</td>
+<td>Free, Silver, Gold, Platinum for RESTAURANT and SUPPLIER</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-17</td>
+<td>Edit plan limits (e.g. daily order limit, SKU limit)</td>
+<td>Saves; tenants reflect on next entitlements fetch</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-18</td>
+<td>Edit plan features (enable/disable a feature for a plan tier)</td>
+<td>Saves; affects all tenants on that plan</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-19</td>
+<td>Create plan version (if supported)</td>
+<td>Appears in catalog</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-20</td>
+<td>Verify plan features JSON contains expected keys</td>
+<td>All 23 restaurant / 22 supplier feature keys present with correct true/false values</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Finance tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-21</td>
+<td>MRR / revenue metrics</td>
+<td>Load</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-22</td>
+<td>Past-due amounts</td>
+<td>Match any seeded billing states</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Usage tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-23</td>
+<td>Tenant usage meters</td>
+<td>Orders/day, SKUs, chats, warehouses per tenant</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-24</td>
+<td><strong>Limit overrides</strong> per tenant</td>
+<td>Override applies over plan; visible in tenant&#39;s entitlements</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Features tab — global flags</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-25</td>
+<td>Global feature flags list</td>
+<td>All 23/22 feature keys listed with current state</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-26</td>
+<td>Disable a feature <strong>globally</strong> (e.g. <code>chat</code>)</td>
+<td><code>POST /api/feature-flags/global</code> 200; all tenants lose feature regardless of plan</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-27</td>
+<td>Verify: Gold restaurant hits <code>/app/chat</code> after global disable</td>
+<td>403 — global flag overrides plan</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-28</td>
+<td>Re-enable feature globally</td>
+<td>Tenants restore feature per plan</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-29</td>
+<td><strong>Per-tenant override</strong> — force enable on Free tenant</td>
+<td>Override record created; tenant gains feature</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-30</td>
+<td>Verify: Free tenant can now use the force-enabled feature</td>
+<td>Feature accessible</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-31</td>
+<td><strong>Per-tenant override</strong> — force disable on Gold tenant</td>
+<td>Override record created; Gold tenant loses that feature</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-32</td>
+<td>Remove tenant override</td>
+<td>Tenant returns to plan-defined entitlement</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-33</td>
+<td>After any flag change, check logged-in tenant receives <code>entitlements_refresh</code></td>
+<td>WebSocket event delivered; UI updates</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-34</td>
+<td>Audit log records every flag change</td>
+<td>Action logged under admin actor</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Deals &amp; Boosts tab — approvals &amp; boost pricing</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-35</td>
+<td>Open <strong>Deals &amp; Boosts</strong> tab on <code>/app/admin</code></td>
+<td>Pending deals list + pricing tiers load</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-36</td>
+<td>Approve pending deal</td>
+<td>Deal status → active; visible to restaurants</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-37</td>
+<td>Reject pending deal</td>
+<td>Deal returns to draft</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-38</td>
+<td>Edit boost pricing tier amount</td>
+<td>Saves via PATCH; suppliers see updated price</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-01</td>
+<td>Deals insights: <strong>ad spend</strong> / order GMV</td>
+<td>Real spend from boost/featured invoices</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-02</td>
+<td>Admin <strong>Mark paid</strong> on unpaid boost invoice</td>
+<td>Boost activates; invoice paid</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-03</td>
+<td>Admin <strong>Refund</strong> boost</td>
+<td>Refund recorded; boost paused/cancelled per rules</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-04</td>
+<td>Admin <strong>Refund</strong> featured placement</td>
+<td>Placement cancelled/refunded</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-05</td>
+<td>Simulate Stripe chargeback webhook (staging)</td>
+<td>Boost paused / featured cancelled; payment <code>disputed</code> (<code>0203</code>)</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-AD-06</td>
+<td>Subscriptions list pagination</td>
+<td>Default page ≤200; cap 500</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Health tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-35</td>
+<td>System health indicators</td>
+<td>API/DB/Redis status or stubs</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Audit tab</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-36</td>
+<td>Audit log entries</td>
+<td>Admin actions recorded (plan change, flag change, impersonation start/stop)</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-37</td>
+<td>Filter by actor/action/date</td>
+<td>Works correctly</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-38</td>
+<td>Export or paginate (if supported)</td>
+<td>Loads without timeout on large log</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>8.2 Supplier admin (<code>/app/admin/suppliers</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-39</td>
+<td>Directory tab — supplier-only list</td>
+<td>Suppliers only</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-40</td>
+<td>Usage &amp; quotas tab</td>
+<td>Per-supplier meters</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-41</td>
+<td>Audit logs tab</td>
+<td>Supplier-scoped events</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>8.3 Restaurant admin (<code>/app/admin/restaurants</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-42</td>
+<td>Directory tab — restaurant-only list</td>
+<td>Restaurants only</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-43</td>
+<td>Usage &amp; quotas tab</td>
+<td>Per-restaurant meters</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-44</td>
+<td>Audit logs tab</td>
+<td>Restaurant-scoped events</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>8.4 Admin support tools</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADM-45</td>
+<td><strong>Impersonate</strong> restaurant from Tenants tab</td>
+<td><code>/app/dashboard</code>; restaurant nav; sticky banner</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-46</td>
+<td>While impersonating: orders, settings, inventory</td>
+<td>Tenant APIs succeed; correct entitlements in UI</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-47</td>
+<td>While impersonating: open <code>/app/admin</code></td>
+<td>Redirect to tenant dashboard</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-48</td>
+<td><strong>Exit impersonation</strong></td>
+<td><code>/app/admin</code>; banner gone</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-49</td>
+<td><strong>Impersonate</strong> supplier; products/orders/warehouses</td>
+<td>Supplier workspace navigable</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-49a</td>
+<td>Impersonation audit + billing block</td>
+<td>START/END in audit; checkout blocked while impersonating</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-50</td>
+<td>Join chat as admin (if exposed)</td>
+<td>Moderation/support view</td>
+<td></td>
+</tr>
+<tr>
+<td>ADM-51</td>
+<td>Admin settings (<code>/app/settings</code>)</td>
+<td>Profile + notification prefs only; no tenant data</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>8.5 Admin RBAC (if multiple admin users)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RBAC-A1</td>
+<td><code>SUPPORT_ADMIN</code></td>
+<td>Tenants + impersonation; no finance tab</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-A2</td>
+<td><code>FINANCE_ADMIN</code></td>
+<td>Finance + subscriptions; no features tab</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-A3</td>
+<td><code>GROWTH_ADMIN</code></td>
+<td>Analytics-focused tools</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-A4</td>
+<td><code>SUPER_ADMIN</code></td>
+<td>All admin tabs</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 9 — End-to-end business flows (multi-persona)</h1>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>E2E-01</td>
+<td>Restaurant places order → Supplier accepts → Ships → Restaurant receives</td>
+<td>Happy path all statuses</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-01b</td>
+<td>Restaurant places order → Supplier <strong>declines with reason</strong> → Restaurant sees decline label + notification</td>
+<td>Decline path</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-02</td>
+<td>Order → Invoice issued → Payment recorded</td>
+<td>Invoice paid; balances correct</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-03</td>
+<td>Restaurant chats supplier about order (both Silver+)</td>
+<td>Message thread linked contextually</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-04</td>
+<td>Guest books table → Restaurant board updates → Guest cancels via link</td>
+<td>Public + internal sync</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-05</td>
+<td>Staff portal account clocks in on <code>/staff/dashboard</code> → Manager sees on <code>/app/staff</code></td>
+<td>Time event recorded; staff cannot access <code>/app</code></td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-05b</td>
+<td>Staff portal user navigates to <code>/app</code> or <code>GET /api/orders</code></td>
+<td>Redirect or 403 <code>STAFF_PORTAL_FORBIDDEN</code></td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-06</td>
+<td>Restaurant quick list scheduled order → Appears on supplier orders</td>
+<td>Scheduled metadata preserved</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-07</td>
+<td>Supplier low stock → Dashboard alert → Adjust inventory</td>
+<td>Stock corrected</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-08</td>
+<td>Free restaurant blocked on calendar → Upgrades to Silver → Calendar works</td>
+<td>Feature gate lifted; subscription cache invalidated</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-09</td>
+<td>Admin impersonates → places test order → stops impersonation</td>
+<td>Audit trail; no data leak across tenants</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-10</td>
+<td>Admin disables <code>chat</code> globally → Both tenants lose chat → Admin re-enables → Chat restored</td>
+<td>Feature gate toggles for all tenants consistently</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-11</td>
+<td>Supplier creates product → Restaurant browses catalog → Restaurant adds to cart → Places order → Supplier fulfills</td>
+<td>Full order lifecycle from catalog to delivery</td>
+<td></td>
+</tr>
+<tr>
+<td>E2E-12</td>
+<td>Tenant subscription goes PAST_DUE (simulated) → Grace period timer → Account locked → Tenant pays → Unlocked</td>
+<td>Full billing lifecycle</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 10 — API smoke tests (optional for QA leads)</h1>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API-01</td>
+<td><code>GET /api/auth/me</code> with session</td>
+<td>User + tenant + permissions</td>
+<td></td>
+</tr>
+<tr>
+<td>API-02</td>
+<td><code>GET /api/subscriptions/entitlements/current</code></td>
+<td>Plan, limits, usage, features object</td>
+<td></td>
+</tr>
+<tr>
+<td>API-03</td>
+<td><code>GET /api/orders/calendar</code> (Silver+ restaurant)</td>
+<td>200 + events</td>
+<td></td>
+</tr>
+<tr>
+<td>API-04</td>
+<td><code>GET /api/orders/calendar</code> (Free restaurant)</td>
+<td>403 feature error</td>
+<td></td>
+</tr>
+<tr>
+<td>API-05</td>
+<td><code>POST /api/billing/checkout</code> (stub card, Silver plan)</td>
+<td>200 + active subscription</td>
+<td></td>
+</tr>
+<tr>
+<td>API-06</td>
+<td><code>GET /api/billing/status</code></td>
+<td>Plan, status, next billing date</td>
+<td></td>
+</tr>
+<tr>
+<td>API-07</td>
+<td><code>PATCH /api/billing/auto-renew</code> <code>{ autoRenew: false }</code></td>
+<td>200; auto_renew updated</td>
+<td></td>
+</tr>
+<tr>
+<td>API-08</td>
+<td><code>GET /api/public/reservations/...</code></td>
+<td>No auth required; 200</td>
+<td></td>
+</tr>
+<tr>
+<td>API-09</td>
+<td>Locked tenant <code>POST /api/orders</code></td>
+<td>402 ACCOUNT_LOCKED</td>
+<td></td>
+</tr>
+<tr>
+<td>API-10</td>
+<td><code>POST /api/files</code> (file upload presign)</td>
+<td>Presigned URL returned; upload succeeds</td>
+<td></td>
+</tr>
+<tr>
+<td>API-11</td>
+<td><code>GET /api/chat/conversations</code> (Free tenant)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-12</td>
+<td><code>GET /api/quick-lists</code> (Free tenant)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-13</td>
+<td><code>GET /api/receiving</code> (Free restaurant)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-14</td>
+<td><code>GET /api/invoices</code> (Free tenant)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-15</td>
+<td><code>GET /api/restaurant-inventory</code> (Free restaurant)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-16</td>
+<td><code>GET /api/fulfillment</code> (Free supplier)</td>
+<td>403 <code>FEATURE_DISABLED</code></td>
+<td></td>
+</tr>
+<tr>
+<td>API-17</td>
+<td><code>GET /api/feature-flags/global</code> (admin)</td>
+<td>200 + list of all global flags</td>
+<td></td>
+</tr>
+<tr>
+<td>API-18</td>
+<td><code>POST /api/feature-flags/global</code> (non-admin)</td>
+<td>403</td>
+<td></td>
+</tr>
+<tr>
+<td>API-19</td>
+<td><code>GET /api/subscriptions/entitlements/current</code> — call 3× in quick succession</td>
+<td>All return same data (cache hit); response time &lt; 100ms on 2nd and 3rd</td>
+<td></td>
+</tr>
+<tr>
+<td>API-20</td>
+<td><code>GET /api/promotions/active</code> (Silver+ restaurant)</td>
+<td>200 + deals array</td>
+<td></td>
+</tr>
+<tr>
+<td>API-21</td>
+<td><code>GET /api/promotions/active</code> (Free Trial restaurant)</td>
+<td>200 + deals array (sandbox); 2nd redemption same day → limit error</td>
+<td></td>
+</tr>
+<tr>
+<td>API-22</td>
+<td><code>GET /api/promotions/admin/pending</code> (admin)</td>
+<td>200 + pending deals</td>
+<td></td>
+</tr>
+<tr>
+<td>API-23</td>
+<td><code>GET /api/orders/:id</code> after deal-applied order</td>
+<td>200 + <code>appliedPromotion</code> on order object</td>
+<td></td>
+</tr>
+<tr>
+<td>API-24</td>
+<td><code>POST /api/orders</code> with <code>promotionId</code> + <code>couponCode</code></td>
+<td>Discount applied; <code>promotion_usages</code> recorded</td>
+<td></td>
+</tr>
+<tr>
+<td>API-25</td>
+<td><code>GET /api/orders?search=...</code> (restaurant/supplier)</td>
+<td>Filtered list matches search term</td>
+<td></td>
+</tr>
+<tr>
+<td>API-26</td>
+<td><code>GET /api/orders?status=...</code></td>
+<td>Status inbox filter applied server-side</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 11 — Automated tests (CI parity)</h1>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Command</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CI-01</td>
+<td><code>pnpm test:api</code></td>
+<td>~293 API test files / suite green (counts drift; trust exit 0)</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-02</td>
+<td><code>pnpm test:web</code></td>
+<td>~126 web test files / suite green</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-03</td>
+<td><code>pnpm test:ci</code> (root)</td>
+<td>Both packages green</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-04</td>
+<td><code>pnpm run e2e:playwright</code> (if configured)</td>
+<td>E2E suite pass</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-05</td>
+<td>Deals/promotions unit + API gates (see <code>docs/features/deals-and-promotions.md</code> § Tests)</td>
+<td>Vitest + <code>tests/api/promotions-deals-gates.spec.ts</code> pass</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-06</td>
+<td>Realtime/socket subset: <code>socket.test.js</code>, <code>useChatRealtime.test.ts</code>, <code>useNotificationAlerts.test.tsx</code></td>
+<td>Pass</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-07</td>
+<td>Legal re-acceptance: <code>legal-acceptance.test.js</code>, <code>legalReacceptanceGate.test.ts</code>, <code>dealDisplayLabels.test.ts</code></td>
+<td>Pass</td>
+<td></td>
+</tr>
+<tr>
+<td>CI-08</td>
+<td>Plan audit (post <code>0145</code>): <code>planLimits.test.ts</code>, <code>planComparison.test.ts</code>, <code>npm run test:billing</code></td>
+<td>Pass; Free <code>chats_per_day</code> = 3</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 12 — Non-functional &amp; browser matrix</h1>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Area</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-01</td>
+<td>Browser</td>
+<td>Chrome latest</td>
+<td>Full pass on critical paths</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-02</td>
+<td>Browser</td>
+<td>Firefox / Safari</td>
+<td>Layout acceptable</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-03</td>
+<td>Responsive</td>
+<td>Tablet width</td>
+<td>Sidebar usable</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-04</td>
+<td>Performance</td>
+<td>Dashboard with prod-like data</td>
+<td>Loads &lt; 5s</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-05</td>
+<td>Error handling</td>
+<td>Stop API mid-request</td>
+<td>Toast/error boundary; no white screen</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-06</td>
+<td>Security</td>
+<td>Access other tenant ID in URL</td>
+<td>403/404</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-07</td>
+<td>Cache</td>
+<td>Subscription entitlements: call 3× rapidly</td>
+<td>Same data; no N+1 to DB</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-08</td>
+<td>WebSocket</td>
+<td>10-minute idle, then send chat message</td>
+<td>Socket reconnects; message delivers</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-09</td>
+<td>Migration</td>
+<td>Run <code>db:migrate</code> on empty DB</td>
+<td>All <strong>223</strong> migrations apply through <code>0222</code> without error</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-10</td>
+<td>Concurrency</td>
+<td>Two users submit orders simultaneously</td>
+<td>Both orders created; no duplicates</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h1>Part 13 — Mobile apps (Android + iOS)</h1>
+<blockquote>
+<p>Native clients: <strong><code>C:/myProjects/supplify-mobile</code></strong> (Android) and <strong><code>C:/myProjects/supplify-mobile-ios</code></strong> (iOS). Both talk to the <strong>same API</strong> as the web ERP. Run <strong>every row on both platforms</strong> unless marked Android-only or iOS-only.</p>
+<p><strong>Accounts:</strong> Reuse demo credentials from <a href="#demo-credentials-for-seeded-environments">Demo credentials</a> — at minimum Gold restaurant (<code>restaurant-gold@supplify.com</code>), Gold supplier (<code>supplier-gold@supplify.com</code>), a driver user linked to that supplier, and a restricted team member (Purchaser or Manager) for RBAC checks.</p>
+</blockquote>
+<h2>13.0 Mobile environment &amp; build</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-ENV-01</td>
+<td>Point app <code>API_URL</code> / env at the same backend used for web QA (local or staging)</td>
+<td>App reaches API; no certificate/host errors</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-02</td>
+<td>Keycloak mobile redirect URI registered (<code>supplify://auth/callback</code>)</td>
+<td>Login completes and returns to app</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-03</td>
+<td>Install <strong>dev client</strong> or <strong>EAS preview</strong> build (not production store build unless that is the test target)</td>
+<td>Version/build number recorded in sign-off</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-04</td>
+<td>Optional release gate: <code>npx tsc --noEmit</code> in mobile repo</td>
+<td>Exit 0</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-05</td>
+<td>Optional release gate: <code>npm test -- --runInBand</code></td>
+<td>Jest green</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-06</td>
+<td>Optional release gate: <code>npx expo-doctor</code></td>
+<td>No blocking failures</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-07</td>
+<td>Cold start with network on</td>
+<td>Splash → login or home within reasonable time; no redbox</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-ENV-08</td>
+<td>Toggle airplane mode mid-session → restore network</td>
+<td>Offline banner; lists recover after reconnect/pull-to-refresh</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.1 Authentication, session, billing lock, workspace</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-AUTH-01</td>
+<td>Sign in as <strong>restaurant</strong> owner</td>
+<td>Restaurant tabs: Home/Orders/Shop/Messages/More (per permissions)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-02</td>
+<td>Sign in as <strong>supplier</strong> owner</td>
+<td>Supplier tabs: Dashboard/Orders/Fulfillment/Messages/More</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-03</td>
+<td>Sign in as <strong>driver</strong></td>
+<td>Driver tabs: Deliveries / More only</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-04</td>
+<td>Sign in as <strong>platform admin</strong></td>
+<td>Admin hub screen; links open web admin URLs in browser (no full admin console in native)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-05</td>
+<td>Sign in as <strong>restricted</strong> restaurant user (e.g. Purchaser)</td>
+<td>Tabs and actions match permissions; gated screens show upgrade/permission message</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-06</td>
+<td>Leave app backgrounded 10+ min → foreground</td>
+<td>Session still valid OR clean re-auth; no stale blank screens</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-07</td>
+<td>Force access-token expiry (wait or shorten TTL in dev)</td>
+<td>Silent refresh once; on refresh failure → signed out to login</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-08</td>
+<td>Tenant with <strong>billing lock</strong> / activation pending</td>
+<td>Billing locked screen; cannot reach operational data until unlocked</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-09</td>
+<td>Logout from Settings/More</td>
+<td>Local session cleared; Keycloak session ended; login screen</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-10</td>
+<td>Multi-branch / linked account → switch <strong>primary branch</strong> in settings</td>
+<td>Identity refreshes; orders/catalog reflect new branch; no data leak from previous branch</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-11</td>
+<td>User with <code>PENDING</code> / incomplete registration</td>
+<td>Pending/setup screen; cannot access tenant operations</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-AUTH-12</td>
+<td>Legal re-acceptance required (<code>legalStatus.needsReacceptance</code>)</td>
+<td>Blocked from app until accepted (web legal flow or embedded WebView if implemented)</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.2 Restaurant mobile</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-R01</td>
+<td><strong>Home</strong> dashboard loads KPIs/shortcuts</td>
+<td>No crash; data matches API entitlements</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R02</td>
+<td><strong>Shop</strong> → pick supplier → <strong>Catalog</strong> → search/filter</td>
+<td>Products load; contract/special prices shown when applicable</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R03</td>
+<td>Add lines to <strong>Cart</strong>; change quantities; remove line</td>
+<td>Totals update; min order / cutoff warnings if configured</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R04</td>
+<td>Place <strong>standard order</strong> from cart</td>
+<td>Success; appears in <strong>Orders</strong> list with correct status</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R05</td>
+<td><strong>Orders</strong> → search/filter → open <strong>Order detail</strong></td>
+<td>Header, items, status timeline load (no infinite spinner / crash on <code>{ order }</code> payload)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R06</td>
+<td>Order detail → <strong>tracking</strong> (when shipped/out for delivery)</td>
+<td>Map/ETA or status panel; matches web tracking semantics</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R07</td>
+<td><strong>Quick lists</strong> (Gold+): open list → load into cart → order</td>
+<td>Gated on Free; works on Gold</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R08</td>
+<td><strong>Deals</strong> feed → apply deal → checkout</td>
+<td>Redemption respects plan limits; order shows promotion</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R09</td>
+<td><strong>Quote requests</strong>: create from cart → supplier notified → view detail</td>
+<td>Status updates when supplier responds</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R10</td>
+<td>Open supplier <strong>quote response</strong> → <strong>Add to cart</strong> → place order</td>
+<td>Locked quote price honored at checkout</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R11</td>
+<td><strong>Receiving</strong> hub → receive delivered order → enter quantities/expiry</td>
+<td>Gated by plan/RBAC; order status moves toward received</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R12</td>
+<td><strong>Disputes</strong>: list → create from order → view detail</td>
+<td>Gated; links to order lines</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R13</td>
+<td><strong>Invoices</strong> list → open invoice → <strong>Statement</strong> export/view</td>
+<td>Gated on Free; currency shown per row</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R14</td>
+<td><strong>Inventory</strong> / expiry views</td>
+<td>Adjust or view stock per permissions</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R15</td>
+<td><strong>My prices</strong> / contract price visibility</td>
+<td>Matches web contract pricing for restaurant</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R16</td>
+<td><strong>Messages</strong>: list unread badge → open thread → send text</td>
+<td>Realtime or refresh shows message; gated without <code>chat</code> plan</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R17</td>
+<td><strong>Messages</strong>: attach image/PDF (if enabled)</td>
+<td>Upload succeeds; attachment visible in thread</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R18</td>
+<td><strong>Assistant</strong> (More → Assistant) with <code>ai_platform</code></td>
+<td>Chat works; without feature → hidden or blocked</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R19</td>
+<td><strong>Reports</strong> (More)</td>
+<td>KPI/report tabs load for entitled plans</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R20</td>
+<td><strong>Recipes</strong> / recipe costing (Gold+)</td>
+<td>Gated; costing fields respect <code>RECIPES_VIEW_COSTS</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R21</td>
+<td><strong>Reservations</strong> / Host tab (when host-only or <code>RESERVATIONS_VIEW</code>)</td>
+<td>Board loads; create reservation</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R22</td>
+<td><strong>Staff</strong> list (operational staff management snapshot)</td>
+<td>Loads for permitted roles</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R23</td>
+<td><strong>Consumer</strong> menu / guest orders / loyalty (hospitality modules in More)</td>
+<td>Screens load for entitled tenant; ordering hours respected</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R24</td>
+<td><strong>Delivery location</strong> save for active branch</td>
+<td>PATCH succeeds with <code>SETTINGS_EDIT</code>; read works for checkout roles</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R25</td>
+<td><strong>Notifications</strong> inbox → tap row</td>
+<td>Navigates to order/chat/deal target</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R26</td>
+<td><strong>Notification preferences</strong> toggles → save → re-open</td>
+<td>Persists via API</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R27</td>
+<td><strong>Subscription / plan</strong> screen</td>
+<td>Shows current plan; upgrade path opens billing WebView/browser if configured</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-R28</td>
+<td>Free-tier restaurant: open <strong>Chat</strong> / <strong>Quick lists</strong> / <strong>Invoices</strong> from More</td>
+<td>Feature gate or paywall — consistent with Part 3</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.3 Supplier mobile</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-S01</td>
+<td><strong>Dashboard</strong> loads command-center style metrics</td>
+<td>Orders today, receivables, deliveries reflect API v2 summary</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S02</td>
+<td><strong>Orders</strong> pipeline tabs / filters → open order detail</td>
+<td>Status actions only show allowed transitions</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S03</td>
+<td>Accept → process → ship flow on test order (from restaurant MOB-R04)</td>
+<td>Status matches web ERP; restaurant sees update</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S04</td>
+<td><strong>Decline</strong> order with reason</td>
+<td>Restaurant notified; decline visible on mobile + web</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S05</td>
+<td><strong>Fulfillment</strong> dispatch board → assign driver</td>
+<td>Sends <code>warehouse_assignment_id</code>; driver sees stop</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S06</td>
+<td><strong>Reassign</strong> driver on same leg</td>
+<td>Sends <code>driver_assignment_id</code> + warehouse leg; previous driver dropped</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S07</td>
+<td><strong>Active deliveries map</strong></td>
+<td>Pins/load for in-flight routes (Gold + fulfillment entitlement)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S08</td>
+<td><strong>Run sheet</strong> for today</td>
+<td>Orders list matches supplier timezone day boundary</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S09</td>
+<td><strong>Pick lists</strong> → complete wave</td>
+<td>Stock committed for correct warehouse leg only</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S10</td>
+<td><strong>Quote inbox</strong> → respond per line (manager)</td>
+<td>Prices/qty saved; restaurant sees compare view</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S11</td>
+<td>Quote inbox as <strong>view-only</strong> user</td>
+<td>Can read; cannot submit response</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S12</td>
+<td><strong>Promotions / deals</strong> → create draft → submit for review</td>
+<td>Validation matches web (description, discount rules)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S13</td>
+<td><strong>Deal analytics</strong> for active deal</td>
+<td>Metrics load</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S14</td>
+<td><strong>Featured placement</strong> payment sheet (if used)</td>
+<td>Payment pending until admin approval</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S15</td>
+<td><strong>Products</strong> list (mobile catalog management scope)</td>
+<td>CRUD within mobile scope; deep admin on web</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S16</td>
+<td><strong>Contract pricing</strong> mobile view/edit</td>
+<td>Dates as <code>YYYY-MM-DD</code>; min/discount clears persist</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S17</td>
+<td><strong>Warehouses</strong> / <strong>Drivers</strong> lists</td>
+<td>Read/manage per RBAC; no cross-tenant rows</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S18</td>
+<td><strong>Inventory</strong> adjust at warehouse</td>
+<td>Insufficient stock returns error (no silent clamp)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S19</td>
+<td><strong>Receivables</strong> / <strong>Incoming disputes</strong></td>
+<td>Gated by finance/disputes features</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S20</td>
+<td><strong>Customer growth</strong> import/connect (if entitled)</td>
+<td>CSV preview/import; connection request flow</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S21</td>
+<td><strong>Customers</strong> list / follow-ups</td>
+<td>Loads; reminder actions when permitted</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S22</td>
+<td><strong>Messages</strong> + <strong>Assistant</strong></td>
+<td>Same gating as restaurant; supplier context tools work</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S23</td>
+<td><strong>Reports</strong></td>
+<td>Supplier report tabs respect permissions</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S24</td>
+<td><strong>Notifications</strong> + push tap → order/chat</td>
+<td>Deep link opens correct screen</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-S25</td>
+<td>Silver supplier: <strong>Fulfillment</strong> without driver management</td>
+<td>Manual fulfillment OK; driver dispatch hidden/403</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.4 Driver mobile</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-D01</td>
+<td><strong>Today</strong> stop list refreshes (pull + auto)</td>
+<td>Shows assigned stops only for logged-in driver</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D02</td>
+<td>Open stop → <strong>Navigate</strong> opens external maps</td>
+<td>Correct destination address</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D03</td>
+<td>Mark <strong>Out for delivery</strong> while app foreground</td>
+<td>GPS tracking starts; parent order moves toward <code>SHIPPED</code> when applicable</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D04</td>
+<td>Background app during active delivery</td>
+<td><strong>No false claim</strong> of continued GPS if policy is foreground-only; status honest in UI</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D05</td>
+<td><strong>POD</strong>: photo + signature + receiver name → submit</td>
+<td>Sends <code>driver_assignment_id</code> / <code>warehouse_assignment_id</code>; idempotent completion</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D06</td>
+<td>POD with <strong>oversize/invalid</strong> image</td>
+<td>Friendly error; can retry without losing photo</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D07</td>
+<td><strong>Failed delivery</strong> → reason required</td>
+<td>Record saved; supplier dispatch shows exception</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D08</td>
+<td><strong>Run sheet</strong> from driver More</td>
+<td>Printable list for the day</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D09</td>
+<td>Retry delivery after failure (supplier retried leg)</td>
+<td>New attempt visible; prior POD not overwritten incorrectly</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D10</td>
+<td>Deliver without prior <strong>SHIPPED</strong> / out-for-delivery</td>
+<td>Blocked with clear error (lifecycle integrity)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-D11</td>
+<td>Driver <strong>notifications</strong> tap</td>
+<td>Opens stop or order detail</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.5 Push notifications &amp; deep links</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass? (Android)</th>
+<th>Pass? (iOS)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MOB-PUSH-01</td>
+<td>Register device token on login</td>
+<td><code>POST /api/push/register</code> succeeds (Gold+ / entitled tenant)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-02</td>
+<td>New order while app backgrounded (supplier)</td>
+<td>Push received; tap opens order detail</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-03</td>
+<td>New chat message while backgrounded</td>
+<td>Push received; tap opens conversation</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-04</td>
+<td>Mark all read in notifications</td>
+<td>Badge counts clear</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-05</td>
+<td>Logout</td>
+<td>Token deregistered or invalidated; no pushes to old session</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-06</td>
+<td>Physical device only: camera permission for POD</td>
+<td>Permission prompt; deny → graceful message</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>MOB-PUSH-07</td>
+<td>Physical device only: location permission for GPS</td>
+<td>Allow/deny paths handled; deny does not crash completion</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>13.6 Device matrix (minimum)</h2>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Required smoke</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Android emulator</td>
+<td>MOB-AUTH-01, MOB-R04–R05, MOB-S03, login/navigation</td>
+<td></td>
+</tr>
+<tr>
+<td>Android physical device</td>
+<td>MOB-D03–D07, MOB-PUSH-02–03, camera/GPS</td>
+<td></td>
+</tr>
+<tr>
+<td>iOS Simulator or EAS simulator build</td>
+<td>MOB-AUTH-01, MOB-R04–R05, MOB-S03, login redirect</td>
+<td></td>
+</tr>
+<tr>
+<td>iOS TestFlight / physical device</td>
+<td>MOB-D03–D07, MOB-PUSH-02–03, camera/GPS</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Record <strong>tester, app version/build, API URL, device/OS, date</strong> on the release ticket and in the sign-off table.</p>
+<hr>
+<h1>Part 14 — Cross-platform parity (web ↔ mobile spot checks)</h1>
+<blockquote>
+<p>After Parts 4–12 (web) and Part 13 (mobile), run these <strong>paired</strong> checks to catch client drift. Same backend, same accounts, within 15 minutes.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Web (ERP) step</th>
+<th>Mobile step</th>
+<th>Expected parity</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PAR-01</td>
+<td>Restaurant places order on web</td>
+<td>Supplier sees order on mobile <strong>Orders</strong></td>
+<td>Same order id, lines, totals</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-02</td>
+<td>Supplier accepts/ships on mobile</td>
+<td>Restaurant <strong>Order detail</strong> on web updates</td>
+<td>Status timeline matches</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-03</td>
+<td>Supplier assigns driver on web fulfillment</td>
+<td>Driver <strong>Today</strong> list on mobile</td>
+<td>Stop appears with correct reference</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-04</td>
+<td>Driver completes POD on mobile</td>
+<td>Web order → POD panel / delivered status</td>
+<td>Proof visible; status <code>DELIVERED</code> when rules satisfied</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-05</td>
+<td>Restaurant sends chat on mobile</td>
+<td>Supplier reads on web <code>/app/chat</code></td>
+<td>Message content + attachment parity</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-06</td>
+<td>RFQ created on web</td>
+<td>Supplier <strong>Quote inbox</strong> on mobile</td>
+<td>Same RFQ id; respond on mobile → web compare works</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-07</td>
+<td>Deal redeemed on mobile</td>
+<td>Web order detail shows <code>appliedPromotion</code></td>
+<td>Discount amount matches</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-08</td>
+<td>Receiving submitted on web</td>
+<td>Mobile order detail shows received quantities</td>
+<td>Line-level qty match</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-09</td>
+<td>Dispute opened on mobile</td>
+<td>Web dispute banner on order</td>
+<td>Same dispute id</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-10</td>
+<td>Admin impersonates restaurant on web</td>
+<td>Mobile login as that restaurant <strong>blocked</strong> or N/A</td>
+<td>Impersonation is web session; mobile uses real login</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-11</td>
+<td>Free-tier gate on web (<code>/app/chat</code>)</td>
+<td>Mobile <strong>Messages</strong> tab</td>
+<td>Both blocked with consistent messaging</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-12</td>
+<td>Branch switch on web header</td>
+<td>Mobile branch switch in settings</td>
+<td>Same active branch id on <code>GET /api/auth/me</code></td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-13</td>
+<td>Invoice marked paid on web</td>
+<td>Mobile invoice list balance</td>
+<td>Open balance zero</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-14</td>
+<td>Order amendment accepted on web</td>
+<td>Mobile order detail lines/qty</td>
+<td>Amended lines match</td>
+<td></td>
+</tr>
+<tr>
+<td>PAR-15</td>
+<td>Push notification for order status</td>
+<td>Web notification bell</td>
+<td>Same event type; no duplicate wrong-tenant payload</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Quote requests &amp; supplier mini-store (2026-06-11; inbox v2 2026-09-10)</h2>
+<p>Spec: <a href="../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md">QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md</a> · Feature: <a href="../features/quote-requests.md">quote-requests.md</a> · Migration <code>0202</code></p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Step</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>QRF-01</td>
+<td>Restaurant → Products → <strong>Request best price</strong></td>
+<td>Create page opens</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-02</td>
+<td>Select products + suppliers → submit</td>
+<td>Quote request created; suppliers notified</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-03</td>
+<td>Supplier → <strong>Quote inbox</strong> → respond per line</td>
+<td>Response saved; restaurant notified</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-04</td>
+<td>Restaurant → Quote requests → <strong>Compare offers</strong></td>
+<td>Side-by-side table</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-05</td>
+<td><strong>Add to cart</strong> from winning response</td>
+<td>Cart populated; checkout still resolves server prices</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-06</td>
+<td>Supplier settings → copy/preview catalog link</td>
+<td>URL <code>/supplier/:slug</code> works</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-07</td>
+<td>Guest opens mini-store</td>
+<td>Products visible; <strong>no prices</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-08</td>
+<td>Logged-in restaurant on mini-store</td>
+<td>Prices + add to cart</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-09</td>
+<td>Disable public catalog in settings</td>
+<td><code>/supplier/:slug</code> returns not found</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-10</td>
+<td>Supplier inbox: status tabs show live <strong>counts</strong></td>
+<td>pending / responded / declined / unread / urgent match API</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-11</td>
+<td>Search inbox by restaurant name</td>
+<td>Debounced filter; list narrows</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-12</td>
+<td>Sort by <strong>needed by</strong></td>
+<td>Ascending needed-by date</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-13</td>
+<td>Overdue / due-today urgency badges</td>
+<td>Visible on cards</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-14</td>
+<td>Unread marker clears after open</td>
+<td><code>viewed_at</code> set; unread count drops</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-15</td>
+<td><strong>Decline</strong> pending RFQ with reason</td>
+<td>Status declined; restaurant notified; reason stored</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-16</td>
+<td>Open closed/cancelled RFQ response page</td>
+<td>Locked; <code>canRespond=false</code>; decline/respond blocked</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-17</td>
+<td>Respond with available line but empty unit price</td>
+<td>Client + API reject</td>
+<td></td>
+</tr>
+<tr>
+<td>QRF-18</td>
+<td>Inbox pagination</td>
+<td>Next page loads without duplicating rows</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>2026-09-10 release smoke pack (run today)</h2>
+<p>Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an existing QA env. Design specs: <a href="../superpowers/specs/2026-09-10-hospitality-excellence-design.md">hospitality</a>, <a href="../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md">promotions</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>IDs</th>
+<th>Area</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P0</td>
+<td>RST-42d–42n, PUB-17–21</td>
+<td>Reservation excellence</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>RST-18a–18f</td>
+<td>Last-order cutoff + contract prices</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>SUP-61–68, ADM-AD-01–05</td>
+<td>Promotions ad billing / ROAS / disputes</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>QRF-10–18</td>
+<td>Quote inbox v2</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>FUL-01–12</td>
+<td>Dispatch / POD / multi-WH</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>MENU-01–03, NFR-11–13</td>
+<td>Guest menu 86 + branded 404/500</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>RBAC-X01–X08</td>
+<td>Sep-10 permission gates</td>
+</tr>
+</tbody></table>
+<h3>RBAC hardening spot checks (2026-09-10)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RBAC-X01</td>
+<td>Restaurant staff without <code>INVOICES_VIEW</code> → <code>/app/invoices</code></td>
+<td>Nav hidden / 403</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X02</td>
+<td>Restaurant without <code>ORDERS_VIEW</code>/<code>CATALOG_VIEW</code> → deals feed</td>
+<td>Blocked</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X03</td>
+<td>Supplier without fulfillment perms → <code>/app/fulfillment</code></td>
+<td>Blocked</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X04</td>
+<td>Quote inbox without <code>ORDERS_VIEW</code></td>
+<td>Blocked</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X05</td>
+<td>Assistant fab without <code>ai_platform</code></td>
+<td>Hidden / tools refuse</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X06</td>
+<td>Price mutation without <code>CATALOG_EDIT</code></td>
+<td>403</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X07</td>
+<td>Restaurant tracking/POD without <code>ORDERS_VIEW</code> / receiving perms</td>
+<td>403</td>
+<td></td>
+</tr>
+<tr>
+<td>RBAC-X08</td>
+<td>Owner role: recipes permissions present on <code>/auth/me</code></td>
+<td><code>RECIPES_*</code> in list</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Branded error pages</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Steps</th>
+<th>Expected</th>
+<th>Pass?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-11</td>
+<td>Navigate to <code>/app/this-route-does-not-exist</code></td>
+<td>Branded <strong>404</strong> (EN); no blank shell</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-12</td>
+<td>Switch locale to AR on 404</td>
+<td>Arabic copy renders</td>
+<td></td>
+</tr>
+<tr>
+<td>NFR-13</td>
+<td>Force router error (dev) or broken chunk</td>
+<td>Branded <strong>500</strong> / error boundary</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Demo credentials (for seeded environments)</h2>
+<table>
+<thead>
+<tr>
+<th>Account</th>
+<th>Password</th>
+<th>Role / notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>admin@supplify.com</code></td>
+<td><code>SupplifyAdmin1!</code></td>
+<td>Platform admin</td>
+</tr>
+<tr>
+<td><code>restaurant@supplify.com</code></td>
+<td><code>SupplifyRestaurant1!</code></td>
+<td>Golden Fork (demo restaurant)</td>
+</tr>
+<tr>
+<td><code>supplier@supplify.com</code></td>
+<td><code>SupplifySupplier1!</code></td>
+<td>Fresh Foods Co. (demo supplier)</td>
+</tr>
+<tr>
+<td><code>restaurant-free@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Free plan — calendar and chat gated</td>
+</tr>
+<tr>
+<td><code>restaurant-Silver@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Silver tier</td>
+</tr>
+<tr>
+<td><code>restaurant-gold@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Gold — full features</td>
+</tr>
+<tr>
+<td><code>restaurant-platinum@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Platinum tier</td>
+</tr>
+<tr>
+<td><code>supplier-free@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Supplier free tier</td>
+</tr>
+<tr>
+<td><code>supplier-gold@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Supplier Gold</td>
+</tr>
+<tr>
+<td><code>restaurant-gold-manager@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Gold restaurant — Manager (<code>seed:tier-catalog</code>)</td>
+</tr>
+<tr>
+<td><code>restaurant-gold-purchaser@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Gold restaurant — Purchaser</td>
+</tr>
+<tr>
+<td><code>restaurant-silver@supplify.com</code> / <code>supplier-silver@supplify.com</code></td>
+<td><code>Supplify1!</code></td>
+<td>Silver tier (<code>tier-restaurant-silver</code> slugs)</td>
+</tr>
+<tr>
+<td><code>restaurant-1@test.com</code> … <code>restaurant-10@test.com</code></td>
+<td>(Keycloak)</td>
+<td>Prod-like seed (<code>seed:prodlike</code>)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Sign-off</h2>
+<table>
+<thead>
+<tr>
+<th>Role / surface</th>
+<th>Tester</th>
+<th>Date</th>
+<th>Build / branch / app version</th>
+<th>API env &amp; device</th>
+<th>Open defects</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fresh DB setup (Part 0)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Restaurant creation (Part 1)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Supplier creation (Part 2)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Feature gate verification (Part 3)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Cross-cutting / Auth (Part 4)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Public / guest flows (Part 5)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Restaurant tenant flows (Part 6)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Supplier tenant flows (Part 7)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Platform admin flows (Part 8)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>E2E business flows (Part 9)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>API smoke tests (Part 10)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Automated tests (Part 11)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Non-functional (Part 12)</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Mobile Android (Part 13)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Mobile iOS (Part 13)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Web ↔ mobile parity (Part 14)</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>Full-system checklist for Supplify web ERP + native mobile. Fresh DB: Part 0 → Part 3 first. PDF: <code>pnpm docs:qa:pdf</code>. Mobile repos: <code>supplify-mobile</code>, <code>supplify-mobile-ios</code>.</em></p>
+</main>
+</body>
+</html>

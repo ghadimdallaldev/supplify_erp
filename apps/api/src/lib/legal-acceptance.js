@@ -4,6 +4,7 @@ import {
   LEGAL_PACK_VERSION,
   requiredInviteDocuments,
   requiredRegistrationDocuments,
+  requiredConsumerRegistrationDocuments,
 } from './legal-documents.js'
 
 /**
@@ -54,7 +55,7 @@ export async function getLatestLegalAcceptancesForUser(userId) {
 /**
  * Which legal documents this user must keep current on login.
  * @param {object} params
- * @param {'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'STAFF_PORTAL' | 'PENDING'} params.role
+ * @param {'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'CONSUMER' | 'STAFF_PORTAL' | 'PENDING'} params.role
  * @param {'RESTAURANT' | 'SUPPLIER' | null | undefined} params.tenantType
  * @param {Array<{ context?: string, tenant_type?: string | null }>} params.rows
  * @returns {{ required: string[], variant: 'registration' | 'invite', accountType: 'RESTAURANT' | 'SUPPLIER' | null }}
@@ -78,6 +79,13 @@ export function resolveRequiredLegalDocuments({ role, tenantType, rows }) {
       accountType: tenantType,
     }
   }
+  if (role === 'CONSUMER') {
+    return {
+      required: requiredConsumerRegistrationDocuments(),
+      variant: 'registration',
+      accountType: 'CONSUMER',
+    }
+  }
   return {
     required: requiredInviteDocuments(),
     variant: 'invite',
@@ -85,10 +93,45 @@ export function resolveRequiredLegalDocuments({ role, tenantType, rows }) {
   }
 }
 
+export async function recordConsumerRegistrationLegalAcceptances(
+  { userId, acceptedDocuments, electronicSignatureAttestation, packVersion, ipAddress, userAgent },
+  client
+) {
+  const required = requiredConsumerRegistrationDocuments()
+  const accepted = validateLegalAcceptancePayload({
+    acceptedDocuments,
+    requiredDocuments: required,
+    electronicSignatureAttestation,
+    packVersion,
+  })
+  const db = client || query
+  const run = typeof db === 'function' ? db : db.query.bind(db)
+  const slugs = [...accepted]
+  const versions = slugs.map(() => packVersion || LEGAL_PACK_VERSION)
+  const contexts = slugs.map(() => 'registration')
+  await run(
+    `INSERT INTO legal_acceptance (
+      user_id, tenant_id, tenant_type, context, document_slug, document_version,
+      ip_address, user_agent, metadata
+    )
+    SELECT $1, NULL, NULL, ctx, slug, ver, $4, $5, $6::jsonb
+    FROM unnest($2::text[], $3::text[], $7::text[]) AS t(slug, ver, ctx)`,
+    [
+      userId,
+      slugs,
+      versions,
+      ipAddress ?? null,
+      userAgent ?? null,
+      JSON.stringify({ packVersion: packVersion || LEGAL_PACK_VERSION, accountType: 'CONSUMER' }),
+      contexts,
+    ]
+  )
+}
+
 /**
  * @param {object} params
  * @param {string} params.userId
- * @param {'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'STAFF_PORTAL' | 'PENDING'} params.role
+ * @param {'ADMIN' | 'SUPPLIER' | 'RESTAURANT' | 'CONSUMER' | 'STAFF_PORTAL' | 'PENDING'} params.role
  * @param {'RESTAURANT' | 'SUPPLIER' | null | undefined} params.tenantType
  */
 export async function getUserLegalAcceptanceStatus({ userId, role, tenantType }) {

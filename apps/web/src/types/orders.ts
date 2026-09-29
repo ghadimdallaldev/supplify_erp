@@ -11,9 +11,32 @@ export interface DeliveryLocationSnapshot {
   address?: Record<string, unknown> | null
 }
 
+export interface OrderCustomerProjection {
+  type: 'RESTAURANT' | 'CONSUMER' | 'GUEST'
+  id?: string | null
+  name: string | null
+  slug?: string | null
+  phone?: string | null
+  email?: string | null
+}
+
 export interface Order {
   id: string
-  restaurant_id: string
+  restaurant_id: string | null
+  consumer_user_id?: string | null
+  customer_type?: 'RESTAURANT' | 'CONSUMER' | 'GUEST'
+  customerType?: 'RESTAURANT' | 'CONSUMER' | 'GUEST'
+  customer?: OrderCustomerProjection
+  customer_display_name?: string
+  customer_contact_snapshot?: { name?: string; phone?: string; email?: string | null } | null
+  checkout_payment_method?: 'CASH_ON_DELIVERY' | 'CASH_ON_PICKUP' | 'BANK_TRANSFER' | null
+  subtotal_amount?: number
+  delivery_fee?: number
+  fulfillmentMethod?: string | null
+  paymentMethod?: 'CASH_ON_DELIVERY' | 'CASH_ON_PICKUP' | 'BANK_TRANSFER' | null
+  subtotal?: number
+  deliveryFee?: number
+  total?: number
   status: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
   total_amount: number
   currency: string

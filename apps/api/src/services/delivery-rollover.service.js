@@ -253,7 +253,7 @@ export async function rolloverAssignmentToNextDay({
       (${effDate}) AS effective_delivery_date
     FROM driver_assignments da
     JOIN customer_order o ON o.id = da.order_id
-    JOIN restaurant r ON r.id = o.restaurant_id
+    LEFT JOIN restaurant r ON r.id = o.restaurant_id
     LEFT JOIN drivers d ON d.id = da.driver_id
     WHERE da.id = $1
     `,

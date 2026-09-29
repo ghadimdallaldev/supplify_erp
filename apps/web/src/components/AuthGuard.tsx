@@ -109,6 +109,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
       return
     }
 
+    if (data.role === 'CONSUMER' && isAppRoute) {
+      navigate('/shop', { replace: true })
+      return
+    }
+
     if (needsLegalReacceptanceGate) {
       navigate('/legal/reaccept', { replace: true })
       return
@@ -174,6 +179,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
         </div>
       </div>
     )
+  }
+
+  if (data?.role === 'CONSUMER' && isAppRoute) {
+    return null
   }
 
   return <>{children}</>

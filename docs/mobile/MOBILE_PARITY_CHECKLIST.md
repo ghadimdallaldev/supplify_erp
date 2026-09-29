@@ -2,6 +2,18 @@
 
 Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBAC.
 
+## 2026-09-29 - Supplier public shopping and personal consumers
+
+- [x] `CONSUMER` role, registration, auth types, and role navigation synchronized on Android and iOS.
+- [x] Logged-out root enters native supplier discovery while Sign In/Create Account remain reachable.
+- [x] Guest public calls explicitly omit auth and cannot trigger refresh/session clearing.
+- [x] Shared storefront, isolated cart, preview, delivery/pickup checkout, receipt, and SecureStore tracking implemented in both apps.
+- [x] Consumer saved addresses, authenticated orders, notifications, current-price reorder, and account screens implemented in both apps.
+- [x] Supplier public-sales settings, native sharing, public-order customer details, and actions implemented in both apps.
+- [x] Storefront/order/tracking deep-link resolution and HTTPS app-link declarations added to both apps.
+- [x] Automated parity tests and typechecks are part of the verification gate.
+- [ ] Physical-device verification remains required for universal/app links, share sheet, permissions, SecureStore restore, offline retry, and push opens.
+
 ## 2026-09-25 - Branch and warehouse scoping hardening
 
 - [x] Server-only fail-closed org and warehouse scoping. No API contract, RBAC key, or mobile type change.

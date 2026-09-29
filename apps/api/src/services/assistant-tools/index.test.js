@@ -189,6 +189,29 @@ describe('assistant tools', () => {
     expect(query.mock.calls.at(-1)[1]).toEqual(['rest-1'])
   })
 
+  it('keeps public orders visible in supplier order list and detail tools', async () => {
+    const ctx = restaurantCtx({
+      tenantId: 'supplier-1',
+      tenantType: 'SUPPLIER',
+      permissions: [P.ORDERS_VIEW],
+    })
+
+    query.mockResolvedValueOnce({ rows: [] })
+    await executeAssistantTool(ctx, 'get_orders', {})
+    expect(query.mock.calls.at(-1)[0]).toContain('LEFT JOIN restaurant r')
+    expect(query.mock.calls.at(-1)[0]).toContain('customer_contact_snapshot')
+
+    query.mockReset()
+    query
+      .mockResolvedValueOnce({ rows: [{ id: '11111111-1111-4111-8111-111111111111' }] })
+      .mockResolvedValueOnce({ rows: [] })
+    await executeAssistantTool(ctx, 'get_order', {
+      orderId: '11111111-1111-4111-8111-111111111111',
+    })
+    expect(query.mock.calls[0][0]).toContain('LEFT JOIN restaurant r')
+    expect(query.mock.calls[0][0]).toContain('customer_contact_snapshot')
+  })
+
   it('offers and runs price history only with catalog permission and intelligence', async () => {
     getProductPriceHistory.mockResolvedValue({
       productId: 'p1',

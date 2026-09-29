@@ -9,6 +9,10 @@ Tenant-scoped RBAC provides a clean foundation for mapping subscription features
 - **ADMIN** – Global admin (no tenant_id; platform-wide access).
 - **STAFF_PORTAL** – Staff self-service app users (`staff_portal` / `staff_portal_user` Keycloak realm roles map to `STAFF_PORTAL_APP_ROLE`). Routes using `assertStaffPortalRouteAccess` restrict these users to staff-portal paths only.
 
+- **CONSUMER** - Global personal shopper backed by the Keycloak `consumer` realm
+  role. A consumer has no tenant context and is restricted to public storefront and
+  owner-scoped `/api/consumer` profile, address, order, and notification operations.
+
 ## Roles
 
 ### Restaurant roles (7)

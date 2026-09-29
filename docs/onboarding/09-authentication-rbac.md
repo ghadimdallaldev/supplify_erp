@@ -4,6 +4,13 @@ Supplify authenticates users with **Keycloak OIDC** (authorization code flow). T
 
 ---
 
+The Keycloak `consumer` realm role maps to the global application `CONSUMER` role.
+Consumer registration accepts name, optional phone, and platform Terms/Privacy
+acceptance, and creates only `consumer_profile`. Consumers deliberately have no tenant
+context, subscription, workspace, branch, or warehouse and are denied tenant ERP APIs.
+The restaurant-scoped diner identity used by restaurant consumer ordering is a separate
+system.
+
 ## Keycloak OIDC flow
 
 ```mermaid

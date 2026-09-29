@@ -594,7 +594,14 @@ describe('Orders Routes', () => {
       expect(resolveProductPricesBatch).toHaveBeenCalledWith(
         expect.objectContaining({
           restaurantId,
-          date: undefined,
+          items: [
+            expect.objectContaining({
+              productId,
+              supplierId,
+              quantity: 10,
+              date: expect.any(String),
+            }),
+          ],
         })
       )
 
@@ -649,7 +656,14 @@ describe('Orders Routes', () => {
       expect(resolveProductPricesBatch).toHaveBeenCalledWith(
         expect.objectContaining({
           restaurantId,
-          date: '2026-12-15',
+          items: [
+            expect.objectContaining({
+              productId,
+              supplierId,
+              quantity: 10,
+              date: '2026-12-15',
+            }),
+          ],
         })
       )
     })

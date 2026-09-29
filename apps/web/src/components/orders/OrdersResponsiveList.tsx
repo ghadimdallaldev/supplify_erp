@@ -305,7 +305,16 @@ export function OrdersResponsiveList({
                   )}
                 </div>
                 <div className="space-y-1 text-sm text-[var(--text-muted)]">
-                  <div>{t('page.restaurant', { name: order.restaurant_name })}</div>
+                  <div>
+                    {order.customer_type && order.customer_type !== 'RESTAURANT' && (
+                      <Badge variant="outline" className="mr-2">
+                        {order.customer_type}
+                      </Badge>
+                    )}
+                    {t('page.restaurant', {
+                      name: order.customer_display_name || order.restaurant_name,
+                    })}
+                  </div>
                   <div>
                     {t('page.placed', {
                       date: new Date(order.placed_at || order.created_at).toLocaleString(),

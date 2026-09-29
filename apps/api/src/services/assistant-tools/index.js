@@ -377,6 +377,8 @@ const TOOLS = {
           o.id,
           'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS "orderNumber",
           o.status,
+          o.customer_type AS customer_type,
+          COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_name,
           ${ctx.tenantType === 'SUPPLIER' ? '(SELECT COALESCE(SUM(oi_total.line_total), 0) FROM order_item oi_total WHERE oi_total.order_id = o.id AND oi_total.supplier_id = $1)' : 'o.total_amount'} AS "totalAmount",
           o.currency,
           COALESCE(o.placed_at, o.created_at) AS "placedAt",
@@ -394,7 +396,7 @@ const TOOLS = {
           )`
           } AS "supplierName"
         FROM customer_order o
-        JOIN restaurant r ON r.id = o.restaurant_id
+        LEFT JOIN restaurant r ON r.id = o.restaurant_id
         WHERE ${where}
           AND o.status <> 'DRAFT'
         ORDER BY COALESCE(o.placed_at, o.created_at) DESC
@@ -438,12 +440,14 @@ const TOOLS = {
           o.id,
           'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS "orderNumber",
           o.status,
+          o.customer_type AS customer_type,
+          COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_name,
           ${ctx.tenantType === 'SUPPLIER' ? '(SELECT COALESCE(SUM(oi_total.line_total), 0) FROM order_item oi_total WHERE oi_total.order_id = o.id AND oi_total.supplier_id = $1)' : 'o.total_amount'} AS "totalAmount",
           o.currency,
           COALESCE(o.placed_at, o.created_at) AS "placedAt",
           r.name AS "restaurantName"
         FROM customer_order o
-        JOIN restaurant r ON r.id = o.restaurant_id
+        LEFT JOIN restaurant r ON r.id = o.restaurant_id
         WHERE ${tenantFilter}
           AND (
             ($2::uuid IS NOT NULL AND o.id = $2::uuid)

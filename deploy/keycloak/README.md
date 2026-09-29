@@ -23,6 +23,11 @@ Setup: [`deploy/railway/keycloak/RAILWAY_SETUP.md`](../railway/keycloak/RAILWAY_
 
 After deploy, apply redirect URIs from the matching realm export if URLs change. Set API `KEYCLOAK_CLIENT_SECRET` (`changeme` for dev import; strong secrets for preprod/prod).
 
+All three realm exports include the `consumer` realm role used by personal supplier
+shoppers. Existing realms are not changed by importing an updated file, so provision
+that role explicitly during rollout before deploying clients that offer consumer
+registration. This global role is separate from restaurant-specific diner accounts.
+
 ## Session policy (ERP humans)
 
 Canonical values live in [`session-policy.json`](./session-policy.json):

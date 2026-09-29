@@ -33,7 +33,27 @@ describe('order placement idempotency', () => {
       id: 'claim-1',
       key: base.key,
     })
-    expect(client.query.mock.calls[1][1]).toEqual([base.restaurantId, base.key, base.requestHash])
+    expect(client.query.mock.calls[1][1]).toEqual([
+      base.restaurantId,
+      `RESTAURANT:${base.restaurantId}`,
+      base.key,
+      base.requestHash,
+    ])
+  })
+
+  it('supports consumer and public actor scopes without restaurant ownership', async () => {
+    const client = clientFor({ rows: [] }, { rows: [{ id: 'claim-2', status: 'IN_PROGRESS' }] })
+    await claimOrderPlacementKey(client, {
+      actorScope: 'CONSUMER:user-1',
+      key: 'consumer-checkout',
+      requestHash: 'hash-2',
+    })
+    expect(client.query.mock.calls[1][1]).toEqual([
+      null,
+      'CONSUMER:user-1',
+      'consumer-checkout',
+      'hash-2',
+    ])
   })
 
   it('replays a successful result for an identical key', async () => {
