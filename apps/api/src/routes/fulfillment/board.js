@@ -90,10 +90,16 @@ router.get('/board', async (req, res) => {
           o.total_amount,
           COALESCE(o.placed_at, o.created_at) AS created_at,
           COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
-          (SELECT COUNT(*)::int FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $1) AS item_count
+          COALESCE(oic.item_count, 0) AS item_count
         FROM customer_order o
         JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
         LEFT JOIN restaurant r ON r.id = o.restaurant_id
+        LEFT JOIN (
+          SELECT order_id, COUNT(*)::int AS item_count
+          FROM order_item
+          WHERE supplier_id = $1
+          GROUP BY order_id
+        ) oic ON oic.order_id = o.id
         WHERE o.status IN ('ACKNOWLEDGED', 'PROCESSING', 'SHIPPED')
           AND UPPER(COALESCE(o.requested_delivery_method, 'DELIVERY')) <> 'PICKUP'
           AND NOT EXISTS (

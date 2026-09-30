@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { query, withTransaction } from '../lib/db.js'
 import {
   consumerLoyaltyEarnBasis,
@@ -9,6 +10,30 @@ import {
 import { validateConsumerOrderSchedule } from '../lib/consumer-ordering-hours.js'
 import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 import { addCalendarDays, getZonedParts } from '../lib/delivery-rollover-time.js'
+
+function digitsOnlyPhone(phone) {
+  return String(phone || '').replace(/\D/g, '')
+}
+
+/** Public track payload — never expose receipt_token or contact PII. */
+function toPublicTrackOrder(order) {
+  return {
+    id: order.id,
+    order_number: order.order_number,
+    status: order.status,
+    fulfillment_type: order.fulfillment_type,
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+    scheduled_for: order.scheduled_for,
+    total_amount: order.total_amount,
+    currency: order.currency,
+    guest_name: order.guest_name,
+    restaurant_name: order.restaurant_name,
+    restaurant_slug: order.restaurant_slug,
+    branch_name: order.branch_name,
+    notes: order.notes,
+  }
+}
 
 export const CONSUMER_ORDER_STATUS_CHAIN = Object.freeze([
   'RECEIVED',
@@ -256,6 +281,7 @@ export function consumerTicketDay(now, timeZone) {
   return calendarDate.replace(/-/g, '')
 }
 
+/** @deprecated Sequential IDs are enumerable — prefer allocateConsumerOrderNumber. Kept for tests. */
 export function nextConsumerOrderNumber(existingNumber, day) {
   const prefix = `CO-${day}-`
   const raw = existingNumber ? String(existingNumber) : ''
@@ -264,21 +290,18 @@ export function nextConsumerOrderNumber(existingNumber, day) {
   return `${prefix}${String(next).padStart(4, '0')}`
 }
 
-async function nextOrderNumber(restaurantId, client, timeZone) {
+async function allocateConsumerOrderNumber(restaurantId, client, timeZone) {
   await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [restaurantId])
   const day = consumerTicketDay(new Date(), timeZone)
-  const prefix = `CO-${day}-`
-  const { rows } = await client.query(
-    `
-    SELECT order_number
-    FROM consumer_order
-    WHERE restaurant_id = $1 AND order_number LIKE $2
-    ORDER BY length(order_number) DESC, order_number DESC
-    LIMIT 1
-    `,
-    [restaurantId, `${prefix}%`]
-  )
-  return nextConsumerOrderNumber(rows[0]?.order_number, day)
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `CO-${day}-${randomBytes(4).toString('hex').toUpperCase()}`
+    const { rows } = await client.query(
+      `SELECT 1 FROM consumer_order WHERE restaurant_id = $1 AND order_number = $2 LIMIT 1`,
+      [restaurantId, candidate]
+    )
+    if (!rows.length) return candidate
+  }
+  throw new Error('Unable to allocate consumer order number')
 }
 
 export async function createConsumerOrder(restaurantId, payload) {
@@ -358,7 +381,7 @@ export async function createConsumerOrder(restaurantId, payload) {
   return withTransaction(async (client) => {
     const consumerMemberId = authMemberId || null
 
-    const orderNumber = await nextOrderNumber(restaurantId, client, timeZone)
+    const orderNumber = await allocateConsumerOrderNumber(restaurantId, client, timeZone)
 
     const { rows: lockedItems } = await client.query(
       `
@@ -475,7 +498,10 @@ export async function createConsumerOrder(restaurantId, payload) {
       [order.id]
     )
 
-    return { order, lines: orderLines }
+    // L7: return isNew flag so callers can guard side-effects (notifications,
+    // socket events) and skip them on idempotent replays once full dedup is
+    // implemented (requires idempotency_key column on consumer_order).
+    return { order, lines: orderLines, isNew: true }
   })
 }
 
@@ -529,9 +555,9 @@ export async function getOrderReceipt(receiptToken) {
 export async function trackConsumerOrder(restaurantId, { orderNumber, email, phone }) {
   const normalizedNumber = String(orderNumber || '').trim()
   const normalizedEmail = email ? String(email).trim().toLowerCase() : null
-  const normalizedPhone = phone ? String(phone).trim() : null
+  const phoneDigits = phone ? digitsOnlyPhone(phone) : null
 
-  if (!normalizedNumber || (!normalizedEmail && !normalizedPhone)) {
+  if (!normalizedNumber || (!normalizedEmail && !phoneDigits)) {
     throw Object.assign(new Error('Order number and email or phone required'), {
       name: 'TRACK_LOOKUP_INVALID',
     })
@@ -543,20 +569,27 @@ export async function trackConsumerOrder(restaurantId, { orderNumber, email, pho
     params.push(normalizedEmail)
     contactFilters.push(`LOWER(o.guest_email) = $${params.length}`)
   }
-  if (normalizedPhone) {
-    params.push(normalizedPhone)
-    contactFilters.push(`o.guest_phone = $${params.length}`)
+  if (phoneDigits) {
+    params.push(phoneDigits)
+    contactFilters.push(
+      `regexp_replace(COALESCE(o.guest_phone, ''), '[^0-9]', '', 'g') = $${params.length}`
+    )
   }
+
+  // When both contacts are supplied, require both (harder to enumerate).
+  const contactClause = contactFilters.length > 1 ? contactFilters.join(' AND ') : contactFilters[0]
 
   const { rows: orders } = await query(
     `
-    SELECT o.*, r.name AS restaurant_name, r.slug AS restaurant_slug, b.name AS branch_name
+    SELECT o.id, o.order_number, o.status, o.fulfillment_type, o.created_at, o.updated_at,
+           o.scheduled_for, o.total_amount, o.currency, o.guest_name, o.notes,
+           r.name AS restaurant_name, r.slug AS restaurant_slug, b.name AS branch_name
     FROM consumer_order o
     JOIN restaurant r ON r.id = o.restaurant_id
     JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id
     WHERE o.restaurant_id = $1
       AND o.order_number = $2
-      AND (${contactFilters.join(' OR ')})
+      AND (${contactClause})
     ORDER BY o.created_at DESC
     LIMIT 1
     `,
@@ -567,15 +600,17 @@ export async function trackConsumerOrder(restaurantId, { orderNumber, email, pho
 
   const order = orders[0]
   const { rows: lines } = await query(
-    `SELECT * FROM consumer_order_line WHERE order_id = $1 ORDER BY created_at`,
+    `SELECT id, order_id, menu_item_id, item_name, quantity, unit_price, line_total, notes, created_at
+     FROM consumer_order_line WHERE order_id = $1 ORDER BY created_at`,
     [order.id]
   )
   const { rows: history } = await query(
-    `SELECT * FROM consumer_order_status_history WHERE order_id = $1 ORDER BY created_at`,
+    `SELECT id, order_id, status, notes, created_at
+     FROM consumer_order_status_history WHERE order_id = $1 ORDER BY created_at`,
     [order.id]
   )
 
-  return { order, lines, history }
+  return { order: toPublicTrackOrder(order), lines, history }
 }
 
 export async function listRestaurantConsumerOrders(

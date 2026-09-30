@@ -3,7 +3,8 @@ import { config } from '../config/env.js'
 import { query } from './db.js'
 import { getSupplierIdForRequest, getRestaurantIdForRequest } from './rbac.js'
 
-const DEFAULT_SIGNED_URL_TTL_SEC = 86400
+/** L5: Keep leaked object URLs short-lived (1h). */
+const DEFAULT_SIGNED_URL_TTL_SEC = 3600
 
 function computeObjectAccessSig(secret, fileKey, exp) {
   return createHmac('sha256', secret).update(`${fileKey}:${exp}`).digest('hex')

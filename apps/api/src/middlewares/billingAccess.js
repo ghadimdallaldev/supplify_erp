@@ -60,6 +60,21 @@ export async function billingAccessMiddleware(req, res, next) {
     }
 
     const subscription = await resolveRequestBillingSubscription(req, tenant)
+    // M6: Fail closed when tenant exists but has no subscription record.
+    // An unlicensed tenant must not be treated as freely unlocked.
+    if (!subscription) {
+      mark(req, 'billing')
+      return res.status(402).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'ACCOUNT_LOCKED',
+          code: 'noSubscription',
+          message: 'No active subscription found for this account',
+        },
+        requestId: req.requestId,
+      })
+    }
     const access = computeBillingAccessState(subscription)
     if (!access.isLocked) {
       mark(req, 'billing')

@@ -10,6 +10,7 @@ import {
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
   useGetMyReviewsQuery,
+  useGetOrderTrackingQuery,
 } from '../services/api'
 import { isEntitlementFeatureEnabled, featureEnabled } from '../lib/planLimits'
 import { isOrderEligibleForReview } from '../lib/orderReviewEligibility'
@@ -72,6 +73,9 @@ export function OrderDetailPage() {
   }, [tabFromUrl])
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
+  const { data: trackingData } = useGetOrderTrackingQuery(id!, {
+    skip: !id || !isSupplier,
+  })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
@@ -168,6 +172,11 @@ export function OrderDetailPage() {
   }
 
   const order = data.order
+  // M12: API rejects SHIPPED/DELIVERED with 400 when no driver is assigned, and
+  // DELIVERED when POD is required but missing. Gate from detail flags.
+  const hasDriverAssignment = Boolean((order as Record<string, unknown>).has_driver_assignment)
+  const hasPod = Boolean((order as Record<string, unknown>).has_pod)
+  const podRequired = Boolean((order as Record<string, unknown>).pod_required)
   const cancellationBanner = resolveOrderCancellationBanner(
     t,
     order,
@@ -189,6 +198,7 @@ export function OrderDetailPage() {
       ''
   )
   const primarySupplier = primarySupplierForReview
+  const isPickup = String(order.requested_delivery_method || '').toUpperCase() === 'PICKUP'
 
   return (
     <RequirePermission permission="ORDERS_VIEW" title="order details">
@@ -312,14 +322,35 @@ export function OrderDetailPage() {
                     </Button>
                   )}
                   {order.status === 'PROCESSING' && (
-                    <Button size="sm" onClick={() => handleStatusUpdate('SHIPPED')}>
+                    // M12: API rejects SHIPPED when no driver assignment exists.
+                    <Button
+                      size="sm"
+                      disabled={!hasDriverAssignment && !isPickup}
+                      title={
+                        !hasDriverAssignment && !isPickup
+                          ? t('detail.shipRequiresDriver')
+                          : undefined
+                      }
+                      onClick={() => handleStatusUpdate('SHIPPED')}
+                    >
                       {t('detail.markShipped')}
                     </Button>
                   )}
                   {order.status === 'SHIPPED' && !isUpdating && (
+                    // M12: POD gate only when supplier policy requires proof.
                     <Button
                       size="sm"
                       variant="default"
+                      disabled={
+                        (!hasDriverAssignment && !isPickup) || (podRequired && !hasPod && !isPickup)
+                      }
+                      title={
+                        !hasDriverAssignment && !isPickup
+                          ? t('detail.deliverRequiresDriver')
+                          : podRequired && !hasPod && !isPickup
+                            ? t('detail.deliverRequiresPod')
+                            : undefined
+                      }
                       onClick={() => handleStatusUpdate('DELIVERED')}
                     >
                       {t('detail.markDelivered')}

@@ -6,7 +6,11 @@
     "failedSupplierPendingOrders": "Failed to get supplier receiving list",
     "orderNotReady": "This order is not ready to receive yet. Wait until the supplier marks it as delivered.",
     "reportAlreadyExists": "A receiving report already exists for this order",
+    "invoiceAlreadyExists": "An invoice already exists for this order",
     "receivedExceedsOrdered": "Received quantity cannot exceed ordered quantity ({{ordered}} {{unit}})",
+    "validationFailed": "Receiving validation failed",
+    "podRequired": "Proof of delivery is required before this action",
+    "orderNotFound": "Order not found",
     "failedCreateReport": "Failed to create receiving report",
     "failedReceivingHistory": "Failed to get receiving history"
   }

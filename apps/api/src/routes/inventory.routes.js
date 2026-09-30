@@ -991,31 +991,37 @@ router.patch(
 )
 
 // Get active inventory alerts for supplier
-router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, res) => {
-  try {
-    const supplierId = await getSupplierIdForRequest(req)
-    if (!supplierId) {
-      if (req.userData.role === 'ADMIN') {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Impersonate a supplier to list inventory alerts',
-          },
+// L6: gate behind inventory_management feature so free-tier tenants can't access alerts.
+router.get(
+  '/alerts',
+  requireAuth,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  inventoryManagementGate,
+  async (req, res) => {
+    try {
+      const supplierId = await getSupplierIdForRequest(req)
+      if (!supplierId) {
+        if (req.userData.role === 'ADMIN') {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'FORBIDDEN',
+              message: 'Impersonate a supplier to list inventory alerts',
+            },
+            requestId: req.requestId,
+          })
+        }
+        return res.json({
+          ok: true,
+          data: { alerts: [] },
+          error: null,
           requestId: req.requestId,
         })
       }
-      return res.json({
-        ok: true,
-        data: { alerts: [] },
-        error: null,
-        requestId: req.requestId,
-      })
-    }
 
-    const supplierCol = await getWarehouseSupplierColumn()
-    let alertsQuery = `
+      const supplierCol = await getWarehouseSupplierColumn()
+      let alertsQuery = `
       SELECT 
         ia.*,
         p.name as product_name,
@@ -1029,36 +1035,39 @@ router.get('/alerts', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (re
         AND p.supplier_id = $1
     `
 
-    const queryParams = [supplierId]
+      const queryParams = [supplierId]
 
-    alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`
+      alertsQuery += ` ORDER BY ia.created_at DESC LIMIT 50`
 
-    const { rows } = await query(alertsQuery, queryParams)
+      const { rows } = await query(alertsQuery, queryParams)
 
-    res.json({
-      ok: true,
-      data: { alerts: rows },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    logger.error('Get alerts error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to get alerts',
-      },
-      requestId: req.requestId,
-    })
+      res.json({
+        ok: true,
+        data: { alerts: rows },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      logger.error('Get alerts error:', error)
+      res.status(500).json({
+        ok: false,
+        data: null,
+        error: {
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to get alerts',
+        },
+        requestId: req.requestId,
+      })
+    }
   }
-})
+)
 
 // Acknowledge an alert
 router.patch(
   '/alerts/:alertId/acknowledge',
   requireAuth,
+  resolveTenantContext,
+  inventoryManagementGate,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('INVENTORY_EDIT'),
   async (req, res) => {

@@ -246,6 +246,9 @@ export async function reassignOrderWarehouseAssignment(
       'PENDING_APPROVAL',
       'ACKNOWLEDGED',
       'PROCESSING',
+      // L2: CONFIRMED and FULFILLING are legacy/dead statuses retained in the DB
+      // enum for historical rows. They are never set by current order logic but
+      // are kept here so that any surviving legacy assignments remain reassignable.
       'CONFIRMED',
       'FULFILLING',
     ].includes(order.status)
@@ -361,6 +364,8 @@ export async function reassignOrderWarehouseAssignment(
   }
 
   const previousWarehouseId = assignment.warehouse_id
+  // Use lineItemsForAssignment for both release and reserve so mixed-leg orders
+  // (where some items have their own dedicated assignment) are not double-reserved.
   const previousLines = await lineItemsForAssignment(client, orderId, assignment)
   for (const line of previousLines) {
     await releaseWarehouseStock(client, previousWarehouseId, line.product_id, line.quantity)
@@ -369,7 +374,7 @@ export async function reassignOrderWarehouseAssignment(
   await reserveWarehouseStockBatch(
     client,
     newWarehouseId,
-    lines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
+    previousLines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
     { supplierId }
   )
 

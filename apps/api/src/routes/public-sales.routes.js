@@ -224,17 +224,20 @@ publicSalesRoutes.post(
         idempotencyKey: key,
       })
       const supplierId = data.order.items[0]?.supplierId || null
-      scheduleOrderPlacedNotification(
-        {
-          id: data.order.id,
-          total_amount: data.order.total,
-          restaurant_id: null,
-          customer_type: data.order.customerType,
-          consumer_user_id: actor?.id || null,
-          customer_contact_snapshot: data.order.customer,
-        },
-        supplierId
-      )
+      // L7: Idempotent replay must not re-notify the supplier.
+      if (!data.replay) {
+        scheduleOrderPlacedNotification(
+          {
+            id: data.order.id,
+            total_amount: data.order.total,
+            restaurant_id: null,
+            customer_type: data.order.customerType,
+            consumer_user_id: actor?.id || null,
+            customer_contact_snapshot: data.order.customer,
+          },
+          supplierId
+        )
+      }
       if (!data.replay && !actor && input.customer.email) {
         void sendTemplateEmail({
           to: input.customer.email,

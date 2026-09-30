@@ -127,37 +127,46 @@ export async function applyAmendmentItems(client, orderId, amendmentId) {
 
       if (restaurantId) {
         const { rows: orderItems } = await client.query(
-          `SELECT product_id, supplier_id, pricing_source FROM order_item WHERE id = $1 AND order_id = $2`,
+          `SELECT product_id, supplier_id, pricing_source, unit_price FROM order_item WHERE id = $1 AND order_id = $2`,
           [item.order_item_id, orderId]
         )
-        if (orderItems.length && orderItems[0].pricing_source !== 'QUOTE_PRICE') {
-          const resolvedPrice = await resolveAmendmentUnitPrice(client, {
-            restaurantId,
-            supplierId: orderItems[0].supplier_id,
-            productId: orderItems[0].product_id,
-            quantity: qty,
-            date: pricingDate,
-          })
-          if (resolvedPrice != null && sameOrderCurrency(orderCurrency, resolvedPrice.currency)) {
-            unitPrice = resolvedPrice.unitPrice
-            await client.query(
-              `
-              UPDATE order_item
-              SET quantity = $1, line_total = $2, unit_price = $3,
-                  pricing_source = $4, contract_price_id = $5
-              WHERE id = $6 AND order_id = $7
-              `,
-              [
-                qty,
-                qty * unitPrice,
-                unitPrice,
-                resolvedPrice.pricingSource,
-                resolvedPrice.contractPriceId,
-                item.order_item_id,
-                orderId,
-              ]
-            )
-            continue
+        if (orderItems.length) {
+          // For qty-only amendments keep the stored unit_price; do NOT re-resolve the live
+          // price unless the amendment explicitly requests a reprice (item.reprice === true).
+          const storedUnitPrice = Number(orderItems[0].unit_price)
+          if (!isNaN(storedUnitPrice) && storedUnitPrice > 0) {
+            unitPrice = storedUnitPrice
+          }
+
+          if (item.reprice === true && orderItems[0].pricing_source !== 'QUOTE_PRICE') {
+            const resolvedPrice = await resolveAmendmentUnitPrice(client, {
+              restaurantId,
+              supplierId: orderItems[0].supplier_id,
+              productId: orderItems[0].product_id,
+              quantity: qty,
+              date: pricingDate,
+            })
+            if (resolvedPrice != null && sameOrderCurrency(orderCurrency, resolvedPrice.currency)) {
+              unitPrice = resolvedPrice.unitPrice
+              await client.query(
+                `
+                UPDATE order_item
+                SET quantity = $1, line_total = $2, unit_price = $3,
+                    pricing_source = $4, contract_price_id = $5
+                WHERE id = $6 AND order_id = $7
+                `,
+                [
+                  qty,
+                  qty * unitPrice,
+                  unitPrice,
+                  resolvedPrice.pricingSource,
+                  resolvedPrice.contractPriceId,
+                  item.order_item_id,
+                  orderId,
+                ]
+              )
+              continue
+            }
           }
         }
       }

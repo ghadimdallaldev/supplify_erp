@@ -38,6 +38,7 @@ export const ORG_SYSTEM_ROLES = [
       'STAFF_VIEW',
       'STAFF_MANAGE',
       'SETTINGS_VIEW',
+      'SETTINGS_EDIT',
       'CHAT_VIEW',
       'CHAT_SEND',
       'FULFILLMENT_VIEW',
@@ -70,6 +71,7 @@ export const ORG_SYSTEM_ROLES = [
       'STAFF_VIEW',
       'STAFF_MANAGE',
       'SETTINGS_VIEW',
+      'SETTINGS_EDIT',
       'CHAT_VIEW',
       'CHAT_SEND',
       'FULFILLMENT_VIEW',
@@ -238,13 +240,18 @@ export async function getOrgRolePermissions(userId, organizationId, supplierId) 
   const branchScope = rows[0].branch_scope
   const permissions = [...new Set(rows.map((r) => r.permission))]
 
-  if (branchScope === 'assigned' && supplierId) {
+  if (branchScope === 'assigned') {
+    // L8: always deny when scope is 'assigned' and we cannot confirm branch access —
+    // previously the guard was `branchScope === 'assigned' && supplierId`, so a
+    // missing supplierId silently fell through and returned full permissions.
+    if (!supplierId) return []
     const { rows: access } = await query(
       `SELECT 1 FROM org_user_branch_access
        WHERE user_id = $1 AND supplier_id = $2 AND organization_id = $3`,
       [userId, supplierId, organizationId]
     )
-    if (!access.length && roleName === 'Regional Manager') {
+    // Any assigned-scope role without branch access must not inherit org perms.
+    if (!access.length) {
       return []
     }
   }
@@ -399,15 +406,25 @@ export async function ensureOrgAccessForBranchStaff(userId, supplierId) {
   if (orgMembership.length > 0) return false
 
   const { rows: tenantMembership } = await query(
-    `SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER'`,
+    `
+    SELECT tr.name AS role_name
+    FROM tenant_user_roles tur
+    JOIN tenant_roles tr ON tr.id = tur.role_id
+    WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = 'SUPPLIER'
+    LIMIT 1
+    `,
     [userId, supplierId]
   )
   if (!tenantMembership.length) return false
 
+  const inviteRoleName = tenantMembership[0]?.role_name || null
+  const orgRoleName =
+    inviteRoleName === 'Driver' || inviteRoleName === 'Viewer' ? 'Org Viewer' : 'Regional Manager'
+
   await assignOrgUserRole({
     userId,
     organizationId,
-    roleName: 'Regional Manager',
+    roleName: orgRoleName,
   })
   await grantOrgBranchAccess({
     userId,

@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.com.supplify.mobile"],
+        "paths": ["/supplier/*", "/order/track/*", "/account/delete", "/legal/*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.com.supplify.mobile"]
+  }
+}

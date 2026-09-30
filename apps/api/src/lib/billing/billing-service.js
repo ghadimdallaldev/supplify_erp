@@ -67,13 +67,23 @@ export async function getSubscriptionForBilling(tenantId, tenantType) {
     const again = await getCache(cacheKey)
     if (again !== null) return again === 'null' ? null : again
 
+    // Prefer commercially relevant rows over a newer Free pending-activation mint
+    // that may have been created before PAST_DUE was respected by ensureTenantSubscription.
     const { rows } = await query(
       `SELECT s.*, sp.code AS plan_code, sp.price_per_month, sp.price_per_year
      FROM subscription s
      LEFT JOIN subscription_plan sp ON sp.id = s.plan_id
      WHERE s.tenant_id = $1 AND s.tenant_type = $2
        AND s.status NOT IN ('CANCELLED')
-     ORDER BY s.created_at DESC
+     ORDER BY
+       CASE
+         WHEN s.status IN ('PAST_DUE', 'SUSPENDED', 'TRIALING') THEN 0
+         WHEN s.status = 'ACTIVE'
+           AND COALESCE(s.lock_reason, '') <> 'pending_activation' THEN 1
+         WHEN s.status = 'ACTIVE' THEN 2
+         ELSE 3
+       END,
+       s.created_at DESC
      LIMIT 1`,
       [billingTenantId, tenantType]
     )
@@ -621,6 +631,9 @@ async function applyFreePlan(tenantId, tenantType, plan, { trialTargetPlanId = n
     )
   }
   await invalidateBillingSubscriptionCache(tenantId, tenantType)
+  // M15: Invalidate feature-flag cache so plan-tier features reflect the new plan immediately.
+  const { invalidateFeatureFlagCache } = await import('../feature-flags.js')
+  await invalidateFeatureFlagCache(tenantId, tenantType).catch(() => {})
   const updatedSub = await getSubscriptionForBilling(tenantId, tenantType)
   if (wasPendingActivation) {
     const { notifyBillingTrialStarted } = await import('../../services/notification.service.js')
@@ -799,6 +812,9 @@ async function applyPaidSubscription(
     eventType: 'subscription.paid',
     payload: { planCode: plan.code, billingCycle },
   })
+  // M15: Invalidate feature-flag cache so plan-tier features reflect immediately after payment.
+  const { invalidateFeatureFlagCache } = await import('../feature-flags.js')
+  await invalidateFeatureFlagCache(tenantId, tenantType).catch(() => {})
 }
 
 export async function payOpenInvoices({
