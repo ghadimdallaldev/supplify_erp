@@ -274,8 +274,6 @@ router.post(
         throw new NotFoundError('Order items not found')
       }
 
-      const supplierId = orderItems[0].supplier_id
-
       let lineItems
       try {
         lineItems = validateAndEnrichReceivingLines(orderItems, rawLineItems)
@@ -376,6 +374,14 @@ router.post(
 
         await assertNoReceivingReport(client, orderId)
 
+        // Prefer order.supplier_id — order_item.supplier_id can be null on older rows.
+        const supplierId = order.supplier_id || orderItems[0]?.supplier_id
+        if (!supplierId) {
+          throw new ValidationError('Order is missing a supplier and cannot be received')
+        }
+
+        const receiverId = receivedBy || req.userData?.id || null
+
         // Create receiving report
         const { rows: reports } = await client.query(
           `
@@ -392,7 +398,7 @@ router.post(
             orderId,
             restaurantId,
             supplierId,
-            receivedBy || req.userData.id,
+            receiverId,
             totalItemsOrdered,
             totalItemsReceived,
             totalExpectedCost,
@@ -465,7 +471,11 @@ router.post(
           }
 
           // Update restaurant inventory if item is accepted and has quantity
-          if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
+          if (
+            item.productId &&
+            item.quality_status === 'ACCEPTED' &&
+            parseFloat(item.received_quantity || 0) > 0
+          ) {
             // M4: SELECT FOR UPDATE to prevent concurrent receiving from racing on the same row.
             // M5: restaurant_inventory is tenant-wide UNIQUE(restaurant_id, product_id), not per-branch.
             const { rows: existingInventory } = await client.query(
@@ -529,11 +539,6 @@ router.post(
           }
         }
 
-        const { markReorderForecastDirty } = await import(
-          '../services/reorder-forecast-cache.service.js'
-        )
-        await markReorderForecastDirty(restaurantId, { reason: 'receiving_completed' })
-
         // Order status: zero billable acceptance → dispute path; never RECEIVED_FULL when all rejected
         let autoDispute = null
         if (discrepancies.length > 0) {
@@ -586,7 +591,7 @@ router.post(
                 hasQualityIssue ? 'quality_issue' : 'short_delivery',
                 'Automatically opened from receiving discrepancies',
                 disputedAmount,
-                receivedBy || req.userData.id,
+                receiverId,
               ]
             )
             autoDispute = rows[0]
@@ -635,20 +640,30 @@ router.post(
 
         // Build invoice from accepted received items (skipped when billableAcceptedQty is 0).
         // Existing manual invoice is reused — never roll status back from INVOICED.
-        const invoiceResult =
-          billableAcceptedQty > 0
-            ? await createInvoiceFromReceiving(client, {
-                order,
-                report,
-                supplierId,
-                restaurantId,
-                receivedBy: receivedBy || req.userData.id,
-              })
-            : null
-        const createdInvoice = invoiceResult?.invoice ?? null
-        const invoiceNewlyCreated = Boolean(invoiceResult?.created)
-        if (createdInvoice) {
-          nextStatus = 'INVOICED'
+        let createdInvoice = null
+        let invoiceNewlyCreated = false
+        if (billableAcceptedQty > 0) {
+          try {
+            const invoiceResult = await createInvoiceFromReceiving(client, {
+              order,
+              report,
+              supplierId,
+              restaurantId,
+              receivedBy: receiverId,
+            })
+            createdInvoice = invoiceResult?.invoice ?? null
+            invoiceNewlyCreated = Boolean(invoiceResult?.created)
+            if (createdInvoice) {
+              nextStatus = 'INVOICED'
+            }
+          } catch (invoiceErr) {
+            // Receiving must succeed even if auto-invoice fails (e.g. missing invoice number fn).
+            logger.error({
+              message: 'Auto-invoice after receiving failed; keeping receive status',
+              error: invoiceErr.message,
+              orderId,
+            })
+          }
         }
 
         if (autoDispute && createdInvoice) {
@@ -660,13 +675,21 @@ router.post(
         }
 
         const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0
-        const loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
-          supplierId,
-          restaurantId,
-          orderId,
-          receiveAmount: earnBaseAmount,
-          createdBy: req.userData?.id,
-        })
+        let loyaltyEarn = null
+        try {
+          loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
+            supplierId,
+            restaurantId,
+            orderId,
+            receiveAmount: earnBaseAmount,
+            createdBy: receiverId,
+          })
+        } catch (loyaltyErr) {
+          logger.warn('Loyalty earn after receiving failed', {
+            error: loyaltyErr.message,
+            orderId,
+          })
+        }
 
         return {
           report,
@@ -676,8 +699,22 @@ router.post(
           autoDispute,
           nextStatus,
           currency: order.currency,
+          supplierId,
+          restaurantId,
         }
       })
+
+      try {
+        const { markReorderForecastDirty } = await import(
+          '../services/reorder-forecast-cache.service.js'
+        )
+        await markReorderForecastDirty(result.restaurantId, { reason: 'receiving_completed' })
+      } catch (dirtyErr) {
+        logger.warn('Reorder forecast dirty mark after receiving failed', {
+          error: dirtyErr.message,
+          orderId,
+        })
+      }
 
       if (result.autoDispute) {
         notifyDisputeOpened(result.autoDispute).catch((err) => {
@@ -686,7 +723,11 @@ router.post(
       }
 
       notifyOrderStatusChange(
-        { id: orderId, restaurant_id: restaurantId, supplier_id: supplierId },
+        {
+          id: orderId,
+          restaurant_id: result.restaurantId,
+          supplier_id: result.supplierId,
+        },
         result.nextStatus
       ).catch((err) => {
         logger.warn('Receiving status notification failed', { error: err.message, orderId })
@@ -700,8 +741,8 @@ router.post(
 
       notifyLeaveReviewIfEligible({
         orderId,
-        supplierId,
-        restaurantId,
+        supplierId: result.supplierId,
+        restaurantId: result.restaurantId,
       }).catch((err) => {
         logger.warn('Review prompt notification failed', { orderId, error: err.message })
       })
@@ -713,14 +754,14 @@ router.post(
         )
         .map((item) => ({
           productId: item.productId,
-          supplierId,
+          supplierId: result.supplierId,
           unitPrice: item.actual_unit_price || item.expected_unit_price,
           unit: item.unit || 'unit',
           currency: result.currency || 'USD',
         }))
-      hookRecipeCostingAfterReceiving(restaurantId, costingItems)
+      hookRecipeCostingAfterReceiving(result.restaurantId, costingItems)
       if (result.createdInvoice) {
-        hookRecipeCostingAfterInvoice(restaurantId, costingItems)
+        hookRecipeCostingAfterInvoice(result.restaurantId, costingItems)
       }
 
       res.status(201).json({

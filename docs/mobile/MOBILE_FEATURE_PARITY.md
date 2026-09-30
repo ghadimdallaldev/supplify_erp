@@ -2,6 +2,16 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-30 — Screen back affordance + receiving report create hardening
+
+**Mobile impact:** Both Expo apps + API.
+
+- `Screen` shows a back chevron when the route can go back and the native stack header is hidden (avoids double backs). Public guest browse and Receive use it.
+- Receive UI aligned with API: requires `RECEIVING_MANAGE`; surfaces server `details` on failure; navigates back on success.
+- API `POST /api/receiving/receive`: resolve `supplier_id` from order, skip inventory when `product_id` missing, keep receive successful if auto-invoice/loyalty/forecast side-effects fail, move forecast dirty mark outside the txn.
+
+---
+
 ## 2026-09-30 — Cold-start Login + supplier account switcher
 
 **Mobile impact:** Both Expo apps.
