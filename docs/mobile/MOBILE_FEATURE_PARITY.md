@@ -2,6 +2,11 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-30 — Local Keycloak can reach Postgres and the host API
+
+- **Local compose:** Keycloak sets `KEYCLOAK_DB_ADMIN` (default `supplify`) and `host.docker.internal:host-gateway`. The Railway entrypoint was waiting on a database named `railway`, and Linux Docker has no `host.docker.internal` unless it is mapped. No API, auth contract, RBAC, or feature-flag change.
+- **Mobile:** Skipped. Android and iOS do not run this compose file.
+
 ## 2026-09-26 — Driver can optimize their own route and finish proof when the scanner is down
 
 - **API:** `POST /api/fulfillment/routes/:id/optimize` now accepts `DRIVER_DELIVERIES_MANAGE`. The driver is scoped to their linked driver id, so they can reorder only their own route. Warehouse staff still use `FULFILLMENT_MANAGE`. Drivers are not granted `FULFILLMENT_VIEW`.
