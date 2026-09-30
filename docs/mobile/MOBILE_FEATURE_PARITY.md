@@ -2,6 +2,34 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-30 — Mobile V2 restaurant UI restyle (implemented)
+
+**Mobile impact:** Presentation-only restyle in both Expo apps. No API, permission, entitlement, pricing, cart-validation, order-state, receiving, or dispute-gate changes.
+
+Implemented per `SUPPLIFY_MOBILE_V2_RESTYLE_SPEC.md`:
+
+1. V2 theme tokens (Supplify green `#0F766E`) + denser type/shadows + solid brand filter chips
+2. Shared primitives in `src/components/ui/v2.tsx` (`V2ProductRow`, `V2SupplierRow`, `V2OrderRow`, `V2QuantityControl`, `V2StickyCheckoutBar`, `V2QuickActionTile`, etc.)
+3. Screens restyled (Catalog benchmark → Suppliers → Cart → Order Details → Home) + tab bar polish
+4. Explicit OMIT retained: approvals, weekly spend forecast, unified/barcode search, Marketplace tab, taxonomy chips, fabricated timelines/cutoffs, Preferred/compliance badges, persisted cart
+
+**Parity:** Same files applied to `supplify-mobile` and `supplify-mobile-ios`. `npx tsc --noEmit` passed on both.
+
+---
+
+## 2026-09-30 — Mobile V2 restyle specification (docs only)
+
+**Mobile impact:** Spec authored first; implementation landed in the entry above.
+
+Figma (`DYoom98NpoZ6VOMi2xMkPj`) treated as visual reference. Capability matrix + screen-by-screen restyle contract written for Restaurant Home, Suppliers, Catalog, Cart, Order Details. Spec lives at:
+
+- `C:/myProjects/supplify-mobile/docs/SUPPLIFY_MOBILE_V2_RESTYLE_SPEC.md`
+- `C:/myProjects/supplify-mobile-ios/docs/SUPPLIFY_MOBILE_V2_RESTYLE_SPEC.md`
+
+No APIs, permissions, entitlements, or business-logic changes in the spec itself.
+
+---
+
 ## 2026-09-30 — Audit MEDIUM/LOW fixes M5/M10–M12/L1–L8/H13
 
 **Mobile impact:** All changes are either web-UI-only, API-internal correctness patches,
