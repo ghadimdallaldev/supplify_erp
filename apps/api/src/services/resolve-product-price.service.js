@@ -535,11 +535,25 @@ export async function resolveProductPricesBatch(
       }
     }
 
+    // Contract exists but qty doesn't satisfy MOQ — surface the MOQ so the UI
+    // can show "contract price available at ≥ N units" without falsely claiming
+    // the contract price at the current quantity.
+    const moqHint =
+      contract && contract.min_order_quantity != null
+        ? {
+            minOrderQuantity: Number(contract.min_order_quantity),
+            contractPriceAtMoq: Number(contract.price),
+            contractCurrencyAtMoq: contract.currency || currency,
+            contractPriceId: contract.id,
+          }
+        : {}
+
     return {
       productId: item.productId,
       supplierId: item.supplierId,
       quantity: qty,
       ...buildDefaultResolution(defaultPrice, currency),
+      ...moqHint,
     }
   })
 }
@@ -579,6 +593,9 @@ export async function enrichProductsWithResolvedPricing(products, restaurantId, 
       contract_valid_from: r.validFrom,
       contract_valid_until: r.validUntil,
       contract_min_order_quantity: r.minOrderQuantity,
+      // When qty < MOQ, expose the contract price the buyer would get once they reach MOQ.
+      contract_price_at_moq: r.contractPriceAtMoq ?? null,
+      contract_currency_at_moq: r.contractCurrencyAtMoq ?? null,
     }
   })
 }

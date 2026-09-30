@@ -87,6 +87,10 @@ const RestaurantDetailPage = lazyNamedPage(
   'RestaurantDetailPage'
 )
 const SettingsPage = lazyNamedPage(() => import('./pages/SettingsPage'), 'SettingsPage')
+const AccountDeletionPage = lazyNamedPage(
+  () => import('./pages/AccountDeletionPage'),
+  'AccountDeletionPage'
+)
 const CartPage = lazyNamedPage(() => import('./pages/CartPage'), 'CartPage')
 const ChatPage = lazyNamedPage(() => import('./pages/ChatPage'), 'ChatPage')
 const FulfillmentPage = lazyNamedPage(() => import('./pages/FulfillmentPage'), 'FulfillmentPage')
@@ -305,6 +309,14 @@ const router = createBrowserRouter([
       {
         path: '/login',
         element: <LoginPage />,
+      },
+      {
+        path: '/account/delete',
+        element: (
+          <LazyPage>
+            <AccountDeletionPage />
+          </LazyPage>
+        ),
       },
       {
         path: '/auth/login',

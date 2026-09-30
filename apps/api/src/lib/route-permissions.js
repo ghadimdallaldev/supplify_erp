@@ -62,7 +62,8 @@ export function ordersCreateMutationGuard(req, res, next) {
 /**
  * After ORDERS_VIEW on /api/orders: enforce write permissions on mutations.
  * POST create (/, /manual) requires ORDERS_CREATE or ORDERS_MANAGE.
- * PATCH/PUT/DELETE require ORDERS_EDIT, ORDERS_MANAGE, or ORDERS_CREATE.
+ * M16: PATCH/PUT/DELETE require ORDERS_EDIT or ORDERS_MANAGE only —
+ * ORDERS_CREATE must NOT grant edit access to existing orders.
  */
 export function ordersRouterMutationGuard(req, res, next) {
   const method = req.method.toUpperCase()
@@ -77,7 +78,7 @@ export function ordersRouterMutationGuard(req, res, next) {
   if (method === 'POST') {
     return requireAnyPermission(P.ORDERS_CREATE, P.ORDERS_MANAGE)(req, res, next)
   }
-  return requireAnyPermission(P.ORDERS_EDIT, P.ORDERS_MANAGE, P.ORDERS_CREATE)(req, res, next)
+  return requireAnyPermission(P.ORDERS_EDIT, P.ORDERS_MANAGE)(req, res, next)
 }
 
 /** Resolve granular admin-dashboard permission from request path (after resolveAdminContext). */
@@ -181,6 +182,12 @@ export function orgStructureGuard(req, res, next) {
   }
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
     return requirePermission(P.SETTINGS_VIEW)(req, res, next)
+  }
+  // PATCH on a specific branch (e.g. name, address, contact) is a branch-management
+  // action that Org Managers and Regional Managers can perform.  Branch creation,
+  // unlinking, and billing changes still require the higher SETTINGS_MANAGE.
+  if (method === 'PATCH' && /^\/branches\/[^/]+(\/[^/]+)?$/.test(path)) {
+    return requireAnyPermission(P.SETTINGS_EDIT, P.SETTINGS_MANAGE)(req, res, next)
   }
   return requirePermission(P.SETTINGS_MANAGE)(req, res, next)
 }

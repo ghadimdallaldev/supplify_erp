@@ -466,10 +466,13 @@ router.post(
 
           // Update restaurant inventory if item is accepted and has quantity
           if (item.quality_status === 'ACCEPTED' && parseFloat(item.received_quantity || 0) > 0) {
+            // M4: SELECT FOR UPDATE to prevent concurrent receiving from racing on the same row.
+            // M5: restaurant_inventory is tenant-wide UNIQUE(restaurant_id, product_id), not per-branch.
             const { rows: existingInventory } = await client.query(
               `
             SELECT * FROM restaurant_inventory 
             WHERE restaurant_id = $1 AND product_id = $2
+            FOR UPDATE
           `,
               [restaurantId, item.productId]
             )
@@ -630,8 +633,9 @@ router.post(
           [nextStatus, orderId]
         )
 
-        // Build invoice from accepted received items (skipped when billableAcceptedQty is 0)
-        const createdInvoice =
+        // Build invoice from accepted received items (skipped when billableAcceptedQty is 0).
+        // Existing manual invoice is reused — never roll status back from INVOICED.
+        const invoiceResult =
           billableAcceptedQty > 0
             ? await createInvoiceFromReceiving(client, {
                 order,
@@ -641,6 +645,11 @@ router.post(
                 receivedBy: receivedBy || req.userData.id,
               })
             : null
+        const createdInvoice = invoiceResult?.invoice ?? null
+        const invoiceNewlyCreated = Boolean(invoiceResult?.created)
+        if (createdInvoice) {
+          nextStatus = 'INVOICED'
+        }
 
         if (autoDispute && createdInvoice) {
           const { rows } = await client.query(
@@ -648,13 +657,6 @@ router.post(
             [autoDispute.id, createdInvoice.id]
           )
           autoDispute = rows[0]
-        }
-
-        if (createdInvoice) {
-          await client.query(
-            `UPDATE customer_order SET status = $1, updated_at = now() WHERE id = $2`,
-            [nextStatus, orderId]
-          )
         }
 
         const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0
@@ -669,6 +671,7 @@ router.post(
         return {
           report,
           createdInvoice,
+          invoiceNewlyCreated,
           loyaltyEarn,
           autoDispute,
           nextStatus,
@@ -689,7 +692,7 @@ router.post(
         logger.warn('Receiving status notification failed', { error: err.message, orderId })
       })
 
-      if (result.createdInvoice) {
+      if (result.createdInvoice && result.invoiceNewlyCreated) {
         notifyInvoiceIssued(result.createdInvoice).catch((err) => {
           logger.warn('Auto-invoice notification failed', { error: err.message, orderId })
         })
@@ -728,18 +731,32 @@ router.post(
       })
     } catch (error) {
       if (error instanceof ConflictError) {
+        const isInvoiceConflict = /invoice already exists/i.test(error.message || '')
         return res.status(409).json({
           ok: false,
           data: null,
-          error: receivingErr(req, 'CONFLICT', 'reportAlreadyExists'),
+          error: receivingErr(
+            req,
+            'CONFLICT',
+            isInvoiceConflict ? 'invoiceAlreadyExists' : 'reportAlreadyExists'
+          ),
           requestId: req.requestId,
         })
       }
       if (error instanceof ValidationError) {
+        const msg = String(error.message || '')
+        let key = 'orderNotReady'
+        if (/proof of delivery/i.test(msg)) key = 'podRequired'
+        else if (/not ready/i.test(msg)) key = 'orderNotReady'
+        else if (/exceed/i.test(msg)) key = 'receivedExceedsOrdered'
+        else key = 'validationFailed'
         return res.status(400).json({
           ok: false,
           data: null,
-          error: receivingErr(req, 'VALIDATION_ERROR', 'orderNotReady'),
+          error: {
+            ...receivingErr(req, 'VALIDATION_ERROR', key),
+            message: msg || receivingErr(req, 'VALIDATION_ERROR', key).message,
+          },
           requestId: req.requestId,
         })
       }

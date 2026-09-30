@@ -2,7 +2,11 @@ import { query, withTransaction } from '../lib/db.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
-import { notifyDisputeOpened, notifyDisputeResolved } from './notification.service.js'
+import {
+  notifyDisputeOpened,
+  notifyDisputeResolved,
+  notifyOrderStatusChange,
+} from './notification.service.js'
 import { DELIVERED_ORDER_STATUSES } from './reviews.service.js'
 import {
   createReplacementOrderFromDispute,
@@ -16,6 +20,7 @@ const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
 const RECEIVED_STATUSES_FOR_DISPUTE_FLAG = [
   'RECEIVED_PARTIAL',
   'RECEIVED_FULL',
+  'INVOICED',
   'DELIVERED',
   'COMPLETED',
 ]
@@ -39,6 +44,19 @@ async function restoreOrderStatusAfterDisputeClosed(client, orderId) {
     [orderId]
   )
   if (orderRows[0]?.status !== 'RECEIVED_WITH_DISPUTE') return
+
+  // Invoice is the canonical terminal after receive+bill — prefer INVOICED when present.
+  const { rows: invoiceRows } = await client.query(
+    `SELECT 1 FROM invoice WHERE order_id = $1 LIMIT 1`,
+    [orderId]
+  )
+  if (invoiceRows.length > 0) {
+    await client.query(
+      `UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1`,
+      [orderId]
+    )
+    return
+  }
 
   const { rows: agg } = await client.query(
     `
@@ -815,6 +833,19 @@ export async function resolveDispute(
   await notifyDisputeResolved(detail.dispute, 'resolved', {
     replacementOrderId: result.replacementOrderId || detail.dispute.replacementOrderId || null,
   })
+  // Notify supplier that the replacement order was placed (same path as normal orders).
+  if (result.replacementOrderId) {
+    try {
+      const {
+        rows: [replacementOrder],
+      } = await query(`SELECT * FROM customer_order WHERE id = $1`, [result.replacementOrderId])
+      if (replacementOrder) {
+        await notifyOrderStatusChange(replacementOrder, 'PLACED')
+      }
+    } catch {
+      /* non-blocking — dispute resolution already succeeded */
+    }
+  }
   return detail
 }
 

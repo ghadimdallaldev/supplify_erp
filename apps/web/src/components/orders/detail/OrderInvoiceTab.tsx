@@ -42,9 +42,9 @@ export function OrderInvoiceTab({ orderId }: OrderInvoiceTabProps) {
               {invoiceTitle}
             </CardTitle>
             <CardDescription>
-              {order.status === 'COMPLETED' ||
-              order.status === 'DELIVERED' ||
-              order.status === 'RECEIVED_FULL'
+              {/* M11: Use invoice presence instead of order status so RECEIVED_PARTIAL
+                  and dispute orders with an existing invoice also show "Ready" copy. */}
+              {invoiceCount > 0
                 ? t('invoiceTab.descriptionReady')
                 : t('invoiceTab.descriptionPending')}
             </CardDescription>

@@ -1,11 +1,22 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Switch } from '../components/ui/switch'
 import { Badge } from '../components/ui/badge'
 import { AppPanel } from '../components/ui/app-panel'
-import { User, Shield, Bell, Loader2, Save, LogIn, ExternalLink, Languages } from 'lucide-react'
+import {
+  User,
+  Shield,
+  Bell,
+  Loader2,
+  Save,
+  LogIn,
+  ExternalLink,
+  Languages,
+  Trash2,
+} from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -551,6 +562,24 @@ export function SettingsPage() {
               </span>
               {t('session.active')}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trash2 className="h-4 w-4" />
+              Delete account
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Permanently delete your personal account. Organization owners must transfer ownership
+              or close the organization first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/account/delete">Open account deletion</Link>
+            </Button>
           </CardContent>
         </Card>
 

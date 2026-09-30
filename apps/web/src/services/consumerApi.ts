@@ -80,13 +80,18 @@ export type ConsumerOrderSummary = {
   guest_name: string
   guest_email?: string | null
   guest_phone?: string | null
-  subtotal: number
-  delivery_fee: number
+  subtotal?: number
+  delivery_fee?: number
   total_amount: number
   created_at: string
-  receipt_token: string
+  /** Present on create/receipt; omitted from public track responses (C4). */
+  receipt_token?: string
   restaurant_name?: string
+  restaurant_slug?: string
   branch_name?: string
+  notes?: string | null
+  scheduled_for?: string | null
+  currency?: string
   lines?: ConsumerOrderLine[]
 }
 

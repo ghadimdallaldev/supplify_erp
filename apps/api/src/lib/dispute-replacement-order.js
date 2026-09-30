@@ -187,6 +187,8 @@ export async function createReplacementOrderFromDispute(
 
   const insertedItems = []
   for (const line of lines) {
+    const unitPrice = line.originalUnitPrice ?? 0
+    const lineTotal = unitPrice * line.quantity
     const {
       rows: [orderItem],
     } = await client.query(
@@ -201,7 +203,7 @@ export async function createReplacementOrderFromDispute(
         notes,
         source_order_item_id,
         original_unit_price
-      ) VALUES ($1, $2, $3, $4, 0, 0, $5, $6, $7)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
       `,
       [
@@ -209,13 +211,22 @@ export async function createReplacementOrderFromDispute(
         line.productId,
         line.supplierId,
         line.quantity,
+        unitPrice,
+        lineTotal,
         line.notes,
         line.sourceOrderItemId,
-        line.originalUnitPrice,
+        unitPrice,
       ]
     )
     insertedItems.push({ ...orderItem, sku: line.productSku })
   }
+
+  // Update total_amount from actual priced lines (order was created with 0 as placeholder).
+  const totalAmount = insertedItems.reduce((sum, row) => sum + Number(row.line_total), 0)
+  await client.query(`UPDATE customer_order SET total_amount = $1 WHERE id = $2`, [
+    totalAmount,
+    replacementOrder.id,
+  ])
 
   const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
     supplierId,

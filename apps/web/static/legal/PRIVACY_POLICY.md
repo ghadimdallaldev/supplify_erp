@@ -195,7 +195,24 @@ Supplify may use subprocessors for hosting, storage, messaging, payments, analyt
 
 We retain data as long as needed to provide the service, comply with legal obligations, resolve disputes, enforce agreements, maintain backups, prevent fraud, support audits, and operate the platform.
 
-Retention periods may vary by data type. Account closure does not necessarily mean immediate deletion.
+Retention periods may vary by data type.
+
+### Account deletion
+
+You can initiate permanent deletion of your personal Supplify account from:
+
+- The mobile app (Settings / Account → Delete account)
+- The web: [https://app.supplifyerp.com/account/delete](https://app.supplifyerp.com/account/delete) (sign in required to complete deletion)
+
+Deleting your personal account does **not** automatically delete or close a restaurant or supplier organization. If you are an organization owner, you must transfer ownership to another user or complete the explicit organization-close flow before personal deletion is allowed.
+
+When personal account deletion completes:
+
+- **Deleted:** profile name/email/phone, saved consumer addresses, push device tokens, and active sessions for that login.
+- **Anonymized:** display identifiers where records must remain linked for history.
+- **Retained:** orders, invoices, payments, tax/financial ledger rows, legal acceptances, security audit logs, and closed organization/branch records required for legal, financial, or audit purposes.
+
+Account freezing alone is not offered as a substitute for deletion. Contact privacy@supplify.com if you need help with a deletion request.
 
 ## 13. Data Security
 

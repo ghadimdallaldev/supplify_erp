@@ -58,6 +58,12 @@ export interface Order {
   cancel_reason?: string | null
   cancelled_by?: 'RESTAURANT' | 'SUPPLIER' | null
   items?: OrderItem[]
+  /** M12 — active driver assignment (assigned / picked_up / out_for_delivery). */
+  has_driver_assignment?: boolean
+  /** M12 — proof_of_delivery row exists. */
+  has_pod?: boolean
+  /** M12 — supplier requires POD before DELIVERED. */
+  pod_required?: boolean
 }
 
 export interface OrderItem {

@@ -43,6 +43,7 @@ import {
   getSupplierIdForOrder,
   orderHasProofOfDelivery,
 } from '../../lib/driver-delivery.js'
+import { assertPodPresentWhenRequired } from '../../lib/pod-requirement.js'
 import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
@@ -382,7 +383,10 @@ const orderListSchema = z.object({
     .default('false'),
 })
 
-// Helper function to create invoice from delivered order
+/**
+ * @deprecated L1 — ordered-qty invoicing is dead; use createInvoiceFromReceiving / createInvoiceManual.
+ * Kept only for a legacy export from orders/index.js. Do not call from new code.
+ */
 export async function createInvoiceFromOrder(order, orderItems, supplierId, client) {
   try {
     // Use a savepoint so failures don't abort the outer transaction
@@ -648,6 +652,16 @@ async function handleOrderDelivery(orderId, userData, res, req, previousStatus =
         }
       }
 
+      const isPickup = String(order.requested_delivery_method || '').toUpperCase() === 'PICKUP'
+      if (!isPickup) {
+        await assertPodPresentWhenRequired({
+          supplierId,
+          orderId,
+          status: 'delivered',
+          dbQuery: (text, params) => client.query(text, params),
+        })
+      }
+
       // Mark order as DELIVERED; restaurant inventory updates only on receiving
       await client.query(
         `
@@ -658,6 +672,20 @@ async function handleOrderDelivery(orderId, userData, res, req, previousStatus =
         [orderId]
       )
       order.status = 'DELIVERED'
+
+      if (!isPickup) {
+        await client.query(
+          `
+          UPDATE driver_assignments
+          SET status = 'delivered',
+              delivered_at = COALESCE(delivered_at, now()),
+              updated_at = now()
+          WHERE order_id = $1
+            AND status IN ('assigned', 'picked_up', 'out_for_delivery')
+          `,
+          [orderId]
+        )
+      }
 
       // Legacy COMPLETED path must sync warehouse assignments like direct DELIVERED updates
       await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'DELIVERED', fromStatus)

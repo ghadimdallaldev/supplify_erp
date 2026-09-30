@@ -52,9 +52,19 @@ const calendarQuerySchema = z.object({
   role: z.enum(['RESTAURANT', 'SUPPLIER']).optional(),
 })
 
-const COMPLETED_STATUSES = new Set(['COMPLETED', 'DELIVERED', 'RECEIVED_FULL'])
+// INVOICED, RECEIVED_PARTIAL, and RECEIVED_WITH_DISPUTE represent delivery
+// completion events and belong in the completed bucket, not pending.
+// CONFIRMED is not a live status and has been removed.
+const COMPLETED_STATUSES = new Set([
+  'COMPLETED',
+  'DELIVERED',
+  'RECEIVED_FULL',
+  'RECEIVED_PARTIAL',
+  'RECEIVED_WITH_DISPUTE',
+  'INVOICED',
+])
 const IN_TRANSIT_STATUSES = new Set(['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED', 'IN_TRANSIT'])
-const PENDING_STATUSES = new Set(['DRAFT', 'PLACED', 'CONFIRMED', 'INVOICED'])
+const PENDING_STATUSES = new Set(['DRAFT', 'PLACED'])
 const CANCELLED_STATUSES = new Set(['CANCELLED'])
 
 function getStatusCategory(status) {

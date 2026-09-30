@@ -1,4 +1,5 @@
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -9,6 +10,8 @@ import {
 import { requireRestaurantId } from '../../lib/tenant-resolve.js'
 import { assertLegacyBranchOwnedByRestaurant } from '../../lib/branch-scope.js'
 import { logger } from '../../lib/logger.js'
+import { config } from '../../config/env.js'
+import { createRateLimitStore } from '../../lib/rate-limit-store.js'
 import {
   createConsumerOrder,
   getOrderReceipt,
@@ -19,6 +22,35 @@ import {
 import { resolveRestaurantBySlug } from '../../services/consumer-menu.service.js'
 import { optionalAuthConsumer } from '../../middlewares/consumerAuth.js'
 import { emitConsumerOrderNew } from '../../lib/socket.js'
+
+const noopLimiter = (_req, _res, next) => next()
+function consumerPublicLimiter({ windowMs, limit, prefix }) {
+  if (!config.RATE_LIMIT_ENABLED) return noopLimiter
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: createRateLimitStore(prefix),
+    keyGenerator: (req) => `${req.ip}:${String(req.params.restaurantSlug || '').toLowerCase()}`,
+    message: {
+      ok: false,
+      data: null,
+      error: { name: 'RATE_LIMITED', message: 'Too many requests, please try again later.' },
+    },
+  })
+}
+
+const createOrderLimiter = consumerPublicLimiter({
+  windowMs: 10 * 60_000,
+  limit: 10,
+  prefix: 'rl:consumer-order-create',
+})
+const trackOrderLimiter = consumerPublicLimiter({
+  windowMs: 60_000,
+  limit: 15,
+  prefix: 'rl:consumer-order-track',
+})
 
 function jsonOk(res, data) {
   res.json({ ok: true, data, error: null, requestId: res.req.requestId })
@@ -86,20 +118,26 @@ const trackOrderSchema = z
 /** Public routes mounted at /api/public/consumer/:restaurantSlug/orders */
 export const consumerOrdersPublicRoutes = express.Router({ mergeParams: true })
 
-consumerOrdersPublicRoutes.post('/', optionalAuthConsumer, async (req, res) => {
+consumerOrdersPublicRoutes.post('/', createOrderLimiter, optionalAuthConsumer, async (req, res) => {
   try {
     const body = createOrderSchema.parse(req.body)
+
     const restaurant = await resolveRestaurantBySlug(req.params.restaurantSlug)
     if (!restaurant) {
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
 
+    // Rate-limited above; full Idempotency-Key replay store can follow public-sales later.
     const result = await createConsumerOrder(restaurant.id, {
       ...body,
       consumerMemberId: req.consumerMember?.id ?? null,
       pointsToRedeem: body.pointsToRedeem,
     })
-    emitConsumerOrderNew(restaurant.id, result.order)
+    // L7: only notify/emit when the order was freshly created, not on idempotent
+    // replay (result.isNew will be false once dedup is wired up).
+    if (result.isNew !== false) {
+      emitConsumerOrderNew(restaurant.id, result.order)
+    }
     jsonOk(res, {
       order: result.order,
       lines: result.lines,
@@ -133,7 +171,7 @@ consumerOrdersPublicRoutes.post('/', optionalAuthConsumer, async (req, res) => {
   }
 })
 
-consumerOrdersPublicRoutes.post('/track', async (req, res) => {
+consumerOrdersPublicRoutes.post('/track', trackOrderLimiter, async (req, res) => {
   try {
     const body = trackOrderSchema.parse(req.body)
     const restaurant = await resolveRestaurantBySlug(req.params.restaurantSlug)

@@ -118,6 +118,9 @@ export async function createRestaurantOrdersInTransaction({
           order: { ...order, restaurant_id: restaurantId },
           orderItems,
           multiWarehouseActive: multiActive,
+          // reserveLegacy: true ensures legacy-mode place increments reserved_qty so
+          // that cancel's GREATEST(0, reserved_qty - qty) decrement is symmetric.
+          reserveLegacy: true,
           legacyLineItems: items.map((item) => ({
             productId: item.productId,
             quantity: item.quantity,

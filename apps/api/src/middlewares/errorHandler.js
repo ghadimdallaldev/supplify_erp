@@ -48,8 +48,8 @@ export function resolveHttpError(err) {
     message = 'Resource not found'
   } else if (err.name === 'ConflictError') {
     statusCode = 409
-    errorName = 'CONFLICT'
-    message = 'Resource conflict'
+    errorName = err.code || 'CONFLICT'
+    message = err.message || 'Resource conflict'
   } else if (err.code === '23505') {
     statusCode = 409
     errorName = 'CONFLICT'
@@ -152,9 +152,10 @@ export class NotFoundError extends Error {
 }
 
 export class ConflictError extends Error {
-  constructor(message = 'Resource conflict') {
+  constructor(message = 'Resource conflict', details = null) {
     super(message)
     this.name = 'ConflictError'
+    this.details = details
   }
 }
 
