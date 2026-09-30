@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-30 — Cold-start Login + supplier account switcher
+
+**Mobile impact:** Both Expo apps.
+
+- Unauthenticated cold start now opens **Supplify Login**, not public Discover / guest shop. Guest catalog browse is optional via Login → “Browse public catalogs”.
+- Supplier (and restaurant) **Switch account / branch** exposed in More → Workspace, and via home header title (chevron). Previously switcher was restaurant-only in More.
+- Orders lists (restaurant + supplier) and supplier home rows moved to dense `V2OrderRow`.
+
+No API/permission key changes.
+
+---
+
 ## 2026-09-30 — Mobile V2 restaurant UI restyle (implemented)
 
 **Mobile impact:** Presentation-only restyle in both Expo apps. No API, permission, entitlement, pricing, cart-validation, order-state, receiving, or dispute-gate changes.
