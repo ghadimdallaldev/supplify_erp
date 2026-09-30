@@ -42,7 +42,7 @@ import {
   getSupplierIdForOrder,
   getActiveDriverAssignment,
 } from '../../lib/driver-delivery.js'
-import { resolveDeliveryPodFlags } from '../../lib/pod-requirement.js'
+import { assertPodPresentWhenRequired, resolveDeliveryPodFlags } from '../../lib/pod-requirement.js'
 import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
@@ -188,8 +188,6 @@ router.patch('/:id', async (req, res) => {
         })
       }
     }
-
-    // Check permissions based on role and status transition
     if (req.userData.role === 'RESTAURANT') {
       // Restaurants can only cancel their own orders
       if (updateData.status && updateData.status !== 'CANCELLED') {
@@ -422,6 +420,22 @@ router.patch('/:id', async (req, res) => {
         stateError.status = 409
         throw stateError
       }
+      // M2: TOCTOU guard — re-check driver assignment under the FOR UPDATE lock.
+      if (
+        updateData.status &&
+        requiresDriverAssignment(updateData.status) &&
+        String(lockedOrder.requested_delivery_method || '').toUpperCase() !== 'PICKUP'
+      ) {
+        const lockedAssignment = await getActiveDriverAssignment(id)
+        if (!lockedAssignment) {
+          const driverErr = new ValidationError(
+            'Assign a driver before marking this order shipped or delivered.'
+          )
+          driverErr.code = 'DRIVER_REQUIRED'
+          driverErr.status = 400
+          throw driverErr
+        }
+      }
       if (updateData.status && updateData.status !== lockedOrder.status) {
         assertValidOrderStatusTransition({
           role: req.userData.role,
@@ -429,6 +443,44 @@ router.patch('/:id', async (req, res) => {
           to: updateData.status,
         })
       }
+
+      const markingDelivered =
+        updateData.status &&
+        ['DELIVERED', 'COMPLETED'].includes(String(updateData.status).toUpperCase()) &&
+        updateData.status !== lockedOrder.status
+      const isPickup =
+        String(lockedOrder.requested_delivery_method || '').toUpperCase() === 'PICKUP'
+
+      if (
+        requiresDriverAssignment(updateData.status) &&
+        !isPickup &&
+        updateData.status !== lockedOrder.status
+      ) {
+        const { rows: activeAssign } = await client.query(
+          `SELECT id FROM driver_assignments
+           WHERE order_id = $1
+             AND status IN ('assigned', 'picked_up', 'out_for_delivery')
+           LIMIT 1
+           FOR UPDATE`,
+          [id]
+        )
+        if (!activeAssign.length) {
+          throw new ValidationError(
+            'Assign a driver before marking this order shipped or delivered.'
+          )
+        }
+      }
+
+      if (markingDelivered && !isPickup && supplier_id) {
+        const dbQuery = (text, params) => client.query(text, params)
+        await assertPodPresentWhenRequired({
+          supplierId: supplier_id,
+          orderId: id,
+          status: 'delivered',
+          dbQuery,
+        })
+      }
+
       const { rows: updated } = await client.query(
         `
         UPDATE customer_order
@@ -438,6 +490,20 @@ router.patch('/:id', async (req, res) => {
       `,
         updateValues
       )
+
+      if (markingDelivered && !isPickup) {
+        await client.query(
+          `
+          UPDATE driver_assignments
+          SET status = 'delivered',
+              delivered_at = COALESCE(delivered_at, now()),
+              updated_at = now()
+          WHERE order_id = $1
+            AND status IN ('assigned', 'picked_up', 'out_for_delivery')
+          `,
+          [id]
+        )
+      }
 
       if (updateData.status && updateData.status !== order.status) {
         await syncWarehouseFulfillmentOnOrderStatus(
@@ -449,7 +515,10 @@ router.patch('/:id', async (req, res) => {
       }
 
       // Unified release: WH-assigned → release reservations; legacy-only → restore inventory.
-      // syncWarehouse already releases WH on CANCELLED/REJECTED (idempotent).
+      // syncWarehouse already releases WH on CANCELLED (idempotent).
+      // L2: REJECTED is a dead transition — not in orderUpdateSchema enum and never
+      // set by any current code path. The DB enum retains it for legacy rows; this
+      // branch is kept as a safety net but will never trigger in normal operation.
       if (
         (updateData.status === 'CANCELLED' || updateData.status === 'REJECTED') &&
         lockedOrder.status !== updateData.status
@@ -520,14 +589,46 @@ router.patch('/:id', async (req, res) => {
       })
     }
 
+    if (error instanceof ValidationError) {
+      const isDriver = /assign a driver/i.test(error.message || '')
+      return res.status(400).json({
+        ok: false,
+        data: null,
+        error: {
+          name: isDriver ? 'DRIVER_REQUIRED' : 'VALIDATION_ERROR',
+          message: error.message,
+        },
+        requestId: req.requestId,
+      })
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+
+    if (error?.code === 'ORDER_STATE_CHANGED' || error?.status === 409) {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'ORDER_STATE_CHANGED', message: error.message },
+        requestId: req.requestId,
+      })
+    }
+
     logger.error('Update order error', { error: error.message, code: error.code })
-    res.status(500).json({
+    const status = error.status || 500
+    res.status(status).json({
       ok: false,
       data: null,
       error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to update order',
-        details: error.message,
+        name: error.code || 'INTERNAL_ERROR',
+        message: status === 500 ? 'Failed to update order' : error.message,
+        details: status === 500 ? error.message : undefined,
       },
       requestId: req.requestId,
     })

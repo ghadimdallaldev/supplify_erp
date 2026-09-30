@@ -420,113 +420,6 @@ async function insertAssignment(
 }
 
 /**
- * Assign warehouses to an order within an existing transaction.
- */
-async function assignWarehousesToOrderLegacy(
-  client,
-  { order, orderItems, supplier, multiWarehouseActive }
-) {
-  const { getWarehouseSupplierColumn, isDefaultWarehouse } = await import(
-    '../lib/warehouse-helpers.js'
-  )
-  const supplierCol = await getWarehouseSupplierColumn((sql, params) => client.query(sql, params))
-
-  const useMulti =
-    multiWarehouseActive &&
-    supplier.fulfillment_mode === 'multi' &&
-    supplier.multi_warehouse_enabled
-
-  if (!useMulti && supplier.default_warehouse_id) {
-    const { rows: activeDefault } = await client.query(
-      `SELECT id FROM warehouse WHERE id = $1 AND ${supplierCol} = $2 AND is_active = TRUE`,
-      [supplier.default_warehouse_id, supplier.id]
-    )
-    if (activeDefault.length) {
-      const warehouseId = activeDefault[0].id
-      const assignment = await insertAssignment(client, {
-        orderId: order.id,
-        orderItemId: null,
-        warehouseId,
-      })
-      await reserveWarehouseStockBatch(
-        client,
-        warehouseId,
-        orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
-        { supplierId: supplier.id }
-      )
-      return { mode: 'single', warehouseId, assignments: [assignment] }
-    }
-  }
-
-  const { rows: warehouses } = await client.query(
-    `SELECT id, is_default, is_main, is_active FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE ORDER BY created_at`,
-    [supplier.id]
-  )
-
-  const activeWarehouseIds = new Set(warehouses.map((w) => w.id))
-  const defaultWarehouseId =
-    (supplier.default_warehouse_id && activeWarehouseIds.has(supplier.default_warehouse_id)
-      ? supplier.default_warehouse_id
-      : null) ??
-    warehouses.find((w) => isDefaultWarehouse(w))?.id ??
-    warehouses[0]?.id
-
-  if (!defaultWarehouseId && warehouses.length === 0) {
-    return { mode: 'none', assignments: [] }
-  }
-
-  if (!useMulti) {
-    const warehouseId = defaultWarehouseId
-    if (!warehouseId || !activeWarehouseIds.has(warehouseId)) {
-      throw new Error('No default warehouse configured for supplier')
-    }
-    const assignment = await insertAssignment(client, {
-      orderId: order.id,
-      orderItemId: null,
-      warehouseId,
-    })
-    await reserveWarehouseStockBatch(
-      client,
-      warehouseId,
-      orderItems.map((item) => ({ productId: item.product_id, quantity: item.quantity })),
-      { supplierId: supplier.id }
-    )
-    return { mode: 'single', warehouseId, assignments: [assignment] }
-  }
-
-  const ctx = await loadRoutingContext(client, supplier, order, orderItems)
-  const assignments = []
-
-  for (const item of ctx.enrichedItems) {
-    const resolution = resolveWarehouseForItem(item, {
-      rules: ctx.rules,
-      warehouses: ctx.warehouses,
-      warehouseStock: ctx.warehouseStock,
-      restaurantInZoneByWarehouse: ctx.restaurantInZoneByWarehouse,
-      restaurantZoneIds: ctx.restaurantZoneIds,
-      defaultWarehouseId: ctx.defaultWarehouseId,
-    })
-
-    await reserveWarehouseStock(
-      client,
-      resolution.warehouseId,
-      item.product_id,
-      Number(item.quantity),
-      { supplierId: supplier.id }
-    )
-
-    const assignment = await insertAssignment(client, {
-      orderId: order.id,
-      orderItemId: item.id,
-      warehouseId: resolution.warehouseId,
-    })
-    assignments.push({ ...assignment, ruleType: resolution.ruleType })
-  }
-
-  return { mode: 'multi', assignments }
-}
-
-/**
  * Build simulation context from caller-supplied data (for API simulate endpoint).
  */
 export function buildSimulationFromPayload({
@@ -782,13 +675,24 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
   for (const zone of zones) {
     if (restaurantMatchesZone(zone, destinationAddress)) restaurantZoneIds.add(zone.id)
   }
+  // True when at least one warehouse in this tenant has an active delivery zone.
+  // Used to fail-close unzoned warehouses so they don't win by default when
+  // sibling warehouses have proper zone coverage configured.
+  const anyWarehouseHasZones = zones.length > 0
+  const destinationSignalled = destinationHasRoutingSignal(destinationAddress)
   for (const warehouse of warehouses) {
     const warehouseZones = zones.filter((zone) => zone.warehouse_id === warehouse.id)
-    zoneEligibleByWarehouse.set(
-      warehouse.id,
-      warehouseZones.length === 0 ||
+    if (warehouseZones.length === 0) {
+      // Unzoned warehouse: only eligible when no other warehouse in the tenant
+      // has zones, OR when the destination carries no routing signals (so zone
+      // matching is impossible for everyone).
+      zoneEligibleByWarehouse.set(warehouse.id, !anyWarehouseHasZones || !destinationSignalled)
+    } else {
+      zoneEligibleByWarehouse.set(
+        warehouse.id,
         warehouseZones.some((zone) => restaurantMatchesZone(zone, destinationAddress))
-    )
+      )
+    }
   }
   const enrichedItems = orderItems.map((item) => ({
     ...item,

@@ -111,6 +111,11 @@ router.get('/:id', async (req, res, next) => {
       { rows: promotionRows },
       { rows: replacementOrders },
       { rows: disputeRows },
+      // M12: expose driver-assignment / POD / pod_required so clients can gate
+      // Ship/Deliver before the API rejects with 400.
+      { rows: driverAssignmentRows },
+      { rows: podRows },
+      { rows: podPolicyRows },
     ] = await Promise.all([
       query(
         `
@@ -167,6 +172,23 @@ router.get('/:id', async (req, res, next) => {
             order.source_dispute_id,
           ])
         : Promise.resolve({ rows: [] }),
+      // Active legs only — matches requiresDriverAssignment enforcement on PATCH.
+      query(
+        `SELECT id FROM driver_assignments
+         WHERE order_id = $1
+           AND status IN ('assigned', 'picked_up', 'out_for_delivery')
+         LIMIT 1`,
+        [id]
+      ),
+      query(`SELECT id FROM proof_of_delivery WHERE order_id = $1 LIMIT 1`, [id]),
+      query(
+        `SELECT s.pod_required
+         FROM order_item oi
+         JOIN supplier s ON s.id = oi.supplier_id
+         WHERE oi.order_id = $1
+         LIMIT 1`,
+        [id]
+      ),
     ])
 
     const promotionUsage = promotionRows[0]
@@ -194,6 +216,11 @@ router.get('/:id', async (req, res, next) => {
           promotion: appliedPromotion,
           replacementOrders,
           sourceDispute,
+          // M12: pre-computed flags so web/mobile can gate Ship/Deliver buttons
+          // before the API rejects with 400 (no driver / missing required POD).
+          has_driver_assignment: driverAssignmentRows.length > 0,
+          has_pod: podRows.length > 0,
+          pod_required: Boolean(podPolicyRows[0]?.pod_required),
         },
       },
       error: null,

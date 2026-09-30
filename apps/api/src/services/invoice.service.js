@@ -112,16 +112,32 @@ export async function generatePaymentNumber(client, prefix = 'PAY') {
   return rows[0]?.payment_number
 }
 
-export async function assertNoDuplicateInvoice(client, { orderId, supplierId }) {
-  if (!orderId) return
+export async function findInvoiceForOrder(client, { orderId, supplierId }) {
+  if (!orderId) return null
   const { rows } = await client.query(
-    `SELECT id FROM invoice WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+    `SELECT * FROM invoice WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
     [orderId, supplierId]
   )
-  if (rows.length > 0) {
+  return rows[0] || null
+}
+
+export async function assertNoDuplicateInvoice(client, { orderId, supplierId }) {
+  if (!orderId) return
+  const existing = await findInvoiceForOrder(client, { orderId, supplierId })
+  if (existing) {
     throw new ConflictError('Invoice already exists for this order and supplier')
   }
 }
+
+/** Statuses that allow a supplier-linked manual invoice (post-delivery / post-receive). */
+const MANUAL_INVOICE_ORDER_STATUSES = new Set([
+  'DELIVERED',
+  'COMPLETED',
+  'RECEIVED_PARTIAL',
+  'RECEIVED_FULL',
+  'RECEIVED_WITH_DISPUTE',
+  'INVOICED',
+])
 
 export async function getSupplierTaxConfig(client, supplierId) {
   const { rows } = await client.query(
@@ -397,7 +413,15 @@ export async function createInvoiceFromReceiving(
   client,
   { order, report, supplierId, restaurantId, receivedBy }
 ) {
-  await assertNoDuplicateInvoice(client, { orderId: order.id, supplierId })
+  // Prior manual invoice must not block receiving — reuse it and keep INVOICED.
+  const existing = await findInvoiceForOrder(client, { orderId: order.id, supplierId })
+  if (existing) {
+    await client.query(
+      `UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1`,
+      [order.id]
+    )
+    return { invoice: existing, created: false }
+  }
 
   const lineItems = await buildLineItemsFromReceiving(client, report.id)
   if (lineItems.length === 0) {
@@ -473,17 +497,22 @@ export async function createInvoiceFromReceiving(
     [order.id]
   )
 
-  return invoice
+  return { invoice, created: true }
 }
 
 export async function createInvoiceManual(client, { invoiceData, supplierId, orderItems, userId }) {
   if (invoiceData.order_id) {
     const { rows: orders } = await client.query(
-      `SELECT restaurant_id FROM customer_order WHERE id = $1 FOR KEY SHARE`,
+      `SELECT restaurant_id, status FROM customer_order WHERE id = $1 FOR KEY SHARE`,
       [invoiceData.order_id]
     )
     if (!orders.length || orders[0].restaurant_id !== invoiceData.restaurant_id) {
       throw new ValidationError('Invoice restaurant must match the selected order')
+    }
+    if (!MANUAL_INVOICE_ORDER_STATUSES.has(String(orders[0].status || '').toUpperCase())) {
+      throw new ValidationError(
+        'Manual invoices require the order to be delivered or received before invoicing'
+      )
     }
     const { rows: supplierItems } = await client.query(
       `SELECT 1 FROM order_item WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,

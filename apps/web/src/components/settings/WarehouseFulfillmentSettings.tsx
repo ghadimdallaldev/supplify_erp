@@ -22,8 +22,9 @@ type Props = {
 export function WarehouseFulfillmentSettings({ enabled }: Props) {
   const { t } = useTranslation('settings')
   const { can } = usePermissions()
-  const canManageFulfillment = can('SETTINGS_MANAGE')
-  const canManageWarehouses = can('WAREHOUSES_MANAGE')
+  // M10: API allows WAREHOUSES_MANAGE; keep SETTINGS_MANAGE for owners who already had it.
+  const canManageFulfillment = can('WAREHOUSES_MANAGE') || can('SETTINGS_MANAGE')
+  const canManageWarehouses = can('WAREHOUSES_MANAGE') || can('SETTINGS_MANAGE')
   const { data, isLoading } = useGetSupplierFulfillmentQuery(undefined, {
     skip: !enabled || !canManageFulfillment,
   })

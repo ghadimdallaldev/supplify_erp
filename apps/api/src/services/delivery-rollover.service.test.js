@@ -46,14 +46,14 @@ describe('delivery-rollover.service', () => {
       rows: [
         {
           id: 'da-1',
-          status: 'out_for_delivery',
+          status: 'assigned',
           order_status: 'SHIPPED',
           effective_delivery_date: '2026-06-08',
           rolled_over_at: null,
         },
         {
           id: 'da-2',
-          status: 'assigned',
+          status: 'rescheduled',
           order_status: 'SHIPPED',
           effective_delivery_date: '2026-06-10',
           rolled_over_at: null,
@@ -125,7 +125,7 @@ describe('delivery-rollover.service', () => {
       rows: [
         {
           id: 'da-locked',
-          status: 'picked_up',
+          status: 'assigned',
           order_status: 'SHIPPED',
           effective_delivery_date: '2026-06-08',
           supplier_id: 'sup-locked',
@@ -144,7 +144,7 @@ describe('delivery-rollover.service', () => {
         rows: [
           {
             id: 'da-locked',
-            status: 'picked_up',
+            status: 'assigned',
             order_id: 'ord-locked',
             supplier_id: 'sup-locked',
             driver_id: 'drv-1',
@@ -170,7 +170,7 @@ describe('delivery-rollover.service', () => {
       rows: [
         {
           id: 'da-1',
-          status: 'picked_up',
+          status: 'assigned',
           order_status: 'SHIPPED',
           effective_delivery_date: '2026-06-08',
           supplier_id: 'sup-1',
@@ -194,7 +194,7 @@ describe('delivery-rollover.service', () => {
         rows: [
           {
             id: 'da-1',
-            status: 'picked_up',
+            status: 'assigned',
             order_id: 'ord-1',
             supplier_id: 'sup-1',
             driver_id: 'drv-1',
@@ -241,8 +241,12 @@ describe('delivery-rollover.service', () => {
     config.DELIVERY_ROLLOVER_ENABLED = true
   })
 
-  it('eligible statuses include active delivery states', () => {
-    expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).toContain('out_for_delivery')
+  it('eligible statuses include assigned and rescheduled, exclude in-progress and terminal states', () => {
+    expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).toContain('assigned')
+    expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).toContain('rescheduled')
+    // picked_up / out_for_delivery are in-progress: rolling those would detach a live route stop
+    expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).not.toContain('picked_up')
+    expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).not.toContain('out_for_delivery')
     expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).not.toContain('delivered')
     expect(ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES).not.toContain('failed')
   })

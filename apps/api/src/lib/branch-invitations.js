@@ -353,10 +353,22 @@ export async function acceptBranchInvitation({
     }
 
     if (scope.organizationId) {
+      // Resolve the invite role name so we can pick the least-privilege org role.
+      // Drivers and read-only Viewers must NOT receive Regional Manager access.
+      const { rows: inviteRoleRows } = await client.query(
+        `SELECT name FROM tenant_roles WHERE id = $1`,
+        [row.role_id]
+      )
+      const inviteRoleName = inviteRoleRows[0]?.name || null
+      const orgRoleName =
+        inviteRoleName === 'Driver' || inviteRoleName === 'Viewer'
+          ? 'Org Viewer'
+          : 'Regional Manager'
+
       await assignOrgUserRole({
         userId,
         organizationId: scope.organizationId,
-        roleName: 'Regional Manager',
+        roleName: orgRoleName,
         assignedBy: row.invited_by,
         client,
       })

@@ -6,12 +6,16 @@ import { ValidationError } from '../middlewares/errorHandler.js'
  */
 
 const RESTAURANT_TRANSITIONS = {
+  // L4: DRAFT is created by restaurants; they can place or discard it.
+  DRAFT: ['PLACED', 'CANCELLED'],
   PLACED: ['CANCELLED'],
   ACKNOWLEDGED: ['CANCELLED'],
   PROCESSING: ['CANCELLED'],
 }
 
 const SUPPLIER_TRANSITIONS = {
+  // L4: DRAFT created on behalf of a restaurant by a supplier can be placed or discarded.
+  DRAFT: ['PLACED', 'CANCELLED'],
   PLACED: ['ACKNOWLEDGED', 'CANCELLED'],
   ACKNOWLEDGED: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['SHIPPED', 'CANCELLED'],

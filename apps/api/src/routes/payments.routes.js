@@ -4,6 +4,7 @@ import {
   requireRole,
   resolveTenantContext,
   requirePermission,
+  requireAnyPermission,
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
@@ -12,7 +13,6 @@ import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
 import { notifyPaymentReceived } from '../services/notification.service.js'
-import { invoicesMutationGuard } from '../lib/route-permissions.js'
 import {
   recordCashPayment,
   computeRemainingBalance,
@@ -45,7 +45,23 @@ router.use(
   requireAuth,
   resolveTenantContext,
   requirePermission('INVOICES_VIEW'),
-  invoicesMutationGuard
+  // M9: Allow PAYMENTS_MANAGE (not only INVOICES_*) to perform payment mutations.
+  (req, res, next) => {
+    const method = req.method.toUpperCase()
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
+    if (method === 'POST') {
+      return requireAnyPermission('INVOICES_CREATE', 'INVOICES_MANAGE', 'PAYMENTS_MANAGE')(
+        req,
+        res,
+        next
+      )
+    }
+    return requireAnyPermission('INVOICES_EDIT', 'INVOICES_MANAGE', 'PAYMENTS_MANAGE')(
+      req,
+      res,
+      next
+    )
+  }
 )
 
 // Record a payment (supplier records receivable payment from restaurant)

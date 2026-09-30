@@ -6,7 +6,11 @@
     "failedSupplierPendingOrders": "تعذر جلب قائمة استلام المورد",
     "orderNotReady": "هذا الطلب غير جاهز للاستلام بعد. انتظر حتى يحدد المورد أنه تم التسليم.",
     "reportAlreadyExists": "يوجد تقرير استلام لهذا الطلب بالفعل",
+    "invoiceAlreadyExists": "توجد فاتورة لهذا الطلب بالفعل",
     "receivedExceedsOrdered": "لا يمكن أن تتجاوز الكمية المستلمة الكمية المطلوبة ({{ordered}} {{unit}})",
+    "validationFailed": "فشل التحقق من الاستلام",
+    "podRequired": "إثبات التسليم مطلوب قبل هذا الإجراء",
+    "orderNotFound": "الطلب غير موجود",
     "failedCreateReport": "تعذر إنشاء تقرير الاستلام",
     "failedReceivingHistory": "تعذر جلب سجل الاستلام"
   }

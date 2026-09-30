@@ -57,8 +57,8 @@ export function ConsumerTrackOrderPage() {
         const result = await trackOrder({
           restaurantSlug: slug,
           orderNumber: tracked.order.order_number,
-          email: tracked.order.guest_email || email || undefined,
-          phone: tracked.order.guest_phone || phone || undefined,
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
         }).unwrap()
         setTracked(result)
       } catch {
@@ -189,13 +189,6 @@ export function ConsumerTrackOrderPage() {
                 <span>{formatPrice(Number(tracked.order.total_amount))}</span>
               </div>
             </div>
-            {tracked.order.receipt_token && (
-              <Button asChild variant="outline" className="w-full">
-                <Link to={`/order/${slug}/receipt/${tracked.order.receipt_token}`}>
-                  {t('track.viewFullReceipt')}
-                </Link>
-              </Button>
-            )}
           </CardContent>
         </Card>
       )}

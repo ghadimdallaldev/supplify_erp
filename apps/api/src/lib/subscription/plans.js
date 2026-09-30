@@ -56,6 +56,9 @@ function subscriptionCacheKey(tenantId, tenantType) {
  * Used so suppliers and restaurants never hit "no subscription" (0/0 limits).
  * Run migration 0048 to backfill existing tenants; this handles new tenants created after.
  */
+/** Non-terminal commercial statuses — never mint a Free ACTIVE row over these. */
+const NON_TERMINAL_SUBSCRIPTION_STATUSES = ['TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED']
+
 async function ensureTenantSubscription(tenantId, tenantType) {
   const { rows: plans } = await query(
     `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND tenant_type = $1 AND is_active = true LIMIT 1`,
@@ -71,11 +74,14 @@ async function ensureTenantSubscription(tenantId, tenantType) {
     )
     return
   }
+  // Any live commercial row (incl. PAST_DUE / SUSPENDED) blocks Free minting so grace
+  // and lock semantics are not overwritten by a newer pending-activation Free ACTIVE row.
   const { rows: existing } = await query(
     `SELECT 1 FROM subscription
-     WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE')
+     WHERE tenant_id = $1 AND tenant_type = $2
+       AND status = ANY($3::text[])
      LIMIT 1`,
-    [tenantId, tenantType]
+    [tenantId, tenantType, NON_TERMINAL_SUBSCRIPTION_STATUSES]
   )
   if (existing.length > 0) return
 
@@ -143,37 +149,49 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
         // Skip if columns missing (migration not run) or any error in pending-apply logic
       }
 
-      let { rows } = await query(
-        `
+      const subscriptionSelect = `
       SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
         sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
       FROM subscription s
       JOIN subscription_plan sp ON sp.id = s.plan_id
-      WHERE s.tenant_id = $1 
+      WHERE s.tenant_id = $1
         AND s.tenant_type = $2
-        AND s.status IN ('TRIALING', 'ACTIVE')
-      ORDER BY s.created_at DESC
-      LIMIT 1
-    `,
-        [billingTenantId, tenantType]
-      )
+        AND s.status = ANY($3::text[])
+      ORDER BY
+        CASE s.status
+          WHEN 'ACTIVE' THEN 0
+          WHEN 'TRIALING' THEN 1
+          WHEN 'PAST_DUE' THEN 2
+          WHEN 'SUSPENDED' THEN 3
+          ELSE 4
+        END,
+        s.created_at DESC
+      LIMIT 1`
+
+      // Prefer live entitlements first; fall back to commercial PAST_DUE/SUSPENDED
+      // so feature gating never mints Free over an existing paid/grace row.
+      let { rows } = await query(subscriptionSelect, [
+        billingTenantId,
+        tenantType,
+        ['TRIALING', 'ACTIVE'],
+      ])
+
+      if (rows.length === 0) {
+        const commercial = await query(subscriptionSelect, [
+          billingTenantId,
+          tenantType,
+          ['PAST_DUE', 'SUSPENDED'],
+        ])
+        rows = commercial.rows
+      }
 
       if (rows.length === 0) {
         await ensureTenantSubscription(billingTenantId, tenantType)
-        const result = await query(
-          `
-        SELECT s.*, sp.limits, sp.features, sp.name as plan_display_name, sp.code as plan_code,
-          sp.price_per_month as plan_price_per_month, sp.price_per_year as plan_price_per_year, sp.tenant_type as plan_tenant_type
-        FROM subscription s
-        JOIN subscription_plan sp ON sp.id = s.plan_id
-        WHERE s.tenant_id = $1 
-          AND s.tenant_type = $2
-          AND s.status IN ('TRIALING', 'ACTIVE')
-        ORDER BY s.created_at DESC
-        LIMIT 1
-      `,
-          [billingTenantId, tenantType]
-        )
+        const result = await query(subscriptionSelect, [
+          billingTenantId,
+          tenantType,
+          ['TRIALING', 'ACTIVE'],
+        ])
         rows = result.rows
       }
 

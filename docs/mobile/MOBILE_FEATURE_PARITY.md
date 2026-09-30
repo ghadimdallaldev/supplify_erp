@@ -2,7 +2,129 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
-## 2026-09-30 — Store readiness: account deletion, privacy links, hide mobile SaaS pay
+## 2026-09-30 — Audit MEDIUM/LOW fixes M5/M10–M12/L1–L8/H13
+
+**Mobile impact:** All changes are either web-UI-only, API-internal correctness patches,
+or server-side gate additions with no client contract change. No new endpoints, no changed
+response shapes visible to mobile, no new permission/feature keys, no new env vars.
+
+Summary of changes:
+
+- **M5** `0004_restaurant_inventory.sql` — Added clarifying comment: inventory is tenant-wide, not per-branch.
+- **M10** `WarehouseFulfillmentSettings.tsx` — Aligned `canManageFulfillment` from `SETTINGS_MANAGE` → `WAREHOUSES_MANAGE` (web UI only).
+- **M11** `OrderInvoiceTab.tsx` — Description now based on invoice presence, not order status (web UI only).
+- **M12** `orders/detail.js` + `OrderDetailPage.tsx` — Ship/Deliver gated on `has_driver_assignment`, `has_pod`, and `pod_required` from order detail. Deliver only requires POD when `pod_required` is true. Mobile types updated in both repos.
+- **L1** `orders.helpers.js` — Hard-deprecation comment on `createInvoiceFromOrder`; no behaviour change.
+- **L2** `warehouseInventory.js`, `orders/update.js` — Comments on dead `REJECTED`/`FULFILLING`/`CONFIRMED` status references; no behaviour change.
+- **L3** `warehouseRouting.js` — Deleted dead `assignWarehousesToOrderLegacy`; no callers.
+- **L4** `order-status-transitions.js` — Added `DRAFT → PLACED` and `DRAFT → CANCELLED` transitions so DRAFT orders can be placed/cancelled without a 400.
+- **L5** `object-download-auth.js` — Signed URL TTL shortened from 24 h → 1 h.
+- **L6** `inventory.routes.js` — `inventoryManagementGate` added to `GET /alerts` and `PATCH /alerts/:id/acknowledge`.
+- **L7** `consumer-order.service.js` + `consumer/orders.routes.js` — `createConsumerOrder` returns `isNew` flag; `emitConsumerOrderNew` gated on `isNew !== false`.
+- **L8** `supplier-org.js` — `getOrgRolePermissions`: deny when `branchScope === 'assigned'` even when `supplierId` is absent (previously leaked permissions through on missing supplierId).
+- **H13** `docs/features/receiving.md` — Added one-report-final note and UI hint.
+
+**Mobile action required for M12 only:** Order detail returns `has_driver_assignment`, `has_pod`, and `pod_required`. Gate Ship on driver assignment (non-pickup); gate Deliver on driver assignment and, when `pod_required`, on `has_pod`. Types already ported to both mobile repos.
+
+---
+
+## 2026-09-30 — Audit CRITICAL fixes C1–C4 (+ receiving/invoice lifecycle)
+
+**Mobile impact:** C1–C3 are API-internal (billing, receiving/invoice, POD on supplier Mark Delivered). No mobile app changes required for those.
+
+**C4 (consumer public track) — response hardened:** `POST /api/public/consumer/:slug/orders/track` no longer returns `receipt_token`, guest email/phone, or other PII; order numbers for new orders are non-sequential; track/create are rate-limited. Mobile consumer track UIs (if any) must not rely on `receipt_token` from track — use the create response or receipt URL. Android/iOS: verify track consumers; no ERP B2B mobile contract change.
+
+Summary:
+
+- **C1** `plans.js` / `billing-service.js` + migration `0225_cancel_spurious_free_over_past_due.sql` — never mint Free ACTIVE over `PAST_DUE`/`SUSPENDED`; billing prefers commercial rows.
+- **C2/H1** `invoice.service.js` / `receiving.routes.js` / `disputes.service.js` — reuse existing invoice on receive; keep `INVOICED`; gate manual invoice to post-delivery; distinct conflict errors.
+- **C3** `orders/update.js` / `orders.helpers.js` — enforce POD on Mark Delivered; complete `driver_assignments` to `delivered`.
+- **C4** `consumer-order.service.js` / `consumer/orders.routes.js` — non-enumerable order numbers, rate limits, projected track payload.
+- **H13** Documented one-report/one-invoice policy in `docs/features/receiving.md` (no multi-receive redesign).
+
+---
+
+## 2026-09-30 — Audit bug fixes H4/H8/H9/H10/H11/H12 (API-only, no client contract change)
+
+**Mobile not affected.** All fixes are server-side correctness patches — no new or changed
+endpoints, no changed request/response payload shapes visible to mobile clients, no new
+permission or feature keys, no new env vars.
+
+Summary of changes:
+
+- **H4** `driver-fulfillment.service.js` (`assignDriverToOrder`) — Block driver assignment on
+  `RECEIVED_PARTIAL`, `RECEIVED_WITH_DISPUTE` in addition to existing post-delivery statuses.
+  Auto-promote only `ACKNOWLEDGED → PROCESSING` (removed `PLACED` from the auto-promote condition
+  so the `PLACED → ACKNOWLEDGED` step is not skipped).
+- **H8** `branch-invitations.js` / `supplier-org.js` — Map invite role to least-privilege org role:
+  `Driver` and `Viewer` branch invitees now receive `Org Viewer` instead of `Regional Manager`.
+  `ensureOrgAccessForBranchStaff` backfill applies the same mapping based on the stored branch role.
+- **H9** `order-amendments.service.js` — `quantity_change` amendments now keep the original
+  `unit_price` from the database and only call `resolveAmendmentUnitPrice` when the amendment
+  item carries `reprice: true`. Prevents silent repricing on pure quantity changes.
+- **H10** `resolve-product-price.service.js` — Batch price resolver now surfaces `minOrderQuantity`,
+  `contractPriceAtMoq`, and `contractCurrencyAtMoq` when a contract exists but the requested
+  quantity is below MOQ. The catalog-display enricher passes these fields through. No contract
+  price is claimed at qty < MOQ.
+- **H11** `orders.calendar.routes.js` — Moved `INVOICED`, `RECEIVED_PARTIAL`, and
+  `RECEIVED_WITH_DISPUTE` from the pending bucket to the completed bucket. Removed dead `CONFIRMED`
+  from the pending set.
+- **H12** `route-permissions.js` / `supplier-org.js` — `orgStructureGuard` now allows
+  `PATCH /branches/:id` for users with `SETTINGS_EDIT` (in addition to `SETTINGS_MANAGE`). Added
+  `SETTINGS_EDIT` to `Org Manager` and `Regional Manager` org role permission sets so those roles
+  can update branch details without requiring the create/billing-level `SETTINGS_MANAGE`.
+
+---
+
+## 2026-09-30 — Audit bug fixes H2/H3/H5/H6/H7 (API-only, no client contract change)
+
+**Mobile not affected.** All five fixes are internal API correctness fixes — no new or changed endpoints,
+no changed request/response shapes, no new permission/feature keys, no new env vars.
+
+Summary of changes (server-side only):
+
+- **H2** `restaurant-order-create.service.js` — Pass `reserveLegacy: true` when calling
+  `reserveStockForPlacedOrder` for restaurant-placed orders in legacy inventory mode. Ensures
+  `reserved_qty` is incremented on place so the cancel path's `reserved_qty` decrement is symmetric.
+- **H3** `warehouseInventory.js` (`reassignOrderWarehouseAssignment`) — Use the same
+  `lineItemsForAssignment` result for both the release and the `reserveWarehouseStockBatch` reserve
+  call. Prevents double-reserving lines that belong to a different assignment leg.
+- **H5** `delivery-rollover.service.js` — Removed `picked_up` and `out_for_delivery` from
+  `ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES` (they are in-progress states and should not be rolled over).
+  Changed `detachOrderFromPriorRoutes` to detach only from `PLANNED` routes, not `IN_PROGRESS` ones.
+- **H6** `lib/dispute-replacement-order.js` + `disputes.service.js` — Replacement order items now
+  carry `unit_price = originalUnitPrice` and `line_total = originalUnitPrice * quantity` (was `0`).
+  Order `total_amount` is computed from actual line totals. Supplier is notified of `PLACED` via
+  `notifyOrderStatusChange` after the transaction commits.
+- **H7** `warehouseRouting.js` (`loadCanonicalRoutingContext`) — Unzoned warehouses now fail-closed
+  when any sibling warehouse in the tenant has delivery zones AND the destination carries routing
+  signals. Unzoned warehouses remain eligible only when no zones exist tenant-wide or when the
+  destination has no postal/GPS signal.
+
+---
+
+## 2026-09-30 — Audit bug fixes M1–M18 (API-only, no client contract change)
+
+**Mobile not affected.** All changes are internal API correctness fixes with no new endpoints, no changed
+request/response shapes, no new permission keys, no new feature flags, and no new env vars. Clients
+(web, mobile) call the same endpoints and receive the same payloads.
+
+Summary of changes (server-side only):
+
+- **M1** `driver-fulfillment.service.js` — emit `notifyOrderStatusChange(SHIPPED)` when `out_for_delivery` promotes order.
+- **M2** `orders/update.js` — re-check active driver assignment inside `FOR UPDATE` lock (TOCTOU fix).
+- **M3** `warehouses.routes.js` PATCH inventory — validate non-negative quantities; `available+reserved ≤ on_hand`.
+- **M4** `receiving.routes.js` — `SELECT ... FOR UPDATE` on inventory rows before updating.
+- **M5** (comment only) — noted `restaurant_inventory` UNIQUE(restaurant_id, product_id) constraint.
+- **M6** `billingAccess.js` — fail closed (402) when tenant exists but subscription row is missing.
+- **M7** `invoice-overdue.job.js` — atomic mark+notify; resolve org billing tenant for subscription checks.
+- **M9** `payments.routes.js` — mutation guard accepts `PAYMENTS_MANAGE` in addition to `INVOICES_*`.
+- **M13** `consumer/orders.routes.js` — rate-limit public consumer order create (Idempotency-Key store deferred; not required).
+- **M14** `consumer-reviews.routes.js` — require consumer session or `receipt_token` on public review POST.
+- **M15** `billing-service.js` — invalidate feature-flag cache on plan activation / paid subscription.
+- **M16** `route-permissions.js` — `ordersRouterMutationGuard` PATCH no longer allows `ORDERS_CREATE`.
+- **M17** `fulfillment/board.js` — replace correlated `item_count` subquery with pre-aggregate join.
+- **M18** (already handled in current file) — ValidationError and ConflictError in receiving route are already mapped distinctly.
 
 - **API:** Self-service account deletion (`GET /api/account/deletion-status`, `DELETE /api/account`, ownership transfer, explicit org close). Org OWNER must transfer ownership or close the organization before personal deletion; personal deletion never implicitly closes the business. PII anonymized; orders/invoices/audit retained.
 - **Web:** `/account/delete` initiates deletion after sign-in (Play external deletion URL). Settings link + privacy policy retention section updated. AASA + `assetlinks.json` stubs under `apps/web/static/.well-known/` (owner must fill Team ID / signing certs).

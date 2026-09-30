@@ -10,12 +10,9 @@ import {
 import { notifyDeliveryRolloverBatch } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 
-export const ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES = [
-  'assigned',
-  'picked_up',
-  'out_for_delivery',
-  'rescheduled',
-]
+// picked_up and out_for_delivery are IN_PROGRESS states — rolling those over
+// would detach an already active leg from its live route stop.
+export const ROLLOVER_ELIGIBLE_ASSIGNMENT_STATUSES = ['assigned', 'rescheduled']
 
 export const TERMINAL_ORDER_STATUSES_FOR_ROLLOVER = [
   'DELIVERED',
@@ -192,7 +189,7 @@ async function detachOrderFromPriorRoutes(client, { orderId, supplierId, beforeD
       AND rs.order_id = $1
       AND dr.supplier_id = $2
       AND dr.scheduled_date < $3::date
-      AND dr.status IN ('PLANNED', 'IN_PROGRESS')
+      AND dr.status = 'PLANNED'
       AND rs.status NOT IN ('COMPLETED', 'FAILED')
     `,
     [orderId, supplierId, beforeDate]

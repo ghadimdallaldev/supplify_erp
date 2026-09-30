@@ -989,6 +989,36 @@ router.patch(
       const qtyReserved = Object.hasOwn(req.body, 'quantity_reserved') ? quantity_reserved : null
       const qtyOnHand = Object.hasOwn(req.body, 'quantity_on_hand') ? quantity_on_hand : null
 
+      // M3: Reject negative values and enforce available+reserved <= on_hand invariant.
+      const checks = [
+        ['quantity_available', qtyAvailable],
+        ['quantity_reserved', qtyReserved],
+        ['quantity_on_hand', qtyOnHand],
+      ]
+      for (const [field, val] of checks) {
+        if (val !== null && (typeof val !== 'number' || !Number.isFinite(val) || val < 0)) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: { name: 'VALIDATION_ERROR', message: `${field} must be a non-negative number` },
+            requestId: req.requestId,
+          })
+        }
+      }
+      if (qtyAvailable !== null && qtyReserved !== null && qtyOnHand !== null) {
+        if (qtyAvailable + qtyReserved > qtyOnHand) {
+          return res.status(400).json({
+            ok: false,
+            data: null,
+            error: {
+              name: 'VALIDATION_ERROR',
+              message: 'quantity_available + quantity_reserved must not exceed quantity_on_hand',
+            },
+            requestId: req.requestId,
+          })
+        }
+      }
+
       const { rows } = await query(
         `INSERT INTO warehouse_inventory (
           warehouse_id, product_id, quantity_available, quantity_reserved, quantity_on_hand,

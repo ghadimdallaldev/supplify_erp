@@ -11,12 +11,18 @@ Plan feature key: `receiving_quality` (Silver+ for restaurants).
 3. Supplier may also mark **Delivered** from Orders list or order detail (**Mark Delivered**).
 4. Restaurant opens **Receiving** (`/app/receiving`) — pending list includes orders with status `DELIVERED` or legacy `COMPLETED`, without an accepted receiving report.
 5. Restaurant taps **Receive Now** (or **Receive order** on order detail tracking panel / Quick Actions), confirms quantities/quality, submits.
-6. API validates that every order line appears exactly once, normalizes the mobile/web payload, and creates the report, line items, accepted inventory, invoice, order status, and any automatic dispute in one transaction.
-7. A short quantity or any non-`ACCEPTED` quality creates or extends the order's single active dispute and sets the order to `RECEIVED_WITH_DISPUTE`. A discrepancy-free receipt becomes `RECEIVED_FULL`.
-8. Suppliers are notified of receiving completion (`RECEIVED_*` status) and of any automatically opened dispute.
+6. API validates that every order line appears exactly once, normalizes the mobile/web payload, and creates the report, line items, accepted inventory, invoice, order status, and any automatic dispute in one transaction. When an invoice already exists (manual pre-invoice), receiving reuses it and keeps the order at `INVOICED` instead of failing.
+7. A short quantity or any non-`ACCEPTED` quality creates or extends the order's single active dispute and sets the order to `RECEIVED_WITH_DISPUTE` (or `INVOICED` when billed). A discrepancy-free receipt becomes `RECEIVED_FULL` / `INVOICED`.
+8. Suppliers are notified of receiving completion (`RECEIVED_*` / `INVOICED` status) and of any automatically opened dispute.
 9. **Receiving history** tab lists past reports (not orders without a report).
 
+### One receiving report per order (H13)
+
+Supplify supports **one** receiving report and **one** invoice per order/supplier. Partial accepts bill only accepted quantity. Remaining short-shipped quantity is handled via dispute resolution (credit / replacement order) or a new supplier order — not a second receive on the same order.
+
 **Line-item authority:** the server resolves product identity, unit, and expected/actual unit pricing from the persisted order item. Web and mobile may submit received quantity, quality, notes, and lot data, but cannot override ordered product or financial facts. An accepted line with an expiry date creates an inventory lot on the order's branch.
+
+> **H13 — One receiving report per order is final.** Once a receiving report is accepted the order moves to `RECEIVED_FULL` or `RECEIVED_PARTIAL` / `RECEIVED_WITH_DISPUTE` and the receiving endpoint rejects further submissions for the same order. Any remaining shortfall must be resolved via the dispute flow (supplier issues a credit or replacement order) or via a new purchase order — re-receiving the same order is not supported. The Receiving UI communicates this with a "Already received" state on orders that have a completed report.
 
 Deep link: `/app/receiving?order={orderId}` opens the receive dialog when the order is in the pending list.
 

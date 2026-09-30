@@ -278,9 +278,16 @@ export async function assignDriverToOrder({
       throw new ValidationError('Pickup orders do not use driver assignments')
     }
     if (
-      ['CANCELLED', 'REJECTED', 'DELIVERED', 'COMPLETED', 'RECEIVED_FULL', 'INVOICED'].includes(
-        lockedOrder.status
-      )
+      [
+        'CANCELLED',
+        'REJECTED',
+        'DELIVERED',
+        'COMPLETED',
+        'RECEIVED_FULL',
+        'RECEIVED_PARTIAL',
+        'RECEIVED_WITH_DISPUTE',
+        'INVOICED',
+      ].includes(lockedOrder.status)
     ) {
       throw new ValidationError(
         `Cannot assign a driver to an order in status ${lockedOrder.status}`
@@ -334,7 +341,10 @@ export async function assignDriverToOrder({
       throw new ValidationError('All warehouse legs already have active driver assignments')
     }
 
-    if (['PLACED', 'ACKNOWLEDGED'].includes(lockedOrder.status)) {
+    // Only auto-promote ACKNOWLEDGED → PROCESSING.  Do NOT skip the ACKNOWLEDGED
+    // step by jumping PLACED → PROCESSING; that lifecycle step belongs to the
+    // supplier's acknowledge action.
+    if (lockedOrder.status === 'ACKNOWLEDGED') {
       await client.query(
         `UPDATE customer_order SET status = 'PROCESSING', updated_at = now() WHERE id = $1`,
         [orderId]
@@ -513,6 +523,7 @@ async function applyDeliveryStatusUpdate({
   let assignmentUpdate = `status = $1, notes = COALESCE($2, notes), updated_at = now()`
   const params = [status, notes ?? null]
   let orderMarkedDelivered = false
+  let orderMarkedShipped = false
 
   if (status === 'picked_up') {
     assignmentUpdate += `, picked_up_at = COALESCE(picked_up_at, now())`
@@ -568,6 +579,7 @@ async function applyDeliveryStatusUpdate({
           `UPDATE customer_order SET status = 'SHIPPED', updated_at = now() WHERE id = $1`,
           [orderId]
         )
+        orderMarkedShipped = true
       }
       await commitDispatchInventoryForAssignment(
         client,
@@ -591,6 +603,7 @@ async function applyDeliveryStatusUpdate({
           `UPDATE customer_order SET status = 'SHIPPED', updated_at = now() WHERE id = $1`,
           [orderId]
         )
+        orderMarkedShipped = true
       }
       if (openLegs.length === 1) {
         await commitDispatchInventoryForAssignment(client, orderId, openLegs[0].id)
@@ -754,6 +767,9 @@ async function applyDeliveryStatusUpdate({
         })
       )
     } else if (status === 'out_for_delivery') {
+      if (orderMarkedShipped) {
+        postCommitEffects.push(() => notifyOrderStatusChange(order, 'SHIPPED'))
+      }
       postCommitEffects.push(() =>
         notifyDriverDeliveryMilestone({
           order,
