@@ -81,3 +81,17 @@ Before marking any API/auth/feature task done, confirm:
 - Never edit a committed SQL migration. New behavior = new migration file.
 - Never push to `main` or `prod` directly.
 - `pnpm` only — no npm/yarn in this repo.
+
+## Cursor Cloud specific instructions
+
+Native dev is Docker infrastructure plus the API and Vite on the host.
+
+- Install with `pnpm install --frozen-lockfile` (pnpm 8.15.9 via Corepack). Do not use npm or yarn.
+- Docker runs nested. If the daemon is down: `sudo service docker start`, then `sudo chmod 666 /var/run/docker.sock` when the socket is root-only. The daemon uses `fuse-overlayfs` and legacy iptables.
+- `minio/minio` and `minio/mc` are no longer on Docker Hub. This environment keeps locally built images tagged `minio/minio:latest` and `minio/mc:latest` (MinIO `RELEASE.2025-10-15T17-29-55Z`). Do not `docker compose pull` those services.
+- Keycloak's entrypoint waits on `KEYCLOAK_DB_ADMIN`. Local Postgres creates `supplify`, not Railway's `railway` database. `docker-compose.yml` sets `KEYCLOAK_DB_ADMIN` and `host.docker.internal:host-gateway` so login email OTP can reach the API.
+- `pnpm local:infra` starts Postgres, Redis, Mailpit, MinIO, and Keycloak. Then `pnpm db:migrate`. App processes: `node scripts/dev-apps.mjs` (API http://localhost:4000/health, web http://localhost:5173). Vite binds IPv6 localhost; `http://127.0.0.1:5173` can refuse connections.
+- Keycloak admin UI: http://localhost:8180 (`admin` / `admin`). Mailpit: http://localhost:8025.
+- Demo restaurant sign-in: username `restaurant`, password `SupplifyRestaurant1!` (`restaurant@supplify.com`). The prepared Keycloak realm has the email OTP browser step turned off so sign-in does not wait on Mailpit. After a fresh realm import, OTP is on: the API needs `AUTH_EMAIL_OTP_INTERNAL_SECRET=dev-email-otp-internal-secret` and Mailpit SMTP (`SMTP_HOST=localhost`, `SMTP_PORT=1025`).
+- A restaurant user created in Keycloak after migrations has no `user_workspace_membership` row, so `/app/orders` is forbidden until the contact-email insert from `apps/api/db/migrations/0104_user_workspace_membership.sql` runs. The prepared database already links `restaurant@supplify.com` to Golden Fork.
+- `CRONS_ENABLED=false` is a reasonable local default when memory is tight. The API still serves traffic.

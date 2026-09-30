@@ -171,6 +171,9 @@ services:
     environment:
       # Cap JVM heap for local dev (default Keycloak dev mode can exceed 1.5 GiB RSS)
       JAVA_OPTS_APPEND: ${KEYCLOAK_JAVA_OPTS_APPEND:--Xms256m -Xmx768m}
+      # railway-entrypoint.sh checks this database before creating "keycloak".
+      # Local Postgres has POSTGRES_DB (supplify), not Railway's "railway" database.
+      KEYCLOAK_DB_ADMIN: ${KEYCLOAK_DB_ADMIN:-supplify}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_DB: postgres
@@ -187,6 +190,8 @@ services:
       AUTH_EMAIL_OTP_HMAC_SECRET: ${AUTH_EMAIL_OTP_HMAC_SECRET:-dev-email-otp-hmac-secret-change-me}
       SUPPLIFY_OTP_MAIL_URL: ${SUPPLIFY_OTP_MAIL_URL:-http://host.docker.internal:4000/api/internal/auth/otp/email}
       SUPPLIFY_OTP_MAIL_SECRET: ${SUPPLIFY_OTP_MAIL_SECRET:-dev-email-otp-internal-secret}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - start
       - --import-realm
