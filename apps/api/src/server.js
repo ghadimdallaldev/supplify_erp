@@ -59,6 +59,7 @@ import { publicRoutes } from './routes/public.routes.js'
 import { publicSalesRoutes } from './routes/public-sales.routes.js'
 import { supplierPublicSalesRoutes } from './routes/supplier-public-sales.routes.js'
 import { consumerAccountRoutes } from './routes/consumer-account.routes.js'
+import { accountRoutes } from './routes/account.routes.js'
 import { e2eRoutes } from './routes/e2e.routes.js'
 import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
 import { driverTrackingRoutes } from './routes/driver-tracking.routes.js'
@@ -517,6 +518,7 @@ app.use('/api/internal', internalAuthRoutes)
 app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
 app.use('/api/consumer', consumerAccountRoutes)
 app.use('/api/consumer', consumerRoutes)
+app.use('/api/account', accountRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
 if (allowE2eRoutes()) {
   app.use('/api/e2e', e2eRoutes)

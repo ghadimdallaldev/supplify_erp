@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-09-30 — Store readiness: account deletion, privacy links, hide mobile SaaS pay
+
+- **API:** Self-service account deletion (`GET /api/account/deletion-status`, `DELETE /api/account`, ownership transfer, explicit org close). Org OWNER must transfer ownership or close the organization before personal deletion; personal deletion never implicitly closes the business. PII anonymized; orders/invoices/audit retained.
+- **Web:** `/account/delete` initiates deletion after sign-in (Play external deletion URL). Settings link + privacy policy retention section updated. AASA + `assetlinks.json` stubs under `apps/web/static/.well-known/` (owner must fill Team ID / signing certs).
+- **Mobile (Android + iOS):** Delete account screens for restaurant/supplier/driver/consumer; Privacy/Terms links on Login/Pending/Settings/checkout; Featured Placement purchase + raw card UI removed (web handoff only); location/FGS/photo-library/Face ID declarations tightened to match foreground/camera-only usage.
+- **Docs:** `docs/mobile/STORE_READINESS_AUDIT.md`, `docs/mobile/STORE_SUBMISSION_PACKET.md`.
+
 ## 2026-09-26 — Driver can optimize their own route and finish proof when the scanner is down
 
 - **API:** `POST /api/fulfillment/routes/:id/optimize` now accepts `DRIVER_DELIVERIES_MANAGE`. The driver is scoped to their linked driver id, so they can reorder only their own route. Warehouse staff still use `FULFILLMENT_MANAGE`. Drivers are not granted `FULFILLMENT_VIEW`.

@@ -6,7 +6,7 @@
 
 **Locked product decisions:** Account deletion **1B** (OWNER must transfer ownership or complete explicit org-close before personal deletion; never implicitly delete the business). Mobile SaaS payments **2C** (hide Featured Placement / digital purchase + raw card UI on mobile; web billing untouched). Public Play deletion URL must **initiate** deletion on web, not only instruct users to use the app.
 
-**Implementation status:** Audit complete. Code fixes blocked until Agent mode is approved (Plan mode rejects non-markdown edits).
+**Implementation status:** Implementation completed 2026-09-30. See `STORE_SUBMISSION_PACKET.md` for owner ACTION REQUIRED items. Pre-implementation FAIL items for deletion/privacy/SaaS-pay/AASA stubs are FIXED in code; console/signing/legal remain OWNER.
 
 ---
 
