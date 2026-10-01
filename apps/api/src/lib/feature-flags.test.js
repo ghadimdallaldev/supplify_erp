@@ -197,6 +197,50 @@ describe('feature-flags', () => {
       ])
       expect(deleteCacheByPrefix).toHaveBeenCalledWith('ff:')
     })
+
+    it('accepts platform-only keys such as mobile_public_shop', async () => {
+      const { setGlobalFeatureOverride } = await import('./feature-flags.js')
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            feature_key: 'mobile_public_shop',
+            feature_name: 'Mobile public shop (guest + consumer catalogs)',
+            description: null,
+            global_override: true,
+            updated_at: new Date(),
+          },
+        ],
+      })
+
+      const flag = await setGlobalFeatureOverride('mobile_public_shop', 'on')
+      expect(flag.featureKey).toBe('mobile_public_shop')
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT (feature_key)'), [
+        'mobile_public_shop',
+        'Mobile public shop (guest + consumer catalogs)',
+        true,
+      ])
+    })
+  })
+
+  describe('isPlatformFeatureEnabled', () => {
+    it('is true only for explicit global override true', async () => {
+      const { isPlatformFeatureEnabled } = await import('./feature-flags.js')
+      const { getCache, setCache } = await import('./cache.js')
+      getCache.mockResolvedValue(null)
+      mockQuery.mockResolvedValueOnce({ rows: [{ global_override: true }] })
+      await expect(isPlatformFeatureEnabled('mobile_public_shop')).resolves.toBe(true)
+      expect(setCache).toHaveBeenCalledWith(
+        'ff:platform:mobile_public_shop',
+        { enabled: true },
+        180
+      )
+
+      getCache.mockResolvedValue(null)
+      mockQuery.mockResolvedValueOnce({ rows: [{ global_override: false }] })
+      await expect(isPlatformFeatureEnabled('mobile_public_shop')).resolves.toBe(false)
+
+      await expect(isPlatformFeatureEnabled('reports')).resolves.toBe(false)
+    })
   })
   describe('tenant override persistence', () => {
     it('upserts the override and invalidates both feature and entitlement caches', async () => {

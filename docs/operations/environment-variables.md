@@ -240,6 +240,12 @@ Access in code: `apps/web/src/lib/env.ts`.
 
 This is a build-time file path supplied by EAS, not an API or client-runtime variable. iOS device builds separately require a valid APNs key in EAS credentials.
 
+## Mobile platform feature flags (admin)
+
+| Feature key          | Used by                                         | Default                                         | Notes                                                                                                                                                                                                                                       |
+| -------------------- | ----------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mobile_public_shop` | Android + iOS Expo (`GET /api/public/features`) | Off (`global_override=false`, migration `0226`) | Admin → Features global toggle. Gates Login guest/shopper CTAs and CONSUMER Discover. Web public catalogs unaffected. See [GUEST_PUBLIC_SHOPPING.md](../mobile/GUEST_PUBLIC_SHOPPING.md) and [feature-flags.md](../admin/feature-flags.md). |
+
 ## Health endpoints
 
 | Route         | Response (preprod/prod)                                  |

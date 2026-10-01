@@ -26,6 +26,14 @@ Migration `0055_admin_feature_toggles.sql`:
 
 Canonical keys live in `apps/api/src/lib/feature-keys.js`.
 
+### Platform-only keys
+
+| Key                  | Default | Notes                                                                                                                        |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `mobile_public_shop` | Off     | Gates Expo guest browse + CONSUMER public shop. Not on tenant plans. Clients poll `GET /api/public/features`. Inherit = off. |
+
+Platform keys appear in Admin → Features global list (`platformOnly: true` in the API payload) and accept the same inherit / on / off modes; they never appear in per-tenant override maps.
+
 ## Admin API
 
 All routes require `ADMIN` role and `ADMIN_ACCESS` permission under `/api/admin-dashboard`.

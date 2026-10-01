@@ -12,6 +12,7 @@ import {
   listPublicSalesSuppliers,
   previewPublicOrder,
 } from '../services/public-sales.service.js'
+import { isPlatformFeatureEnabled } from '../lib/feature-flags.js'
 import { scheduleOrderPlacedNotification } from './orders/orders.helpers.js'
 import { sendTemplateEmail } from '../services/email/email.service.js'
 import { isWhatsAppConfigured, sendWhatsAppMessage } from '../services/whatsapp.service.js'
@@ -143,6 +144,20 @@ function sendError(res, req, error) {
     requestId: req.requestId,
   })
 }
+
+publicSalesRoutes.get('/features', async (req, res) => {
+  try {
+    const mobilePublicShop = await isPlatformFeatureEnabled('mobile_public_shop')
+    res.json({
+      ok: true,
+      data: { mobile_public_shop: mobilePublicShop },
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    sendError(res, req, error)
+  }
+})
 
 publicSalesRoutes.get('/suppliers', async (req, res) => {
   try {

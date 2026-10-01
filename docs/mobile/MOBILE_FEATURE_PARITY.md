@@ -2,6 +2,24 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-10-01 — Public shop / consumer account UX (admin feature flag)
+
+**Mobile impact:** Both Expo apps + API. New public contract + platform feature key.
+
+**Problem:** Login “Browse public catalogs” opened guest Discover with “Recent guest orders / Create account / No suppliers found”, which looks broken when no suppliers have public sales enabled and confuses B2B users.
+
+**Fix:**
+
+- Platform admin feature key `mobile_public_shop` (migration `0226`, default **off**). Toggle in Admin → Features (global on/off). Not a tenant plan key.
+- Unauthenticated `GET /api/public/features` returns `{ mobile_public_shop: boolean }`.
+- Mobile Login / CONSUMER Discover / guest CTAs read that flag (fail-closed). Removed `EXPO_PUBLIC_PUBLIC_SHOP_ENABLED`.
+- When off: Login is B2B sign-in only; CONSUMER sees “Shopping is not available” + Account.
+- When on: guest CTAs stay guest-only; Discovery empty/error copy explains public-sales enablement; `ConsumerAccountScreen` hardened (prefill, errors, address validation).
+
+Enable via Admin → Features → `mobile_public_shop` → On (after migrate). No app rebuild required for the toggle.
+
+---
+
 ## 2026-09-30 — Screen back affordance + receiving report create hardening
 
 **Mobile impact:** Both Expo apps + API.
@@ -1808,3 +1826,9 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Release follow-up:** physical-device validation of app links, sharing, location
   permission, SecureStore restoration, timeout retries, and notification opens remains
   manual. No new environment variable was introduced.
+
+## 2026-10-01 - 7addak stakeholder presentation (documentation-only)
+
+- Added a standalone, editable stakeholder presentation and print-ready PDF for the 7addak business concept.
+- This documentation-only deliverable does not change any API, authentication, RBAC, type, notification, feature-flag, runtime, or environment-variable contract.
+- No Android or iOS code update is required; this entry records the intentional mobile-parity exception.

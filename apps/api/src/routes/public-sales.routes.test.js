@@ -30,6 +30,9 @@ vi.mock('../lib/app-url.js', () => ({ buildAppUrl: (path) => `https://app.exampl
 vi.mock('../lib/rate-limit-store.js', () => ({ createRateLimitStore: vi.fn() }))
 vi.mock('../lib/logger.js', () => ({ logger: { error: vi.fn() } }))
 vi.mock('../config/env.js', () => ({ config: { RATE_LIMIT_ENABLED: false } }))
+vi.mock('../lib/feature-flags.js', () => ({
+  isPlatformFeatureEnabled: vi.fn(async () => false),
+}))
 
 const supplier = 'public-supplier'
 const productId = '11111111-1111-4111-8111-111111111111'
@@ -145,5 +148,13 @@ describe('public sales routes', () => {
     const res = await request(app).get(`/api/public/orders/${token}`).expect(200)
     expect(res.body.data).toEqual(order)
     expect(res.headers['cache-control']).toBe('no-store')
+  })
+
+  it('exposes mobile_public_shop from the platform feature flag', async () => {
+    const { isPlatformFeatureEnabled } = await import('../lib/feature-flags.js')
+    isPlatformFeatureEnabled.mockResolvedValueOnce(true)
+    const res = await request(app).get('/api/public/features').expect(200)
+    expect(res.body.data).toEqual({ mobile_public_shop: true })
+    expect(isPlatformFeatureEnabled).toHaveBeenCalledWith('mobile_public_shop')
   })
 })
