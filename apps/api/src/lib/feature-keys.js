@@ -64,6 +64,17 @@ export const SUPPLIER_FEATURE_KEYS = [
 
 export const ALL_FEATURE_KEYS = [...new Set([...RESTAURANT_FEATURE_KEYS, ...SUPPLIER_FEATURE_KEYS])]
 
+/**
+ * Platform-only admin toggles (not sold on tenant plans).
+ * Resolution is global_override only: explicit true enables; null/false/missing = off.
+ */
+export const PLATFORM_FEATURE_KEYS = ['mobile_public_shop']
+
+/** Keys admins can force on/off from Admin → Features (plans + platform). */
+export const ADMIN_GLOBAL_FEATURE_KEYS = [
+  ...new Set([...ALL_FEATURE_KEYS, ...PLATFORM_FEATURE_KEYS]),
+]
+
 /** Legacy / migration-only keys in DB JSON — verifier warns, does not fail. */
 export const KNOWN_EXTRA_FEATURE_KEYS = ['supplier_deals_redeem']
 
@@ -73,6 +84,10 @@ export function getAllowedFeatureKeys(tenantType) {
 
 export function isFeatureKeyAllowed(featureKey, tenantType) {
   return getAllowedFeatureKeys(tenantType).includes(featureKey)
+}
+
+export function isPlatformFeatureKey(featureKey) {
+  return PLATFORM_FEATURE_KEYS.includes(featureKey)
 }
 
 const DISPLAY_NAMES = {
@@ -111,6 +126,7 @@ const DISPLAY_NAMES = {
   intelligence: 'Operational intelligence',
   ai_assistant: 'Supplify AI Assistant',
   ai_platform: 'AI platform (Smart Reorder LLM)',
+  mobile_public_shop: 'Mobile public shop (guest + consumer catalogs)',
 }
 
 export function featureDisplayName(featureKey) {

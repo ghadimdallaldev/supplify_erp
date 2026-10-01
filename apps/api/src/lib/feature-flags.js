@@ -4,9 +4,12 @@ import { getCache, setCache, deleteCache, deleteCacheByPrefix } from './cache.js
 import { singleflight } from './singleflight.js'
 import {
   ALL_FEATURE_KEYS,
+  ADMIN_GLOBAL_FEATURE_KEYS,
+  PLATFORM_FEATURE_KEYS,
   featureDisplayName,
   getAllowedFeatureKeys,
   isFeatureKeyAllowed,
+  isPlatformFeatureKey,
 } from './feature-keys.js'
 
 const FF_CACHE_TTL = 180 // seconds
@@ -248,24 +251,41 @@ export async function listGlobalFeatureFlags() {
     if (error.code === '42P01') return []
     throw error
   }
-  return [...ALL_FEATURE_KEYS].sort().map((featureKey) => {
+  return [...ADMIN_GLOBAL_FEATURE_KEYS].sort().map((featureKey) => {
     const r = byKey.get(featureKey)
     return {
       featureKey,
       featureName: r?.feature_name ?? featureDisplayName(featureKey),
       description: r?.description ?? null,
-      /** null = inherit from each tenant's plan */
+      /** null = inherit from each tenant's plan (platform keys: inherit = off) */
       globalOverride: r ? r.global_override : null,
       updatedAt: r?.updated_at ? new Date(r.updated_at).toISOString() : null,
+      platformOnly: isPlatformFeatureKey(featureKey),
     }
   })
+}
+
+/**
+ * Platform flags ignore plans/tenant overrides: only explicit global true enables.
+ * @param {string} featureKey
+ * @returns {Promise<boolean>}
+ */
+export async function isPlatformFeatureEnabled(featureKey) {
+  if (!PLATFORM_FEATURE_KEYS.includes(featureKey)) return false
+  const cacheKey = `ff:platform:${featureKey}`
+  const cached = await getCache(cacheKey)
+  if (cached !== null) return Boolean(cached.enabled)
+  const globalRow = await getGlobalOverride(featureKey)
+  const enabled = globalRow?.global_override === true
+  await setCache(cacheKey, { enabled }, FF_CACHE_TTL).catch(() => {})
+  return enabled
 }
 
 /**
  * @param {'inherit'|'on'|'off'} mode
  */
 export async function setGlobalFeatureOverride(featureKey, mode) {
-  if (!ALL_FEATURE_KEYS.includes(featureKey)) {
+  if (!ADMIN_GLOBAL_FEATURE_KEYS.includes(featureKey)) {
     throw new Error(`Unknown feature key: ${featureKey}`)
   }
   const globalOverride =
