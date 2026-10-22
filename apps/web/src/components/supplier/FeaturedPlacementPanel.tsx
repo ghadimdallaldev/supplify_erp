@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   useGetFeaturedPlacementPackagesQuery,
   useGetMyFeaturedPlacementsQuery,
@@ -15,7 +14,6 @@ import { ensureNamespace } from '../../i18n'
 import { FeaturedPlacementPaymentDialog } from './FeaturedPlacementPaymentDialog'
 
 export function FeaturedPlacementPanel() {
-  const { t } = useTranslation('suppliers')
   const { data: packagesData, isLoading: packagesLoading } = useGetFeaturedPlacementPackagesQuery()
   const { data: mineData, isLoading: mineLoading, refetch } = useGetMyFeaturedPlacementsQuery()
   const [paymentSelection, setPaymentSelection] = useState<{ pkg?: any; placement?: any } | null>(

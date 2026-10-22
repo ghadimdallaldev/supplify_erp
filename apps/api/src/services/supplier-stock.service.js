@@ -210,6 +210,7 @@ export async function seedMissingWarehouseInventoryForSupplier(
     WHERE w.${supplierCol} = $1
       AND w.is_active = FALSE
       AND wi.product_id = ANY($2::uuid[])
+    FOR UPDATE OF wi
     `,
     [supplierId, missingIds]
   )
@@ -226,8 +227,6 @@ export async function seedMissingWarehouseInventoryForSupplier(
     current.warehouseIds.push(row.warehouse_id)
     inactiveByProduct.set(row.product_id, current)
   }
-
-  const { upsertWarehouseInventoryFromInventory } = await import('./supplier-inventory.service.js')
 
   let seeded = 0
   let transferredFromInactive = 0
@@ -256,12 +255,17 @@ export async function seedMissingWarehouseInventoryForSupplier(
       continue
     }
 
-    await upsertWarehouseInventoryFromInventory(client, {
-      warehouseId: targetWarehouseId,
-      productId: row.product_id,
-      availableQty: row.available_qty,
-      reservedQty: row.reserved_qty || 0,
-    })
+    // Insert only. ON CONFLICT DO UPDATE would copy a stale legacy quantity over a
+    // reservation another checkout already committed on this row.
+    const available = Number(row.available_qty) || 0
+    const reserved = Number(row.reserved_qty) || 0
+    await db(
+      `INSERT INTO warehouse_inventory (
+         warehouse_id, product_id, quantity_available, quantity_reserved, quantity_on_hand, updated_at
+       ) VALUES ($1, $2, $3, $4, $3, now())
+       ON CONFLICT (warehouse_id, product_id) DO NOTHING`,
+      [targetWarehouseId, row.product_id, available, reserved]
+    )
     seeded += 1
   }
 

@@ -171,7 +171,8 @@ export async function releaseInventoryForOrder(client, orderId) {
   // Restaurant cancel is blocked after SHIPPED; supplier decline on SHIPPED still hits this path.
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')`,
+     WHERE order_id = $1 AND status NOT IN ('delivered', 'failed', 'superseded')
+     FOR UPDATE`,
     [orderId]
   )
 
@@ -202,7 +203,8 @@ export async function releaseInventoryForOrder(client, orderId) {
 export async function commitDispatchInventoryForOrder(client, orderId) {
   const { rows: assignments } = await client.query(
     `SELECT * FROM order_warehouse_assignment
-     WHERE order_id = $1 AND status NOT IN ('dispatched', 'delivered', 'failed', 'superseded')`,
+     WHERE order_id = $1 AND status NOT IN ('dispatched', 'delivered', 'failed', 'superseded')
+     FOR UPDATE`,
     [orderId]
   )
 

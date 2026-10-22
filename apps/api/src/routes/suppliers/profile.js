@@ -4,6 +4,7 @@ import {
   requireRole,
   optionalAuth,
   resolveTenantContext,
+  resolveAdminContext,
   requirePermission,
   requireAnyPermission,
   getSupplierIdForRequest,
@@ -593,6 +594,8 @@ router.post(
   '/featured-placement/:id/refund',
   requireAuth,
   requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_FINANCE'),
   async (req, res, next) => {
     try {
       const result = await refundFeaturedPlacement({
@@ -611,6 +614,8 @@ router.get(
   '/featured-placement/admin/active',
   requireAuth,
   requireRole(['ADMIN']),
+  resolveAdminContext,
+  requireAnyPermission('ADMIN_GROWTH', 'ADMIN_FINANCE'),
   async (req, res, next) => {
     try {
       const placements = await listFeaturedPlacementsForAdmin()
@@ -625,6 +630,8 @@ router.post(
   '/featured-placement/:id/approve',
   requireAuth,
   requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_GROWTH'),
   async (req, res, next) => {
     try {
       const result = await approveFeaturedPlacement({
@@ -642,6 +649,8 @@ router.post(
   '/featured-placement/:id/reject',
   requireAuth,
   requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_GROWTH'),
   async (req, res, next) => {
     try {
       const result = await rejectFeaturedPlacement({

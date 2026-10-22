@@ -7,6 +7,22 @@ import {
 } from './subscription.js'
 
 /**
+ * Reserve a conservative number of bytes when a client omits the optional
+ * size. The upload session enforces the same ceiling, so callers cannot obtain
+ * an unmetered max-size capability by sending zero or leaving fileSize out.
+ */
+export function resolveStorageReservationBytes(sizeBytes, maxBytes) {
+  const parsedSize = Number(sizeBytes)
+  const parsedMax = Number(maxBytes)
+  if (!Number.isSafeInteger(parsedMax) || parsedMax <= 0) {
+    throw new TypeError('maxBytes must be a positive safe integer')
+  }
+  return Number.isSafeInteger(parsedSize) && parsedSize > 0
+    ? Math.min(parsedSize, parsedMax)
+    : parsedMax
+}
+
+/**
  * Resolve tenant from request and meter file bytes against storage_mb.
  * @param {import('express').Request} req
  * @param {number} sizeBytes

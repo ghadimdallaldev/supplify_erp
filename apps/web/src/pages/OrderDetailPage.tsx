@@ -10,7 +10,6 @@ import {
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
   useGetMyReviewsQuery,
-  useGetOrderTrackingQuery,
 } from '../services/api'
 import { isEntitlementFeatureEnabled, featureEnabled } from '../lib/planLimits'
 import { isOrderEligibleForReview } from '../lib/orderReviewEligibility'
@@ -73,9 +72,6 @@ export function OrderDetailPage() {
   }, [tabFromUrl])
 
   const { data, isLoading, error, refetch } = useGetOrderQuery(id!)
-  const { data: trackingData } = useGetOrderTrackingQuery(id!, {
-    skip: !id || !isSupplier,
-  })
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const disputesEnabled = isEntitlementFeatureEnabled(
     entitlementsData?.entitlements,
