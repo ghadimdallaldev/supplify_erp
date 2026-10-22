@@ -36,7 +36,8 @@ describe('seedMissingWarehouseInventoryForSupplier', () => {
         .mockResolvedValueOnce({
           rows: [{ product_id: 'p-1', available_qty: 12, reserved_qty: 1 }],
         })
-        .mockResolvedValueOnce({ rows: [] }),
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 }),
     }
 
     const result = await seedMissingWarehouseInventoryForSupplier('sup-1', 'wh-default', {
@@ -45,12 +46,12 @@ describe('seedMissingWarehouseInventoryForSupplier', () => {
     })
 
     expect(result.seeded).toBe(1)
-    expect(upsertWarehouseInventoryFromInventory).toHaveBeenCalledWith(client, {
-      warehouseId: 'wh-default',
-      productId: 'p-1',
-      availableQty: 12,
-      reservedQty: 1,
-    })
+    expect(upsertWarehouseInventoryFromInventory).not.toHaveBeenCalled()
+    const insert = client.query.mock.calls.find((call) =>
+      String(call[0]).includes('INSERT INTO warehouse_inventory')
+    )
+    expect(String(insert[0])).toMatch(/ON CONFLICT \(warehouse_id, product_id\) DO NOTHING/)
+    expect(insert[1]).toEqual(['wh-default', 'p-1', 12, 1])
   })
 
   it('transfers inactive warehouse stock to target instead of using legacy', async () => {

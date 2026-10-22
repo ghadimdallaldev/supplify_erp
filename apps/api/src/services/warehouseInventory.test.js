@@ -82,6 +82,10 @@ describe('warehouseInventory', () => {
     expect(client.query).toHaveBeenCalledWith(expect.stringContaining("SET status = 'failed'"), [
       'order-1',
     ])
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringMatching(/FROM order_warehouse_assignment[\s\S]*FOR UPDATE/),
+      ['order-1']
+    )
   })
 
   it('does not release a line twice when a whole-order leg and an item leg both exist', async () => {

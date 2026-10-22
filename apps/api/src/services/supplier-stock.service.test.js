@@ -17,6 +17,7 @@ vi.mock('../lib/warehouse-helpers.js', () => ({
 
 import {
   overlayProductRowsWithAuthoritativeStock,
+  seedMissingWarehouseInventoryForSupplier,
   supplierUsesWarehouseInventory,
 } from './supplier-stock.service.js'
 
@@ -72,5 +73,34 @@ describe('supplier stock source of truth', () => {
       { id: 'a', supplier_id: 's1', available_qty: 7 },
       { id: 'b', supplier_id: 's1', available_qty: 0 },
     ])
+  })
+
+  it('heals a missing warehouse row without overwriting a concurrent reservation', async () => {
+    const calls = []
+    const client = {
+      query: vi.fn(async (sql) => {
+        const text = String(sql)
+        calls.push(text)
+        if (text.includes('NOT EXISTS')) {
+          return { rows: [{ product_id: 'p1', available_qty: 10, reserved_qty: 1 }] }
+        }
+        if (text.includes('is_active = FALSE')) {
+          return { rows: [] }
+        }
+        return { rows: [], rowCount: 0 }
+      }),
+    }
+
+    const result = await seedMissingWarehouseInventoryForSupplier('supplier-1', 'wh-1', {
+      client,
+      productIds: ['p1'],
+    })
+
+    expect(result.seeded).toBe(1)
+    const inactiveLock = calls.find((sql) => sql.includes('is_active = FALSE'))
+    expect(inactiveLock).toMatch(/FOR UPDATE OF wi/)
+    const insert = calls.find((sql) => sql.includes('INSERT INTO warehouse_inventory'))
+    expect(insert).toMatch(/ON CONFLICT \(warehouse_id, product_id\) DO NOTHING/)
+    expect(insert).not.toMatch(/DO UPDATE SET/)
   })
 })

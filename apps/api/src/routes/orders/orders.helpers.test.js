@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { buildOrderCustomerContract, orderListSchema } from './orders.helpers.js'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  buildOrderCustomerContract,
+  markLegacyOrderDelivered,
+  orderListSchema,
+} from './orders.helpers.js'
 
 describe('orderListSchema includeItems default', () => {
   it('defaults includeItems to false when omitted', () => {
@@ -15,6 +19,54 @@ describe('orderListSchema includeItems default', () => {
   it('parses includeItems=false when explicitly false', () => {
     const parsed = orderListSchema.parse({ includeItems: 'false' })
     expect(parsed.includeItems).toBe(false)
+  })
+})
+
+describe('markLegacyOrderDelivered', () => {
+  it('rejects a cancelled order and does not write DELIVERED', async () => {
+    const query = vi.fn(async (sql) => {
+      if (String(sql).includes('FOR UPDATE')) {
+        return { rows: [{ id: 'order-1', status: 'CANCELLED' }] }
+      }
+      return { rows: [], rowCount: 1 }
+    })
+
+    await expect(markLegacyOrderDelivered({ query }, 'order-1')).rejects.toThrow(
+      /Cannot change order status from CANCELLED/
+    )
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a shipped order delivered only while that status is still locked', async () => {
+    const query = vi.fn(async (sql) => {
+      if (String(sql).includes('FOR UPDATE')) {
+        return {
+          rows: [{ id: 'order-1', status: 'SHIPPED', requested_delivery_method: 'DELIVERY' }],
+        }
+      }
+      expect(String(sql)).toContain('AND status = $2')
+      return { rows: [], rowCount: 1 }
+    })
+
+    const order = await markLegacyOrderDelivered({ query }, 'order-1')
+    expect(order.status).toBe('DELIVERED')
+    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining('AND status = $2'), [
+      'order-1',
+      'SHIPPED',
+    ])
+  })
+
+  it('fails closed when the conditional update loses the race', async () => {
+    const query = vi.fn(async (sql) => {
+      if (String(sql).includes('FOR UPDATE')) {
+        return { rows: [{ id: 'order-1', status: 'SHIPPED' }] }
+      }
+      return { rows: [], rowCount: 0 }
+    })
+
+    await expect(markLegacyOrderDelivered({ query }, 'order-1')).rejects.toThrow(
+      /Order state changed/
+    )
   })
 })
 

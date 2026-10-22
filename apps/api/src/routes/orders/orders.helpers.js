@@ -44,6 +44,7 @@ import {
   orderHasProofOfDelivery,
 } from '../../lib/driver-delivery.js'
 import { assertPodPresentWhenRequired } from '../../lib/pod-requirement.js'
+import { assertValidOrderStatusTransition } from '../../lib/order-status-transitions.js'
 import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
@@ -607,23 +608,44 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
 
 // Legacy COMPLETED status: mark DELIVERED only. Restaurant inventory and invoices
 // are applied exclusively via receiving (prevents double-count if receive also runs).
-async function handleOrderDelivery(orderId, userData, res, req, previousStatus = null) {
+/**
+ * Lock the order and refuse legacy COMPLETED → DELIVERED unless it is still SHIPPED.
+ * The caller checks status before the transaction; a concurrent cancel can commit
+ * first. This re-reads under FOR UPDATE and updates only that locked status.
+ */
+export async function markLegacyOrderDelivered(client, orderId) {
+  const { rows: orders } = await client.query(
+    `SELECT * FROM customer_order WHERE id = $1 FOR UPDATE`,
+    [orderId]
+  )
+  if (orders.length === 0) throw new NotFoundError('Order not found')
+
+  const order = orders[0]
+  assertValidOrderStatusTransition({
+    role: 'SUPPLIER',
+    from: order.status,
+    to: 'DELIVERED',
+    legacyCompleted: true,
+  })
+
+  const updated = await client.query(
+    `UPDATE customer_order
+     SET status = 'DELIVERED', updated_at = now()
+     WHERE id = $1 AND status = $2`,
+    [orderId, order.status]
+  )
+  if (!updated.rowCount) {
+    throw new ValidationError('Order state changed; refresh and retry')
+  }
+  order.status = 'DELIVERED'
+  return order
+}
+
+async function handleOrderDelivery(orderId, userData, res, req, _previousStatus = null) {
   try {
     const result = await withTransaction(async (client) => {
-      // Get order first
-      const { rows: orders } = await client.query(
-        `
-        SELECT * FROM customer_order WHERE id = $1
-      `,
-        [orderId]
-      )
-
-      if (orders.length === 0) {
-        throw new NotFoundError('Order not found')
-      }
-
-      const order = orders[0]
-      const fromStatus = previousStatus || order.status
+      const order = await markLegacyOrderDelivered(client, orderId)
+      const fromStatus = 'SHIPPED'
 
       const supplierId = await getSupplierIdForRequest(req)
       if (!supplierId) {
@@ -654,6 +676,19 @@ async function handleOrderDelivery(orderId, userData, res, req, previousStatus =
 
       const isPickup = String(order.requested_delivery_method || '').toUpperCase() === 'PICKUP'
       if (!isPickup) {
+        const { rows: activeAssign } = await client.query(
+          `SELECT id FROM driver_assignments
+           WHERE order_id = $1
+             AND status IN ('assigned', 'picked_up', 'out_for_delivery')
+           LIMIT 1
+           FOR UPDATE`,
+          [orderId]
+        )
+        if (!activeAssign.length) {
+          throw new ValidationError(
+            'Assign a driver before marking this order shipped or delivered.'
+          )
+        }
         await assertPodPresentWhenRequired({
           supplierId,
           orderId,
@@ -661,17 +696,6 @@ async function handleOrderDelivery(orderId, userData, res, req, previousStatus =
           dbQuery: (text, params) => client.query(text, params),
         })
       }
-
-      // Mark order as DELIVERED; restaurant inventory updates only on receiving
-      await client.query(
-        `
-        UPDATE customer_order 
-        SET status = 'DELIVERED', updated_at = now()
-        WHERE id = $1
-      `,
-        [orderId]
-      )
-      order.status = 'DELIVERED'
 
       if (!isPickup) {
         await client.query(
