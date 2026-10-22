@@ -13,16 +13,25 @@ vi.mock('../../lib/db.js', () => {
 })
 
 vi.mock('../../lib/rbac.js', async (importOriginal) => {
+  const actual = await importOriginal()
   const { loadRbacRouteMock } = await import('../../test/rbac-route-mock.js')
-  return loadRbacRouteMock(importOriginal, {
+  return loadRbacRouteMock(async () => actual, {
     resolveTenantContext: (req, res, next) => {
       req.tenantContext = req.tenantContext || {
-        permissions: ['SETTINGS_VIEW'],
+        permissions: ['SETTINGS_VIEW', 'SETTINGS_EDIT'],
         tenantId: 'supplier-1',
         tenantType: 'SUPPLIER',
       }
       next()
     },
+    resolveAdminContext: (req, res, next) => {
+      req.adminContext = {
+        permissions: req.userData?.adminPermissions || [],
+      }
+      next()
+    },
+    requirePermission: actual.requirePermission,
+    requireAnyPermission: actual.requireAnyPermission,
     getSupplierIdForRequest: vi.fn().mockResolvedValue('supplier-1'),
   })
 })
@@ -69,6 +78,49 @@ describe('Supplier profile routes', () => {
       next()
     })
     app.use('/api/suppliers', profileRouter)
+  })
+
+  function createAdminApp(adminPermissions) {
+    const adminApp = express()
+    adminApp.use(express.json())
+    adminApp.use((req, res, next) => {
+      req.requestId = 'test-request-id'
+      req.userData = { id: 'admin-1', role: 'ADMIN', adminPermissions }
+      next()
+    })
+    adminApp.use('/api/suppliers', profileRouter)
+    return adminApp
+  }
+
+  describe('featured placement admin permissions', () => {
+    it('denies the placement queue without growth or finance permission', async () => {
+      const response = await request(createAdminApp(['ADMIN_ACCESS']))
+        .get('/api/suppliers/featured-placement/admin/active')
+        .expect(403)
+
+      expect(response.body.error.message).toContain('ADMIN_GROWTH')
+      expect(db.query).not.toHaveBeenCalled()
+    })
+
+    it('denies approval without ADMIN_GROWTH', async () => {
+      const response = await request(createAdminApp(['ADMIN_FINANCE']))
+        .post('/api/suppliers/featured-placement/placement-1/approve')
+        .send({})
+        .expect(403)
+
+      expect(response.body.error.message).toContain('ADMIN_GROWTH')
+      expect(db.query).not.toHaveBeenCalled()
+    })
+
+    it('denies an explicit refund without ADMIN_FINANCE', async () => {
+      const response = await request(createAdminApp(['ADMIN_GROWTH']))
+        .post('/api/suppliers/featured-placement/placement-1/refund')
+        .send({ reason: 'test' })
+        .expect(403)
+
+      expect(response.body.error.message).toContain('ADMIN_FINANCE')
+      expect(db.query).not.toHaveBeenCalled()
+    })
   })
 
   describe('GET /api/suppliers/me', () => {

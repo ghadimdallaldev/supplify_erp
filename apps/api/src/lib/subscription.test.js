@@ -91,7 +91,9 @@ describe('Subscription lib', () => {
           plan: { rows: [{ id: 'plan-free', name: 'Free', code: 'free' }] },
           fullSub: () => {
             fullSubCalls += 1
-            if (fullSubCalls === 1) return { rows: [] }
+            // Live rows and commercial grace rows are both checked before a
+            // missing tenant subscription is created.
+            if (fullSubCalls <= 2) return { rows: [] }
             return {
               rows: [
                 subscriptionRow({

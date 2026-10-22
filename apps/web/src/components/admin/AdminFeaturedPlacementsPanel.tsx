@@ -12,15 +12,23 @@ import { Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { usePermissions } from '../../hooks/usePermissions'
 
 export function AdminFeaturedPlacementsPanel() {
   const { t } = useTranslation('admin')
-  const { data, isLoading, refetch } = useGetAdminFeaturedPlacementsQuery()
+  const { can } = usePermissions()
+  const canReview = can('ADMIN_GROWTH')
+  const canRefund = can('ADMIN_FINANCE')
+  const { data, isLoading, refetch } = useGetAdminFeaturedPlacementsQuery(undefined, {
+    skip: !canReview && !canRefund,
+  })
   const [refundFeatured] = useRefundFeaturedPlacementMutation()
   const [approveFeatured] = useApproveFeaturedPlacementMutation()
   const [rejectFeatured] = useRejectFeaturedPlacementMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
   const placements = data?.placements ?? []
+
+  if (!canReview && !canRefund) return null
 
   const handleRefund = async (id: string) => {
     setBusyId(id)
@@ -87,7 +95,8 @@ export function AdminFeaturedPlacementsPanel() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant="outline">{p.pricing_key}</Badge>
-                  {p.status === 'pending' &&
+                  {canReview &&
+                  p.status === 'pending' &&
                   (p.payment_status === 'paid' || p.payment_status === 'waived') ? (
                     <>
                       <Button
@@ -110,7 +119,7 @@ export function AdminFeaturedPlacementsPanel() {
                         {t('placements.reject')}
                       </Button>
                     </>
-                  ) : p.status === 'active' ? (
+                  ) : canRefund && p.status === 'active' ? (
                     <Button
                       size="sm"
                       variant="outline"

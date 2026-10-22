@@ -17,6 +17,10 @@ vi.mock('../lib/background-write-locks.js', () => ({
   isTenantUnlockedForBackgroundWrites: vi.fn(),
 }))
 
+vi.mock('../lib/org-billing-tenant.js', () => ({
+  resolveOrgBillingTenantId: vi.fn(async (tenantId) => tenantId),
+}))
+
 describe('checkOverdueInvoices', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -35,6 +39,7 @@ describe('checkOverdueInvoices', () => {
           { id: 'inv-2', restaurant_id: 'r2', supplier_id: 's2' },
         ],
       })
+      .mockResolvedValueOnce({ rows: [{ restaurant_ok: true, supplier_ok: true }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -48,7 +53,7 @@ describe('checkOverdueInvoices', () => {
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [{ id: 'inv-1' }] })
+      .mockResolvedValueOnce({ rows: [{ restaurant_ok: true, supplier_ok: true }] })
       .mockResolvedValueOnce({ rows: [] })
 
     const result = await checkOverdueInvoices()
@@ -56,9 +61,9 @@ describe('checkOverdueInvoices', () => {
     expect(result.notified).toBe(1)
     expect(result.skippedLocked).toBe(0)
     expect(notifyInvoiceOverdue).toHaveBeenCalledOnce()
-    expect(String(query.mock.calls[0][0])).toContain('sub.account_locked_at IS NULL')
-    expect(String(query.mock.calls[0][0])).toContain('sub.tenant_id = invoice.supplier_id')
-    expect(String(query.mock.calls[0][0])).toContain('sub.tenant_id = invoice.restaurant_id')
+    expect(String(query.mock.calls[1][0])).toContain('sub.account_locked_at IS NULL')
+    expect(String(query.mock.calls[1][0])).toContain('SUPPLIER')
+    expect(String(query.mock.calls[1][0])).toContain('RESTAURANT')
     expect(String(query.mock.calls[0][0])).toContain('AT TIME ZONE')
     expect(String(query.mock.calls[0][0])).toContain('r.timezone')
   })
@@ -70,12 +75,13 @@ describe('checkOverdueInvoices', () => {
     query.mockResolvedValueOnce({
       rows: [{ id: 'inv-locked', restaurant_id: 'rest-locked', supplier_id: 'supplier-1' }],
     })
+    query.mockResolvedValueOnce({ rows: [{ restaurant_ok: true, supplier_ok: true }] })
     isTenantUnlockedForBackgroundWrites.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     const result = await checkOverdueInvoices()
 
     expect(result).toEqual({ processed: 1, notified: 0, skippedLocked: 1 })
-    expect(query).toHaveBeenCalledTimes(1)
+    expect(query).toHaveBeenCalledTimes(2)
     expect(notifyInvoiceOverdue).not.toHaveBeenCalled()
   })
 })

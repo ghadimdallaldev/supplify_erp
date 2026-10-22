@@ -136,6 +136,8 @@ Permission codes are string enums used in code and DB. `*_MANAGE` implies all ac
 - Grant/revoke org branch access and unlink require the branch tenant to belong to the caller organization. Warehouse routing simulate product lookups are supplier-scoped.
 - Branch invitation APIs (`/api/org/invitations`, `/api/restaurants/invitations/branches`) require impersonation for admins. A `?organization_id=` that does not match the impersonated tenant returns 400. Unscoped `ADMIN_TENANTS` query overrides are not allowed.
 - Platform support chat (`GET /api/chat/admin/conversations`, admin-join, start-conversation) requires `ADMIN_SUPPORT`. Socket chat does not grant unscoped ADMIN access to marketplace threads; support threads also require `ADMIN_SUPPORT`.
+- Platform tenant creation (`POST /api/restaurants`, `POST /api/suppliers`) requires an ADMIN identity with resolved admin context and `ADMIN_TENANTS`; the coarse ADMIN role alone is insufficient.
+- Featured-placement review actions require `ADMIN_GROWTH`. Explicit placement refunds require `ADMIN_FINANCE`. The web operations panel hides review/refund controls unless the matching permission is present.
 
 ## Database
 

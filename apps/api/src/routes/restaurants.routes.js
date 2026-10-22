@@ -649,73 +649,80 @@ router.get(
   }
 )
 
-// Create restaurant (admin only)
-router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const restaurantData = restaurantCreateSchema.parse(req.body)
+// Create restaurant (tenant admins only)
+router.post(
+  '/',
+  requireAuth,
+  requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_TENANTS'),
+  async (req, res) => {
+    try {
+      const restaurantData = restaurantCreateSchema.parse(req.body)
 
-    const businessType = restaurantData.businessType
-      ? normalizeBusinessType(restaurantData.businessType) || restaurantData.businessType
-      : null
+      const businessType = restaurantData.businessType
+        ? normalizeBusinessType(restaurantData.businessType) || restaurantData.businessType
+        : null
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       INSERT INTO restaurant (name, slug, trade_license_no, contact_email, phone, business_type, address_json)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `,
-      [
-        restaurantData.name,
-        restaurantData.slug,
-        restaurantData.tradeLicenseNo,
-        restaurantData.contactEmail,
-        restaurantData.phone,
-        businessType,
-        restaurantData.address ? JSON.stringify(restaurantData.address) : null,
-      ]
-    )
+        [
+          restaurantData.name,
+          restaurantData.slug,
+          restaurantData.tradeLicenseNo,
+          restaurantData.contactEmail,
+          restaurantData.phone,
+          businessType,
+          restaurantData.address ? JSON.stringify(restaurantData.address) : null,
+        ]
+      )
 
-    await createPendingActivationSubscription(query, rows[0].id, 'RESTAURANT', 'free')
-    await ensureTenantSystemRoles(rows[0].id, 'RESTAURANT')
+      await createPendingActivationSubscription(query, rows[0].id, 'RESTAURANT', 'free')
+      await ensureTenantSystemRoles(rows[0].id, 'RESTAURANT')
 
-    logger.info('Restaurant created', {
-      restaurantId: rows[0].id,
-      name: rows[0].name,
-      actor: req.userData.id,
-    })
+      logger.info('Restaurant created', {
+        restaurantId: rows[0].id,
+        name: rows[0].name,
+        actor: req.userData.id,
+      })
 
-    res.status(201).json({
-      ok: true,
-      data: { restaurant: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(201).json({
+        ok: true,
+        data: { restaurant: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid restaurant data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Create restaurant error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid restaurant data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to create restaurant',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Create restaurant error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create restaurant',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 // Upload restaurant logo when custom branding is available
 router.post(

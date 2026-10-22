@@ -42,6 +42,10 @@ vi.mock('../services/storage/upload-security.service.js', () => ({
 
 vi.mock('../lib/storage-upload.js', () => ({
   meterStorageFromRequest: vi.fn().mockResolvedValue({ ok: true }),
+  resolveStorageReservationBytes: (sizeBytes, maxBytes) =>
+    Number.isSafeInteger(Number(sizeBytes)) && Number(sizeBytes) > 0
+      ? Math.min(Number(sizeBytes), Number(maxBytes))
+      : Number(maxBytes),
 }))
 const createPresignedUploadMock = vi.fn()
 const updateDeliveryStatusMock = vi.fn()
@@ -92,6 +96,7 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
 })
 
 import { assertDriverAssignmentAccess } from '../lib/driver-rbac.js'
+import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import { ordersRoutes } from './orders.routes.js'
 
 describe('driver order delivery routes without ORDERS_VIEW', () => {
@@ -137,6 +142,18 @@ describe('driver order delivery routes without ORDERS_VIEW', () => {
     expect(res.body.data.presignedUrl).toContain('/api/files/upload/')
     expect(createPresignedUploadMock).toHaveBeenCalledWith(
       expect.objectContaining({ useApiUpload: true, fileSize: 123, fileType: 'image/jpeg' })
+    )
+  })
+
+  it('reserves the server maximum when POD fileSize is omitted', async () => {
+    await request(app)
+      .post('/api/orders/order-1/proof-of-delivery/presign')
+      .send({ fileName: 'proof.jpg', fileType: 'image/jpeg' })
+      .expect(200)
+
+    expect(meterStorageFromRequest).toHaveBeenCalledWith(expect.anything(), 10 * 1024 * 1024)
+    expect(createPresignedUploadMock).toHaveBeenCalledWith(
+      expect.objectContaining({ fileSize: 10 * 1024 * 1024 })
     )
   })
   it('allows POST location with driver-only permissions', async () => {

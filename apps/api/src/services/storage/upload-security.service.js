@@ -400,7 +400,8 @@ export async function assertCleanUploadOwnership(
   { userId, tenantId = null, tenantType = null }
 ) {
   const { rows } = await query(
-    `SELECT fus.destination_key, fus.tenant_id, fus.tenant_type, fss.sha256,
+    `SELECT fus.destination_key, fus.tenant_id, fus.tenant_type,
+            fus.content_type, fus.max_bytes, fss.sha256,
             fss.stored_etag, fss.stored_version_id
      FROM file_upload_session fus
      JOIN file_security_scan fss ON fss.upload_session_id = fus.id

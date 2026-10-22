@@ -97,22 +97,23 @@ Legacy env aliases: `S3_*`, Railway `BUCKET` / `ENDPOINT`, and AWS SDK names map
    - Types: `image/jpeg`, `image/png`, `image/webp`, `application/pdf`
    - Max size: **10 MB**
    - Filename sanitization
-   - Plan **storage_mb** quota ([`storage-upload.js`](../../apps/api/src/lib/storage-upload.js)) when `fileSize` is provided (skipped for `ADMIN`)
+   - Plan **storage_mb** quota ([`storage-upload.js`](../../apps/api/src/lib/storage-upload.js)); a positive declared `fileSize` reserves that amount, while an omitted or zero size conservatively reserves the full 10 MiB session ceiling (skipped for `ADMIN`)
 3. API creates a short-lived, single-use database session and returns `presignedUrl`, `url`, `publicUrl`, `fileKey`; both upload URL fields are gateway URLs.
 4. Client sends an authenticated `PUT` with the exact `Content-Type`. Web includes credentials; mobile includes the bearer and active-tenant tokens.
-5. Gateway spools bytes in a private `0700` directory, scans them with ClamAV before parsing or optimization, validates magic signatures/CSV text, then writes private storage. If ClamAV cannot be reached for that file, a magic-byte-valid upload is still stored and marked `scan_unavailable` so delivery proof can finish. Infected files are still rejected and are not stored.
+5. Gateway spools bytes in a private `0700` directory, scans them with ClamAV before parsing or optimization, validates magic signatures/CSV text, then writes private storage. If ClamAV cannot be reached for that file, a magic-byte-valid upload is still stored and marked `scan_unavailable` so delivery proof can finish. Infected files are still rejected and are not stored. Migration `0227_allow_scan_unavailable_file_status.sql` must be applied before deploying this runtime state.
 6. Feature persists the reference:
    - **Chat** → `message_attachment.file_url` ([`ChatPage`](../../apps/web/src/pages/ChatPage.tsx))
    - **Products** → `POST /api/files/product/:productId/attach`
    - **Logos / onboarding / settings** → tenant/org logo URL ([`LogoUpload.tsx`](../../apps/web/src/components/LogoUpload.tsx))
    - **Disputes** → `dispute_attachments.file_key`
 
-**Ownership:** attach/import/POD/dispute-attachment endpoints require a completed database session owned by the authenticated user and tenant, with scan status `clean` or `scan_unavailable`. Prefix checks remain defense in depth.
+**Ownership:** attach/import/POD/dispute-attachment endpoints require a completed database session owned by the authenticated user and tenant, with scan status `clean` or `scan_unavailable`. Prefix checks remain defense in depth. Product attachment type and reserved size are read from that server-owned upload session; client-supplied type, size, or metering flags are not authoritative.
 
 ### Security controls
 
 - Normal uploads are capped at 10 MiB. ZIP uploads have a hard 100 MiB cap, plus entry-count, aggregate expansion, path-depth, per-entry, and extraction-time limits.
 - A session can be claimed once. Replays with a different SHA-256 are rejected, while an identical completed retry is idempotent. Destination keys are unique to prevent an upload session from overwriting another session's object.
+- Unknown or zero client sizes do not create an unmetered upload capability: normal and POD presign routes reserve the full server ceiling, and the gateway enforces the same ceiling.
 - Hosted startup fails closed if ClamAV is unavailable, bypass is enabled, scanner configuration is missing, S3 public-access verification is unsupported, or a bucket ACL/policy/public-access-block check is unsafe. Railway Storage is a documented private-only provider; its empty public-access-block response is accepted only for `storageapi.dev` / `storage.railway.app` endpoints when `STORAGE_PUBLIC_READ=false` and no public ACL or policy is reported. Generic S3 still requires all four public-access-block flags.
 - Legacy objects are scanned on their first authorized API read under a PostgreSQL advisory lock. A clean verdict is accepted only for the exact SHA-256/ETag/version returned by storage.
 - Logs redact upload tokens, signed object parameters, file keys, URLs, storage endpoints, bucket names, and authorization values.
@@ -196,4 +197,4 @@ Or use full Docker (`pnpm dev:docker`) for MinIO + `STORAGE_DRIVER=s3` automatic
 
 ## POD binary upload contract (2026-09-18)
 
-POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. Web, Android, and iOS upload through the authenticated API gateway. ClamAV rejection asks for a replacement photo. A scanner outage still accepts a magic-byte-valid photo so the driver can mark the order delivered; the scan row is `scan_unavailable`, not `clean`. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed. Mobile sends the photo as raw file bytes.
+POD presigning accepts JPEG, PNG, or WebP files up to 10 MB and validates the MIME type, extension, and declared size. If size is omitted or zero, quota enforcement reserves the full 10 MiB ceiling. Web, Android, and iOS upload through the authenticated API gateway. ClamAV rejection asks for a replacement photo. A scanner outage still accepts a magic-byte-valid photo so the driver can mark the order delivered; the scan row is `scan_unavailable`, not `clean`. Proof submission is idempotent per order and must remain proof-first before a delivered status is confirmed. Mobile sends the photo as raw file bytes.

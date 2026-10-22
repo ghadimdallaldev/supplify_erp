@@ -1,7 +1,7 @@
 import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ALL_FEATURE_KEYS } from '../lib/feature-keys.js'
+import { ADMIN_GLOBAL_FEATURE_KEYS } from '../lib/feature-keys.js'
 
 vi.mock('../lib/db.js', () => ({
   query: vi.fn(),
@@ -9,6 +9,12 @@ vi.mock('../lib/db.js', () => ({
 }))
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}))
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+  deleteCache: vi.fn().mockResolvedValue(undefined),
+  deleteCacheByPrefix: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => next(),
@@ -1001,7 +1007,7 @@ describe('Admin Dashboard Routes', () => {
       const res = await request(app).get('/api/admin-dashboard/feature-flags').expect(200)
 
       expect(res.body.ok).toBe(true)
-      expect(res.body.data.flags).toHaveLength(ALL_FEATURE_KEYS.length)
+      expect(res.body.data.flags).toHaveLength(ADMIN_GLOBAL_FEATURE_KEYS.length)
       const reports = res.body.data.flags.find((f) => f.featureKey === 'reports')
       expect(reports.featureName).toBe('Reports')
       expect(reports.globalOverride).toBe(null)

@@ -23,7 +23,7 @@ function setObjectCorsHeaders(req, res) {
   }
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
 }
-import { meterStorageFromRequest } from '../lib/storage-upload.js'
+import { meterStorageFromRequest, resolveStorageReservationBytes } from '../lib/storage-upload.js'
 import {
   sanitizeUploadFileName,
   assertFileExtensionMatchesMime,
@@ -274,14 +274,16 @@ router.post(
       // Validate file size (10MB max)
       if (
         fileSize != null &&
-        (!Number.isSafeInteger(Number(fileSize)) || Number(fileSize) > MAX_UPLOAD_BYTES)
+        (!Number.isSafeInteger(Number(fileSize)) ||
+          Number(fileSize) < 0 ||
+          Number(fileSize) > MAX_UPLOAD_BYTES)
       ) {
         return res.status(400).json({
           ok: false,
           data: null,
           error: {
             name: 'VALIDATION_ERROR',
-            message: 'File size too large (max 10MB)',
+            message: 'File size must be an integer between 0 and 10MB',
           },
           requestId: req.requestId,
         })
@@ -304,18 +306,8 @@ router.post(
       }
 
       const sizeBytes = fileSize ? Number(fileSize) : 0
-      if (sizeBytes > MAX_UPLOAD_BYTES) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'File size too large (max 10MB)',
-          },
-          requestId: req.requestId,
-        })
-      }
-      const storageMeter = await meterStorageFromRequest(req, sizeBytes)
+      const reservationBytes = resolveStorageReservationBytes(sizeBytes, MAX_UPLOAD_BYTES)
+      const storageMeter = await meterStorageFromRequest(req, reservationBytes)
       if (!storageMeter.ok) {
         return res.status(storageMeter.status).json({
           ok: false,
@@ -329,7 +321,7 @@ router.post(
       const tenant = await getRequestTenant(req)
       const { presignedUrl, publicUrl } = await createPresignedUpload({
         fileKey,
-        fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
+        fileSize: reservationBytes,
         fileType,
         userId: req.userData.id,
         tenantId: tenant?.tenantId || null,
@@ -351,7 +343,7 @@ router.post(
           fileKey,
           fileName,
           fileType,
-          storageMetered: sizeBytes > 0,
+          storageMetered: true,
         },
         error: null,
         requestId: req.requestId,
@@ -387,7 +379,7 @@ router.post(
   async (req, res) => {
     try {
       const { productId } = req.params
-      const { fileKey, fileName, fileType, fileSize } = req.body
+      const { fileKey, fileName } = req.body
 
       if (!fileKey || !fileName) {
         return res.status(400).json({
@@ -402,11 +394,24 @@ router.post(
       }
 
       const tenant = await getRequestTenant(req)
-      await assertCleanUploadOwnership(fileKey, {
+      const approvedUpload = await assertCleanUploadOwnership(fileKey, {
         userId: req.userData.id,
         tenantId: tenant?.tenantId || null,
         tenantType: tenant?.tenantType || null,
       })
+
+      const normalizedFileKey = String(fileKey).replace(/^\/+/, '')
+      if (!normalizedFileKey.startsWith(`uploads/${req.userData.id}/`)) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Upload is not valid for product attachments',
+          },
+          requestId: req.requestId,
+        })
+      }
 
       const { rows: products } = await query(
         `
@@ -443,9 +448,9 @@ router.post(
         })
       }
 
-      const supplierId = products[0].supplier_id
-      const sizeBytes = fileSize != null ? Math.max(0, parseInt(String(fileSize), 10) || 0) : 0
-      const fileUrl = buildObjectPublicUrl(fileKey)
+      const sizeBytes = Math.max(0, Number(approvedUpload.max_bytes) || 0)
+      const approvedFileType = approvedUpload.content_type || 'application/octet-stream'
+      const fileUrl = buildObjectPublicUrl(normalizedFileKey)
 
       const { rows } = await query(
         `
@@ -456,29 +461,13 @@ router.post(
         [
           productId,
           fileUrl,
-          fileType || 'application/octet-stream',
+          approvedFileType,
           JSON.stringify({ fileName, uploadedBy: req.userData.id }),
           sizeBytes,
         ]
       )
 
-      if (supplierId && sizeBytes > 0 && !req.body.storageMeteredAtPresign) {
-        const { ensureStorageForUpload } = await import('../lib/subscription.js')
-        const metered = await ensureStorageForUpload(supplierId, 'SUPPLIER', sizeBytes)
-        if (!metered.allowed) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'LIMIT_EXCEEDED',
-              message: `Storage limit reached (${metered.current}/${metered.limit} MB).`,
-            },
-            requestId: req.requestId,
-          })
-        }
-      }
-
-      if (fileType && fileType.startsWith('image/')) {
+      if (approvedFileType.startsWith('image/')) {
         await query(
           `
         UPDATE product 

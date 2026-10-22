@@ -36,7 +36,7 @@ import { ValidationError, ForbiddenError, NotFoundError } from '../middlewares/e
 import { resolveDeliveryPodFlags } from '../lib/pod-requirement.js'
 import { hasPermission } from '../lib/permissions.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
-import { meterStorageFromRequest } from '../lib/storage-upload.js'
+import { meterStorageFromRequest, resolveStorageReservationBytes } from '../lib/storage-upload.js'
 import {
   sanitizeUploadFileName,
   assertFileExtensionMatchesMime,
@@ -436,6 +436,7 @@ router.post(
         })
       }
       const sizeBytes = body.fileSize ? Number(body.fileSize) : 0
+      const reservationBytes = resolveStorageReservationBytes(sizeBytes, MAX_UPLOAD_BYTES)
       if (sizeBytes > MAX_UPLOAD_BYTES) {
         return res.status(400).json({
           ok: false,
@@ -456,7 +457,7 @@ router.post(
           requestId: req.requestId,
         })
       }
-      const storageMeter = await meterStorageFromRequest(req, sizeBytes)
+      const storageMeter = await meterStorageFromRequest(req, reservationBytes)
       if (!storageMeter.ok) {
         return res.status(storageMeter.status).json({
           ok: false,
@@ -469,7 +470,7 @@ router.post(
       const tenant = await getRequestTenant(req)
       const { presignedUrl, publicUrl } = await createPresignedUpload({
         fileKey,
-        fileSize: sizeBytes > 0 ? sizeBytes : MAX_UPLOAD_BYTES,
+        fileSize: reservationBytes,
         fileType: body.fileType,
         userId: req.userData.id,
         tenantId: tenant?.tenantId || supplierId,
@@ -485,7 +486,7 @@ router.post(
           fileKey,
           fileName: body.fileName,
           fileType: body.fileType,
-          storageMetered: sizeBytes > 0,
+          storageMetered: true,
         },
         error: null,
         requestId: req.requestId,

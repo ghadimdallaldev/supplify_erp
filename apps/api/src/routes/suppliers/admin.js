@@ -2,6 +2,7 @@ import express from 'express'
 import {
   requireAuth,
   requireRole,
+  resolveAdminContext,
   optionalAuth,
   resolveTenantContext,
   requirePermission,
@@ -42,67 +43,74 @@ import {
 
 const router = express.Router()
 
-// Create supplier (admin only)
-router.post('/', requireAuth, requireRole(['ADMIN']), async (req, res) => {
-  try {
-    const supplierData = supplierCreateSchema.parse(req.body)
+// Create supplier (tenant admins only)
+router.post(
+  '/',
+  requireAuth,
+  requireRole(['ADMIN']),
+  resolveAdminContext,
+  requirePermission('ADMIN_TENANTS'),
+  async (req, res) => {
+    try {
+      const supplierData = supplierCreateSchema.parse(req.body)
 
-    const { rows } = await query(
-      `
+      const { rows } = await query(
+        `
       INSERT INTO supplier (name, slug, vat_no, contact_email, phone, address_json)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `,
-      [
-        supplierData.name,
-        supplierData.slug,
-        supplierData.vatNo,
-        supplierData.contactEmail,
-        supplierData.phone,
-        supplierData.address ? JSON.stringify(supplierData.address) : null,
-      ]
-    )
+        [
+          supplierData.name,
+          supplierData.slug,
+          supplierData.vatNo,
+          supplierData.contactEmail,
+          supplierData.phone,
+          supplierData.address ? JSON.stringify(supplierData.address) : null,
+        ]
+      )
 
-    await createPendingActivationSubscription(query, rows[0].id, 'SUPPLIER', 'free')
-    await ensureTenantSystemRoles(rows[0].id, 'SUPPLIER')
+      await createPendingActivationSubscription(query, rows[0].id, 'SUPPLIER', 'free')
+      await ensureTenantSystemRoles(rows[0].id, 'SUPPLIER')
 
-    logger.info('Supplier created', {
-      supplierId: rows[0].id,
-      name: rows[0].name,
-      actor: req.userData.id,
-    })
+      logger.info('Supplier created', {
+        supplierId: rows[0].id,
+        name: rows[0].name,
+        actor: req.userData.id,
+      })
 
-    res.status(201).json({
-      ok: true,
-      data: { supplier: rows[0] },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(201).json({
+        ok: true,
+        data: { supplier: rows[0] },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'VALIDATION_ERROR',
+            message: 'Invalid supplier data',
+            details: error.errors,
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      logger.error('Create supplier error:', error)
+      res.status(500).json({
         ok: false,
         data: null,
         error: {
-          name: 'VALIDATION_ERROR',
-          message: 'Invalid supplier data',
-          details: error.errors,
+          name: 'INTERNAL_ERROR',
+          message: 'Failed to create supplier',
         },
         requestId: req.requestId,
       })
     }
-
-    logger.error('Create supplier error:', error)
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: {
-        name: 'INTERNAL_ERROR',
-        message: 'Failed to create supplier',
-      },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
 export default router

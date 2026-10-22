@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-10-22 — Legacy order completion cannot overwrite a cancel
+
+**Mobile impact:** None. Android and iOS already send `DELIVERED` through the locked order update path. No request or response fields changed.
+
+**Server:** `PATCH /api/orders/:id` with legacy `status: COMPLETED` now locks the order, re-checks that it is still `SHIPPED`, and updates only that status. A concurrent cancel commits first and the completion returns 400 instead of rewriting the order to `DELIVERED` after stock was released. Warehouse release and dispatch stock updates lock assignment rows. First-time warehouse stock seeding inserts with `ON CONFLICT DO NOTHING` so a second checkout cannot copy a stale legacy quantity over a reservation that already landed.
+
+---
+
 ## 2026-10-01 — Public shop / consumer account UX (admin feature flag)
 
 **Mobile impact:** Both Expo apps + API. New public contract + platform feature key.
@@ -1832,3 +1840,11 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - Added a standalone, editable stakeholder presentation and print-ready PDF for the 7addak business concept.
 - This documentation-only deliverable does not change any API, authentication, RBAC, type, notification, feature-flag, runtime, or environment-variable contract.
 - No Android or iOS code update is required; this entry records the intentional mobile-parity exception.
+
+## 2026-10-07 - Final production audit hardening
+
+- **Admin-only RBAC:** tenant creation now requires `ADMIN_TENANTS`; featured-placement review requires `ADMIN_GROWTH`; explicit refunds require `ADMIN_FINANCE`. Native clients expose no platform-admin surface, so Android and iOS are intentionally unchanged.
+- **Upload reliability and quota enforcement:** migration `0227_allow_scan_unavailable_file_status.sql` aligns the database constraint with the existing scanner-outage verdict. Generic and POD presign routes now reserve the full server ceiling when an optional size is omitted or zero, and product attachments use server-owned upload metadata.
+- **Native verification:** both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios` already read local bytes before POD presign and send `prepared.bytes`; their generic attachment upload services send `file.size`. No request/response shape, API path, auth flow, permission key, feature key, notification payload, or required environment variable changed.
+- **Parity decision:** no native source edit is required. The server-side fallback only hardens malformed or omitted sizes; compliant native calls retain the same contract and behavior.
+- **Web-only cleanup:** removed an unused order-tracking subscription from the web order-detail page and an unused translation hook from the supplier placement panel. Native screens and API contracts are unaffected.

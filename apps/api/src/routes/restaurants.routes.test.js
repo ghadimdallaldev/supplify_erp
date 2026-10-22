@@ -42,7 +42,7 @@ vi.mock('../lib/rbac.js', () => ({
   },
   resolveAdminContext: (req, res, next) => {
     req.adminContext = req.adminContext || {
-      permissions: req.userData?.adminPermissions || ['ADMIN_ACCESS'],
+      permissions: req.userData?.adminPermissions || ['ADMIN_ACCESS', 'ADMIN_TENANTS'],
     }
     next()
   },
@@ -119,6 +119,31 @@ describe('Restaurants Routes', () => {
     app.use('/api/restaurants', restaurantsRoutes)
     const { errorHandler } = await import('../middlewares/errorHandler.js')
     app.use(errorHandler)
+  })
+
+  describe('POST /api/restaurants', () => {
+    it('denies an admin without ADMIN_TENANTS before creating a tenant', async () => {
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'ADMIN', adminPermissions: ['ADMIN_ACCESS'] }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+
+      const response = await request(localApp)
+        .post('/api/restaurants')
+        .send({
+          name: 'Unauthorized Restaurant',
+          slug: 'unauthorized-restaurant',
+          contactEmail: 'owner@example.com',
+        })
+        .expect(403)
+
+      expect(response.body.error.message).toContain('ADMIN_TENANTS')
+      expect(db.query).not.toHaveBeenCalled()
+    })
   })
 
   describe('GET /api/restaurants', () => {
