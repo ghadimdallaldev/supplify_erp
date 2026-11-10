@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 — HORECA demo seed script (mobile skipped, dev tooling only)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). `apps/api/scripts/seed-horeca-demo.mjs` (`pnpm --filter api seed:horeca-demo`) only writes demo data. Its `--only=today` section refreshes today's orders and GPS for the supplier Command Center. The B2C demo seeder's `delivery_zone` insert was also fixed to drop the removed `postcode_prefix` column. No API, type or client contract change. Cheat sheet: `docs/guides/horeca-demo-2026-11.md`.
+
+---
+
 ## 2026-11-11 — Driver route stop "items · amount" formatting (mobile skipped, web-only UI)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Web-only layout fix in `DriverRoutePanel.tsx`: the item count and stop total were adjacent text nodes in one flex item, so they rendered as "5 items108.76". Each now has its own element with a "·" separator, and the total uses `formatCurrency` with the stop's currency, matching `FulfillmentRouteDetailPanel`. The mobile driver screens don't render this line the same way. No API or type change.
