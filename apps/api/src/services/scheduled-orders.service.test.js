@@ -12,6 +12,17 @@ vi.mock('../lib/db.js', () => ({
   withTransaction: vi.fn(async (handler) =>
     handler({ query: (...args) => clientQueryMock(...args) })
   ),
+  withSavepoint: vi.fn(async (client, fn) => {
+    await client.query('SAVEPOINT sp_test')
+    try {
+      const result = await fn()
+      await client.query('RELEASE SAVEPOINT sp_test')
+      return result
+    } catch (error) {
+      await client.query('ROLLBACK TO SAVEPOINT sp_test')
+      throw error
+    }
+  }),
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -123,6 +134,41 @@ describe('executeScheduledOrders', () => {
 
     expect(result.executed).toBe(1)
     expect(notifyScheduledOrderEvent).toHaveBeenCalledWith(list, 'REMINDER')
+  })
+
+  it('isolates a failing auto-create list in a savepoint and still records its ledger outcome', async () => {
+    const failing = dueQuickList({ id: 'ql-bad', auto_create_order: true })
+    const reminder = dueQuickList({ id: 'ql-ok', auto_create_order: false })
+    const statements = []
+    const ledgerOutcomes = []
+    clientQueryMock.mockImplementation(async (sql, params) => {
+      const text = String(sql).trim()
+      statements.push(text.split(String.fromCharCode(10))[0].trim())
+      if (text.includes('FROM quick_list') && text.includes('LIMIT')) {
+        return {
+          rows:
+            statements.filter((q) => q.startsWith('SELECT')).length <= 1 ? [failing, reminder] : [],
+        }
+      }
+      if (text.includes('AS today_date')) return { rows: [{ today_date: '2026-06-01' }] }
+      if (text.includes('INSERT INTO quick_list_execution')) {
+        return { rows: [{ id: 'ledger-' + params[0] }] }
+      }
+      if (text.includes('UPDATE quick_list_execution')) {
+        ledgerOutcomes.push(params[0])
+        return { rowCount: 1 }
+      }
+      if (text.includes('FROM quick_list_item')) throw new Error('relation does not exist')
+      return { rows: [], rowCount: 1 }
+    })
+
+    const result = await executeScheduledOrders()
+
+    expect(statements).toContain('SAVEPOINT sp_test')
+    expect(statements).toContain('ROLLBACK TO SAVEPOINT sp_test')
+    expect(ledgerOutcomes).toEqual(['failed', 'reminder'])
+    expect(result.errors).toBe(1)
+    expect(result.executed).toBe(1)
   })
 
   it('propagates database errors from the due-list query', async () => {

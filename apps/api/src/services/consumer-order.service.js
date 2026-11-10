@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import {
   consumerLoyaltyEarnBasis,
   earnConsumerLoyaltyOnOrderComplete,
@@ -713,13 +713,15 @@ export async function updateConsumerOrderStatus(orderId, restaurantId, status, c
     if (status === 'DELIVERED' && order.consumer_member_id) {
       try {
         const earnSubtotal = consumerLoyaltyEarnBasis(order.subtotal, order.loyalty_discount_amount)
-        await earnConsumerLoyaltyOnOrderComplete(client, {
-          restaurantId,
-          memberId: order.consumer_member_id,
-          consumerOrderId: orderId,
-          spendAmount: earnSubtotal,
-          fulfillmentType: order.fulfillment_type,
-        })
+        await withSavepoint(client, () =>
+          earnConsumerLoyaltyOnOrderComplete(client, {
+            restaurantId,
+            memberId: order.consumer_member_id,
+            consumerOrderId: orderId,
+            spendAmount: earnSubtotal,
+            fulfillmentType: order.fulfillment_type,
+          })
+        )
       } catch {
         // Points earn must not block the kitchen from completing the ticket.
       }

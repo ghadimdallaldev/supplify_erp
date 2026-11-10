@@ -8,7 +8,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { ConflictError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -644,13 +644,15 @@ router.post(
         let invoiceNewlyCreated = false
         if (billableAcceptedQty > 0) {
           try {
-            const invoiceResult = await createInvoiceFromReceiving(client, {
-              order,
-              report,
-              supplierId,
-              restaurantId,
-              receivedBy: receiverId,
-            })
+            const invoiceResult = await withSavepoint(client, () =>
+              createInvoiceFromReceiving(client, {
+                order,
+                report,
+                supplierId,
+                restaurantId,
+                receivedBy: receiverId,
+              })
+            )
             createdInvoice = invoiceResult?.invoice ?? null
             invoiceNewlyCreated = Boolean(invoiceResult?.created)
             if (createdInvoice) {
@@ -677,13 +679,15 @@ router.post(
         const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0
         let loyaltyEarn = null
         try {
-          loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
-            supplierId,
-            restaurantId,
-            orderId,
-            receiveAmount: earnBaseAmount,
-            createdBy: receiverId,
-          })
+          loyaltyEarn = await withSavepoint(client, () =>
+            earnLoyaltyOnOrderReceive(client, {
+              supplierId,
+              restaurantId,
+              orderId,
+              receiveAmount: earnBaseAmount,
+              createdBy: receiverId,
+            })
+          )
         } catch (loyaltyErr) {
           logger.warn('Loyalty earn after receiving failed', {
             error: loyaltyErr.message,

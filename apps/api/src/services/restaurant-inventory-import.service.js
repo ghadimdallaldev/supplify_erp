@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { checkLimit } from '../lib/subscription.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { markReorderForecastDirty } from './reorder-forecast-cache.service.js'
@@ -343,12 +343,9 @@ export async function executeRestaurantInventoryImport(restaurantId, csvText) {
   await withTransaction(async (client) => {
     for (const row of importableRows) {
       try {
-        const result = await addInventoryRow(
-          client,
-          restaurantId,
-          row.productId,
-          row.quantity,
-          row.reason
+        // Savepoint per row so one failing row cannot abort the whole import transaction.
+        const result = await withSavepoint(client, () =>
+          addInventoryRow(client, restaurantId, row.productId, row.quantity, row.reason)
         )
         if (result.created) {
           summary.added += 1

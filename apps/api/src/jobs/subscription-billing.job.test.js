@@ -13,7 +13,7 @@ vi.mock('../lib/db.js', () => ({
 }))
 
 vi.mock('../lib/logger.js', () => ({
-  logger: { info: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 
 vi.mock('../lib/billing/billing-service.js', () => ({
@@ -217,5 +217,131 @@ describe('runSubscriptionBillingJob', () => {
       '2026-07-16T00:00:00.000Z',
     ])
     expect(mockInvalidateTenantSubscriptionCache).toHaveBeenCalledWith('tenant-1', 'RESTAURANT')
+  })
+})
+
+describe('runSubscriptionBillingJob retry and stuck-payment handling', () => {
+  const pm = {
+    id: 'pm-1',
+    provider: 'stub',
+    provider_payment_method_id: 'pm_stub_ok',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockReset()
+    mockQuery.mockResolvedValue({ rows: [] })
+    mockGetActiveTenantAddons.mockResolvedValue([])
+    mockInvalidateTenantSubscriptionCache.mockResolvedValue(undefined)
+    mockChargeOffSession.mockResolvedValue({ status: 'succeeded', providerPaymentId: 'pi-2' })
+    mockGetBillingGateway.mockReturnValue({ id: 'stub', chargeOffSession: mockChargeOffSession })
+    mockWithTransaction.mockImplementation(async (fn) => fn({ query: mockQuery }))
+  })
+
+  it('re-claims a FAILED renewal payment on a later run and charges with a per-attempt key', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({ rows: [] }) // no SUCCEEDED payment
+      .mockResolvedValueOnce({ rows: [pm] })
+      .mockResolvedValueOnce({ rows: [{ id: 'pay-claim', attempt: 2 }] }) // retry claim
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({ rows: [{ id: 'inv-1' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+
+    const { runSubscriptionBillingJob } = await import('./subscription-billing.job.js')
+    const result = await runSubscriptionBillingJob()
+
+    expect(result).toEqual({ renewed: 1, locked: 0, pastDue: 0 })
+    const claimSql = String(mockQuery.mock.calls[4][0])
+    expect(claimSql).toContain('ON CONFLICT (idempotency_key) DO UPDATE')
+    expect(claimSql).toContain("billing_payment.status = 'FAILED'")
+    // retry cadence and attempt cap are passed as parameters
+    expect(mockQuery.mock.calls[4][1].slice(8)).toEqual([24, 7])
+    expect(mockChargeOffSession).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: 'renew_sub-1_2026-07-16T00:00:00.000Z_a2' })
+    )
+  })
+
+  it('does not charge when the existing FAILED payment is not yet due for retry', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [pm] })
+      .mockResolvedValueOnce({ rows: [] }) // claim refused by WHERE clause
+      .mockResolvedValueOnce({
+        rows: [{ id: 'pay-1', status: 'FAILED', age_minutes: 60, attempt: 1 }],
+      })
+
+    const { runSubscriptionBillingJob } = await import('./subscription-billing.job.js')
+    const result = await runSubscriptionBillingJob()
+
+    expect(result).toEqual({ renewed: 0, locked: 0, pastDue: 0 })
+    expect(mockChargeOffSession).not.toHaveBeenCalled()
+  })
+
+  it('does not re-claim a fresh PROCESSING payment and does not alert', async () => {
+    const { logger } = await import('../lib/logger.js')
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [pm] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'pay-1', status: 'PROCESSING', age_minutes: 2, attempt: 1 }],
+      })
+
+    const { runSubscriptionBillingJob } = await import('./subscription-billing.job.js')
+    await runSubscriptionBillingJob()
+
+    expect(mockChargeOffSession).not.toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('never re-charges a stale PROCESSING payment but logs an error for manual reconciliation', async () => {
+    const { logger } = await import('../lib/logger.js')
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [pm] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 'pay-1', status: 'PROCESSING', age_minutes: 90, attempt: 1 }],
+      })
+
+    const { runSubscriptionBillingJob } = await import('./subscription-billing.job.js')
+    await runSubscriptionBillingJob()
+
+    expect(mockChargeOffSession).not.toHaveBeenCalled()
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('PROCESSING'),
+      expect.objectContaining({ subscriptionId: 'sub-1', paymentId: 'pay-1' })
+    )
+  })
+
+  it('does not re-charge a renewal that already SUCCEEDED', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] })
+      .mockResolvedValueOnce({ rows: [dueSubscription()] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            payment_id: 'pay-1',
+            provider_payment_id: 'pi-1',
+            period_start: null,
+            period_end: null,
+          },
+        ],
+      })
+
+    const { runSubscriptionBillingJob } = await import('./subscription-billing.job.js')
+    await runSubscriptionBillingJob()
+
+    expect(mockChargeOffSession).not.toHaveBeenCalled()
   })
 })

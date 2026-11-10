@@ -2,6 +2,20 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch B: data-integrity fixes (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). All changes are server-side transaction and job behavior; no request or response shape, permission key, feature key or notification payload changed, so no mobile files were touched and `tsc` was not needed.
+
+**Orders:** cancelling a `DRAFT` order via `PATCH /api/orders/:id` no longer calls the stock release path. Stock is only reserved when an order is placed, so the old behavior added inventory that never existed. `PLACED` (and later) cancellations release stock as before.
+
+**Draft placement:** placing a draft order through `PATCH /api/orders/:id` (DRAFT to PLACED) now reserves stock like a direct place and can fail with a 400 `VALIDATION_ERROR` (insufficient stock); the order then stays DRAFT. Neither mobile app places drafts via PATCH (the cart creates orders with `POST /api/orders`, `status: 'PLACED'`), so no mobile change is needed.
+
+**Transactions:** added `withSavepoint(client, fn)` in `apps/api/src/lib/db.js`. Best-effort steps inside a transaction (auto-invoice and loyalty earn on receiving, consumer loyalty earn on delivery, each scheduled quick list, per-row menu/inventory/image imports, invoice-number sequence, referral sponsorship link on registration) now roll back to a savepoint on failure instead of poisoning the outer transaction, which Postgres would otherwise silently roll back at COMMIT while the API reported success.
+
+**Billing:** a FAILED renewal charge is now retried by `subscription-billing.job.js` once per 24h (up to 7 attempts, inside the 7-day grace window) using a fresh gateway idempotency key per attempt. A renewal payment stuck in PROCESSING for 30+ minutes is never re-charged automatically; the job logs an error with the subscription and payment ids for manual reconciliation.
+
+---
+
 ## 2026-11-10 — Audit batch A: billing gateway lockdown + owner role-name hardening (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Neither app sends `provider` to `/api/billing/*`, sponsorship or promotion endpoints, and neither creates or renames tenant roles. Checked by grep in both repos; no mobile files changed, so `tsc` was not needed.

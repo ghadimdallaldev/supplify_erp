@@ -7,6 +7,17 @@ vi.mock('../lib/db.js', () => {
   return {
     query: queryMock,
     withTransaction: vi.fn(async (fn) => fn({ query: queryMock })),
+    withSavepoint: vi.fn(async (client, fn) => {
+      await client.query('SAVEPOINT sp_test')
+      try {
+        const result = await fn()
+        await client.query('RELEASE SAVEPOINT sp_test')
+        return result
+      } catch (error) {
+        await client.query('ROLLBACK TO SAVEPOINT sp_test')
+        throw error
+      }
+    }),
     pool: { query: queryMock },
     __queryMock: queryMock,
   }
@@ -49,6 +60,7 @@ vi.mock('../services/reviews.service.js', () => ({
 
 vi.mock('../services/notification.service.js', () => ({
   notifyInvoiceIssued: vi.fn().mockResolvedValue(undefined),
+  notifyOrderStatusChange: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/inventory-expiry.service.js', () => ({
@@ -231,5 +243,70 @@ describe('receiving.routes POST /receive line completeness', () => {
       .expect(400)
 
     expect(res.body.error.message).toMatch(/unknown order item/i)
+  })
+})
+
+describe('receiving.routes POST /receive best-effort steps use savepoints', () => {
+  let app
+  let db
+
+  beforeEach(async () => {
+    db = await import('../lib/db.js')
+    db.query.mockReset()
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test'
+      next()
+    })
+    app.use('/api/receiving', receivingRoutes)
+  })
+
+  it('rolls back to a savepoint when auto-invoice fails and the receive still succeeds', async () => {
+    const { createInvoiceFromReceiving } = await import('../services/invoice.service.js')
+    const { earnLoyaltyOnOrderReceive } = await import('../services/loyalty.service.js')
+    createInvoiceFromReceiving.mockRejectedValueOnce(new Error('invoice number fn missing'))
+    earnLoyaltyOnOrderReceive.mockRejectedValueOnce(new Error('loyalty down'))
+
+    const statements = []
+    db.query.mockImplementation(async (sql) => {
+      const text = String(sql).trim()
+      statements.push(text.split(String.fromCharCode(10))[0].trim())
+      if (text.includes('FROM order_item oi')) {
+        return {
+          rows: [
+            {
+              id: 'oi-1',
+              quantity: 2,
+              product_id: 'p-1',
+              unit_price: 5,
+              supplier_id: 'sup-1',
+              unit: 'case',
+            },
+          ],
+        }
+      }
+      if (text.includes('INSERT INTO receiving_report')) return { rows: [{ id: 'rep-1' }] }
+      if (text.includes('INSERT INTO receiving_line_item')) return { rows: [{ id: 'li-1' }] }
+      return { rows: [] }
+    })
+
+    const res = await request(app)
+      .post('/api/receiving/receive')
+      .send({
+        orderId: 'order-1',
+        lineItems: [
+          {
+            orderItemId: 'oi-1',
+            productId: 'p-1',
+            received_quantity: 2,
+            quality_status: 'ACCEPTED',
+          },
+        ],
+      })
+
+    expect(res.status).toBeLessThan(300)
+    expect(statements.filter((q) => q === 'SAVEPOINT sp_test')).toHaveLength(2)
+    expect(statements.filter((q) => q === 'ROLLBACK TO SAVEPOINT sp_test')).toHaveLength(2)
   })
 })

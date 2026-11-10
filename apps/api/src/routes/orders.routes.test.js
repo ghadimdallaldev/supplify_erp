@@ -112,6 +112,14 @@ vi.mock('../services/supplier-inventory.service.js', () => ({
   restoreSupplierStockForOrder: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../services/supplier-order-stock.service.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    reserveStockForPlacedOrder: vi.fn((...args) => actual.reserveStockForPlacedOrder(...args)),
+  }
+})
+
 vi.mock('../services/order-create.service.js', () => ({
   insertOrderItemsBatch: vi.fn(),
 }))
@@ -1096,6 +1104,173 @@ describe('Orders Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.order.status).toBe('CANCELLED')
+    })
+
+    it('does not restore stock when cancelling a DRAFT order (nothing was reserved)', async () => {
+      const { restoreSupplierStockForOrder } = await import(
+        '../services/supplier-inventory.service.js'
+      )
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'DRAFT', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'DRAFT', restaurant_id: 'restaurant-1' }],
+        }) // transactional order lock
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }],
+        })
+
+      await request(app).patch('/api/orders/order-1').send({ status: 'CANCELLED' }).expect(200)
+
+      expect(restoreSupplierStockForOrder).not.toHaveBeenCalled()
+    })
+
+    it('restores stock when cancelling a PLACED order', async () => {
+      const { restoreSupplierStockForOrder } = await import(
+        '../services/supplier-inventory.service.js'
+      )
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }],
+        })
+
+      await request(app).patch('/api/orders/order-1').send({ status: 'CANCELLED' }).expect(200)
+
+      expect(restoreSupplierStockForOrder).toHaveBeenCalledTimes(1)
+    })
+
+    // DRAFT -> PLACED over PATCH is only reachable by an admin impersonating a supplier:
+    // restaurants may only cancel, suppliers may not place, plain admins are rejected.
+    describe('DRAFT to PLACED stock reservation', () => {
+      let adminApp
+
+      beforeEach(async () => {
+        adminApp = express()
+        adminApp.use(express.json())
+        adminApp.use((req, res, next) => {
+          req.requestId = 'test-request-id'
+          req.user = mockUser
+          req.userData = { ...mockUser, role: 'ADMIN', email: 'admin@example.com' }
+          req.impersonationContext = {
+            adminUserId: req.userData.id,
+            tenantId: 'supplier-1',
+            tenantType: 'SUPPLIER',
+          }
+          req.tenantContext = { tenantId: 'supplier-1', tenantType: 'SUPPLIER', permissions: [] }
+          next()
+        })
+        adminApp.use('/api/orders', ordersRoutes)
+        const { errorHandler } = await import('../middlewares/errorHandler.js')
+        adminApp.use(errorHandler)
+      })
+
+      function mockOrderQueries(fromStatus, toRow) {
+        const orderRow = { id: 'order-1', status: fromStatus, restaurant_id: 'restaurant-1' }
+        db.query.mockImplementation(async (sql) => {
+          const text = String(sql)
+          if (text.includes('SELECT supplier_id FROM order_item')) {
+            return { rows: [{ supplier_id: 'supplier-1' }] }
+          }
+          if (text.includes('SELECT 1 FROM order_item')) return { rows: [{ ok: 1 }] }
+          if (text.includes('UPDATE customer_order')) return { rows: [toRow] }
+          if (text.includes('FROM order_item oi')) {
+            return {
+              rows: [
+                {
+                  id: 'oi-1',
+                  order_id: 'order-1',
+                  product_id: 'prod-1',
+                  supplier_id: 'supplier-1',
+                  quantity: 3,
+                  sku: 'SKU-1',
+                },
+              ],
+            }
+          }
+          if (text.includes('FROM supplier')) return { rows: [{ id: 'supplier-1' }] }
+          return { rows: [orderRow] }
+        })
+      }
+
+      it('reserves stock with the same arguments as a direct place', async () => {
+        const { reserveStockForPlacedOrder } = await import(
+          '../services/supplier-order-stock.service.js'
+        )
+        vi.mocked(reserveStockForPlacedOrder).mockResolvedValueOnce({
+          mode: 'legacy',
+          fulfillment: null,
+        })
+        mockOrderQueries('DRAFT', {
+          id: 'order-1',
+          status: 'PLACED',
+          restaurant_id: 'restaurant-1',
+        })
+
+        await request(adminApp).patch('/api/orders/order-1').send({ status: 'PLACED' }).expect(200)
+
+        expect(reserveStockForPlacedOrder).toHaveBeenCalledTimes(1)
+        const [, args] = vi.mocked(reserveStockForPlacedOrder).mock.calls[0]
+        expect(args).toMatchObject({
+          supplierId: 'supplier-1',
+          reserveLegacy: true,
+          multiWarehouseActive: false,
+          legacyLineItems: [{ productId: 'prod-1', quantity: 3, sku: 'SKU-1', reserve: true }],
+        })
+        const updateCall = db.query.mock.calls.find((call) =>
+          String(call[0]).includes('UPDATE customer_order')
+        )
+        expect(String(updateCall[0])).toContain('placed_at = now()')
+      })
+
+      it('fails with 400 and sends no status notification on insufficient stock', async () => {
+        const { reserveStockForPlacedOrder } = await import(
+          '../services/supplier-order-stock.service.js'
+        )
+        const { ValidationError } = await import('../middlewares/errorHandler.js')
+        vi.mocked(reserveStockForPlacedOrder).mockRejectedValueOnce(
+          new ValidationError('Insufficient stock for SKU-1')
+        )
+        mockOrderQueries('DRAFT', {
+          id: 'order-1',
+          status: 'PLACED',
+          restaurant_id: 'restaurant-1',
+        })
+
+        const res = await request(adminApp)
+          .patch('/api/orders/order-1')
+          .send({ status: 'PLACED' })
+          .expect(400)
+
+        expect(res.body.ok).toBe(false)
+        expect(res.body.error.message).toMatch(/Insufficient stock/)
+        // The error propagates out of withTransaction (ROLLBACK), so the order stays DRAFT
+        // and no post-commit work runs.
+        const { notifyOrderStatusChange } = await import('../services/notification.service.js')
+        expect(notifyOrderStatusChange).not.toHaveBeenCalled()
+      })
+
+      it('releases stock when an order placed from a draft is later cancelled', async () => {
+        const { restoreSupplierStockForOrder } = await import(
+          '../services/supplier-inventory.service.js'
+        )
+        mockOrderQueries('PLACED', { id: 'order-1', status: 'CANCELLED' })
+
+        await request(adminApp)
+          .patch('/api/orders/order-1')
+          .send({ status: 'CANCELLED' })
+          .expect(200)
+
+        expect(restoreSupplierStockForOrder).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('should schedule notifyOrderStatusChange without awaiting it on status update', async () => {

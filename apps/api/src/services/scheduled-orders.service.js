@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import {
@@ -119,7 +119,11 @@ export async function executeScheduledOrders() {
 
           try {
             if (quickList.auto_create_order) {
-              const result = await createOrderFromQuickList(quickList, client, executionDate)
+              // Savepoint per list: a failed list must not abort the shared transaction,
+              // otherwise the ledger/outcome writes below and every later list roll back too.
+              const result = await withSavepoint(client, () =>
+                createOrderFromQuickList(quickList, client, executionDate)
+              )
               const orders = result?.orders
               aiAdjustments = result?.aiAdjustments ?? null
               outcome = 'executed'

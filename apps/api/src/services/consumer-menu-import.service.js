@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import { invalidateMenuCache } from './consumer-menu.service.js'
 
@@ -202,100 +202,105 @@ export async function executeMenuImport(
       }
 
       try {
-        const categoryKey = raw.category.trim().toLowerCase()
-        let categoryId = categoryCache.get(categoryKey)
-        if (!categoryId) {
-          const { rows: existingCat } = await client.query(
-            `
-              SELECT id FROM menu_category
-              WHERE restaurant_id = $1
-                AND branch_id IS NOT DISTINCT FROM $2
-                AND lower(trim(name)) = lower(trim($3))
-              LIMIT 1
-            `,
-            [restaurantId, branchId, raw.category]
-          )
-          if (existingCat.length) {
-            categoryId = existingCat[0].id
-          } else {
-            categoryId = await findOrCreateCategory(
-              client,
-              restaurantId,
-              branchId,
-              raw.category,
-              raw.categoryDescription
+        // Savepoint per row: a failed statement must not abort the whole import transaction.
+        await withSavepoint(client, async () => {
+          const categoryKey = raw.category.trim().toLowerCase()
+          let categoryId = categoryCache.get(categoryKey)
+          if (!categoryId) {
+            const { rows: existingCat } = await client.query(
+              `
+                  SELECT id FROM menu_category
+                  WHERE restaurant_id = $1
+                    AND branch_id IS NOT DISTINCT FROM $2
+                    AND lower(trim(name)) = lower(trim($3))
+                  LIMIT 1
+                `,
+              [restaurantId, branchId, raw.category]
             )
-            summary.categoriesCreated += 1
-          }
-          categoryCache.set(categoryKey, categoryId)
-        }
-
-        const basePrice = Number(raw.price)
-        const isAvailable = parseBoolean(raw.available, true)
-        const sortOrder =
-          raw.sortOrder !== undefined && raw.sortOrder !== '' ? Number(raw.sortOrder) : 0
-
-        const { rows: existingItem } = await client.query(
-          `
-            SELECT id FROM menu_item
-            WHERE restaurant_id = $1
-              AND branch_id IS NOT DISTINCT FROM $2
-              AND category_id = $3
-              AND lower(trim(name)) = lower(trim($4))
-            LIMIT 1
-          `,
-          [restaurantId, branchId, categoryId, raw.name]
-        )
-
-        if (existingItem.length && updateExisting) {
-          await client.query(
-            `
-              UPDATE menu_item
-              SET
-                description = COALESCE($1, description),
-                base_price = $2,
-                image_url = COALESCE($3, image_url),
-                sort_order = COALESCE($4, sort_order),
-                is_available = $5,
-                updated_at = now()
-              WHERE id = $6
-            `,
-            [
-              raw.description?.trim() || null,
-              basePrice,
-              raw.imageUrl?.trim() || null,
-              sortOrder,
-              isAvailable,
-              existingItem[0].id,
-            ]
-          )
-          summary.itemsUpdated += 1
-        } else if (existingItem.length) {
-          summary.skipped += 1
-        } else {
-          await client.query(
-            `
-              INSERT INTO menu_item (
-                restaurant_id, branch_id, category_id, name, description,
-                base_price, image_url, sort_order, is_available
+            if (existingCat.length) {
+              categoryId = existingCat[0].id
+            } else {
+              categoryId = await findOrCreateCategory(
+                client,
+                restaurantId,
+                branchId,
+                raw.category,
+                raw.categoryDescription
               )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            `,
-            [
-              restaurantId,
-              branchId,
-              categoryId,
-              raw.name.trim(),
-              raw.description?.trim() || null,
-              basePrice,
-              raw.imageUrl?.trim() || null,
-              sortOrder,
-              isAvailable,
-            ]
+              summary.categoriesCreated += 1
+            }
+            categoryCache.set(categoryKey, categoryId)
+          }
+
+          const basePrice = Number(raw.price)
+          const isAvailable = parseBoolean(raw.available, true)
+          const sortOrder =
+            raw.sortOrder !== undefined && raw.sortOrder !== '' ? Number(raw.sortOrder) : 0
+
+          const { rows: existingItem } = await client.query(
+            `
+                SELECT id FROM menu_item
+                WHERE restaurant_id = $1
+                  AND branch_id IS NOT DISTINCT FROM $2
+                  AND category_id = $3
+                  AND lower(trim(name)) = lower(trim($4))
+                LIMIT 1
+              `,
+            [restaurantId, branchId, categoryId, raw.name]
           )
-          summary.itemsCreated += 1
-        }
+
+          if (existingItem.length && updateExisting) {
+            await client.query(
+              `
+                  UPDATE menu_item
+                  SET
+                    description = COALESCE($1, description),
+                    base_price = $2,
+                    image_url = COALESCE($3, image_url),
+                    sort_order = COALESCE($4, sort_order),
+                    is_available = $5,
+                    updated_at = now()
+                  WHERE id = $6
+                `,
+              [
+                raw.description?.trim() || null,
+                basePrice,
+                raw.imageUrl?.trim() || null,
+                sortOrder,
+                isAvailable,
+                existingItem[0].id,
+              ]
+            )
+            summary.itemsUpdated += 1
+          } else if (existingItem.length) {
+            summary.skipped += 1
+          } else {
+            await client.query(
+              `
+                  INSERT INTO menu_item (
+                    restaurant_id, branch_id, category_id, name, description,
+                    base_price, image_url, sort_order, is_available
+                  )
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `,
+              [
+                restaurantId,
+                branchId,
+                categoryId,
+                raw.name.trim(),
+                raw.description?.trim() || null,
+                basePrice,
+                raw.imageUrl?.trim() || null,
+                sortOrder,
+                isAvailable,
+              ]
+            )
+            summary.itemsCreated += 1
+          }
+        })
       } catch (err) {
+        // The row's category insert (if any) was rolled back with the savepoint.
+        categoryCache.delete(raw.category.trim().toLowerCase())
         summary.failed += 1
         rowErrors.push({
           rowNumber,

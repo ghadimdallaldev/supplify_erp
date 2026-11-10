@@ -218,18 +218,18 @@ All jobs also run **once immediately on API boot** (except when `NODE_ENV=test`)
 
 ## 9. Idempotency / deduplication
 
-| Job                    | Protection                                                         | Notes                   |
-| ---------------------- | ------------------------------------------------------------------ | ----------------------- |
-| scheduled_orders       | `quick_list_execution` UNIQUE + `SKIP LOCKED`                      | OK                      |
-| invoice_overdue        | `UPDATE … WHERE overdue_notified_at IS NULL`                       | One-shot                |
-| subscription_billing   | `FOR UPDATE` + charge `idempotencyKey`                             | OK                      |
-| promotions_expiry      | SQL status predicates; notify only new IDs                         | OK                      |
-| free_sandbox_expiry    | SQL lock predicate                                                 | OK                      |
-| trial_ending_soon      | `billing_trial_reminder_log` UNIQUE claim                          | **NEW**                 |
-| inventory expiry       | `inventory_expiry_notification_log` INSERT claim **before** notify | **FIXED**               |
-| reorder cadence        | `reorder_cadence_reminder_log` INSERT claim **before** notify      | **FIXED**               |
-| fulfillment_exceptions | Skip if open exception exists                                      | **FIXED** logging count |
-| waitlist               | `FOR UPDATE SKIP LOCKED`                                           | OK                      |
+| Job                    | Protection                                                                                                                                                                               | Notes                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| scheduled_orders       | `quick_list_execution` UNIQUE + `SKIP LOCKED`; per-list SAVEPOINT                                                                                                                        | OK (one bad list no longer rolls back the batch; failed lists are ledgered as `failed` and not retried the same day) |
+| invoice_overdue        | `UPDATE … WHERE overdue_notified_at IS NULL`                                                                                                                                             | One-shot                                                                                                             |
+| subscription_billing   | `FOR UPDATE` + charge `idempotencyKey`; FAILED claims re-claimable after 24h (max 7 attempts, per-attempt gateway key `_aN`); PROCESSING > 30 min logged as error, never auto re-charged | OK (stuck PROCESSING rows need manual reconciliation)                                                                |
+| promotions_expiry      | SQL status predicates; notify only new IDs                                                                                                                                               | OK                                                                                                                   |
+| free_sandbox_expiry    | SQL lock predicate                                                                                                                                                                       | OK                                                                                                                   |
+| trial_ending_soon      | `billing_trial_reminder_log` UNIQUE claim                                                                                                                                                | **NEW**                                                                                                              |
+| inventory expiry       | `inventory_expiry_notification_log` INSERT claim **before** notify                                                                                                                       | **FIXED**                                                                                                            |
+| reorder cadence        | `reorder_cadence_reminder_log` INSERT claim **before** notify                                                                                                                            | **FIXED**                                                                                                            |
+| fulfillment_exceptions | Skip if open exception exists                                                                                                                                                            | **FIXED** logging count                                                                                              |
+| waitlist               | `FOR UPDATE SKIP LOCKED`                                                                                                                                                                 | OK                                                                                                                   |
 
 **Manual HTTP triggers bypass advisory lock:**
 
