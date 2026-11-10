@@ -42,7 +42,7 @@ import {
 } from '../../components/disputes/DisputeListCards'
 import { TableScroll } from '../../components/ui/table-scroll'
 import { EmptyState } from '../../components/ui/empty-state'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 import { toast } from 'sonner'
 import { Check, Eye, Loader2, Scale, X } from 'lucide-react'
 import { ensureNamespace } from '../../i18n'
@@ -55,8 +55,14 @@ type DisputeRow = {
   status?: string
   disputedAmount?: number | null
   disputed_amount?: number | null
+  currency?: string | null
+  order_currency?: string | null
   restaurantName?: string
   restaurant_name?: string
+}
+
+function formatDisputeMoney(amount: number, currency?: string | null): string {
+  return formatCurrency(amount, { currency: currency || 'USD' })
 }
 
 export function DisputesPage() {
@@ -140,7 +146,7 @@ export function DisputesPage() {
       .filter((o) => isOrderEligibleForDispute(o.status))
       .map((o) => ({
         id: o.id,
-        label: `${formatOrderRef(o.id)} — ${String(o.status).replace(/_/g, ' ')} — ${new Date(o.placed_at || o.created_at).toLocaleDateString()} — $${formatPrice(Number(o.total_amount || 0))}`,
+        label: `${formatOrderRef(o.id)} — ${String(o.status).replace(/_/g, ' ')} — ${new Date(o.placed_at || o.created_at).toLocaleDateString()} — ${formatDisputeMoney(Number(o.total_amount || 0), o.currency)}`,
       }))
   }, [ordersListData])
 
@@ -328,7 +334,7 @@ export function DisputesPage() {
               <DisputeListCards
                 disputes={disputes as DisputeRow[]}
                 isSupplier={isSupplier}
-                formatAmount={(n) => `$${formatPrice(n)}`}
+                formatAmount={formatDisputeMoney}
                 onReview={isSupplier && canManageSupplierDisputes ? handleReview : undefined}
                 onResolve={
                   isSupplier && canManageSupplierDisputes ? (id) => setResolveId(id) : undefined
@@ -405,7 +411,10 @@ export function DisputesPage() {
                           </td>
                           <td className="hidden px-4 py-3 tabular-nums lg:table-cell">
                             {disputedAmount != null
-                              ? `$${formatPrice(Number(disputedAmount))}`
+                              ? formatDisputeMoney(
+                                  Number(disputedAmount),
+                                  dispute.currency ?? dispute.order_currency
+                                )
                               : '—'}
                           </td>
                           <td className="px-4 py-3 pr-5 text-right">

@@ -26,6 +26,7 @@ import {
 import { cn } from '../../lib/utils'
 import { TableScroll } from '../ui/table-scroll'
 import { ADMIN_EMPTY_STATE } from '../../lib/dealDisplayLabels'
+import { formatCurrency } from '../../utils/format'
 import {
   DEAL_PAGE_SIZES,
   DEAL_QUICK_STATUS_FILTERS,
@@ -37,6 +38,7 @@ import {
   DealSortableHeader,
   formatDealType,
   formatDealValue,
+  dealCurrency,
   type DealSortKey,
 } from './deals/adminDealsTableUtils'
 import { AdminTabLoading } from './dashboard/adminDashboardShared'
@@ -89,6 +91,8 @@ export function AdminDealsPanel() {
 
   const deals = useMemo(() => data?.deals || [], [data?.deals])
   const insights = insightsData?.insights
+  const insightsCurrency =
+    String((insights as Record<string, unknown> | undefined)?.currency || '') || 'USD'
 
   const hasActiveFilters = Boolean(
     statusFilter || typeFilter || debouncedSearch || fromDate || toDate
@@ -211,15 +215,27 @@ export function AdminDealsPanel() {
             { label: t('deals.insights.dealRedemptions'), value: insights.orders_from_deals },
             {
               label: t('deals.insights.boostAdSpend'),
-              value: `$${Number(insights.total_ad_spend || insights.boost_ad_spend || 0).toFixed(0)}`,
+              value: formatCurrency(
+                Number(insights.total_ad_spend || insights.boost_ad_spend || 0),
+                {
+                  currency: insightsCurrency,
+                  maximumFractionDigits: 0,
+                }
+              ),
             },
             {
               label: t('deals.insights.orderGmv'),
-              value: `$${Number(insights.total_revenue || 0).toFixed(0)}`,
+              value: formatCurrency(Number(insights.total_revenue || 0), {
+                currency: insightsCurrency,
+                maximumFractionDigits: 0,
+              }),
             },
             {
               label: t('deals.insights.discountAmount'),
-              value: `$${Number(insights.total_discount_given || 0).toFixed(0)}`,
+              value: formatCurrency(Number(insights.total_discount_given || 0), {
+                currency: insightsCurrency,
+                maximumFractionDigits: 0,
+              }),
             },
             {
               label: t('deals.insights.openAdInvoices'),
@@ -568,7 +584,9 @@ export function AdminDealsPanel() {
                                     <div>
                                       <dt className="font-medium text-[var(--text)]">Min order</dt>
                                       <dd className="mt-0.5">
-                                        ${Number(deal.min_order_amount).toFixed(2)}
+                                        {formatCurrency(Number(deal.min_order_amount), {
+                                          currency: dealCurrency(deal),
+                                        })}
                                       </dd>
                                     </div>
                                   ) : null}
@@ -595,7 +613,9 @@ export function AdminDealsPanel() {
                                           Boost price (snapshot)
                                         </dt>
                                         <dd className="mt-0.5 tabular-nums">
-                                          ${Number(deal.boost_price_snapshot || 0).toFixed(2)}
+                                          {formatCurrency(Number(deal.boost_price_snapshot || 0), {
+                                            currency: dealCurrency(deal),
+                                          })}
                                         </dd>
                                       </div>
                                       <div>

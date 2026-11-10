@@ -14,6 +14,9 @@ export type DisputeListRow = {
   status?: string
   disputedAmount?: number | null
   disputed_amount?: number | null
+  // Not returned by the API today; formatted as USD until it is.
+  currency?: string | null
+  order_currency?: string | null
   restaurantName?: string
   restaurant_name?: string
 }
@@ -47,7 +50,7 @@ function formatDisputeStatus(status: string, t: (key: string) => string): string
 type Props = {
   disputes: DisputeListRow[]
   isSupplier: boolean
-  formatAmount: (amount: number) => string
+  formatAmount: (amount: number, currency?: string | null) => string
   onReview?: (id: string) => void
   onResolve?: (id: string) => void
   onReject?: (id: string) => void
@@ -111,7 +114,12 @@ export function DisputeListCards({
 
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--app-border)] pt-3">
                 <span className="text-sm font-medium text-[var(--text)]">
-                  {disputedAmount != null ? formatAmount(Number(disputedAmount)) : '—'}
+                  {disputedAmount != null
+                    ? formatAmount(
+                        Number(disputedAmount),
+                        dispute.currency ?? dispute.order_currency
+                      )
+                    : '—'}
                 </span>
                 {showSupplierActions && (
                   <div className="action-bar w-full sm:w-auto">
