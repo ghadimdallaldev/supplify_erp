@@ -227,6 +227,9 @@ export const config = {
     process.env.EMAIL_FROM_ADDRESS ||
     process.env.SMTP_USER ||
     'noreply@supplify.local',
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  RESEND_API_URL: process.env.RESEND_API_URL || 'https://api.resend.com',
+  RESEND_TIMEOUT_MS: envInt(process.env.RESEND_TIMEOUT_MS, 15000),
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: envInt(process.env.SMTP_PORT, 587),
   SMTP_USER: process.env.SMTP_USER || '',

@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Resend HTTPS API email transport (mobile skipped, server-side only)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Server-side email transport only: `EMAIL_PROVIDER=resend` sends through `POST https://api.resend.com/emails` because Railway blocks outbound SMTP. New API env vars `RESEND_API_KEY`, `RESEND_API_URL`, `RESEND_TIMEOUT_MS`. No endpoint, auth, RBAC, type, notification payload or mobile env var change.
+
+---
+
 ## 2026-11-10 — Docs and repo restructure (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Documentation and repo hygiene only: docs moved into a new folder layout (architecture, security, product, guides, archive), root audit docs moved under `docs/`, dead husky/lint-staged configs removed, and the onboarding generator helpers restored. No API, auth, RBAC, type, notification or feature change. Paths cited by `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/mobile-parity.mdc` are unchanged.

@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { config } from '../config/env.js'
 import { logger } from '../lib/logger.js'
+import { isResendProvider, isResendConfigured, sendViaResend } from './resend-transport.js'
 
 let transporter
 
@@ -38,6 +39,7 @@ export function isSmtpConfigured() {
 export function isEmailConfigured() {
   if (!config.EMAIL_ENABLED) return false
   if (config.EMAIL_LOG_ONLY) return true
+  if (isResendProvider()) return isResendConfigured()
   return isSmtpConfigured()
 }
 
@@ -89,14 +91,29 @@ async function sendViaSmtp(payload) {
 }
 
 /**
- * Send transactional email via SMTP (nodemailer).
+ * Send transactional email via the Resend HTTPS API (EMAIL_PROVIDER=resend) or SMTP (nodemailer).
  */
-export async function sendMail({ to, subject, text, html, cc, bcc, attachments, replyTo, from }) {
+export async function sendMail({
+  to,
+  subject,
+  text,
+  html,
+  cc,
+  bcc,
+  attachments,
+  replyTo,
+  from,
+  idempotencyKey,
+}) {
   if (!to) {
     throw new Error('Email recipient (to) is required')
   }
 
   const basePayload = buildPayload({ to, subject, text, html, cc, bcc, attachments, replyTo, from })
+
+  if (isResendProvider()) {
+    return sendViaResend({ ...basePayload, from: formatFrom(basePayload.from) }, { idempotencyKey })
+  }
 
   const transport = getSmtpTransporter()
   if (transport) {

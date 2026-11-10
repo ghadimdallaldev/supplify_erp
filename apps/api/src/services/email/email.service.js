@@ -1,6 +1,7 @@
 import { config } from '../../config/env.js'
 import { logger } from '../../lib/logger.js'
 import { sendMail, isEmailConfigured as isTransportConfigured } from '../mailer.service.js'
+import { warnIfResendSmtpHost } from '../resend-transport.js'
 import { query } from '../../lib/db.js'
 import { claimEmailDelivery, finalizeEmailDelivery } from './email-delivery-log.js'
 import { resolveLocale } from '../../i18n/index.js'
@@ -12,10 +13,12 @@ let bootLogged = false
 export function logEmailBootMode() {
   if (bootLogged) return
   bootLogged = true
-  logger.info('Email service initialized', {
+  const provider = resolveActiveProvider()
+  warnIfResendSmtpHost()
+  logger.info(`Email service initialized, provider: ${provider}`, {
     enabled: config.EMAIL_ENABLED,
     logOnly: config.EMAIL_LOG_ONLY,
-    provider: resolveActiveProvider(),
+    provider,
     configured: isTransportConfigured(),
   })
 }
@@ -23,6 +26,7 @@ export function logEmailBootMode() {
 function resolveActiveProvider() {
   if (!config.EMAIL_ENABLED) return 'disabled'
   if (config.EMAIL_LOG_ONLY) return 'log_only'
+  if (String(config.EMAIL_PROVIDER || '').toLowerCase() === 'resend') return 'resend'
   if (config.SMTP_HOST) return 'smtp'
   return 'none'
 }
@@ -167,7 +171,7 @@ export async function sendEmail({
   }
 
   try {
-    const result = await sendMail(payload)
+    const result = await sendMail({ ...payload, idempotencyKey: eventKey || undefined })
     logger.info('Email sent', {
       eventType,
       eventKey,
