@@ -69,6 +69,6 @@ Fulfillment reassignment requires the existing supplier RBAC context plus `FULFI
 
 - Order ownership: `customer_order.restaurant_id`, `supplier_organization_id` for new rows, and `order_item.supplier_id` for tenant/history compatibility.
 - Catalog ownership: supplier tenant product/catalog rows; organization views aggregate child tenants without merging tenant-specific products.
-- Inventory ownership: legacy tenant inventory when no warehouse exists; `warehouse_inventory` when active warehouses exist.
+- Inventory ownership: legacy tenant inventory when no warehouse exists; `warehouse_inventory` when active warehouses exist. Both modes reserve at placement and consume the reservation at dispatch; failed-delivery redelivery re-reserves fresh warehouse legs (see [warehouse-fulfillment.md](../features/warehouse-fulfillment.md), "Stock accounting rules").
 - Pricing and contract scope: supplier tenant/product relationships and existing quote/contract price resolution; transfers preserve the committed snapshots.
 - Permissions: `permission`, `role_permission`, named tenant roles, and supplier organization roles; `FULFILLMENT_TRANSFER` follows those conventions.

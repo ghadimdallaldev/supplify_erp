@@ -127,7 +127,13 @@ async function commitWarehouseStock(client, warehouseId, productId, quantity) {
   )
 }
 
-/** Restore on-hand qty when a dispatched (already committed) assignment is cancelled. */
+/**
+ * Restore stock when a dispatched (already committed) assignment is cancelled or fails.
+ * Reserve moves qty available -> reserved; commit removes it from reserved AND on_hand
+ * (available is untouched), so the invariant is available = on_hand - reserved. Returning
+ * the goods must therefore raise on_hand and available together; raising on_hand alone
+ * leaves the units counted but never sellable again.
+ */
 async function restoreDispatchedWarehouseStock(client, warehouseId, productId, quantity) {
   const qty = Number(quantity)
   if (!qty || qty <= 0) return
@@ -135,6 +141,7 @@ async function restoreDispatchedWarehouseStock(client, warehouseId, productId, q
   await client.query(
     `UPDATE warehouse_inventory
      SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + $1,
+         quantity_available = quantity_available + $1,
          updated_at = now()
      WHERE warehouse_id = $2 AND product_id = $3`,
     [qty, warehouseId, productId]
@@ -572,6 +579,128 @@ export async function releaseInventoryForFailedDelivery(client, orderId) {
   )
 }
 
+/**
+ * Re-open failed warehouse legs for a redelivery.
+ *
+ * A failed delivery marks every leg 'failed' and releases (or restores) its stock, so
+ * on the next out_for_delivery there is no open leg to commit and the order would be
+ * delivered without its stock ever leaving the warehouse. Each failed leg gets a fresh
+ * 'pending' leg (retry_of_assignment_id points back, the failed one becomes 'superseded'
+ * so it is not re-opened twice) and the stock is reserved again; the normal
+ * commit-on-dispatch then deducts it. Throws (plain Error, "Insufficient stock...") when
+ * the warehouse can no longer cover the lines, which aborts the caller's transaction.
+ *
+ * @returns {Promise<object[]>} the newly created legs (empty when nothing was failed)
+ */
+export async function reopenFailedWarehouseLegs(
+  client,
+  orderId,
+  { assignmentId = null, supplierId = null } = {}
+) {
+  const params = [orderId]
+  let filter = ''
+  if (assignmentId) {
+    params.push(assignmentId)
+    filter = 'AND id = $2'
+  }
+  const { rows: failedLegs } = await client.query(
+    `SELECT * FROM order_warehouse_assignment
+     WHERE order_id = $1 AND status = 'failed' ${filter}
+     ORDER BY id
+     FOR UPDATE`,
+    params
+  )
+  if (!failedLegs.length) return []
+
+  const reopened = []
+  for (const failed of failedLegs) {
+    const reasonJson = JSON.stringify({
+      type: 'redelivery_reopen',
+      source_assignment_id: failed.id,
+    })
+    const { rows } = await client.query(
+      `INSERT INTO order_warehouse_assignment
+       (order_id, order_item_id, warehouse_id, assigned_by, assignment_source, assignment_reason, status, retry_of_assignment_id)
+       VALUES ($1, $2, $3, 'manual', 'manual', $4::jsonb, 'pending', $5)
+       RETURNING *`,
+      [orderId, failed.order_item_id ?? null, failed.warehouse_id, reasonJson, failed.id]
+    )
+    reopened.push(rows[0])
+  }
+
+  // Supersede the failed legs before computing lines: lineItemsForAssignment ignores
+  // lines owned by other non-superseded legs, and a failed item leg would hide its items.
+  for (let i = 0; i < failedLegs.length; i += 1) {
+    await client.query(
+      `UPDATE order_warehouse_assignment
+       SET status = 'superseded', superseded_at = now(), superseded_by_assignment_id = $2
+       WHERE id = $1`,
+      [failedLegs[i].id, reopened[i].id]
+    )
+  }
+
+  for (const leg of reopened) {
+    const lines = await lineItemsForAssignment(client, orderId, leg)
+    await reserveWarehouseStockBatch(
+      client,
+      leg.warehouse_id,
+      lines.map((line) => ({ productId: line.product_id, quantity: line.quantity })),
+      supplierId ? { supplierId } : {}
+    )
+  }
+  return reopened
+}
+
+/**
+ * Legacy (non-warehouse) suppliers: placing an order moves qty available -> reserved.
+ * Nothing ever consumed the reservation, so reserved_qty (and the derived on-hand,
+ * available + reserved) grew forever. When the order first ships, the goods have left:
+ * drop reserved_qty by the ordered quantity. available_qty is untouched (already deducted
+ * at placement).
+ *
+ * Idempotent through customer_order.legacy_stock_committed_at: only the first caller wins
+ * the claim, so a failed delivery -> re-ship cycle cannot decrement twice. Orders with
+ * warehouse legs are skipped (warehouse mode commits per leg).
+ * releaseStockForOrder reads the same marker to avoid double-releasing on a later cancel.
+ */
+export async function commitLegacyReservedStockForOrder(client, orderId) {
+  const { rows: claimed } = await client.query(
+    `UPDATE customer_order
+     SET legacy_stock_committed_at = now()
+     WHERE id = $1
+       AND legacy_stock_committed_at IS NULL
+       AND NOT EXISTS (
+         SELECT 1 FROM order_warehouse_assignment owa
+         WHERE owa.order_id = $1 AND owa.status <> 'superseded'
+       )
+     RETURNING id`,
+    [orderId]
+  )
+  if (!claimed.length) return { committed: false }
+
+  const { rows: items } = await client.query(
+    `SELECT product_id, quantity FROM order_item WHERE order_id = $1`,
+    [orderId]
+  )
+  const byProduct = new Map()
+  for (const item of items) {
+    const qty = Number(item.quantity)
+    if (!item.product_id || !Number.isFinite(qty) || qty <= 0) continue
+    byProduct.set(item.product_id, (byProduct.get(item.product_id) || 0) + qty)
+  }
+  if (byProduct.size) {
+    await client.query(
+      `UPDATE inventory AS inv
+       SET reserved_qty = GREATEST(0, inv.reserved_qty - src.qty),
+           updated_at = now()
+       FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
+       WHERE inv.product_id = src.product_id`,
+      [[...byProduct.keys()], [...byProduct.values()]]
+    )
+  }
+  return { committed: true }
+}
+
 const PICKING_ORDER_STATUSES = new Set(['ACKNOWLEDGED', 'PROCESSING'])
 const DISPATCH_ORDER_STATUSES = new Set(['SHIPPED', 'COMPLETED', 'DELIVERED'])
 const RELEASE_ORDER_STATUSES = new Set(['CANCELLED', 'REJECTED'])
@@ -593,6 +722,13 @@ export async function syncWarehouseFulfillmentOnOrderStatus(client, orderId, new
 
   if (DISPATCH_ORDER_STATUSES.has(newStatus) && !DISPATCH_ORDER_STATUSES.has(oldStatus)) {
     await commitDispatchInventoryForOrder(client, orderId)
+  }
+
+  // Legacy suppliers have no warehouse legs; consume the placement reservation once.
+  // Runs for any dispatch-class status (idempotent claim) so an order that skipped
+  // SHIPPED (e.g. straight to DELIVERED/COMPLETED) is still committed.
+  if (DISPATCH_ORDER_STATUSES.has(newStatus)) {
+    await commitLegacyReservedStockForOrder(client, orderId)
   }
 
   if (RELEASE_ORDER_STATUSES.has(newStatus) && !RELEASE_ORDER_STATUSES.has(oldStatus)) {

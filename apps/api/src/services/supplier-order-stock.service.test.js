@@ -121,6 +121,47 @@ describe('supplier-order-stock.service', () => {
     expect(client.query.mock.calls[2][0]).toContain('available_qty = inv.available_qty + src.qty')
   })
 
+  it('aggregates duplicate product_ids when restoring legacy stock (B6d)', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [
+            { product_id: 'p-1', quantity: 3 },
+            { product_id: 'p-1', quantity: 2 },
+            { product_id: 'p-2', quantity: 1 },
+          ],
+        })
+        .mockResolvedValueOnce({}),
+    }
+
+    await releaseStockForOrder(client, 'ord-1')
+    // UPDATE ... FROM unnest applies a duplicated product_id only once, so quantities must be summed.
+    expect(client.query.mock.calls[2][1]).toEqual([
+      ['p-1', 'p-2'],
+      [5, 1],
+    ])
+  })
+
+  it('after the order shipped (reserved_qty already consumed) cancel restores available only (B6c)', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({
+          rows: [{ product_id: 'p-1', quantity: 3, legacy_stock_committed_at: '2026-11-10' }],
+        })
+        .mockResolvedValueOnce({}),
+    }
+
+    const result = await releaseStockForOrder(client, 'ord-1')
+    expect(result.mode).toBe('legacy')
+    const sql = String(client.query.mock.calls[2][0])
+    expect(sql).toContain('available_qty = inv.available_qty + src.qty')
+    expect(sql).not.toContain('reserved_qty')
+  })
+
   it('maps warehouse insufficient stock to ValidationError', async () => {
     supplierUsesWarehouseInventory.mockResolvedValue(true)
     assignWarehousesToOrder.mockRejectedValueOnce(
