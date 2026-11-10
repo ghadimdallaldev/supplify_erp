@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Resend HTTPS API email transport (mobile skipped, server-side only)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Server-side email transport only: `EMAIL_PROVIDER=resend` sends through `POST https://api.resend.com/emails` because Railway blocks outbound SMTP. New API env vars `RESEND_API_KEY`, `RESEND_API_URL`, `RESEND_TIMEOUT_MS`. No endpoint, auth, RBAC, type, notification payload or mobile env var change.
+
+---
+
 ## 2026-11-10 — Dispute credit application isolated in a savepoint (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Internal transaction safety only: `resolveDispute` now applies the credit note to the invoice inside `withSavepoint`, so a failed application rolls back to the savepoint instead of aborting the resolve transaction. Request and response shapes are unchanged.

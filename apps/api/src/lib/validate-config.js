@@ -80,10 +80,17 @@ function validateSharedProductionRules(issues) {
   if (config.AUTH_EMAIL_OTP_ENABLED && config.EMAIL_LOG_ONLY && config.APP_ENV !== 'dev') {
     issues.push('EMAIL_LOG_ONLY is not allowed for enabled email OTP outside dev')
   }
-  const emailConfigured =
-    !config.EMAIL_ENABLED || config.EMAIL_LOG_ONLY || Boolean(config.SMTP_HOST && config.SMTP_PASS)
-  if (config.EMAIL_ENABLED && !emailConfigured && !config.EMAIL_LOG_ONLY) {
-    issues.push('EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS or EMAIL_LOG_ONLY=true')
+  if (config.EMAIL_ENABLED && !config.EMAIL_LOG_ONLY) {
+    if (String(config.EMAIL_PROVIDER || '').toLowerCase() === 'resend') {
+      const resendHost = String(config.SMTP_HOST || '').toLowerCase() === 'smtp.resend.com'
+      if (!config.RESEND_API_KEY && !(resendHost && config.SMTP_PASS)) {
+        issues.push(
+          'EMAIL_PROVIDER=resend requires RESEND_API_KEY (or SMTP_PASS with SMTP_HOST=smtp.resend.com)'
+        )
+      }
+    } else if (!(config.SMTP_HOST && config.SMTP_PASS)) {
+      issues.push('EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS or EMAIL_LOG_ONLY=true')
+    }
   }
 }
 

@@ -71,7 +71,10 @@ See [../operations/storage-uploads.md](../operations/storage-uploads.md) for whe
 
 | `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |
-| `EMAIL_PROVIDER` | API | optional | `smtp` | Transport selection |
+| `EMAIL_PROVIDER` | API | optional | `smtp` | Transport selection: `smtp` (nodemailer) or `resend` (Resend HTTPS API). **`resend` is recommended on Railway**: outbound SMTP (ports 25/465/587) is blocked on Trial/Hobby plans, so nodemailer fails with `ETIMEDOUT` / `CONN`. Never auto-selected; a one-time startup warning suggests it when `SMTP_HOST=smtp.resend.com` |
+| `RESEND_API_KEY` | API | when `EMAIL_PROVIDER=resend` | — | Resend API key (secret; Railway secrets only). If unset and `SMTP_HOST=smtp.resend.com`, `SMTP_PASS` (the same key) is used; the startup log names the source, never the value |
+| `RESEND_API_URL` | API | optional | `https://api.resend.com` | Resend API base URL (override for tests) |
+| `RESEND_TIMEOUT_MS` | API | optional | `15000` | Per-request timeout for the Resend API |
 | `EMAIL_FROM_NAME` | API | all | `Supplify` | From display name |
 | `EMAIL_FROM_ADDRESS` | API | preprod, prod | `noreply@…` | From email (falls back to `SMTP_FROM`) |
 | `EMAIL_REPLY_TO` | API | optional | email | Optional reply-to header |

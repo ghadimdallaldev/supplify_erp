@@ -152,7 +152,9 @@ Non-secret email settings load from `deploy/railway/<env>/api.env` on deploy (`E
 | development    | `EMAIL_LOG_ONLY=true` (safe log-only)                      |
 | preprod / prod | `EMAIL_LOG_ONLY=false` — requires `SMTP_PASS` in dashboard |
 
-API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `SMTP_HOST`+`SMTP_PASS`. Test with `pnpm --filter @supplify/api email:test`. See [email-system.md](./email-system.md).
+**Railway blocks outbound SMTP on Trial/Hobby plans** (nodemailer to `smtp.resend.com:587` fails with `ETIMEDOUT`, command `CONN`). Use the Resend HTTPS API instead: set `EMAIL_PROVIDER=resend` and `RESEND_API_KEY=<same value as SMTP_PASS>` (if `RESEND_API_KEY` is unset and `SMTP_HOST=smtp.resend.com`, `SMTP_PASS` is reused). Startup logs `Email service initialized, provider: resend` and each send logs `Email sent via Resend`. The sending domain must be verified in Resend (an unverified domain returns 403, which is not retried automatically).
+
+API startup validates: when `EMAIL_ENABLED=true` and `EMAIL_LOG_ONLY=false`, you must configure `EMAIL_PROVIDER=resend` with `RESEND_API_KEY`, or `SMTP_HOST`+`SMTP_PASS`. Test with `pnpm --filter @supplify/api email:test`. See [email-system.md](./email-system.md).
 
 ## 3. Web service
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockConfig = vi.hoisted(() => ({
   APP_ENV: 'prod',
@@ -200,6 +200,66 @@ describe('validateProductionConfig dev (Railway)', () => {
     })
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()
+  })
+})
+
+describe('validateProductionConfig email provider', () => {
+  beforeEach(() => {
+    Object.assign(mockConfig, {
+      APP_ENV: 'prod',
+      NODE_ENV: 'production',
+      PAYMENTS_MODE: 'live',
+      BILLING_GATEWAY: 'manual',
+      BILLING_GATEWAY_EXPLICIT: true,
+      STORAGE_DRIVER: 's3',
+      WEB_ORIGINS: ['https://app.example.com'],
+      COOKIE_SECURE: true,
+      RATE_LIMIT_ENABLED: true,
+      OAUTH_CALLBACK_BASE_URL: 'https://app.example.com',
+      EMAIL_ENABLED: true,
+      EMAIL_LOG_ONLY: false,
+      EMAIL_PROVIDER: 'resend',
+      RESEND_API_KEY: 're_test_key',
+      SMTP_HOST: '',
+      SMTP_PASS: '',
+    })
+  })
+
+  afterEach(() => {
+    delete mockConfig.EMAIL_ENABLED
+    delete mockConfig.EMAIL_LOG_ONLY
+    delete mockConfig.EMAIL_PROVIDER
+    delete mockConfig.RESEND_API_KEY
+    mockConfig.SMTP_HOST = 'smtp.example.com'
+    mockConfig.SMTP_PASS = 'smtp-secret'
+  })
+
+  it('accepts resend with RESEND_API_KEY and no SMTP vars', async () => {
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).not.toThrow(/EMAIL/)
+  })
+
+  it('accepts resend with SMTP_PASS when SMTP_HOST is smtp.resend.com', async () => {
+    mockConfig.RESEND_API_KEY = ''
+    mockConfig.SMTP_HOST = 'smtp.resend.com'
+    mockConfig.SMTP_PASS = 're_from_smtp_pass'
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).not.toThrow(/EMAIL/)
+  })
+
+  it('rejects resend without any key', async () => {
+    mockConfig.RESEND_API_KEY = ''
+    mockConfig.SMTP_HOST = 'smtp.example.com'
+    mockConfig.SMTP_PASS = 'smtp-secret'
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/EMAIL_PROVIDER=resend requires/)
+  })
+
+  it('keeps the SMTP rule for the smtp provider', async () => {
+    mockConfig.EMAIL_PROVIDER = 'smtp'
+    mockConfig.RESEND_API_KEY = ''
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/SMTP_HOST\+SMTP_PASS/)
   })
 })
 
