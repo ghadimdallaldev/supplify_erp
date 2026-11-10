@@ -21,6 +21,20 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
   return loadRbacRouteMock(importOriginal)
 })
 
+const featureGate = vi.hoisted(() => ({ calls: [], blocked: false }))
+
+vi.mock('../lib/subscription.js', () => ({
+  requireFeature: (...args) => {
+    featureGate.calls.push(args[0])
+    return (_req, res, next) => {
+      if (featureGate.blocked) {
+        return res.status(403).json({ ok: false, error: { name: 'FeatureNotAvailable' } })
+      }
+      next()
+    }
+  },
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -39,6 +53,7 @@ describe('Payments Routes', () => {
 
   beforeEach(async () => {
     clearAllMocks()
+    featureGate.blocked = false
     db = setupMocks()
 
     // Sync db mocks
@@ -57,6 +72,27 @@ describe('Payments Routes', () => {
     app.use('/api/payments', paymentsRoutes)
     const { errorHandler } = await import('../middlewares/errorHandler.js')
     app.use(errorHandler)
+  })
+
+  describe('plan gate', () => {
+    it('is gated by the finance_invoices feature like the invoices routes', () => {
+      expect(featureGate.calls).toContain('finance_invoices')
+    })
+
+    it('blocks tenants without the feature before any handler or query runs', async () => {
+      featureGate.blocked = true
+      await request(app).get('/api/payments/invoice/invoice-1').expect(403)
+      await request(app)
+        .post('/api/payments')
+        .send({
+          invoice_id: '11111111-1111-4111-8111-111111111111',
+          payment_amount: 5,
+          payment_date: '2026-01-01',
+          payment_method: 'CASH',
+        })
+        .expect(403)
+      expect(db.query).not.toHaveBeenCalled()
+    })
   })
 
   describe('GET /api/payments/invoice/:invoiceId', () => {

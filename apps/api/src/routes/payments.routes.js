@@ -11,6 +11,7 @@ import {
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { requireFeature } from '../lib/subscription.js'
 import { z } from 'zod'
 import { notifyPaymentReceived } from '../services/notification.service.js'
 import {
@@ -20,6 +21,14 @@ import {
 } from '../services/invoice.service.js'
 
 const router = express.Router()
+
+// Payments are part of the finance/invoices surface: same plan gate as /api/invoices
+// and /api/restaurant-finance.
+const financeInvoicesGate = requireFeature(
+  'finance_invoices',
+  (req) => req.tenantContext?.tenantId,
+  (req) => req.tenantContext?.tenantType
+)
 
 const paymentSchema = z.object({
   invoice_id: z.string().uuid(),
@@ -44,6 +53,7 @@ const paymentSchema = z.object({
 router.use(
   requireAuth,
   resolveTenantContext,
+  financeInvoicesGate,
   requirePermission('INVOICES_VIEW'),
   // M9: Allow PAYMENTS_MANAGE (not only INVOICES_*) to perform payment mutations.
   (req, res, next) => {

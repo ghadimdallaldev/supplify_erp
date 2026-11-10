@@ -27,6 +27,7 @@ import {
   computeRemainingBalance,
   getInvoiceDetail,
   recordCashPayment,
+  roundMoney,
   INVOICE_CSV_HEADER,
   invoiceToCsvRow,
   withInvoiceCalendarDates,
@@ -554,7 +555,8 @@ router.post(
         paymentAmount = Math.max(0, remainingBalance - creditAmount)
       }
 
-      const totalPaymentWithCredit = paymentAmount + creditAmount
+      // Compare in 2dp so float noise (0.1 + 0.2) cannot reject or over-accept a payment.
+      const totalPaymentWithCredit = roundMoney(paymentAmount + creditAmount)
 
       if (totalPaymentWithCredit > remainingBalance) {
         throw new ValidationError(
