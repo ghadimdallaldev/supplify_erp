@@ -1013,8 +1013,17 @@ async function withRequesterAiUsage(payload, req) {
  * @param {string} tenantType - 'SUPPLIER' or 'RESTAURANT'
  * @param {string} meterType - Type of meter
  * @param {number} increment - Amount to increment (default: 1)
+ * @param {{ client?: { query: Function } | null }} [options] - when a transaction client is
+ *   given the meter write runs on it (rolls back with the caller's transaction). Failures are
+ *   still swallowed, so the write is wrapped in a savepoint to keep the transaction usable.
  */
-export async function incrementUsage(tenantId, tenantType, meterType, increment = 1) {
+export async function incrementUsage(
+  tenantId,
+  tenantType,
+  meterType,
+  increment = 1,
+  { client = null } = {}
+) {
   try {
     const subscription = await getTenantSubscription(tenantId, tenantType)
     if (!subscription) return
@@ -1030,22 +1039,32 @@ export async function incrementUsage(tenantId, tenantType, meterType, increment 
     })
     const effectiveLimit = resolved.isUnlimited ? null : resolved.effectiveLimit
 
-    await query(
-      `
+    const incrementSql = `
       INSERT INTO usage_meter (tenant_id, tenant_type, meter_type, current_value, period_type, period_start_date, limit_value)
       VALUES ($1, $2, $3, $4, 'DAILY', CURRENT_DATE, $5)
       ON CONFLICT (tenant_id, tenant_type, meter_type, period_start_date)
-      DO UPDATE SET 
+      DO UPDATE SET
         current_value = usage_meter.current_value + $4,
         last_updated = now(),
         limit_value = COALESCE(usage_meter.limit_value, $5),
-        is_over_limit = CASE 
+        is_over_limit = CASE
           WHEN $5 IS NULL THEN false
           ELSE (usage_meter.current_value + $4) >= $5
         END
-    `,
-      [tenantId, tenantType, meterType, increment, effectiveLimit]
-    )
+    `
+    const incrementParams = [tenantId, tenantType, meterType, increment, effectiveLimit]
+    if (client) {
+      await client.query('SAVEPOINT usage_meter_increment')
+      try {
+        await client.query(incrementSql, incrementParams)
+        await client.query('RELEASE SAVEPOINT usage_meter_increment')
+      } catch (writeError) {
+        await client.query('ROLLBACK TO SAVEPOINT usage_meter_increment')
+        throw writeError
+      }
+    } else {
+      await query(incrementSql, incrementParams)
+    }
 
     logger.info('Usage incremented', {
       tenantId,

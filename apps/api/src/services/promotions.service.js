@@ -1,6 +1,7 @@
 import { query } from '../lib/db.js'
 import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecycle.service.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
+import { moneySub, moneyToNumber } from '../lib/money.js'
 
 function runQuery(db, text, params) {
   if (db && typeof db.query === 'function') {
@@ -233,7 +234,77 @@ export async function loadActivePromotionsForSupplier(supplierId, restaurantId) 
 }
 
 /**
+ * Order total after a discount. The discount is computed on the promo-eligible lines, but
+ * the total starts from the full order subtotal (QUOTE_PRICE lines are excluded from the
+ * discount, not from the order).
+ */
+export function totalAfterPromotionDiscount(orderSubtotal, discountAmount) {
+  return Math.max(0, moneyToNumber(moneySub(orderSubtotal, discountAmount)))
+}
+
+/**
+ * Atomically consume one redemption. The caps are checked inside the UPDATE so two
+ * concurrent orders cannot both pass an unlocked `usage_count < usage_limit` read.
+ * stock_quantity is the deal's redemption stock and is compared with the same counter.
+ * @returns {Promise<boolean>} false when the promotion is exhausted (nothing was written)
+ */
+export async function claimPromotionUsage(db, promotionId) {
+  const { rows } = await runQuery(
+    db,
+    `
+    UPDATE promotions
+    SET usage_count = usage_count + 1, updated_at = NOW()
+    WHERE id = $1
+      AND (usage_limit IS NULL OR usage_count < usage_limit)
+      AND (stock_quantity IS NULL OR usage_count < stock_quantity)
+    RETURNING id, usage_count
+    `,
+    [promotionId]
+  )
+  return rows.length > 0
+}
+
+/**
+ * Give promotion redemptions back when an order is cancelled: usage_count drops by the
+ * number of redemptions the order consumed (never below 0). Each promotion_usages row is
+ * marked released in the same statement that selects it, so a repeated cancel (or a
+ * concurrent one) cannot decrement twice. The usage row itself is kept for audit.
+ * @returns {Promise<{ released: number }>}
+ */
+export async function releasePromotionUsageForOrder(db, orderId) {
+  const { rows } = await runQuery(
+    db,
+    `
+    UPDATE promotion_usages
+    SET released_at = NOW()
+    WHERE order_id = $1 AND released_at IS NULL
+    RETURNING promotion_id
+    `,
+    [orderId]
+  )
+  if (!rows.length) return { released: 0 }
+
+  const byPromotion = new Map()
+  for (const row of rows) {
+    if (!row.promotion_id) continue
+    byPromotion.set(row.promotion_id, (byPromotion.get(row.promotion_id) || 0) + 1)
+  }
+  for (const [promotionId, count] of byPromotion) {
+    await runQuery(
+      db,
+      `UPDATE promotions
+       SET usage_count = GREATEST(0, usage_count - $2), updated_at = NOW()
+       WHERE id = $1`,
+      [promotionId, count]
+    )
+  }
+  return { released: rows.length }
+}
+
+/**
  * Apply best eligible promotion inside an order transaction.
+ * `subtotal` is the promo-eligible subtotal (discount base); `orderSubtotal` is the full
+ * order subtotal the total is derived from (defaults to `subtotal`).
  */
 export async function applyBestPromotionToOrder({
   client,
@@ -241,6 +312,7 @@ export async function applyBestPromotionToOrder({
   supplierId,
   restaurantId,
   subtotal,
+  orderSubtotal = subtotal,
   lineItems,
   skipDealPreflight = false,
 }) {
@@ -262,7 +334,10 @@ export async function applyBestPromotionToOrder({
   if (!selected || selected.discountAmount <= 0) return null
 
   const { promotion, discountAmount } = selected
-  const newTotal = Math.max(0, Number(subtotal) - discountAmount)
+  // Claim first: if another order took the last redemption, apply nothing.
+  if (!(await claimPromotionUsage(client, promotion.id))) return null
+
+  const newTotal = totalAfterPromotionDiscount(orderSubtotal, discountAmount)
 
   await client.query(
     `UPDATE customer_order SET total_amount = $1, updated_at = NOW() WHERE id = $2`,
@@ -290,11 +365,6 @@ export async function applyBestPromotionToOrder({
       promotion.type === 'free_shipping' ? discountAmount : 0,
       JSON.stringify(buildDealConfigSnapshot(promotion)),
     ]
-  )
-
-  await client.query(
-    `UPDATE promotions SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1`,
-    [promotion.id]
   )
 
   return {

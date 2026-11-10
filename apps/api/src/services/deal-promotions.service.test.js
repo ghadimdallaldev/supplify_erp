@@ -80,8 +80,8 @@ describe('deal-promotions.service redemption metering', () => {
         if (text.includes('INSERT INTO promotion_usages')) {
           return { rows: [] }
         }
-        if (text.includes('UPDATE promotions SET usage_count')) {
-          return { rows: [] }
+        if (text.includes('UPDATE promotions') && text.includes('usage_count')) {
+          return { rows: [{ id: promotionId, usage_count: 1 }] }
         }
         if (text.includes('FROM deal_promotions')) {
           return { rows: [] }
@@ -108,12 +108,113 @@ describe('deal-promotions.service redemption metering', () => {
       discountAmount: 10,
     })
     expect(incrementUsage).toHaveBeenCalledTimes(1)
+    // B12: the meter write joins the order transaction so it rolls back with the order.
     expect(incrementUsage).toHaveBeenCalledWith(
       restaurantId,
       'RESTAURANT',
       'deal_redemptions_per_day',
-      1
+      1,
+      { client }
     )
+  })
+
+  describe('order totals and usage limits', () => {
+    const restaurantId = '550e8400-e29b-41d4-a716-446655440002'
+    const supplierId = '550e8400-e29b-41d4-a716-446655440001'
+    const now = new Date()
+    const promotion = {
+      id: 'promo-1111-4111-8111-111111111111',
+      supplier_id: supplierId,
+      name: 'Demo 10% Off',
+      type: 'percentage_discount',
+      discount_value: 10,
+      min_order_amount: null,
+      max_discount_cap: null,
+      applies_to: 'all',
+      status: 'active',
+      payment_status: 'not_required',
+      starts_at: new Date(now.getTime() - 86400000).toISOString(),
+      ends_at: new Date(now.getTime() + 86400000 * 30).toISOString(),
+      boost_start_at: new Date(now.getTime() - 86400000).toISOString(),
+      boost_end_at: new Date(now.getTime() + 86400000 * 7).toISOString(),
+      usage_limit: 3,
+      usage_count: 2,
+      target_product_ids: [],
+      target_category_ids: [],
+      restaurant_ids: [],
+    }
+
+    function makeClient({ claimed = true } = {}) {
+      return {
+        query: vi.fn(async (sql) => {
+          const text = typeof sql === 'string' ? sql : ''
+          if (text.includes('FROM promotions p') && text.includes('promotion_targets')) {
+            return { rows: [promotion] }
+          }
+          if (text.includes('UPDATE promotions') && text.includes('usage_count')) {
+            return { rows: claimed ? [{ id: promotion.id, usage_count: 3 }] : [] }
+          }
+          return { rows: [] }
+        }),
+      }
+    }
+
+    it('keeps QUOTE_PRICE lines in the total: $1000 quote + $200 catalog at 10% = $1180 (B8)', async () => {
+      const client = makeClient()
+      const result = await applyPromotionByIdToOrder({
+        client,
+        promotionId: promotion.id,
+        orderId: 'order-1',
+        supplierId,
+        restaurantId,
+        subtotal: 200,
+        orderSubtotal: 1200,
+        lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
+      })
+
+      expect(result.discountAmount).toBe(20)
+      expect(result.totalAfterDiscount).toBe(1180)
+      const totalUpdate = client.query.mock.calls.find(([sql]) =>
+        String(sql).includes('UPDATE customer_order SET total_amount')
+      )
+      expect(totalUpdate[1]).toEqual([1180, 'order-1'])
+    })
+
+    it('rejects the promotion when the atomic usage claim loses the race (B12)', async () => {
+      const client = makeClaimLost()
+      const result = await applyPromotionByIdToOrder({
+        client,
+        promotionId: promotion.id,
+        orderId: 'order-1',
+        supplierId,
+        restaurantId,
+        subtotal: 200,
+        lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
+      })
+
+      expect(result).toBeNull()
+      const claim = client.query.mock.calls.find(
+        ([sql]) => String(sql).includes('UPDATE promotions') && String(sql).includes('usage_count')
+      )
+      expect(String(claim[0])).toContain('usage_limit IS NULL OR usage_count < usage_limit')
+      expect(String(claim[0])).toContain('RETURNING')
+      expect(
+        client.query.mock.calls.some(([sql]) =>
+          String(sql).includes('INSERT INTO promotion_usages')
+        )
+      ).toBe(false)
+      expect(
+        client.query.mock.calls.some(([sql]) =>
+          String(sql).includes('UPDATE customer_order SET total_amount')
+        )
+      ).toBe(false)
+      // A rejected promotion must not consume the restaurant's daily redemption meter.
+      expect(incrementUsage).not.toHaveBeenCalled()
+    })
+
+    function makeClaimLost() {
+      return makeClient({ claimed: false })
+    }
   })
 })
 

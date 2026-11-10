@@ -50,6 +50,10 @@ Suppliers can run a loyalty program for restaurant buyers. Points are **earned w
 
 - Stub page: `apps/web/src/pages/loyalty/LoyaltyProgramPage.tsx` → `/app/loyalty`
 
+## Cancellation refund
+
+Cancelling an order (`PATCH /api/orders/:id` to `CANCELLED`, non-draft) calls `reverseSupplierLoyaltyRedeemOnOrderCancel` in the same transaction. For each program with `REDEEM` rows on the order it restores `points_balance`, lowers `lifetime_redeemed` (floored at 0) and appends a compensating `REVERSAL` ledger row (`reference_type = 'order_cancel'`, positive `points_delta`, original `monetary_value`). The balance row is locked first and an existing reversal makes a repeat a no-op. If the refund fails the cancel rolls back. Amendments keep the loyalty discount in the recalculated order total.
+
 ## Service
 
 - `apps/api/src/services/loyalty.service.js` — earn, redeem, validation, balance queries.

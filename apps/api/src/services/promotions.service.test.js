@@ -202,4 +202,140 @@ describe('promotions.service', () => {
       expect(scheduledSql).toContain('sub.account_locked_at IS NULL')
     })
   })
+
+  describe('releasePromotionUsageForOrder (B7)', () => {
+    it('decrements usage_count once per redeemed promotion and marks the usage released', async () => {
+      const { releasePromotionUsageForOrder } = await import('./promotions.service.js')
+      const client = {
+        query: vi.fn(async (sql) => {
+          if (String(sql).includes('UPDATE promotion_usages')) {
+            return { rows: [{ promotion_id: 'promo-1' }, { promotion_id: 'promo-1' }] }
+          }
+          return { rows: [], rowCount: 1 }
+        }),
+      }
+
+      const result = await releasePromotionUsageForOrder(client, 'ord-1')
+
+      expect(result).toEqual({ released: 2 })
+      const mark = client.query.mock.calls.find(([sql]) =>
+        String(sql).includes('UPDATE promotion_usages')
+      )
+      expect(String(mark[0])).toContain('released_at IS NULL')
+      const decrement = client.query.mock.calls.find(([sql]) =>
+        String(sql).includes('UPDATE promotions')
+      )
+      expect(String(decrement[0])).toContain('GREATEST(0, usage_count - $2)')
+      expect(decrement[1]).toEqual(['promo-1', 2])
+    })
+
+    it('is idempotent: already-released usages decrement nothing', async () => {
+      const { releasePromotionUsageForOrder } = await import('./promotions.service.js')
+      const client = { query: vi.fn(async () => ({ rows: [] })) }
+
+      const result = await releasePromotionUsageForOrder(client, 'ord-1')
+
+      expect(result).toEqual({ released: 0 })
+      expect(client.query).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('applyBestPromotionToOrder', () => {
+    const percentOff = {
+      ...basePromo,
+      id: 'promo-1',
+      supplier_id: 'sup-1',
+      name: '10% off',
+      type: 'percentage_discount',
+      discount_value: 10,
+      usage_limit: 5,
+      usage_count: 4,
+      target_product_ids: [],
+      target_category_ids: [],
+      restaurant_ids: [],
+    }
+
+    function makeClient({ claimed = true } = {}) {
+      return {
+        query: vi.fn(async (sql) => {
+          const text = String(sql)
+          if (text.includes('FROM promotions p')) return { rows: [percentOff] }
+          if (text.includes('UPDATE promotions') && text.includes('usage_count')) {
+            return { rows: claimed ? [{ id: 'promo-1', usage_count: 5 }] : [] }
+          }
+          return { rows: [] }
+        }),
+      }
+    }
+
+    it('keeps QUOTE_PRICE lines in the order total: $1000 quote + $200 catalog at 10% = $1180 (B8)', async () => {
+      const { applyBestPromotionToOrder } = await import('./promotions.service.js')
+      const client = makeClient()
+      const result = await applyBestPromotionToOrder({
+        client,
+        orderId: 'ord-1',
+        supplierId: 'sup-1',
+        restaurantId: 'rest-1',
+        // Discount is computed on the promo-eligible (catalog) lines only...
+        subtotal: 200,
+        lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
+        // ...but the order total starts from the FULL subtotal, quote line included.
+        orderSubtotal: 1200,
+        skipDealPreflight: true,
+      })
+
+      expect(result.discountAmount).toBe(20)
+      expect(result.totalAfterDiscount).toBe(1180)
+      const totalUpdate = client.query.mock.calls.find(([sql]) =>
+        String(sql).includes('UPDATE customer_order SET total_amount')
+      )
+      expect(totalUpdate[1]).toEqual([1180, 'ord-1'])
+    })
+
+    it('defaults the order total base to the discounted subtotal when no orderSubtotal is passed', async () => {
+      const { applyBestPromotionToOrder } = await import('./promotions.service.js')
+      const result = await applyBestPromotionToOrder({
+        client: makeClient(),
+        orderId: 'ord-1',
+        supplierId: 'sup-1',
+        restaurantId: 'rest-1',
+        subtotal: 200,
+        lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
+        skipDealPreflight: true,
+      })
+      expect(result.totalAfterDiscount).toBe(180)
+    })
+
+    it('claims usage atomically and writes nothing when the limit was hit concurrently (B12)', async () => {
+      const { applyBestPromotionToOrder } = await import('./promotions.service.js')
+      const client = makeClient({ claimed: false })
+      const result = await applyBestPromotionToOrder({
+        client,
+        orderId: 'ord-1',
+        supplierId: 'sup-1',
+        restaurantId: 'rest-1',
+        subtotal: 200,
+        lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
+        skipDealPreflight: true,
+      })
+
+      expect(result).toBeNull()
+      const claim = client.query.mock.calls.find(
+        ([sql]) => String(sql).includes('UPDATE promotions') && String(sql).includes('usage_count')
+      )
+      expect(String(claim[0])).toContain('usage_limit IS NULL OR usage_count < usage_limit')
+      expect(String(claim[0])).toContain('stock_quantity IS NULL OR usage_count < stock_quantity')
+      expect(String(claim[0])).toContain('RETURNING')
+      expect(
+        client.query.mock.calls.some(([sql]) =>
+          String(sql).includes('INSERT INTO promotion_usages')
+        )
+      ).toBe(false)
+      expect(
+        client.query.mock.calls.some(([sql]) =>
+          String(sql).includes('UPDATE customer_order SET total_amount')
+        )
+      ).toBe(false)
+    })
+  })
 })

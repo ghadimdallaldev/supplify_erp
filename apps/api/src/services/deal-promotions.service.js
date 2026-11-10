@@ -1,6 +1,11 @@
 import { query, withTransaction } from '../lib/db.js'
 import { buildBoostStatus } from './deal-boost.helpers.js'
-import { calculatePromotionDiscount, isPromotionEligible } from './promotions.service.js'
+import {
+  calculatePromotionDiscount,
+  claimPromotionUsage,
+  isPromotionEligible,
+  totalAfterPromotionDiscount,
+} from './promotions.service.js'
 import {
   buildDealConfigSnapshot,
   EXTENDED_INTERACTION_TYPES,
@@ -839,6 +844,7 @@ export async function applyPromotionByIdToOrder({
   supplierId,
   restaurantId,
   subtotal,
+  orderSubtotal = subtotal,
   lineItems,
 }) {
   const { isFeatureEnabled, checkLimit, incrementUsage } = await import('../lib/subscription.js')
@@ -880,7 +886,11 @@ export async function applyPromotionByIdToOrder({
   const discountAmount = calculatePromotionDiscount(promotion, subtotal, lineItems)
   if (discountAmount <= 0) return null
 
-  const newTotal = Math.max(0, Number(subtotal) - discountAmount)
+  // Atomic cap check + increment: the eligibility read above is unlocked, so this claim is
+  // what actually enforces usage_limit / stock_quantity under concurrency.
+  if (!(await claimPromotionUsage(client, promotion.id))) return null
+
+  const newTotal = totalAfterPromotionDiscount(orderSubtotal, discountAmount)
 
   await client.query(
     `UPDATE customer_order SET total_amount = $1, updated_at = NOW() WHERE id = $2`,
@@ -894,13 +904,9 @@ export async function applyPromotionByIdToOrder({
     discountAmount,
   })
 
-  await client.query(
-    `UPDATE promotions SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1`,
-    [promotion.id]
-  )
-
   const activePromo = await getActiveDealPromotion(client, promotion.id)
-  await incrementUsage(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day', 1)
+  // Pass the transaction client so the daily redemption meter rolls back with the order.
+  await incrementUsage(restaurantId, 'RESTAURANT', 'deal_redemptions_per_day', 1, { client })
   await recordDealInteraction({
     dealId: promotion.id,
     restaurantId,
