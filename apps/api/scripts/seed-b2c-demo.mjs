@@ -506,9 +506,9 @@ async function upsertBranchFulfillment(client, branchId, zonePrefixes) {
   await client.query(`DELETE FROM delivery_zone WHERE branch_id = $1`, [branchId])
   for (const zone of zonePrefixes) {
     await client.query(
-      `INSERT INTO delivery_zone (branch_id, name, postcode_prefix, delivery_fee, min_order_amount)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [branchId, zone.name, zone.prefix, zone.fee, zone.minOrder]
+      `INSERT INTO delivery_zone (branch_id, name, coverage_area_json, zone_type, postal_codes, delivery_fee, min_order_amount)
+       VALUES ($1, $2, $3::jsonb, 'postal_codes', $4::text[], $5, $6)`,
+      [branchId, zone.name, JSON.stringify({ postcodePrefix: zone.prefix }), [zone.prefix], zone.fee, zone.minOrder]
     )
   }
 }
