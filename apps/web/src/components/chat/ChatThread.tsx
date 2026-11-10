@@ -216,7 +216,7 @@ export function ChatThread({
                                       <span className="min-w-0 truncate text-sm">
                                         {String(att.fileName)}
                                       </span>
-                                      <Download className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
+                                      <Download className="ms-auto h-3.5 w-3.5 shrink-0 opacity-70" />
                                     </a>
                                   )}
                                 </div>
@@ -271,7 +271,7 @@ export function ChatThread({
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
                     <span className="chat-typing-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-mid)]" />
-                    <span className="ml-1.5 text-xs text-[var(--text-mid)]">
+                    <span className="ms-1.5 text-xs text-[var(--text-mid)]">
                       {t('thread.typing')}
                     </span>
                   </div>
@@ -289,7 +289,7 @@ export function ChatThread({
           onClick={onScrollToBottom}
           size="sm"
           variant="secondary"
-          className="erp-pressable absolute bottom-4 right-4 h-9 w-9 rounded-full p-0"
+          className="erp-pressable absolute bottom-4 end-4 h-9 w-9 rounded-full p-0"
           aria-label={t('thread.scrollToLatestAria')}
         >
           <ChevronDown className="h-4 w-4" />

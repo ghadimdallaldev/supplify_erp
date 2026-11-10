@@ -1,4 +1,4 @@
-import { Suspense, useState, useMemo, useEffect, useCallback } from 'react'
+import { Suspense, useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   useGetProductsQuery,
@@ -95,7 +95,10 @@ export function ProductsPage() {
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
   const [favoriteProduct] = useFavoriteProductMutation()
   const [unfavoriteProduct] = useUnfavoriteProductMutation()
-  const [generatePresignedUrl, { isLoading: isUploadingImage }] = useGeneratePresignedUrlMutation()
+  const [generatePresignedUrl] = useGeneratePresignedUrlMutation()
+  // Covers the whole presign + upload + create flow (the mutation isLoading only covers presign).
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false)
+  const submittingProductRef = useRef(false)
 
   const isSupplier = isEffectiveSupplier
   const isRestaurant = isEffectiveRestaurant
@@ -280,6 +283,9 @@ export function ProductsPage() {
   }
 
   const handleSubmitProduct = async () => {
+    if (submittingProductRef.current) return
+    submittingProductRef.current = true
+    setIsSubmittingProduct(true)
     try {
       let imageUrl = productForm.image_url
       if (productImage) {
@@ -320,6 +326,9 @@ export function ProductsPage() {
       setImagePreview(null)
     } catch (error: any) {
       toast.error(error?.data?.error?.message || t('toast.productCreateFailed'))
+    } finally {
+      submittingProductRef.current = false
+      setIsSubmittingProduct(false)
     }
   }
 
@@ -565,7 +574,7 @@ export function ProductsPage() {
                 handleImageSelect={handleImageSelect}
                 handleSubmitProduct={handleSubmitProduct}
                 isCreating={isCreating}
-                isUploadingImage={isUploadingImage}
+                isUploadingImage={isSubmittingProduct}
               />
             )}
             {showImageImport && (

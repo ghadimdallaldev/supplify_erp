@@ -54,8 +54,12 @@ export function ProofOfDeliveryDialog({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [presignPod] = usePresignOrderProofOfDeliveryMutation()
-  const [submitPod, { isLoading: submitting }] = useSubmitOrderProofOfDeliveryMutation()
-  const [completeDelivery, { isLoading: completing }] = useCompleteOrderDeliveryMutation()
+  const [submitPod] = useSubmitOrderProofOfDeliveryMutation()
+  const [completeDelivery] = useCompleteOrderDeliveryMutation()
+  // One in-flight flag for the whole flow (photo/signature upload + GPS wait + submit).
+  // The mutation isLoading flags only cover their own request, so they miss the uploads.
+  const [inFlight, setInFlight] = useState(false)
+  const inFlightRef = useRef(false)
 
   const resetForm = useCallback(() => {
     setRecipientName('')
@@ -167,6 +171,9 @@ export function ProofOfDeliveryDialog({
 
   const handleSubmit = async () => {
     if (!orderId || !hasProof) return
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    setInFlight(true)
     try {
       let fileKey: string | undefined
       let signatureFileKey: string | undefined
@@ -244,6 +251,9 @@ export function ProofOfDeliveryDialog({
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
       toast.error(msg || (error instanceof Error ? error.message : t('pod.toast.saveFailed')))
+    } finally {
+      inFlightRef.current = false
+      setInFlight(false)
     }
   }
 
@@ -350,12 +360,8 @@ export function ProofOfDeliveryDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {t('pod.dialog.skip')}
           </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || completing || !hasProof}
-          >
-            {(submitting || completing) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="button" onClick={handleSubmit} disabled={inFlight || !hasProof}>
+            {inFlight && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {t('pod.dialog.saveProof')}
           </Button>
         </DialogFooter>
