@@ -37,7 +37,19 @@ export interface Order {
   subtotal?: number
   deliveryFee?: number
   total?: number
-  status: 'DRAFT' | 'PLACED' | 'ACKNOWLEDGED' | 'PROCESSING' | 'SHIPPED' | 'COMPLETED' | 'CANCELLED'
+  status:
+    | 'DRAFT'
+    | 'PLACED'
+    | 'ACKNOWLEDGED'
+    | 'PROCESSING'
+    | 'SHIPPED'
+    | 'DELIVERED'
+    | 'RECEIVED_PARTIAL'
+    | 'RECEIVED_FULL'
+    | 'RECEIVED_WITH_DISPUTE'
+    | 'INVOICED'
+    | 'COMPLETED'
+    | 'CANCELLED'
   total_amount: number
   currency: string
   supplier_organization_id?: string | null
@@ -338,6 +350,8 @@ export interface DeliveryRouteStop {
   deliveryArea?: string | null
   addressLine?: string | null
   totalAmount: number
+  /** ISO currency of the order total; formatted as USD when absent. */
+  currency?: string | null
   itemCount: number
   notes?: string | null
   assignmentStatus?: string | null
