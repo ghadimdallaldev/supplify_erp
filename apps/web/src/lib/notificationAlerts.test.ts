@@ -56,3 +56,43 @@ describe('resolveNotificationUrl', () => {
     ).toBe('/app/settings?tab=plan')
   })
 })
+
+describe('resolveNotificationUrl tenant routing', () => {
+  const sub = { id: 's1', reference_type: 'SUBSCRIPTION', metadata: {} }
+
+  it('sends suppliers to the plan tab and restaurants to the subscription tab', () => {
+    expect(resolveNotificationUrl(sub, { tenantType: 'SUPPLIER' })).toBe('/app/settings?tab=plan')
+    expect(resolveNotificationUrl(sub, { tenantType: 'RESTAURANT' })).toBe(
+      '/app/settings?tab=subscription'
+    )
+  })
+
+  it('rewrites a server link that names the other tenant settings tab', () => {
+    const withLink = (link: string) => ({ id: 's2', metadata: { link } })
+    expect(
+      resolveNotificationUrl(withLink('/app/settings?tab=subscription'), {
+        tenantType: 'SUPPLIER',
+      })
+    ).toBe('/app/settings?tab=plan')
+    expect(
+      resolveNotificationUrl(withLink('/app/settings?tab=plan'), { tenantType: 'RESTAURANT' })
+    ).toBe('/app/settings?tab=subscription')
+  })
+
+  it('routes restaurant expiry alerts to restaurant inventory', () => {
+    const expiry = { id: 'e1', reference_type: 'INVENTORY_EXPIRY' }
+    expect(resolveNotificationUrl(expiry, { tenantType: 'RESTAURANT' })).toBe(
+      '/app/restaurant-inventory'
+    )
+    expect(resolveNotificationUrl(expiry, { tenantType: 'SUPPLIER' })).toBe(
+      '/app/inventory?tab=expiry'
+    )
+  })
+
+  it('rejects protocol-relative links', () => {
+    expect(resolveNotificationUrl({ id: 'x', metadata: { link: '//evil.example/x' } })).toBe('/app')
+    expect(resolveNotificationUrl({ id: 'x', metadata: { ctaUrl: '/\\evil.example' } })).toBe(
+      '/app'
+    )
+  })
+})

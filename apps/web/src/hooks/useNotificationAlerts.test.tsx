@@ -27,6 +27,10 @@ vi.mock('./redux', () => ({
   useAppDispatch: () => vi.fn(),
 }))
 
+vi.mock('./useImpersonation', () => ({
+  useImpersonation: () => ({ isEffectiveSupplier: false }),
+}))
+
 vi.mock('../lib/registerServiceWorker', () => ({
   registerServiceWorker: vi.fn(),
 }))

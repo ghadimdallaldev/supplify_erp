@@ -11,17 +11,23 @@ import {
   showBrowserNotificationAlways,
   unlockNotificationAudio,
   type NotificationLike,
+  type NotificationRouteOptions,
 } from '../lib/notificationAlerts'
+import { useImpersonation } from './useImpersonation'
 import { registerServiceWorker } from '../lib/registerServiceWorker'
 import { getAppSocket } from '../lib/appSocket'
 
 const POLL_DISCONNECTED_MS = 30_000
 const PERMISSION_PROMPT_KEY = 'supplify_notif_permission_asked'
 
-function showNotificationToast(notification: NotificationLike, onNavigate: (path: string) => void) {
+function showNotificationToast(
+  notification: NotificationLike,
+  onNavigate: (path: string) => void,
+  routeOptions: NotificationRouteOptions
+) {
   const title = notification.title || 'New notification'
   const message = notification.message || ''
-  const path = resolveNotificationUrl(notification)
+  const path = resolveNotificationUrl(notification, routeOptions)
 
   toast.custom(
     (id) => (
@@ -78,6 +84,9 @@ export function useNotificationAlerts() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const location = useLocation()
+  const { isEffectiveSupplier } = useImpersonation()
+  const isEffectiveSupplierRef = useRef(isEffectiveSupplier)
+  isEffectiveSupplierRef.current = isEffectiveSupplier
   const bootstrappedRef = useRef(false)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const lastUserIdRef = useRef<string | null>(null)
@@ -117,11 +126,14 @@ export function useNotificationAlerts() {
         return
       }
       playNotificationSound()
-      showNotificationToast(item, (path) => navigate(path))
+      const routeOptions: NotificationRouteOptions = {
+        tenantType: isEffectiveSupplierRef.current ? 'SUPPLIER' : 'RESTAURANT',
+      }
+      showNotificationToast(item, (path) => navigate(path), routeOptions)
       showBrowserNotificationAlways(
         item.title || 'Supplify',
         item.message || 'You have a new notification',
-        resolveNotificationUrl(item)
+        resolveNotificationUrl(item, routeOptions)
       )
       dispatch(api.util.invalidateTags(['Notification']))
     },
