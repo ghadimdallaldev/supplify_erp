@@ -25,7 +25,9 @@ import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
   hasActiveSupplierOrderPromotions,
+  releasePromotionUsageForOrder,
 } from '../../services/promotions.service.js'
+import { reverseSupplierLoyaltyRedeemOnOrderCancel } from '../../services/loyalty.service.js'
 import {
   applyPromotionByIdToOrder,
   validateCouponForOrder,
@@ -580,6 +582,22 @@ router.patch('/:id', async (req, res) => {
         await restoreSupplierStockForOrder(client, id)
       }
 
+      // Cancelling gives back what checkout consumed: redeemed loyalty points (compensating
+      // REVERSAL ledger entry) and promotion redemptions (usage_count). Both are idempotent
+      // and run in this transaction, so a failure rolls the cancel back instead of leaving
+      // the restaurant out of points.
+      if (
+        updateData.status === 'CANCELLED' &&
+        lockedOrder.status !== 'CANCELLED' &&
+        lockedOrder.status !== 'DRAFT'
+      ) {
+        await reverseSupplierLoyaltyRedeemOnOrderCancel(client, {
+          orderId: id,
+          createdBy: req.userData?.id,
+        })
+        await releasePromotionUsageForOrder(client, id)
+      }
+
       if (
         updateData.status === 'CANCELLED' &&
         lockedOrder.status !== 'CANCELLED' &&
@@ -639,6 +657,17 @@ router.patch('/:id', async (req, res) => {
           message: 'Invalid update data',
           details: error.errors,
         },
+        requestId: req.requestId,
+      })
+    }
+
+    // Must precede the ValidationError branch: the concurrent-state error is a
+    // ValidationError subclass instance, and its intended status is 409, not 400.
+    if (error?.code === 'ORDER_STATE_CHANGED') {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'ORDER_STATE_CHANGED', message: error.message },
         requestId: req.requestId,
       })
     }

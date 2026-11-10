@@ -10,13 +10,24 @@ import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notificati
 import { applySmartQuantitiesToItems } from './quick-list-ai.service.js'
 import { resolveProductPricesBatch } from './resolve-product-price.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
+import { getZonedParts } from '../lib/delivery-rollover-time.js'
 
 const DUE_LISTS_BATCH_SIZE = 50
 
+// Due-ness is evaluated on each restaurant's own clock (restaurant.timezone, falling back to
+// the platform default $2), the same convention as invoices and reorder cadence. A list set for
+// 09:00 therefore fires at 09:00 restaurant-local, and "today" is the local calendar day.
 const DUE_LISTS_SQL = `
-  SELECT ql.*, r.id AS restaurant_id
+  SELECT ql.*, r.id AS restaurant_id,
+         tz.name AS schedule_timezone,
+         to_char(tz.local_now, 'YYYY-MM-DD') AS local_today
   FROM quick_list ql
   JOIN restaurant r ON r.id = ql.restaurant_id
+  CROSS JOIN LATERAL (
+    SELECT COALESCE(NULLIF(TRIM(r.timezone), ''), $2) AS name,
+           (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)) AS local_now
+  ) tz
   WHERE ql.is_scheduled = true
     AND ql.status = 'ACTIVE'
     AND NOT EXISTS (
@@ -27,14 +38,14 @@ const DUE_LISTS_SQL = `
         AND sub.status IN ('TRIALING', 'ACTIVE', 'PAST_DUE')
         AND sub.account_locked_at IS NOT NULL
     )
-    AND ql.next_execution_date <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+    AND ql.next_execution_date <= tz.local_now::date
     AND (
-      ql.next_execution_date < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+      ql.next_execution_date < tz.local_now::date
       OR (
-        ql.next_execution_date = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date
+        ql.next_execution_date = tz.local_now::date
         AND (
           ql.preferred_time IS NULL
-          OR ql.preferred_time <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::time
+          OR ql.preferred_time <= tz.local_now::time
         )
       )
     )
@@ -45,11 +56,12 @@ const DUE_LISTS_SQL = `
 
 /**
  * Execute scheduled quick lists and create orders if auto_create_order is true.
- * Uses UTC for due-date matching, row locks, and a per-list daily execution ledger.
+ * Due-date matching uses each restaurant's timezone; row locks and a per-list daily
+ * execution ledger (keyed by that local date) make execution idempotent.
  */
 export async function executeScheduledOrders() {
   try {
-    logger.info('Checking for scheduled orders to execute (UTC)...')
+    logger.info('Checking for scheduled orders to execute (restaurant-local time)...')
 
     let executed = 0
     let errors = 0
@@ -57,14 +69,13 @@ export async function executeScheduledOrders() {
 
     for (;;) {
       const batchResult = await withTransaction(async (client) => {
-        const { rows: scheduledLists } = await client.query(DUE_LISTS_SQL, [DUE_LISTS_BATCH_SIZE])
+        const { rows: scheduledLists } = await client.query(DUE_LISTS_SQL, [
+          DUE_LISTS_BATCH_SIZE,
+          getDefaultTenantTimezone(),
+        ])
         if (scheduledLists.length === 0) {
           return { done: true, executed: 0, errors: 0, skipped: 0 }
         }
-
-        const {
-          rows: [{ today_date: executionDate }],
-        } = await client.query(`SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date AS today_date`)
 
         let batchExecuted = 0
         let batchErrors = 0
@@ -72,6 +83,8 @@ export async function executeScheduledOrders() {
         const postCommitNotifications = []
 
         for (const quickList of scheduledLists) {
+          // Local calendar day of this restaurant (computed in SQL with the due check).
+          const executionDate = quickList.local_today
           const nextExecutionDate = computeNextExecutionDate(quickList)
 
           const { rows: ledgerRows } = await client.query(
@@ -384,9 +397,13 @@ export async function createOrderFromQuickList(quickList, client, executionDate 
         order: { ...order, restaurant_id: restaurantId },
         orderItems: insertedItems,
         multiWarehouseActive: multiActive,
+        // Reserve like every other placement path so the shipped-order commit and a later
+        // cancel stay symmetric for legacy (non-warehouse) suppliers.
+        reserveLegacy: true,
         legacyLineItems: orderItems.map((item) => ({
           productId: item.productId,
           quantity: item.quantity,
+          reserve: true,
         })),
       }
     )
@@ -410,13 +427,22 @@ export async function createOrderFromQuickList(quickList, client, executionDate 
 }
 
 /**
- * Compute next execution date based on frequency (UTC calendar dates).
+ * Compute next execution date based on frequency. The calendar math runs on a UTC-midnight
+ * Date that stands for the restaurant-local calendar day, so "today" is the local day
+ * (default: the list's schedule_timezone from the due query, else UTC).
  */
-export function computeNextExecutionDate(quickList) {
-  const today = new Date()
-  const utcToday = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-  )
+export function computeNextExecutionDate(
+  quickList,
+  timeZone = quickList?.schedule_timezone ?? null
+) {
+  let utcToday
+  if (timeZone) {
+    const [y, m, d] = getZonedParts(new Date(), timeZone).calendarDate.split('-').map(Number)
+    utcToday = new Date(Date.UTC(y, m - 1, d))
+  } else {
+    const today = new Date()
+    utcToday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+  }
   let cursor = new Date(utcToday)
   let nextExecutionDate
 

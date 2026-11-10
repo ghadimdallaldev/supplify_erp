@@ -10,6 +10,7 @@ import {
   markWarehouseAssignmentDelivered,
   releaseInventoryForAssignment,
   allWarehouseAssignmentsDelivered,
+  reopenFailedWarehouseLegs,
 } from './warehouseInventory.js'
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
@@ -473,6 +474,21 @@ export async function updateDeliveryStatus({
   return result
 }
 
+/**
+ * Re-open failed warehouse legs (fresh pending leg + new reservation) for a redispatch.
+ * An insufficient-stock failure is a client-facing validation error, not a 500.
+ */
+async function reopenLegsForRedispatch(client, orderId, supplierId, { assignmentId = null } = {}) {
+  try {
+    return (await reopenFailedWarehouseLegs(client, orderId, { assignmentId, supplierId })) ?? []
+  } catch (error) {
+    if (/Insufficient stock|no warehouse inventory row/i.test(error?.message || '')) {
+      throw new ValidationError(error.message)
+    }
+    throw error
+  }
+}
+
 async function applyDeliveryStatusUpdate({
   supplierId,
   orderId,
@@ -581,11 +597,20 @@ async function applyDeliveryStatusUpdate({
         )
         orderMarkedShipped = true
       }
-      await commitDispatchInventoryForAssignment(
-        client,
-        orderId,
-        assignment.warehouse_assignment_id
-      )
+      // A failed delivery marks the leg 'failed' and releases its stock. Redispatching
+      // such a leg must reserve again, or the commit below would silently skip it.
+      let legId = assignment.warehouse_assignment_id
+      const reopenedLegs = await reopenLegsForRedispatch(client, orderId, supplierId, {
+        assignmentId: legId,
+      })
+      if (reopenedLegs.length) {
+        legId = reopenedLegs[0].id
+        await client.query(
+          `UPDATE driver_assignments SET warehouse_assignment_id = $1, updated_at = now() WHERE id = $2`,
+          [legId, assignment.id]
+        )
+      }
+      await commitDispatchInventoryForAssignment(client, orderId, legId)
     } else {
       const { rows: openLegs } = await client.query(
         `SELECT id FROM order_warehouse_assignment
@@ -598,6 +623,16 @@ async function applyDeliveryStatusUpdate({
           'This delivery is not tied to a warehouse leg; specify warehouse_assignment_id'
         )
       }
+      // Every leg failed on an earlier attempt: re-reserve fresh legs so the stock leaves the
+      // warehouse on this redelivery instead of the order shipping with nothing deducted.
+      const reopenedLegs = openLegs.length
+        ? []
+        : await reopenLegsForRedispatch(client, orderId, supplierId)
+      if (reopenedLegs.length > 1) {
+        throw new ValidationError(
+          'This delivery is not tied to a warehouse leg; specify warehouse_assignment_id'
+        )
+      }
       if (oldStatus === 'PROCESSING') {
         await client.query(
           `UPDATE customer_order SET status = 'SHIPPED', updated_at = now() WHERE id = $1`,
@@ -605,7 +640,9 @@ async function applyDeliveryStatusUpdate({
         )
         orderMarkedShipped = true
       }
-      if (openLegs.length === 1) {
+      if (reopenedLegs.length === 1) {
+        await commitDispatchInventoryForAssignment(client, orderId, reopenedLegs[0].id)
+      } else if (openLegs.length === 1) {
         await commitDispatchInventoryForAssignment(client, orderId, openLegs[0].id)
       } else if (oldStatus === 'PROCESSING') {
         await syncWarehouseFulfillmentOnOrderStatus(client, orderId, 'SHIPPED', oldStatus)

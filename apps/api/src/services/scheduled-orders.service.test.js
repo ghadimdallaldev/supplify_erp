@@ -68,6 +68,8 @@ function dueQuickList(overrides = {}) {
     auto_create_order: false,
     frequency: 'WEEKLY',
     days_of_week: null,
+    schedule_timezone: 'UTC',
+    local_today: '2026-06-01',
     ...overrides,
   }
 }
@@ -78,6 +80,39 @@ describe('computeNextExecutionDate', () => {
     vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
     const next = computeNextExecutionDate({ frequency: 'DAILY' })
     expect(next).toBe('2026-06-02')
+    vi.useRealTimers()
+  })
+
+  it('advances from the restaurant-local calendar day, not the UTC day (UTC+3)', () => {
+    vi.useFakeTimers()
+    // 22:30 UTC on Jun 1 is already 01:30 on Jun 2 in Riyadh (UTC+3, no DST).
+    vi.setSystemTime(new Date('2026-06-01T22:30:00Z'))
+    expect(computeNextExecutionDate({ frequency: 'DAILY' })).toBe('2026-06-02')
+    expect(computeNextExecutionDate({ frequency: 'DAILY' }, 'Asia/Riyadh')).toBe('2026-06-03')
+    expect(computeNextExecutionDate({ frequency: 'WEEKLY' }, 'Asia/Riyadh')).toBe('2026-06-09')
+    vi.useRealTimers()
+  })
+
+  it('reads the timezone from the due-list row (schedule_timezone)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T22:30:00Z'))
+    expect(computeNextExecutionDate({ frequency: 'DAILY', schedule_timezone: 'Asia/Riyadh' })).toBe(
+      '2026-06-03'
+    )
+    vi.useRealTimers()
+  })
+
+  it('picks the next scheduled weekday in the local timezone', () => {
+    vi.useFakeTimers()
+    // UTC says Monday Jun 1; Riyadh already says Tuesday Jun 2, so next MONDAY/THURSDAY is Thursday.
+    vi.setSystemTime(new Date('2026-06-01T22:30:00Z'))
+    const list = { frequency: 'WEEKLY_3X', days_of_week: ['MONDAY', 'THURSDAY'] }
+    expect(computeNextExecutionDate(list)).toBe('2026-06-04')
+    expect(computeNextExecutionDate(list, 'Asia/Riyadh')).toBe('2026-06-04')
+    const tuesdayOnly = { frequency: 'WEEKLY_3X', days_of_week: ['TUESDAY'] }
+    // From local Tuesday the next Tuesday is a week away; from UTC Monday it is tomorrow.
+    expect(computeNextExecutionDate(tuesdayOnly)).toBe('2026-06-02')
+    expect(computeNextExecutionDate(tuesdayOnly, 'Asia/Riyadh')).toBe('2026-06-09')
     vi.useRealTimers()
   })
 })
@@ -98,6 +133,60 @@ describe('executeScheduledOrders', () => {
       "sub.status IN ('TRIALING', 'ACTIVE', 'PAST_DUE')"
     )
   })
+  it('compares next_execution_date and preferred_time in the restaurant timezone, not UTC (B14)', async () => {
+    clientQueryMock.mockResolvedValueOnce({ rows: [] })
+
+    await executeScheduledOrders()
+
+    const [sql, params] = clientQueryMock.mock.calls[0]
+    const text = String(sql)
+    expect(text).not.toContain("AT TIME ZONE 'UTC'")
+    expect(text).toContain("NULLIF(TRIM(r.timezone), '')")
+    expect(text).toContain('::time')
+    // [batch size, platform default timezone used when restaurant.timezone is empty]
+    expect(params[0]).toBe(50)
+    expect(typeof params[1]).toBe('string')
+    expect(params[1].length).toBeGreaterThan(0)
+  })
+
+  it('records the ledger and next run on the restaurant-local date (UTC+3)', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T22:30:00Z'))
+    // Due list as the SQL returns it: it is already 2026-06-02 in the restaurant's timezone.
+    const list = dueQuickList({
+      schedule_timezone: 'Asia/Riyadh',
+      local_today: '2026-06-02',
+      preferred_time: '01:00:00',
+      frequency: 'DAILY',
+    })
+    const statements = []
+    clientQueryMock.mockImplementation(async (sql, params) => {
+      const text = String(sql)
+      statements.push({ text, params })
+      if (text.includes('FROM quick_list ql')) {
+        return {
+          rows:
+            statements.filter((s) => s.text.includes('FROM quick_list ql')).length > 1
+              ? []
+              : [list],
+        }
+      }
+      if (text.includes('INSERT INTO quick_list_execution')) return { rows: [{ id: 'ledger-1' }] }
+      return { rows: [], rowCount: 1 }
+    })
+
+    await executeScheduledOrders()
+    vi.useRealTimers()
+
+    const ledger = statements.find((s) => s.text.includes('INSERT INTO quick_list_execution'))
+    expect(ledger.params[2]).toBe('2026-06-02')
+    const advance = statements.find(
+      (s) => s.text.includes('UPDATE quick_list') && s.text.includes('next_execution_date')
+    )
+    // next run = local tomorrow (Jun 3), last run = local today (Jun 2)
+    expect(advance.params.slice(0, 2)).toEqual(['2026-06-03', '2026-06-02'])
+  })
+
   it('returns zero when no lists are due', async () => {
     clientQueryMock.mockResolvedValueOnce({ rows: [] })
 
@@ -110,7 +199,6 @@ describe('executeScheduledOrders', () => {
     const list = dueQuickList()
     clientQueryMock
       .mockResolvedValueOnce({ rows: [list] })
-      .mockResolvedValueOnce({ rows: [{ today_date: '2026-06-01' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rowCount: 1 })
 
@@ -124,7 +212,6 @@ describe('executeScheduledOrders', () => {
     const list = dueQuickList()
     clientQueryMock
       .mockResolvedValueOnce({ rows: [list] })
-      .mockResolvedValueOnce({ rows: [{ today_date: '2026-06-01' }] })
       .mockResolvedValueOnce({ rows: [{ id: 'ledger-1' }] })
       .mockResolvedValueOnce({ rowCount: 1 })
       .mockResolvedValueOnce({ rowCount: 1 })
@@ -150,7 +237,6 @@ describe('executeScheduledOrders', () => {
             statements.filter((q) => q.startsWith('SELECT')).length <= 1 ? [failing, reminder] : [],
         }
       }
-      if (text.includes('AS today_date')) return { rows: [{ today_date: '2026-06-01' }] }
       if (text.includes('INSERT INTO quick_list_execution')) {
         return { rows: [{ id: 'ledger-' + params[0] }] }
       }
@@ -253,5 +339,38 @@ describe('executeScheduledOrders', () => {
     ])
     expect(result.orders).toHaveLength(1)
     expect(result.orders[0].total_amount).toBe(15)
+  })
+
+  it('reserves legacy stock for scheduled orders like every other placement path (B6c)', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+    const { reserveStockForPlacedOrder } = await import('./supplier-order-stock.service.js')
+    vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+      {
+        productId: 'prod-1',
+        supplierId: 'sup-1',
+        quantity: 2,
+        unitPrice: 7.5,
+        source: 'DEFAULT_PRICE',
+        defaultPrice: 7.5,
+        contractPriceId: null,
+      },
+    ])
+    const q = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [{ product_id: 'prod-1', supplier_id: 'sup-1', quantity: 2, notes: '' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'prod-1', sku: 'SKU-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ord-1', restaurant_id: 'rest-1', total_amount: 15 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'oi-1', product_id: 'prod-1', unit_price: 7.5 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'sup-1' }] })
+
+    await createOrderFromQuickList({ id: 'ql-1', restaurant_id: 'rest-1' }, { query: q })
+
+    const args = vi.mocked(reserveStockForPlacedOrder).mock.calls.at(-1)[1]
+    expect(args.reserveLegacy).toBe(true)
+    expect(args.legacyLineItems).toEqual([
+      expect.objectContaining({ productId: 'prod-1', quantity: 2, reserve: true }),
+    ])
   })
 })

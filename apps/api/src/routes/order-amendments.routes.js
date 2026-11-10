@@ -20,7 +20,10 @@ import {
 
 const router = express.Router({ mergeParams: true })
 
-const createSchema = z.object({
+// Quantities must be positive (line removal is the explicit item_removal change type, not
+// quantity 0). There is deliberately no client unit price: amendment prices are always
+// resolved server-side, and zod strips unknown keys, so a legacy `unitPrice` is ignored.
+export const createAmendmentSchema = z.object({
   changeType: z.enum([
     'quantity_change',
     'item_substitution',
@@ -35,9 +38,8 @@ const createSchema = z.object({
         orderItemId: z.string().uuid().optional(),
         originalProductId: z.string().uuid().optional(),
         substituteProductId: z.string().uuid().optional(),
-        originalQuantity: z.number().optional(),
-        requestedQuantity: z.number().optional(),
-        unitPrice: z.number().optional(),
+        originalQuantity: z.number().positive().optional(),
+        requestedQuantity: z.number().positive().optional(),
         notes: z.string().optional(),
       })
     )
@@ -119,7 +121,7 @@ router.post('/', requirePermission('ORDERS_MANAGE'), amendmentsGate, async (req,
     if (!canAmendOrderStatus(order.status)) {
       throw new ValidationError('Order cannot be amended in its current status')
     }
-    const body = createSchema.parse(req.body)
+    const body = createAmendmentSchema.parse(req.body)
     const requestedByRole = resolveRequesterRole(req)
 
     const amendment = await withTransaction(async (client) => {
@@ -149,7 +151,7 @@ router.post('/', requirePermission('ORDERS_MANAGE'), amendmentsGate, async (req,
             item.substituteProductId ?? null,
             item.originalQuantity ?? null,
             item.requestedQuantity ?? null,
-            item.unitPrice ?? null,
+            null, // unit_price: never client-supplied; applyAmendmentItems resolves it
             item.notes ?? null,
           ]
         )

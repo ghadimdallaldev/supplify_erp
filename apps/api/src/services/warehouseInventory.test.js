@@ -14,7 +14,10 @@ vi.mock('../lib/warehouse-helpers.js', () => ({
 import {
   syncWarehouseFulfillmentOnOrderStatus,
   releaseInventoryForOrder,
+  releaseInventoryForFailedDelivery,
   reserveWarehouseStockBatch,
+  commitLegacyReservedStockForOrder,
+  reopenFailedWarehouseLegs,
 } from './warehouseInventory.js'
 import { seedMissingWarehouseInventoryForSupplier } from './supplier-stock.service.js'
 
@@ -347,5 +350,199 @@ describe('warehouseInventory', () => {
     expect(
       queries.some((q) => String(q.sql).includes('quantity_reserved = wi.quantity_reserved +'))
     ).toBe(true)
+  })
+
+  describe('dispatched stock restore keeps available in step with on_hand (B6a)', () => {
+    function dispatchedClient() {
+      return {
+        query: vi.fn(async (sql) => {
+          if (sql.includes('FROM order_warehouse_assignment') && sql.includes('SELECT *')) {
+            return {
+              rows: [
+                {
+                  id: 'a-dispatched',
+                  order_id: 'order-1',
+                  order_item_id: null,
+                  warehouse_id: 'wh-1',
+                  status: 'dispatched',
+                },
+              ],
+            }
+          }
+          if (sql.includes('FROM order_item')) {
+            return { rows: [{ product_id: 'p1', quantity: 3 }] }
+          }
+          return { rows: [] }
+        }),
+      }
+    }
+
+    it('cancelling a dispatched leg restores quantity_available as well as quantity_on_hand', async () => {
+      const client = dispatchedClient()
+      await releaseInventoryForOrder(client, 'order-1')
+
+      const restore = client.query.mock.calls.find((c) =>
+        String(c[0]).includes('quantity_on_hand = COALESCE(quantity_on_hand, 0) +')
+      )
+      expect(restore).toBeTruthy()
+      expect(String(restore[0])).toContain('quantity_available = quantity_available +')
+      expect(restore[1]).toEqual([3, 'wh-1', 'p1'])
+    })
+
+    it('a failed delivery of a dispatched leg restores quantity_available as well', async () => {
+      const client = dispatchedClient()
+      await releaseInventoryForFailedDelivery(client, 'order-1')
+
+      const restore = client.query.mock.calls.find((c) =>
+        String(c[0]).includes('quantity_on_hand = COALESCE(quantity_on_hand, 0) +')
+      )
+      expect(restore).toBeTruthy()
+      expect(String(restore[0])).toContain('quantity_available = quantity_available +')
+    })
+  })
+
+  describe('legacy reserved_qty commit on dispatch (B6c)', () => {
+    function legacyClient({ claimed }) {
+      return {
+        query: vi.fn(async (sql) => {
+          if (sql.includes('legacy_stock_committed_at IS NULL')) {
+            return { rows: claimed ? [{ id: 'order-1' }] : [] }
+          }
+          if (sql.includes('FROM order_item')) {
+            return {
+              rows: [
+                { product_id: 'p1', quantity: 2 },
+                { product_id: 'p1', quantity: 3 },
+                { product_id: 'p2', quantity: 1 },
+              ],
+            }
+          }
+          return { rows: [], rowCount: 0 }
+        }),
+      }
+    }
+
+    it('decrements reserved_qty once per product (aggregated) when the order first ships', async () => {
+      const client = legacyClient({ claimed: true })
+      const result = await commitLegacyReservedStockForOrder(client, 'order-1')
+
+      expect(result).toEqual({ committed: true })
+      const update = client.query.mock.calls.find((c) => String(c[0]).includes('UPDATE inventory'))
+      expect(update).toBeTruthy()
+      expect(String(update[0])).toContain('reserved_qty = GREATEST(0, inv.reserved_qty - src.qty)')
+      expect(String(update[0])).not.toContain('available_qty')
+      expect(update[1]).toEqual([
+        ['p1', 'p2'],
+        [5, 1],
+      ])
+    })
+
+    it('is idempotent: a second commit (claim returns no row) touches nothing', async () => {
+      const client = legacyClient({ claimed: false })
+      const result = await commitLegacyReservedStockForOrder(client, 'order-1')
+
+      expect(result).toEqual({ committed: false })
+      expect(client.query.mock.calls.some((c) => String(c[0]).includes('UPDATE inventory'))).toBe(
+        false
+      )
+    })
+
+    it('only claims orders that have no warehouse legs (warehouse mode commits per leg)', async () => {
+      const client = legacyClient({ claimed: false })
+      await commitLegacyReservedStockForOrder(client, 'order-1')
+      const claim = client.query.mock.calls.find((c) =>
+        String(c[0]).includes('legacy_stock_committed_at IS NULL')
+      )
+      expect(String(claim[0])).toContain('NOT EXISTS')
+      expect(String(claim[0])).toContain('order_warehouse_assignment')
+    })
+
+    it('syncWarehouseFulfillmentOnOrderStatus commits legacy stock when the order ships', async () => {
+      const client = legacyClient({ claimed: true })
+      await syncWarehouseFulfillmentOnOrderStatus(client, 'order-1', 'SHIPPED', 'PROCESSING')
+      expect(client.query.mock.calls.some((c) => String(c[0]).includes('UPDATE inventory'))).toBe(
+        true
+      )
+    })
+
+    it('syncWarehouseFulfillmentOnOrderStatus does not commit legacy stock before dispatch', async () => {
+      const client = legacyClient({ claimed: true })
+      await syncWarehouseFulfillmentOnOrderStatus(client, 'order-1', 'PROCESSING', 'ACKNOWLEDGED')
+      expect(
+        client.query.mock.calls.some((c) => String(c[0]).includes('legacy_stock_committed_at'))
+      ).toBe(false)
+    })
+  })
+
+  describe('reopenFailedWarehouseLegs re-reserves stock for a redelivery (B6b)', () => {
+    function reopenClient(failedLegs) {
+      const inserted = []
+      const client = {
+        inserted,
+        query: vi.fn(async (sql, params) => {
+          if (
+            sql.includes('FROM order_warehouse_assignment') &&
+            sql.includes("status = 'failed'")
+          ) {
+            return { rows: failedLegs }
+          }
+          if (sql.includes('INSERT INTO order_warehouse_assignment')) {
+            const row = {
+              id: `new-${inserted.length + 1}`,
+              order_id: params[0],
+              order_item_id: params[1],
+              warehouse_id: params[2],
+              status: 'pending',
+            }
+            inserted.push(row)
+            return { rows: [row] }
+          }
+          if (sql.includes('SELECT product_id, quantity_available FROM warehouse_inventory')) {
+            return { rows: [{ product_id: 'p1', quantity_available: 10 }] }
+          }
+          if (sql.includes('FROM order_item')) {
+            return { rows: [{ product_id: 'p1', quantity: 4 }] }
+          }
+          return { rows: [], rowCount: 1 }
+        }),
+      }
+      return client
+    }
+
+    it('creates a fresh pending leg, supersedes the failed one and reserves the stock again', async () => {
+      const client = reopenClient([
+        { id: 'old-1', order_id: 'order-1', order_item_id: null, warehouse_id: 'wh-1' },
+      ])
+      const legs = await reopenFailedWarehouseLegs(client, 'order-1', { supplierId: 'sup-1' })
+
+      expect(legs).toHaveLength(1)
+      expect(legs[0].id).toBe('new-1')
+      const insert = client.query.mock.calls.find((c) =>
+        String(c[0]).includes('INSERT INTO order_warehouse_assignment')
+      )
+      expect(insert[1][2]).toBe('wh-1')
+      expect(insert[1][4]).toBe('old-1')
+      expect(
+        client.query.mock.calls.some(
+          (c) => String(c[0]).includes("SET status = 'superseded'") && c[1].includes('old-1')
+        )
+      ).toBe(true)
+      const reserve = client.query.mock.calls.find((c) =>
+        String(c[0]).includes('quantity_reserved = wi.quantity_reserved +')
+      )
+      expect(reserve).toBeTruthy()
+      expect(reserve[1]).toEqual(['wh-1', ['p1'], [4]])
+    })
+
+    it('does nothing when there are no failed legs', async () => {
+      const client = reopenClient([])
+      const legs = await reopenFailedWarehouseLegs(client, 'order-1')
+      expect(legs).toEqual([])
+      expect(
+        client.query.mock.calls.some((c) =>
+          String(c[0]).includes('INSERT INTO order_warehouse_assignment')
+        )
+      ).toBe(false)
+    })
   })
 })

@@ -42,6 +42,8 @@ Web maps list lines with `cartItemsFromQuickList` / `quickListItemToProduct` (`a
 | POST   | `/api/quick-lists/:id/ai-suggest`       | Returns add/update proposals from reorder assistance                        |
 | POST   | `/api/quick-lists/:id/ai-suggest/apply` | Body `{ proposals: [...] }`                                                 |
 
+Scheduled execution runs on the **restaurant's clock**: a list is due when `next_execution_date` is on or before the restaurant-local date and `preferred_time` has passed in the restaurant-local time (`restaurant.timezone`, falling back to the platform default `getDefaultTenantTimezone()`, same convention as invoices and reorder cadence). The daily execution ledger is keyed by that local date, and the next run date is advanced from the local calendar day (a UTC+3 restaurant at 01:30 local on the 2nd is already on the 2nd even though UTC still says the 1st). Scheduled orders reserve stock like any other placement.
+
 Scheduled cron (`scheduled-orders.service`) applies smart quantities when `quick_list.use_ai_quantities = true`, writing an audit payload to `quick_list_execution.ai_adjustments`. Locked or expired tenants must not create operational writes through scheduled execution.
 
 ## 5-minute Buyer Test

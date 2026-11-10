@@ -708,6 +708,60 @@ describe('Subscription lib', () => {
     })
   })
 
+  describe('incrementUsage with a transaction client (B12)', () => {
+    it('writes the meter on the supplied client inside a savepoint, not on the pool', async () => {
+      const { incrementUsage } = await import('./subscription.js')
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow()] },
+          fullSub: { rows: [subscriptionRow({ tenant_id: 'rest-1', limits: {} })] },
+        })
+      )
+      const clientSql = []
+      const client = {
+        query: vi.fn(async (sql) => {
+          clientSql.push(String(sql).trim().split('\n')[0].trim())
+          return { rows: [] }
+        }),
+      }
+      const poolCallsBefore = mockQuery.mock.calls.length
+
+      await incrementUsage('rest-1', 'RESTAURANT', 'deal_redemptions_per_day', 1, { client })
+
+      expect(clientSql[0]).toBe('SAVEPOINT usage_meter_increment')
+      expect(clientSql.some((s) => s.startsWith('INSERT INTO usage_meter'))).toBe(true)
+      expect(clientSql.at(-1)).toBe('RELEASE SAVEPOINT usage_meter_increment')
+      const poolMeterWrites = mockQuery.mock.calls
+        .slice(poolCallsBefore)
+        .filter((call) => String(call[0]).includes('INSERT INTO usage_meter'))
+      expect(poolMeterWrites).toHaveLength(0)
+    })
+
+    it('rolls the savepoint back (and stays silent) when the meter write fails', async () => {
+      const { incrementUsage } = await import('./subscription.js')
+      mockQuery.mockImplementation(
+        createSubscriptionQueryRouter({
+          subId: { rows: [subscriptionIdRow()] },
+          fullSub: { rows: [subscriptionRow({ tenant_id: 'rest-1', limits: {} })] },
+        })
+      )
+      const clientSql = []
+      const client = {
+        query: vi.fn(async (sql) => {
+          const first = String(sql).trim().split('\n')[0].trim()
+          clientSql.push(first)
+          if (first.startsWith('INSERT INTO usage_meter')) throw new Error('boom')
+          return { rows: [] }
+        }),
+      }
+
+      await expect(
+        incrementUsage('rest-1', 'RESTAURANT', 'deal_redemptions_per_day', 1, { client })
+      ).resolves.toBeUndefined()
+      expect(clientSql).toContain('ROLLBACK TO SAVEPOINT usage_meter_increment')
+    })
+  })
+
   describe('invalidateTenantSubscriptionCache', () => {
     beforeEach(async () => {
       const { deleteCache } = await import('./cache.js')

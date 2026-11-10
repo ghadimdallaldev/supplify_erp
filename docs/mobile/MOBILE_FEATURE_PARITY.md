@@ -2,6 +2,22 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch D2: stock accounting, promotions, loyalty refunds, amendments, scheduled-order timezone (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Checked by grep in both repos: neither app creates amendments (they only `GET /api/orders/:id/amendments` and render `requestedQuantity` / `unitPrice`, both still returned; `unitPrice` is now `null` for new items), neither computes an order total (they display the server's `total_amount`), neither special-cases 400 vs 409 on `PATCH /api/orders/:id` (the shared client handles 401/402/403 only; the one 409 check is the public-shop checkout and is unaffected), and no permission key, feature key, notification payload or env var changed. No mobile files were touched, so `tsc` was not needed.
+
+**Stock (API):** returning dispatched warehouse stock (cancel or failed delivery) now raises `quantity_available` together with `quantity_on_hand`. A redelivery after a failed delivery re-opens the failed warehouse legs (fresh `pending` leg, failed leg `superseded`) and reserves stock again, so the stock leaves the warehouse when the order goes out for delivery the second time; an insufficient-stock redelivery returns 400. Legacy (non-warehouse) suppliers now consume the placement reservation (`reserved_qty`) when an order first ships, idempotently (`customer_order.legacy_stock_committed_at`, migration `0229`); a cancel after that point restores `available_qty` only. Scheduled quick-list orders and amendment re-reserves now reserve like normal placements. Cancel restore sums duplicate product lines.
+
+**Promotions and loyalty (API):** a promotion no longer drops `QUOTE_PRICE` lines from the order total (`total = full subtotal - discount`; discount still computed on eligible lines). `usage_limit` / `stock_quantity` are enforced with one atomic UPDATE; when the last redemption is taken concurrently the order is placed without the promotion. The `deal_redemptions_per_day` meter now rolls back with the order. Cancelling a non-draft order refunds redeemed loyalty points (compensating `REVERSAL` ledger row) and decrements `promotions.usage_count` (idempotent, `promotion_usages.released_at`, migration `0229`). Mobile already shows `total_amount` and loyalty balance from the server, so both just reflect the corrected values.
+
+**Amendments (API):** `requestedQuantity` / `originalQuantity` must be positive (400 otherwise; removal is the `item_removal` type), `unitPrice` is ignored and never used for pricing, a substitute product must belong to the order's supplier, and an amendment recalculates the total with the loyalty discount and delivery fee preserved.
+
+**Scheduled orders (API):** due time, execution date and next run date are evaluated in the restaurant's timezone (`restaurant.timezone`, platform default fallback) instead of UTC. No request or response shape changed.
+
+**Order update (API):** a concurrent state change on `PATCH /api/orders/:id` now returns 409 `ORDER_STATE_CHANGED` instead of 400. Neither mobile app distinguishes the two; both show the server message.
+
+---
+
 ## 2026-11-10 — Audit batch D1: invoice, credit note and dispute money fixes (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). No request shape, permission key, feature key or notification payload changed. Checked by grep in both repos: the dispute resolve screens send the same body (`resolutionType`, `creditNoteAmount`, `refundAmount`, `refundReference`) and only display `creditNotes` read-only; neither app voids invoices or calls `/api/payments` (web only: `finance.ts`, `InvoicesPage`). No mobile files changed, so `tsc` was not needed.

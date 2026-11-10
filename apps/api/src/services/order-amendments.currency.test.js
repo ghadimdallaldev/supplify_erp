@@ -49,11 +49,19 @@ describe('applyAmendmentItems currency', () => {
           ],
         })
         .mockResolvedValueOnce({
-          rows: [{ product_id: 'prod-1', supplier_id: 'sup-1', pricing_source: 'CONTRACT_PRICE' }],
+          rows: [
+            {
+              product_id: 'prod-1',
+              supplier_id: 'sup-1',
+              pricing_source: 'CONTRACT_PRICE',
+              unit_price: 10,
+            },
+          ],
         })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ total: 40 }] })
         .mockResolvedValueOnce({ rows: [{ discount: 0 }] })
+        .mockResolvedValueOnce({ rows: [{ delivery_fee: 0, loyalty_discount: 0 }] })
         .mockResolvedValueOnce({ rows: [] }),
     }
 
@@ -93,6 +101,9 @@ describe('applyAmendmentItems currency', () => {
           rows: [
             { restaurant_id: 'rest-1', requested_delivery_date: '2026-09-25', currency: 'USD' },
           ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ product_id: 'prod-1', supplier_id: 'sup-1', quantity: 1 }],
         })
         .mockResolvedValueOnce({ rows: [{ supplier_id: 'sup-1' }] }),
     }

@@ -4,6 +4,7 @@ import {
   consumerLoyaltyEarnBasis,
   quoteConsumerLoyaltyRedeem,
   reverseConsumerLoyaltyOnOrderCancel,
+  reverseSupplierLoyaltyRedeemOnOrderCancel,
   suggestConsumerRedeemPoints,
 } from './loyalty.service.js'
 
@@ -124,5 +125,80 @@ describe('reverseConsumerLoyaltyOnOrderCancel', () => {
 
     expect(result).toBeNull()
     expect(client.calls.some((call) => call.sql.includes('UPDATE consumer_member'))).toBe(false)
+  })
+})
+
+describe('reverseSupplierLoyaltyRedeemOnOrderCancel (B7)', () => {
+  function supplierLedgerClient({ redeemRows, alreadyReversed = false, balance = 20 }) {
+    const calls = []
+    return {
+      calls,
+      async query(sql, params) {
+        const text = String(sql)
+        calls.push({ sql: text, params })
+        if (text.includes("entry_type = 'REDEEM'") && text.includes('GROUP BY')) {
+          return { rows: redeemRows }
+        }
+        if (text.includes('INSERT INTO restaurant_loyalty_balance')) {
+          return { rows: [{ points_balance: balance }] }
+        }
+        if (text.includes("entry_type = 'REVERSAL'")) {
+          return { rows: alreadyReversed ? [{ id: 'led-rev' }] : [] }
+        }
+        if (text.includes('INSERT INTO loyalty_ledger')) return { rows: [{ id: 'led-new' }] }
+        return { rows: [], rowCount: 1 }
+      },
+    }
+  }
+
+  it('gives redeemed points back with a compensating REVERSAL ledger entry', async () => {
+    const client = supplierLedgerClient({
+      redeemRows: [
+        { supplier_id: 'sup-1', restaurant_id: 'rest-1', points: 50, monetary_value: '5.000' },
+      ],
+    })
+
+    const result = await reverseSupplierLoyaltyRedeemOnOrderCancel(client, {
+      orderId: 'ord-1',
+      createdBy: 'user-1',
+    })
+
+    expect(result).toEqual({
+      reversed: [{ supplierId: 'sup-1', restaurantId: 'rest-1', points: 50 }],
+    })
+    const balanceUpdate = client.calls.find((c) =>
+      c.sql.includes('UPDATE restaurant_loyalty_balance')
+    )
+    expect(balanceUpdate.params).toEqual([70, 50, 'sup-1', 'rest-1'])
+    expect(balanceUpdate.sql).toContain('GREATEST(0, lifetime_redeemed - $2)')
+    const ledgerInsert = client.calls.find((c) => c.sql.includes('INSERT INTO loyalty_ledger'))
+    expect(ledgerInsert.sql).toContain("'REVERSAL'")
+    expect(ledgerInsert.params).toEqual(
+      expect.arrayContaining(['sup-1', 'rest-1', 'ord-1', 50, 70])
+    )
+  })
+
+  it('is idempotent: a second cancel finds the reversal and writes nothing', async () => {
+    const client = supplierLedgerClient({
+      redeemRows: [
+        { supplier_id: 'sup-1', restaurant_id: 'rest-1', points: 50, monetary_value: '5.000' },
+      ],
+      alreadyReversed: true,
+    })
+
+    const result = await reverseSupplierLoyaltyRedeemOnOrderCancel(client, { orderId: 'ord-1' })
+
+    expect(result).toEqual({ reversed: [] })
+    expect(client.calls.some((c) => c.sql.includes('UPDATE restaurant_loyalty_balance'))).toBe(
+      false
+    )
+    expect(client.calls.some((c) => c.sql.includes('INSERT INTO loyalty_ledger'))).toBe(false)
+  })
+
+  it('does nothing when the order redeemed no points', async () => {
+    const client = supplierLedgerClient({ redeemRows: [] })
+    const result = await reverseSupplierLoyaltyRedeemOnOrderCancel(client, { orderId: 'ord-1' })
+    expect(result).toEqual({ reversed: [] })
+    expect(client.calls).toHaveLength(1)
   })
 })

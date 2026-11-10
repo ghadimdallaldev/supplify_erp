@@ -59,6 +59,12 @@ vi.mock('../lib/subscription.js', () => ({
 vi.mock('../services/promotions.service.js', () => ({
   applyBestPromotionToOrder: vi.fn().mockResolvedValue(null),
   hasActiveSupplierOrderPromotions: vi.fn().mockResolvedValue(false),
+  releasePromotionUsageForOrder: vi.fn().mockResolvedValue({ released: 0 }),
+}))
+
+vi.mock('../services/loyalty.service.js', () => ({
+  redeemLoyaltyAtCheckout: vi.fn(),
+  reverseSupplierLoyaltyRedeemOnOrderCancel: vi.fn().mockResolvedValue({ reversed: [] }),
 }))
 
 vi.mock('../lib/audit.js', () => ({
@@ -1146,6 +1152,79 @@ describe('Orders Routes', () => {
       await request(app).patch('/api/orders/order-1').send({ status: 'CANCELLED' }).expect(200)
 
       expect(restoreSupplierStockForOrder).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns 409 ORDER_STATE_CHANGED (not 400) when the order moved under the row lock', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          // Another request already cancelled it between the read and the lock.
+          rows: [{ id: 'order-1', status: 'CANCELLED', restaurant_id: 'restaurant-1' }],
+        })
+
+      const response = await request(app)
+        .patch('/api/orders/order-1')
+        .send({ status: 'CANCELLED' })
+        .expect(409)
+
+      expect(response.body.error.name).toBe('ORDER_STATE_CHANGED')
+    })
+
+    it('refunds redeemed loyalty points and releases promotion usage when cancelling a PLACED order (B7)', async () => {
+      const { reverseSupplierLoyaltyRedeemOnOrderCancel } = await import(
+        '../services/loyalty.service.js'
+      )
+      const { releasePromotionUsageForOrder } = await import('../services/promotions.service.js')
+      reverseSupplierLoyaltyRedeemOnOrderCancel.mockClear()
+      releasePromotionUsageForOrder.mockClear()
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'PLACED', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }],
+        })
+
+      await request(app).patch('/api/orders/order-1').send({ status: 'CANCELLED' }).expect(200)
+
+      expect(reverseSupplierLoyaltyRedeemOnOrderCancel).toHaveBeenCalledTimes(1)
+      expect(reverseSupplierLoyaltyRedeemOnOrderCancel).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ orderId: 'order-1' })
+      )
+      expect(releasePromotionUsageForOrder).toHaveBeenCalledWith(expect.anything(), 'order-1')
+    })
+
+    it('does not touch loyalty or promotion usage when cancelling a DRAFT order (B7)', async () => {
+      const { reverseSupplierLoyaltyRedeemOnOrderCancel } = await import(
+        '../services/loyalty.service.js'
+      )
+      const { releasePromotionUsageForOrder } = await import('../services/promotions.service.js')
+      reverseSupplierLoyaltyRedeemOnOrderCancel.mockClear()
+      releasePromotionUsageForOrder.mockClear()
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'DRAFT', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ supplier_id: 'supplier-1' }] })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'DRAFT', restaurant_id: 'restaurant-1' }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ id: 'order-1', status: 'CANCELLED', total_amount: 100.5 }],
+        })
+
+      await request(app).patch('/api/orders/order-1').send({ status: 'CANCELLED' }).expect(200)
+
+      expect(reverseSupplierLoyaltyRedeemOnOrderCancel).not.toHaveBeenCalled()
+      expect(releasePromotionUsageForOrder).not.toHaveBeenCalled()
     })
 
     // DRAFT -> PLACED over PATCH is only reachable by an admin impersonating a supplier:
