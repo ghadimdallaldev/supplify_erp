@@ -4,6 +4,17 @@
 import { query, withTransaction } from './db.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 
+/**
+ * SQL predicate (for a join on drivers alias `d`): the driver's linked user is a member of the
+ * driver's supplier. Used so linked_user_email / name are only exposed for genuine members, even
+ * if an older row links an outsider.
+ */
+export const LINKED_USER_IS_SUPPLIER_MEMBER_SQL = `(
+  EXISTS (SELECT 1 FROM user_role m WHERE m.user_id = d.user_id AND m.tenant_id = d.supplier_id AND m.tenant_type = 'SUPPLIER')
+  OR EXISTS (SELECT 1 FROM tenant_user_roles m WHERE m.user_id = d.user_id AND m.tenant_id = d.supplier_id AND m.tenant_type = 'SUPPLIER')
+  OR EXISTS (SELECT 1 FROM user_workspace_membership m WHERE m.user_id = d.user_id AND m.home_tenant_id = d.supplier_id AND m.workspace_type = 'SUPPLIER' AND m.status = 'active')
+)`
+
 export async function getDriverLinkForUser(userId, supplierId) {
   const { rows } = await query(
     `
@@ -46,6 +57,31 @@ export async function assertUserNotLinkedToOtherDriver(userId, supplierId, excep
   }
 }
 
+/**
+ * The user must already belong to the supplier tenant (role assignment, named role, or active
+ * workspace membership). Runs on the caller's client so uncommitted role assignments in the same
+ * transaction (invitation accept) are visible.
+ */
+async function assertUserIsTenantMember(userId, supplierId, db) {
+  const { rows } = await db(
+    `
+    SELECT 1 FROM user_role
+      WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER'
+    UNION ALL
+    SELECT 1 FROM tenant_user_roles
+      WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER'
+    UNION ALL
+    SELECT 1 FROM user_workspace_membership
+      WHERE user_id = $1 AND home_tenant_id = $2 AND workspace_type = 'SUPPLIER' AND status = 'active'
+    LIMIT 1
+    `,
+    [userId, supplierId]
+  )
+  if (!rows.length) {
+    throw new ValidationError('User must be a member of this supplier to be linked as a driver')
+  }
+}
+
 export async function linkDriverToUser({ driverId, userId, supplierId }, client = null) {
   const db = client ? (sql, params) => client.query(sql, params) : query
 
@@ -61,6 +97,7 @@ export async function linkDriverToUser({ driverId, userId, supplierId }, client 
   )
   if (!userRows.length) throw new ValidationError('User not found')
 
+  await assertUserIsTenantMember(userId, supplierId, db)
   await assertUserNotLinkedToOtherDriver(userId, supplierId, driverId)
 
   if (driverRows[0].user_id && driverRows[0].user_id !== userId) {
@@ -101,6 +138,7 @@ export async function ensureDriverProfileForUser(
   ])
   if (!userRows.length) throw new ValidationError('User not found')
 
+  await assertUserIsTenantMember(userId, supplierId, db)
   await assertUserNotLinkedToOtherDriver(userId, supplierId)
 
   const name =

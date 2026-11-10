@@ -40,6 +40,14 @@ Source of truth for default roles: `apps/api/src/lib/role-matrix.js`.
 - **Supplier:** `ORDERS_MANAGE` (maps to `orders.decline`)
 - **Not granted** to Order Fulfillment Staff, Accountant, Viewer by default
 
+### Resolve disputes (supplier)
+
+- `POST /api/disputes/:id/resolve` with `credit_note` or `refund` issues money, so it requires `INVOICES_MANAGE` (Owner and Accountant by default). Order Fulfillment Staff and Warehouse Manager (`FULFILLMENT_MANAGE` only) can no longer issue credit notes or refunds.
+- `replacement` and `no_action` resolutions, review and reject still use `FULFILLMENT_MANAGE`.
+- The route uses the dynamic `requirePermission` (key chosen from `resolutionType`); `requireAnyPermission` with one key would be identical. Owner passes through `rolesIncludeOwner`.
+- **Promotions Manager** no longer holds `ORDERS_MANAGE` (read-only `ORDERS_VIEW` + `CATALOG_VIEW`), so it cannot accept, decline or cancel orders.
+- Existing tenants: `ensureTenantSystemRoles` rewrites system role permissions from `role-matrix.js` whenever it runs (tenant/branch creation, owner permission cache miss, first-role setup). There is no boot-time sweep, so run `pnpm --filter api roles:sync` (calls `syncAllTenantsSystemRoles`) after deploying matrix changes to update every tenant immediately.
+
 ### Customer growth (supplier)
 
 | Permission         | Owner | Supplier Manager | Notes                                |

@@ -5,6 +5,7 @@
 import express from 'express'
 import { withTransaction } from '../lib/db.js'
 import { config } from '../config/env.js'
+import { safeEqualStrings } from '../lib/safe-compare.js'
 
 const router = express.Router()
 
@@ -24,7 +25,7 @@ const SCENARIOS = [
 
 function requireE2ESecret(req, res, next) {
   const secret = req.headers['x-e2e-secret']
-  if (!config.E2E_SECRET || secret !== config.E2E_SECRET) {
+  if (!config.E2E_SECRET || !safeEqualStrings(secret, config.E2E_SECRET)) {
     return res.status(404).json({ ok: false, error: { name: 'NOT_FOUND', message: 'Not found' } })
   }
   next()

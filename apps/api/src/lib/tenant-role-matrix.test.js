@@ -117,12 +117,22 @@ describe('Supplier default roles', () => {
     expect(can(perms, P.STAFF_VIEW)).toBe(false)
   })
 
-  it('Promotions Manager manages deals', () => {
+  it('Promotions Manager manages deals with read-only order context', () => {
     const perms = role('Promotions Manager', 'SUPPLIER')
     expect(can(perms, P.PROMOTIONS_MANAGE)).toBe(true)
-    expect(can(perms, P.ORDERS_MANAGE)).toBe(true)
+    expect(can(perms, P.ORDERS_VIEW)).toBe(true)
+    expect(can(perms, P.ORDERS_MANAGE)).toBe(false)
+    expect(can(perms, P.ORDERS_EDIT)).toBe(false)
+    expect(can(perms, P.ORDERS_CREATE)).toBe(false)
     expect(can(perms, P.CATALOG_MANAGE)).toBe(false)
     expect(can(perms, P.CATALOG_VIEW)).toBe(true)
+  })
+
+  it('only finance roles hold INVOICES_MANAGE (dispute credit/refund resolution)', () => {
+    expect(can(role('Accountant', 'SUPPLIER'), P.INVOICES_MANAGE)).toBe(true)
+    for (const name of ['Order Fulfillment Staff', 'Warehouse Manager', 'Supplier Manager']) {
+      expect(can(role(name, 'SUPPLIER'), P.INVOICES_MANAGE)).toBe(false)
+    }
   })
 
   it('Accountant cannot accept/decline orders', () => {

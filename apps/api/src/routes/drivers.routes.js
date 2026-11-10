@@ -21,6 +21,7 @@ import {
   unlinkDriverUser,
   listUnlinkedDrivers,
   assertUserNotLinkedToOtherDriver,
+  LINKED_USER_IS_SUPPLIER_MEMBER_SQL,
 } from '../lib/driver-user-link.js'
 
 const router = express.Router()
@@ -137,6 +138,7 @@ router.get('/', requirePermission('FULFILLMENT_VIEW'), async (req, res) => {
       FROM drivers d
       LEFT JOIN warehouse w ON w.id = d.warehouse_id AND w.${supplierCol} = d.supplier_id
       LEFT JOIN app_user u ON u.id = d.user_id
+        AND ${LINKED_USER_IS_SUPPLIER_MEMBER_SQL}
       WHERE d.supplier_id = $1
     `
     if (activeOnly) sql += ` AND d.is_active = true`
@@ -353,6 +355,7 @@ router.patch('/:id', requirePermission('FULFILLMENT_MANAGE'), async (req, res) =
       FROM drivers d
       LEFT JOIN warehouse w ON w.id = d.warehouse_id AND w.${supplierCol} = d.supplier_id
       LEFT JOIN app_user u ON u.id = d.user_id
+        AND ${LINKED_USER_IS_SUPPLIER_MEMBER_SQL}
       WHERE d.id = $1
       `,
       [driverRow.id]

@@ -5,6 +5,7 @@ import { config } from '../config/env.js'
 import { optionalAuth } from '../lib/rbac.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { logger } from '../lib/logger.js'
+import { consumeRecipientQuota } from '../lib/recipient-rate-limit.js'
 import { buildAppUrl } from '../lib/app-url.js'
 import {
   createPublicOrder,
@@ -70,6 +71,16 @@ const createLimiter = publicWriteLimiter({
   prefix: 'rl:public-order-create',
   keyGenerator: (req) => `${req.ip}:${String(req.params.idOrSlug || '').toLowerCase()}`,
 })
+// Global per-IP cap across ALL suppliers: createLimiter above is keyed per IP + supplier, so a single
+// client could otherwise place 5 orders per supplier per window against every supplier.
+const createGlobalIpLimiter = publicWriteLimiter({
+  windowMs: 60 * 60_000,
+  limit: 20,
+  prefix: 'rl:public-order-create-ip',
+})
+// Outbound notification caps per recipient (email / phone), see consumeRecipientQuota.
+const RECIPIENT_NOTIFICATION_LIMIT = 3
+const RECIPIENT_NOTIFICATION_WINDOW_MS = 60 * 60_000
 const trackingLimiter = publicWriteLimiter({
   windowMs: 60_000,
   limit: 30,
@@ -206,6 +217,7 @@ publicSalesRoutes.post(
 publicSalesRoutes.post(
   '/suppliers/:idOrSlug/orders',
   enforcePublicCheckoutBodySize,
+  createGlobalIpLimiter,
   createLimiter,
   optionalAuth,
   async (req, res) => {
@@ -253,7 +265,20 @@ publicSalesRoutes.post(
           supplierId
         )
       }
-      if (!data.replay && !actor && input.customer.email) {
+      const emailAllowed =
+        !data.replay &&
+        !actor &&
+        Boolean(input.customer.email) &&
+        (await consumeRecipientQuota({
+          channel: 'public-order-email',
+          recipient: input.customer.email,
+          limit: RECIPIENT_NOTIFICATION_LIMIT,
+          windowMs: RECIPIENT_NOTIFICATION_WINDOW_MS,
+        }))
+      if (!data.replay && !actor && input.customer.email && !emailAllowed) {
+        logger.warn('Public order email suppressed: recipient notification limit reached')
+      }
+      if (emailAllowed) {
         void sendTemplateEmail({
           to: input.customer.email,
           template: 'order.placed',
@@ -277,7 +302,13 @@ publicSalesRoutes.post(
         !data.replay &&
         data.trackingToken &&
         input.customer.whatsappConsent &&
-        isWhatsAppConfigured()
+        isWhatsAppConfigured() &&
+        (await consumeRecipientQuota({
+          channel: 'public-order-whatsapp',
+          recipient: input.customer.phone,
+          limit: RECIPIENT_NOTIFICATION_LIMIT,
+          windowMs: RECIPIENT_NOTIFICATION_WINDOW_MS,
+        }))
       ) {
         void sendWhatsAppMessage({
           to: input.customer.phone,

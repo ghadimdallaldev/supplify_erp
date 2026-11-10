@@ -246,6 +246,77 @@ describe('receiving.routes POST /receive line completeness', () => {
   })
 })
 
+describe('receiving.routes POST /receive ownership before line validation', () => {
+  let app
+  let db
+
+  beforeEach(async () => {
+    db = await import('../lib/db.js')
+    db.query.mockReset()
+    app = express()
+    app.use(express.json())
+    app.use((req, res, next) => {
+      req.requestId = 'test'
+      next()
+    })
+    app.use('/api/receiving', receivingRoutes)
+  })
+
+  it("does not leak another tenant's ordered quantities through line validation errors", async () => {
+    // Order belongs to rest-OTHER; the caller is rest-1. Rows are only visible when the SQL
+    // is scoped to the order's own restaurant.
+    db.query.mockImplementation(async (sql, params) => {
+      const text = String(sql)
+      if (text.includes('FROM order_item oi')) {
+        const scoped = /restaurant_id = $2/.test(text) && params?.[1] === 'rest-OTHER'
+        return {
+          rows: scoped
+            ? [
+                {
+                  id: 'oi-1',
+                  quantity: 7,
+                  product_id: 'p-1',
+                  unit_price: 5,
+                  supplier_id: 's',
+                  unit: 'kg',
+                },
+              ]
+            : text.includes('restaurant_id')
+              ? []
+              : [
+                  {
+                    id: 'oi-1',
+                    quantity: 7,
+                    product_id: 'p-1',
+                    unit_price: 5,
+                    supplier_id: 's',
+                    unit: 'kg',
+                  },
+                ],
+        }
+      }
+      return { rows: [] }
+    })
+
+    const res = await request(app)
+      .post('/api/receiving/receive')
+      .send({
+        orderId: 'order-of-other-tenant',
+        lineItems: [
+          {
+            orderItemId: 'oi-1',
+            productId: 'p-1',
+            received_quantity: 999,
+            quality_status: 'ACCEPTED',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(404)
+    expect(JSON.stringify(res.body)).not.toMatch(/ordered|exceed|7/i)
+  })
+})
+
 describe('receiving.routes POST /receive best-effort steps use savepoints', () => {
   let app
   let db

@@ -45,6 +45,53 @@ describe('isPrivateHostname', () => {
     }
   })
 
+  it('flags IPv4-mapped IPv6 in dotted and WHATWG-normalised hex forms', () => {
+    for (const host of [
+      '::ffff:127.0.0.1',
+      '::ffff:7f00:1',
+      '[::ffff:7f00:1]',
+      '::ffff:169.254.169.254',
+      '::ffff:a9fe:a9fe',
+      '::ffff:10.0.0.1',
+      '::ffff:c0a8:101',
+      '0:0:0:0:0:ffff:7f00:1',
+    ]) {
+      expect(isPrivateHostname(host), host).toBe(true)
+    }
+    expect(isPrivateHostname('::ffff:8.8.8.8')).toBe(false)
+    expect(isPrivateHostname('::ffff:808:808')).toBe(false)
+  })
+
+  it('flags IPv4-compatible, NAT64, 6to4, Teredo and other special IPv6 ranges', () => {
+    for (const host of [
+      '::127.0.0.1',
+      '::7f00:1',
+      '::a9fe:a9fe',
+      '64:ff9b::a9fe:a9fe',
+      '64:ff9b::127.0.0.1',
+      '64:ff9b:1::1',
+      '2002:7f00:1::1',
+      '2002:a9fe:a9fe::1',
+      '2001:0:4136:e378:8000:63bf:3fff:fdd2',
+      'fc00::1',
+      'fdff::1',
+      'fe80::1%eth0',
+      'febf::1',
+      'ff02::1',
+      '100::1',
+    ]) {
+      expect(isPrivateHostname(host), host).toBe(true)
+    }
+    // public targets reachable through the same prefixes stay allowed
+    expect(isPrivateHostname('64:ff9b::808:808')).toBe(false)
+    expect(isPrivateHostname('2002:808:808::1')).toBe(false)
+  })
+
+  it('fails closed on malformed IPv6 literals', () => {
+    expect(isPrivateHostname('1:2:3')).toBe(true)
+    expect(isPrivateHostname('::g')).toBe(true)
+  })
+
   it('allows public hostnames and addresses', () => {
     for (const host of ['example.com', 'hook.test', '8.8.8.8', '1.1.1.1', '2606:4700::1111']) {
       expect(isPrivateHostname(host), host).toBe(false)
@@ -79,6 +126,18 @@ describe('assertPublicHttpUrl', () => {
       /private or local/
     )
     expect(() => assertPublicHttpUrl('https://127.0.0.1:6379/')).toThrow(/private or local/)
+  })
+
+  it('rejects IPv6-mapped, compatible and NAT64 URL forms', () => {
+    for (const url of [
+      'http://[::ffff:127.0.0.1]/',
+      'http://[::ffff:169.254.169.254]/',
+      'http://[64:ff9b::a9fe:a9fe]/',
+      'http://[::127.0.0.1]/',
+    ]) {
+      expect(() => assertPublicHttpUrl(url), url).toThrow(/private or local/)
+    }
+    expect(() => assertPublicHttpUrl('https://[2606:4700::1111]/hook')).not.toThrow()
   })
 
   it('rejects embedded credentials', () => {

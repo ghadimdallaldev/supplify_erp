@@ -212,6 +212,29 @@ describe('chatSendGuard', () => {
     chatSendGuard(req, res, next)
     expect(next).toHaveBeenCalled()
   })
+
+  it('allows PATCH message read receipt without CHAT_SEND', () => {
+    const req = {
+      ...mockReq('PATCH', '/messages/m1/read'),
+      tenantContext: { permissions: [P.CHAT_VIEW] },
+    }
+    chatSendGuard(req, res, next)
+    expect(next).toHaveBeenCalled()
+  })
+
+  it.each([
+    ['PATCH', '/conversations/c1/readme'],
+    ['PUT', '/conversations/c1/messages/read'],
+    ['PATCH', '/messages/read/m1'],
+    ['PATCH', '/conversations/c1/read/extra'],
+    ['PUT', '/conversations/c1/archive/read'],
+  ])('does not treat %s %s as a read receipt (CHAT_SEND still required)', (method, path) => {
+    const req = { ...mockReq(method, path), tenantContext: { permissions: [P.CHAT_VIEW] } }
+    const r = mockResWithPerms([P.CHAT_VIEW])
+    chatSendGuard(req, r, next)
+    expect(next).not.toHaveBeenCalled()
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
 })
 
 describe('adminDashboardPermissionGuard', () => {

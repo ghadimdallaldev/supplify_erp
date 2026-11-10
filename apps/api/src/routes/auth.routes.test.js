@@ -285,8 +285,12 @@ describe('Auth Routes', () => {
   })
 
   describe('OAuth redirect_uri origin', () => {
+    const originalOrigins = authConfigState.WEB_ORIGINS
+    const originalWebOrigin = authConfigState.WEB_ORIGIN
     afterEach(() => {
       delete process.env.OAUTH_CALLBACK_BASE_URL
+      authConfigState.WEB_ORIGINS = originalOrigins
+      authConfigState.WEB_ORIGIN = originalWebOrigin
     })
 
     it('uses OAUTH_CALLBACK_BASE_URL when set (same-origin proxy flow)', async () => {
@@ -301,12 +305,42 @@ describe('Auth Routes', () => {
       )
     })
 
-    it('falls back to X-Forwarded-Host when env is unset', async () => {
+    it('honours X-Forwarded-Host when env is unset and the host is an allowed web origin', async () => {
+      authConfigState.WEB_ORIGINS = ['https://web.example.com']
       const { getAuthorizationUrl } = await import('../lib/auth.js')
 
       await request(app)
         .get('/auth/login')
         .set('X-Forwarded-Host', 'web.example.com')
+        .set('X-Forwarded-Proto', 'https')
+        .expect(302)
+
+      expect(getAuthorizationUrl).toHaveBeenCalledWith(
+        'https://web.example.com/auth/callback',
+        expect.any(String)
+      )
+    })
+  })
+
+  describe('OAuth redirect_uri origin (untrusted forwarded host)', () => {
+    const originalOrigins = authConfigState.WEB_ORIGINS
+    const originalWebOrigin = authConfigState.WEB_ORIGIN
+    const originalAppEnv = authConfigState.APP_ENV
+    afterEach(() => {
+      authConfigState.WEB_ORIGINS = originalOrigins
+      authConfigState.WEB_ORIGIN = originalWebOrigin
+      authConfigState.APP_ENV = originalAppEnv
+    })
+
+    it('ignores an attacker-controlled X-Forwarded-Host and uses the configured web origin', async () => {
+      authConfigState.WEB_ORIGINS = ['https://web.example.com']
+      authConfigState.WEB_ORIGIN = 'https://web.example.com'
+      authConfigState.APP_ENV = 'prod' // dev trusts the request Host; hosted envs must not
+      const { getAuthorizationUrl } = await import('../lib/auth.js')
+
+      await request(app)
+        .get('/auth/login')
+        .set('X-Forwarded-Host', 'evil.example')
         .set('X-Forwarded-Proto', 'https')
         .expect(302)
 

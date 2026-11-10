@@ -50,12 +50,19 @@ async function handleBearerCsrfBypass(req, res) {
   }
 }
 
-/** Session cookies that authenticate a browser request (consumer shop cookie is out of scope). */
+/** Session cookies that authenticate a browser request (consumer shop cookie is handled below). */
 const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:access_token|refresh_token)=[^;]/
 
 /** True when the request carries the web session cookie, so a cross-site form could ride on it. */
 function hasSessionCookie(req) {
   return SESSION_COOKIE_PATTERN.test(req.headers.cookie || '')
+}
+
+/** Diner (B2C shop) session cookie, only meaningful under /api/public/consumer/*. */
+const CONSUMER_COOKIE_PATTERN = /(?:^|;\s*)consumer_auth_token=[^;]/
+
+function hasConsumerCookie(req) {
+  return CONSUMER_COOKIE_PATTERN.test(req.headers.cookie || '')
 }
 
 /** True when the request carries a Bearer token that verifies (mobile). Never responds. */
@@ -116,6 +123,19 @@ export async function csrfProtection(req, res, next) {
   // callback, logout) are safe methods and never reach this branch.
   if (req.path.startsWith('/auth/') || req.path.startsWith('/api/public')) {
     if (!hasSessionCookie(req)) {
+      // Consumer shop cookie writes: header-only check. A cross-site form cannot set
+      // X-Requested-With, and a cross-origin fetch that sets it needs a CORS preflight that the API
+      // only grants to WEB_ORIGINS. The Origin allowlist is deliberately NOT applied: tenant custom
+      // shop domains (tenant_custom_domain) are not in WEB_ORIGINS.
+      if (
+        req.path.startsWith('/api/public/consumer/') &&
+        hasConsumerCookie(req) &&
+        config.NODE_ENV !== 'test' &&
+        req.headers[CSRF_REQUEST_HEADER] !== CSRF_REQUEST_HEADER_VALUE &&
+        !(await hasValidBearer(req))
+      ) {
+        return csrfForbidden(req, res, 'Missing or invalid CSRF protection header')
+      }
       return next()
     }
     if (await hasValidBearer(req)) {

@@ -77,6 +77,15 @@ describe('drivers routes', () => {
     expect(String(db.query.mock.calls[0][0])).toMatch(/w\.supplier_id = d\.supplier_id/)
   })
 
+  it('GET / only joins the linked user (email/name) when that user is a tenant member', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] })
+    await request(app).get('/')
+    const sql = String(db.query.mock.calls[0][0])
+    expect(sql).toMatch(/LEFT JOIN app_user u ON u\.id = d\.user_id\s+AND/)
+    expect(sql).toMatch(/user_workspace_membership/)
+    expect(sql).toMatch(/tenant_user_roles/)
+  })
+
   it('DELETE /:id blocks when active deliveries exist', async () => {
     db.query
       .mockResolvedValueOnce({

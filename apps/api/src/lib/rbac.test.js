@@ -9,6 +9,7 @@ import {
   setAuthCookies,
   clearAuthCookies,
 } from './rbac.js'
+import { config } from '../config/env.js'
 
 vi.mock('./db.js', () => ({
   query: vi.fn(),
@@ -61,6 +62,8 @@ describe('RBAC Utilities', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Deterministic regardless of the developer's local .env
+    config.AUTH_EMAIL_OTP_ENABLED = false
     req = {
       cookies: {},
       headers: {},
@@ -126,6 +129,18 @@ describe('RBAC Utilities', () => {
       expect(req.authMethod).toBe('bearer')
       expect(next).toHaveBeenCalled()
       expect(res.status).not.toHaveBeenCalled()
+    })
+
+    it('blocks bearer sessions with an unverified email when email OTP is enabled', async () => {
+      req.headers = { authorization: 'Bearer unverified-token' }
+      const { verifyToken } = await import('./auth.js')
+      config.AUTH_EMAIL_OTP_ENABLED = true
+      verifyToken.mockResolvedValueOnce({ sub: 'sub-123', email_verified: false })
+      await requireAuth(req, res, next)
+
+      expect(res.status).toHaveBeenCalledWith(403)
+      expect(res.json.mock.calls[0][0].error.name).toBe('EMAIL_NOT_VERIFIED')
+      expect(next).not.toHaveBeenCalled()
     })
 
     it('should reject expired bearer without cookie refresh', async () => {
@@ -208,7 +223,7 @@ describe('RBAC Utilities', () => {
         display_name: 'Admin User',
         role: 'ADMIN',
       }
-      query.mockResolvedValueOnce({ rows: [{ role: 'ADMIN' }] })
+      query.mockResolvedValueOnce({ rows: [{ role: 'ADMIN', keycloak_sub: 'admin-sub' }] })
       query.mockResolvedValueOnce({ rows: [linkedUser] })
 
       const user = await upsertUser(
@@ -217,11 +232,71 @@ describe('RBAC Utilities', () => {
           email: 'admin@supplify.com',
           given_name: 'Admin',
           family_name: 'User',
+          email_verified: true,
         },
         ['admin']
       )
 
       expect(user).toEqual(linkedUser)
+    })
+
+    it('refuses to link an existing account by email when email_verified is not true', async () => {
+      const { query } = await import('./db.js')
+      query.mockResolvedValueOnce({ rows: [{ role: 'RESTAURANT', keycloak_sub: 'admin-sub' }] })
+
+      await expect(
+        upsertUser({ sub: '11111111-1111-4111-8111-111111111111', email: 'victim@example.com' }, [])
+      ).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' })
+      expect(query).toHaveBeenCalledTimes(1)
+    })
+
+    it('never overwrites an existing real (UUID) keycloak_sub by email match', async () => {
+      const { query } = await import('./db.js')
+      query.mockResolvedValueOnce({
+        rows: [{ role: 'RESTAURANT', keycloak_sub: '22222222-2222-4222-8222-222222222222' }],
+      })
+
+      await expect(
+        upsertUser(
+          {
+            sub: '11111111-1111-4111-8111-111111111111',
+            email: 'victim@example.com',
+            email_verified: true,
+          },
+          []
+        )
+      ).rejects.toMatchObject({ code: 'ACCOUNT_LINK_CONFLICT' })
+      expect(query).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not auto-grant ADMIN to seeded admin emails on a production-built (hosted dev) image', async () => {
+      const { query } = await import('./db.js')
+      const originalNodeEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'production'
+      try {
+        query.mockResolvedValueOnce({ rows: [] })
+        query.mockResolvedValueOnce({ rows: [{ id: 'u', role: 'PENDING' }] })
+
+        await upsertUser({ sub: 'sub-y', email: 'admin@supplify.com', email_verified: true }, [])
+      } finally {
+        process.env.NODE_ENV = originalNodeEnv
+      }
+
+      const insertCall = query.mock.calls.find((call) => String(call[0]).includes('INSERT INTO'))
+      expect(insertCall?.[1]?.[3]).toBeNull()
+      expect(insertCall?.[1]?.[4]).toBe('PENDING')
+    })
+
+    it('does not auto-grant ADMIN to seeded admin emails when email is unverified', async () => {
+      const { query } = await import('./db.js')
+      query.mockResolvedValueOnce({ rows: [] })
+      query.mockResolvedValueOnce({ rows: [{ id: 'u', role: 'PENDING' }] })
+
+      await upsertUser({ sub: 'sub-x', email: 'admin@supplify.com' }, [])
+
+      const insertCall = query.mock.calls.find((call) => String(call[0]).includes('INSERT INTO'))
+      expect(insertCall?.[1]?.[3]).toBeNull()
+      expect(insertCall?.[1]?.[4]).toBe('PENDING')
     })
 
     it('preserves RESTAURANT role when Keycloak only reports staff_portal', async () => {
@@ -233,7 +308,7 @@ describe('RBAC Utilities', () => {
         display_name: 'Manager User',
         role: 'RESTAURANT',
       }
-      query.mockResolvedValueOnce({ rows: [{ role: 'RESTAURANT' }] })
+      query.mockResolvedValueOnce({ rows: [{ role: 'RESTAURANT', keycloak_sub: 'dual-role-sub' }] })
       query.mockResolvedValueOnce({ rows: [linkedUser] })
 
       const user = await upsertUser(

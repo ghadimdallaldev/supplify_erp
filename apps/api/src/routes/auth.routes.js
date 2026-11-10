@@ -42,6 +42,7 @@ import {
 import { emitAuthSessionEvent } from '../lib/auth-session-events.js'
 import { extractAccessToken } from '../lib/mobile-auth.js'
 import { mustBlockUnverifiedEmail } from '../lib/email-verification-gate.js'
+import { resolveCallbackOrigin } from '../lib/oauth-callback-origin.js'
 
 const legalAcceptanceSchema = {
   packVersion: (v) => typeof v === 'string' && v.length > 0 && v.length <= 32,
@@ -126,14 +127,17 @@ async function redirectUnverifiedEmailToLogin(req, res, idTokenHint = null) {
  * then X-Forwarded-Host, then the request host (localhost dev / direct API).
  */
 function callbackOrigin(req) {
-  const configured = process.env.OAUTH_CALLBACK_BASE_URL
-  if (configured) return configured.replace(/\/$/, '')
-  const forwardedHost = req.get('x-forwarded-host')
-  if (forwardedHost) {
-    const proto = req.get('x-forwarded-proto') || req.protocol
-    return `${proto}://${forwardedHost}`
-  }
-  return `${req.protocol}://${req.get('host')}`
+  // Forwarded headers are client-controllable: only hosts in WEB_ORIGINS / the public API URL are
+  // honoured (see lib/oauth-callback-origin.js); anything else falls back to the web origin.
+  return resolveCallbackOrigin({
+    configured: process.env.OAUTH_CALLBACK_BASE_URL,
+    forwardedHost: req.get('x-forwarded-host'),
+    host: req.get('host'),
+    protocol: req.protocol,
+    allowedOrigins: [...(config.WEB_ORIGINS || []), config.PUBLIC_API_URL].filter(Boolean),
+    fallbackOrigin: config.WEB_ORIGIN,
+    allowUnlistedHost: config.APP_ENV === 'dev' && process.env.NODE_ENV !== 'production',
+  })
 }
 
 function isAllowedWebRedirect(urlString) {
@@ -351,6 +355,11 @@ router.get('/callback', async (req, res) => {
   } catch (error) {
     if (isUniqueViolation(error) || error?.code === 'IDENTITY_CONFLICT') {
       logger.warn('Callback identity conflict', { requestId: req.requestId })
+      const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
+      return res.redirect(`${origin}/login?error=account_conflict`)
+    }
+    if (error?.code === 'ACCOUNT_LINK_CONFLICT' || error?.code === 'EMAIL_NOT_VERIFIED') {
+      logger.warn('Callback refused account link', { requestId: req.requestId, code: error.code })
       const origin = process.env.WEB_ORIGIN || 'http://localhost:5173'
       return res.redirect(`${origin}/login?error=account_conflict`)
     }

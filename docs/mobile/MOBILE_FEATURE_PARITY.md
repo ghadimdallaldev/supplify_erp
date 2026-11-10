@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch F: account linking, role matrix, SSRF, OAuth redirect, 5xx bodies (mobile updated for dispute resolution; auth verified)
+
+**Mobile impact:** `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS) were both inspected. One identical file changed in each repo: `src/features/disputes/DisputeDetailScreen.tsx`. `npx tsc --noEmit` passes in both. Nothing committed in either repo.
+
+**RBAC (S7):** `POST /api/disputes/:id/resolve` with `credit_note` or `refund` now requires `INVOICES_MANAGE` (Owner, Accountant) instead of `FULFILLMENT_MANAGE`; `replacement` and `no_action` still use `FULFILLMENT_MANAGE`. Both mobile apps now show the "Credit note" and "Refund" resolution chips only when `can('INVOICES_MANAGE')`, and default the picker to `replacement` otherwise, so a fulfillment-only supplier user no longer gets a form that the API rejects with 403. The Promotions Manager role lost `ORDERS_MANAGE` (it keeps `ORDERS_VIEW` and `CATALOG_VIEW`). Both apps already derive order accept/decline/cancel gating (`can('ORDERS_MANAGE')`, `usePermissions`) from the permission list the API returns, so no mobile change is needed there. Existing tenants pick up the matrix change when `ensureTenantSystemRoles` next runs; `pnpm --filter api roles:sync` forces it for all tenants.
+
+**Auth (S6):** the Bearer path now applies the web `/auth/callback` unverified-email gate. With `AUTH_EMAIL_OTP_ENABLED=true`, an access token without `email_verified=true` gets 403 `EMAIL_NOT_VERIFIED` (the mobile `email` scope already makes Keycloak put `email_verified` in the access token; `src/features/auth/keycloakAuth.ts` requests `openid profile email offline_access`, identical in both repos). A first Bearer login whose email matches an existing account with a different real Keycloak `sub` is refused with 403 `ACCOUNT_LINK_CONFLICT`, and email linking now needs `email_verified === true`. The shared API client already surfaces 403 `error.message` to the user (`src/services/api/client.ts`), so no new handler was added.
+
+**Other API-only changes (no client contract change):** `X-Requested-With: Supplify` is now required on consumer-shop cookie writes under `/api/public/consumer/*` (both mobile clients already send it on every non-GET); 5xx JSON bodies outside local dev now carry the generic message `Internal server error` with no `details` (neither app reads `details` from 5xx responses); guest checkout has a 20/hour/IP cap and per-recipient notification caps; the SSRF guard, OAuth `redirect_uri` allowlist, e2e secret compare, consumer-auth secret fallback, driver-link membership check, receiving ownership order and chat read-receipt guard are server-side only.
+
+---
+
 ## 2026-11-10 — Audit batch C: contact_email ownership, socket tenant rooms, CSRF on cookie writes (mobile verified, no change needed)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Both repos were inspected; no mobile files changed, so `tsc` was not needed.

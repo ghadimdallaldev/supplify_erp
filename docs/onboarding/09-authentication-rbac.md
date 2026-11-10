@@ -60,7 +60,7 @@ sequenceDiagram
 
 ### OAuth callback origin
 
-`callbackOrigin(req)` prefers `OAUTH_CALLBACK_BASE_URL`, then `X-Forwarded-Host`, then request host — so cookies are **first-party** on the web domain (critical for mobile Chrome).
+`callbackOrigin(req)` prefers `OAUTH_CALLBACK_BASE_URL` (required in preprod/prod), then an `X-Forwarded-Host`/request host that matches `WEB_ORIGINS` or `PUBLIC_API_URL` (never an arbitrary forwarded host) — so cookies are **first-party** on the web domain (critical for mobile Chrome).
 
 ---
 
@@ -194,7 +194,7 @@ Verified by `apps/api/src/lib/tenant-role-matrix.test.js`.
 | **Order Fulfillment Staff** | Fulfillment board; no decline/billing                            |
 | **Driver**                  | `DRIVER_DELIVERIES_*` only                                       |
 | **Catalog Manager**         | Catalog + inventory edit                                         |
-| **Promotions Manager**      | Promotions + order manage for deals                              |
+| **Promotions Manager**      | Promotions + read-only orders/catalog for deals                  |
 | **Accountant**              | Finance keys only                                                |
 | **Viewer**                  | All supplier `*_VIEW`; no mutations                              |
 

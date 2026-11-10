@@ -161,6 +161,39 @@ describe('csrfProtection — exempt prefixes only for non-cookie requests', () =
     expect(res.status).toBe(200)
   })
 
+  describe('consumer shop cookie (consumer_auth_token) under /api/public/consumer', () => {
+    beforeEach(() => {
+      app.post('/api/public/consumer/:slug/orders', (_req, res) => res.json({ ok: true }))
+    })
+
+    it('rejects a consumer-cookie write without the X-Requested-With header', async () => {
+      const res = await request(app)
+        .post('/api/public/consumer/pizza-place/orders')
+        .set('Cookie', 'consumer_auth_token=jwt')
+        .set('Origin', 'https://shop.custom-domain.example')
+        .send({})
+
+      expect(res.status).toBe(403)
+      expect(res.body.error.name).toBe('CSRF_FORBIDDEN')
+    })
+
+    it('allows a consumer-cookie write with the header from any origin (custom shop domains)', async () => {
+      const res = await request(app)
+        .post('/api/public/consumer/pizza-place/orders')
+        .set('Cookie', 'consumer_auth_token=jwt')
+        .set('Origin', 'https://shop.custom-domain.example')
+        .set(CSRF_REQUEST_HEADER, CSRF_REQUEST_HEADER_VALUE)
+        .send({})
+
+      expect(res.status).toBe(200)
+    })
+
+    it('still allows anonymous consumer writes (login/register/guest checkout) without the header', async () => {
+      const res = await request(app).post('/api/public/consumer/pizza-place/orders').send({})
+      expect(res.status).toBe(200)
+    })
+  })
+
   it('allows a Bearer-authenticated public POST without header or origin', async () => {
     verifyToken.mockResolvedValueOnce({ sub: 'user-1' })
 
