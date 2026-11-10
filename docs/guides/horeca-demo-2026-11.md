@@ -6,7 +6,7 @@ API: https://api-dev.supplifyerp.com
 
 All demo businesses are fictional. Every account below uses the password `Supplify1!` and was verified with a real Keycloak token against the dev API (`/auth/me` resolves the tenant and role).
 
-> Interactive browser login asks for an email one-time code. Demo mailboxes do not exist, so the presenter's OTP setup is handled separately. Do not rely on a fresh browser login on stage: sign in to the three or four accounts you need before the session and keep the tabs open.
+> For the demo, the email one-time-code step is disabled on the dev Keycloak realm, because demo mailboxes do not exist. Login is email and password only. Restore the step after the demo. Signing in to the three or four accounts you need beforehand, in separate browser profiles or private windows, keeps the stage flow fast.
 
 ## The data in one minute
 
