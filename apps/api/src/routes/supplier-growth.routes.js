@@ -335,7 +335,6 @@ router.post(
 const paySchema = z.object({
   paymentMethodId: z.string().uuid().optional().nullable(),
   idempotencyKey: z.string().min(8).max(128),
-  provider: z.string().optional().nullable(),
 })
 
 router.post(
@@ -366,7 +365,6 @@ router.post(
       const data = await retrySupplierPayment(supplierId, req.params.id, {
         paymentMethodId: body.paymentMethodId,
         idempotencyKey: body.idempotencyKey,
-        provider: body.provider,
         req,
       })
       res.json({ ok: true, data, error: null, requestId: req.requestId })

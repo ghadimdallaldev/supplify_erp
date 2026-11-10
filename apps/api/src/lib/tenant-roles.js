@@ -14,6 +14,9 @@ export { RESTAURANT_SYSTEM_ROLES, SUPPLIER_SYSTEM_ROLES }
 
 export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Owner',
+  // Owner-bypass identifiers (TENANT_OWNER_ROLE_NAMES) — a custom role must never carry these.
+  'RESTAURANT_OWNER',
+  'SUPPLIER_OWNER',
   'Restaurant Manager',
   'Supplier Manager',
   'Purchaser',
@@ -93,6 +96,32 @@ export const TENANT_OWNER_ROLE_NAMES = Object.freeze([
   'SUPPLIER_OWNER',
 ])
 
+/** Canonical form for role-name comparisons: trimmed, whitespace-collapsed, lower-cased. */
+export function normalizeRoleName(name) {
+  return String(name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+const RESERVED_ROLE_NAME_SET = new Set(RESERVED_SYSTEM_ROLE_NAMES.map(normalizeRoleName))
+const OWNER_ROLE_NAME_SET = new Set(TENANT_OWNER_ROLE_NAMES.map(normalizeRoleName))
+
+/** True when a tenant-defined (custom) role may not use this name. */
+export function isReservedRoleName(name) {
+  return RESERVED_ROLE_NAME_SET.has(normalizeRoleName(name))
+}
+
+/** True when the name is one of the owner-bypass identifiers (case-insensitive, trimmed). */
+export function isOwnerRoleName(name) {
+  return OWNER_ROLE_NAME_SET.has(normalizeRoleName(name))
+}
+
+/**
+ * Owner bypass check on a resolved role-name list.
+ * SECURITY: the list comes from getRolesForUser(), which only emits owner names for system
+ * roles (custom roles carrying owner-like names are neutralised there), so exact-match is safe.
+ */
 export function rolesIncludeOwner(roles) {
   if (!Array.isArray(roles) || roles.length === 0) return false
   return roles.some((name) => TENANT_OWNER_ROLE_NAMES.includes(name))
@@ -292,7 +321,7 @@ export async function userHasOwnerRole(userId, tenantId, tenantType) {
      FROM tenant_user_roles tur
      JOIN tenant_roles tr ON tr.id = tur.role_id
      WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
-       AND tr.name = 'Owner'`,
+       AND tr.name = 'Owner' AND tr.is_system = true`,
     [userId, tenantId, tenantType]
   )
   return rows.some((row) => row.is_owner === true)

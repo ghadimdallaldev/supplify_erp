@@ -33,7 +33,9 @@ import {
   permissionCacheKey,
   hasPermission,
   getPermissionsForTenantRole,
+  getRolesForUser,
 } from './permissions.js'
+import { rolesIncludeOwner } from './tenant-roles.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { resetSingleflightForTests } from './singleflight.js'
 
@@ -124,6 +126,25 @@ describe('permissions resolution', () => {
     expect(perms).toEqual(['CATALOG_VIEW', 'CATALOG_EDIT', 'ORDERS_VIEW'])
     expect(perms).not.toContain('FULFILLMENT_VIEW')
     expect(perms).not.toContain('RESERVATIONS_VIEW')
+  })
+
+  it('custom (non-system) roles named like owners never yield owner role names', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        { name: 'RESTAURANT_OWNER', is_system: false },
+        { name: 'SUPPLIER_OWNER', is_system: false },
+        { name: 'Kitchen Lead', is_system: false },
+      ],
+    })
+    const roles = await getRolesForUser('u1', 't1', 'RESTAURANT')
+    expect(rolesIncludeOwner(roles)).toBe(false)
+    expect(roles).toContain('Kitchen Lead')
+  })
+
+  it('system Owner role still yields owner bypass', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ name: 'Owner', is_system: true }] })
+    const roles = await getRolesForUser('u1', 't1', 'RESTAURANT')
+    expect(rolesIncludeOwner(roles)).toBe(true)
   })
 
   it('uses cache when present', async () => {

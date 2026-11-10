@@ -165,6 +165,41 @@ describe('Tenant roles routes', () => {
     expect(res.body.data.role.name).toBe('Custom')
   })
 
+  it.each(['SUPPLIER_OWNER', 'RESTAURANT_OWNER', 'restaurant_owner', ' Supplier_Owner ', 'owner'])(
+    'POST / rejects reserved owner role name %j',
+    async (name) => {
+      const res = await request(app)
+        .post('/api/roles')
+        .send({ name, permissions: ['ORDERS_VIEW'] })
+        .expect(400)
+      expect(res.body.error.message).toMatch(/reserved/i)
+    }
+  )
+
+  it.each(['SUPPLIER_OWNER', 'restaurant_owner', ' Supplier_Owner '])(
+    'PATCH / rejects renaming a custom role to reserved owner name %j',
+    async (name) => {
+      db.query.mockImplementation((sql) => {
+        if (String(sql).includes('FROM tenant_roles WHERE id')) {
+          return {
+            rows: [
+              {
+                id: 'r-custom',
+                name: 'Custom',
+                is_system: false,
+                tenant_id: 'tenant-1',
+                tenant_type: 'RESTAURANT',
+              },
+            ],
+          }
+        }
+        return { rows: [] }
+      })
+      const res = await request(app).patch('/api/roles/r-custom').send({ name }).expect(400)
+      expect(res.body.error.message).toMatch(/reserved/i)
+    }
+  )
+
   it('POST / rejects removed or invalid permission keys', async () => {
     const res = await request(app)
       .post('/api/roles')

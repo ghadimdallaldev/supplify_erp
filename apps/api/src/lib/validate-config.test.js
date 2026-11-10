@@ -15,6 +15,7 @@ const mockConfig = vi.hoisted(() => ({
   SMTP_PASS: 'smtp-secret',
   PAYMENTS_MODE: 'live',
   BILLING_GATEWAY: 'manual',
+  BILLING_GATEWAY_EXPLICIT: true,
   STORAGE_DRIVER: 's3',
   STORAGE_ACCESS_KEY_ID: 'access-key-prod',
   STORAGE_SECRET_ACCESS_KEY: 'secret-key-prod-32chars-min',
@@ -46,6 +47,7 @@ describe('validateProductionConfig prod safety', () => {
       NODE_ENV: 'production',
       PAYMENTS_MODE: 'live',
       BILLING_GATEWAY: 'manual',
+      BILLING_GATEWAY_EXPLICIT: true,
       STORAGE_DRIVER: 's3',
       WEB_ORIGINS: ['https://app.example.com'],
       ENABLE_DEBUG_ROUTES: false,
@@ -111,6 +113,14 @@ describe('validateProductionConfig prod safety', () => {
     mockConfig.BILLING_GATEWAY = 'manual'
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()
+  })
+
+  it('rejects an implicit (defaulted) BILLING_GATEWAY with PAYMENTS_MODE=live in prod', async () => {
+    mockConfig.PAYMENTS_MODE = 'live'
+    mockConfig.BILLING_GATEWAY = 'manual'
+    mockConfig.BILLING_GATEWAY_EXPLICIT = false
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/BILLING_GATEWAY must be set explicitly/)
   })
 
   it('rejects BILLING_GATEWAY=stub with PAYMENTS_MODE=live in prod', async () => {

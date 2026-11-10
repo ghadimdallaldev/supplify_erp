@@ -7,6 +7,8 @@ const listPaymentMethods = vi.fn()
 const setAutoRenew = vi.fn()
 const listBillingGateways = vi.fn()
 const checkoutSubscription = vi.fn()
+const addPaymentMethod = vi.fn()
+const payOpenInvoices = vi.fn()
 
 const rbacState = vi.hoisted(() => ({
   userData: { id: 'user-1', role: 'RESTAURANT', email: 'r@test.com' },
@@ -44,10 +46,10 @@ vi.mock('../lib/billing/billing-service.js', () => ({
     gateways,
   })),
   listPaymentMethods,
-  addPaymentMethod: vi.fn(),
+  addPaymentMethod,
   removePaymentMethod: vi.fn(),
   checkoutSubscription,
-  payOpenInvoices: vi.fn(),
+  payOpenInvoices,
   setAutoRenew,
 }))
 
@@ -91,6 +93,8 @@ describe('billing.routes', () => {
     listPaymentMethods.mockReset()
     setAutoRenew.mockReset()
     checkoutSubscription.mockReset()
+    addPaymentMethod.mockReset()
+    payOpenInvoices.mockReset()
     listBillingGateways.mockReturnValue(['stub', 'manual'])
 
     app = express()
@@ -183,6 +187,48 @@ describe('billing.routes', () => {
         trialTargetPlanId: '22222222-2222-4222-8222-222222222222',
       })
     )
+  })
+
+  it('POST /checkout does not forward a client-chosen gateway provider', async () => {
+    checkoutSubscription.mockResolvedValue({ success: true })
+
+    await request(app)
+      .post('/api/billing/checkout')
+      .send({
+        planId: '11111111-1111-4111-8111-111111111111',
+        billingCycle: 'MONTHLY',
+        idempotencyKey: 'manual-provider-test-key',
+        provider: 'manual',
+      })
+      .expect(200)
+
+    expect(checkoutSubscription).toHaveBeenCalledTimes(1)
+    expect(checkoutSubscription.mock.calls[0][0]).not.toHaveProperty('provider')
+  })
+
+  it('POST /payment-methods does not forward a client-chosen gateway provider', async () => {
+    addPaymentMethod.mockResolvedValue({
+      id: 'pm-1',
+      provider: 'stub',
+      type: 'CARD',
+      last4: '4242',
+    })
+
+    await request(app)
+      .post('/api/billing/payment-methods')
+      .send({ type: 'CARD', provider: 'manual', card: { number: '4242424242424242' } })
+      .expect(201)
+
+    expect(addPaymentMethod.mock.calls[0][2]).not.toHaveProperty('provider')
+  })
+
+  it('POST /pay-now does not forward a client-chosen gateway provider', async () => {
+    payOpenInvoices.mockResolvedValue({ allPaid: true, results: [] })
+
+    await request(app).post('/api/billing/pay-now').send({ provider: 'manual' })
+
+    expect(payOpenInvoices).toHaveBeenCalledTimes(1)
+    expect(payOpenInvoices.mock.calls[0][0]).not.toHaveProperty('provider')
   })
 
   it('POST /checkout returns 403 while impersonating', async () => {

@@ -13,7 +13,7 @@ import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
   ensureTenantSystemRoles,
-  RESERVED_SYSTEM_ROLE_NAMES,
+  isReservedRoleName,
   getAllPermissionsForTenantType,
   assignTenantUserRole,
 } from '../lib/tenant-roles.js'
@@ -127,7 +127,7 @@ router.post('/', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
     const { tenantId, tenantType } = assertTenantAccess(req)
     const data = createRoleSchema.parse(req.body)
     const name = data.name.trim()
-    if (RESERVED_SYSTEM_ROLE_NAMES.some((r) => r.toLowerCase() === name.toLowerCase())) {
+    if (isReservedRoleName(name)) {
       throw new ValidationError('Role name is reserved for system roles')
     }
     const allowed = new Set(getAllPermissionsForTenantType(tenantType))
@@ -216,7 +216,7 @@ router.patch('/:id', requirePermission('SETTINGS_MANAGE'), async (req, res) => {
     } else {
       if (data.name) {
         const name = data.name.trim()
-        if (RESERVED_SYSTEM_ROLE_NAMES.some((r) => r.toLowerCase() === name.toLowerCase())) {
+        if (isReservedRoleName(name)) {
           throw new ValidationError('Role name is reserved for system roles')
         }
         await query(`UPDATE tenant_roles SET name = $1, updated_at = NOW() WHERE id = $2`, [

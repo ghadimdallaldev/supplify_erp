@@ -258,6 +258,9 @@ export const config = {
   PAYMENTS_SECRET_KEY: process.env.PAYMENTS_SECRET_KEY || '',
   PAYMENTS_WEBHOOK_SECRET: process.env.PAYMENTS_WEBHOOK_SECRET || '',
   BILLING_GATEWAY: resolveBillingGatewayId(PAYMENTS_MODE),
+  BILLING_GATEWAY_EXPLICIT: Boolean(
+    process.env.BILLING_GATEWAY?.trim() || process.env.PAYMENTS_PROVIDER?.trim()
+  ),
   LOG_LEVEL:
     process.env.LOG_LEVEL || (APP_ENV === 'dev' ? 'debug' : APP_ENV === 'prod' ? 'warn' : 'info'),
   ENABLE_REQUEST_LOGGING: envBool(process.env.ENABLE_REQUEST_LOGGING, APP_ENV !== 'prod'),

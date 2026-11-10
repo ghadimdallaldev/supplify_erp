@@ -40,7 +40,6 @@ const cardSchema = z.object({
 
 const addPaymentMethodSchema = z.object({
   type: z.enum(['CARD', 'BANK_ACCOUNT']),
-  provider: z.string().optional(),
   setAsDefault: z.boolean().optional(),
   card: cardSchema.optional(),
 })
@@ -50,14 +49,12 @@ const checkoutSchema = z.object({
   billingCycle: z.enum(['MONTHLY', 'YEARLY']),
   paymentMethodId: z.string().uuid().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
-  provider: z.string().optional(),
   trialTargetPlanId: z.string().uuid().optional(),
 })
 
 const payNowSchema = z.object({
   paymentMethodId: z.string().uuid().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
-  provider: z.string().optional(),
 })
 
 router.get('/status', async (req, res) => {
@@ -173,7 +170,6 @@ router.post(
       const method = await addPaymentMethod(tenant.tenantId, tenant.tenantType, {
         type: body.type,
         card: body.card,
-        provider: body.provider,
         setAsDefault: body.setAsDefault !== false,
       })
       await writeAuditLog(req, {
@@ -279,7 +275,6 @@ router.post(
         billingCycle: body.billingCycle,
         paymentMethodId: body.paymentMethodId,
         idempotencyKey: body.idempotencyKey || `chk_${req.requestId}`,
-        provider: body.provider,
         trialTargetPlanId: body.trialTargetPlanId,
       })
       await writeAuditLog(req, {
@@ -353,7 +348,6 @@ router.post(
         tenantType: tenant.tenantType,
         paymentMethodId: body.paymentMethodId,
         idempotencyKey: body.idempotencyKey || `pay_${req.requestId}`,
-        provider: body.provider,
       })
       if (!result.allPaid) {
         return res.status(402).json({

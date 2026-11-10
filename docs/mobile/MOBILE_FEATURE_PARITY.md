@@ -2,6 +2,16 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch A: billing gateway lockdown + owner role-name hardening (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Neither app sends `provider` to `/api/billing/*`, sponsorship or promotion endpoints, and neither creates or renames tenant roles. Checked by grep in both repos; no mobile files changed, so `tsc` was not needed.
+
+**Billing:** tenants can no longer send `provider` on `POST /api/billing/payment-methods`, `/checkout`, `/pay-now` or the supplier sponsorship pay/retry routes (Zod strips it). The server picks the gateway from `BILLING_GATEWAY`, and a stored payment method can only be charged by the gateway that tokenized it. The `manual` gateway settles charges only while it is the configured gateway (pilot mode). Once another gateway is configured, a method stored under `manual` returns `requires_admin_confirmation`, so checkout fails with 402 and the plan is not activated. Prod startup now requires an explicit `BILLING_GATEWAY` when `PAYMENTS_MODE=live`.
+
+**RBAC:** `RESTAURANT_OWNER` and `SUPPLIER_OWNER` are now reserved role names on role create and rename (case-insensitive, trimmed; returns 400). Owner names only grant the owner bypass when they come from system roles: `getRolesForUser` relabels a non-system role with an owner name as `Custom: <name>`, and `userHasOwnerRole` requires `is_system`. Assigning any owner-named role requires an Owner. The owner-name list in mobile `usePermissions.ts` is unchanged and still correct.
+
+---
+
 ## 2026-10-22 — Legacy order completion cannot overwrite a cancel
 
 **Mobile impact:** None. Android and iOS already send `DELIVERED` through the locked order update path. No request or response fields changed.

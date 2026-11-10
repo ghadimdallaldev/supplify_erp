@@ -95,7 +95,7 @@ See [../features/notifications-and-alerts.md](../features/notifications-and-aler
 
 See [../features/notifications-and-alerts.md](../features/notifications-and-alerts.md) § WhatsApp.
 | `PAYMENTS_MODE` | API | all | `mock`/`test`/`live` | **mock blocked in preprod/prod**; **live never waives boost/featured payment** |
-| `BILLING_GATEWAY` | API | optional | `stub` | `stub` \| `manual` \| `stripe` (stripe requires secret key) |
+| `BILLING_GATEWAY` | API | **required when `PAYMENTS_MODE=live`** (prod startup fails if unset); otherwise optional | `stub` (non-live) | `stub` \| `manual` \| `stripe` (stripe requires secret key). `stub` is rejected in live. `manual` auto-settles charges only while it is the configured gateway (pilot mode). A payment method stored under `manual` returns `requires_admin_confirmation` once another gateway is configured, so the invoice stays OPEN. The gateway is resolved server-side; tenant billing requests cannot choose a `provider`. |
 | `PAYMENTS_PROVIDER` | API | live | `stripe` | Preferred PSP id when live |
 | `PAYMENTS_SECRET_KEY` / `STRIPE_SECRET_KEY` | API | live card | secret | Stripe secret (`sk_…`); registers Visa/MC gateway |
 | `PAYMENTS_PUBLIC_KEY` | API | live card | — | Stripe publishable key for Elements (web) |

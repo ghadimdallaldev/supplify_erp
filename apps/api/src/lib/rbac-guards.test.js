@@ -144,6 +144,32 @@ describe('rbac-guards', () => {
       )
     })
 
+    it.each(['SUPPLIER_OWNER', 'RESTAURANT_OWNER', ' supplier_owner '])(
+      'rejects non-owner assigning an owner-named role %j',
+      async (name) => {
+        mockQueryBySql([
+          [
+            'FROM tenant_roles WHERE id',
+            {
+              rows: [
+                {
+                  id: 'role-x',
+                  name,
+                  tenant_id: 'tenant-1',
+                  tenant_type: 'RESTAURANT',
+                  is_system: false,
+                },
+              ],
+            },
+          ],
+          ['tenant_user_roles tur', { rows: [] }],
+        ])
+        await expect(assertCanAssignRole({ ...baseArgs, roleId: 'role-x' })).rejects.toThrow(
+          /Only an Owner can assign the Owner role/
+        )
+      }
+    )
+
     it('allows a tenant Owner to assign Owner when the restaurant has no organization', async () => {
       mockQueryBySql([
         [

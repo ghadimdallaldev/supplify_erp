@@ -123,6 +123,11 @@ function validateProdRules(issues) {
       'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live — set BILLING_GATEWAY=manual for pilot or register a live PSP'
     )
   }
+  if (config.PAYMENTS_MODE === 'live' && !config.BILLING_GATEWAY_EXPLICIT) {
+    issues.push(
+      'BILLING_GATEWAY must be set explicitly with PAYMENTS_MODE=live (no silent default to manual) — set it to a registered PSP (e.g. stripe) or manual (admin-confirmed payments only)'
+    )
+  }
   if (config.STORAGE_DRIVER === 'local') {
     issues.push(
       'STORAGE_DRIVER=local is not allowed in production — use s3-compatible external storage'

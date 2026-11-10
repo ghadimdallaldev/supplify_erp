@@ -8,6 +8,8 @@ import {
   rolesIncludeOwner,
   TENANT_OWNER_ROLE_NAMES,
   RESERVED_SYSTEM_ROLE_NAMES,
+  isReservedRoleName,
+  isOwnerRoleName,
 } from './tenant-roles.js'
 
 describe('tenant-roles definitions', () => {
@@ -53,5 +55,25 @@ describe('tenant-roles definitions', () => {
     expect(TENANT_OWNER_ROLE_NAMES).not.toContain('Org Owner')
     expect(RESERVED_SYSTEM_ROLE_NAMES).toContain('Org Owner')
     expect(RESERVED_SYSTEM_ROLE_NAMES).toContain('Regional Manager')
+  })
+
+  it('reserves every tenant owner role name', () => {
+    for (const name of TENANT_OWNER_ROLE_NAMES) {
+      expect(RESERVED_SYSTEM_ROLE_NAMES).toContain(name)
+    }
+  })
+
+  it('isReservedRoleName is case-insensitive and trims', () => {
+    expect(isReservedRoleName('SUPPLIER_OWNER')).toBe(true)
+    expect(isReservedRoleName('restaurant_owner')).toBe(true)
+    expect(isReservedRoleName('  Supplier_Owner  ')).toBe(true)
+    expect(isReservedRoleName(' owner ')).toBe(true)
+    expect(isReservedRoleName('Kitchen Lead')).toBe(false)
+  })
+
+  it('isOwnerRoleName matches owner names case-insensitively', () => {
+    expect(isOwnerRoleName(' supplier_owner ')).toBe(true)
+    expect(isOwnerRoleName('Owner')).toBe(true)
+    expect(isOwnerRoleName('Org Owner')).toBe(false)
   })
 })

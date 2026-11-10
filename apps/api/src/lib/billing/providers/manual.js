@@ -1,6 +1,29 @@
 import crypto from 'node:crypto'
+import { config } from '../../../config/env.js'
 
-/** Admin-recorded or offline payments (bank transfer confirmed manually). */
+/**
+ * Admin-recorded or offline payments (bank transfer confirmed manually).
+ *
+ * SECURITY: manual charges auto-settle only while `manual` is the server-configured gateway
+ * (pilot mode, BILLING_GATEWAY=manual). Once a real PSP is configured, a payment method that
+ * was stored under `manual` can never settle an invoice on its own.
+ */
+const MANUAL_PENDING_RESULT = () => ({
+  status: 'requires_admin_confirmation',
+  providerPaymentId: `pi_manual_${crypto.randomUUID()}`,
+  failureCode: 'MANUAL_PAYMENT_REQUIRES_ADMIN_CONFIRMATION',
+  failureMessage:
+    'Manual payments are not settled automatically. Contact support to confirm your payment.',
+})
+
+function manualCharge() {
+  if (config.BILLING_GATEWAY !== 'manual') return MANUAL_PENDING_RESULT()
+  return {
+    status: 'succeeded',
+    providerPaymentId: `pi_manual_${crypto.randomUUID()}`,
+  }
+}
+
 export const manualGateway = {
   id: 'manual',
 
@@ -16,13 +39,10 @@ export const manualGateway = {
   },
 
   async charge() {
-    return {
-      status: 'succeeded',
-      providerPaymentId: `pi_manual_${crypto.randomUUID()}`,
-    }
+    return manualCharge()
   },
 
   async chargeOffSession() {
-    return this.charge()
+    return manualCharge()
   },
 }

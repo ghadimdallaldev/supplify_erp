@@ -839,7 +839,7 @@ export async function confirmSupplierPayment(
 export async function initiateSupplierPayment(
   supplierId,
   sponsorshipId,
-  { paymentMethodId = null, idempotencyKey, provider = null, req = null } = {}
+  { paymentMethodId = null, idempotencyKey, req = null } = {}
 ) {
   const sponsorship = await getSupplierSponsorship(supplierId, sponsorshipId)
   if (!['payment_pending', 'payment_failed'].includes(sponsorship.status)) {
@@ -864,7 +864,6 @@ export async function initiateSupplierPayment(
       supplierId,
       paymentMethodId,
       idempotencyKey: key,
-      provider,
     })
     const confirmed = await confirmSupplierPayment(sponsorshipId, {
       providerPaymentRef: charge.providerPaymentId || null,
