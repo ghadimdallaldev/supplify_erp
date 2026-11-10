@@ -2,6 +2,16 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch D1: invoice, credit note and dispute money fixes (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). No request shape, permission key, feature key or notification payload changed. Checked by grep in both repos: the dispute resolve screens send the same body (`resolutionType`, `creditNoteAmount`, `refundAmount`, `refundReference`) and only display `creditNotes` read-only; neither app voids invoices or calls `/api/payments` (web only: `finance.ts`, `InvoicesPage`). No mobile files changed, so `tsc` was not needed.
+
+**Disputes:** a `refund` resolution now writes its credit note already consumed (`APPLIED`, `remaining_amount 0`) and no longer applies it to the invoice, so a refund can no longer be paid twice. Credit and refund resolutions are capped at the supplier/invoice total minus non-void credits already issued for the order or invoice, under an order row lock. A resolve that exceeds the remainder returns 400 `ValidationError` with the remaining amount in the message (the mobile screens show server messages as they are). The resolve response's `invoiceAdjustment.status` is `refunded_externally` for refunds; no client reads that field.
+
+**Invoices:** voided invoices no longer block a corrected invoice for the same order, or get reused by receiving (migration `0228` makes `uq_invoice_order_supplier` ignore `VOID`). `PATCH /api/invoices/:id` with `VOID` returns 409 `ConflictError` when the invoice has completed payments or applied credit notes (it now also maps `ValidationError` to 400 instead of 500). Receiving rewrites an unpaid prior manual invoice to the accepted quantities; for a paid one it records the over-billed difference as the auto-dispute's `disputed_amount`. Loyalty points redeemed at checkout now reduce the invoice. `/api/payments` is gated by `finance_invoices` like `/api/invoices`. The overdue job always sets `OVERDUE` and only skips the notification for locked tenants. Payment plus credit is compared in 2dp in `restaurant-finance`.
+
+---
+
 ## 2026-11-10 — Audit batch C: contact_email ownership, socket tenant rooms, CSRF on cookie writes (mobile verified, no change needed)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Both repos were inspected; no mobile files changed, so `tsc` was not needed.
