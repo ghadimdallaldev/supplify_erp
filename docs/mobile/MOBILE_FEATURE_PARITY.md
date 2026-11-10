@@ -2,6 +2,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Checkout rejects when a promotion runs out mid-order (mobile checked, no code change needed)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). `POST /api/orders` now answers `409` with `error.name` `PROMOTION_NO_LONGER_AVAILABLE` and a readable `error.message` when a promotion that qualified for the order lost the atomic usage claim (another checkout took the last redemption) instead of placing the order without the discount. Both apps' `CartScreen` catch `ApiError` (built from `json.error.message` in `services/api/client.ts`) and show `error.message` in the "Checkout failed" alert, so the reason reaches the user with no change; web `CartPage` already toasts `error.data.error.message`. No order is created (the API rolls the transaction back), so the cart stays intact for a retry. Scheduled quick-list and consumer orders do not apply promotions, so they are unaffected.
+
 ## 2026-11-10 — Audit batch D2: stock accounting, promotions, loyalty refunds, amendments, scheduled-order timezone (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Checked by grep in both repos: neither app creates amendments (they only `GET /api/orders/:id/amendments` and render `requestedQuantity` / `unitPrice`, both still returned; `unitPrice` is now `null` for new items), neither computes an order total (they display the server's `total_amount`), neither special-cases 400 vs 409 on `PATCH /api/orders/:id` (the shared client handles 401/402/403 only; the one 409 check is the public-shop checkout and is unaffected), and no permission key, feature key, notification payload or env var changed. No mobile files were touched, so `tsc` was not needed.

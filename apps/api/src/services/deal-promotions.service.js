@@ -3,6 +3,7 @@ import { buildBoostStatus } from './deal-boost.helpers.js'
 import {
   calculatePromotionDiscount,
   claimPromotionUsage,
+  promotionNoLongerAvailableError,
   isPromotionEligible,
   totalAfterPromotionDiscount,
 } from './promotions.service.js'
@@ -887,8 +888,11 @@ export async function applyPromotionByIdToOrder({
   if (discountAmount <= 0) return null
 
   // Atomic cap check + increment: the eligibility read above is unlocked, so this claim is
-  // what actually enforces usage_limit / stock_quantity under concurrency.
-  if (!(await claimPromotionUsage(client, promotion.id))) return null
+  // what actually enforces usage_limit / stock_quantity under concurrency. Losing the race
+  // rejects the order (throws inside the order transaction) rather than dropping the deal.
+  if (!(await claimPromotionUsage(client, promotion.id))) {
+    throw promotionNoLongerAvailableError(promotion.name)
+  }
 
   const newTotal = totalAfterPromotionDiscount(orderSubtotal, discountAmount)
 

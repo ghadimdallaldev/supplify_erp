@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConflictError } from '../middlewares/errorHandler.js'
 import { activeRestaurantDeal } from '../test/factories/deal-promotion.js'
 const mockQuery = vi.hoisted(() => vi.fn())
 
@@ -306,10 +307,10 @@ describe('promotions.service', () => {
       expect(result.totalAfterDiscount).toBe(180)
     })
 
-    it('claims usage atomically and writes nothing when the limit was hit concurrently (B12)', async () => {
+    it('rejects the order and writes nothing when the usage claim loses the race (B12)', async () => {
       const { applyBestPromotionToOrder } = await import('./promotions.service.js')
       const client = makeClient({ claimed: false })
-      const result = await applyBestPromotionToOrder({
+      const err = await applyBestPromotionToOrder({
         client,
         orderId: 'ord-1',
         supplierId: 'sup-1',
@@ -317,9 +318,15 @@ describe('promotions.service', () => {
         subtotal: 200,
         lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
         skipDealPreflight: true,
-      })
+      }).then(
+        () => null,
+        (e) => e
+      )
 
-      expect(result).toBeNull()
+      // Rejects (so the surrounding order transaction rolls back) instead of dropping the deal.
+      expect(err).toBeInstanceOf(ConflictError)
+      expect(err.code).toBe('PROMOTION_NO_LONGER_AVAILABLE')
+      expect(err.message).toContain('"10% off" just reached its redemption limit')
       const claim = client.query.mock.calls.find(
         ([sql]) => String(sql).includes('UPDATE promotions') && String(sql).includes('usage_count')
       )

@@ -2,6 +2,7 @@ import { query } from '../lib/db.js'
 import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecycle.service.js'
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { moneySub, moneyToNumber } from '../lib/money.js'
+import { ConflictError } from '../middlewares/errorHandler.js'
 
 function runQuery(db, text, params) {
   if (db && typeof db.query === 'function') {
@@ -242,6 +243,24 @@ export function totalAfterPromotionDiscount(orderSubtotal, discountAmount) {
   return Math.max(0, moneyToNumber(moneySub(orderSubtotal, discountAmount)))
 }
 
+export const PROMOTION_NO_LONGER_AVAILABLE = 'PROMOTION_NO_LONGER_AVAILABLE'
+
+/**
+ * 409 raised inside the order transaction when a promotion that qualified for the order
+ * lost the atomic usage claim (another checkout took the last redemption). Throwing rolls
+ * the whole order back instead of silently placing it without the discount.
+ */
+export function promotionNoLongerAvailableError(promotionName) {
+  const label = promotionName ? `"${promotionName}"` : 'you selected'
+  const err = new ConflictError(
+    `The promotion ${label} just reached its redemption limit and is no longer available. ` +
+      'Remove it or review your cart and place the order again.',
+    { promotionName: promotionName || null }
+  )
+  err.code = PROMOTION_NO_LONGER_AVAILABLE
+  return err
+}
+
 /**
  * Atomically consume one redemption. The caps are checked inside the UPDATE so two
  * concurrent orders cannot both pass an unlocked `usage_count < usage_limit` read.
@@ -334,8 +353,10 @@ export async function applyBestPromotionToOrder({
   if (!selected || selected.discountAmount <= 0) return null
 
   const { promotion, discountAmount } = selected
-  // Claim first: if another order took the last redemption, apply nothing.
-  if (!(await claimPromotionUsage(client, promotion.id))) return null
+  // Claim first: if another order took the last redemption, reject the order (rolls back).
+  if (!(await claimPromotionUsage(client, promotion.id))) {
+    throw promotionNoLongerAvailableError(promotion.name)
+  }
 
   const newTotal = totalAfterPromotionDiscount(orderSubtotal, discountAmount)
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConflictError } from '../middlewares/errorHandler.js'
 
 const subscriptionMocks = vi.hoisted(() => ({
   incrementUsage: vi.fn().mockResolvedValue(true),
@@ -180,9 +181,9 @@ describe('deal-promotions.service redemption metering', () => {
       expect(totalUpdate[1]).toEqual([1180, 'order-1'])
     })
 
-    it('rejects the promotion when the atomic usage claim loses the race (B12)', async () => {
+    it('rejects the order when the atomic usage claim loses the race (B12)', async () => {
       const client = makeClaimLost()
-      const result = await applyPromotionByIdToOrder({
+      const err = await applyPromotionByIdToOrder({
         client,
         promotionId: promotion.id,
         orderId: 'order-1',
@@ -190,9 +191,14 @@ describe('deal-promotions.service redemption metering', () => {
         restaurantId,
         subtotal: 200,
         lineItems: [{ productId: 'p1', quantity: 1, unitPrice: 200, lineTotal: 200 }],
-      })
+      }).then(
+        () => null,
+        (e) => e
+      )
 
-      expect(result).toBeNull()
+      expect(err).toBeInstanceOf(ConflictError)
+      expect(err.code).toBe('PROMOTION_NO_LONGER_AVAILABLE')
+      expect(err.message).toContain(`"${promotion.name}"`)
       const claim = client.query.mock.calls.find(
         ([sql]) => String(sql).includes('UPDATE promotions') && String(sql).includes('usage_count')
       )
