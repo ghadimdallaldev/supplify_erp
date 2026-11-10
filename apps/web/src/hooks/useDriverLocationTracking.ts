@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiUrl } from '../lib/apiBase'
+import { CSRF_HEADERS } from '../lib/csrfHeaders'
 import { useSendDriverLocationMutation } from '../services/api'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 import { createDriverLocationProvider } from '../lib/driverLocationPlatform'
@@ -34,7 +35,7 @@ function stopTrackingSession(sessionId: string, reason: string) {
   return fetch(apiUrl(`/api/driver/tracking-sessions/${sessionId}/stop`), {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
     body: JSON.stringify({ reason }),
   })
 }
@@ -66,7 +67,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
           {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
             body: JSON.stringify(point),
           }
         )
@@ -137,7 +138,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
           const response = await fetch(apiUrl('/api/driver/tracking-sessions'), {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
             body: JSON.stringify({ routeId: trackableRef.current[0]?.routeId ?? null }),
           })
           const payload = (await response.json()) as SessionResponse
