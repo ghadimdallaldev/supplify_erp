@@ -378,5 +378,8 @@
       "waste_with_excess_stock": "Waste is high while stock cover remains high"
     },
     "unitCoverage": "Some products have receiving lines in a different unit and are excluded from the comparison."
+  },
+  "toastMessages": {
+    "recommendationFeedbackRecorded": "Thanks — we recorded that this recommendation looks incorrect"
   }
 }

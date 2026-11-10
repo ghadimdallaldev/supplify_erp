@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   useCreateConsumerAddressMutation,
@@ -162,6 +163,7 @@ export function ConsumerOrderDetailPage() {
   const navigate = useNavigate()
   const { data } = useGetConsumerPublicOrderQuery(orderId, { skip: !orderId })
   const [reorder, reorderState] = useGetConsumerReorderPreviewMutation()
+  const { t: tCommon } = useTranslation('common')
   if (!data) return <Skeleton className="h-44" />
   return (
     <section>
@@ -200,10 +202,10 @@ export function ConsumerOrderDetailPage() {
               )
               navigate(`/supplier/${encodeURIComponent(result.storefrontId)}`)
             } else {
-              toast.info('No items from this order are currently available.')
+              toast.info(tCommon('toastMessages.reorderNoItems'))
             }
           } catch {
-            toast.error('Unable to rebuild this order.')
+            toast.error(tCommon('toastMessages.reorderFailed'))
           }
         }}
       >

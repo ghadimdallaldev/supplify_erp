@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bot, Loader2, Paperclip, Send, Sparkles, X } from 'lucide-react'
@@ -44,7 +44,19 @@ function suggestionKeysForRole(role: string | undefined, tools: string[]): strin
 export function AssistantFab() {
   const { t, i18n } = useTranslation('assistant')
   const [open, setOpen] = useState(false)
+  // Conversation state lives above the Sheet: its content unmounts on close, which used to
+  // throw away the chat every time the sheet was dismissed.
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [localMessages, setLocalMessages] = useState<LocalMsg[]>([])
+  const [draft, setDraft] = useState('')
   const { user } = useAppSelector((s) => s.auth)
+  const userId = user?.id ?? null
+  useEffect(() => {
+    // A different signed-in user must never see the previous user's conversation.
+    setConversationId(null)
+    setLocalMessages([])
+    setDraft('')
+  }, [userId])
   const { isImpersonating } = useImpersonation()
   const { data: entitlements } = useGetEntitlementsQuery(undefined, {
     skip: !user || (user.role === 'ADMIN' && !isImpersonating),
@@ -109,6 +121,12 @@ export function AssistantFab() {
             quotaRemaining={caps?.quotaRemaining}
             loadingCaps={capsLoading}
             role={user.role}
+            conversationId={conversationId}
+            setConversationId={setConversationId}
+            localMessages={localMessages}
+            setLocalMessages={setLocalMessages}
+            draft={draft}
+            setDraft={setDraft}
           />
         </SheetContent>
       </Sheet>
@@ -122,18 +140,27 @@ function AssistantChatBody({
   quotaRemaining,
   loadingCaps,
   role,
+  conversationId,
+  setConversationId,
+  localMessages,
+  setLocalMessages,
+  draft,
+  setDraft,
 }: {
   enabled: boolean
   tools: string[]
   quotaRemaining?: number | null
   loadingCaps: boolean
   role?: string
+  conversationId: string | null
+  setConversationId: Dispatch<SetStateAction<string | null>>
+  localMessages: LocalMsg[]
+  setLocalMessages: Dispatch<SetStateAction<LocalMsg[]>>
+  draft: string
+  setDraft: Dispatch<SetStateAction<string>>
 }) {
   const { t } = useTranslation('assistant')
   const { isEffectiveSupplier } = useImpersonation()
-  const [conversationId, setConversationId] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
-  const [localMessages, setLocalMessages] = useState<LocalMsg[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])

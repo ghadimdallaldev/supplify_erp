@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
+  exceedsAmount,
+  roundMoney,
+  toCents,
   invoiceIsOverdue,
   invoiceRemainingBalance,
   isCalendarDateBeforeToday,
@@ -43,5 +46,19 @@ describe('invoiceRemainingBalance', () => {
         today
       )
     ).toBe(true)
+  })
+})
+
+describe('money precision', () => {
+  it('rounds float drift out of a computed balance', () => {
+    expect(invoiceRemainingBalance({ total_amount: 0.3, total_paid: 0.1 })).toBe(0.2)
+    expect(roundMoney(0.1 + 0.2)).toBe(0.3)
+  })
+
+  it('compares in cents so a full payment never "exceeds" the balance', () => {
+    expect(0.1 + 0.2 > 0.3).toBe(true)
+    expect(exceedsAmount(0.1 + 0.2, 0.3)).toBe(false)
+    expect(exceedsAmount(0.31, 0.3)).toBe(true)
+    expect(toCents(19.99)).toBe(1999)
   })
 })

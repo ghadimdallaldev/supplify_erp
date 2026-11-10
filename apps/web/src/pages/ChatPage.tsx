@@ -54,7 +54,10 @@ export function ChatPage() {
   const [replyingTo, setReplyingTo] = useState<Record<string, unknown> | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [filePreviews, setFilePreviews] = useState<string[]>([])
+  // Previews are keyed by File so async FileReader completion order can't misalign them.
+  const [previewByFile, setPreviewByFile] = useState<Map<File, string>>(() => new Map())
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [showOrderPicker, setShowOrderPicker] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<{
     id: string
@@ -86,7 +89,7 @@ export function ChatPage() {
   const [createConversation, { isLoading: isCreatingConversation }] =
     useCreateConversationMutation()
   const [markConversationRead] = useMarkConversationReadMutation()
-  const [generatePresignedUrl, { isLoading: isUploadingFile }] = useGetPresignedUrlMutation()
+  const [generatePresignedUrl] = useGetPresignedUrlMutation()
   const [pinConversation] = usePinConversationMutation()
   const [archiveConversation] = useArchiveConversationMutation()
   const [deleteConversation] = useDeleteConversationMutation()
@@ -100,6 +103,7 @@ export function ChatPage() {
     [conversationsData?.conversations]
   )
   const messages = useMemo(() => messagesData?.messages || [], [messagesData?.messages])
+  const filePreviews = selectedFiles.map((file) => previewByFile.get(file) ?? '')
 
   const handleTypingChange = useCallback((typing: boolean) => {
     setOtherPartyTyping(typing)
@@ -329,6 +333,7 @@ export function ChatPage() {
       await archiveConversation(selectedConversation).unwrap()
       setSelectedConversation(null)
       setMobileShowThread(false)
+      navigate('/app/chat', { replace: true })
       refetchConversations()
       toast.success(t('toast.conversationArchived'))
     } catch (error: unknown) {
@@ -344,6 +349,7 @@ export function ChatPage() {
       await deleteConversation(selectedConversation).unwrap()
       setSelectedConversation(null)
       setMobileShowThread(false)
+      navigate('/app/chat', { replace: true })
       refetchConversations()
       toast.success(t('toast.conversationDeleted'))
     } catch (error: unknown) {
@@ -365,10 +371,9 @@ export function ChatPage() {
     validFiles.forEach((file) => {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader()
-        reader.onloadend = () => setFilePreviews((prev) => [...prev, reader.result as string])
+        reader.onloadend = () =>
+          setPreviewByFile((prev) => new Map(prev).set(file, reader.result as string))
         reader.readAsDataURL(file)
-      } else {
-        setFilePreviews((prev) => [...prev, ''])
       }
     })
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -377,6 +382,10 @@ export function ChatPage() {
   const handleSendMessage = async () => {
     if ((!message.trim() && selectedFiles.length === 0 && !selectedOrder) || !selectedConversation)
       return
+    // Ref guard covers same-tick double clicks / Enter before state re-renders.
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
 
     const messageContent =
       message.trim() ||
@@ -423,12 +432,15 @@ export function ChatPage() {
       setMessage('')
       setReplyingTo(null)
       setSelectedFiles([])
-      setFilePreviews([])
+      setPreviewByFile(new Map())
       setSelectedOrder(null)
       setTimeout(() => scrollToBottom(), 100)
     } catch (error: unknown) {
       const err = error as { data?: { error?: { message?: string } } }
       toast.error(err?.data?.error?.message || t('toast.failedSendMessage'))
+    } finally {
+      submittingRef.current = false
+      setIsSubmitting(false)
     }
   }
 
@@ -570,8 +582,8 @@ export function ChatPage() {
                       onMessageChange={setMessage}
                       onSend={handleSendMessage}
                       onTyping={handleTyping}
-                      isSending={isSendingMessage}
-                      isUploading={isUploadingFile}
+                      isSending={isSendingMessage || isSubmitting}
+                      isUploading={isSubmitting}
                       replyingTo={replyingTo}
                       onClearReply={() => setReplyingTo(null)}
                       showEmojiPicker={showEmojiPicker}
@@ -594,7 +606,6 @@ export function ChatPage() {
                       onFileSelect={handleFileSelect}
                       onRemoveFile={(index) => {
                         setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
-                        setFilePreviews((prev) => prev.filter((_, i) => i !== index))
                       }}
                       fileInputRef={fileInputRef}
                       inputRef={inputRef}

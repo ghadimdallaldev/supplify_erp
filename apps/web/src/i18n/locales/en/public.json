@@ -57,5 +57,8 @@
       "linkCopied": "Catalog link copied",
       "copyFailed": "Could not copy link"
     }
+  },
+  "toastMessages": {
+    "addedToCart": "Added to your cart"
   }
 }

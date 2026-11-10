@@ -16,7 +16,8 @@ import { Select, SelectItem, SelectTrigger } from '../ui/select'
 import { useTranslation } from 'react-i18next'
 import { Loader2, CreditCard, CheckCircle } from 'lucide-react'
 import { formatCurrency } from '../../utils/format'
-import { formatCalendarDate } from '../../lib/invoiceBalance'
+import { formatCalendarDate, localDateKey, roundMoney } from '../../lib/invoiceBalance'
+import { useState } from 'react'
 
 const PAYMENT_METHODS = [
   'BANK_TRANSFER',
@@ -41,6 +42,8 @@ export function InvoicePaymentDialog(props: any) {
     setPaymentAmount,
     creditAmount,
     setCreditAmount,
+    paymentDate,
+    setPaymentDate,
     selectedCreditNoteId,
     setSelectedCreditNoteId,
     paymentMethod,
@@ -61,6 +64,11 @@ export function InvoicePaymentDialog(props: any) {
   } = props
 
   const { t } = useTranslation('invoices')
+  // Raw text while typing, so "0", "0." and "0.5" aren't reset by the numeric parse. The
+  // numeric state in the parent is parsed from it; null means "show the parent's value".
+  const [paymentAmountText, setPaymentAmountText] = useState<string | null>(null)
+  const [creditAmountText, setCreditAmountText] = useState<string | null>(null)
+  const amountToText = (n: number) => (n ? String(n) : '')
   const invoiceCurrency = selectedInvoice?.currency || 'USD'
   const money = (amount: number | string | null | undefined) =>
     formatCurrency(amount, { currency: invoiceCurrency })
@@ -143,7 +151,13 @@ export function InvoicePaymentDialog(props: any) {
 
                   <div>
                     <Label>{t('payment.paymentDate')}</Label>
-                    <Input type="date" value={new Date().toISOString().split('T')[0]} required />
+                    <Input
+                      type="date"
+                      value={paymentDate}
+                      max={localDateKey()}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      required
+                    />
                   </div>
                 </div>
 
@@ -189,19 +203,21 @@ export function InvoicePaymentDialog(props: any) {
                     min="0.01"
                     max={remainingBalance}
                     placeholder={t('payment.maxAmount', { amount: money(remainingBalance) })}
-                    value={paymentAmount || ''}
+                    value={paymentAmountText ?? amountToText(paymentAmount)}
                     onChange={(e) => {
+                      setPaymentAmountText(e.target.value)
                       const val = parseFloat(e.target.value)
                       if (!isNaN(val) && val > 0) {
-                        setPaymentAmount(Math.min(val, remainingBalance))
+                        setPaymentAmount(Math.min(roundMoney(val), remainingBalance))
                       } else {
                         setPaymentAmount(0)
                       }
                     }}
+                    onBlur={() => setPaymentAmountText(null)}
                   />
                   <p className="text-xs text-[var(--text-muted)] mt-1">
                     {t('payment.remainingAfter', {
-                      amount: money(remainingBalance - paymentAmount),
+                      amount: money(roundMoney(remainingBalance - paymentAmount)),
                     })}
                   </p>
                 </div>
@@ -216,7 +232,13 @@ export function InvoicePaymentDialog(props: any) {
 
                   <div>
                     <Label>{t('payment.paymentDate')}</Label>
-                    <Input type="date" value={new Date().toISOString().split('T')[0]} required />
+                    <Input
+                      type="date"
+                      value={paymentDate}
+                      max={localDateKey()}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      required
+                    />
                   </div>
                 </div>
 
@@ -277,20 +299,26 @@ export function InvoicePaymentDialog(props: any) {
                               ?.remaining_amount || 0
                           }
                           placeholder={t('payment.amountToApply')}
-                          value={creditAmount || ''}
+                          value={creditAmountText ?? amountToText(creditAmount)}
                           onChange={(e) => {
+                            setCreditAmountText(e.target.value)
                             const val = parseFloat(e.target.value)
                             const maxCredit =
                               creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
                                 ?.remaining_amount || 0
                             if (!isNaN(val) && val > 0) {
                               setCreditAmount(
-                                Math.min(val, maxCredit, remainingBalance - paymentAmount)
+                                Math.min(
+                                  roundMoney(val),
+                                  maxCredit,
+                                  roundMoney(remainingBalance - paymentAmount)
+                                )
                               )
                             } else {
                               setCreditAmount(0)
                             }
                           }}
+                          onBlur={() => setCreditAmountText(null)}
                         />
                       </div>
                     )}
@@ -347,18 +375,22 @@ export function InvoicePaymentDialog(props: any) {
                               ?.remaining_amount || 0
                           }
                           placeholder={t('payment.amountToApply')}
-                          value={creditAmount || ''}
+                          value={creditAmountText ?? amountToText(creditAmount)}
                           onChange={(e) => {
+                            setCreditAmountText(e.target.value)
                             const val = parseFloat(e.target.value)
                             const maxCredit =
                               creditNotes.find((cn: any) => cn.id === selectedCreditNoteId)
                                 ?.remaining_amount || 0
                             if (!isNaN(val) && val > 0) {
-                              setCreditAmount(Math.min(val, maxCredit, remainingBalance))
+                              setCreditAmount(
+                                Math.min(roundMoney(val), maxCredit, remainingBalance)
+                              )
                             } else {
                               setCreditAmount(0)
                             }
                           }}
+                          onBlur={() => setCreditAmountText(null)}
                         />
                         <p className="text-xs text-[var(--text-muted)] mt-1">
                           {t('payment.available', {
@@ -373,7 +405,13 @@ export function InvoicePaymentDialog(props: any) {
 
                     <div>
                       <Label>{t('payment.paymentDate')}</Label>
-                      <Input type="date" value={new Date().toISOString().split('T')[0]} required />
+                      <Input
+                        type="date"
+                        value={paymentDate}
+                        max={localDateKey()}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        required
+                      />
                     </div>
 
                     <div>
@@ -447,19 +485,19 @@ export function InvoicePaymentDialog(props: any) {
                     <div className="flex justify-between font-semibold text-lg border-t pt-2">
                       <span>{t('payment.totalPayment')}</span>
                       <span className="text-[var(--mint)]">
-                        {money(paymentAmount + creditAmount)}
+                        {money(roundMoney(paymentAmount + creditAmount))}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm border-t pt-2">
                       <span>{t('payment.newBalance')}</span>
                       <span
                         className={
-                          remainingBalance - paymentAmount - creditAmount > 0
+                          roundMoney(remainingBalance - paymentAmount - creditAmount) > 0
                             ? 'text-[var(--amber)]'
                             : 'text-[var(--mint)]'
                         }
                       >
-                        {money(remainingBalance - paymentAmount - creditAmount)}
+                        {money(roundMoney(remainingBalance - paymentAmount - creditAmount))}
                       </span>
                     </div>
                   </div>

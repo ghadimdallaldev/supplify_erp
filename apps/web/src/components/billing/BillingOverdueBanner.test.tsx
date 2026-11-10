@@ -14,6 +14,10 @@ vi.mock('../../hooks/redux', () => ({
   useAppDispatch: () => vi.fn(),
 }))
 
+vi.mock('../../hooks/useImpersonation', () => ({
+  useImpersonation: () => ({ isEffectiveSupplier: false }),
+}))
+
 vi.mock('../../lib/openPaymentModal', () => ({
   openOverduePayment: vi.fn(),
 }))

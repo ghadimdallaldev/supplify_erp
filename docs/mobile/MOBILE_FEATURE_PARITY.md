@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch E: web UI bug fixes (type and notification-route parity only)
+
+**Mobile impact:** Two small identical changes in both `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS); everything else is web-only UI behavior with no API, auth, RBAC or notification payload change. `npx tsc --noEmit` passes in both repos.
+
+**Implemented in both mobile repos:** `src/types/supplify.ts` gains an `OrderStatus` union (`DRAFT`, `PLACED`, `ACKNOWLEDGED`, `PROCESSING`, `SHIPPED`, `DELIVERED`, `RECEIVED_PARTIAL`, `RECEIVED_FULL`, `RECEIVED_WITH_DISPUTE`, `INVOICED`, `COMPLETED`, `CANCELLED`) matching `apps/web/src/types/orders.ts`. `Order.status` is `OrderStatus | (string & {})`, so legacy strings such as `PENDING_APPROVAL` still type-check. `src/navigation/notificationNavigation.ts` now opens the Subscription screen for `/app/settings?tab=plan` links as well as `tab=subscription`, because supplier billing links use the `plan` tab.
+
+**Web fixes (no mobile change needed):** double-submit guard while chat, product and proof-of-delivery uploads run; chat `?conversation=` param cleared on archive and delete; chat image previews keyed by file; staff portal magic-link token dropped on 401/403/404/410 and guarded `localStorage` access; orders tabs now give each status exactly one tab and send single-status tabs (`PLACED`, `SHIPPED`) to the API `status` filter; `AuthGuard` redirects to `/login?returnTo=` only on 401/403 and shows a retry card on network or 5xx errors (`returnTo` is validated as a same-origin relative path); receiving "in progress" ids expire after 2 minutes and are scoped per user; invoice payment dialog keeps raw amount text, uses a controlled local payment date, and compares money in cents; hardcoded `$` replaced by the record currency (cart shows one total per currency when suppliers differ); notification and billing-banner links choose `plan` or `subscription` by tenant type, restaurant `INVENTORY_EXPIRY` goes to `/app/restaurant-inventory`, and `//host` links are rejected; assistant conversation survives closing the sheet; stale contract-price responses can no longer overwrite newer ones; `useDriverLocationTracking` stops GPS and closes the session if unmounted mid-start and builds URLs with `apiUrl()`, and its tracking-session POSTs now send the `X-Requested-With: Supplify` CSRF header (they were rejected with 403 under cookie auth; mobile uses Bearer and is unaffected); hardcoded English toasts moved to i18n (en and ar).
+
+**Checked and not applicable on mobile:** the staff portal token bug (neither app implements the staff magic-link portal) and the float money comparison bug (neither app has an invoice payment form). Mobile already types `Order.status` loosely, so no exhaustiveness fixes were needed. Money fields typed `number` actually arrive as strings from Postgres NUMERIC on web and mobile; no type migration was done in this batch.
+
+---
+
 ## 2026-11-10 — Audit batch F: account linking, role matrix, SSRF, OAuth redirect, 5xx bodies (mobile updated for dispute resolution; auth verified)
 
 **Mobile impact:** `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS) were both inspected. One identical file changed in each repo: `src/features/disputes/DisputeDetailScreen.tsx`. `npx tsc --noEmit` passes in both. Nothing committed in either repo.

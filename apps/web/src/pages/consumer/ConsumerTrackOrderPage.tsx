@@ -46,6 +46,9 @@ export function ConsumerTrackOrderPage() {
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [tracked, setTracked] = useState<ConsumerOrderReceipt | null>(null)
+  // Contact values that actually matched the order. Polling must use these, not whatever
+  // is currently typed into the form (editing the inputs would break or redirect the poll).
+  const [trackedContact, setTrackedContact] = useState<{ email?: string; phone?: string }>({})
 
   const [trackOrder, { isLoading }] = useTrackPublicConsumerOrderMutation()
 
@@ -57,8 +60,8 @@ export function ConsumerTrackOrderPage() {
         const result = await trackOrder({
           restaurantSlug: slug,
           orderNumber: tracked.order.order_number,
-          email: email.trim() || undefined,
-          phone: phone.trim() || undefined,
+          email: trackedContact.email,
+          phone: trackedContact.phone,
         }).unwrap()
         setTracked(result)
       } catch {
@@ -67,7 +70,7 @@ export function ConsumerTrackOrderPage() {
     }, 5000)
 
     return () => window.clearInterval(timer)
-  }, [tracked, slug, email, phone, trackOrder])
+  }, [tracked, slug, trackedContact, trackOrder])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -88,6 +91,7 @@ export function ConsumerTrackOrderPage() {
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
       }).unwrap()
+      setTrackedContact({ email: email.trim() || undefined, phone: phone.trim() || undefined })
       setTracked(result)
     } catch (error: any) {
       setTracked(null)

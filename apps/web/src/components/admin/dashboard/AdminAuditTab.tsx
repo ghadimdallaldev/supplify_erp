@@ -300,8 +300,18 @@ export function AdminAuditTab({ active }: AdminAuditTabProps) {
                     return (
                       <Fragment key={log.id}>
                         <tr
-                          className="cursor-pointer transition-colors hover:bg-[var(--brand-ultra)]/35"
+                          className="cursor-pointer transition-colors hover:bg-[var(--brand-ultra)]/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--brand-mid)]"
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isExpanded}
                           onClick={() => setAuditExpandedId(isExpanded ? null : log.id)}
+                          onKeyDown={(event) => {
+                            if (event.target !== event.currentTarget) return
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              setAuditExpandedId(isExpanded ? null : log.id)
+                            }
+                          }}
                         >
                           <td className="px-4 py-3.5">
                             <AuditActionBadge actionType={log.action_type} />

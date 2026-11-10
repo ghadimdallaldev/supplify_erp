@@ -18,6 +18,7 @@ import {
 } from '../../services/api'
 import { usePermissions } from '../../hooks/usePermissions'
 import { formatOrderRef } from './fulfillmentDispatchUtils'
+import { formatCurrency } from '../../utils/format'
 import { getGpsStatusLabel } from '../../lib/deliveryTrackingLabels'
 import {
   formatFulfillmentRouteStatus,
@@ -227,7 +228,9 @@ function RouteStopCard({
                       ? t('routeDetail.itemsCount', { count: stop.itemCount })
                       : null}
                     {stop.itemCount > 0 && stop.totalAmount > 0 ? ' · ' : null}
-                    {stop.totalAmount > 0 ? `$${stop.totalAmount.toFixed(2)}` : null}
+                    {stop.totalAmount > 0
+                      ? formatCurrency(stop.totalAmount, { currency: stop.currency || 'USD' })
+                      : null}
                   </p>
                 ) : null}
               </div>

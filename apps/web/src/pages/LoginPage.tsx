@@ -19,6 +19,7 @@ import { SupplifyLogo } from '../components/SupplifyLogo'
 import { redirectToAuth, redirectToLogout, isEmbeddedFrame } from '../lib/authRedirect'
 import { LegalFooterLinks } from '../components/legal/LegalFooterLinks'
 import { ensureNamespace } from '../i18n'
+import { sanitizeReturnTo } from '../lib/returnTo'
 
 export function LoginPage() {
   const { t } = useTranslation('auth')
@@ -31,7 +32,11 @@ export function LoginPage() {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
     const type = params.get('type')
-    if (!token || !type) return undefined
+    if (!token || !type) {
+      // Same-origin relative path the user was trying to reach before being sent to login.
+      const returnTo = sanitizeReturnTo(params.get('returnTo'))
+      return returnTo ? new URL(returnTo, window.location.origin).toString() : undefined
+    }
     const inviteUrl = new URL('/invite', window.location.origin)
     inviteUrl.searchParams.set('token', token)
     inviteUrl.searchParams.set('type', type)

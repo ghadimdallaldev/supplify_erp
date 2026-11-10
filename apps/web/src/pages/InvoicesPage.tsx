@@ -42,7 +42,7 @@ import {
 } from '../components/invoices/lazyInvoiceDialogs'
 import { apiUrl } from '../lib/apiBase'
 import { applyReportDatePreset } from '../components/reports/ReportFiltersBar'
-import { invoiceRemainingBalance, localDateKey } from '../lib/invoiceBalance'
+import { exceedsAmount, invoiceRemainingBalance, localDateKey } from '../lib/invoiceBalance'
 
 type SupplierExportType = 'standard' | 'quickbooks' | 'payments'
 
@@ -75,6 +75,7 @@ export function InvoicesPage() {
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState<number>(0)
   const [creditAmount, setCreditAmount] = useState<number>(0)
+  const [paymentDate, setPaymentDate] = useState<string>(() => localDateKey())
   const [selectedCreditNoteId, setSelectedCreditNoteId] = useState<string>('')
   const [paymentMethod, setPaymentMethod] = useState<string>('BANK_TRANSFER')
   const [paymentReference, setPaymentReference] = useState('')
@@ -169,6 +170,7 @@ export function InvoicesPage() {
     if (options?.pay) {
       setPaymentMode('full')
       setPaymentAmount(invoiceRemainingBalance(invoice))
+      setPaymentDate(localDateKey())
       setShowPaymentDialog(true)
     }
   }, [])
@@ -253,6 +255,7 @@ export function InvoicesPage() {
     setShowPaymentDialog(true)
     setPaymentMode('full')
     setPaymentAmount(remaining)
+    setPaymentDate(localDateKey())
     setCreditAmount(0)
     setSelectedCreditNoteId('')
     setPaymentMethod('BANK_TRANSFER')
@@ -281,10 +284,12 @@ export function InvoicesPage() {
       return
     }
 
-    if (finalPaymentAmount + creditAmount > remainingBalance) {
+    if (exceedsAmount(finalPaymentAmount + creditAmount, remainingBalance)) {
       toast.error(t('toasts.exceedsBalance'))
       return
     }
+
+    const chosenPaymentDate = /^\d{4}-\d{2}-\d{2}$/.test(paymentDate) ? paymentDate : localDateKey()
 
     try {
       if (!isRestaurant) {
@@ -295,7 +300,7 @@ export function InvoicesPage() {
         await recordSupplierPayment({
           invoice_id: selectedInvoice.id,
           payment_amount: finalPaymentAmount,
-          payment_date: localDateKey(),
+          payment_date: chosenPaymentDate,
           payment_method: paymentMethod,
           payment_reference: paymentReference || undefined,
           bank_name: bankName || undefined,
@@ -306,7 +311,7 @@ export function InvoicesPage() {
           invoiceId: selectedInvoice.id,
           data: {
             paymentAmount: paymentMode === 'credit' ? 0 : finalPaymentAmount,
-            paymentDate: localDateKey(),
+            paymentDate: chosenPaymentDate,
             paymentMethod: paymentMethod as any,
             paymentReference: paymentReference || undefined,
             bankName: bankName || undefined,
@@ -539,6 +544,8 @@ export function InvoicesPage() {
               setPaymentAmount={setPaymentAmount}
               creditAmount={creditAmount}
               setCreditAmount={setCreditAmount}
+              paymentDate={paymentDate}
+              setPaymentDate={setPaymentDate}
               selectedCreditNoteId={selectedCreditNoteId}
               setSelectedCreditNoteId={setSelectedCreditNoteId}
               paymentMethod={paymentMethod}
