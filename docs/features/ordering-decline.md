@@ -66,4 +66,4 @@ Preference key: `notify_order_cancelled` (same as other order status events).
 | Web   | `apps/web/src/lib/orderStatusDisplay.test.ts`                                        |
 | API   | Extend `orders.routes.test.js` for `DECLINE_REASON_REQUIRED` when adding route tests |
 
-**Manual QA:** [regression-checklist.md](../qa/regression-checklist.md) — `ORD-DECL-*`, `RST-10`, `SUP-06b`.
+**Manual QA:** [regression-checklist.md](../guides/qa/regression-checklist.md) — `ORD-DECL-*`, `RST-10`, `SUP-06b`.

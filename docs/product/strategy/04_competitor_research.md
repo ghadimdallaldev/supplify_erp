@@ -408,7 +408,7 @@ xtraCHEF (single profile under §4.6.1). Source categories:
 - **Funding aggregators:** Crunchbase, Tracxn, PitchBook, Latka — used only where labeled
 - **Press:** TechCrunch, PR Newswire, The National, Wamda, Menabytes, BetaKit, EU-Startups
 - **Reviews:** G2, Capterra, TrustRadius, Glassdoor, Trustpilot
-- **Supplify baseline:** Part 1 §1.2–§1.14; `docs/product/tier-matrix.md`
+- **Supplify baseline:** Part 1 §1.2–§1.14; `docs/archive/product/tier-matrix.md`
 
 **Research limitations:** Private-company revenue is "not disclosed" unless a self-reported
 press figure exists. Customer counts frequently conflict across a vendor's own pages;

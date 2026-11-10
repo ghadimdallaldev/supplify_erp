@@ -193,13 +193,13 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 - Sidebar: tenant nav when `useImpersonation()` reports restaurant/supplier; admin nav when platform admin and not impersonating; Settings/Staff/etc. gated by permissions.
 - Direct URLs under `/app/*` use `RequirePermission` at the router for the same keys as the matching API (catalog, orders, inventory, invoices, recipes, staff, settings, chat, fulfillment, receiving, promotions, reports). Restaurant onboarding requires `SETTINGS_VIEW` or `STAFF_VIEW`. Org branch detail requires `SETTINGS_VIEW`.
 
-**Impersonation:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
+**Impersonation:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../archive/audits/impersonation-audit.md)
 
 ## Subscription features vs RBAC
 
 Plan entitlements (`requireFeature`) and role permissions (`requirePermission`) are **both** required. They answer different questions: whether the **tenant** bought the module vs whether the **user** may use it.
 
-See **[ACCESS_CONTROL.md](./ACCESS_CONTROL.md)** for the full matrix (module analytics vs global `reports`, tenant resolution, and checklists for new routes).
+See **[ACCESS_CONTROL.md](./access-control.md)** for the full matrix (module analytics vs global `reports`, tenant resolution, and checklists for new routes).
 
 ## contact_email is not an ownership credential (2026-11-10)
 
@@ -228,9 +228,9 @@ New staff or multi-tenant users must be assigned roles via `user_role` (e.g. whe
 
 ## Hardening pass (2026-05-27)
 
-- [RBAC permission matrix](./RBAC_PERMISSION_MATRIX.md) — default restaurant/supplier roles and codes
-- [RBAC audit report](./RBAC_AUDIT_REPORT.md) — route/page enforcement inventory and verification commands
-- Manual spot checks: [regression-checklist.md](../qa/regression-checklist.md) **RBAC-X01–X08** (2026-09-10) and §6.16 / §7.10
+- [RBAC permission matrix](../security/rbac-permission-matrix.md) — default restaurant/supplier roles and codes
+- [RBAC audit report](../archive/audits/rbac-audit-report.md) — route/page enforcement inventory and verification commands
+- Manual spot checks: [regression-checklist.md](../guides/qa/regression-checklist.md) **RBAC-X01–X08** (2026-09-10) and §6.16 / §7.10
 
 After deploy, system roles are synced automatically by the `migrate` container (`sync-system-roles.mjs`). On dev machines: `pnpm db:sync-roles`.
 

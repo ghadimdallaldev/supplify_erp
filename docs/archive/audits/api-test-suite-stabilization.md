@@ -2,7 +2,7 @@
 
 Stabilized the `@supplify/api` Vitest suite so the full API Vitest suite completes reliably without a real Postgres instance. No product features, tier limits/prices, or deals/promotions business rules were changed.
 
-**Workflow:** Use **`pnpm test:api`** (non-watch) from the repo root for CI, PR checks, and Cursor verification. See **[testing guide](../../qa/testing-guide.md)** for all scripts, test rules, and CI.
+**Workflow:** Use **`pnpm test:api`** (non-watch) from the repo root for CI, PR checks, and Cursor verification. See **[testing guide](../../guides/qa/testing-guide.md)** for all scripts, test rules, and CI.
 
 ## Development workflow (locked)
 

@@ -40,4 +40,4 @@ The historical `platinum` catalog JSON includes feature **strings** that describ
 
 ## Enterprise
 
-Custom contracts, **100 GB** storage in catalog, admin assignment — see [ENTERPRISE.md](./ENTERPRISE.md).
+Custom contracts, **100 GB** storage in catalog, admin assignment — see [ENTERPRISE.md](./enterprise.md).

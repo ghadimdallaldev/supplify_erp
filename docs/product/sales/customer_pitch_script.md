@@ -165,4 +165,4 @@ Use these if the room pushes back. Answer honestly — the strategy docs require
 
 ---
 
-_Synthesized from the Supplify strategy document set (Parts 1, 3, 4, 5, 7, 10) and sales materials (`01_problem.md`, `02_solution.md`). Last updated: 2026-07-20 — aligned to [four-plan-pricing-model.md](../product/four-plan-pricing-model.md)._
+_Synthesized from the Supplify strategy document set (Parts 1, 3, 4, 5, 7, 10) and sales materials (`01_problem.md`, `02_solution.md`). Last updated: 2026-07-20 — aligned to [four-plan-pricing-model.md](../four-plan-pricing-model.md)._

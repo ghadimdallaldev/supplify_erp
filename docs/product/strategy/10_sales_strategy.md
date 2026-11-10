@@ -33,7 +33,7 @@ split along the same line the product itself already draws:
 - **Founder-led (Gold/Platinum multi-branch, Enterprise-track).** Part 1's Business Model
   Canvas explicitly reserves "high-touch sales for Platinum/Enterprise" (§1.11). A real,
   already-written discovery and onboarding checklist exists for this motion
-  (`docs/sales/enterprise_checklist.md`) — see §10.5 and §10.7.
+  (`docs/product/sales/enterprise_checklist.md`) — see §10.5 and §10.7.
 
 **A material, disclosed constraint on this motion: real payment collection is not live in
 production yet.** Part 11 states plainly that `apps/api/src/lib/billing/providers/stub.js`
@@ -81,10 +81,10 @@ Lebanon relationships, which this document does not have visibility into (see Pa
 **Restaurant-side prioritization, in order:**
 
 1. **Multi-supplier independent restaurants, cafés, and cloud kitchens (5+ active suppliers,
-   1–2 locations).** This is the segment for whom the core problem statement (`docs/sales/01_problem.md`
+   1–2 locations).** This is the segment for whom the core problem statement (`docs/product/sales/01_problem.md`
    — "manual ordering," "no single view," fragmented reconciliation) is most acute, and it maps
    directly onto the pricing ladder: Silver's `suppliers_per_restaurant` cap is 5, Gold's is 30
-   (`docs/product/tier-matrix.md` §3) — a restaurant already juggling 5+ suppliers outgrows
+   (`docs/archive/product/tier-matrix.md` §3) — a restaurant already juggling 5+ suppliers outgrows
    Silver quickly, which is the intended upgrade trigger (Part 7 §7.2). A restaurant with one
    or two suppliers has comparatively little fragmentation pain to solve and is a weaker early
    target regardless of size.
@@ -98,7 +98,7 @@ Lebanon relationships, which this document does not have visibility into (see Pa
    segment most likely to test **remaining** catalog-only Platinum gaps (developer API +
    order/invoice webhooks, advanced reports, central purchasing — `PLATINUM_CATALOG_ONLY_FEATURES.md`)
    and ask for integrations (EDI, SSO) that do not
-   exist yet (`docs/sales/enterprise_checklist.md`, "Integration & SLA" section). Part 7's
+   exist yet (`docs/product/sales/enterprise_checklist.md`, "Integration & SLA" section). Part 7's
    own recommendation applies here directly: do not actively pursue this segment until a
    Gold/Platinum reference customer exists (§7.4).
 
@@ -129,17 +129,17 @@ Lebanon relationships, which this document does not have visibility into (see Pa
 The funnel below is mapped to real, shipped product touchpoints — not a generic SaaS funnel
 template. Every stage after "First Touch" is instrumented in the product today
 (`docs/product/monetization-ux.md`; conversion tracking referenced in
-`docs/sales/08_pricing_strategy.md`).
+`docs/product/sales/08_pricing_strategy.md`).
 
 | Stage                                              | Real touchpoint                                                                                                                                                                                                                                                                                        | What exists today                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1. Awareness / first touch**                     | Founder direct outreach, demo booking                                                                                                                                                                                                                                                                  | No paid or organic marketing channel is modeled in this document — that is Part 9's scope (not yet started per `README.md`). At this stage, awareness is founder-network-driven, consistent with Part 1's "founder market access" framing (§1.13).                                                                                                                                 |
-| **2. Discovery / demo**                            | `docs/sales/enterprise_checklist.md` discovery questions; `docs/onboarding/12-demo-script.md` scripted walkthroughs                                                                                                                                                                                    | Real, usable collateral exists for both self-guided and founder-led demos — see §10.5.                                                                                                                                                                                                                                                                                             |
+| **2. Discovery / demo**                            | `docs/product/sales/enterprise_checklist.md` discovery questions; `docs/onboarding/12-demo-script.md` scripted walkthroughs                                                                                                                                                                            | Real, usable collateral exists for both self-guided and founder-led demos — see §10.5.                                                                                                                                                                                                                                                                                             |
 | **3. Free Trial signup**                           | `/register/complete` → **Activate free plan**                                                                                                                                                                                                                                                          | Live, self-serve, no card required (`docs/features/tenant-registration.md`). Trial ships with **Gold-equivalent feature flags** and Free-tier limits, 7–90 days, default 30 (`docs/features/free-trial-expiry.md`) — the trial itself is the strongest self-serve sales asset the company has, because a prospect sees full Gold functionality, not a crippled demo (Part 7 §7.3). |
-| **4. In-trial usage / product-qualified signal**   | Standardized `LIMIT_EXCEEDED` / `FEATURE_NOT_AVAILABLE` API errors → `UpgradeModal`; 80% usage-warning banner; proactive nudge after ≥3 blocks in 7 days; `RecommendedBadge` from `GET /api/subscriptions/recommendation`; Nav "Upgrade" CTA (`docs/product/monetization-ux.md`, B1–B3, Launch Polish) | Fully shipped. The admin dashboard's **conversion funnel** stats (blocks → upgrades, most-blocked feature/limit — `docs/sales/06_admin_and_operations.md`) let the founder identify which trial tenants are hitting real friction — a genuine, already-built product-qualified-lead (PQL) signal that most pre-launch companies have to build from scratch.                        |
+| **4. In-trial usage / product-qualified signal**   | Standardized `LIMIT_EXCEEDED` / `FEATURE_NOT_AVAILABLE` API errors → `UpgradeModal`; 80% usage-warning banner; proactive nudge after ≥3 blocks in 7 days; `RecommendedBadge` from `GET /api/subscriptions/recommendation`; Nav "Upgrade" CTA (`docs/product/monetization-ux.md`, B1–B3, Launch Polish) | Fully shipped. The admin dashboard's **conversion funnel** stats (blocks → upgrades, most-blocked feature/limit — `docs/product/sales/06_admin_and_operations.md`) let the founder identify which trial tenants are hitting real friction — a genuine, already-built product-qualified-lead (PQL) signal that most pre-launch companies have to build from scratch.                |
 | **5. Conversion (first paid)**                     | `POST /api/billing/checkout`                                                                                                                                                                                                                                                                           | Mechanically live, but see §10.1's billing caveat — expect this step to run through **manual invoicing** (bank transfer confirmed via the `manual` gateway) for the first cohort, not automated card checkout, until a live processor ships (Part 11 §11.1).                                                                                                                       |
 | **6. Expansion (upsell / add-ons)**                | Branch/warehouse add-ons (admin-provisioned, `PUT /subscription-addons/:addonKey`); tier upgrade nudges continue post-conversion                                                                                                                                                                       | Add-on sales require a manual admin step today (`tier-matrix.md` §5b) — a real, disclosed operational gap (Part 11 §11.1), not a hypothetical one. Tier upsell (Silver→Gold→Platinum) is driven by the same usage-nudge system as trial conversion.                                                                                                                                |
-| **7. Enterprise track (parallel, not sequential)** | `docs/sales/enterprise_checklist.md` — discovery, sizing, integration/SLA, contract fields, onboarding steps, indicative timelines                                                                                                                                                                     | A real, already-written internal template for a structured enterprise sales process. It should be treated as **the company's own planning assumption**, not a track record — no Enterprise deal has been run through it yet. Per Part 7 §7.4, this track should not be actively pushed until a Gold/Platinum self-serve reference customer exists.                                 |
+| **7. Enterprise track (parallel, not sequential)** | `docs/product/sales/enterprise_checklist.md` — discovery, sizing, integration/SLA, contract fields, onboarding steps, indicative timelines                                                                                                                                                             | A real, already-written internal template for a structured enterprise sales process. It should be treated as **the company's own planning assumption**, not a track record — no Enterprise deal has been run through it yet. Per Part 7 §7.4, this track should not be actively pushed until a Gold/Platinum self-serve reference customer exists.                                 |
 
 **What this funnel does not yet have:** a top-of-funnel acquisition channel beyond founder
 network and the referral/sponsorship loop described in §10.4. That gap is explicitly Part 9's
@@ -207,7 +207,7 @@ required. This is a genuine, usable-today asset, not a roadmap dependency.
 - **The Free Trial itself.** As noted in §10.3, a self-serve trial with Gold-equivalent
   features is the single most persuasive piece of "collateral" the company has — it is the
   product, not a deck about the product.
-- **`docs/sales/01_problem.md` through `08_pricing_strategy.md`.** Eight internal narrative
+- **`docs/product/sales/01_problem.md` through `08_pricing_strategy.md`.** Eight internal narrative
   documents (problem, solution, platform overview, roles/security, subscriptions/controls,
   admin/operations, scalability/enterprise, pricing strategy) written in clean, buyer-facing
   prose. These are real, already-written source material for external collateral, but they
@@ -220,7 +220,7 @@ required. This is a genuine, usable-today asset, not a roadmap dependency.
   a demo," "Start a Free Trial," "Go live"). This is the closest thing to a real pitch deck
   Supplify has today. It has not been confirmed as used with any real external prospect yet
   (see open items).
-- **`docs/sales/enterprise_checklist.md`.** A genuinely operational one-page checklist for
+- **`docs/product/sales/enterprise_checklist.md`.** A genuinely operational one-page checklist for
   Platinum/Enterprise-track discovery, sizing, integration/SLA scoping, a contract-fields
   template, and an onboarding sequence with indicative phase durations. This is real,
   reusable internal collateral — not aspirational — though it is a **template with no deals
@@ -263,7 +263,7 @@ review or contract negotiation will find the gap regardless.
 | **"Platinum lists AI quick lists, advanced custom reports, full API/webhooks, white-label domains, and central purchasing — do these actually work?"** | **Partially — updated 2026-07.** **Smart Reorder** (forecast, explain, ask) and **smart quick lists** (forecast quantities + suggest) are enforced — see `docs/features/ai-smart-reorder.md` and `docs/features/ai-quick-lists.md`. **Notification webhooks** and **custom catalog domains** (Platinum white-label) are shipped. Still catalog-only: **advanced/custom reports** strings, **full API + order/invoice webhooks** (`api_integrations`), and **central purchasing**. Do not represent catalog-only items as available; disclose roadmap items explicitly. |
 | **"How do I actually pay you — will my card be charged automatically?"**                                                                               | Not yet, in production. The live billing gateway is a development stub (Part 11 §11.1); the near-term path is manual invoicing (bank transfer, recorded via the `manual` gateway — §10.1). Be direct rather than implying automated recurring billing exists today.                                                                                                                                                                                                                                                                                                    |
 | **"Where is my data hosted — is it safe, and what happens if Supplify goes down?"**                                                                    | A static security review found zero Critical findings, with solid fundamentals (Keycloak OIDC, parameterized SQL, 52-key RBAC, audit logging) in place (Part 11 §11.4). Equally honest: infrastructure is **single-region** with no failover (Part 11 §11.5), rate limiting is in-memory, and there is **no SOC 2 or ISO 27001**. Reasonable for an independent restaurant; a genuine gap for an enterprise/GCC buyer running a security questionnaire — say so plainly.                                                                                               |
-| **"We already coordinate fine over WhatsApp and phone calls — why switch?"**                                                                           | The exact problem Supplify's own materials name (`docs/sales/01_problem.md`; Part 1 §1.7). Acknowledge WhatsApp "works" at small scale; frame value around what breaks as suppliers/locations multiply (no shared record, manual reconciliation, evidence-free disputes) rather than a fabricated hours-saved figure — Part 1 declines to cite one for this exact reason (§1.7).                                                                                                                                                                                       |
+| **"We already coordinate fine over WhatsApp and phone calls — why switch?"**                                                                           | The exact problem Supplify's own materials name (`docs/product/sales/01_problem.md`; Part 1 §1.7). Acknowledge WhatsApp "works" at small scale; frame value around what breaks as suppliers/locations multiply (no shared record, manual reconciliation, evidence-free disputes) rather than a fabricated hours-saved figure — Part 1 declines to cite one for this exact reason (§1.7).                                                                                                                                                                               |
 | **"Can you integrate with our EDI system, accounting software, or POS?"**                                                                              | Not today. The one real asset is a one-way, manual **QuickBooks-compatible CSV export** (Part 11 §11.3) — no live QuickBooks/Xero sync, no EDI, no POS integration. This is why larger, already-integrated distributors are sequenced lower in §10.2 — do not commit to a timeline Part 11's roadmap doesn't support.                                                                                                                                                                                                                                                  |
 | **"We're a hotel/chain with several branches — can we run central purchasing across all of them?"**                                                    | Not as a differentiated product today — "central purchasing" is a Platinum catalog-only string behaving like Gold's `multi_branch` (`tier-matrix.md` §7; Part 11 §11.1, §11.8). What's real: strong multi-branch RBAC, a Regional Manager role, and linked branch accounts under one org (`docs/architecture/tenancy.md`) — a credible foundation, described honestly as a foundation, not a finished engine.                                                                                                                                                          |
 | **"You have zero live customers. Why would we be first?"**                                                                                             | Product risk, not market risk, is what's retired here (Part 1 §1.13) — 186 migrations, 225+ backend and 100+ frontend tests, and the hard parts (RBAC, billing enforcement, GPS logistics, real-time chat) are already built. Frame being early as direct access to the builders, not a downside.                                                                                                                                                                                                                                                                      |
@@ -274,9 +274,9 @@ review or contract negotiation will find the gap regardless.
 **No real sales cycle or deal data exists — zero closed deals to date.** The figures below
 are either (a) directly derived from real, shipped pricing (deal size) or (b) modeled
 assumptions built from the company's own existing internal planning template
-(`docs/sales/enterprise_checklist.md`), clearly labeled as such and not as track record.
+(`docs/product/sales/enterprise_checklist.md`), clearly labeled as such and not as track record.
 
-**Deal size (ACV), derived directly from live pricing** (`docs/product/tier-matrix.md` §1):
+**Deal size (ACV), derived directly from live pricing** (`docs/archive/product/tier-matrix.md` §1):
 
 | Plan       | Monthly × 12 | Annual (discounted) | Notes                                                                              |
 | ---------- | -----------: | ------------------: | ---------------------------------------------------------------------------------- |
@@ -296,7 +296,7 @@ a **stated assumption, not a measured figure** (§7.10).
   the high end by the trial window itself (7–90 days, default 30 —
   `docs/features/free-trial-expiry.md`). This is inferred from the product's own trial-length
   design, not from observed conversions, since none exist yet.
-- **Founder-led (Gold/Platinum multi-branch, enterprise-track).** `docs/sales/enterprise_checklist.md`
+- **Founder-led (Gold/Platinum multi-branch, enterprise-track).** `docs/product/sales/enterprise_checklist.md`
   already states internal target timelines for this track: Discovery (1–2 calls), Proposal
   (3–5 days), Legal/DPA (1–3 weeks), Provisioning (1–2 days post-sign), Onboarding (1–2
   weeks), Go-live by week 2–4. Summed, this implies a **modeled target of roughly 3–7 weeks**
@@ -337,10 +337,10 @@ elsewhere in this document — not a pipeline, and none should be represented as
 **Already instrumented and available from day one** — a genuine advantage, since most
 pre-launch companies have to build this tracking from scratch:
 
-- Plans viewed, upgrade modal opened, plan changed (`docs/sales/08_pricing_strategy.md`,
+- Plans viewed, upgrade modal opened, plan changed (`docs/product/sales/08_pricing_strategy.md`,
   "Conversion tracking").
 - Blocked-event counts by feature/limit key, and the admin-visible **blocks → upgrades**
-  conversion rate and most-blocked feature/limit (`docs/sales/06_admin_and_operations.md`;
+  conversion rate and most-blocked feature/limit (`docs/product/sales/06_admin_and_operations.md`;
   `docs/product/monetization-ux.md` B3).
 - `GET /api/subscriptions/recommendation`-driven "Recommended" plan impressions, usable as a
   proxy for identifying product-qualified leads before they self-convert.
@@ -365,13 +365,13 @@ none of the following should be reported as an actual until a real cohort produc
 
 ### Sources & assumptions used in this part
 
-- Sales motion, pricing, and billing-gateway status: `docs/sales/01_problem.md` through
-  `08_pricing_strategy.md`, `docs/sales/enterprise_checklist.md`; Part 11 §11.1, §11.3
+- Sales motion, pricing, and billing-gateway status: `docs/product/sales/01_problem.md` through
+  `08_pricing_strategy.md`, `docs/product/sales/enterprise_checklist.md`; Part 11 §11.1, §11.3
   (billing gateway code inspection: `apps/api/src/lib/billing/providers/stub.js`,
   `manual.js`).
 - Tenant registration and Free Trial mechanics: `docs/features/tenant-registration.md`,
   `docs/features/free-trial-expiry.md`.
-- Pricing ladder and limits: `docs/product/tier-matrix.md`, `docs/product/subscriptions.md`
+- Pricing ladder and limits: `docs/archive/product/tier-matrix.md`, `docs/archive/product/subscriptions.md`
   (verified 2026-05-28 per that document's own header).
 - Monetization UX / in-app upgrade mechanics: `docs/product/monetization-ux.md`.
 - Two-sided growth mechanics: `docs/features/supplier-customer-growth.md` (migration `0169`).

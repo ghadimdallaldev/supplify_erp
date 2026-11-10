@@ -71,6 +71,6 @@ Admins share `supplify-api`. A separate admin client (idle 1d / max 7d) is a **f
 ## Related
 
 - Audit: `docs/audits/auth-session-architecture-current-state.md`
-- Plan: `docs/plans/auth-session-hardening-plan.md`
-- Keycloak runbook: `docs/runbooks/keycloak-session-configuration.md`
-- Troubleshooting: `docs/runbooks/auth-session-troubleshooting.md`
+- Plan: `docs/archive/plans/auth-session-hardening-plan.md`
+- Keycloak runbook: `docs/operations/runbooks/keycloak-session-configuration.md`
+- Troubleshooting: `docs/operations/runbooks/auth-session-troubleshooting.md`

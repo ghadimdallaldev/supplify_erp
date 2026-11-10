@@ -4,7 +4,7 @@
 
 Every restaurant and supplier has a **subscription** with a **plan**. Plans define limits (e.g. branches, active customer locations, users, AI assists) and which features are on (e.g. order calendar, smart reorder, multi-warehouse). This keeps the product clear and upgrade paths obvious.
 
-**Canonical commercial source:** [four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [plans-and-limits.md](../product/plans-and-limits.md). Historical catalogs in `subscriptions.md` / `tier-matrix.md` are not current pricing guidance.
+**Canonical commercial source:** [four-plan-pricing-model.md](../four-plan-pricing-model.md) and [plans-and-limits.md](../plans-and-limits.md). Historical catalogs in `subscriptions.md` / `tier-matrix.md` are not current pricing guidance.
 
 ### Public plans (conceptual)
 

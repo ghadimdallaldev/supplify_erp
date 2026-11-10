@@ -7,7 +7,7 @@
 | **HEAD**             | `b8e43f262af454027aacea7d57c392250c9b0fb7` (`b8e43f26`)                                                                                                                                                                           |
 | **Working tree**     | Clean                                                                                                                                                                                                                             |
 | **Migrations**       | Through `0192_supplier_sponsorship_lifecycle.sql` (0191 tracked)                                                                                                                                                                  |
-| **Inventory source** | [docs/supplify-complete-feature-and-business-logic.md](../supplify-complete-feature-and-business-logic.md) (2026-07-20) — **re-verified**; former “uncommitted” Branch Account / warehouse / org-report work is **now committed** |
+| **Inventory source** | [docs/supplify-complete-feature-and-business-logic.md](../../product/supplify-complete-feature-and-business-logic-2026-07-20.md) (2026-07-20) — **re-verified**; former “uncommitted” Branch Account / warehouse / org-report work is **now committed** |
 | **Method**           | Sequential single-agent audit (no parallel Task subagents); code + migrations + Vitest; Playwright blocked (API unreachable)                                                                                                      |
 
 **Source of truth:** runtime code > migrations > tests > docs.
@@ -262,7 +262,7 @@ Code fixes landed on working tree (not necessarily committed):
 | P0-5 | Cleared | Inventory route tests mock WH SoT services; `getStockStatus` coerces numbers; RTL cleanup; InventoryPage tests use card list |
 | P0-4 | Cleared | `assertImpersonationAllowsMutation` in `requireAuth` blocks all non-GET mutations (allowlist: stop impersonation, logout)    |
 | P0-1 | Cleared | Reject `stub`+`live`; prod `BILLING_GATEWAY=manual`; live default gateway `manual`                                           |
-| P0-3 | Cleared | [backup-and-restore.md](../operations/backup-and-restore.md); local dump→restore drill PASS                                  |
+| P0-3 | Cleared | [backup-and-restore.md](../../operations/backup-and-restore.md); local dump→restore drill PASS                                  |
 
 Playwright: still **blocked** locally (API needs reachable Postgres on host; probe web=true api=false). Re-run when API `/health` is up.
 

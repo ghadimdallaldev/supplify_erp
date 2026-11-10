@@ -12,8 +12,8 @@ already exist in the shipped platform.
 tenants today. Nothing in this part is derived from customer interviews, surveys, usage
 data, or sales-call notes. Where this part describes personas, needs, or buying
 behavior, it either (a) cites external, third-party research from Part 2, (b) restates
-the company's own disclosed problem/solution framing (`docs/sales/01_problem.md`,
-`docs/sales/02_solution.md`), or (c) is explicitly labeled an illustrative hypothesis
+the company's own disclosed problem/solution framing (`docs/product/sales/01_problem.md`,
+`docs/product/sales/02_solution.md`), or (c) is explicitly labeled an illustrative hypothesis
 for founder validation.
 
 ---
@@ -114,12 +114,12 @@ initial supplier focus as **food and beverage distributors**, with packaging, cl
 and equipment suppliers named explicitly as a later expansion target rather than a
 current go-to-market focus.
 
-| Supplier segment                               | Profile                                                                                                                                                                                                           | Product fit / plan mapping                                                                                                                                                                                                                                                                                  |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Local/independent distributors**             | Single-warehouse operations serving a defined city or district; order intake by phone/WhatsApp per restaurant customer, the same fragmentation problem described from the buyer side (`docs/sales/01_problem.md`) | Silver (1 warehouse) or Gold (up to 3 warehouses) depending on scale; the natural entry tier for most Lebanese distributors given the single-warehouse norm implied by a market this size                                                                                                                   |
-| **Regional/multi-warehouse wholesalers**       | Multiple warehouses, broader restaurant customer base, likely already juggling manual reconciliation across a larger number of accounts than an independent distributor                                           | Gold or Platinum (up to 5 warehouses, `tier-matrix.md` §5); the segment most likely to benefit from — and be willing to pay for — the driver dispatch/GPS and multi-warehouse routing features (Gold+, Part 1 §1.2)                                                                                         |
-| **Specialty/import suppliers**                 | Narrower catalog (e.g., imported alcohol, specialty proteins, bakery inputs), often serving a smaller number of higher-value restaurant accounts rather than high order-volume, low-value accounts                | Could fit Silver's lower SKU/warehouse ceiling despite meaningful revenue per account; a segment where promotion/deal tooling (all tiers) may matter more than volume-based features                                                                                                                        |
-| **Packaging / cleaning / equipment suppliers** | Longer reorder cycles, non-perishable inventory, different compliance/documentation needs (e.g., safety data sheets) than food suppliers                                                                          | Explicitly **not** a current GTM focus (Part 1, §1.6); the product's supplier-type-agnostic catalog model supports this segment today, but no category-specific catalog fields (units of measure, compliance docs) exist yet — a Part 11 roadmap item (§11.1, "Later" horizon), not a near-term opportunity |
+| Supplier segment                               | Profile                                                                                                                                                                                                                   | Product fit / plan mapping                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local/independent distributors**             | Single-warehouse operations serving a defined city or district; order intake by phone/WhatsApp per restaurant customer, the same fragmentation problem described from the buyer side (`docs/product/sales/01_problem.md`) | Silver (1 warehouse) or Gold (up to 3 warehouses) depending on scale; the natural entry tier for most Lebanese distributors given the single-warehouse norm implied by a market this size                                                                                                                   |
+| **Regional/multi-warehouse wholesalers**       | Multiple warehouses, broader restaurant customer base, likely already juggling manual reconciliation across a larger number of accounts than an independent distributor                                                   | Gold or Platinum (up to 5 warehouses, `tier-matrix.md` §5); the segment most likely to benefit from — and be willing to pay for — the driver dispatch/GPS and multi-warehouse routing features (Gold+, Part 1 §1.2)                                                                                         |
+| **Specialty/import suppliers**                 | Narrower catalog (e.g., imported alcohol, specialty proteins, bakery inputs), often serving a smaller number of higher-value restaurant accounts rather than high order-volume, low-value accounts                        | Could fit Silver's lower SKU/warehouse ceiling despite meaningful revenue per account; a segment where promotion/deal tooling (all tiers) may matter more than volume-based features                                                                                                                        |
+| **Packaging / cleaning / equipment suppliers** | Longer reorder cycles, non-perishable inventory, different compliance/documentation needs (e.g., safety data sheets) than food suppliers                                                                                  | Explicitly **not** a current GTM focus (Part 1, §1.6); the product's supplier-type-agnostic catalog model supports this segment today, but no category-specific catalog fields (units of measure, compliance docs) exist yet — a Part 11 roadmap item (§11.1, "Later" horizon), not a near-term opportunity |
 
 **Why supplier-side segmentation matters as much as the buyer side**: Supplify's
 referral-driven growth loop (`docs/features/supplier-customer-growth.md`, detailed in
@@ -137,8 +137,8 @@ acquisition problems.
 ## 3.3 Buyer Personas
 
 **Explicit framing**: the personas below are **illustrative hypotheses synthesized from
-the company's disclosed problem/solution documentation (`docs/sales/01_problem.md`,
-`docs/sales/02_solution.md`) and the product's actual tier design (`tier-matrix.md`)** —
+the company's disclosed problem/solution documentation (`docs/product/sales/01_problem.md`,
+`docs/product/sales/02_solution.md`) and the product's actual tier design (`tier-matrix.md`)** —
 not personas derived from customer interviews, surveys, or usage analytics. They should
 be treated as founder-testable hypotheses to validate against the first real cohort, not
 as research findings.
@@ -154,7 +154,7 @@ derived from customer interviews)_
 - **Day-to-day pain, per the disclosed problem statement**: coordinates 5–15 suppliers by
   phone and WhatsApp (Part 1, §1.1), reconciles what arrived against what was ordered
   manually, and has no single view across inventory, orders, and supplier conversations
-  (`docs/sales/01_problem.md`).
+  (`docs/product/sales/01_problem.md`).
 - **Economic context**: operates on the thin 3–5% restaurant margins documented
   industry-wide (Part 2, §2.3), which makes both his tolerance for wasted time and his
   price sensitivity on new software unusually high at the same time.
@@ -207,7 +207,7 @@ derived from customer interviews)_
 - **Day-to-day pain, per the disclosed problem statement**: "order chaos" — orders arrive
   through multiple channels and consolidating them for fulfillment is error-prone; limited
   visibility into which restaurants order what and how often; invoicing and collections
-  take time away from growing the business (`docs/sales/01_problem.md`).
+  take time away from growing the business (`docs/product/sales/01_problem.md`).
 - **Likely plan fit**: Silver or Gold depending on warehouse count and order volume.
 - **Growth-program relevance**: Nadine is a strong candidate to use the supplier customer
   import and referral tooling (`docs/features/supplier-customer-growth.md`) — she likely
@@ -235,7 +235,7 @@ derived from customer interviews)_
 ## 3.4 Customer Needs & Pain Points
 
 This section restates, without embellishment, the pain points already disclosed in
-`docs/sales/01_problem.md` — the correct source document per Part 1's own citation
+`docs/product/sales/01_problem.md` — the correct source document per Part 1's own citation
 practice (§1.7) — organized by which side of the marketplace experiences them and mapped
 to the specific product capability that addresses each one (Part 1, §1.2).
 
@@ -442,15 +442,15 @@ from an existing, deeply embedded manual process**:
   §2.14 — see that part's own source list for the underlying primary citations
   (Hospitality News ME, The Beiruter, Mordor Intelligence, Panorama Consulting Group,
   World Bank Global Findex, ReFED, National Restaurant Association via Restaurant Dive).
-- Pricing, tier limits, and add-on structure: `docs/product/tier-matrix.md` (verified
+- Pricing, tier limits, and add-on structure: `docs/archive/product/tier-matrix.md` (verified
   2026-05-28) and Part 7, §7.2–§7.11.
-- Problem/solution framing and persona pain points: `docs/sales/01_problem.md`,
-  `docs/sales/02_solution.md`, used in substance rather than rewritten to sound more
+- Problem/solution framing and persona pain points: `docs/product/sales/01_problem.md`,
+  `docs/product/sales/02_solution.md`, used in substance rather than rewritten to sound more
   research-derived than they are.
 - Growth/referral mechanics and customer-journey touchpoints:
   `docs/features/supplier-customer-growth.md`, `docs/product/monetization-ux.md`, and
   Part 7, §7.9.
-- Pricing-strategy design rationale: `docs/sales/08_pricing_strategy.md`.
+- Pricing-strategy design rationale: `docs/product/sales/08_pricing_strategy.md`.
 - **No customer interviews, surveys, NPS/satisfaction data, or usage analytics exist and
   none are represented as existing anywhere in this part.** Every persona is labeled
   illustrative; every willingness-to-pay statement is qualitative.

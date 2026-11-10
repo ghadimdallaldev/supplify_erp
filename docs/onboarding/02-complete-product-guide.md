@@ -65,7 +65,7 @@ Resolution logic lives in `apps/api/src/lib/rbac.js` (`upsertUser`). Platform ro
 
 Custom tenant roles can be created with subsets of permissions; system role names are protected (`RESERVED_SYSTEM_ROLE_NAMES` in `tenant-roles.js`).
 
-**Implementation evidence:** `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/permission-keys.js`, `docs/architecture/rbac-permission-matrix.md`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/RequirePermission.tsx`.
+**Implementation evidence:** `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/permission-keys.js`, `docs/security/rbac-permission-matrix.md`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/RequirePermission.tsx`.
 
 ---
 
@@ -200,7 +200,7 @@ Restaurants see supplier catalogs through authenticated product APIs with **serv
 - **Per-warehouse zones** — `GET/POST /api/warehouses/:id/zones` for warehouse-scoped delivery zones (distinct from Settings Delivery Zones tab).
 - **Stock levels** — `/app/inventory` → `/api/inventory`.
 
-> **Partial feature — Supplier Settings Delivery Zones:** The Delivery Zones and Contacts tabs in Supplier Settings are **UI-only**. `DELIVERY_ZONES_ENABLED` and `CONTACTS_TAB_ENABLED` are `false` in `supplierSettingsShared.tsx`. Warehouse zone APIs exist separately; the settings tab was never wired. See `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
+> **Partial feature — Supplier Settings Delivery Zones:** The Delivery Zones and Contacts tabs in Supplier Settings are **UI-only**. `DELIVERY_ZONES_ENABLED` and `CONTACTS_TAB_ENABLED` are `false` in `supplierSettingsShared.tsx`. Warehouse zone APIs exist separately; the settings tab was never wired. See `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
 
 **Implementation evidence:** `apps/api/src/routes/products.routes.js`, `apps/api/src/routes/warehouses.routes.js`, `apps/api/src/services/public-supplier-catalog.service.js`, `apps/web/src/pages/PublicSupplierCatalogPage.tsx`, `apps/web/src/components/supplier/settings/supplierSettingsShared.tsx`.
 
@@ -487,7 +487,7 @@ Waitlist auto-promotion is plan-gated (`waitlist_auto_promo`).
 
 Admin RBAC uses `ADMIN` tenant scope with `SUPER_ADMIN` role when `ALLOW_AUTO_SUPER_ADMIN` is enabled.
 
-**Implementation evidence:** `docs/sales/06_admin_and_operations.md`, `apps/api/src/routes/admin-dashboard/`, `tests/api/admin-rbac.spec.ts`, `tests/api/admin-impersonation.spec.ts`.
+**Implementation evidence:** `docs/product/sales/06_admin_and_operations.md`, `apps/api/src/routes/admin-dashboard/`, `tests/api/admin-rbac.spec.ts`, `tests/api/admin-impersonation.spec.ts`.
 
 ---
 
@@ -509,7 +509,7 @@ Free Trial (`free`), Silver ($49), Gold ($149), Platinum ($349) — separate pla
 - Upgrade: billing checkout, `UpgradeModal`, conversion events
 - Admin override: extend trial, unlock, change plan
 
-**Implementation evidence:** `docs/product/subscriptions.md`, `docs/product/tier-matrix.md`, `apps/api/src/routes/subscriptions.routes.js`, `apps/api/src/lib/plan-enforcement.js`, `tests/e2e/suites/critical_e2e/subscription-limits.spec.ts`.
+**Implementation evidence:** `docs/archive/product/subscriptions.md`, `docs/archive/product/tier-matrix.md`, `apps/api/src/routes/subscriptions.routes.js`, `apps/api/src/lib/plan-enforcement.js`, `tests/e2e/suites/critical_e2e/subscription-limits.spec.ts`.
 
 ---
 
@@ -637,7 +637,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Web unit tests    | `pnpm --filter @supplify/web test:run`          |
 | E2E Playwright    | `pnpm e2e:playwright`                           |
 | Route inventory   | `docs/audits/route-inventory.json` (554 routes) |
-| Manual QA         | `docs/qa/regression-checklist.md`               |
+| Manual QA         | `docs/guides/qa/regression-checklist.md`        |
 | RBAC matrix tests | `apps/api/src/lib/rbac-full-app.test.js`        |
 
 ---
@@ -647,7 +647,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Domain          | Primary paths                                                                                            |
 | --------------- | -------------------------------------------------------------------------------------------------------- |
 | Auth            | `apps/api/src/lib/rbac.js`, `apps/api/src/routes/auth.routes.js`, `docs/features/tenant-registration.md` |
-| Roles           | `apps/api/src/lib/role-matrix.js`, `docs/architecture/rbac-permission-matrix.md`                         |
+| Roles           | `apps/api/src/lib/role-matrix.js`, `docs/security/rbac-permission-matrix.md`                             |
 | Catalog         | `apps/api/src/routes/products.routes.js`, `apps/web/src/pages/ProductsPage.tsx`                          |
 | Ordering        | `apps/api/src/routes/orders.routes.js`, `apps/web/src/pages/OrdersPage.tsx`                              |
 | Fulfillment     | `apps/api/src/routes/fulfillment/`, `apps/api/src/services/delivery-rollover.service.js`                 |
@@ -660,7 +660,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Staff           | `apps/api/src/routes/staff.routes.js`, `apps/api/src/lib/staff-portal-auth.js`                           |
 | Notifications   | `apps/api/src/services/notification.service.js`                                                          |
 | Admin           | `apps/api/src/routes/admin-dashboard/`                                                                   |
-| Subscriptions   | `apps/api/src/routes/subscriptions.routes.js`, `docs/product/tier-matrix.md`                             |
+| Subscriptions   | `apps/api/src/routes/subscriptions.routes.js`, `docs/archive/product/tier-matrix.md`                     |
 | Consumer B2C    | `apps/api/src/routes/consumer/`, `apps/api/db/migrations/0161_consumer_ordering.sql`                     |
 | Growth          | `apps/api/db/migrations/0169_supplier_growth_program.sql`                                                |
 | Quote requests  | `apps/api/src/services/quote-requests.service.js`                                                        |

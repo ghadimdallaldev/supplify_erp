@@ -1,5 +1,5 @@
 > Superseded by the four-plan pricing model.
-> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](./four-plan-pricing-model.md). Do not use this file as current commercial guidance.
+> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](../../product/four-plan-pricing-model.md). Do not use this file as current commercial guidance.
 
 # Subscriptions and plan catalogs
 
@@ -7,7 +7,7 @@ Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exi
 
 **Canonical source (live DB):** migrations `0116_rename_bronze_to_silver.sql`, `0117_silver_tier_limits_features.sql`, `0119_gold_tier_limits_features.sql`, `0120_platinum_tier_limits_features.sql`, `0131_free_trial_deal_redemptions.sql`. Verify anytime with `pnpm run log:tier-limits`.
 
-**Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented Ã¢â‚¬â€ see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md).
+**Platinum catalog-only strings:** Several Platinum feature values are marketing/catalog until implemented Ã¢â‚¬â€ see [PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md).
 
 ## Free Trial (plan code `free`)
 
@@ -17,13 +17,13 @@ Plans are split by **tenant type**: each of Free, Silver, Gold, and Platinum exi
 - **After expiry:** `lock_reason = 'free_sandbox_expired'` Ã¢â‚¬â€ **GET** APIs read-only; **writes 402**; billing/upgrade still available.
 - **Admin:** `POST Ã¢â‚¬Â¦/extend-free-trial`, unlock extends expiry for expired trials.
 
-Details: [free-trial-expiry.md](../features/free-trial-expiry.md).
+Details: [free-trial-expiry.md](../../features/free-trial-expiry.md).
 
 ## Supplier growth program (referral & sponsorship)
 
 Suppliers can import restaurant customers, send connection requests to existing tenants, invite or sponsor new restaurants, and earn rewards when referrals convert to paid plans. Referred restaurants use the same **30-day Free Trial** plus an admin-configurable **first-paid discount**.
 
-- **Spec:** [supplier-customer-growth.md](../features/supplier-customer-growth.md)
+- **Spec:** [supplier-customer-growth.md](../../features/supplier-customer-growth.md)
 - **Admin config:** `GET/PATCH /api/admin-dashboard/growth-settings` (`referral_program_config`)
 - **Migration:** `0169_supplier_growth_program.sql`
 
@@ -138,7 +138,7 @@ Top self-serve tier: most operational meters **unlimited** (`-1`), but **branche
 
 **Smart reorder (Platinum):** `smart_reorder` = `ai_forecast_seasonality` Ã¢â‚¬â€ Gold forecasts plus weekday seasonality and 7d/30d trend adjustment; adds `POST /reorder-assistance/ask` for natural-language product matching. LLM gated by `ai_platform` + env; metered via `ai_requests_per_day`.
 
-**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):** Platinum **smart quick lists**, **notification webhooks**, and **custom catalog domains** are enforced (see feature docs). Still catalog-only: `advanced_forecasting_custom_reports`, `full_api_webhooks`, `central_purchasing`, etc. Smart reorder tier strings **are** enforced Ã¢â‚¬â€ see [ai-smart-reorder.md](../features/ai-smart-reorder.md).
+**Feature strings (see [PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md)):** Platinum **smart quick lists**, **notification webhooks**, and **custom catalog domains** are enforced (see feature docs). Still catalog-only: `advanced_forecasting_custom_reports`, `full_api_webhooks`, `central_purchasing`, etc. Smart reorder tier strings **are** enforced Ã¢â‚¬â€ see [ai-smart-reorder.md](../../features/ai-smart-reorder.md).
 
 ### Supplier Platinum
 

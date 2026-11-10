@@ -19,7 +19,7 @@ Shared transactional shell lives in `apps/api/src/services/email/templates/layou
 - `renderDetailStrip` — optional key/value rows for invites, orders, invoices, billing when payload fields exist
 - Copy: `apps/api/src/i18n/locales/{en,ar}/emails.json`
 
-Design: [2026-08-21-transactional-email-design.md](../superpowers/specs/2026-08-21-transactional-email-design.md).
+Design: [2026-08-21-transactional-email-design.md](../archive/superpowers/specs/2026-08-21-transactional-email-design.md).
 
 ## Coverage (high level)
 

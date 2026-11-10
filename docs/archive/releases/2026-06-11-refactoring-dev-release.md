@@ -34,7 +34,7 @@ This release bundles UI modernization (admin, supplier, restaurant, mobile), ope
 - Restaurant: request best price, compare supplier responses, add winner to cart (no auto-order)
 - Supplier: quote inbox, per-line response
 - Public catalog: `/supplier/:slug`, settings copy/preview link
-- Docs: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)
+- Docs: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)
 
 ### Reorder, branding, deals, support (see audit doc)
 
@@ -42,14 +42,14 @@ This release bundles UI modernization (admin, supplier, restaurant, mobile), ope
 - Runtime tenant branding (`TenantBrandingProvider`, Gold+ gate)
 - New deals banner with dismiss; featured supplier placement
 - Admin support chat; warehouse/fulfillment UI improvements
-- Audit: [REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)
+- Audit: [REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](../../audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)
 
 ### Cron & background jobs
 
 - Central `register-cron-jobs.js`; 16 in-process jobs
 - New: email retry, email digest, stale GPS alerts, log retention, trial-ending-soon
 - CLI: `pnpm jobs:list`, `pnpm jobs:run <key>`
-- Docs: [cron-jobs.md](../operations/cron-jobs.md), [CRON_AND_BACKGROUND_JOBS_AUDIT.md](../audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md)
+- Docs: [cron-jobs.md](../../operations/cron-jobs.md), [CRON_AND_BACKGROUND_JOBS_AUDIT.md](../../audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md)
 
 ## API additions
 
@@ -74,4 +74,4 @@ This release bundles UI modernization (admin, supplier, restaurant, mobile), ope
 
 ## Mobile parity
 
-Web-only for quote UI and mini-store. See [MOBILE_FEATURE_PARITY.md](../mobile/MOBILE_FEATURE_PARITY.md).
+Web-only for quote UI and mini-store. See [MOBILE_FEATURE_PARITY.md](../../mobile/MOBILE_FEATURE_PARITY.md).

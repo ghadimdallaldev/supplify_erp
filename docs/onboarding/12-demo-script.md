@@ -2,7 +2,7 @@
 
 **Audience:** Sales, customer success, product, and engineering presenters.  
 **Environment:** Local or staging with `pnpm run seed:full` completed.  
-**Evidence:** `apps/api/scripts/seed-full.mjs`, `seed-demo-users.js`, `seed-plan-tier-demos.js`, `seed-billing.js`, `seed-demo-readiness-extras.js`, `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
+**Evidence:** `apps/api/scripts/seed-full.mjs`, `seed-demo-users.js`, `seed-plan-tier-demos.js`, `seed-billing.js`, `seed-demo-readiness-extras.js`, `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
 
 ---
 
@@ -221,7 +221,7 @@ Subset for CFO/platform stakeholders — steps 1, 5, 6, 7, 9 from Operations dem
 
 - [02-complete-product-guide.md](./02-complete-product-guide.md) — domain reference
 - [06-admin-onboarding.md](./06-admin-onboarding.md) — admin tab detail
-- [SUPPLIFY_DEMO_READINESS_AUDIT.md](../audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) — known gaps
+- [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) — known gaps
 - [13-acceptance-criteria.md](./13-acceptance-criteria.md) — pass/fail definitions
 
 _Document version: 2026-06-17._

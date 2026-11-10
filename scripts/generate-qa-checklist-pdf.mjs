@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate printable PDF for docs/qa/regression-checklist.md
+ * Generate printable PDF for docs/guides/qa/regression-checklist.md
  * Usage: node scripts/generate-qa-checklist-pdf.mjs
  */
 import fs from 'node:fs'
@@ -11,9 +11,9 @@ import { chromium } from '@playwright/test'
 import { marked } from 'marked'
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const SOURCE_MD = path.join(ROOT, 'docs/qa/regression-checklist.md')
-const CSS_PATH = path.join(ROOT, 'docs/qa/styles/qa-checklist-print.css')
-const OUT_DIR = path.join(ROOT, 'docs/qa/output')
+const SOURCE_MD = path.join(ROOT, 'docs/guides/qa/regression-checklist.md')
+const CSS_PATH = path.join(ROOT, 'docs/guides/qa/styles/qa-checklist-print.css')
+const OUT_DIR = path.join(ROOT, 'docs/guides/qa/output')
 const OUT_HTML = path.join(OUT_DIR, 'Supplify-Manual-QA-Checklist.html')
 const OUT_PDF = path.join(OUT_DIR, 'Supplify-Manual-QA-Checklist.pdf')
 
@@ -44,7 +44,7 @@ function buildHtml({ markdown, css, date, commit }) {
     <p class="meta">
       Generated ${date}<br />
       Repository commit ${commit}<br />
-      Source: docs/qa/regression-checklist.md
+      Source: docs/guides/qa/regression-checklist.md
     </p>
   </section>
   <main class="content">${bodyHtml}</main>

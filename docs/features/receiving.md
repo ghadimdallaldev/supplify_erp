@@ -51,4 +51,4 @@ Android and iOS expose an actual-quantity, quality-status, and notes field for e
 ## Related
 
 - GPS / tracking spec: [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md)
-- Manual QA: `GPS-*` and `RECV-*` rows in [regression-checklist.md](../qa/regression-checklist.md)
+- Manual QA: `GPS-*` and `RECV-*` rows in [regression-checklist.md](../guides/qa/regression-checklist.md)

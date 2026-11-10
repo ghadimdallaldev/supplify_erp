@@ -8,7 +8,7 @@
 
 | Document                                                                                   | Role                                      |
 | ------------------------------------------------------------------------------------------ | ----------------------------------------- |
-| [PERFORMANCE_CURRENT_STATE.md](./PERFORMANCE_CURRENT_STATE.md)                             | Full inventory of what makes the app fast |
+| [PERFORMANCE_CURRENT_STATE.md](../../../audits/performance/PERFORMANCE_CURRENT_STATE.md)                             | Full inventory of what makes the app fast |
 | [../cache-audit/CACHE_AUDIT_CURRENT_STATE.md](../cache-audit/CACHE_AUDIT_CURRENT_STATE.md) | Cache keys, gaps, risk table              |
 | [../cache-audit/CACHE_FIX_PLAN.md](../cache-audit/CACHE_FIX_PLAN.md)                       | Detailed cache remediation steps          |
 

@@ -42,4 +42,4 @@ Tenant roles, branch context, subscription feature gates, and RBAC permissions â
 
 ## QA
 
-Manual regression: [regression-checklist.md](../qa/regression-checklist.md). Route smoke map: [features.md](./features.md).
+Manual regression: [regression-checklist.md](../guides/qa/regression-checklist.md). Route smoke map: [features.md](./features.md).

@@ -13,7 +13,7 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 | Plans & limits                          | [product/plans-and-limits.md](./product/plans-and-limits.md) · [product/four-plan-pricing-model.md](./product/four-plan-pricing-model.md)               |
 | Feature behavior                        | [features/README.md](./features/README.md)                                                                                                              |
 | Recipe costing (restaurant Scale)       | [features/recipe-costing.md](./features/recipe-costing.md) · migration `0186`                                                                           |
-| Responsive lists (card ↔ table)        | [ui/responsive-data-list.md](./ui/responsive-data-list.md)                                                                                              |
+| Responsive lists (card ↔ table)        | [ui/responsive-data-list.md](./guides/ui/responsive-data-list.md)                                                                                       |
 | Bulk product image import (supplier)    | [features/bulk-product-image-import.md](./features/bulk-product-image-import.md)                                                                        |
 | Supplier customer growth (referral)     | [features/supplier-customer-growth.md](./features/supplier-customer-growth.md) · migration `0169`                                                       |
 | Deploy to Railway                       | [operations/deployment.md](./operations/deployment.md)                                                                                                  |
@@ -21,11 +21,11 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 | Performance / Railway latency           | [operations/railway-performance.md](./operations/railway-performance.md)                                                                                |
 | RBAC & security                         | [security/rbac.md](./security/rbac.md) · [security/security-audit-report.md](./security/security-audit-report.md)                                       |
 | Admin console                           | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                                                                |
-| Run tests / QA                          | [qa/testing-guide.md](./qa/testing-guide.md) · [qa/regression-checklist.md](./qa/regression-checklist.md)                                               |
+| Run tests / QA                          | [qa/testing-guide.md](./guides/qa/testing-guide.md) · [qa/regression-checklist.md](./guides/qa/regression-checklist.md)                                 |
 | Notifications (email, WhatsApp, events) | [product/notifications-summary.md](./product/notifications-summary.md) · [features/notifications-and-alerts.md](./features/notifications-and-alerts.md) |
 | Release workflow                        | [operations/branching.md](./operations/branching.md)                                                                                                    |
-| **Pre-deploy (June 2026)**              | [releases/2026-06-09-pre-deploy-checklist.md](./releases/2026-06-09-pre-deploy-checklist.md)                                                            |
-| **Refactoring-dev release (Jun 2026)**  | [releases/2026-06-11-refactoring-dev-release.md](./releases/2026-06-11-refactoring-dev-release.md)                                                      |
+| **Pre-deploy (June 2026)**              | [releases/2026-06-09-pre-deploy-checklist.md](./archive/releases/2026-06-09-pre-deploy-checklist.md)                                                    |
+| **Refactoring-dev release (Jun 2026)**  | [releases/2026-06-11-refactoring-dev-release.md](./archive/releases/2026-06-11-refactoring-dev-release.md)                                              |
 | Quote requests & mini-store             | [product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](./product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                                  |
 | Cron & background jobs audit            | [audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md](./audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                                  |
 | Reorder / branding / deals audit        | [audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)                  |

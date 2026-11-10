@@ -2,7 +2,7 @@
 
 **Last verified:** 2026-09-10 (file inventory + P0 suite green; full API suite was **291 passed / 2 failed** before cron+prices mock fixes — re-run `pnpm test:api` / `pnpm test:web` for sign-off totals).
 
-Automated coverage spans API routes, services, libraries, middlewares, jobs, and React units. Manual regression: [regression-checklist.md](./regression-checklist.md). Feature-level test maps: [deals-and-promotions.md](../features/deals-and-promotions.md), [waitlist-auto-promotion.md](../features/waitlist-auto-promotion.md).
+Automated coverage spans API routes, services, libraries, middlewares, jobs, and React units. Manual regression: [regression-checklist.md](./regression-checklist.md). Feature-level test maps: [deals-and-promotions.md](../../features/deals-and-promotions.md), [waitlist-auto-promotion.md](../../features/waitlist-auto-promotion.md).
 
 ## Summary
 
@@ -111,5 +111,5 @@ Targeted 2026-09-10 commands: [testing-guide.md](./testing-guide.md)#2026-09-10-
 ## Related docs
 
 - [QA automation guide](./testing-guide.md)
-- [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md)
+- [API test suite stabilization](../../archive/audits/api-test-suite-stabilization.md)
 - [regression-checklist.md](./regression-checklist.md)

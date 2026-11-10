@@ -7,7 +7,7 @@ Supplify is designed so that single-location restaurants and small suppliers can
 ### How the platform scales
 
 - **Tenant isolation** — Every restaurant and supplier is a separate tenant. Data, permissions, and usage are scoped so one tenant never sees or affects another.
-- **Plans and limits** — Limits (branches, active customer locations, warehouses, users, AI, storage) and features (reports, smart reorder, multi-branch / multi-warehouse) scale by plan. **Scale** tiers support serious multi-location / high-volume workflows. Canonical model: [four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
+- **Plans and limits** — Limits (branches, active customer locations, warehouses, users, AI, storage) and features (reports, smart reorder, multi-branch / multi-warehouse) scale by plan. **Scale** tiers support serious multi-location / high-volume workflows. Canonical model: [four-plan-pricing-model.md](../four-plan-pricing-model.md).
 - **Admin controls** — Admins can raise limits via overrides, change plans, and manage many tenants from one dashboard. Conversion and audit data support operations and revenue decisions.
 - **Deployment** — The app runs behind a CDN, with an API server, database, and auth. Architecture supports horizontal scaling and clear separation of concerns.
 
@@ -44,7 +44,7 @@ flowchart TB
 ### Enterprise readiness
 
 - **High or unlimited limits** — Supplier Scale / Restaurant Scale (and optional custom Enterprise handling) raise or remove commercial caps so large chains and suppliers don’t hit artificial walls.
-- **Central management** — Admins manage all tenants, plans, and overrides; [impersonation](../features/admin-impersonation.md) and audit logs support compliance and support.
+- **Central management** — Admins manage all tenants, plans, and overrides; [impersonation](../../features/admin-impersonation.md) and audit logs support compliance and support.
 - **Custom needs** — Enterprise plans can be defined with custom limits and features and assigned only by admin (e.g. manual onboarding, SLAs, custom contracts). See **docs/product/enterprise.md** for what enterprise gets and how it’s positioned.
 
 ### Why this matters to buyers

@@ -15,59 +15,59 @@ No business logic, database, API fields, migrations, checkout, billing, or plan 
 
 ### New files
 
-- [`apps/web/src/lib/dealDisplayLabels.ts`](../apps/web/src/lib/dealDisplayLabels.ts) — central user-facing label maps, helper text, empty states.
-- [`apps/web/src/lib/dealDisplayLabels.test.ts`](../apps/web/src/lib/dealDisplayLabels.test.ts) — label/helper/empty-state tests.
+- [`apps/web/src/lib/dealDisplayLabels.ts`](../../../apps/web/src/lib/dealDisplayLabels.ts) — central user-facing label maps, helper text, empty states.
+- [`apps/web/src/lib/dealDisplayLabels.test.ts`](../../../apps/web/src/lib/dealDisplayLabels.test.ts) — label/helper/empty-state tests.
 
 ### Plan & limit display
 
-- [`apps/web/src/lib/adminLimitLabels.ts`](../apps/web/src/lib/adminLimitLabels.ts) — `promotions` → **Active deals**
-- [`apps/web/src/lib/planComparison.ts`](../apps/web/src/lib/planComparison.ts) — limit/feature labels for deals and redemptions
-- [`apps/web/src/lib/planLimits.ts`](../apps/web/src/lib/planLimits.ts) — gate message uses “active deal”
-- [`apps/web/src/lib/upgradeCopy.ts`](../apps/web/src/lib/upgradeCopy.ts) — upgrade copy for active deals
+- [`apps/web/src/lib/adminLimitLabels.ts`](../../../apps/web/src/lib/adminLimitLabels.ts) — `promotions` → **Active deals**
+- [`apps/web/src/lib/planComparison.ts`](../../../apps/web/src/lib/planComparison.ts) — limit/feature labels for deals and redemptions
+- [`apps/web/src/lib/planLimits.ts`](../../../apps/web/src/lib/planLimits.ts) — gate message uses “active deal”
+- [`apps/web/src/lib/upgradeCopy.ts`](../../../apps/web/src/lib/upgradeCopy.ts) — upgrade copy for active deals
 
 ### Supplier UI
 
-- [`apps/web/src/components/Sidebar.tsx`](../apps/web/src/components/Sidebar.tsx) — nav **Deals**
-- [`apps/web/src/components/Header.tsx`](../apps/web/src/components/Header.tsx) — page title **Deals**
-- [`apps/web/src/lib/workspaceRoleProfile.ts`](../apps/web/src/lib/workspaceRoleProfile.ts) — persona copy
-- [`apps/web/src/pages/promotions/PromotionsPage.tsx`](../apps/web/src/pages/promotions/PromotionsPage.tsx) — create form helpers, empty state, badges
-- [`apps/web/src/components/promotions/DealsPerformanceSummary.tsx`](../apps/web/src/components/promotions/DealsPerformanceSummary.tsx)
-- [`apps/web/src/components/deals/DealAnalyticsDialog.tsx`](../apps/web/src/components/deals/DealAnalyticsDialog.tsx)
-- [`apps/web/src/components/deals/PromoteDealDialog.tsx`](../apps/web/src/components/deals/PromoteDealDialog.tsx)
-- [`apps/web/src/components/deals/DealBoostPackagePicker.tsx`](../apps/web/src/components/deals/DealBoostPackagePicker.tsx)
-- [`apps/web/src/lib/permissionLabels.js`](../apps/web/src/lib/permissionLabels.js) — RBAC **Deals** domain
+- [`apps/web/src/components/Sidebar.tsx`](../../../apps/web/src/components/Sidebar.tsx) — nav **Deals**
+- [`apps/web/src/components/Header.tsx`](../../../apps/web/src/components/Header.tsx) — page title **Deals**
+- [`apps/web/src/lib/workspaceRoleProfile.ts`](../../../apps/web/src/lib/workspaceRoleProfile.ts) — persona copy
+- [`apps/web/src/pages/promotions/PromotionsPage.tsx`](../../../apps/web/src/pages/promotions/PromotionsPage.tsx) — create form helpers, empty state, badges
+- [`apps/web/src/components/promotions/DealsPerformanceSummary.tsx`](../../../apps/web/src/components/promotions/DealsPerformanceSummary.tsx)
+- [`apps/web/src/components/deals/DealAnalyticsDialog.tsx`](../../../apps/web/src/components/deals/DealAnalyticsDialog.tsx)
+- [`apps/web/src/components/deals/PromoteDealDialog.tsx`](../../../apps/web/src/components/deals/PromoteDealDialog.tsx)
+- [`apps/web/src/components/deals/DealBoostPackagePicker.tsx`](../../../apps/web/src/components/deals/DealBoostPackagePicker.tsx)
+- [`apps/web/src/lib/permissionLabels.js`](../../../apps/web/src/lib/permissionLabels.js) — RBAC **Deals** domain
 
 ### Restaurant UI
 
-- [`apps/web/src/pages/deals/DealsPage.tsx`](../apps/web/src/pages/deals/DealsPage.tsx)
-- [`apps/web/src/components/deals/DealCard.tsx`](../apps/web/src/components/deals/DealCard.tsx)
-- [`apps/web/src/pages/CartPage.tsx`](../apps/web/src/pages/CartPage.tsx)
-- [`apps/web/src/pages/OrderDetailPage.tsx`](../apps/web/src/pages/OrderDetailPage.tsx)
+- [`apps/web/src/pages/deals/DealsPage.tsx`](../../../apps/web/src/pages/deals/DealsPage.tsx)
+- [`apps/web/src/components/deals/DealCard.tsx`](../../../apps/web/src/components/deals/DealCard.tsx)
+- [`apps/web/src/pages/CartPage.tsx`](../../../apps/web/src/pages/CartPage.tsx)
+- [`apps/web/src/pages/OrderDetailPage.tsx`](../../../apps/web/src/pages/OrderDetailPage.tsx)
 
 ### Admin UI
 
-- [`apps/web/src/components/admin/AdminDealsPanel.tsx`](../apps/web/src/components/admin/AdminDealsPanel.tsx)
-- [`apps/web/src/pages/AdminDashboardPage.tsx`](../apps/web/src/pages/AdminDashboardPage.tsx)
+- [`apps/web/src/components/admin/AdminDealsPanel.tsx`](../../../apps/web/src/components/admin/AdminDealsPanel.tsx)
+- [`apps/web/src/pages/AdminDashboardPage.tsx`](../../../apps/web/src/pages/AdminDashboardPage.tsx)
 
 ### Tests updated
 
-- [`apps/web/src/lib/planComparison.test.ts`](../apps/web/src/lib/planComparison.test.ts)
+- [`apps/web/src/lib/planComparison.test.ts`](../../../apps/web/src/lib/planComparison.test.ts)
 
 ### Legal pack + re-acceptance (June 2026 follow-up)
 
 Presentation and acceptance flow only — no discount, checkout, or boost billing logic changed.
 
-- [`apps/web/src/lib/legalDocuments.ts`](../apps/web/src/lib/legalDocuments.ts) — pack version `2026-06-09`, deals/boost description
-- [`apps/api/src/lib/legal-documents.js`](../apps/api/src/lib/legal-documents.js) — matching pack version (must stay in sync)
-- [`apps/web/src/pages/LegalDocumentPage.tsx`](../apps/web/src/pages/LegalDocumentPage.tsx) — **Billing & deals** category
-- [`apps/web/src/pages/LegalReacceptPage.tsx`](../apps/web/src/pages/LegalReacceptPage.tsx) — `/legal/reaccept` gate page
-- [`apps/web/src/lib/legalReacceptanceGate.ts`](../apps/web/src/lib/legalReacceptanceGate.ts) — redirect helper
-- [`apps/web/src/components/AuthGuard.tsx`](../apps/web/src/components/AuthGuard.tsx), [`StaffPortalGuard.tsx`](../apps/web/src/components/StaffPortalGuard.tsx) — redirect when `legalStatus.needsReacceptance`
-- [`apps/api/src/lib/legal-acceptance.js`](../apps/api/src/lib/legal-acceptance.js) — status resolution + `login_refresh` recording
-- [`apps/api/src/routes/auth.routes.js`](../apps/api/src/routes/auth.routes.js) — `GET /auth/me` (`legalStatus`), `POST /auth/legal-acceptance`
-- Static legal markdown under [`apps/web/static/legal/`](../../apps/web/static/legal/): `TERMS_AND_CONDITIONS.md`, `DEALS_BOOST_TERMS.md`, `ACCEPTABLE_USE_POLICY.md`, `SUBSCRIPTION_ADDON_TERMS.md`, `SUPPLIER_AGREEMENT.md`, `PRIVACY_POLICY.md`, `LEGAL_REVIEW_NOTES.md`
+- [`apps/web/src/lib/legalDocuments.ts`](../../../apps/web/src/lib/legalDocuments.ts) — pack version `2026-06-09`, deals/boost description
+- [`apps/api/src/lib/legal-documents.js`](../../../apps/api/src/lib/legal-documents.js) — matching pack version (must stay in sync)
+- [`apps/web/src/pages/LegalDocumentPage.tsx`](../../../apps/web/src/pages/LegalDocumentPage.tsx) — **Billing & deals** category
+- [`apps/web/src/pages/LegalReacceptPage.tsx`](../../../apps/web/src/pages/LegalReacceptPage.tsx) — `/legal/reaccept` gate page
+- [`apps/web/src/lib/legalReacceptanceGate.ts`](../../../apps/web/src/lib/legalReacceptanceGate.ts) — redirect helper
+- [`apps/web/src/components/AuthGuard.tsx`](../../../apps/web/src/components/AuthGuard.tsx), [`StaffPortalGuard.tsx`](../../../apps/web/src/components/StaffPortalGuard.tsx) — redirect when `legalStatus.needsReacceptance`
+- [`apps/api/src/lib/legal-acceptance.js`](../../../apps/api/src/lib/legal-acceptance.js) — status resolution + `login_refresh` recording
+- [`apps/api/src/routes/auth.routes.js`](../../../apps/api/src/routes/auth.routes.js) — `GET /auth/me` (`legalStatus`), `POST /auth/legal-acceptance`
+- Static legal markdown under [`apps/web/static/legal/`](../../../apps/web/static/legal/): `TERMS_AND_CONDITIONS.md`, `DEALS_BOOST_TERMS.md`, `ACCEPTABLE_USE_POLICY.md`, `SUBSCRIPTION_ADDON_TERMS.md`, `SUPPLIER_AGREEMENT.md`, `PRIVACY_POLICY.md`, `LEGAL_REVIEW_NOTES.md`
 
-See [LEGAL_PACK_REACCEPTANCE.md](./LEGAL_PACK_REACCEPTANCE.md) and [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md).
+See [LEGAL_PACK_REACCEPTANCE.md](./LEGAL_PACK_REACCEPTANCE.md) and [../releases/2026-06-09-pre-deploy-checklist.md](../../archive/releases/2026-06-09-pre-deploy-checklist.md).
 
 ## 3. What did not change
 

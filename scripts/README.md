@@ -59,6 +59,6 @@ See [`docs/onboarding/GENERATION.md`](../docs/onboarding/GENERATION.md) for the 
 
 ## Archived one-offs
 
-Historical monolith-split tooling and superseded scripts: [`docs/archive/scripts/one-off/`](../docs/archive/scripts/one-off/README.md). Do not run on the current tree.
+Historical monolith-split tooling and superseded one-off scripts were removed from the tree (2026-11 docs restructure). Recover them from version history at commit `970be8e5` under `docs/archive/scripts/one-off/`. Do not run them on the current tree.
 
 Full audit: [`docs/operations/scripts-audit.md`](../docs/operations/scripts-audit.md).

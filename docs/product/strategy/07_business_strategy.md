@@ -13,7 +13,7 @@ exists yet. See [README.md](./README.md) for document scope.
 Supplify's revenue model is **dual-sided subscription SaaS**: both restaurant tenants and
 supplier tenants are charged directly for platform access, independent of the value or
 volume of orders flowing between them. This is a structural choice, not a placeholder — it
-is fully implemented (`docs/product/tier-matrix.md`) with plan-based feature gating
+is fully implemented (`docs/archive/product/tier-matrix.md`) with plan-based feature gating
 enforced at the API layer (`requireFeature`/`checkLimit` middleware), not just hidden in
 the UI. The practical implication: revenue is predictable and usage-independent per tenant,
 at the cost of forgoing a GMV-linked revenue line that competitors with payment
@@ -22,7 +22,7 @@ rails (e.g., Toast) can capture. §7.6 addresses whether and how to revisit that
 ## 7.2 Pricing Strategy
 
 The pricing ladder is designed around a specific psychological and operational mechanic
-already documented in `docs/sales/08_pricing_strategy.md`: **Free demonstrates value
+already documented in `docs/product/sales/08_pricing_strategy.md`: **Free demonstrates value
 without enabling real operations, Gold is the intended default for serious daily use, and
 Platinum removes the need to think about limits at all.**
 
@@ -206,9 +206,9 @@ presented to investors as a proven unit-economics result.
 
 ### Sources & assumptions used in this part
 
-- Pricing, limits, and add-on figures: `docs/product/tier-matrix.md` (verified 2026-05-28
+- Pricing, limits, and add-on figures: `docs/archive/product/tier-matrix.md` (verified 2026-05-28
   per that document's own header).
-- Pricing design rationale: `docs/sales/08_pricing_strategy.md`.
+- Pricing design rationale: `docs/product/sales/08_pricing_strategy.md`.
 - Upgrade-nudge and monetization UX mechanics: `docs/product/monetization-ux.md`.
 - Referral/growth program mechanics: `docs/features/supplier-customer-growth.md`
   (migration `0169`).

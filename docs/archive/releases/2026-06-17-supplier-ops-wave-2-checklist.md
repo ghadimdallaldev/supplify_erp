@@ -50,8 +50,8 @@ Confirm `CRONS_ENABLED=true` in `deploy/railway/<env>/api.env`. New job:
 
 ## Related docs
 
-- [../features/supplier-ops.md](../features/supplier-ops.md)
-- [../features/warehouse-fulfillment.md](../features/warehouse-fulfillment.md)
-- [../features/drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md)
-- [../mobile/MOBILE_FEATURE_PARITY.md](../mobile/MOBILE_FEATURE_PARITY.md)
-- [../features/ARABIC_LOCALIZATION_I18N.md](../features/ARABIC_LOCALIZATION_I18N.md)
+- [../features/supplier-ops.md](../../features/supplier-ops.md)
+- [../features/warehouse-fulfillment.md](../../features/warehouse-fulfillment.md)
+- [../features/drivers-and-gps-tracking.md](../../features/drivers-and-gps-tracking.md)
+- [../mobile/MOBILE_FEATURE_PARITY.md](../../mobile/MOBILE_FEATURE_PARITY.md)
+- [../features/ARABIC_LOCALIZATION_I18N.md](../../features/ARABIC_LOCALIZATION_I18N.md)

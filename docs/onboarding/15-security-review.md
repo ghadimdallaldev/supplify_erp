@@ -166,11 +166,11 @@ _None identified in static review._
 
 ### L-5: `sql-migrator.js` treats `42P07` as success
 
-| Field              | Detail                                                           |
-| ------------------ | ---------------------------------------------------------------- |
-| **Evidence**       | `docs/audits/supplify-quick-performance-ui-db-security-audit.md` |
-| **Risk**           | Partial migrations marked applied                                |
-| **Recommendation** | Strict migration CI on fresh DB                                  |
+| Field              | Detail                                                                   |
+| ------------------ | ------------------------------------------------------------------------ |
+| **Evidence**       | `docs/archive/audits/supplify-quick-performance-ui-db-security-audit.md` |
+| **Risk**           | Partial migrations marked applied                                        |
+| **Recommendation** | Strict migration CI on fresh DB                                          |
 
 ---
 

@@ -150,26 +150,26 @@ Spec index: [docs/features/README.md](docs/features/README.md) · master catalog
 
 **Hub:** [docs/README.md](docs/README.md) (full index — docs live on **`dev`** only; release branches are runtime-only).
 
-| Topic                          | Document                                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Feature catalog & verification | [docs/product/features.md](docs/product/features.md)                                                              |
-| Plans, tiers & limits          | [docs/product/plans-and-limits.md](docs/product/plans-and-limits.md)                                              |
-| Bulk product image import      | [docs/features/bulk-product-image-import.md](docs/features/bulk-product-image-import.md)                          |
-| Supplier customer growth       | [docs/features/supplier-customer-growth.md](docs/features/supplier-customer-growth.md)                            |
-| Supplier ops API               | [docs/features/supplier-ops.md](docs/features/supplier-ops.md)                                                    |
-| GPS & drivers                  | [docs/features/drivers-and-gps-tracking.md](docs/features/drivers-and-gps-tracking.md)                            |
-| Quote requests & mini-store    | [docs/product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](docs/product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)    |
-| Developer handbook             | [docs/guides/developer-handbook.md](docs/guides/developer-handbook.md)                                            |
-| Database migrations            | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                          |
-| Testing & regression           | [docs/qa/testing-guide.md](docs/qa/testing-guide.md) · [regression-checklist.md](docs/qa/regression-checklist.md) |
-| API route index                | [docs/api/README.md](docs/api/README.md)                                                                          |
-| RBAC & security                | [docs/security/rbac.md](docs/security/rbac.md)                                                                    |
-| Env variables                  | [docs/operations/environment-variables.md](docs/operations/environment-variables.md)                              |
-| Storage & uploads              | [docs/operations/storage-uploads.md](docs/operations/storage-uploads.md)                                          |
-| Railway deploy                 | [docs/operations/railway-environments.md](docs/operations/railway-environments.md)                                |
-| Deploy assets                  | [deploy/README.md](deploy/README.md)                                                                              |
-| Admin console & flags          | [docs/admin/admin-operations-console.md](docs/admin/admin-operations-console.md)                                  |
-| Mobile parity                  | [docs/mobile/MOBILE_FEATURE_PARITY.md](docs/mobile/MOBILE_FEATURE_PARITY.md)                                      |
+| Topic                          | Document                                                                                                                               |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Feature catalog & verification | [docs/product/features.md](docs/product/features.md)                                                                                   |
+| Plans, tiers & limits          | [docs/product/plans-and-limits.md](docs/product/plans-and-limits.md)                                                                   |
+| Bulk product image import      | [docs/features/bulk-product-image-import.md](docs/features/bulk-product-image-import.md)                                               |
+| Supplier customer growth       | [docs/features/supplier-customer-growth.md](docs/features/supplier-customer-growth.md)                                                 |
+| Supplier ops API               | [docs/features/supplier-ops.md](docs/features/supplier-ops.md)                                                                         |
+| GPS & drivers                  | [docs/features/drivers-and-gps-tracking.md](docs/features/drivers-and-gps-tracking.md)                                                 |
+| Quote requests & mini-store    | [docs/product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](docs/product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                         |
+| Developer handbook             | [docs/guides/developer-handbook.md](docs/guides/developer-handbook.md)                                                                 |
+| Database migrations            | [docs/guides/database-migrations.md](docs/guides/database-migrations.md)                                                               |
+| Testing & regression           | [docs/guides/qa/testing-guide.md](docs/guides/qa/testing-guide.md) · [regression-checklist.md](docs/guides/qa/regression-checklist.md) |
+| API route index                | [docs/architecture/api-routes.md](docs/architecture/api-routes.md)                                                                     |
+| RBAC & security                | [docs/security/rbac.md](docs/security/rbac.md)                                                                                         |
+| Env variables                  | [docs/operations/environment-variables.md](docs/operations/environment-variables.md)                                                   |
+| Storage & uploads              | [docs/operations/storage-uploads.md](docs/operations/storage-uploads.md)                                                               |
+| Railway deploy                 | [docs/operations/railway-environments.md](docs/operations/railway-environments.md)                                                     |
+| Deploy assets                  | [deploy/README.md](deploy/README.md)                                                                                                   |
+| Admin console & flags          | [docs/admin/admin-operations-console.md](docs/admin/admin-operations-console.md)                                                       |
+| Mobile parity                  | [docs/mobile/MOBILE_FEATURE_PARITY.md](docs/mobile/MOBILE_FEATURE_PARITY.md)                                                           |
 
 ---
 
@@ -199,7 +199,7 @@ pnpm e2e:playwright   # Playwright E2E (optional)
 pnpm verify:tier-matrix
 ```
 
-Use `pnpm test:api:watch` while developing; **`pnpm test` runs in watch mode** — use `pnpm test:api` for CI-style runs. Mock patterns: [docs/API_TEST_SUITE_STABILIZATION.md](docs/API_TEST_SUITE_STABILIZATION.md).
+Use `pnpm test:api:watch` while developing; **`pnpm test` runs in watch mode** — use `pnpm test:api` for CI-style runs. Mock patterns: [docs/archive/audits/api-test-suite-stabilization.md](docs/archive/audits/api-test-suite-stabilization.md).
 
 ### Database & seeds
 
@@ -293,7 +293,7 @@ Full list with defaults: `apps/api/src/config/env.js` · matrix: [docs/operation
 - Envelope: `{ ok, data, error, requestId }`
 - Auth: session cookie after Keycloak login (`/auth/*`)
 - Gates: RBAC permissions + subscription `requireFeature()` + plan usage meters
-- Route groups: [docs/api/README.md](docs/api/README.md)
+- Route groups: [docs/architecture/api-routes.md](docs/architecture/api-routes.md)
 
 ---
 

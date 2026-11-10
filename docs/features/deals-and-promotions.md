@@ -8,7 +8,7 @@ Suppliers create **deals** (stored in `promotions`) — percentage/fixed discoun
 
 **Boosts** (paid visibility layer, stored in `deal_promotions`) are separate: suppliers pay to run a boost campaign that surfaces deals to non-followers with analytics (views, clicks, orders, messages, coupon uses).
 
-> **UI labels (June 2026):** User-facing copy uses **Deals** and **Boosts**; internal API/DB names remain `promotions`, `deal_promotions`, etc. See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
+> **UI labels (June 2026):** User-facing copy uses **Deals** and **Boosts**; internal API/DB names remain `promotions`, `deal_promotions`, etc. See [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../guides/ui/DEALS_BOOSTS_WORDING_CLEANUP.md).
 
 ## Mobile creation parity (2026-09-12)
 
@@ -193,11 +193,11 @@ Label maps: [`apps/web/src/lib/dealDisplayLabels.ts`](../../apps/web/src/lib/dea
 
 ### Legal (deals/boost copy in agreements)
 
-Legal pack **`2026-06-09`** aligns static terms with Deals/Boosts/Coupon terminology. Existing users re-accept on login via `/legal/reaccept`. See [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
+Legal pack **`2026-06-09`** aligns static terms with Deals/Boosts/Coupon terminology. Existing users re-accept on login via `/legal/reaccept`. See [../ui/LEGAL_PACK_REACCEPTANCE.md](../guides/ui/LEGAL_PACK_REACCEPTANCE.md).
 
 ## Tests
 
-Automated coverage maps to `docs/qa/regression-checklist.md` IDs below.
+Automated coverage maps to `docs/guides/qa/regression-checklist.md` IDs below.
 
 ### API unit (Vitest)
 
@@ -237,7 +237,7 @@ Automated coverage maps to `docs/qa/regression-checklist.md` IDs below.
 - RST-74–RST-80: Full deals feed CTAs and sponsored UI (E2E not implemented)
 - RST-82–RST-83: Free Trial **1/day** deal redemption cap (manual + `limit-resolution.test.js`)
 - SUP-52–SUP-58: Supplier create/boost/analytics UI (E2E not implemented)
-- **SUP-61–SUP-68 / ADM-AD-01–05** (2026-09-10): ad billing pay flow, create preview, audience targeting, ROAS UI, admin mark-paid/refund, Stripe dispute — see [regression-checklist.md](../qa/regression-checklist.md) smoke pack
+- **SUP-61–SUP-68 / ADM-AD-01–05** (2026-09-10): ad billing pay flow, create preview, audience targeting, ROAS UI, admin mark-paid/refund, Stripe dispute — see [regression-checklist.md](../guides/qa/regression-checklist.md) smoke pack
 - API-24: `POST /api/orders` with `promotionId` + `couponCode` (integration)
 
 ### Analytics fields (supplier deal analytics)

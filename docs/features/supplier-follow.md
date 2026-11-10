@@ -4,7 +4,7 @@
 
 Restaurants **follow** suppliers to curate their marketplace feed, unlock organic deal discovery, and establish an ongoing buyer–seller relationship. Follow status is stored in `supplier_follow` and enforced by plan limits.
 
-**Plan meter:** `suppliers_per_restaurant` — Free **1**, Silver **5**, Gold **30**, Platinum **unlimited** (see [tier-matrix.md](../product/tier-matrix.md)).
+**Plan meter:** `suppliers_per_restaurant` — Free **1**, Silver **5**, Gold **30**, Platinum **unlimited** (see [tier-matrix.md](../archive/product/tier-matrix.md)).
 
 ## Rules
 

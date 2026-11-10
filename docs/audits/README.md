@@ -15,18 +15,18 @@ Active audit reports, route inventories, and performance/cache analysis. Histori
 
 ## Feature & platform audits
 
-| File                                                                                                                     | Topic                               |
-| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| [FINAL_PRODUCTION_AUDIT_2026-10-07.md](./FINAL_PRODUCTION_AUDIT_2026-10-07.md)                                           | Final API/web production readiness  |
-| [CRON_AND_BACKGROUND_JOBS_AUDIT.md](./CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                 | Cron and background jobs            |
-| [REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md) | Reorder, branding, deals, warehouse |
-| [SUPPLIFY_DEMO_READINESS_AUDIT.md](./SUPPLIFY_DEMO_READINESS_AUDIT.md)                                                   | Demo environment gaps               |
-| [PLAN_TIER_FUNCTIONALITY_AUDIT.md](./PLAN_TIER_FUNCTIONALITY_AUDIT.md)                                                   | Plan tier behavior                  |
-| [STOCK_STATUS_CRITERIA_AUDIT.md](./STOCK_STATUS_CRITERIA_AUDIT.md)                                                       | Stock status rules                  |
-| [ADMIN_USAGE_METRICS_BACKEND_COMPLETION.md](./ADMIN_USAGE_METRICS_BACKEND_COMPLETION.md)                                 | Admin usage metrics backend         |
-| [DEV_API_AUTH_DEV.md](./DEV_API_AUTH_DEV.md)                                                                             | Dev API auth notes                  |
-| [SUPPLIFY_ROLE_TEST_MATRIX.md](./SUPPLIFY_ROLE_TEST_MATRIX.md)                                                           | Role test matrix                    |
-| [supplify-quick-performance-ui-db-security-audit.md](./supplify-quick-performance-ui-db-security-audit.md)               | Performance, UI, DB, security       |
+| File                                                                                                                       | Topic                               |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [FINAL_PRODUCTION_AUDIT_2026-10-07.md](../archive/audits/FINAL_PRODUCTION_AUDIT_2026-10-07.md)                             | Final API/web production readiness  |
+| [CRON_AND_BACKGROUND_JOBS_AUDIT.md](./CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                   | Cron and background jobs            |
+| [REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)   | Reorder, branding, deals, warehouse |
+| [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md)                                     | Demo environment gaps               |
+| [PLAN_TIER_FUNCTIONALITY_AUDIT.md](./PLAN_TIER_FUNCTIONALITY_AUDIT.md)                                                     | Plan tier behavior                  |
+| [STOCK_STATUS_CRITERIA_AUDIT.md](./STOCK_STATUS_CRITERIA_AUDIT.md)                                                         | Stock status rules                  |
+| [ADMIN_USAGE_METRICS_BACKEND_COMPLETION.md](../archive/audits/ADMIN_USAGE_METRICS_BACKEND_COMPLETION.md)                   | Admin usage metrics backend         |
+| [DEV_API_AUTH_DEV.md](../archive/audits/DEV_API_AUTH_DEV.md)                                                               | Dev API auth notes                  |
+| [SUPPLIFY_ROLE_TEST_MATRIX.md](./SUPPLIFY_ROLE_TEST_MATRIX.md)                                                             | Role test matrix                    |
+| [supplify-quick-performance-ui-db-security-audit.md](../archive/audits/supplify-quick-performance-ui-db-security-audit.md) | Performance, UI, DB, security       |
 
 ## Performance & cache
 

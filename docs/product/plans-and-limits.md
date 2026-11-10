@@ -41,4 +41,4 @@ Admin-provisioned add-ons are documented in [four-plan-pricing-model.md](./four-
 
 ## Superseded Docs
 
-[tier-matrix.md](./tier-matrix.md) and [subscriptions.md](./subscriptions.md) describe the previous four-tier catalog and are retained for historical implementation context only. Do not use them as current pricing guidance.
+[tier-matrix.md](../archive/product/tier-matrix.md) and [subscriptions.md](../archive/product/subscriptions.md) describe the previous four-tier catalog and are retained for historical implementation context only. Do not use them as current pricing guidance.

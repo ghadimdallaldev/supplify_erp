@@ -396,5 +396,5 @@ apps/web/src/components/AuthGuard.tsx
 
 - [07-technical-architecture.md](./07-technical-architecture.md) — session store, Redis, middleware order
 - [08-database-guide.md](./08-database-guide.md) — `tenant_roles` tables
-- [docs/features/staff-portal-access.md](../features/staff-portal-access.md) — staff portal product notes
-- [docs/architecture/security-baseline.md](../architecture/security-baseline.md) — CSRF, public routes
+- [docs/features/staff-portal-access.md](../features/staff-portal.md) — staff portal product notes
+- [docs/security/security-baseline.md](../security/security-baseline.md) — CSRF, public routes

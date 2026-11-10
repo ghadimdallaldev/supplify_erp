@@ -28,4 +28,4 @@ Per-feature behavior: [features/README.md](../features/README.md).
 
 ## Sales & GTM
 
-External narrative: [sales/](../sales/) (01_problem … enterprise_checklist).
+External narrative: [sales/](sales/) (01_problem … enterprise_checklist).

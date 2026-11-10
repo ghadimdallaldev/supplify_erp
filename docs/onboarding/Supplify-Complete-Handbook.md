@@ -648,18 +648,18 @@ These are product honesty markers, not blockers for core B2B ordering flows.
 
 ### Implementation Evidence
 
-| Topic                 | Primary paths                                                                                                        |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Product definition    | `docs/product/overview.md`, `docs/sales/02_solution.md`, `docs/sales/03_platform_overview.md`                        |
-| Route inventory       | `docs/audits/route-inventory.json`                                                                                   |
-| Bootstrap metrics     | `docs/onboarding/_artifacts/bootstrap-metrics.md`                                                                    |
-| Frontend routing      | `apps/web/src/App.tsx`                                                                                               |
-| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/architecture/rbac-permission-matrix.md` |
-| Subscriptions & tiers | `docs/product/tier-matrix.md`, `docs/product/plans.md`, `apps/api/db/migrations/0116`–`0120`                         |
-| Auth & registration   | `apps/api/src/lib/rbac.js`, `docs/features/tenant-registration.md`                                                   |
-| Feature catalog       | `docs/product/features.md`, `docs/product/feature-catalog-technical.md`                                              |
-| Cron jobs             | `docs/operations/cron-jobs.md`, `apps/api/src/lib/register-cron-jobs.js`                                             |
-| Demo readiness audit  | `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                                       |
+| Topic                 | Primary paths                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Product definition    | `docs/product/overview.md`, `docs/product/sales/02_solution.md`, `docs/product/sales/03_platform_overview.md`    |
+| Route inventory       | `docs/audits/route-inventory.json`                                                                               |
+| Bootstrap metrics     | `docs/onboarding/_artifacts/bootstrap-metrics.md`                                                                |
+| Frontend routing      | `apps/web/src/App.tsx`                                                                                           |
+| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/security/rbac-permission-matrix.md` |
+| Subscriptions & tiers | `docs/archive/product/tier-matrix.md`, `docs/archive/product/plans.md`, `apps/api/db/migrations/0116`–`0120`     |
+| Auth & registration   | `apps/api/src/lib/rbac.js`, `docs/features/tenant-registration.md`                                               |
+| Feature catalog       | `docs/product/features.md`, `docs/product/feature-catalog-technical.md`                                          |
+| Cron jobs             | `docs/operations/cron-jobs.md`, `apps/api/src/lib/register-cron-jobs.js`                                         |
+| Demo readiness audit  | `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                           |
 
 ---
 
@@ -667,9 +667,9 @@ These are product honesty markers, not blockers for core B2B ordering flows.
 
 ### Next Steps for Readers
 
-- **Business stakeholders:** Continue to [02-complete-product-guide.md](part-ii-complete-product-guide) for domain-by-domain behavior, order lifecycle, and tenant model.
-- **Technical onboarding:** Run `pnpm setup && pnpm dev`, then use `docs/product/features.md` verification tables and `docs/qa/regression-checklist.md`.
-- **Sales narrative:** See `docs/sales/` (01_problem through enterprise_checklist).
+- **Business stakeholders:** Continue to [02-complete-product-guide.md](#part-ii-complete-product-guide) for domain-by-domain behavior, order lifecycle, and tenant model.
+- **Technical onboarding:** Run `pnpm setup && pnpm dev`, then use `docs/product/features.md` verification tables and `docs/guides/qa/regression-checklist.md`.
+- **Sales narrative:** See `docs/product/sales/` (01_problem through enterprise_checklist).
 
 ---
 
@@ -756,7 +756,7 @@ Resolution logic lives in `apps/api/src/lib/rbac.js` (`upsertUser`). Platform ro
 
 Custom tenant roles can be created with subsets of permissions; system role names are protected (`RESERVED_SYSTEM_ROLE_NAMES` in `tenant-roles.js`).
 
-**Implementation evidence:** `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/permission-keys.js`, `docs/architecture/rbac-permission-matrix.md`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/RequirePermission.tsx`.
+**Implementation evidence:** `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/permission-keys.js`, `docs/security/rbac-permission-matrix.md`, `apps/web/src/components/Sidebar.tsx`, `apps/web/src/components/RequirePermission.tsx`.
 
 ---
 
@@ -917,7 +917,7 @@ Restaurants see supplier catalogs through authenticated product APIs with **serv
 - **Per-warehouse zones** — `GET/POST /api/warehouses/:id/zones` for warehouse-scoped delivery zones (distinct from Settings Delivery Zones tab).
 - **Stock levels** — `/app/inventory` → `/api/inventory`.
 
-> **Partial feature — Supplier Settings Delivery Zones:** The Delivery Zones and Contacts tabs in Supplier Settings are **UI-only**. `DELIVERY_ZONES_ENABLED` and `CONTACTS_TAB_ENABLED` are `false` in `supplierSettingsShared.tsx`. Warehouse zone APIs exist separately; the settings tab was never wired. See `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
+> **Partial feature — Supplier Settings Delivery Zones:** The Delivery Zones and Contacts tabs in Supplier Settings are **UI-only**. `DELIVERY_ZONES_ENABLED` and `CONTACTS_TAB_ENABLED` are `false` in `supplierSettingsShared.tsx`. Warehouse zone APIs exist separately; the settings tab was never wired. See `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
 
 **Implementation evidence:** `apps/api/src/routes/products.routes.js`, `apps/api/src/routes/warehouses.routes.js`, `apps/api/src/services/public-supplier-catalog.service.js`, `apps/web/src/pages/PublicSupplierCatalogPage.tsx`, `apps/web/src/components/supplier/settings/supplierSettingsShared.tsx`.
 
@@ -1271,7 +1271,7 @@ Waitlist auto-promotion is plan-gated (`waitlist_auto_promo`).
 
 Admin RBAC uses `ADMIN` tenant scope with `SUPER_ADMIN` role when `ALLOW_AUTO_SUPER_ADMIN` is enabled.
 
-**Implementation evidence:** `docs/sales/06_admin_and_operations.md`, `apps/api/src/routes/admin-dashboard/`, `tests/api/admin-rbac.spec.ts`, `tests/api/admin-impersonation.spec.ts`.
+**Implementation evidence:** `docs/product/sales/06_admin_and_operations.md`, `apps/api/src/routes/admin-dashboard/`, `tests/api/admin-rbac.spec.ts`, `tests/api/admin-impersonation.spec.ts`.
 
 ---
 
@@ -1301,7 +1301,7 @@ Free Trial (`free`), Silver ($49), Gold ($149), Platinum ($349) — separate pla
 - Upgrade: billing checkout, `UpgradeModal`, conversion events
 - Admin override: extend trial, unlock, change plan
 
-**Implementation evidence:** `docs/product/subscriptions.md`, `docs/product/tier-matrix.md`, `apps/api/src/routes/subscriptions.routes.js`, `apps/api/src/lib/plan-enforcement.js`, `tests/e2e/suites/critical_e2e/subscription-limits.spec.ts`.
+**Implementation evidence:** `docs/archive/product/subscriptions.md`, `docs/archive/product/tier-matrix.md`, `apps/api/src/routes/subscriptions.routes.js`, `apps/api/src/lib/plan-enforcement.js`, `tests/e2e/suites/critical_e2e/subscription-limits.spec.ts`.
 
 ---
 
@@ -1449,7 +1449,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Web unit tests    | `pnpm --filter @supplify/web test:run`          |
 | E2E Playwright    | `pnpm e2e:playwright`                           |
 | Route inventory   | `docs/audits/route-inventory.json` (554 routes) |
-| Manual QA         | `docs/qa/regression-checklist.md`               |
+| Manual QA         | `docs/guides/qa/regression-checklist.md`        |
 | RBAC matrix tests | `apps/api/src/lib/rbac-full-app.test.js`        |
 
 ---
@@ -1461,7 +1461,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Domain          | Primary paths                                                                                            |
 | --------------- | -------------------------------------------------------------------------------------------------------- |
 | Auth            | `apps/api/src/lib/rbac.js`, `apps/api/src/routes/auth.routes.js`, `docs/features/tenant-registration.md` |
-| Roles           | `apps/api/src/lib/role-matrix.js`, `docs/architecture/rbac-permission-matrix.md`                         |
+| Roles           | `apps/api/src/lib/role-matrix.js`, `docs/security/rbac-permission-matrix.md`                             |
 | Catalog         | `apps/api/src/routes/products.routes.js`, `apps/web/src/pages/ProductsPage.tsx`                          |
 | Ordering        | `apps/api/src/routes/orders.routes.js`, `apps/web/src/pages/OrdersPage.tsx`                              |
 | Fulfillment     | `apps/api/src/routes/fulfillment/`, `apps/api/src/services/delivery-rollover.service.js`                 |
@@ -1474,7 +1474,7 @@ Disable all: `CRONS_ENABLED=false`.
 | Staff           | `apps/api/src/routes/staff.routes.js`, `apps/api/src/lib/staff-portal-auth.js`                           |
 | Notifications   | `apps/api/src/services/notification.service.js`                                                          |
 | Admin           | `apps/api/src/routes/admin-dashboard/`                                                                   |
-| Subscriptions   | `apps/api/src/routes/subscriptions.routes.js`, `docs/product/tier-matrix.md`                             |
+| Subscriptions   | `apps/api/src/routes/subscriptions.routes.js`, `docs/archive/product/tier-matrix.md`                     |
 | Consumer B2C    | `apps/api/src/routes/consumer/`, `apps/api/db/migrations/0161_consumer_ordering.sql`                     |
 | Growth          | `apps/api/db/migrations/0169_supplier_growth_program.sql`                                                |
 | Quote requests  | `apps/api/src/services/quote-requests.service.js`                                                        |
@@ -3022,7 +3022,7 @@ Guide for **Supplify platform administrators** managing tenants, billing, suppor
 | `/app/admin/restaurants/:tab` | Restaurant portal tab                                  |
 | `/app/settings`               | Admin personal settings (notifications, Keycloak link) |
 
-**QA cross-reference:** `docs/qa/regression-checklist.md` Part 0 (setup), admin sections; stub card `4242424242424242` for billing tests.
+**QA cross-reference:** `docs/guides/qa/regression-checklist.md` Part 0 (setup), admin sections; stub card `4242424242424242` for billing tests.
 
 ---
 
@@ -3477,8 +3477,8 @@ deploy/railway/
 
 ### Related docs
 
-- [09-authentication-rbac.md](part-ix-authentication-rbac-internal-technical-reference) — OIDC, cookies, permissions
-- [08-database-guide.md](part-viii-database-guide-internal-technical-reference) — schema and migrations
+- [09-authentication-rbac.md](#part-ix-authentication-rbac-internal-technical-reference) — OIDC, cookies, permissions
+- [08-database-guide.md](#part-viii-database-guide-internal-technical-reference) — schema and migrations
 - [docs/operations/cron-jobs.md](../operations/cron-jobs.md) — cron operations runbook
 
 ---
@@ -3854,8 +3854,8 @@ psql $DATABASE_URL -c "SELECT version FROM schema_migrations ORDER BY version DE
 
 ### Related docs
 
-- [07-technical-architecture.md](part-vii-technical-architecture-internal-technical-reference) — Postgres pool, Redis, deployment
-- [09-authentication-rbac.md](part-ix-authentication-rbac-internal-technical-reference) — `tenant_roles` permission model
+- [07-technical-architecture.md](#part-vii-technical-architecture-internal-technical-reference) — Postgres pool, Redis, deployment
+- [09-authentication-rbac.md](#part-ix-authentication-rbac-internal-technical-reference) — `tenant_roles` permission model
 - [docs/operations/cron-jobs.md](../operations/cron-jobs.md) — jobs that mutate subscription/invoice state
 
 ---
@@ -4293,10 +4293,10 @@ apps/web/src/components/AuthGuard.tsx
 
 ### Related docs
 
-- [07-technical-architecture.md](part-vii-technical-architecture-internal-technical-reference) — session store, Redis, middleware order
-- [08-database-guide.md](part-viii-database-guide-internal-technical-reference) — `tenant_roles` tables
-- [docs/features/staff-portal-access.md](../features/staff-portal-access.md) — staff portal product notes
-- [docs/architecture/security-baseline.md](../architecture/security-baseline.md) — CSRF, public routes
+- [07-technical-architecture.md](#part-vii-technical-architecture-internal-technical-reference) — session store, Redis, middleware order
+- [08-database-guide.md](#part-viii-database-guide-internal-technical-reference) — `tenant_roles` tables
+- [docs/features/staff-portal-access.md](../features/staff-portal.md) — staff portal product notes
+- [docs/security/security-baseline.md](../security/security-baseline.md) — CSRF, public routes
 
 ---
 
@@ -5162,7 +5162,7 @@ Outputs:
 
 **Audience:** Sales, customer success, product, and engineering presenters.  
 **Environment:** Local or staging with `pnpm run seed:full` completed.  
-**Evidence:** `apps/api/scripts/seed-full.mjs`, `seed-demo-users.js`, `seed-plan-tier-demos.js`, `seed-billing.js`, `seed-demo-readiness-extras.js`, `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
+**Evidence:** `apps/api/scripts/seed-full.mjs`, `seed-demo-users.js`, `seed-plan-tier-demos.js`, `seed-billing.js`, `seed-demo-readiness-extras.js`, `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`.
 
 ---
 
@@ -5413,10 +5413,10 @@ Subset for CFO/platform stakeholders — steps 1, 5, 6, 7, 9 from Operations dem
 
 ### Related docs
 
-- [02-complete-product-guide.md](part-ii-complete-product-guide) — domain reference
-- [06-admin-onboarding.md](part-vi-platform-admin-onboarding-guide) — admin tab detail
-- [SUPPLIFY_DEMO_READINESS_AUDIT.md](../audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) — known gaps
-- [13-acceptance-criteria.md](part-xiii-acceptance-criteria) — pass/fail definitions
+- [02-complete-product-guide.md](#part-ii-complete-product-guide) — domain reference
+- [06-admin-onboarding.md](#part-vi-platform-admin-onboarding-guide) — admin tab detail
+- [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) — known gaps
+- [13-acceptance-criteria.md](#part-xiii-acceptance-criteria) — pass/fail definitions
 
 ---
 
@@ -6468,7 +6468,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/auth/me
 
 #### Diagnose
 
-- Compare role in **Settings → Team** with `docs/architecture/rbac-permission-matrix.md`.
+- Compare role in **Settings → Team** with `docs/security/rbac-permission-matrix.md`.
 - `GET /api/auth/me` → `tenantPermissions` array.
 - `GET /api/subscriptions/current` → features/limits.
 
@@ -7288,13 +7288,13 @@ curl http://localhost:9000/minio/health/live
 
 ### Escalation matrix
 
-| Severity | Condition               | Action                                                    |
-| -------- | ----------------------- | --------------------------------------------------------- |
-| P0       | Production auth down    | Status page; rollback API; verify Keycloak                |
-| P1       | Orders cannot be placed | Check billing lock, DB, API 500s                          |
-| P2       | Chat/realtime degraded  | Redis + Socket.IO                                         |
-| P3       | Reports slow            | Analytics indexes; read replicas                          |
-| P4       | Demo script gap         | Use backups in [12-demo-script.md](part-xii-demo-scripts) |
+| Severity | Condition               | Action                                                     |
+| -------- | ----------------------- | ---------------------------------------------------------- |
+| P0       | Production auth down    | Status page; rollback API; verify Keycloak                 |
+| P1       | Orders cannot be placed | Check billing lock, DB, API 500s                           |
+| P2       | Chat/realtime degraded  | Redis + Socket.IO                                          |
+| P3       | Reports slow            | Analytics indexes; read replicas                           |
+| P4       | Demo script gap         | Use backups in [12-demo-script.md](#part-xii-demo-scripts) |
 
 ---
 
@@ -7512,11 +7512,11 @@ _None identified in static review._
 
 #### L-5: `sql-migrator.js` treats `42P07` as success
 
-| Field              | Detail                                                           |
-| ------------------ | ---------------------------------------------------------------- |
-| **Evidence**       | `docs/audits/supplify-quick-performance-ui-db-security-audit.md` |
-| **Risk**           | Partial migrations marked applied                                |
-| **Recommendation** | Strict migration CI on fresh DB                                  |
+| Field              | Detail                                                                   |
+| ------------------ | ------------------------------------------------------------------------ |
+| **Evidence**       | `docs/archive/audits/supplify-quick-performance-ui-db-security-audit.md` |
+| **Risk**           | Partial migrations marked applied                                        |
+| **Recommendation** | Strict migration CI on fresh DB                                          |
 
 ---
 
@@ -7944,7 +7944,7 @@ Weak: abuse protection (rate limits only).
 
 - Claims cite files, migrations, or audit docs — not roadmap slides.
 - "Working" means code path exists and was verified in audits/tests — not that every customer edge case is handled.
-- Partial features are **not** labeled Shipped in [13-acceptance-criteria.md](part-xiii-acceptance-criteria).
+- Partial features are **not** labeled Shipped in [13-acceptance-criteria.md](#part-xiii-acceptance-criteria).
 
 ---
 
@@ -7952,12 +7952,12 @@ Weak: abuse protection (rate limits only).
 
 ### Related artifacts
 
-| Document                                                                       | Use                       |
-| ------------------------------------------------------------------------------ | ------------------------- |
-| [SUPPLIFY_DEMO_READINESS_AUDIT.md](../audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) | Jun 2026 demo pass        |
-| [full-app-feature-audit.md](../archive/audits/full-app-feature-audit.md)       | Feature matrix            |
-| [DEV_API_ROUTE_TEST_MATRIX.md](../audits/DEV_API_ROUTE_TEST_MATRIX.md)         | Route test classification |
-| [12-demo-script.md](part-xii-demo-scripts)                                     | What to show anyway       |
+| Document                                                                               | Use                       |
+| -------------------------------------------------------------------------------------- | ------------------------- |
+| [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) | Jun 2026 demo pass        |
+| [full-app-feature-audit.md](../archive/audits/full-app-feature-audit.md)               | Feature matrix            |
+| [DEV_API_ROUTE_TEST_MATRIX.md](../audits/DEV_API_ROUTE_TEST_MATRIX.md)                 | Route test classification |
+| [12-demo-script.md](#part-xii-demo-scripts)                                            | What to show anyway       |
 
 ---
 
@@ -7971,7 +7971,7 @@ Weak: abuse protection (rate limits only).
 
 **Source of truth:** Application code (`apps/api`, `apps/web`), migrations, and companion docs in `docs/onboarding/`.
 
-Terms are grouped by theme. Where a concept has both a **plan entitlement** (subscription feature) and an **RBAC permission**, both are noted — they are independent gates (see [09-authentication-rbac.md](part-ix-authentication-rbac-internal-technical-reference) and [10-subscriptions-and-plans.md](part-x-subscriptions-and-plans-internal-technical-reference)).
+Terms are grouped by theme. Where a concept has both a **plan entitlement** (subscription feature) and an **RBAC permission**, both are noted — they are independent gates (see [09-authentication-rbac.md](#part-ix-authentication-rbac-internal-technical-reference) and [10-subscriptions-and-plans.md](#part-x-subscriptions-and-plans-internal-technical-reference)).
 
 ---
 
@@ -8605,10 +8605,10 @@ Machine-readable API catalog `docs/audits/route-inventory.json` (554 routes as o
 
 ### Related docs
 
-- [09-authentication-rbac.md](part-ix-authentication-rbac-internal-technical-reference) — permissions and roles in depth
-- [10-subscriptions-and-plans.md](part-x-subscriptions-and-plans-internal-technical-reference) — feature and limit matrices
-- [02-complete-product-guide.md](part-ii-complete-product-guide) — feature-to-route mapping
-- [11-api-and-workflow-reference.md](part-xi-api-and-workflow-reference-internal-technical-reference) — API workflows
+- [09-authentication-rbac.md](#part-ix-authentication-rbac-internal-technical-reference) — permissions and roles in depth
+- [10-subscriptions-and-plans.md](#part-x-subscriptions-and-plans-internal-technical-reference) — feature and limit matrices
+- [02-complete-product-guide.md](#part-ii-complete-product-guide) — feature-to-route mapping
+- [11-api-and-workflow-reference.md](#part-xi-api-and-workflow-reference-internal-technical-reference) — API workflows
 
 ---
 
@@ -9022,12 +9022,12 @@ DB seeds in migrations `0117`, `0119`, `0120`, `0145`; runtime keys in `feature-
 
 ### Related docs
 
-- [17-glossary.md](part-xvii-glossary) — term definitions
-- [19-onboarding-checklists.md](part-xix-onboarding-checklists) — printable checklists
-- [03-supplier-onboarding.md](part-iii-supplier-onboarding-guide) — supplier steps
-- [04-restaurant-onboarding.md](part-iv-restaurant-onboarding-guide) — restaurant steps
-- [06-admin-onboarding.md](part-vi-platform-admin-onboarding-guide) — platform admin
-- [10-subscriptions-and-plans.md](part-x-subscriptions-and-plans-internal-technical-reference) — full matrices
+- [17-glossary.md](#part-xvii-glossary) — term definitions
+- [19-onboarding-checklists.md](#part-xix-onboarding-checklists) — printable checklists
+- [03-supplier-onboarding.md](#part-iii-supplier-onboarding-guide) — supplier steps
+- [04-restaurant-onboarding.md](#part-iv-restaurant-onboarding-guide) — restaurant steps
+- [06-admin-onboarding.md](#part-vi-platform-admin-onboarding-guide) — platform admin
+- [10-subscriptions-and-plans.md](#part-x-subscriptions-and-plans-internal-technical-reference) — full matrices
 
 ---
 
@@ -9542,12 +9542,12 @@ DB seeds in migrations `0117`, `0119`, `0120`, `0145`; runtime keys in `feature-
 
 ### Related docs
 
-- [03-supplier-onboarding.md](part-iii-supplier-onboarding-guide)
-- [04-restaurant-onboarding.md](part-iv-restaurant-onboarding-guide)
-- [05-driver-onboarding.md](part-v-driver-onboarding-guide)
-- [06-admin-onboarding.md](part-vi-platform-admin-onboarding-guide)
-- [07-technical-architecture.md](part-vii-technical-architecture-internal-technical-reference)
-- [18-frequently-asked-questions.md](part-xviii-frequently-asked-questions)
+- [03-supplier-onboarding.md](#part-iii-supplier-onboarding-guide)
+- [04-restaurant-onboarding.md](#part-iv-restaurant-onboarding-guide)
+- [05-driver-onboarding.md](#part-v-driver-onboarding-guide)
+- [06-admin-onboarding.md](#part-vi-platform-admin-onboarding-guide)
+- [07-technical-architecture.md](#part-vii-technical-architecture-internal-technical-reference)
+- [18-frequently-asked-questions.md](#part-xviii-frequently-asked-questions)
 
 ---
 
@@ -9705,9 +9705,9 @@ DB seeds in migrations `0117`, `0119`, `0120`, `0145`; runtime keys in `feature-
 | Features              | Tenant roles feature doc                      | `docs/features/tenant-roles.md`                                      | custom roles                                | Verified            | `advanced_roles`                     |
 | Features              | Inventory expiry doc                          | `docs/features/inventory-expiry-and-reorder.md`                      | lot model                                   | Verified            | Migration 0133                       |
 | Features              | Branch invitations                            | `docs/features/branch-invitations.md`                                | `/invite/branch`                            | Verified            | Branch scope                         |
-| Architecture          | RBAC permission matrix doc                    | `docs/architecture/rbac-permission-matrix.md`                        | —                                           | Verified            | Human-readable matrix                |
-| Architecture          | Security baseline                             | `docs/architecture/security-baseline.md`                             | CSRF, cookies                               | Verified            | Security review                      |
-| Sales                 | Admin impersonation sales doc                 | `docs/sales/06_admin_and_operations.md`                              | impersonate                                 | Verified            | Sales enablement                     |
+| Architecture          | RBAC permission matrix doc                    | `docs/security/rbac-permission-matrix.md`                            | —                                           | Verified            | Human-readable matrix                |
+| Architecture          | Security baseline                             | `docs/security/security-baseline.md`                                 | CSRF, cookies                               | Verified            | Security review                      |
+| Sales                 | Admin impersonation sales doc                 | `docs/product/sales/06_admin_and_operations.md`                      | impersonate                                 | Verified            | Sales enablement                     |
 | Web                   | Sidebar plan gating                           | `apps/web/src/components/Sidebar.tsx`                                | `canUse*` helpers                           | Verified            | Hides nav items                      |
 | Web                   | Limit exceeded banner                         | `apps/web/src/components/LimitExceededBanner.tsx`                    | component                                   | Verified            | Monetization UX                      |
 | Web                   | Monetization Redux slice                      | `apps/web/src/store/monetizationSlice.ts`                            | upgrade modal                               | Verified            | 402/403 handler                      |
@@ -9733,7 +9733,7 @@ DB seeds in migrations `0117`, `0119`, `0120`, `0145`; runtime keys in `feature-
 | Mobile                | Feature parity doc                            | `docs/mobile/MOBILE_FEATURE_PARITY.md`                               | —                                           | Doc-only            | Cross-repo                           |
 | Legal                 | DPA impersonation clause                      | `apps/web/static/legal/DATA_PROCESSING_ADDENDUM.md`                  | support access                              | Verified            | Customer legal                       |
 | Audits                | API route test matrix                         | `docs/audits/DEV_API_ROUTE_TEST_MATRIX.md`                           | —                                           | Generated           | QA reference                         |
-| Audits                | Demo readiness audit                          | `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                       | —                                           | Partial             | Point-in-time                        |
+| Audits                | Demo readiness audit                          | `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`               | —                                           | Partial             | Point-in-time                        |
 | Bootstrap             | Onboarding metrics artifact                   | `docs/onboarding/_artifacts/bootstrap-metrics.md`                    | —                                           | Generated           | Doc metrics                          |
 
 ---
@@ -9755,7 +9755,7 @@ DB seeds in migrations `0117`, `0119`, `0120`, `0145`; runtime keys in `feature-
 ### Related docs
 
 - [README.md](./README.md) — reading order and doc index
-- [11-api-and-workflow-reference.md](part-xi-api-and-workflow-reference-internal-technical-reference) — API pipeline
+- [11-api-and-workflow-reference.md](#part-xi-api-and-workflow-reference-internal-technical-reference) — API pipeline
 - [docs/audits/route-inventory.json](../audits/route-inventory.json) — machine route list
 
 ---

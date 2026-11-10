@@ -4,14 +4,14 @@ Active reference for tenant roles, permissions, and how they combine with subscr
 
 ## Core docs
 
-| Topic                           | Location                                                               |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| Roles, middleware, tenant roles | [rbac-overview.md](../architecture/rbac-overview.md)                   |
-| Default permission matrix       | [rbac-permission-matrix.md](../architecture/rbac-permission-matrix.md) |
-| Features vs permissions         | [access-control.md](../architecture/access-control.md)                 |
-| Multi-tenant isolation          | [tenancy.md](../architecture/tenancy.md)                               |
-| Production hardening            | [hardening.md](../architecture/hardening.md)                           |
-| Security baseline               | [security-baseline.md](../architecture/security-baseline.md)           |
+| Topic                           | Location                                                 |
+| ------------------------------- | -------------------------------------------------------- |
+| Roles, middleware, tenant roles | [rbac-overview.md](../architecture/rbac-overview.md)     |
+| Default permission matrix       | [rbac-permission-matrix.md](./rbac-permission-matrix.md) |
+| Features vs permissions         | [access-control.md](../architecture/access-control.md)   |
+| Multi-tenant isolation          | [tenancy.md](../architecture/tenancy.md)                 |
+| Production hardening            | [hardening.md](hardening.md)                             |
+| Security baseline               | [security-baseline.md](security-baseline.md)             |
 
 ## Feature specs
 

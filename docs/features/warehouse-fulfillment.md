@@ -65,7 +65,7 @@ Legacy `inventory` is kept for UI/compatibility. When warehouse mode is on, a le
 - `node apps/api/scripts/seed-warehouse-inventory-from-inventory.js [--apply]`
 - `node apps/api/scripts/reconcile-inventory-sources.js [--apply-seed-missing-wh] [--apply-mirror-legacy]`
 
-Design: `docs/superpowers/specs/2026-07-23-inventory-source-of-truth-design.md`.
+Design: `docs/archive/superpowers/specs/2026-07-23-inventory-source-of-truth-design.md`.
 
 ## API (supplier)
 

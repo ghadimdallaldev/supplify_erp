@@ -36,7 +36,7 @@ Concise map of supplier-side features. Detailed specs live under [features/](../
 
 ## Subscription & limits
 
-Suppliers share tier names with restaurants; limits differ (SKUs, warehouses, promotions, chats/day). See [subscriptions.md](./subscriptions.md) and Settings → **Plan & usage**.
+Suppliers share tier names with restaurants; limits differ (SKUs, warehouses, promotions, chats/day). See [subscriptions.md](../archive/product/subscriptions.md) and Settings → **Plan & usage**.
 
 ## Access control
 
@@ -44,4 +44,4 @@ Tenant roles, warehouse scope, driver portal link — [security/rbac.md](../secu
 
 ## QA
 
-Manual regression: [regression-checklist.md](../qa/regression-checklist.md) (**SUP-15a–f**, **GRW-01–GRW-10**). Bulk image import: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Supplier pain-killer / command center: [supplier-pain-killer-features-audit.md](../archive/audits/supplier-pain-killer-features-audit.md).
+Manual regression: [regression-checklist.md](../guides/qa/regression-checklist.md) (**SUP-15a–f**, **GRW-01–GRW-10**). Bulk image import: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Supplier pain-killer / command center: [supplier-pain-killer-features-audit.md](../archive/audits/supplier-pain-killer-features-audit.md).

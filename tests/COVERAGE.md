@@ -37,4 +37,4 @@ $env:E2E_SUPPLIER_ORG_ID="0ea8d7f9-bfdf-4f75-9acf-3b1d74623329"
 pnpm e2e:playwright
 ```
 
-See also [docs/qa/app-dev-e2e-report-2026-07-28.md](../docs/qa/app-dev-e2e-report-2026-07-28.md).
+See also [docs/archive/audits/2026-07-28-app-dev-e2e-report.md](../docs/archive/audits/2026-07-28-app-dev-e2e-report.md).

@@ -35,4 +35,4 @@ Result: **11 test files passed, 71 tests passed**. The dedicated RBAC suite also
 - Full route authorization matrix, ZAP, malware scanning, RLS, and global username/phone schema remain Phase 2+.
 - pnpm audit:prod was not run because it would transmit private dependency metadata to an external registry audit service; run it only with explicit approval.
 
-Machine-readable details: [`2026-07-28-security-findings.json`](./2026-07-28-security-findings.json). Route seed: [`route-inventory.json`](./route-inventory.json).
+Machine-readable details: [`2026-07-28-security-findings.json`](./2026-07-28-security-findings.json). Route seed: [`route-inventory.json`](../../audits/route-inventory.json).

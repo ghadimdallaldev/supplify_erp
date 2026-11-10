@@ -146,7 +146,7 @@ Primary canonical sources:
 - Routes: `docs/audits/route-inventory.json` (554 routes, 2026-06-17)
 - Permissions: `apps/api/src/lib/permission-keys.js`, `role-matrix.js`
 - Plans: `apps/api/src/lib/feature-keys.js`, `limit-resolution.js`, migrations `0117`–`0120`
-- Demo gaps: `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`
+- Demo gaps: `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`
 - Feature specs: `docs/features/README.md`
 
 See [20-source-evidence-index.md](./20-source-evidence-index.md) for claim-level verification.

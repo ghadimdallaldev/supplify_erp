@@ -67,7 +67,7 @@ Set secrets only in Railway — never commit real values.
 
 ClamAV must be ready before hosted API traffic is accepted. Docker Compose provides a private `clamav` service. On Railway, deploy the same image as a private service in each environment and set `MALWARE_SCAN_HOST` to that service's private DNS name; never publish port 3310 publicly. See [`deploy/railway/clamav/README.md`](../../deploy/railway/clamav/README.md). If a single upload cannot reach ClamAV, the API still stores magic-byte-valid bytes and records `scan_unavailable`. Infected files are rejected. Startup still refuses traffic when the scanner is not configured.
 
-See [../operations/storage-uploads.md](../operations/storage-uploads.md) for where file bytes are stored, the presign → PUT flow, bulk image import dual path, and Railway volume / R2 setup.
+See [../operations/storage-uploads.md](storage-uploads.md) for where file bytes are stored, the presign → PUT flow, bulk image import dual path, and Railway volume / R2 setup.
 
 | `EMAIL_ENABLED` | API | all | `true`/`false` | Master switch (default `true`) |
 | `EMAIL_LOG_ONLY` | API | dev | `true`/`false` | Log only, no network send (Railway dev default) |
@@ -141,7 +141,7 @@ See [../features/notifications-and-alerts.md](../features/notifications-and-aler
 
 Tenant gating: plan feature `ai_platform` + admin global/per-tenant overrides. Powers Smart Reorder LLM and the Supplify Assistant chatbot. See [../features/ai-smart-reorder.md](../features/ai-smart-reorder.md) and [../features/ai-assistant.md](../features/ai-assistant.md).
 
-See [../operations/cron-jobs.md](../operations/cron-jobs.md) for the full job inventory.
+See [../operations/cron-jobs.md](cron-jobs.md) for the full job inventory.
 
 ### Email OTP authentication
 

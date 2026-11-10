@@ -59,7 +59,7 @@ aspirational marketing copy:
 | Growth tooling          | Supplier-side customer import, referral/connection requests, paid promotions with admin approval                                                                                                                                                   |
 | Platform administration | Tenant/subscription management, database-backed feature flags (global and per-tenant), limit overrides, impersonation, audit logging                                                                                                               |
 
-_(Full technical inventory: [docs/onboarding/01-executive-overview.md](../onboarding/01-executive-overview.md) and [docs/product/feature-catalog-full.md](../product/feature-catalog-full.md).)_
+_(Full technical inventory: [docs/onboarding/01-executive-overview.md](../../onboarding/01-executive-overview.md) and [docs/product/feature-catalog-full.md](../feature-catalog-full.md).)_
 
 **What it does not yet do**, stated for the same reason investors are told about
 liabilities on a balance sheet — because it is decision-relevant:
@@ -106,7 +106,7 @@ shared externally.
 The second clause is a deliberate strategic stance, not filler: most competitors documented
 in Part 4 either target enterprise chains (high price, long sales cycle) or offer
 lightweight ordering tools with shallow operational depth. Supplify's tiering — a $49/month
-Silver plan sitting below a $149/month "most popular" Gold plan (`docs/product/tier-matrix.md`,
+Silver plan sitting below a $149/month "most popular" Gold plan (`docs/archive/product/tier-matrix.md`,
 §1) — is built to serve the independent operator segment that most competitors underserve,
 while retaining Platinum/Enterprise depth for chains.
 
@@ -156,7 +156,7 @@ error-prone. They have limited visibility into which customers order what and ho
 and invoicing/collections take time away from growing the business.
 
 _(This restates, with tighter framing, the problem already documented internally in
-`docs/sales/01_problem.md`; it is the correct problem statement and is preserved here
+`docs/product/sales/01_problem.md`; it is the correct problem statement and is preserved here
 rather than rewritten for its own sake.)_
 
 **On sizing this problem:** no reliable, verifiable public dataset quantifies "hours lost
@@ -177,7 +177,7 @@ this document avoids. What can be stated from public sources:
 These two figures bound the addressable buyer population and category size; they do not,
 on their own, prove procurement inefficiency. The problem statement above rests on the
 product-and-sales team's direct qualitative observation of the market (documented
-separately in `docs/sales/01_problem.md`), not on a fabricated efficiency statistic.
+separately in `docs/product/sales/01_problem.md`), not on a fabricated efficiency statistic.
 
 ## 1.8 Solution
 
@@ -188,7 +188,7 @@ driver dispatch, and receivables in the same system; and chat scoped to orders/p
 removes the "which channel did we discuss this in" problem entirely. Plans scale from a
 single-location Silver tenant to a multi-branch, multi-warehouse Platinum tenant without a
 platform migration — the same schema and RBAC model serve both (see §1.2 and
-`docs/product/tier-matrix.md`).
+`docs/archive/product/tier-matrix.md`).
 
 ## 1.9 Value Proposition
 
@@ -204,7 +204,7 @@ platform migration — the same schema and RBAC model serve both (see §1.2 and
 Supplify is a **subscription SaaS marketplace** monetized primarily through tiered plans
 sold to both sides of the marketplace (restaurants and suppliers), not through transaction
 fees or commission on order value. This is a deliberate choice already reflected in the
-shipped pricing model (`docs/product/tier-matrix.md`, §1):
+shipped pricing model (`docs/archive/product/tier-matrix.md`, §1):
 
 | Plan       | Monthly | Yearly | Positioning                                                      |
 | ---------- | ------: | -----: | ---------------------------------------------------------------- |
@@ -217,7 +217,7 @@ shipped pricing model (`docs/product/tier-matrix.md`, §1):
 **Secondary revenue lines already built into the product:**
 
 - **Branch/warehouse add-ons** — $19–$69/month per unit depending on tenant type and plan
-  (`docs/product/tier-matrix.md`, §5b). Currently admin-provisioned, not self-serve billed —
+  (`docs/archive/product/tier-matrix.md`, §5b). Currently admin-provisioned, not self-serve billed —
   an near-term automation opportunity, not a hypothetical one.
 - **Paid promotions/deals** — suppliers pay (via plan-gated promotion slots) to surface
   offers to restaurant buyers, with admin approval as a trust/compliance gate.
@@ -236,7 +236,7 @@ Matrix / future revenue streams) and Part 7.
 | **Key Activities**         | Product engineering (multi-tenant platform), two-sided sales (restaurants + suppliers must both be sold), tenant onboarding, trust & safety (deal approvals, dispute mediation)                                       |
 | **Key Resources**          | The codebase itself (186 migrations, full RBAC/billing engine); founding team's Lebanon market access; bilingual data model as an expansion asset                                                                     |
 | **Value Propositions**     | See §1.9 — unified ordering/fulfillment/finance for restaurants; centralized order intake/logistics/receivables for suppliers                                                                                         |
-| **Customer Relationships** | Self-serve signup/trial → in-app upgrade prompts (already instrumented — see conversion-funnel tracking in `docs/sales/08_pricing_strategy.md`) for Silver/Gold; high-touch sales for Platinum/Enterprise             |
+| **Customer Relationships** | Self-serve signup/trial → in-app upgrade prompts (already instrumented — see conversion-funnel tracking in `docs/product/sales/08_pricing_strategy.md`) for Silver/Gold; high-touch sales for Platinum/Enterprise     |
 | **Channels**               | Direct sales (initially founder-led in Lebanon), self-serve web signup, supplier-driven referral of restaurant customers (growth program already built), future: trade associations, industry events (Part 8/9)       |
 | **Customer Segments**      | Independent restaurants/cafés/cloud kitchens/bakeries/caterers/hotels; F&B distributors (initial focus); packaging/cleaning/equipment suppliers (expansion target)                                                    |
 | **Cost Structure**         | Engineering (dominant cost pre-revenue), infrastructure (Railway/Redis/Postgres/storage), founder-led sales and support (no dedicated sales team yet)                                                                 |
@@ -329,7 +329,7 @@ targets would feed).
 
 - Product/feature/architecture claims: internal codebase audit conducted 2026-07-01
   against `apps/api`, `apps/web`, and `docs/product/`, `docs/onboarding/`,
-  `docs/sales/tier-matrix.md` (verified 2026-05-28 per that document's own header).
+  `docs/product/sales/tier-matrix.md` (verified 2026-05-28 per that document's own header).
 - Lebanon F&B establishment estimate: derived from headcount figures in
   [Hospitality News ME (2025)](https://www.hospitalitynewsmag.com/lebanon-fb-industry/);
   not an official register count — flagged as a derived estimate throughout.

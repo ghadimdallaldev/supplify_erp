@@ -289,24 +289,24 @@ These are product honesty markers, not blockers for core B2B ordering flows.
 
 | Topic                 | Primary paths                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Product definition    | `docs/product/overview.md`, `docs/sales/02_solution.md`, `docs/sales/03_platform_overview.md`                            |
+| Product definition    | `docs/product/overview.md`, `docs/product/sales/02_solution.md`, `docs/product/sales/03_platform_overview.md`            |
 | Route inventory       | `docs/audits/route-inventory.json`                                                                                       |
 | Bootstrap metrics     | `docs/onboarding/_artifacts/bootstrap-metrics.md`                                                                        |
 | Frontend routing      | `apps/web/src/App.tsx`                                                                                                   |
-| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/architecture/rbac-permission-matrix.md`     |
+| RBAC & roles          | `apps/api/src/lib/role-matrix.js`, `apps/api/src/lib/tenant-roles.js`, `docs/security/rbac-permission-matrix.md`         |
 | Subscriptions & tiers | `docs/product/four-plan-pricing-model.md`, `docs/product/plans-and-limits.md` (historical: `tier-matrix.md`, `plans.md`) |
 | Auth & registration   | `apps/api/src/lib/rbac.js`, `docs/features/tenant-registration.md`                                                       |
 | Feature catalog       | `docs/product/features.md`, `docs/product/feature-catalog-technical.md`                                                  |
 | Cron jobs             | `docs/operations/cron-jobs.md`, `apps/api/src/lib/register-cron-jobs.js`                                                 |
-| Demo readiness audit  | `docs/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                                           |
+| Demo readiness audit  | `docs/archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md`                                                                   |
 
 ---
 
 ## Next Steps for Readers
 
 - **Business stakeholders:** Continue to [02-complete-product-guide.md](./02-complete-product-guide.md) for domain-by-domain behavior, order lifecycle, and tenant model.
-- **Technical onboarding:** Run `pnpm setup && pnpm dev`, then use `docs/product/features.md` verification tables and `docs/qa/regression-checklist.md`.
-- **Sales narrative:** See `docs/sales/` (01_problem through enterprise_checklist).
+- **Technical onboarding:** Run `pnpm setup && pnpm dev`, then use `docs/product/features.md` verification tables and `docs/guides/qa/regression-checklist.md`.
+- **Sales narrative:** See `docs/product/sales/` (01_problem through enterprise_checklist).
 
 ---
 

@@ -1,6 +1,6 @@
 # Approvals & budgets — removed
 
-**Removed:** 2026-05 (product direction). See [APPROVALS_BUDGETING_REMOVAL_AUDIT.md](../../APPROVALS_BUDGETING_REMOVAL_AUDIT.md) for full audit.
+**Removed:** 2026-05 (product direction). See APPROVALS_BUDGETING_REMOVAL_AUDIT.md for full audit.
 
 ## What was removed
 

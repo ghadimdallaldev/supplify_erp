@@ -4,7 +4,7 @@
 [Part 1](./01_executive_summary_and_foundations.md) (company foundations, product inventory),
 [Part 2](./02_industry_research.md) (industry and regional context),
 [Part 3](./03_market_research.md) (segmentation and personas),
-[Part 4](./04_competitors_group1_of_3.md) (competitor research — groups 1–3),
+[Part 4](./04_competitor_research.md) (competitor research — groups 1–3),
 [Part 6](./06_feasibility_study.md) (feasibility and break-even),
 [Part 7](./07_business_strategy.md) (pricing and unit-economics model), and
 [Part 11](./11_product_strategy.md) (roadmap and disclosed gaps). This part applies
@@ -136,7 +136,7 @@ drivers**, not footnotes — consistent with Part 13's disclosure standard.
 ### Social
 
 - **Operator behavior:** Purchasing still coordinated via phone, WhatsApp, and spreadsheets
-  (Part 1 §1.7; `docs/sales/01_problem.md`). _Implication:_ Change management and trust
+  (Part 1 §1.7; `docs/product/sales/01_problem.md`). _Implication:_ Change management and trust
   outweigh feature checklists in early sales; **WhatsApp Cloud API is integrated** (July 2026) but requires per-environment Meta credentials and `WHATSAPP_ENABLED=true` before
   live sends — default Railway config keeps it off/log-only (Part 11 §11.3).
 - **Workforce:** Lebanon F&B sector estimated 80,000+ employees, ~18 per establishment
@@ -473,8 +473,8 @@ cohort data at 6, 12, and 18 months per Part 1 §1.15 targets.
   (§1.2, §1.5–1.7, §1.10–1.15).
 - Industry and regional context: [Part 2](./02_industry_research.md) (§2.3–2.4, §2.12–2.14).
 - Segmentation and personas: [Part 3](./03_market_research.md) (§3.1–3.2).
-- Competitor profiles: [Part 4 group 1](./04_competitors_group1_of_3.md) (MarketMan, **Supy**,
-  **Choco**); [Part 4 group 2](./04_competitors_group2_of_3.md); [Part 4 group 3](./04_competitors_group3_of_3.md)
+- Competitor profiles: [Part 4 group 1](./04_competitor_research.md) (MarketMan, **Supy**,
+  **Choco**); [Part 4 group 2](./04_competitor_research.md); [Part 4 group 3](./04_competitor_research.md)
   (**Foodics**, **Rewaa**).
 - Break-even and feasibility: [Part 6](./06_feasibility_study.md) (§6.2–6.4, §6.13 — ~55 tenant
   break-even as **model output**, not actual).
@@ -482,7 +482,7 @@ cohort data at 6, 12, and 18 months per Part 1 §1.15 targets.
   assumptions).
 - Product roadmap and gaps: [Part 11](./11_product_strategy.md) (§11.1–11.3, §11.6–11.8).
 - Lebanon macro risk: [Part 13](./13_risk_management.md) (§13.3).
-- Codebase references: `docs/product/tier-matrix.md`; `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`;
+- Codebase references: `docs/archive/product/tier-matrix.md`; `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`;
   `apps/api/src/lib/billing/providers/stub.js`;
   `apps/api/src/services/whatsapp.service.js`; `apps/api/src/services/notification/webhook.js`;
   internal codebase audit cited in Part 1 (2026-07-01).

@@ -86,7 +86,7 @@ Allowed while locked (activation / payment): `/api/register/*`, `/api/billing/*`
 | Unit (API)       | `apps/api/src/lib/platform-settings.test.js` (trial days 7-90, default 30) |
 | Unit (web)       | `apps/web/src/lib/activateFreePlan.test.ts`                                |
 | API (Playwright) | `tests/api/registration-activation.spec.ts`                                |
-| Manual QA        | `docs/qa/regression-checklist.md` - CRST-_ / CSUP-_ / **BIL-FT-\***        |
+| Manual QA        | `docs/guides/qa/regression-checklist.md` - CRST-_ / CSUP-_ / **BIL-FT-\*** |
 
 ## QA References
 

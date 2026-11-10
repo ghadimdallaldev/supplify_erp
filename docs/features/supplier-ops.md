@@ -218,5 +218,5 @@ Service: `supplier-reorder-intelligence.service.js` (`createReorderReminderDraft
 Supplier Business settings can set `last_order_mode`: `none` | `cutoff` (absolute time or minutes-before-window + rollover days). Cart checkout persists resolved `deliveryDate` as `customer_order.requested_delivery_date`.
 
 - Lib: `apps/api/src/lib/supplier-last-order.js` (+ `supplier-last-order.test.js`)
-- Manual QA: [regression-checklist.md](../qa/regression-checklist.md) **RST-18a–18c**
-- Design: [hospitality-excellence](../superpowers/specs/2026-09-10-hospitality-excellence-design.md)
+- Manual QA: [regression-checklist.md](../guides/qa/regression-checklist.md) **RST-18a–18c**
+- Design: [hospitality-excellence](../archive/superpowers/specs/2026-09-10-hospitality-excellence-design.md)

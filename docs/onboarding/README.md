@@ -133,14 +133,14 @@ Goal: Validate environments before sales or go-live.
 
 ## Suggested learning paths by scenario
 
-| Scenario                         | Path                                                                                             |
-| -------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **New hire week 1**              | 01 → 17 → 09 → 10 → persona guide matching team (03 or 04)                                       |
-| **Supplier go-live this week**   | 19 checklists 1–2 → 03 → 18 FAQ supplier sections                                                |
-| **Restaurant go-live this week** | 19 checklists 3–4 → 04 → 18 FAQ restaurant sections                                              |
-| **Production deploy**            | 19 checklists 10–11 → 07 → `docs/operations/railway.md`                                          |
-| **Security / compliance review** | 09 → 10 (billing lock) → 20 (impersonation, DPA rows) → `docs/architecture/security-baseline.md` |
-| **Mobile parity change**         | 11 → `docs/mobile/MOBILE_PARITY_CHECKLIST.md` → 20                                               |
+| Scenario                         | Path                                                                                         |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| **New hire week 1**              | 01 → 17 → 09 → 10 → persona guide matching team (03 or 04)                                   |
+| **Supplier go-live this week**   | 19 checklists 1–2 → 03 → 18 FAQ supplier sections                                            |
+| **Restaurant go-live this week** | 19 checklists 3–4 → 04 → 18 FAQ restaurant sections                                          |
+| **Production deploy**            | 19 checklists 10–11 → 07 → `docs/operations/railway.md`                                      |
+| **Security / compliance review** | 09 → 10 (billing lock) → 20 (impersonation, DPA rows) → `docs/security/security-baseline.md` |
+| **Mobile parity change**         | 11 → `docs/mobile/MOBILE_PARITY_CHECKLIST.md` → 20                                           |
 
 ---
 

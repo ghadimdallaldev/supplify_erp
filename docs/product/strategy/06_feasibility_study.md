@@ -477,7 +477,7 @@ bookends built from explicit, challengeable assumptions.
 - Market figures (§6.2): Part 1 §1.7 — Lebanon F&B establishment estimate ([Hospitality News ME, 2025](https://www.hospitalitynewsmag.com/lebanon-fb-industry/)) and food-market size/CAGR (Statista
   Market Insights, accessed 2026-07-01). Not re-derived; TAM/SAM/SOM deferred to Parts 2–3.
 - Product/test-coverage/disclosed-gap facts (§6.3, §6.5): internal codebase audit,
-  2026-07-01, and `docs/product/tier-matrix.md` (verified 2026-05-28), per Part 1 §1.2 and
+  2026-07-01, and `docs/archive/product/tier-matrix.md` (verified 2026-05-28), per Part 1 §1.2 and
   Part 7 §7.2–7.3.
 - Pricing/ARPU/churn/LTV/CAC inputs (§6.4, §6.12, §6.14): Part 7 §7.2 and §7.10–7.11
   (explicitly modeled, not measured).

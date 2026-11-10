@@ -174,7 +174,7 @@ Run: `cd apps/api && npm run test:billing`, `cd apps/web && pnpm exec vitest run
 
 ### Risks
 
-- **Deploy migrations:** Apply `0144` + `0145` on Railway dev → preprod → prod (API startup migrate or manual). Full checklist: [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md).
+- **Deploy migrations:** Apply `0144` + `0145` on Railway dev → preprod → prod (API startup migrate or manual). Full checklist: [../releases/2026-06-09-pre-deploy-checklist.md](../archive/releases/2026-06-09-pre-deploy-checklist.md).
 - **Reservations** still not plan-gated.
 - **Reports tier differentiation** not implemented at API level.
 - **`chats_per_day` vs `open_conversations`:** two meters; confirm product intent.

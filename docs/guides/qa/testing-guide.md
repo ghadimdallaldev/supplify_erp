@@ -1,6 +1,6 @@
 # QA automation guide
 
-How to run automated checks in the Supplify monorepo: API unit tests (Vitest), web unit tests, RBAC/billing subsets, and CI. For API mock patterns and stabilization history, see **[API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md)**.
+How to run automated checks in the Supplify monorepo: API unit tests (Vitest), web unit tests, RBAC/billing subsets, and CI. For API mock patterns and stabilization history, see **[API test suite stabilization](../../archive/audits/api-test-suite-stabilization.md)**.
 
 ## Quick commands (monorepo root)
 
@@ -119,7 +119,7 @@ GitHub Actions was removed from this repo. Run before deploy or in your own pipe
 2. `pnpm test:ci` (API + web unit tests)
 3. `pnpm build`
 
-E2E (Playwright) is not part of the default check; run `pnpm e2e:playwright` locally when Docker infra is up. See [tests/README.md](../../tests/README.md).
+E2E (Playwright) is not part of the default check; run `pnpm e2e:playwright` locally when Docker infra is up. See [tests/README.md](../../../tests/README.md).
 
 ## Delivery GPS / tracking (targeted runs)
 
@@ -128,7 +128,7 @@ pnpm --filter @supplify/api test:api src/lib/delivery-tracking-payload.test.js s
 pnpm --filter @supplify/web test:run -- deliveryTrackingLabels DeliveryTrackingMap DriverDispatchBoard FulfillmentTrackingTab RestaurantOrderTrackingPanel restaurantTrackingMessages orderTimeline
 ```
 
-Manual regression: [regression-checklist.md](./regression-checklist.md) §6.6.1, §7.4.1, §7.4.2. Feature spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
+Manual regression: [regression-checklist.md](./regression-checklist.md) §6.6.1, §7.4.1, §7.4.2. Feature spec: [drivers-and-gps-tracking.md](../../features/drivers-and-gps-tracking.md).
 
 ## Bulk product image import (targeted runs)
 
@@ -137,7 +137,7 @@ pnpm --filter @supplify/api test:api src/services/image-optimization.service.tes
 pnpm --filter @supplify/web test:run -- ProductImageImport
 ```
 
-Manual regression: [regression-checklist.md](./regression-checklist.md) §7.3 **SUP-15a–f**. Feature spec: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Requires migration `0168_catalog_image_import.sql`.
+Manual regression: [regression-checklist.md](./regression-checklist.md) §7.3 **SUP-15a–f**. Feature spec: [bulk-product-image-import.md](../../features/bulk-product-image-import.md). Requires migration `0168_catalog_image_import.sql`.
 
 ## 2026-09-10 release areas (targeted runs)
 
@@ -166,17 +166,17 @@ Manual regression: [regression-checklist.md](./regression-checklist.md) **2026-0
 
 ## Manual QA (web + mobile)
 
-| Output                | Command            | Path                                               |
-| --------------------- | ------------------ | -------------------------------------------------- |
-| Printable PDF         | `pnpm docs:qa:pdf` | `docs/qa/output/Supplify-Manual-QA-Checklist.pdf`  |
-| HTML (print fallback) | same command       | `docs/qa/output/Supplify-Manual-QA-Checklist.html` |
+| Output                | Command            | Path                                                      |
+| --------------------- | ------------------ | --------------------------------------------------------- |
+| Printable PDF         | `pnpm docs:qa:pdf` | `docs/guides/qa/output/Supplify-Manual-QA-Checklist.pdf`  |
+| HTML (print fallback) | same command       | `docs/guides/qa/output/Supplify-Manual-QA-Checklist.html` |
 
 Source checklist: [regression-checklist.md](./regression-checklist.md) (Parts 0–14). Requires Playwright Chromium (`npx playwright install chromium` once).
 
 ## Related docs
 
-- [API test suite stabilization](../API_TEST_SUITE_STABILIZATION.md) — baseline failures, fixes, risks
+- [API test suite stabilization](../../archive/audits/api-test-suite-stabilization.md) — baseline failures, fixes, risks
 - [Manual test checklist](./regression-checklist.md)
 - [Test coverage report](./test-coverage-report.md)
-- [Billing activation manual checklist](./../archive/old/manual-test-checklist-billing-activation.md)
-- [tests/README.md](../../tests/README.md) — Playwright E2E
+- [Billing activation manual checklist](../../archive/old/manual-test-checklist-billing-activation.md)
+- [tests/README.md](../../../tests/README.md) — Playwright E2E

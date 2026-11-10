@@ -40,7 +40,7 @@ Confirm in DB or logs:
 - Gold supplier/restaurant: `branches` = **3**
 - Platinum: `branches` = **-1** (unlimited)
 
-Full audit report: [../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md](../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md)
+Full audit report: [../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md](../../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md)
 
 ---
 
@@ -60,9 +60,9 @@ Full audit report: [../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md](../audits/PLAN_T
 - Restaurant: **Deals** → `/app/deals`
 - Admin tab: **Deals & Boosts**
 
-Full detail: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)
+Full detail: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../../guides/ui/DEALS_BOOSTS_WORDING_CLEANUP.md)
 
-Feature reference (API/DB unchanged): [../features/deals-and-promotions.md](../features/deals-and-promotions.md)
+Feature reference (API/DB unchanged): [../features/deals-and-promotions.md](../../features/deals-and-promotions.md)
 
 ---
 
@@ -84,7 +84,7 @@ If these diverge, registration and re-acceptance validation will fail.
 - `ACCEPTABLE_USE_POLICY.md`, `SUBSCRIPTION_ADDON_TERMS.md`, `SUPPLIER_AGREEMENT.md`, `PRIVACY_POLICY.md`
 - `LEGAL_REVIEW_NOTES.md` (internal counsel notes)
 
-Index: [../../apps/web/static/legal/README.md](../../apps/web/static/legal/README.md)
+Index: [../../apps/web/static/legal/README.md](../../../apps/web/static/legal/README.md)
 
 ### Login re-acceptance gate
 
@@ -95,7 +95,7 @@ Existing users whose stored `legal_acceptance.document_version` ≠ `2026-06-09`
 | `GET /auth/me`                | Returns `legalStatus` (`needsReacceptance`, `requiredDocuments`, …) |
 | `POST /auth/legal-acceptance` | Records `login_refresh` acceptances                                 |
 
-Full flow: [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md)
+Full flow: [../ui/LEGAL_PACK_REACCEPTANCE.md](../../guides/ui/LEGAL_PACK_REACCEPTANCE.md)
 
 **Ops note:** Expect a one-time spike in support questions (“Updated legal agreements”) after prod deploy. Users with no prior `legal_acceptance` rows (legacy) will also be prompted.
 
@@ -114,7 +114,7 @@ Apply the same sequence on **dev**, then **preprod**, then **prod**:
 7. **Plan catalog:** Admin → Plans → edit limit → save → refresh (persisted).
 8. **Deals UI:** Supplier `/app/promotions` shows “Deals”; restaurant `/app/deals` unchanged behavior.
 
-Railway reference: [../operations/railway-environments.md](../operations/railway-environments.md)
+Railway reference: [../operations/railway-environments.md](../../operations/railway-environments.md)
 
 ---
 
@@ -150,7 +150,7 @@ cd apps/web && pnpm exec vitest run src/lib/legalReacceptanceGate.test.ts src/li
 - [ ] `/legal/reaccept` for user on stale pack
 - [ ] Free tier: **3 chats/day** (not 10) when hitting chat limit message
 
-Extended QA: [../qa/regression-checklist.md](../qa/regression-checklist.md) — §6.14, §7.11, §Legal re-acceptance
+Extended QA: [../qa/regression-checklist.md](../../guides/qa/regression-checklist.md) — §6.14, §7.11, §Legal re-acceptance
 
 ---
 
@@ -179,11 +179,11 @@ Do not revert only one of web/API legal pack version.
 
 | Doc                                                                                      | Topic                    |
 | ---------------------------------------------------------------------------------------- | ------------------------ |
-| [../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md](../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md) | Plan tier audit          |
-| [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)           | Deals/Boosts UI copy     |
-| [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md)                     | Legal re-acceptance      |
-| [../features/deals-and-promotions.md](../features/deals-and-promotions.md)               | Deals system (technical) |
-| [../operations/railway-environments.md](../operations/railway-environments.md)           | Railway deploy           |
+| [../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md](../../audits/PLAN_TIER_FUNCTIONALITY_AUDIT.md) | Plan tier audit          |
+| [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../../guides/ui/DEALS_BOOSTS_WORDING_CLEANUP.md)           | Deals/Boosts UI copy     |
+| [../ui/LEGAL_PACK_REACCEPTANCE.md](../../guides/ui/LEGAL_PACK_REACCEPTANCE.md)                     | Legal re-acceptance      |
+| [../features/deals-and-promotions.md](../../features/deals-and-promotions.md)               | Deals system (technical) |
+| [../operations/railway-environments.md](../../operations/railway-environments.md)           | Railway deploy           |
 
 ---
 

@@ -27,7 +27,7 @@ meaning and a financial meaning, both are noted.
 ### A–C
 
 **Add-on billing (branch/warehouse).** Optional monthly charges for extra restaurant
-branches or supplier branches/warehouses beyond plan defaults (`docs/product/tier-matrix.md`
+branches or supplier branches/warehouses beyond plan defaults (`docs/archive/product/tier-matrix.md`
 §5b). Admin-provisioned today, not yet automated through the billing engine (Part 1 §1.2;
 Part 7 §7.2; Part 11 §11.1).
 
@@ -202,7 +202,7 @@ replaced for commercial launch (Part 11 §11.1).
 with isolated data, subscription plan, and RBAC (Part 1 §1.2; `docs/architecture/tenancy.md`).
 
 **Tier matrix.** Authoritative pricing, limits, and feature-gating document:
-`docs/product/tier-matrix.md`. Referenced throughout as the commercial source of truth.
+`docs/archive/product/tier-matrix.md`. Referenced throughout as the commercial source of truth.
 
 **Two-sided marketplace sales complexity.** Requirement to sell and retain both sides;
 supplier-driven acquisition is the prescribed cold-start mitigation (Part 10 §10.4).
@@ -247,7 +247,7 @@ shared conventions.
 |        4 | Review platforms (G2, Capterra)                                             | Sentiment and feature confirmation; note HTTP/access limitations |
 |        5 | Vendor-sponsored surveys (Toast, etc.)                                      | Directional only; flag self-interest                             |
 |        6 | Low-tier aggregators (DataIntelo, dataintelo, Business Research Insights)   | Directional framing only; disclose weak methodology              |
-|        7 | Internal codebase audit, `docs/product/*`, `docs/sales/*`                   | Product and pricing verified facts                               |
+|        7 | Internal codebase audit, `docs/product/*`, `docs/product/sales/*`           | Product and pricing verified facts                               |
 
 **Internal verification.** Product claims require traceability to codebase or internal docs.
 The canonical audit date is **2026-07-01** (180 SQL migrations, 554 API routes, 225+ backend
@@ -283,7 +283,7 @@ not forecasted** — distinct from promises.
 3. **Primary vs. derivative.** When Part 13 cites Lebanon macro via The Middle East Insider
    and Wikipedia, the part discloses synthesis limits. Part 16 lists representative URLs in
    §16.3; the part of record remains the first substantive use.
-4. **Internal docs.** Repository paths (`docs/product/tier-matrix.md`, `docs/sales/01_problem.md`)
+4. **Internal docs.** Repository paths (`docs/archive/product/tier-matrix.md`, `docs/product/sales/01_problem.md`)
    are valid citations for product behavior — equivalent to source code for commercial claims.
 5. **Date stamps.** External sources accessed **2026-07-01** unless otherwise noted. Macro
    conditions (Lebanon conflict from March 2026) are time-stamped as live at writing.
@@ -343,11 +343,11 @@ map (§16.5).
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
 | `docs/onboarding/01-executive-overview.md`                                                 | Product inventory, migration counts                    |
 | `docs/product/PLATINUM_CATALOG_ONLY_FEATURES.md`                                           | Enforced vs catalog-only Platinum gap register         |
-| `docs/product/tier-matrix.md`                                                              | Pricing, limits, feature gating                        |
+| `docs/archive/product/tier-matrix.md`                                                      | Pricing, limits, feature gating                        |
 | `docs/product/feature-catalog-full.md`                                                     | Full capability inventory                              |
-| `docs/sales/01_problem.md`, `docs/sales/02_solution.md`                                    | Problem/solution framing                               |
-| `docs/sales/08_pricing_strategy.md`                                                        | Trial and upgrade mechanics                            |
-| `docs/sales/enterprise_checklist.md`                                                       | Enterprise sales template                              |
+| `docs/product/sales/01_problem.md`, `docs/product/sales/02_solution.md`                    | Problem/solution framing                               |
+| `docs/product/sales/08_pricing_strategy.md`                                                | Trial and upgrade mechanics                            |
+| `docs/product/sales/enterprise_checklist.md`                                               | Enterprise sales template                              |
 | `docs/features/ai-smart-reorder.md`                                                        | Smart Reorder AI scope                                 |
 | `docs/features/tenant-registration.md`, `docs/features/free-trial-expiry.md`               | Self-serve funnel                                      |
 | `docs/architecture/tenancy.md`, `docs/architecture/access-control.md`                      | Multi-tenancy, RBAC                                    |

@@ -46,7 +46,7 @@ Inside cards, use `CardActionGrid` / flex-wrap — never viewport breakpoints fo
 | Product catalog                 | **`xl`** (default) | Cards through laptop; table when wide enough                                                                        |
 | Contract pricing                | default **`xl`**   | Same hybrid pattern                                                                                                 |
 
-Design note for orders: [../superpowers/specs/2026-07-17-orders-list-laptop-density-design.md](../superpowers/specs/2026-07-17-orders-list-laptop-density-design.md).
+Design note for orders: [../superpowers/specs/2026-07-17-orders-list-laptop-density-design.md](../../archive/superpowers/specs/2026-07-17-orders-list-laptop-density-design.md).
 
 ## Testing
 
@@ -57,4 +57,4 @@ Responsive layout is asserted via **compile-time class strings**, not runtime me
 
 ## Mobile parity
 
-Web density changes do not require mobile app UI changes. Document web-only layout work in [../mobile/MOBILE_FEATURE_PARITY.md](../mobile/MOBILE_FEATURE_PARITY.md) (see **2026-07-17 — Orders list laptop density**).
+Web density changes do not require mobile app UI changes. Document web-only layout work in [../mobile/MOBILE_FEATURE_PARITY.md](../../mobile/MOBILE_FEATURE_PARITY.md) (see **2026-07-17 — Orders list laptop density**).

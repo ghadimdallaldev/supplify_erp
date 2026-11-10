@@ -4,6 +4,8 @@ Last updated: 2026-06-15. Covers `apps/api/scripts/` (~49 active files), repo `s
 
 **Cleanup done (2026-06-19):** 71 one-off API scripts in `docs/archive/scripts/one-off/`; admin i18n codemods archived to `apps-web/`; docs consolidated — `cache-audit/`, `performance/`, and `performance-audit/` merged under `docs/audits/`; Keycloak incident doc moved to `docs/operations/keycloak-railway-memory-fix.md`; completed June 2026 audits archived; root `scripts/README.md` added.
 
+**Update (2026-11-10):** the archived one-off scripts referenced below (`docs/archive/scripts/`) were deleted in the docs restructure. They remain in version history at commit `970be8e5`.
+
 ## What actually runs in production
 
 | Environment                         | Auto-run on deploy                                                                                                                                                            | Manual only           |

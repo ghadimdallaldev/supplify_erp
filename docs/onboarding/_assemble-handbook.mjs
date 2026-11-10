@@ -96,7 +96,7 @@ function processContent(raw) {
     const meta = Object.entries(PART_META).find(([f]) => f.startsWith(num + '-'));
     if (meta) {
       const partSlug = partSlugForFile(meta[0]);
-      return `](${hash ? partSlug + hash : partSlug})`;
+      return `](#${hash ? partSlug + hash : partSlug})`;
     }
     return `](./${key}.md${hash || ''})`;
   });

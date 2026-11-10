@@ -208,16 +208,16 @@ Added `manualChunks` to group `@radix-ui`, `lucide-react`, `react-router`, `@red
 
 ### Fixes applied
 
-| Area               | Change                                                                                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Timing             | [`request-timing.js`](../apps/api/src/middlewares/request-timing.js) — `event: http.request.slow_breakdown` when total &gt; `SLOW_REQUEST_MS` (default 800) |
-| Subscription       | [`request-subscription.js`](../apps/api/src/lib/request-subscription.js) — one `req.billingSubscription` + `req.subscription` per request                   |
-| Auth user          | `getUserBySub` cached 120s (`user:sub:{sub}`)                                                                                                               |
-| Notification prefs | `ensureNotificationPreferences` cached 60s; invalidate on PATCH                                                                                             |
-| Inventory GET `/`  | Single `usage` CTE instead of 4× correlated subqueries                                                                                                      |
-| Receiving pending  | `LEFT JOIN receiving_report` anti-join + default `LIMIT` 50                                                                                                 |
-| Orders list        | Skip `DISTINCT` + item joins when restaurant-only list (no search/supplier filter)                                                                          |
-| Indexes            | [`0139_railway_hot_path_indexes.sql`](../apps/api/db/migrations/0139_railway_hot_path_indexes.sql)                                                          |
+| Area               | Change                                                                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Timing             | [`request-timing.js`](../../apps/api/src/middlewares/request-timing.js) — `event: http.request.slow_breakdown` when total &gt; `SLOW_REQUEST_MS` (default 800) |
+| Subscription       | [`request-subscription.js`](../../apps/api/src/lib/request-subscription.js) — one `req.billingSubscription` + `req.subscription` per request                   |
+| Auth user          | `getUserBySub` cached 120s (`user:sub:{sub}`)                                                                                                                  |
+| Notification prefs | `ensureNotificationPreferences` cached 60s; invalidate on PATCH                                                                                                |
+| Inventory GET `/`  | Single `usage` CTE instead of 4× correlated subqueries                                                                                                         |
+| Receiving pending  | `LEFT JOIN receiving_report` anti-join + default `LIMIT` 50                                                                                                    |
+| Orders list        | Skip `DISTINCT` + item joins when restaurant-only list (no search/supplier filter)                                                                             |
+| Indexes            | [`0139_railway_hot_path_indexes.sql`](../../apps/api/db/migrations/0139_railway_hot_path_indexes.sql)                                                          |
 
 ### Expected latency (warm Railway, Redis + migrations 0138–0139)
 
@@ -257,7 +257,7 @@ Added `manualChunks` to group `@radix-ui`, `lucide-react`, `react-router`, `@red
 | Caches          | `getRolesForUser` 120s + per-request memo; `getSubscriptionForBilling` 60s; product categories/tags 60s tenant-scoped                                                           |
 | Products        | Cap `limit` 100; skip inventory aggregate unless `inStock`; lighter count query; restaurant pricing enrich uses `tenantId`                                                      |
 | Pricing / staff | my-pricing `LIMIT 500`; staff documents `LIMIT 100`                                                                                                                             |
-| Indexes         | [`0140_railway_cold_path_indexes.sql`](../apps/api/db/migrations/0140_railway_cold_path_indexes.sql)                                                                            |
+| Indexes         | [`0140_railway_cold_path_indexes.sql`](../../apps/api/db/migrations/0140_railway_cold_path_indexes.sql)                                                                         |
 | Frontend        | Sidebar hover/focus route chunk prefetch; Layout prefetch Products/Reservations at 500ms; RTK `keepUnusedDataFor: 120` for categories/tags                                      |
 
 ### Expected first-open (warm pool + Redis + migrations 0138–0140)

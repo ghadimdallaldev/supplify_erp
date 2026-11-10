@@ -2,7 +2,7 @@
 
 The internal DB plan code `free` is retained for compatibility, but the public product experience is a **30-day free trial of a selected paid plan**. It is not a permanent no-cost plan. The selected target plan controls the trial positioning and most trial entitlements, while `subscription.free_sandbox_expires_at` remains the expiry mechanism.
 
-**Related:** [tenant-registration.md](./tenant-registration.md), [four-plan-pricing-model.md](../product/four-plan-pricing-model.md), [plans-and-limits.md](../product/plans-and-limits.md), [qa/FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md)
+**Related:** [tenant-registration.md](./tenant-registration.md), [four-plan-pricing-model.md](../product/four-plan-pricing-model.md), [plans-and-limits.md](../product/plans-and-limits.md), [qa/FREE_TRIAL_BEHAVIOR_AUDIT.md](../archive/audits/free-trial-behavior-audit.md)
 
 ## Product Rules
 
@@ -82,15 +82,15 @@ sequenceDiagram
 
 ## Tests
 
-| Layer         | File                                                    |
-| ------------- | ------------------------------------------------------- |
-| Unit (API)    | `apps/api/src/middlewares/billingAccess.test.js`        |
-| Unit (API)    | `apps/api/src/lib/billing/billing-service.test.js`      |
-| Unit (API)    | `apps/api/src/lib/platform-settings.test.js`            |
-| Manual QA     | `docs/qa/regression-checklist.md` - trial expiry checks |
-| Audit / risks | `docs/archive/audits/free-trial-behavior-audit.md`      |
+| Layer         | File                                                           |
+| ------------- | -------------------------------------------------------------- |
+| Unit (API)    | `apps/api/src/middlewares/billingAccess.test.js`               |
+| Unit (API)    | `apps/api/src/lib/billing/billing-service.test.js`             |
+| Unit (API)    | `apps/api/src/lib/platform-settings.test.js`                   |
+| Manual QA     | `docs/guides/qa/regression-checklist.md` - trial expiry checks |
+| Audit / risks | `docs/archive/audits/free-trial-behavior-audit.md`             |
 
 ## QA References
 
-- BIL-FT-01 through BIL-FT-12 in [regression-checklist.md](../qa/regression-checklist.md)
-- SQL shortcut to simulate expiry in [FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md)
+- BIL-FT-01 through BIL-FT-12 in [regression-checklist.md](../guides/qa/regression-checklist.md)
+- SQL shortcut to simulate expiry in [FREE_TRIAL_BEHAVIOR_AUDIT.md](../archive/audits/free-trial-behavior-audit.md)

@@ -45,7 +45,7 @@ function extractReadmePaths(readmePath) {
   return paths
 }
 
-const scanRoots = [join(ROOT, 'docs'), join(ROOT, 'docs/blueprint')].filter((p) => {
+const scanRoots = [join(ROOT, 'docs')].filter((p) => {
   try {
     statSync(p)
     return true
@@ -75,24 +75,24 @@ for (const file of files) {
   }
 }
 
-const readmePath = join(ROOT, 'docs/diagrams/README.md')
+const readmePath = join(ROOT, 'docs/architecture/diagrams/README.md')
 let indexed = new Set()
 try {
   indexed = extractReadmePaths(readmePath)
 } catch {
-  errors.push('docs/diagrams/README.md: missing (required index)')
+  errors.push('docs/architecture/diagrams/README.md: missing (required index)')
 }
 
 for (const file of files) {
   const rel = relative(ROOT, file).replace(/\\/g, '/')
-  if (!rel.startsWith('docs/diagrams/')) continue
-  const short = rel.replace(/^docs\/diagrams\//, '')
+  if (!rel.startsWith('docs/architecture/diagrams/')) continue
+  const short = rel.replace(/^docs\/architecture\/diagrams\//, '')
   const listed =
     indexed.has(rel) ||
     indexed.has(short) ||
     [...indexed].some((p) => p.endsWith(short) || rel.endsWith(p.replace(/^\.\//, '')))
   if (!listed) {
-    errors.push(`${rel}: not listed in docs/diagrams/README.md`)
+    errors.push(`${rel}: not listed in docs/architecture/diagrams/README.md`)
   }
 }
 

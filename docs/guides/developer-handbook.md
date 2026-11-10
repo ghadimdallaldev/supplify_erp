@@ -104,16 +104,16 @@ Full catalog, routes, roles, and verification steps: **[features.md](../product/
 | Staff / shifts | `/api/staff`           | Members, shifts, time entries                                                           |
 | Admin          | `/api/admin-dashboard` | Plans, limits, [impersonation](../features/admin-impersonation.md), **feature toggles** |
 
-Subscription **plans** define default features; admins can override globally or per tenant — see [admin-feature-flags.md](../admin/admin-feature-flags.md).
+Subscription **plans** define default features; admins can override globally or per tenant — see [admin-feature-flags.md](../admin/feature-flags.md).
 
 ## Documentation
 
 - [Feature catalog & verification](../product/features.md) — all product areas, routes, smoke checks
 - [Database migrations](./database-migrations.md) — running, troubleshooting, fresh DB
-- [Admin feature toggles](../admin/admin-feature-flags.md) — global and per-tenant flags
+- [Admin feature toggles](../admin/feature-flags.md) — global and per-tenant flags
 - [Railway environments](../operations/railway-environments.md) — dev / preprod / prod (primary)
-- [Deploy](../deploy/README.md) — optional legacy Docker on a VM
-- [Tests](../tests/README.md) — unit and E2E
+- [Deploy](../../deploy/README.md) — optional legacy Docker on a VM
+- [Tests](../../tests/README.md) — unit and E2E
 
 ## Development
 

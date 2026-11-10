@@ -25,7 +25,7 @@ disclosed in the product documentation itself:
 | Risk                           | Detail                                                                                                                                                                                                                                                                                                                                       | Mitigation                                                                                                                                                                                                |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Catalog-only Platinum features | **Partially closed (July 2026).** Smart quick lists, outbound notification webhooks, custom catalog domains, and WhatsApp Cloud API code are enforced/shipped. **Still catalog-only:** developer API + order/invoice webhooks (`api_integrations`), advanced custom report strings, central purchasing (`PLATINUM_CATALOG_ONLY_FEATURES.md`) | Close or disclose remaining strings before Platinum IT/enterprise sales; enable WhatsApp in prod when Meta credentials are set                                                                            |
-| Dependency vulnerabilities     | An internal security audit (`docs/architecture/security-baseline.md`) identified 14 `pnpm audit` issues (5 high) in axios, react-router-dom, glob, and qs at time of that audit                                                                                                                                                              | Re-run `pnpm audit` and apply upgrades before any external security review or enterprise sales conversation; treat as pre-launch hygiene, not a major program                                             |
+| Dependency vulnerabilities     | An internal security audit (`docs/security/security-baseline.md`) identified 14 `pnpm audit` issues (5 high) in axios, react-router-dom, glob, and qs at time of that audit                                                                                                                                                                  | Re-run `pnpm audit` and apply upgrades before any external security review or enterprise sales conversation; treat as pre-launch hygiene, not a major program                                             |
 | Single-region infrastructure   | All environments run on a single Railway deployment per environment; no multi-region failover or data residency options exist today (Part 11 §5)                                                                                                                                                                                             | Acceptable at current (zero-tenant) scale; becomes a real constraint specifically when EU expansion requires data residency (GDPR) or when uptime SLAs are contractually promised to Enterprise customers |
 | Manual add-on billing          | Branch/warehouse add-ons are admin-provisioned, not billed automatically (Part 7 §7.2)                                                                                                                                                                                                                                                       | Low risk at low tenant counts; becomes an operational and revenue-leakage risk as tenant count grows — track and automate before it does                                                                  |
 
@@ -119,7 +119,7 @@ company has paying customers, not solved speculatively here.
 ## 13.5 Cybersecurity Risk
 
 **Assessment: Reasonable baseline, standard pre-launch hygiene gaps.** Per the internal
-security assessment (`docs/architecture/security-baseline.md`): OIDC via Keycloak,
+security assessment (`docs/security/security-baseline.md`): OIDC via Keycloak,
 httpOnly/secure cookies, Helmet security headers, rate limiting, parameterized SQL
 queries (no string-concatenation injection risk), and React's default XSS escaping are
 already in place. The identified gaps at the time of that audit were dependency
@@ -188,8 +188,8 @@ pushing likely compensation structures toward USD — a real cost consideration 
   2026-07-01. These are current-events sources for a fast-moving, ongoing situation —
   re-verify immediately before sharing this document externally, as facts may have changed
   since 2026-07-01.
-- Technical/security posture: `docs/architecture/security-baseline.md`,
-  `docs/product/tier-matrix.md` §7.
+- Technical/security posture: `docs/security/security-baseline.md`,
+  `docs/archive/product/tier-matrix.md` §7.
 - Competitive risk framing: [04_competitor_research.md](./04_competitor_research.md) (Part 4,
   consolidated 2026-07-01); §13.2 updated against Part 4 findings.
 - Regulatory risk: explicitly unassessed pending Part 14 legal research — no regulation is

@@ -10,7 +10,7 @@ This document lists **every major product capability** in the monorepo: web UI r
 
 **Removed from product (not MVP):** Order approvals & budgets (`approvals_budgets`) — see [approvals-budgets.md](../features/approvals-budgets.md).
 
-**Release branches:** `dev` → `preprod` → `prod` only; prod never merges `dev` directly ([BRANCHING.md](../BRANCHING.md)).
+**Release branches:** `dev` → `preprod` → `prod` only; prod never merges `dev` directly ([BRANCHING.md](../operations/branching.md)).
 
 ---
 
@@ -624,7 +624,7 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 | Local Docker stack         | `pnpm local:up`                                                                                        |
 | Railway deploy             | `pnpm promote:preprod`, `pnpm promote:prod`                                                            |
 | Branch deploy model        | `dev` → `preprod` → `prod`                                                                             |
-| Manual QA checklist        | `docs/qa/regression-checklist.md`                                                                      |
+| Manual QA checklist        | `docs/guides/qa/regression-checklist.md`                                                               |
 | Tenant audit log (detail)  | `docs/features/tenant-audit-log.md`                                                                    |
 | Tenant roles (detail)      | `docs/features/tenant-roles.md`                                                                        |
 | Security audit notes       | `docs/security/security-audit-report.md`                                                               |
@@ -754,33 +754,33 @@ Orders (new, acknowledged, processing, shipped, delivered, cancelled/declined), 
 
 ## Related documentation
 
-| Document                                                                             | Purpose                                                    |
-| ------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| [store-wide-deal-badges.md](../features/store-wide-deal-badges.md)                   | Supplier list on-sale badges                               |
-| [supplier-follow.md](../features/supplier-follow.md)                                 | Follow/unfollow suppliers                                  |
-| [quote-requests.md](../features/quote-requests.md)                                   | RFQ + public mini-store                                    |
-| [supplier-ops.md](../features/supplier-ops.md)                                       | Command center, CSV import, bulk image import, receivables |
-| [bulk-product-image-import.md](../features/bulk-product-image-import.md)             | ZIP / mapping CSV / URL image import                       |
-| [search-and-discovery.md](../features/search-and-discovery.md)                       | Search API + history                                       |
-| [consumer-ordering.md](../features/consumer-ordering.md)                             | Guest B2C ordering                                         |
-| [restaurant-reviews.md](../features/restaurant-reviews.md)                           | Consumer restaurant reviews                                |
-| [supplier-loyalty.md](../features/supplier-loyalty.md)                               | B2B loyalty earn/redeem                                    |
-| [consumer-loyalty.md](../features/consumer-loyalty.md)                               | B2C loyalty program                                        |
-| [waste-tracking.md](../features/waste-tracking.md)                                   | Restaurant waste & spoilage                                |
-| [warehouse-fulfillment.md](../features/warehouse-fulfillment.md)                     | Warehouses, routing, order assignments                     |
-| [deals-and-promotions.md](../features/deals-and-promotions.md)                       | Deals lifecycle & admin approval                           |
-| [DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)             | UI label map (Deals vs Boosts)                             |
-| [LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md)                       | Legal pack login gate                                      |
-| [2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md) | Coordinated release checklist                              |
-| [disputes-returns.md](../features/disputes-returns.md)                               | Disputes & replacement orders                              |
-| [BRANCHING.md](../BRANCHING.md)                                                      | dev → preprod → prod release chain                         |
-| [supplier-branches.md](../features/supplier-branches.md)                             | Supplier org & branch accounts                             |
-| [features.md](./features.md)                                                         | Shorter catalog + verification commands                    |
-| [regression-checklist.md](../qa/regression-checklist.md)                             | QA smoke tests                                             |
-| [admin_endpoints.md](../blueprint/admin/admin_endpoints.md)                          | Admin API reference                                        |
-| [admin-feature-flags.md](../admin/admin-feature-flags.md)                            | Feature toggle API                                         |
-| [email-system.md](../operations/email-system.md)                                     | Transactional email (SMTP)                                 |
-| [SECURITY_AUDIT_REPORT.md](../security/SECURITY_AUDIT_REPORT.md)                     | Security posture                                           |
+| Document                                                                                     | Purpose                                                    |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [store-wide-deal-badges.md](../features/store-wide-deal-badges.md)                           | Supplier list on-sale badges                               |
+| [supplier-follow.md](../features/supplier-follow.md)                                         | Follow/unfollow suppliers                                  |
+| [quote-requests.md](../features/quote-requests.md)                                           | RFQ + public mini-store                                    |
+| [supplier-ops.md](../features/supplier-ops.md)                                               | Command center, CSV import, bulk image import, receivables |
+| [bulk-product-image-import.md](../features/bulk-product-image-import.md)                     | ZIP / mapping CSV / URL image import                       |
+| [search-and-discovery.md](../features/search-and-discovery.md)                               | Search API + history                                       |
+| [consumer-ordering.md](../features/consumer-ordering.md)                                     | Guest B2C ordering                                         |
+| [restaurant-reviews.md](../features/restaurant-reviews.md)                                   | Consumer restaurant reviews                                |
+| [supplier-loyalty.md](../features/supplier-loyalty.md)                                       | B2B loyalty earn/redeem                                    |
+| [consumer-loyalty.md](../features/consumer-loyalty.md)                                       | B2C loyalty program                                        |
+| [waste-tracking.md](../features/waste-tracking.md)                                           | Restaurant waste & spoilage                                |
+| [warehouse-fulfillment.md](../features/warehouse-fulfillment.md)                             | Warehouses, routing, order assignments                     |
+| [deals-and-promotions.md](../features/deals-and-promotions.md)                               | Deals lifecycle & admin approval                           |
+| [DEALS_BOOSTS_WORDING_CLEANUP.md](../guides/ui/DEALS_BOOSTS_WORDING_CLEANUP.md)              | UI label map (Deals vs Boosts)                             |
+| [LEGAL_PACK_REACCEPTANCE.md](../guides/ui/LEGAL_PACK_REACCEPTANCE.md)                        | Legal pack login gate                                      |
+| [2026-06-09-pre-deploy-checklist.md](../archive/releases/2026-06-09-pre-deploy-checklist.md) | Coordinated release checklist                              |
+| [disputes-returns.md](../features/disputes-returns.md)                                       | Disputes & replacement orders                              |
+| [BRANCHING.md](../operations/branching.md)                                                   | dev → preprod → prod release chain                         |
+| [supplier-branches.md](../features/supplier-branches.md)                                     | Supplier org & branch accounts                             |
+| [features.md](./features.md)                                                                 | Shorter catalog + verification commands                    |
+| [regression-checklist.md](../guides/qa/regression-checklist.md)                              | QA smoke tests                                             |
+| [admin_endpoints.md](../archive/old/blueprint/admin/admin_endpoints.md)                      | Admin API reference                                        |
+| [admin-feature-flags.md](../admin/feature-flags.md)                                          | Feature toggle API                                         |
+| [email-system.md](../operations/email-system.md)                                             | Transactional email (SMTP)                                 |
+| [SECURITY_AUDIT_REPORT.md](../security/security-audit-report.md)                             | Security posture                                           |
 
 ---
 

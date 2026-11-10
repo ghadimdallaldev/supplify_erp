@@ -1,10 +1,10 @@
 # Supplify Mermaid diagrams
 
-Canonical feature diagrams live under `docs/diagrams/`. Legacy blueprint diagrams remain in [`docs/blueprint/`](../blueprint/) and are cross-referenced here.
+Canonical feature diagrams live under `docs/architecture/diagrams/`. Legacy blueprint diagrams remain in [`docs/blueprint/`](../../archive/old/blueprint/) and are cross-referenced here.
 
 **Validate:** `pnpm run docs:diagrams:check`
 
-**Tier source of truth:** [FINAL_TIER_MATRIX.md](../product/tier-matrix.md)
+**Tier source of truth:** [FINAL_TIER_MATRIX.md](../../archive/product/tier-matrix.md)
 
 ---
 
@@ -127,4 +127,4 @@ Canonical feature diagrams live under `docs/diagrams/`. Legacy blueprint diagram
 
 ## Features without dedicated diagrams (gaps)
 
-Listed in [MMD_DIAGRAM_AUDIT_REPORT.md](../../MMD_DIAGRAM_AUDIT_REPORT.md): staff scheduling detail, invoice PDF pipeline, smart reorder AI (catalog), enterprise assignment UI, legacy budget tables (deprecated DB only).
+Listed in MMD_DIAGRAM_AUDIT_REPORT.md: staff scheduling detail, invoice PDF pipeline, smart reorder AI (catalog), enterprise assignment UI, legacy budget tables (deprecated DB only).

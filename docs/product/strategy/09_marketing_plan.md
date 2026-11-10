@@ -4,7 +4,7 @@
 (channel prioritization, message architecture, persona mapping), [Part 7](./07_business_strategy.md)
 (pricing ladder, trial design, referral economics), [Part 6](./06_feasibility_study.md) (operating
 cost envelope and break-even model), and [Part 10](./10_sales_strategy.md) (sales funnel,
-two-sided acquisition sequencing). Cross-references product collateral in `docs/sales/*.md`,
+two-sided acquisition sequencing). Cross-references product collateral in `docs/product/sales/*.md`,
 `docs/onboarding/Supplify-Customer-Presentation.md`, and `docs/product/monetization-ux.md`.
 
 **A standing disclosure carried from every prior part:** Supplify is **pre-launch** and
@@ -99,18 +99,18 @@ Part 6's $200/month SaaS tooling line (support desk, monitoring, email) but **ov
 with analytics and email tools counted there — the table below shows incremental marketing-specific
 spend only.
 
-| Category                                                   | Year 1 budget (USD) | Monthly avg. | Notes                                                                                                                                       |
-| ---------------------------------------------------------- | ------------------: | -----------: | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web hosting / domain (marketing site)                      |                $360 |          $30 | Assumption: static or lightweight marketing pages on existing Railway deployment or separate static host                                    |
-| Analytics & attribution (GA4, Search Console, UTM tooling) |                  $0 |           $0 | Free-tier tools assumed sufficient at pre-launch scale                                                                                      |
-| Design / collateral production                             |              $1,200 |         $100 | Freelance pass on pitch one-pager, supplier "Bring your customers" PDF, social templates — content exists in `docs/sales/*` (Part 10 §10.5) |
-| Demo video production                                      |                $600 |          $50 | One 60–90 second screen-capture demo (Arabic + English voiceover or subtitles) — Part 8 §8.4.1                                              |
-| LinkedIn (optional Sales Navigator trial / page tools)     |             $0–$360 |       $0–$30 | **Assumption:** founder personal brand is primary; paid LinkedIn deferred unless Month 6 review justifies                                   |
-| Local F&B event / trade association                        |                $600 |          $50 | One modest booth or sponsorship — Part 8 §8.6.1 Rank 5; fee variable                                                                        |
-| Arabic keyword research (freelance, one-time)              |                $300 |            — | Part 8 §8.5.3 open item; Lebanon geo-target pass before bilingual SEO commit                                                                |
-| Contingency                                                |                $780 |          $65 | Buffer for second event, print runs, or unexpected design work                                                                              |
-| **Referral discount cost (variable, not marketing OPEX)**  | _Not budgeted here_ |            — | 20% first-paid discount + supplier reward (1 mo free/credit — Part 7 §7.9) hits **COGS/CAC**, not marketing budget — tracked in Part 12     |
-| **Total incremental marketing cash**                       |          **$4,800** |     **$400** | ≈7% of Part 6 §6.4.1 monthly fixed OPEX ($5,800)                                                                                            |
+| Category                                                   | Year 1 budget (USD) | Monthly avg. | Notes                                                                                                                                               |
+| ---------------------------------------------------------- | ------------------: | -----------: | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web hosting / domain (marketing site)                      |                $360 |          $30 | Assumption: static or lightweight marketing pages on existing Railway deployment or separate static host                                            |
+| Analytics & attribution (GA4, Search Console, UTM tooling) |                  $0 |           $0 | Free-tier tools assumed sufficient at pre-launch scale                                                                                              |
+| Design / collateral production                             |              $1,200 |         $100 | Freelance pass on pitch one-pager, supplier "Bring your customers" PDF, social templates — content exists in `docs/product/sales/*` (Part 10 §10.5) |
+| Demo video production                                      |                $600 |          $50 | One 60–90 second screen-capture demo (Arabic + English voiceover or subtitles) — Part 8 §8.4.1                                                      |
+| LinkedIn (optional Sales Navigator trial / page tools)     |             $0–$360 |       $0–$30 | **Assumption:** founder personal brand is primary; paid LinkedIn deferred unless Month 6 review justifies                                           |
+| Local F&B event / trade association                        |                $600 |          $50 | One modest booth or sponsorship — Part 8 §8.6.1 Rank 5; fee variable                                                                                |
+| Arabic keyword research (freelance, one-time)              |                $300 |            — | Part 8 §8.5.3 open item; Lebanon geo-target pass before bilingual SEO commit                                                                        |
+| Contingency                                                |                $780 |          $65 | Buffer for second event, print runs, or unexpected design work                                                                                      |
+| **Referral discount cost (variable, not marketing OPEX)**  | _Not budgeted here_ |            — | 20% first-paid discount + supplier reward (1 mo free/credit — Part 7 §7.9) hits **COGS/CAC**, not marketing budget — tracked in Part 12             |
+| **Total incremental marketing cash**                       |          **$4,800** |     **$400** | ≈7% of Part 6 §6.4.1 monthly fixed OPEX ($5,800)                                                                                                    |
 
 **Explicit exclusions (deferred):** Google Ads, Meta Ads, agency retainers, PR wire services,
 influencer fees, G2/Capterra paid listings, conference travel outside Lebanon, GCC campaigns.
@@ -154,13 +154,13 @@ opportunity transitions from marketing awareness to founder-led sales with no se
 Part 8 §8.7 defines the message hierarchy. Year 1 creative work packages that hierarchy into
 **five deliverables**, sequenced by supplier-first GTM:
 
-| Deliverable                                          | Source material                                             | Target completion | Budget                               |
-| ---------------------------------------------------- | ----------------------------------------------------------- | ----------------- | ------------------------------------ |
-| **D1 — Marketing website (English core)**            | Part 8 §8.5.4 pillars; `tier-matrix.md` pricing             | Month 2           | Hosting in §9.4.2                    |
-| **D2 — Supplier one-pager ("Bring your customers")** | `docs/features/supplier-customer-growth.md`; Part 8 §8.3.3  | Month 1           | ~$300 design                         |
-| **D3 — Restaurant one-pager + 60s demo video**       | `docs/sales/01_problem.md`, `02_solution.md`; Part 8 §8.4.1 | Month 3           | ~$600 video + $300 design            |
-| **D4 — Bilingual geo landing page (Lebanon)**        | Part 8 §8.8.1; Arabic audit pending (Part 8 open item #3)   | Month 4–5         | Founder time + keyword research $300 |
-| **D5 — LinkedIn content kit (12 post templates)**    | Four content pillars (Part 8 §8.5.4)                        | Month 2           | Founder time                         |
+| Deliverable                                          | Source material                                                     | Target completion | Budget                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------- | ----------------- | ------------------------------------ |
+| **D1 — Marketing website (English core)**            | Part 8 §8.5.4 pillars; `tier-matrix.md` pricing                     | Month 2           | Hosting in §9.4.2                    |
+| **D2 — Supplier one-pager ("Bring your customers")** | `docs/features/supplier-customer-growth.md`; Part 8 §8.3.3          | Month 1           | ~$300 design                         |
+| **D3 — Restaurant one-pager + 60s demo video**       | `docs/product/sales/01_problem.md`, `02_solution.md`; Part 8 §8.4.1 | Month 3           | ~$600 video + $300 design            |
+| **D4 — Bilingual geo landing page (Lebanon)**        | Part 8 §8.8.1; Arabic audit pending (Part 8 open item #3)           | Month 4–5         | Founder time + keyword research $300 |
+| **D5 — LinkedIn content kit (12 post templates)**    | Four content pillars (Part 8 §8.5.4)                                | Month 2           | Founder time                         |
 
 **Copy constraints (non-negotiable):**
 
@@ -345,7 +345,7 @@ research-only content per Part 14 — none of which is budgeted or scheduled her
 
 - **Channel prioritization and message architecture:** Part 8, §8.5–§8.7.
 - **Pricing, trial design, referral economics:** Part 7, §7.2–§7.3, §7.9–§7.11;
-  `docs/product/tier-matrix.md`; `docs/sales/08_pricing_strategy.md`.
+  `docs/archive/product/tier-matrix.md`; `docs/product/sales/08_pricing_strategy.md`.
 - **Operating cost envelope and break-even model:** Part 6, §6.4–§6.6, §6.12.
 - **Sales funnel, two-sided sequencing, collateral inventory:** Part 10, §10.1–§10.5, §10.9.
 - **Success metric horizons:** Part 1, §1.15.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Compatibility shim — full OpenAPI spec generation is not implemented yet.
- * Exports route inventory JSON/Markdown via discover-routes.mjs (see docs/api/).
+ * Exports route inventory JSON/Markdown via discover-routes.mjs (see docs/architecture/api-routes.md).
  */
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'

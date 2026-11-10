@@ -3,7 +3,7 @@
 **Date:** 2026-07-08  
 **Environment:** Railway preprod (`api-preprod.supplifyerp.com`) for health/public probes; authenticated latency harness blocked (no staging Keycloak credentials in CI)  
 **Scope:** Web (`apps/web`), API (`apps/api`), Postgres migrations, deployment configs  
-**Baseline:** [PERFORMANCE_CURRENT_STATE.md](./PERFORMANCE_CURRENT_STATE.md), June 2026 optimization work preserved
+**Baseline:** [PERFORMANCE_CURRENT_STATE.md](../../../audits/performance/PERFORMANCE_CURRENT_STATE.md), June 2026 optimization work preserved
 
 ---
 
@@ -45,7 +45,7 @@ Authenticated endpoints **could not be measured** on preprod without `SUPPLIFY_*
 | `/health` | 247ms | 255ms | 500ms  | No   |
 | `/ready`  | 232ms | 272ms | 500ms  | No   |
 
-**Action:** Run `pnpm perf:api` with tokens against preprod for full matrix. See [perf-audit-api-results.md](./perf-audit-api-results.md).
+**Action:** Run `pnpm perf:api` with tokens against preprod for full matrix. See [perf-audit-api-results.md](../../../audits/performance/perf-audit-api-results.md).
 
 ### Frontend bundle (production build)
 

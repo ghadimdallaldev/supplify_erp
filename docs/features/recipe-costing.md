@@ -29,7 +29,7 @@
 
 ## Migration
 
-- [`apps/api/db/migrations/0186_recipe_costing.sql`](../apps/api/db/migrations/0186_recipe_costing.sql)
+- [`apps/api/db/migrations/0186_recipe_costing.sql`](../../apps/api/db/migrations/0186_recipe_costing.sql)
 
 Run: `npm run db:migrate` then `npm run db:sync-roles`
 

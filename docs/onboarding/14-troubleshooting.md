@@ -185,7 +185,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/auth/me
 
 ### Diagnose
 
-- Compare role in **Settings → Team** with `docs/architecture/rbac-permission-matrix.md`.
+- Compare role in **Settings → Team** with `docs/security/rbac-permission-matrix.md`.
 - `GET /api/auth/me` → `tenantPermissions` array.
 - `GET /api/subscriptions/current` → features/limits.
 

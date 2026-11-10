@@ -135,3 +135,7 @@ backups-preprod/
 
 # Playwright MCP scratch output (console/page dumps from browser tooling)
 .playwright-mcp/
+
+# Generated intermediates (PDF/PPTX deliverables stay tracked)
+docs/onboarding/output/*.html
+docs/guides/qa/output/*.html

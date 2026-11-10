@@ -253,7 +253,7 @@ VITE_API_URL=http://localhost:4000
 
 ## 🧪 Testing
 
-**Before PR / CI:** use non-watch commands (see [QA automation guide](../qa/testing-guide.md)).
+**Before PR / CI:** use non-watch commands (see [QA automation guide](qa/testing-guide.md)).
 
 ```bash
 # Full API unit suite (683 tests, no DB required)
@@ -315,7 +315,7 @@ See [railway-environments.md](../operations/railway-environments.md).
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 

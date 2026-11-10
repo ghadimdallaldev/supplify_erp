@@ -140,7 +140,7 @@ Shared: `ORDERS_*`, `INVOICES_*`, `INVENTORY_*`, `STAFF_*`, `SETTINGS_*`, `CHAT_
 
 Defined in `apps/api/src/lib/role-matrix.js`, synced to DB on every `ensureTenantSystemRoles` run.
 
-See also: `docs/architecture/rbac-permission-matrix.md`
+See also: `docs/security/rbac-permission-matrix.md`
 
 ### Restaurant (abbreviated)
 

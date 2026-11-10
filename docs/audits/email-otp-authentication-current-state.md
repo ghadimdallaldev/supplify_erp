@@ -39,6 +39,6 @@ Related session and identity hardening references:
 
 - [Auth session architecture](auth-session-architecture-current-state.md)
 - [Auth session management](../features/auth-session-management.md)
-- [Auth session hardening report](../reports/auth-session-hardening-implementation-report.md)
-- [Auth session troubleshooting](../runbooks/auth-session-troubleshooting.md)
+- [Auth session hardening report](../archive/reports/auth-session-hardening-implementation-report.md)
+- [Auth session troubleshooting](../operations/runbooks/auth-session-troubleshooting.md)
 - [Identity normalizer](../../apps/api/src/lib/identity-normalize.js)

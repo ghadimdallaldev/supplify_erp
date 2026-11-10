@@ -1,6 +1,6 @@
 # Supplify Subscription Plans
 
-> **Superseded for commercial guidance.** Use [four-plan-pricing-model.md](./four-plan-pricing-model.md) and [plans-and-limits.md](./plans-and-limits.md) for current public names (Restaurant/Supplier Growth & Scale), prices, add-ons, trial behavior, AI allowances, and billing status.
+> **Superseded for commercial guidance.** Use [four-plan-pricing-model.md](../../product/four-plan-pricing-model.md) and [plans-and-limits.md](../../product/plans-and-limits.md) for current public names (Restaurant/Supplier Growth & Scale), prices, add-ons, trial behavior, AI allowances, and billing status.
 >
 > The sections below retain the **legacy Free / Silver / Gold / Platinum catalog** for historical migration context only. Do not quote them in sales, onboarding, or customer materials.
 
@@ -8,7 +8,7 @@
 
 Supplify offers tiered subscription plans for **restaurants and suppliers**. Public self-serve plans are now tenant-specific Growth and Scale tiers (internal codes preserved).
 
-- **Current catalog:** [four-plan-pricing-model.md](./four-plan-pricing-model.md)
+- **Current catalog:** [four-plan-pricing-model.md](../../product/four-plan-pricing-model.md)
 - **Current supplier metric:** `active_customer_locations_monthly`
 - **API:** `GET /api/subscriptions/current` and `GET /api/subscriptions/usage/:meterType`
 
@@ -23,7 +23,7 @@ Supplify offers tiered subscription plans for **restaurants and suppliers**. Pub
 **Pricing:** $0 during trial  
 **Duration:** **7–90 days** (platform default **30**), set in Admin → Platform settings. After expiry, account locks to **read-only** until upgrade or admin extends trial.
 
-See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md).
+See [free-trial-expiry.md](../../features/free-trial-expiry.md) and [FREE_TRIAL_BEHAVIOR_AUDIT.md](../qa/FREE_TRIAL_BEHAVIOR_AUDIT.md).
 
 - 1 branch account (your main location only — no extra branch accounts)
 - 1 supplier connection per restaurant
@@ -163,7 +163,7 @@ See [free-trial-expiry.md](../features/free-trial-expiry.md) and [FREE_TRIAL_BEH
 - Unlimited active promotions
 - **30 GB** storage
 
-**Features (catalog; some require future implementation — see [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)):**
+**Features (catalog; some require future implementation — see [PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md)):**
 
 - **Everything in Gold PLUS (marketing):**
 - Smart quantities + suggest for quick lists (forecast-based, Platinum)
@@ -328,7 +328,7 @@ A: Orders are blocked with an upgrade prompt. Existing orders remain untouched.
 A: Contact admin for custom enterprise plans with tailored limits and features.
 
 **Q: Are there trials?**
-A: **Free Trial** (`free` plan) is time-limited (**7–90 days**, default **30**). After expiry you can still log in and view data, but must upgrade to create or change operational records. Referred restaurants may also qualify for a first-paid discount — see [supplier-customer-growth.md](../features/supplier-customer-growth.md). Silver may offer promotional trials separately. Gold/Platinum available on request.
+A: **Free Trial** (`free` plan) is time-limited (**7–90 days**, default **30**). After expiry you can still log in and view data, but must upgrade to create or change operational records. Referred restaurants may also qualify for a first-paid discount — see [supplier-customer-growth.md](../../features/supplier-customer-growth.md). Silver may offer promotional trials separately. Gold/Platinum available on request.
 
 **Q: How do I upgrade?**
 A: In your restaurant settings → Subscription, click Upgrade and follow the flow.
@@ -348,7 +348,7 @@ Admins can:
 - View usage analytics
 - Configure plan features directly in plan JSONB field
 
-See [ADMIN.md](../admin/admin-guide.md) for details.
+See [ADMIN.md](../../admin/admin-guide.md) for details.
 
 ---
 

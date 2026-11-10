@@ -2,9 +2,9 @@
 
 ## Positioning
 
-Supplify’s pricing is designed so that a **30-day Free Trial** demonstrates real workflows, **Growth** is the natural first paid plan for daily use, and **Scale** serves multi-location restaurants and high-volume suppliers. Hidden custom / Enterprise handling exists for special accounts — see [enterprise.md](../product/enterprise.md).
+Supplify’s pricing is designed so that a **30-day Free Trial** demonstrates real workflows, **Growth** is the natural first paid plan for daily use, and **Scale** serves multi-location restaurants and high-volume suppliers. Hidden custom / Enterprise handling exists for special accounts — see [enterprise.md](../enterprise.md).
 
-Canonical numbers and matrices: [four-plan-pricing-model.md](../product/four-plan-pricing-model.md).
+Canonical numbers and matrices: [four-plan-pricing-model.md](../four-plan-pricing-model.md).
 
 ### Principles
 

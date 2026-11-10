@@ -1,12 +1,12 @@
 > Superseded by the four-plan pricing model.
-> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](./four-plan-pricing-model.md). Do not use this file as current commercial guidance.
+> This document is retained for historical implementation context around the legacy four-tier catalog. Current pricing, public plan names, limits, add-ons, trial behavior, AI allowances, and billing status live in [four-plan-pricing-model.md](../../product/four-plan-pricing-model.md). Do not use this file as current commercial guidance.
 
 # Final tier matrix (post-migrations)
 
 **Verified:** 2026-05-28
 **Catalog migrations:** `0116` (bronzeÃ¢â€ â€™silver), `0117` (Silver), `0119` (Gold), `0120` (Platinum)
 **Live check:** `pnpm run log:tier-limits`
-**Related:** [SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md), [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md), [ENTERPRISE.md](./ENTERPRISE.md)
+**Related:** [SUBSCRIPTIONS.md](./SUBSCRIPTIONS.md), [PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md), [ENTERPRISE.md](./ENTERPRISE.md)
 
 ---
 
@@ -14,7 +14,7 @@
 
 | Code         | User-facing name |         Monthly |        Yearly | Active |     Self-serve     | Notes                                                                                       |
 | ------------ | ---------------- | --------------: | ------------: | :----: | :----------------: | ------------------------------------------------------------------------------------------- |
-| `free`       | **Free Trial**   |           $0.00 |       Ã¢â‚¬â€ |  Yes   | Yes (time-limited) | Not Ã¢â‚¬Å“forever freeÃ¢â‚¬Â; see [free-trial-expiry.md](../features/free-trial-expiry.md) |
+| `free`       | **Free Trial**   |           $0.00 |       Ã¢â‚¬â€ |  Yes   | Yes (time-limited) | Not Ã¢â‚¬Å“forever freeÃ¢â‚¬Â; see [free-trial-expiry.md](../../features/free-trial-expiry.md) |
 | `silver`     | **Silver**       |      **$49.00** |   **$490.00** |  Yes   |        Yes         | First paid tier                                                                             |
 | `gold`       | **Gold**         |     **$149.00** | **$1,490.00** |  Yes   |        Yes         | Subtitle: Ã¢â‚¬Å“Most PopularÃ¢â‚¬Â                                                         |
 | `platinum`   | **Platinum**     |     **$349.00** | **$3,490.00** |  Yes   |        Yes         | Subtitle: Ã¢â‚¬Å“Unlimited OpsÃ¢â‚¬Â                                                        |
@@ -205,7 +205,7 @@ Binary on/off per key (non-empty string = on). **Tier strings are not compared**
 | `full_schedule` (Gold)       |  Ã¢Å“â€œ   |    Ã¢Å“â€œ    |     Ã¢â‚¬â€      |    Ã¢â‚¬â€    |
 | `ai_smart_automation` (Plat) |  Ã¢Å“â€œ   |    Ã¢Å“â€œ    |     Ã¢Å“â€œ      |    Ã¢Å“â€œ    |
 
-See [ai-quick-lists.md](../features/ai-quick-lists.md).
+See [ai-quick-lists.md](../../features/ai-quick-lists.md).
 
 ### Free Trial behavior (unchanged)
 
@@ -217,14 +217,14 @@ See [ai-quick-lists.md](../features/ai-quick-lists.md).
 
 ## 7. Catalog-only / not fully enforced yet
 
-See [PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md) for the live backlog.
+See [PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md) for the live backlog.
 
 ### Enforced Platinum strings (2026-07)
 
-- **Smart quick lists** Ã¢â‚¬â€ [ai-quick-lists.md](../features/ai-quick-lists.md)
+- **Smart quick lists** Ã¢â‚¬â€ [ai-quick-lists.md](../../features/ai-quick-lists.md)
 - **Notification webhooks** Ã¢â‚¬â€ migration `0182`, `GET/PUT /api/notifications/webhook`
-- **Custom catalog domain** Ã¢â‚¬â€ [custom-domains.md](../operations/custom-domains.md)
-- **Smart reorder** Ã¢â‚¬â€ [ai-smart-reorder.md](../features/ai-smart-reorder.md)
+- **Custom catalog domain** Ã¢â‚¬â€ [custom-domains.md](../../operations/custom-domains.md)
+- **Smart reorder** Ã¢â‚¬â€ [ai-smart-reorder.md](../../features/ai-smart-reorder.md)
 
 ### Cross-tier (string labels Ã¢â€°Â  behavior) Ã¢â‚¬â€ still open
 
@@ -383,7 +383,7 @@ Full output: run `pnpm run log:tier-limits` from `apps/api`.
 | Restaurant no `promotions` limit  | **Pass**                                                                            |
 | Supplier `promotions` limit       | **Pass**                                                                            |
 | No approvals_budgets in UI        | **Pass**                                                                            |
-| Platinum catalog-only documented  | **Pass** ([PLATINUM_CATALOG_ONLY_FEATURES.md](./PLATINUM_CATALOG_ONLY_FEATURES.md)) |
+| Platinum catalog-only documented  | **Pass** ([PLATINUM_CATALOG_ONLY_FEATURES.md](../../product/PLATINUM_CATALOG_ONLY_FEATURES.md)) |
 | Enterprise inactive/custom        | **Pass**                                                                            |
 | API tests (22)                    | **Pass**                                                                            |
 | Web plan tests (21)               | **Pass**                                                                            |

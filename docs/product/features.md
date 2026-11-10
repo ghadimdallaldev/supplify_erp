@@ -11,7 +11,7 @@ pnpm setup
 pnpm dev
 ```
 
-**Fast dev restarts:** `pnpm dev -- --no-migrate` skips SQL/runtime checks. On a normal start, tenant role backfill is skipped automatically when the DB is already migrated (see [PERFORMANCE.md](../operations/PERFORMANCE.md)).
+**Fast dev restarts:** `pnpm dev -- --no-migrate` skips SQL/runtime checks. On a normal start, tenant role backfill is skipped automatically when the DB is already migrated (see [PERFORMANCE.md](../audits/performance/PERFORMANCE_CURRENT_STATE.md)).
 
 | Service                            | URL (native dev)                                     |
 | ---------------------------------- | ---------------------------------------------------- |
@@ -31,7 +31,7 @@ After seed (`scripts\run-local.cmd seed` or `pnpm db:seed` + `pnpm seed:demo-use
 
 ## New tenant signup & activation
 
-Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` by selecting a paid Growth/Scale trial target or completing paid checkout. See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1-2 in [regression-checklist.md](../qa/regression-checklist.md).
+Fresh Keycloak users complete organization setup at `/register/complete`, then unlock the workspace at `/app/activate` by selecting a paid Growth/Scale trial target or completing paid checkout. See [tenant-registration.md](../features/tenant-registration.md) and QA Part 1-2 in [regression-checklist.md](../guides/qa/regression-checklist.md).
 
 ## Roles & navigation
 
@@ -81,7 +81,7 @@ RBAC permissions (e.g. `RESERVATIONS_VIEW`, `STAFF_VIEW`, `INVOICES_VIEW`) furth
 | Chat UI   | `/app/chat` | `/api/chat`        | Conversations, messages, attachments; refactored thread/list/composer components                                           |
 | Socket.IO | —           | same origin as API | `getAppSocket()` + `useChatRealtime` / `useNotificationAlerts`; Redis adapter when `REDIS_URL` set (multi-replica Railway) |
 
-Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/admin-feature-flags.md)).
+Gated by subscription feature `chat` (see [admin-feature-flags.md](../admin/feature-flags.md)).
 
 **Verify:** Restaurant opens chat from supplier detail; messages persist after refresh; recipient sees message within ~1s without reload. Tests: `chat.routes.test.js`, `socket.test.js`, `socket-auth.test.js`, web `useChatRealtime.test.ts`, `useNotificationAlerts.test.tsx`.
 
@@ -143,7 +143,7 @@ Gated by `finance_invoices` where applicable. Tests: `invoices.routes.test.js`, 
 | Supplier decline      | `/app/orders/:id` | `PATCH /api/orders/:id` | Required `decline_reason`; restaurant sees **Declined by supplier**    |
 | Cancellation metadata | —                 | —                       | `cancel_reason`, `cancelled_by` on `customer_order` (migration `0108`) |
 
-See [order-decline.md](../features/order-decline.md).
+See [order-decline.md](../features/ordering-decline.md).
 
 ## Reservations (FOH)
 
@@ -215,7 +215,7 @@ Tests: `notification.service.test.js`, `push.service.test.js`, `orderStatusDispl
 | Impersonation       | Banner + tenant nav       | `/api/admin-dashboard/impersonate*` + `impersonation_token` | Full tenant workspace; see [admin-impersonation.md](../features/admin-impersonation.md)                                          |
 | Legacy admin routes | —                         | `/api/admin`                                                | Internal maintenance endpoints                                                                                                   |
 
-See [admin-feature-flags.md](../admin/admin-feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
+See [admin-feature-flags.md](../admin/feature-flags.md) for toggle API details. Tests: `admin-dashboard.routes.test.js`.
 
 ## Auth & files
 

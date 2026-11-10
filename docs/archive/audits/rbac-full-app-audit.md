@@ -4,7 +4,7 @@
 **Scope:** Restaurants, suppliers, drivers, platform admins, branches/warehouses, impersonation, and all major product areas.  
 **Out of scope:** New features, tier pricing/limit changes, Deals/Promotions business logic (except permission bugs), UI redesign.
 
-**Related:** `docs/archive/audits/rbac-roles-permissions-audit.md` (driver hardening slice), `docs/architecture/rbac-permission-matrix.md`, `docs/architecture/rbac-overview.md`.
+**Related:** `docs/archive/audits/rbac-roles-permissions-audit.md` (driver hardening slice), `docs/security/rbac-permission-matrix.md`, `docs/architecture/rbac-overview.md`.
 
 ---
 

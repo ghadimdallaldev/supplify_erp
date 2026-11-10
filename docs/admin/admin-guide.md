@@ -14,7 +14,7 @@ Navigate to `/app/admin` (visible only to users with ADMIN role).
 
 ### Navigating the console
 
-The admin console has its own shell (see `docs/ui/ADMIN_SHELL_REVAMP.md`):
+The admin console has its own shell (see `docs/archive/ui/ADMIN_SHELL_REVAMP.md`):
 
 - **Sidebar** — workspace switcher (Platform / Suppliers / Restaurants / Settings) on top, grouped
   sections below (Monitor, Accounts, Billing, Growth). On desktop the footer button collapses it to
@@ -162,7 +162,7 @@ To upgrade or downgrade a tenant:
 
 **Unlock** on an expired trial also extends expiry so the hourly expiry job does not immediately re-lock.
 
-See [free-trial-expiry.md](../features/free-trial-expiry.md) and QA **BIL-FT-\*** in [regression-checklist.md](../qa/regression-checklist.md).
+See [free-trial-expiry.md](../features/free-trial-expiry.md) and QA **BIL-FT-\*** in [regression-checklist.md](../guides/qa/regression-checklist.md).
 
 ### Apply Override
 
@@ -262,7 +262,7 @@ Conversation appears in tenant's chat with "From Supplify Admin" label.
 
 Admins can **impersonate** a Restaurant or Supplier to navigate the full tenant workspace for support—without logging in as that user.
 
-**Deep dive:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
+**Deep dive:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../archive/audits/impersonation-audit.md)
 
 ### How to use
 

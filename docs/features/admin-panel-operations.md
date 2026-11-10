@@ -27,7 +27,7 @@ All under `/api/admin-dashboard`, guarded by `ADMIN` role + granular admin permi
 - `GET /tenants/:tenantType/:id/operational-snapshot`
 - `GET /health` — includes `emailFailures` (24h, redacted)
 
-See [admin_endpoints.md](../blueprint/admin/admin_endpoints.md).
+See [admin_endpoints.md](../archive/old/blueprint/admin/admin_endpoints.md).
 
 ## Warnings
 

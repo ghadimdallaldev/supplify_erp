@@ -106,4 +106,4 @@ Also: `requireFeature` attaches the already-fetched subscription to `req.subscri
 
 ## Atomic usage
 
-Daily meters (orders_per_day, chats_per_day) use `checkAndIncrementUsage` with a transaction and `SELECT ... FOR UPDATE` on the usage_meter row so concurrent requests do not double-count. See [HARDENING.md](../architecture/HARDENING.md).
+Daily meters (orders_per_day, chats_per_day) use `checkAndIncrementUsage` with a transaction and `SELECT ... FOR UPDATE` on the usage_meter row so concurrent requests do not double-count. See [HARDENING.md](../security/hardening.md).

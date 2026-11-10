@@ -71,13 +71,13 @@ Goal: find and fix defects **across the product**, not only RBAC/warehouse.
 
 | Fix                     | File(s)                                                                                                                                     | Change                                                                                                                             |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Demo email role map     | [`apps/api/src/lib/rbac.js`](../../../apps/api/src/lib/rbac.js)                                                                             | Disable demo email → role shortcuts in production; reject via [`validate-config.js`](../../../apps/api/src/lib/validate-config.js) |
-| Restaurant PATCH IDOR   | [`apps/api/src/routes/restaurants.routes.js`](../../../apps/api/src/routes/restaurants.routes.js)                                           | Tenant resolve + `SETTINGS_EDIT`; scope via `getRestaurantIdForRequest`                                                            |
-| Invoice ADMIN bypass    | [`invoices.routes.js`](../../../apps/api/src/routes/invoices.routes.js), [`invoice-access.js`](../../../apps/api/src/lib/invoice-access.js) | Scope ADMIN to impersonated tenant (access control only — not payment)                                                             |
-| Chat mark-read IDOR     | [`chat/conversations.js`](../../../apps/api/src/routes/chat/conversations.js)                                                               | `userCanAccessConversation` before mark-read                                                                                       |
-| Admin UI fallback       | [`usePermissions.ts`](../../../apps/web/src/hooks/usePermissions.ts)                                                                        | No prod admin permission fallback; deny until permissions load                                                                     |
-| Auto SUPER_ADMIN        | [`validate-config.js`](../../../apps/api/src/lib/validate-config.js)                                                                        | Hard-fail if `ALLOW_AUTO_SUPER_ADMIN=true` in prod                                                                                 |
-| Branch ADMIN query IDOR | [`branches.routes.js`](../../../apps/api/src/routes/branches.routes.js)                                                                     | Require admin permission / impersonation scope for query overrides                                                                 |
+| Demo email role map     | [`apps/api/src/lib/rbac.js`](../../../../apps/api/src/lib/rbac.js)                                                                             | Disable demo email → role shortcuts in production; reject via [`validate-config.js`](../../../../apps/api/src/lib/validate-config.js) |
+| Restaurant PATCH IDOR   | [`apps/api/src/routes/restaurants.routes.js`](../../../../apps/api/src/routes/restaurants.routes.js)                                           | Tenant resolve + `SETTINGS_EDIT`; scope via `getRestaurantIdForRequest`                                                            |
+| Invoice ADMIN bypass    | [`invoices.routes.js`](../../../../apps/api/src/routes/invoices.routes.js), [`invoice-access.js`](../../../../apps/api/src/lib/invoice-access.js) | Scope ADMIN to impersonated tenant (access control only — not payment)                                                             |
+| Chat mark-read IDOR     | [`chat/conversations.js`](../../../../apps/api/src/routes/chat/conversations.js)                                                               | `userCanAccessConversation` before mark-read                                                                                       |
+| Admin UI fallback       | [`usePermissions.ts`](../../../../apps/web/src/hooks/usePermissions.ts)                                                                        | No prod admin permission fallback; deny until permissions load                                                                     |
+| Auto SUPER_ADMIN        | [`validate-config.js`](../../../../apps/api/src/lib/validate-config.js)                                                                        | Hard-fail if `ALLOW_AUTO_SUPER_ADMIN=true` in prod                                                                                 |
+| Branch ADMIN query IDOR | [`branches.routes.js`](../../../../apps/api/src/routes/branches.routes.js)                                                                     | Require admin permission / impersonation scope for query overrides                                                                 |
 
 Vitest for each P0.
 
@@ -87,10 +87,10 @@ Vitest for each P0.
 
 **Fix (stock correctness):**
 
-1. Wire catalog/cart qty to warehouse SoT (`getSupplierProductAvailableQty` / `listSupplierStockDisplay`) in [`public-supplier-catalog.service.js`](../../../apps/api/src/services/public-supplier-catalog.service.js) and related paths.
-2. Warehouse mode only when feature **and** ≥1 active warehouse ([`supplier-stock.service.js`](../../../apps/api/src/services/supplier-stock.service.js)).
-3. Fail closed when warehouse mode active — no silent legacy deduct ([`supplier-order-stock.service.js`](../../../apps/api/src/services/supplier-order-stock.service.js)).
-4. WH inventory PATCH mirrors legacy **or** all reads use unified display helper ([`warehouses.routes.js`](../../../apps/api/src/routes/warehouses.routes.js)).
+1. Wire catalog/cart qty to warehouse SoT (`getSupplierProductAvailableQty` / `listSupplierStockDisplay`) in [`public-supplier-catalog.service.js`](../../../../apps/api/src/services/public-supplier-catalog.service.js) and related paths.
+2. Warehouse mode only when feature **and** ≥1 active warehouse ([`supplier-stock.service.js`](../../../../apps/api/src/services/supplier-stock.service.js)).
+3. Fail closed when warehouse mode active — no silent legacy deduct ([`supplier-order-stock.service.js`](../../../../apps/api/src/services/supplier-order-stock.service.js)).
+4. WH inventory PATCH mirrors legacy **or** all reads use unified display helper ([`warehouses.routes.js`](../../../../apps/api/src/routes/warehouses.routes.js)).
 
 **Hide / gate (incomplete, non-payment):**
 
@@ -110,7 +110,7 @@ Vitest for each P0.
 
 Concrete work:
 
-1. Wire web client to `POST .../pay-activation` (missing today) from supplier deals UI ([`SupplierDealRow.tsx`](../../../apps/web/src/components/deals/SupplierDealRow.tsx) + API client).
+1. Wire web client to `POST .../pay-activation` (missing today) from supplier deals UI ([`SupplierDealRow.tsx`](../../../../apps/web/src/components/deals/SupplierDealRow.tsx) + API client).
 2. Backend: on pay-activation, charge via `getBillingGateway()` (stub/manual) instead of hard 402 “provider not connected”; mark promotion paid/active on success — mirror patterns in sponsorship/billing services **without changing those surfaces**.
 3. Honest statuses: `approved_pending_payment` → pay CTA → `active` (or clear failure message from gateway).
 4. Keep package pricing visible; do not waive-by-default in a way that hides the product intent in preprod/prod (dev may still waive for local DX if already env-gated).
@@ -128,7 +128,7 @@ Concrete work:
 | Featured placement                                 | **LEAVE AS-IS**                                                                                         |
 | Invoice Pay / STRIPE ledger labels                 | **LEAVE AS-IS**                                                                                         |
 | Billing gateway / PaymentModal / billing providers | **LEAVE AS-IS**                                                                                         |
-| Settings dead Contact buttons                      | **FIX** — reuse [`SupportContactCard`](../../../apps/web/src/components/support/SupportContactCard.tsx) |
+| Settings dead Contact buttons                      | **FIX** — reuse [`SupportContactCard`](../../../../apps/web/src/components/support/SupportContactCard.tsx) |
 | Admin “Coming soon” prefs/alerts                   | **HIDE** unfinished prefs panels only                                                                   |
 | WhatsApp / Push / AI FAB                           | **SAFE-DEGRADE** when env/capabilities off (not payment)                                                |
 
@@ -149,8 +149,8 @@ Fix regressions from Phases 0–4. Full suite must be green (or only documented,
 
 ## Phase 6 — Docs
 
-- [`docs/mobile/MOBILE_FEATURE_PARITY.md`](../../mobile/MOBILE_FEATURE_PARITY.md): dated skip — mobile deferred by request.
-- [`docs/operations/production-readiness.md`](../../operations/production-readiness.md): RBAC/warehouse/deal-boost harden; billing still stub/manual; sponsorship untouched for upcoming integration.
+- [`docs/mobile/MOBILE_FEATURE_PARITY.md`](../../../mobile/MOBILE_FEATURE_PARITY.md): dated skip — mobile deferred by request.
+- [`docs/operations/production-readiness.md`](../../../operations/production-readiness.md): RBAC/warehouse/deal-boost harden; billing still stub/manual; sponsorship untouched for upcoming integration.
 - No mobile repo changes.
 
 ---
@@ -172,4 +172,4 @@ Fix regressions from Phases 0–4. Full suite must be green (or only documented,
 ## Related
 
 - Cursor working plan: `.cursor/plans/prod_ship_hardening_28fa7615.plan.md` (if present locally)
-- Prior audits: [`docs/audits/2026-07-24-pilot-production-readiness.md`](../../audits/2026-07-24-pilot-production-readiness.md), [`docs/operations/production-readiness.md`](../../operations/production-readiness.md)
+- Prior audits: [`docs/audits/2026-07-24-pilot-production-readiness.md`](../../audits/2026-07-24-pilot-production-readiness.md), [`docs/operations/production-readiness.md`](../../../operations/production-readiness.md)

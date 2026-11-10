@@ -14,7 +14,7 @@ Per-feature specifications. Naming: lowercase kebab-case.
 | Quick lists & schedules                      | See restaurant operations doc                                                                                                                                                                                              |
 | Fulfillment, drivers, GPS                    | [drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md)                                                                                                                                                               |
 | Warehouses                                   | [warehouse-fulfillment.md](./warehouse-fulfillment.md)                                                                                                                                                                     |
-| Deals & promotions                           | [deals-and-promotions.md](./deals-and-promotions.md) · [store-wide-deal-badges.md](./store-wide-deal-badges.md) · UI labels: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../ui/DEALS_BOOSTS_WORDING_CLEANUP.md)                |
+| Deals & promotions                           | [deals-and-promotions.md](./deals-and-promotions.md) · [store-wide-deal-badges.md](./store-wide-deal-badges.md) · UI labels: [../ui/DEALS_BOOSTS_WORDING_CLEANUP.md](../guides/ui/DEALS_BOOSTS_WORDING_CLEANUP.md)         |
 | Staff portal                                 | [staff-portal.md](./staff-portal.md)                                                                                                                                                                                       |
 | Email & notifications                        | [notifications-and-alerts.md](./notifications-and-alerts.md) · [../product/notifications-summary.md](../product/notifications-summary.md)                                                                                  |
 | Quote requests (RFQ)                         | [quote-requests.md](./quote-requests.md) · product spec: [../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                                        |
@@ -38,12 +38,12 @@ Per-feature specifications. Naming: lowercase kebab-case.
 
 ## Tenant & billing
 
-| Topic                     | Document                                                                                                                                                                                                                   |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Registration & activation | [tenant-registration.md](./tenant-registration.md) · Legal re-accept: [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md) · Referral signup: [supplier-customer-growth.md](./supplier-customer-growth.md) |
-| Free trial expiry         | [free-trial-expiry.md](./free-trial-expiry.md)                                                                                                                                                                             |
-| Tenant roles              | [tenant-roles.md](./tenant-roles.md)                                                                                                                                                                                       |
-| Branches & invitations    | [restaurant-branches.md](./restaurant-branches.md), [supplier-branches.md](./supplier-branches.md), [branch-invitations.md](./branch-invitations.md)                                                                       |
+| Topic                     | Document                                                                                                                                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registration & activation | [tenant-registration.md](./tenant-registration.md) · Legal re-accept: [../ui/LEGAL_PACK_REACCEPTANCE.md](../guides/ui/LEGAL_PACK_REACCEPTANCE.md) · Referral signup: [supplier-customer-growth.md](./supplier-customer-growth.md) |
+| Free trial expiry         | [free-trial-expiry.md](./free-trial-expiry.md)                                                                                                                                                                                    |
+| Tenant roles              | [tenant-roles.md](./tenant-roles.md)                                                                                                                                                                                              |
+| Branches & invitations    | [restaurant-branches.md](./restaurant-branches.md), [supplier-branches.md](./supplier-branches.md), [branch-invitations.md](./branch-invitations.md)                                                                              |
 
 ## Reviews & loyalty
 

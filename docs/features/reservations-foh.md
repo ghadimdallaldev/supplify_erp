@@ -77,7 +77,7 @@ Foreground alerts: `useNotificationAlerts` in `Layout` (toast ~10s, sound, brows
 - [waitlist-auto-promotion.md](./waitlist-auto-promotion.md)
 - [restaurant-reviews.md](./restaurant-reviews.md) — shared rating summary includes reservation reviews
 - [features.md](../product/features.md) — Reservations section
-- [regression-checklist.md](../qa/regression-checklist.md) — Part 5 (PUB-\*), §6.8 (RST-35+, RST-42a–c), waitlist offers (PUB-14–16)
+- [regression-checklist.md](../guides/qa/regression-checklist.md) — Part 5 (PUB-\*), §6.8 (RST-35+, RST-42a–c), waitlist offers (PUB-14–16)
 
 ## Tests
 

@@ -411,4 +411,4 @@ Guide for **Supplify platform administrators** managing tenants, billing, suppor
 | `/app/admin/restaurants/:tab` | Restaurant portal tab                                  |
 | `/app/settings`               | Admin personal settings (notifications, Keycloak link) |
 
-**QA cross-reference:** `docs/qa/regression-checklist.md` Part 0 (setup), admin sections; stub card `4242424242424242` for billing tests.
+**QA cross-reference:** `docs/guides/qa/regression-checklist.md` Part 0 (setup), admin sections; stub card `4242424242424242` for billing tests.

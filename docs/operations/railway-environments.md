@@ -111,7 +111,7 @@ See `apps/api/.env.<env>.example` and [environment-variables.md](./environment-v
 | `EMAIL_LOG_ONLY`                      | `false` (real email via Resend) | `false`            | `false`          |
 | `SMTP_PASS`                           | dashboard secret                | dashboard secret   | dashboard secret |
 
-Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [../features/email-system.md](../features/email-system.md).
+Non-secret email settings (`EMAIL_*`, `SMTP_HOST`, etc.) load from `deploy/railway/<env>/api.env` on deploy. Set **`SMTP_PASS`** once per API service in the Railway Raw Editor (see `secrets.env.example`). See [./email-system.md](./email-system.md).
 
 ## G. Required frontend variables (summary)
 
@@ -132,9 +132,9 @@ Set at **build time** (Docker `ARG` or Railway). See `apps/web/.env.<env>.exampl
 4. Deploy API: Root Directory **empty**, config `/apps/api/railway.json`, Dockerfile `apps/api/Dockerfile`, health check `/health`.
 5. Deploy Web: Root Directory **empty**, config `/apps/web/railway.json`, Dockerfile `apps/web/Dockerfile`, build args from `apps/web/.env.<env>.example`.
 6. Commit defaults live in `deploy/railway/<environment>/` (API + web load on deploy). Paste secrets from `deploy/railway/<environment>/secrets.env.example` into each service’s Railway Raw Editor once (`DATABASE_URL`, `REDIS_URL`, session keys, Keycloak secret).
-7. On API startup (`RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env`), the server runs the **full** migration pipeline: SQL files, runtime schema checks, tenant role backfill, and supplier org backfill (same as `pnpm db:migrate`). No manual steps after redeploy. Check API logs for `Running full startup migrations` / `Full startup migrations completed`. **June 2026 release:** confirm **`0144`** and **`0145`** apply (plan catalog audit); see [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md).
+7. On API startup (`RUN_MIGRATIONS_ON_START=true` in `deploy/railway/<env>/api.env`), the server runs the **full** migration pipeline: SQL files, runtime schema checks, tenant role backfill, and supplier org backfill (same as `pnpm db:migrate`). No manual steps after redeploy. Check API logs for `Running full startup migrations` / `Full startup migrations completed`. **June 2026 release:** confirm **`0144`** and **`0145`** apply (plan catalog audit); see [../releases/2026-06-09-pre-deploy-checklist.md](../archive/releases/2026-06-09-pre-deploy-checklist.md).
 8. Verify `GET /health` and `GET /ready` on API (`redis.connected` should be `true` when Redis is wired); open web app and sign in via Keycloak. Confirm `CRONS_ENABLED=true` in `deploy/railway/<env>/api.env` (loaded on deploy) so the operational reminders job runs daily (default `CRON_OPERATIONAL_REMINDERS_INTERVAL_MS=86400000`). For email, confirm API boot logs show `Email service initialized` with the expected provider; preprod/prod require `SMTP_PASS` in dashboard secrets when `EMAIL_LOG_ONLY=false`.
-9. **Legal pack `2026-06-09`:** deploy **Web and API together** (`LEGAL_PACK_VERSION` must match). After deploy, existing users with stale acceptances are redirected to **`/legal/reaccept`** on first app login — expected one-time UX; see [../ui/LEGAL_PACK_REACCEPTANCE.md](../ui/LEGAL_PACK_REACCEPTANCE.md).
+9. **Legal pack `2026-06-09`:** deploy **Web and API together** (`LEGAL_PACK_VERSION` must match). After deploy, existing users with stale acceptances are redirected to **`/legal/reaccept`** on first app login — expected one-time UX; see [../ui/LEGAL_PACK_REACCEPTANCE.md](../guides/ui/LEGAL_PACK_REACCEPTANCE.md).
 
 ## I. Redis (cache + Socket.IO)
 
@@ -226,7 +226,7 @@ Port comes from `docker/.env` → `REDIS_PORT` (default `6379`).
 
 ## L. Storage per environment
 
-Full upload pipeline (authenticated gateway, quarantine scanning, keys, local vs S3): [../operations/storage-uploads.md](../operations/storage-uploads.md).
+Full upload pipeline (authenticated gateway, quarantine scanning, keys, local vs S3): [../operations/storage-uploads.md](storage-uploads.md).
 
 | env     | Driver | Notes                                                                     |
 | ------- | ------ | ------------------------------------------------------------------------- |
@@ -300,4 +300,4 @@ API blocks `PAYMENTS_MODE=mock` in prod/preprod, and blocks **stub + live** at s
 - `STORAGE_DRIVER=local` on prod (validation fails)
 - Committing `.env` files with real secrets
 
-See also: [railway.md](./railway.md) (single-env overview), [env-matrix.md](./env-matrix.md), [../operations/cron-jobs.md](../operations/cron-jobs.md) (in-process scheduled jobs and env vars), [../releases/2026-06-09-pre-deploy-checklist.md](../releases/2026-06-09-pre-deploy-checklist.md) (June 2026 coordinated release).
+See also: [railway.md](./railway.md) (single-env overview), [env-matrix.md](./env-matrix.md), [../operations/cron-jobs.md](cron-jobs.md) (in-process scheduled jobs and env vars), [../releases/2026-06-09-pre-deploy-checklist.md](../archive/releases/2026-06-09-pre-deploy-checklist.md) (June 2026 coordinated release).

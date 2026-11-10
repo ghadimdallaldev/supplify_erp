@@ -4,7 +4,7 @@
 (segmentation, personas, customer journey), [Part 4](./04_competitor_research.md) (competitive
 landscape and messaging benchmarks), and [Part 7](./07_business_strategy.md) (pricing ladder,
 trial design, retention mechanics). Cross-references product and sales collateral in
-`docs/sales/*.md` and `docs/product/monetization-ux.md`. Part 9 (Marketing Plan) depends on
+`docs/product/sales/*.md` and `docs/product/monetization-ux.md`. Part 9 (Marketing Plan) depends on
 this part for channel prioritization and message architecture.
 
 **A standing disclosure carried from every prior part:** Supplify is **pre-launch** and
@@ -66,7 +66,7 @@ and product voice should be aligned to it.
 (restaurant product vs. supplier product vs. admin) exists in the codebase or docs. For
 marketing purposes, a single master brand with **role-contextual messaging** (restaurant-
 facing vs. supplier-facing value props) is the correct structure — mirroring how the product
-already presents itself (`docs/sales/02_solution.md` splits benefits by side without splitting
+already presents itself (`docs/product/sales/02_solution.md` splits benefits by side without splitting
 the brand).
 
 **Category label** is an unresolved marketing decision with competitive implications. Part 4
@@ -123,7 +123,7 @@ draft for founder confirmation**, not a tested message:
 
 Each clause maps to a verified fact or a labeled competitive inference:
 
-- "Fragmented phone, WhatsApp, and spreadsheet workflows" — `docs/sales/01_problem.md`, Part 1
+- "Fragmented phone, WhatsApp, and spreadsheet workflows" — `docs/product/sales/01_problem.md`, Part 1
   §1.7; not a quantified hours-lost statistic (Part 3 §3.4 explicitly avoids fabricating one).
 - "$49/month" vs. "$250+" — Part 7 §7.2 vs. Supy pricing (Part 4 §4.3.1).
 - "Two-sided from day one" — Part 4 §4.9.2; no competitor ships the same combination at this
@@ -167,7 +167,7 @@ track record exists.
 ### 8.3.3 Side-specific value propositions
 
 Marketing must maintain **two parallel message tracks** without splitting the brand. Part 3
-(§3.4) and `docs/sales/02_solution.md` provide the substance:
+(§3.4) and `docs/product/sales/02_solution.md` provide the substance:
 
 | Side           | Primary promise                                                          | Proof point (verifiable)                                                                                               | What not to say                                                                                                                            |
 | -------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -189,7 +189,7 @@ instead, use **category contrast**:
 | Buyer objection (anticipated)               | Response frame                                                                                                                                                                                                                                | Evidence basis                                                                                   |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | "We already use Supy / another tool"        | "Supplify connects restaurants _and_ suppliers in one platform — if your suppliers aren't on the same system, you're still reconciling across channels."                                                                                      | Part 4 §4.9.2 white-space table                                                                  |
-| "Why not just use WhatsApp?"                | "WhatsApp doesn't reconcile what you ordered, what arrived, and what you owe. Supplify keeps that chain in one place — your supplier relationships stay; the chaos doesn't."                                                                  | Part 3 §3.8; `docs/sales/01_problem.md`                                                          |
+| "Why not just use WhatsApp?"                | "WhatsApp doesn't reconcile what you ordered, what arrived, and what you owe. Supplify keeps that chain in one place — your supplier relationships stay; the chaos doesn't."                                                                  | Part 3 §3.8; `docs/product/sales/01_problem.md`                                                  |
 | "$49/month is another cost on thin margins" | "Restaurants run on 3–5% margins industry-wide (Part 2 §2.3). Supplify is priced below the threshold where multi-stakeholder approval is typically required (Part 3 §3.7) — one avoided stockout or invoice dispute covers the subscription." | Industry margin data is sourced; ROI claim is **directional logic**, not a measured Supplify ROI |
 | "Is this proven?"                           | "We're launching in Lebanon now with a free trial — no credit card, full Gold features to evaluate. Be among the first operators on the platform."                                                                                            | Honest pre-launch framing; Free Trial mechanics verified (Part 7 §7.3)                           |
 
@@ -369,12 +369,12 @@ unlocks. Align copy with shipped touchpoints: no-card 30-day trial, `UpgradeModa
 
 ### 8.7.1 Message hierarchy
 
-| Level                 | Message                                                                                                      | Usage                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| **Tagline (draft)**   | "One platform for restaurants and suppliers."                                                                | Homepage hero, email signature — derived from `docs/sales/02_solution.md` headline |
-| **Value proposition** | "Order, fulfill, receive, and pay — connected."                                                              | Sub-headline, demo opener                                                          |
-| **Proof points (3)**  | (1) Two-sided from $49/mo, (2) Free trial, full Gold features, (3) Built for MENA — bilingual, Lebanon-first | Feature sections, comparison tables                                                |
-| **Call to action**    | "Start free trial" / "Book a demo" (founder-led)                                                             | All conversion points                                                              |
+| Level                 | Message                                                                                                      | Usage                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Tagline (draft)**   | "One platform for restaurants and suppliers."                                                                | Homepage hero, email signature — derived from `docs/product/sales/02_solution.md` headline |
+| **Value proposition** | "Order, fulfill, receive, and pay — connected."                                                              | Sub-headline, demo opener                                                                  |
+| **Proof points (3)**  | (1) Two-sided from $49/mo, (2) Free trial, full Gold features, (3) Built for MENA — bilingual, Lebanon-first | Feature sections, comparison tables                                                        |
+| **Call to action**    | "Start free trial" / "Book a demo" (founder-led)                                                             | All conversion points                                                                      |
 
 Tagline and value prop are **drafts for founder confirmation**, consistent with Part 1's
 treatment of vision/mission (§1.3–§1.4).
@@ -490,11 +490,11 @@ action. All are **recommendations**, not executed activities.
 - **Brand personality and design principles:** `PRODUCT.md` (verified internal source).
 - **Vision, mission, values (draft):** Part 1, §1.3–§1.5 — proposed, not founder-confirmed.
 - **Market segmentation and personas:** Part 3, §3.1–§3.3 — personas labeled illustrative.
-- **Pain points and solution framing:** `docs/sales/01_problem.md`, `docs/sales/02_solution.md`.
+- **Pain points and solution framing:** `docs/product/sales/01_problem.md`, `docs/product/sales/02_solution.md`.
 - **Competitive landscape and white space:** Part 4, §4.3–§4.9 — competitor figures cited
   inline in Part 4, not re-sourced here.
 - **Pricing, trial design, referral mechanics:** Part 7, §7.2–§7.3, §7.9–§7.11;
-  `docs/product/tier-matrix.md`; `docs/sales/08_pricing_strategy.md`.
+  `docs/archive/product/tier-matrix.md`; `docs/product/sales/08_pricing_strategy.md`.
 - **Monetization UX and trial conversion touchpoints:** `docs/product/monetization-ux.md`.
 - **Supplier growth program:** `docs/features/supplier-customer-growth.md`.
 - **Sales motion and channel baseline:** Part 10, §10.1–§10.4.

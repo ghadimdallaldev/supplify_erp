@@ -2,7 +2,7 @@
 
 **Migration:** `0186_recipe_costing.sql`  
 **Plan feature:** `recipe_costing` (restaurant Gold, Platinum; Free Trial inherits Gold gates)  
-**Deploy order:** `dev` → `preprod` → `prod` — [branching.md](../operations/branching.md)
+**Deploy order:** `dev` → `preprod` → `prod` — [branching.md](../../operations/branching.md)
 
 ## Pre-deploy (each environment)
 
@@ -29,5 +29,5 @@ node scripts/pnpm-run.mjs --filter @supplify/web test:run -- RecipesListPage
 
 ## Docs
 
-- [recipe-costing.md](../features/recipe-costing.md)
-- QA gates: `GATE-R21`–`GATE-R21b` in [regression-checklist.md](../qa/regression-checklist.md)
+- [recipe-costing.md](../../features/recipe-costing.md)
+- QA gates: `GATE-R21`–`GATE-R21b` in [regression-checklist.md](../../guides/qa/regression-checklist.md)

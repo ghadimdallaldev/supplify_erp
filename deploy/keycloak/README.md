@@ -55,13 +55,13 @@ Dry run: `DRY_RUN=1 node deploy/keycloak/apply-session-policy.mjs`
 
 Consumer diner JWT and staff magic-link sessions are **out of scope** for this policy.
 
-See [`docs/runbooks/keycloak-session-configuration.md`](../../docs/runbooks/keycloak-session-configuration.md).
+See [`docs/operations/runbooks/keycloak-session-configuration.md`](../../docs/operations/runbooks/keycloak-session-configuration.md).
 
 ## Local Docker
 
 `docker-compose.yml` imports `realm-export.json` (realm **Supplify**). Preprod/prod exports are for hosted environments only.
 
-**B2C diner signup** (guest ordering rewards at `/order/:slug/account`) does **not** use Keycloak — no realm or client changes. Diner sessions are API JWT cookies signed with `CONSUMER_AUTH_SECRET` (see [consumer-ordering.md](../../features/consumer-ordering.md)).
+**B2C diner signup** (guest ordering rewards at `/order/:slug/account`) does **not** use Keycloak — no realm or client changes. Diner sessions are API JWT cookies signed with `CONSUMER_AUTH_SECRET` (see [consumer-ordering.md](../../docs/features/consumer-ordering.md)).
 
 ## Railway recovery (no Admin UI)
 

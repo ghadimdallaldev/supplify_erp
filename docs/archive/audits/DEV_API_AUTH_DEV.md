@@ -151,6 +151,6 @@ For automated smoke tests, **`SUPPLIFY_STAFF_TOKEN`** (Bearer JWT for a `staff_p
 
 ## Related artifacts
 
-- [`dev-api-preflight.json`](./dev-api-preflight.json) — reachability preflight
-- [`DEV_API_ROUTE_TEST_RESULTS.md`](./DEV_API_ROUTE_TEST_RESULTS.md) — live route results
-- [`apps/api/scripts/lib/auth-token.mjs`](../../apps/api/scripts/lib/auth-token.mjs) — token helper
+- [`dev-api-preflight.json`](../../audits/dev-api-preflight.json) — reachability preflight
+- [`DEV_API_ROUTE_TEST_RESULTS.md`](../../audits/DEV_API_ROUTE_TEST_RESULTS.md) — live route results
+- [`apps/api/scripts/lib/auth-token.mjs`](../../../apps/api/scripts/lib/auth-token.mjs) — token helper

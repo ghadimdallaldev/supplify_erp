@@ -41,4 +41,4 @@ Wipe and reset scripts are **DEV ONLY** — never against Railway preprod/prod.
 
 ## Archived one-offs
 
-Superseded schema patches, wave-split tooling, and ad-hoc backfills live in [`docs/archive/scripts/one-off/`](../../../docs/archive/scripts/one-off/). See [`docs/operations/scripts-audit.md`](../../../docs/operations/scripts-audit.md).
+Superseded schema patches, wave-split tooling, and ad-hoc backfills were removed from the tree (2026-11 docs restructure); recover them from version history at commit `970be8e5` under `docs/archive/scripts/one-off/`. See [`docs/operations/scripts-audit.md`](../../../docs/operations/scripts-audit.md).

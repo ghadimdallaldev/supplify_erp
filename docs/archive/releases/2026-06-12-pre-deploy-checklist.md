@@ -31,5 +31,5 @@ cd apps/api && pnpm db:migrate
 
 ## Related docs
 
-- [../features/consumer-ordering.md](../features/consumer-ordering.md)
-- [../features/warehouse-fulfillment.md](../features/warehouse-fulfillment.md)
+- [../features/consumer-ordering.md](../../features/consumer-ordering.md)
+- [../features/warehouse-fulfillment.md](../../features/warehouse-fulfillment.md)

@@ -218,4 +218,4 @@ Core tables from `0169`; lifecycle columns/indexes/constraints from `0192` (`pri
 
 ## QA checklist
 
-See [regression-checklist.md](../qa/regression-checklist.md) — **§4.9 Supplier customer growth**.
+See [regression-checklist.md](../guides/qa/regression-checklist.md) — **§4.9 Supplier customer growth**.

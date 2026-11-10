@@ -2,7 +2,7 @@
 
 Use this document for **end-to-end manual testing** of the **web ERP** (`apps/web` + `apps/api`) and **native mobile apps** (Android + iOS) across **Public**, **Restaurant**, **Supplier**, **Driver**, **Staff portal**, and **Platform Admin** personas.
 
-**Printable PDF:** From repo root run `pnpm docs:qa:pdf` → `docs/qa/output/Supplify-Manual-QA-Checklist.pdf` (landscape A4). HTML fallback: `docs/qa/output/Supplify-Manual-QA-Checklist.html` (browser → Print → Save as PDF).
+**Printable PDF:** From repo root run `pnpm docs:qa:pdf` → `docs/guides/qa/output/Supplify-Manual-QA-Checklist.pdf` (landscape A4). HTML fallback: `docs/guides/qa/output/Supplify-Manual-QA-Checklist.html` (browser → Print → Save as PDF).
 
 **Recommended test order (fresh database wipe):** Part 0 → Part 1 → Part 2 → Part 3 → Parts 4–12 (web ERP) → **Part 13** (mobile, both platforms) → **Part 14** (cross-platform parity spot checks) → Part 10–11 if QA lead runs API/CI smoke.
 
@@ -28,7 +28,7 @@ Use this document for **end-to-end manual testing** of the **web ERP** (`apps/we
 1. **Record results:** Pass / Fail / Blocked / N/A in **Pass?**; add tester name, date, build/branch/app version, API environment, device/OS (mobile), and notes in the sign-off table.
 2. **Test matrix:** Parts 0–3 must run before anything else on a wiped database. Parts 4–12 can run in parallel across web personas once accounts exist. Part 13 requires the same API backend the web tests used (shared entitlements and seed data).
 3. **Deep links:** Many web routes work when typed in the address bar even if not in the sidebar — test those once per persona.
-4. **Delivery GPS:** Web: restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver web **§7.4.2** (`DRV-GPS1–3`). Mobile driver: **Part 13.4** (`MOB-D*`). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md).
+4. **Delivery GPS:** Web: restaurant **§6.6.1** (`GPS-R01–R10`); supplier **§7.4.1** (`GPS-S01–S09`); driver web **§7.4.2** (`DRV-GPS1–3`). Mobile driver: **Part 13.4** (`MOB-D*`). Spec: [drivers-and-gps-tracking.md](../../features/drivers-and-gps-tracking.md).
 5. **Billing stub card:** `4242424242424242` (any future expiry/CVC) when `BILLING_GATEWAY=stub`.
 6. **Release delta packs:** After Parts 0–3, run the **[2026-09-10 release smoke pack](#2026-09-10-release-smoke-pack-run-today)** on web; re-run the overlapping mobile rows in **Part 13** and **Part 14** (orders, quotes, fulfillment/POD, receiving).
 7. **Mobile preflight (optional, before Part 13):** In each mobile repo: `npx tsc --noEmit`, `npm test -- --runInBand`, `npx expo-doctor` — records build health; does not replace manual Part 13.
@@ -215,7 +215,7 @@ Use this document for **end-to-end manual testing** of the **web ERP** (`apps/we
 >
 > **Required accounts:** Free restaurant, Silver restaurant, Gold restaurant, Free supplier, Silver supplier, Gold supplier, Admin.
 >
-> **Silver catalog reference:** migration `0117_silver_tier_limits_features.sql` · [SUBSCRIPTIONS.md](../product/subscriptions.md)
+> **Silver catalog reference:** migration `0117_silver_tier_limits_features.sql` · [SUBSCRIPTIONS.md](../../archive/product/subscriptions.md)
 
 ## 3.1 Restaurant feature gates
 
@@ -379,7 +379,7 @@ Use this document for **end-to-end manual testing** of the **web ERP** (`apps/we
 
 ## 4.7 Free Trial expiry (read-only lock)
 
-> **Spec:** [free-trial-expiry.md](../features/free-trial-expiry.md) · **Audit:** [FREE_TRIAL_BEHAVIOR_AUDIT.md](./FREE_TRIAL_BEHAVIOR_AUDIT.md)  
+> **Spec:** [free-trial-expiry.md](../../features/free-trial-expiry.md) · **Audit:** [FREE_TRIAL_BEHAVIOR_AUDIT.md](../../archive/audits/free-trial-behavior-audit.md)  
 > **Accounts:** Free restaurant or supplier (`restaurant-free@…` / `supplier-free@…`) or any tenant on plan `free`.  
 > **Simulate expiry:** run SQL below (replace subscription id) or set `free_sandbox_expires_at` in the past and wait for / trigger `free-sandbox-expiry` job.
 
@@ -408,7 +408,7 @@ WHERE id = '<subscription_id>';
 
 ## 4.9 Supplier customer growth
 
-> **Spec:** [supplier-customer-growth.md](../features/supplier-customer-growth.md) · **Migration:** `0169_supplier_growth_program.sql`  
+> **Spec:** [supplier-customer-growth.md](../../features/supplier-customer-growth.md) · **Migration:** `0169_supplier_growth_program.sql`  
 > **Prereq:** Supplier user with `CUSTOMERS_IMPORT` / `CUSTOMERS_MANAGE`; sample CSV with restaurant name + email.
 
 | ID      | Steps                                                           | Expected                                                                  | Pass? |
@@ -447,7 +447,7 @@ WHERE id = '<subscription_id>';
 
 ## 4.9 Notifications preferences
 
-> **Spec:** [notifications-summary.md](../product/notifications-summary.md) · [notifications-and-alerts.md](../features/notifications-and-alerts.md)
+> **Spec:** [notifications-summary.md](../../product/notifications-summary.md) · [notifications-and-alerts.md](../../features/notifications-and-alerts.md)
 
 | ID     | Steps                                                   | Expected                                          | Pass? |
 | ------ | ------------------------------------------------------- | ------------------------------------------------- | ----- |
@@ -465,7 +465,7 @@ WHERE id = '<subscription_id>';
 
 ## 4.10 Realtime & impersonation
 
-Ref: [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../IMPERSONATION_AUDIT.md)
+Ref: [features/admin-impersonation.md](../../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../../archive/audits/impersonation-audit.md)
 
 | ID         | Steps                                               | Expected                                                 | Pass? |
 | ---------- | --------------------------------------------------- | -------------------------------------------------------- | ----- |
@@ -665,7 +665,7 @@ Prereq: supplier assigned driver; active assignment; API `GPS_ALLOW_RESTAURANT_L
 
 ### 6.8.1 Reservation excellence (migration `0198`) — 2026-09-10
 
-Spec: [hospitality-excellence design](../superpowers/specs/2026-09-10-hospitality-excellence-design.md) · Feature: [reservations-foh.md](../features/reservations-foh.md)
+Spec: [hospitality-excellence design](../../archive/superpowers/specs/2026-09-10-hospitality-excellence-design.md) · Feature: [reservations-foh.md](../../features/reservations-foh.md)
 
 | ID      | Steps                                                                  | Expected                                                               | Pass? |
 | ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----- |
@@ -837,7 +837,7 @@ Spec: [hospitality-excellence design](../superpowers/specs/2026-09-10-hospitalit
 
 ### 7.4.3 Dispatch cache, POD, multi-WH — 2026-09-10
 
-Migrations: `0200` (POD one-per-order). Spec: [drivers-and-gps-tracking.md](../features/drivers-and-gps-tracking.md)
+Migrations: `0200` (POD one-per-order). Spec: [drivers-and-gps-tracking.md](../../features/drivers-and-gps-tracking.md)
 
 | ID     | Steps                                                                | Expected                                                                                         | Pass? |
 | ------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----- |
@@ -964,7 +964,7 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 ### 7.11.1 Promotion ad billing, targeting & ROAS — 2026-09-10
 
-Migrations: `0197`, `0203`. Spec: [supplier-promotions-excellence](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md) · [deals-and-promotions.md](../features/deals-and-promotions.md)
+Migrations: `0197`, `0203`. Spec: [supplier-promotions-excellence](../../archive/superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md) · [deals-and-promotions.md](../../features/deals-and-promotions.md)
 
 | ID     | Steps                                                               | Expected                                                                   | Pass? |
 | ------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----- |
@@ -1390,7 +1390,7 @@ Record **tester, app version/build, API URL, device/OS, date** on the release ti
 
 ## Quote requests & supplier mini-store (2026-06-11; inbox v2 2026-09-10)
 
-Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md) · Feature: [quote-requests.md](../features/quote-requests.md) · Migration `0202`
+Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../../product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md) · Feature: [quote-requests.md](../../features/quote-requests.md) · Migration `0202`
 
 | ID     | Step                                             | Expected                                                   | Pass? |
 | ------ | ------------------------------------------------ | ---------------------------------------------------------- | ----- |
@@ -1417,7 +1417,7 @@ Spec: [QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](../product/QUOTE_REQUESTS_AND_S
 
 ## 2026-09-10 release smoke pack (run today)
 
-Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an existing QA env. Design specs: [hospitality](../superpowers/specs/2026-09-10-hospitality-excellence-design.md), [promotions](../superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md).
+Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an existing QA env. Design specs: [hospitality](../../archive/superpowers/specs/2026-09-10-hospitality-excellence-design.md), [promotions](../../archive/superpowers/specs/2026-09-10-supplier-promotions-excellence-design.md).
 
 | Priority | IDs                     | Area                                    |
 | -------- | ----------------------- | --------------------------------------- |

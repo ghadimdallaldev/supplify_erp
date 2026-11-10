@@ -41,14 +41,14 @@ Most tenant events use **`notifyTenantUsers`**: every user in `tenant_user_roles
 
 ### Orders
 
-| Event                                        | Recipient(s)      | Category / notes                                                                                 |
-| -------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
-| Order placed                                 | Supplier team     | `PLACED` / `notify_order_new`                                                                    |
-| Acknowledged, processing, shipped, delivered | Restaurant team   | matching status                                                                                  |
-| Cancelled by **restaurant**                  | Supplier team     | `CANCELLED`                                                                                      |
-| **Declined by supplier** (reason required)   | Restaurant team   | `CANCELLED`; message includes `cancel_reason` — [order-decline.md](../features/order-decline.md) |
-| Order amendment created/accepted/rejected    | Counterparty team | `order_amendment`                                                                                |
-| Order reminder (restaurant)                  | Supplier team     | `PLACED`                                                                                         |
+| Event                                        | Recipient(s)      | Category / notes                                                                                    |
+| -------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------- |
+| Order placed                                 | Supplier team     | `PLACED` / `notify_order_new`                                                                       |
+| Acknowledged, processing, shipped, delivered | Restaurant team   | matching status                                                                                     |
+| Cancelled by **restaurant**                  | Supplier team     | `CANCELLED`                                                                                         |
+| **Declined by supplier** (reason required)   | Restaurant team   | `CANCELLED`; message includes `cancel_reason` — [order-decline.md](../features/ordering-decline.md) |
+| Order amendment created/accepted/rejected    | Counterparty team | `order_amendment`                                                                                   |
+| Order reminder (restaurant)                  | Supplier team     | `PLACED`                                                                                            |
 
 ### Reservations
 

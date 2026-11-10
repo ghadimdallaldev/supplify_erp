@@ -74,7 +74,7 @@ All management routes require `requireAuth`, `resolveTenantContext`, and `requir
 
 - **SQL:** `0078_tenant_named_roles.sql`, `0079_advanced_roles_feature.sql`
 - **Script:** `node apps/api/scripts/migrate-users-to-roles.js` (idempotent; runs automatically in Docker `migrate` on deploy when backfill is incomplete). From repo root: `pnpm db:migrate-users-to-roles`.
-- **Dev startup:** `pnpm dev` / `migrate.js` skips the script when every tenant has an Owner system role and all `user_role` rows have a matching `tenant_user_roles` row (see [PERFORMANCE.md](../operations/PERFORMANCE.md)).
+- **Dev startup:** `pnpm dev` / `migrate.js` skips the script when every tenant has an Owner system role and all `user_role` rows have a matching `tenant_user_roles` row (see [PERFORMANCE.md](../audits/performance/PERFORMANCE_CURRENT_STATE.md)).
 
 ## Approvals integration
 
@@ -101,4 +101,4 @@ Supplier tier seed uses `-sales` instead of purchaser. Each account is a separat
 
 - API: `tenant-roles.routes.test.js`, `rbac-guards.test.js`, `rbac-full-app.test.js`
 - Web: `TeamRolesPanel.test.jsx`, `RolePermissionChecklist.test.jsx`, `tenantRoles.test.ts`, `permissionLabels.test.ts`
-- Manual: GATE-R08, RBAC-R\* in [regression-checklist.md](../qa/regression-checklist.md)
+- Manual: GATE-R08, RBAC-R\* in [regression-checklist.md](../guides/qa/regression-checklist.md)

@@ -249,12 +249,12 @@ Weak: abuse protection (rate limits only).
 
 ## Related artifacts
 
-| Document                                                                       | Use                       |
-| ------------------------------------------------------------------------------ | ------------------------- |
-| [SUPPLIFY_DEMO_READINESS_AUDIT.md](../audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) | Jun 2026 demo pass        |
-| [full-app-feature-audit.md](../archive/audits/full-app-feature-audit.md)       | Feature matrix            |
-| [DEV_API_ROUTE_TEST_MATRIX.md](../audits/DEV_API_ROUTE_TEST_MATRIX.md)         | Route test classification |
-| [12-demo-script.md](./12-demo-script.md)                                       | What to show anyway       |
+| Document                                                                               | Use                       |
+| -------------------------------------------------------------------------------------- | ------------------------- |
+| [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md) | Jun 2026 demo pass        |
+| [full-app-feature-audit.md](../archive/audits/full-app-feature-audit.md)               | Feature matrix            |
+| [DEV_API_ROUTE_TEST_MATRIX.md](../audits/DEV_API_ROUTE_TEST_MATRIX.md)                 | Route test classification |
+| [12-demo-script.md](./12-demo-script.md)                                               | What to show anyway       |
 
 ---
 
