@@ -26,7 +26,7 @@ import {
 } from '../services/branding.service.js'
 import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
 import { normalizeBusinessType } from '../lib/restaurant-targeting.js'
-import { presentRestaurant } from '../lib/tenant-profile-redaction.js'
+import { presentRestaurant, canChangeTenantContactEmail } from '../lib/tenant-profile-redaction.js'
 
 const router = express.Router()
 
@@ -807,6 +807,18 @@ router.patch(
           error: {
             name: 'FORBIDDEN',
             message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      if (!canChangeTenantContactEmail(req, restaurant.contact_email, updateData.contactEmail)) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Only a workspace owner can change the contact email',
           },
           requestId: req.requestId,
         })

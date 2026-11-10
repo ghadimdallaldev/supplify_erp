@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Audit batch C: contact_email ownership, socket tenant rooms, CSRF on cookie writes (mobile verified, no change needed)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Both repos were inspected; no mobile files changed, so `tsc` was not needed.
+
+**Sockets:** both apps connect Socket.IO with an `extraHeaders.Cookie` built from the Bearer access token, refresh token and `active_tenant_token` (`src/services/chatSocket.ts`, identical in both repos) and never send a tenant id. That path is unchanged: the server still resolves the tenant from the active-branch token or the user's workspace assignment, but now requires `userCanAccessTenant` for either, and the `contact_email` lookup is gone. Members still join their `restaurant_<id>` / `supplier_<id>` room.
+
+**CSRF:** `/auth/*` and `/api/public/*` writes are now CSRF-checked when they carry the web session cookie (`access_token` / `refresh_token`). Mobile uses Bearer (valid Bearer skips the check) and `POST /auth/mobile/refresh` (explicitly exempt, token in the body). Neither app calls `/api/public/invitations/*` or the cookie-based `/auth` writes (`/auth/refresh`, `/auth/legal-acceptance`, `/auth/me/locale`, `/auth/admin-preferences`); the only `/auth` write is `POST /auth/logout` with Bearer.
+
+**contact_email:** branch-account-link invite acceptance, linked child account access and branch parent resolution now require a verified owner (system Owner role; legacy memberless tenants keep the contact-email bootstrap). `PATCH /api/suppliers/:id` and `PATCH /api/restaurants/:id` return 403 when a non-owner changes `contactEmail`. Neither app edits `contact_email` or accepts link invitations; `/api/branches` and `/api/branches/switch` response shapes are unchanged (only stricter for hijacked access).
+
+---
+
 ## 2026-11-10 — Audit batch B: data-integrity fixes (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). All changes are server-side transaction and job behavior; no request or response shape, permission key, feature key or notification payload changed, so no mobile files were touched and `tsc` was not needed.

@@ -14,6 +14,7 @@ import { linkRestaurantToOrganization } from './restaurant-org.js'
 import { linkSupplierToOrganization } from './supplier-org.js'
 import { applyOrgBillingOnLink, recordBranchAccountLinkHistory } from './branch-account-billing.js'
 import { logger } from './logger.js'
+import { userIsVerifiedTenantOwner } from './tenant-roles.js'
 
 const INVITE_TYPE = 'branch_account_link'
 
@@ -280,19 +281,17 @@ export async function acceptBranchAccountLinkInvitation({
       return { ok: false, reason: 'ALREADY_LINKED' }
     }
 
-    // Owner authority: accepting user must own/manage the target tenant
-    const email = (acceptingUserEmail || '').trim().toLowerCase()
-    const contact = (target.contact_email || '').trim().toLowerCase()
-    const { rows: ownerRoles } = await client.query(
-      `SELECT 1 FROM tenant_user_roles tur
-       JOIN tenant_roles tr ON tr.id = tur.role_id
-       WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
-         AND tr.name = 'Owner'
-       LIMIT 1`,
-      [acceptingUserId, target.id, orgType]
+    // Owner authority: the accepting user must be a verified owner of the target tenant
+    // (system Owner role, or bootstrap contact for a tenant with no members). contact_email
+    // alone is editable by SETTINGS_EDIT staff and is not proof of ownership.
+    const isOwner = await userIsVerifiedTenantOwner(
+      acceptingUserId,
+      acceptingUserEmail,
+      target.id,
+      orgType,
+      client
     )
-    const isContactOwner = email && contact && email === contact
-    if (!ownerRoles.length && !isContactOwner) {
+    if (!isOwner) {
       return { ok: false, reason: 'NOT_OWNER' }
     }
 

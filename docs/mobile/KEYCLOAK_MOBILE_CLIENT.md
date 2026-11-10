@@ -83,7 +83,7 @@ Mobile obtains `activeTenantToken` from the `POST /api/branches/switch` JSON res
 
 ## CSRF note
 
-Web cookie sessions still require CSRF + allowed Origin on mutating `/api/*` requests. Valid Bearer tokens skip CSRF (mobile path). Web behavior is unchanged.
+Web cookie sessions still require CSRF + allowed Origin on mutating `/api/*` requests, and since 2026-11-10 also on `/auth/*` and `/api/public/*` requests that carry the session cookie. Valid Bearer tokens skip CSRF (mobile path), and `POST /auth/mobile/refresh` is exempt (token in body). Web behavior is unchanged.
 
 ## Railway dev
 

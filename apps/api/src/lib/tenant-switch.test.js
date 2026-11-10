@@ -43,8 +43,7 @@ function noDirectAccessPrefix() {
     { rows: [] }, // user_role
     { rows: [] }, // tenant_user_roles
     { rows: [] }, // workspace
-    { rows: [] }, // primary tenant (not linked child)
-    { rows: [] }, // primary tenant fallback by email
+    { rows: [] }, // linked parent accounts
   ]
 }
 

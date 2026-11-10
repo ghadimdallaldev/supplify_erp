@@ -201,6 +201,19 @@ Plan entitlements (`requireFeature`) and role permissions (`requirePermission`) 
 
 See **[ACCESS_CONTROL.md](./ACCESS_CONTROL.md)** for the full matrix (module analytics vs global `reports`, tenant resolution, and checklists for new routes).
 
+## contact_email is not an ownership credential (2026-11-10)
+
+`contact_email` on `supplier` / `restaurant` is editable tenant data, so authorization never relies on it alone:
+
+- `userIsVerifiedTenantOwner` (`lib/tenant-roles.js`) is the single owner check for branch-account-link invitation acceptance, linked child account access (`userCanAccessTenant`) and primary-parent resolution (`getPrimaryTenantForUser(email, type, userId)`, which fails closed without a `userId`). It passes for the system Owner role (`tenant_roles.is_system = true`), or, only for legacy tenants with zero `tenant_user_roles` and zero `user_role` rows (bootstrap case), when the user's email equals `contact_email`. Once a tenant has any member, editing `contact_email` grants nothing.
+- Linked child access now comes from being a verified owner of a parent account in `tenant_account_link` (no email match needed); the parent's `contact_email` is only a hint when picking the primary account.
+- Changing `contact_email` through `PATCH /api/suppliers/:id` or `PATCH /api/restaurants/:id` requires a workspace Owner (or platform admin). `SETTINGS_EDIT` can still edit every other field and resubmit the unchanged email.
+- `ensurePrimaryContactOwnerRole` and the `/auth/me` first-login Owner assignment still key on `contact_email`, but only run for users who already resolved this tenant through membership and have no other assigned role.
+
+## Socket tenant rooms (2026-11-10)
+
+`resolveSocketUserFromCookieHeader` only returns a `tenantId` after `userCanAccessTenant` passes, the same gate as HTTP `getRequestTenant`: the verified `active_tenant_token` cookie, otherwise the user's workspace assignment (`getTenantAssignmentForUser`). The old `contact_email` fallback is removed. `restaurant_<id>` / `supplier_<id>` rooms are joined from the verified tenant type. Sockets still authenticate from the `Cookie` handshake header (web cookies, or mobile `extraHeaders.Cookie` built from its Bearer/refresh/active-branch tokens); clients cannot pass a tenant id.
+
 ## Socket chat authorization (2026-09-12)
 
 Socket.IO chat events do not pass through Express middleware, so `join_conversation`, `send_message`, `message_read`, and `typing` repeat the critical boundary checks: the conversation must exist, its supplier/restaurant ID must match the socket's active tenant, the tenant must have the `chat` feature, and the user must have `CHAT_VIEW` or `CHAT_SEND` (with `CHAT_MANAGE` implication). Permission resolution uses tenant-role membership, so invited staff work without relying on the tenant contact email. Socket message persistence derives `sender_id` from the authenticated active tenant and applies the daily chat usage limit.

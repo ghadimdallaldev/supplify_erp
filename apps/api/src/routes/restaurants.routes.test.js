@@ -228,6 +228,66 @@ describe('Restaurants Routes', () => {
 
       expect(response.body.error.name).toBe('FORBIDDEN')
     })
+
+    function buildTenantPatchApp(roles) {
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'RESTAURANT', email: 'staff@example.com' }
+        req.tenantContext = {
+          tenantId: 'restaurant-1',
+          tenantType: 'RESTAURANT',
+          roles,
+          permissions: ['SETTINGS_EDIT'],
+        }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      return localApp
+    }
+
+    it('denies a SETTINGS_EDIT non-owner from changing contact_email (ownership credential)', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'restaurant-1', name: 'R', contact_email: 'owner@example.com' }],
+      })
+
+      const response = await request(buildTenantPatchApp(['Restaurant Manager']))
+        .patch('/api/restaurants/restaurant-1')
+        .send({ contactEmail: 'staff@example.com' })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+      expect(response.body.error.message).toMatch(/owner/i)
+      // only the SELECT ran; no UPDATE
+      expect(db.query).toHaveBeenCalledTimes(1)
+    })
+
+    it('lets a SETTINGS_EDIT non-owner edit other fields and resubmit the unchanged contact_email', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1', name: 'R', contact_email: 'Owner@example.com' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1', name: 'Renamed' }] })
+
+      await request(buildTenantPatchApp(['Restaurant Manager']))
+        .patch('/api/restaurants/restaurant-1')
+        .send({ name: 'Renamed', contactEmail: 'owner@example.com' })
+        .expect(200)
+    })
+
+    it('lets the owner change contact_email', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'restaurant-1', name: 'R', contact_email: 'owner@example.com' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1', contact_email: 'new@example.com' }] })
+
+      await request(buildTenantPatchApp(['Owner']))
+        .patch('/api/restaurants/restaurant-1')
+        .send({ contactEmail: 'new@example.com' })
+        .expect(200)
+    })
   })
 
   describe('GET /api/restaurants/:id', () => {

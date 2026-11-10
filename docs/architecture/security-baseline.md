@@ -30,7 +30,7 @@ The app implements **solid baseline security** (auth, headers, rate limiting, co
 
 ### Public surface
 
-- Public routes (e.g. `/api/public/...`) are intentionally unauthenticated (reservations, staff portal, etc.); CSRF is skipped only for those prefixes.
+- Public routes (e.g. `/api/public/...`) are intentionally unauthenticated (reservations, staff portal, etc.). Some use `optionalAuth` (for example `POST /api/public/invitations/accept`), so CSRF is skipped on `/api/public` and `/auth` only for requests that do not carry the session cookie (`access_token` / `refresh_token`). A request with the session cookie must send `X-Requested-With: Supplify` from an allowed origin, even under those prefixes (2026-11-10).
 
 ---
 
@@ -57,10 +57,10 @@ Apply dependency upgrades and, where needed, `pnpm overrides` for transitive pac
 
 ### 2. CSRF on API routes
 
-- **Current**: CSRF middleware **skips all `/api/*`** routes (“handled by session cookies”).
-- **Reality**: Protection relies on **CORS** (single origin) + **SameSite cookies**; no double-submit or custom header for API.
-- **Risk**: If `WEB_ORIGIN` is too broad or CORS is misconfigured, cross-site requests could send cookies.
-- **Recommendation**: For strict compliance (e.g. OWASP), consider requiring a CSRF token or custom header for state-changing API requests, or document that CORS + SameSite is the chosen mitigation.
+- **Current** (`apps/api/src/middlewares/csrf.js`): state-changing requests that carry the session cookie must send the non-simple header `X-Requested-With: Supplify` and an `Origin`/`Referer` in `WEB_ORIGINS`; otherwise 403 `CSRF_FORBIDDEN`. Valid Bearer tokens (mobile) skip the check.
+- **Exemptions**: safe methods; `/health`; `/webhooks/*` (signature-verified); e2e and HMAC upload endpoints; `POST /auth/mobile/refresh` (refresh token in the JSON body, never read from cookies); and `/auth/*` and `/api/public/*` requests **without** a session cookie (anonymous callers and Bearer clients). The OAuth flows (`/auth/login`, `/register`, `/callback`, `GET /logout`) are GET redirects and unaffected.
+- **Cookie requests under `/auth` and `/api/public`** (`POST /auth/refresh`, `/auth/logout`, `/auth/legal-acceptance`, `PATCH /auth/me/locale`, `/auth/admin-preferences`, `POST /api/public/invitations/accept|reject|branch/accept`) are no longer exempt. Fixed 2026-11-10; relevant when `COOKIE_SAME_SITE=none`. The web client already sends the header on every call (RTK base query and `authSessionRefresh.ts`).
+- **Not covered**: the consumer shop cookie (`consumer_auth_token`) under `/api/public/consumer/*` is outside this check; custom-domain shops may not be in `WEB_ORIGINS`.
 
 ### 3. Secrets and config
 

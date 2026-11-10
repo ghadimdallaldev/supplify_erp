@@ -398,8 +398,9 @@ app.use(activeTenantContext)
 // Block locked tenants except billing/subscription read endpoints
 app.use(billingAccessMiddleware)
 
-// CSRF protection for state-changing operations (skip for public APIs)
-const csrfBypassPrefixes = ['/api/public', '/webhooks']
+// CSRF protection for state-changing operations. Only signature-verified webhooks bypass it here;
+// /api/public and /auth are handled inside csrfProtection (exempt only when not cookie-authenticated).
+const csrfBypassPrefixes = ['/webhooks']
 app.use((req, res, next) => {
   if (csrfBypassPrefixes.some((prefix) => req.path.startsWith(prefix))) {
     return next()

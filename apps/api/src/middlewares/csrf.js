@@ -50,6 +50,48 @@ async function handleBearerCsrfBypass(req, res) {
   }
 }
 
+/** Session cookies that authenticate a browser request (consumer shop cookie is out of scope). */
+const SESSION_COOKIE_PATTERN = /(?:^|;\s*)(?:access_token|refresh_token)=[^;]/
+
+/** True when the request carries the web session cookie, so a cross-site form could ride on it. */
+function hasSessionCookie(req) {
+  return SESSION_COOKIE_PATTERN.test(req.headers.cookie || '')
+}
+
+/** True when the request carries a Bearer token that verifies (mobile). Never responds. */
+async function hasValidBearer(req) {
+  const bearerToken = extractBearerToken(req)
+  if (!bearerToken) return false
+  try {
+    await verifyToken(bearerToken)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function csrfForbidden(req, res, message) {
+  return res.status(403).json({
+    ok: false,
+    data: null,
+    error: { name: 'CSRF_FORBIDDEN', message },
+    requestId: req.requestId,
+  })
+}
+
+/** Custom-header + trusted-origin check for cookie-authenticated writes. Returns true if passed. */
+function passesCookieCsrfChecks(req, res) {
+  if (req.headers[CSRF_REQUEST_HEADER] !== CSRF_REQUEST_HEADER_VALUE) {
+    csrfForbidden(req, res, 'Missing or invalid CSRF protection header')
+    return false
+  }
+  if (!isAllowedOrigin(req)) {
+    csrfForbidden(req, res, 'Origin not allowed')
+    return false
+  }
+  return true
+}
+
 // CSRF protection middleware
 export async function csrfProtection(req, res, next) {
   if (isSafeMethod(req.method)) {
@@ -60,17 +102,33 @@ export async function csrfProtection(req, res, next) {
     return next()
   }
 
-  // OAuth flows use state parameter in /auth
-  if (req.path.startsWith('/auth/')) {
+  // Native refresh authenticates with the refresh token in the JSON body and never reads
+  // cookies, so a cross-site form cannot ride on a browser session.
+  if (req.path === '/auth/mobile/refresh') {
     return next()
   }
 
-  // Public unauthenticated endpoints (token-based staff/reservation flows)
-  if (req.path.startsWith('/api/public')) {
+  // /auth/* (session writes, cookie refresh, logout) and /api/public/* (optionalAuth routes such
+  // as invitation accept) are exempt only for requests that are not cookie-authenticated:
+  // anonymous callers and Bearer-token clients. A request that carries the session cookie must
+  // pass the same header + origin checks as the rest of the API, otherwise a cross-site form
+  // could act as the victim when COOKIE_SAME_SITE=none. The OAuth GET flows (login, register,
+  // callback, logout) are safe methods and never reach this branch.
+  if (req.path.startsWith('/auth/') || req.path.startsWith('/api/public')) {
+    if (!hasSessionCookie(req)) {
+      return next()
+    }
+    if (await hasValidBearer(req)) {
+      return next()
+    }
+    if (config.NODE_ENV === 'test') {
+      return next()
+    }
+    if (!passesCookieCsrfChecks(req, res)) return
     return next()
   }
 
-  // Meta WhatsApp inbound webhooks
+  // Meta WhatsApp inbound webhooks (signature-verified)
   if (req.path.startsWith('/webhooks/')) {
     return next()
   }
@@ -99,31 +157,7 @@ export async function csrfProtection(req, res, next) {
       return
     }
 
-    const headerValue = req.headers[CSRF_REQUEST_HEADER]
-    if (headerValue !== CSRF_REQUEST_HEADER_VALUE) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'CSRF_FORBIDDEN',
-          message: 'Missing or invalid CSRF protection header',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    if (!isAllowedOrigin(req)) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'CSRF_FORBIDDEN',
-          message: 'Origin not allowed',
-        },
-        requestId: req.requestId,
-      })
-    }
-
+    if (!passesCookieCsrfChecks(req, res)) return
     return next()
   }
 

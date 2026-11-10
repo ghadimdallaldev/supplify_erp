@@ -171,6 +171,54 @@ describe('Suppliers Routes', () => {
     })
   })
 
+  describe('PATCH /api/suppliers/:id contact_email', () => {
+    function buildSupplierPatchApp(roles) {
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'SUPPLIER', email: 'staff@example.com' }
+        req.tenantContext = {
+          tenantId: 'supplier-1',
+          tenantType: 'SUPPLIER',
+          roles,
+          permissions: ['SETTINGS_EDIT'],
+        }
+        next()
+      })
+      localApp.use('/api/suppliers', suppliersRoutes)
+      return localApp
+    }
+
+    it('denies a SETTINGS_EDIT non-owner from changing contact_email (ownership credential)', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: 'supplier-1', name: 'S', contact_email: 'owner@example.com' }],
+      })
+
+      const response = await request(buildSupplierPatchApp(['Supplier Manager']))
+        .patch('/api/suppliers/supplier-1')
+        .send({ contactEmail: 'staff@example.com' })
+        .expect(403)
+
+      expect(response.body.error.name).toBe('FORBIDDEN')
+      expect(response.body.error.message).toMatch(/owner/i)
+      expect(db.query).toHaveBeenCalledTimes(1)
+    })
+
+    it('lets the owner change contact_email', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'supplier-1', name: 'S', contact_email: 'owner@example.com' }],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 'supplier-1', contact_email: 'new@example.com' }] })
+
+      await request(buildSupplierPatchApp(['Owner']))
+        .patch('/api/suppliers/supplier-1')
+        .send({ contactEmail: 'new@example.com' })
+        .expect(200)
+    })
+  })
+
   describe('GET /api/suppliers/:id', () => {
     it('should return supplier details', async () => {
       // Keep this fixture focused on the supplier detail query; no restaurant
