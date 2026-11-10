@@ -38,6 +38,14 @@ Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and si
 
 ---
 
+## 2026-10-23 — Mobile look-and-feel pass: type scale, radii, depth (implemented)
+
+**Mobile impact:** Implemented in both `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS) with identical `src/` changes. Visual only: no API, auth, RBAC, type or env changes.
+
+**What changed:** theme tokens (`src/theme/index.ts`): larger type scale (body 15, captions 12.5, overline 12), larger radii (sm 10 / md 12 / lg 16 / xl 20), new `shadow.card`. `textFaint` darkened to `#66758C` to clear 4.5:1 on white. Shared components (`ui/index.tsx`, `ui/v2.tsx`, `HomeChrome.tsx`): 50px buttons with press-scale feedback, shadowed rounded cards and quick-action tiles, brand-tinted avatars, larger badges/pills (11.5–12px), a status dot replaces the 3px side stripe on attention rows, icon-in-circle empty/error states, circular notification button with red count badge. Tab bar: larger labels and icons, soft top shadow. Section headers are now `h2` titles instead of tiny uppercase overlines.
+
+---
+
 ## 2026-10-22 — Legacy order completion cannot overwrite a cancel
 
 **Mobile impact:** None. Android and iOS already send `DELIVERED` through the locked order update path. No request or response fields changed.
