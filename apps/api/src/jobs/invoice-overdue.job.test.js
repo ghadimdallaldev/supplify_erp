@@ -67,7 +67,7 @@ describe('checkOverdueInvoices', () => {
     expect(String(query.mock.calls[0][0])).toContain('AT TIME ZONE')
     expect(String(query.mock.calls[0][0])).toContain('r.timezone')
   })
-  it('skips overdue update and notification when either tenant locks after scan', async () => {
+  it('marks the invoice OVERDUE but skips the notification when a tenant locks after scan', async () => {
     const { query } = await import('../lib/db.js')
     const { notifyInvoiceOverdue } = await import('../services/notification.service.js')
     const { isTenantUnlockedForBackgroundWrites } = await import('../lib/background-write-locks.js')
@@ -76,12 +76,34 @@ describe('checkOverdueInvoices', () => {
       rows: [{ id: 'inv-locked', restaurant_id: 'rest-locked', supplier_id: 'supplier-1' }],
     })
     query.mockResolvedValueOnce({ rows: [{ restaurant_ok: true, supplier_ok: true }] })
+    query.mockResolvedValueOnce({ rows: [{ id: 'inv-locked' }] })
     isTenantUnlockedForBackgroundWrites.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     const result = await checkOverdueInvoices()
 
     expect(result).toEqual({ processed: 1, notified: 0, skippedLocked: 1 })
-    expect(query).toHaveBeenCalledTimes(2)
+    expect(query).toHaveBeenCalledTimes(3)
+    const statusUpdate = String(query.mock.calls[2][0])
+    expect(statusUpdate).toContain("SET status = 'OVERDUE'")
+    expect(statusUpdate).not.toContain('overdue_notified_at')
+    expect(notifyInvoiceOverdue).not.toHaveBeenCalled()
+  })
+
+  it('marks the invoice OVERDUE when the subscription check fails, without notifying', async () => {
+    const { query } = await import('../lib/db.js')
+    const { notifyInvoiceOverdue } = await import('../services/notification.service.js')
+
+    query
+      .mockResolvedValueOnce({
+        rows: [{ id: 'inv-sub', restaurant_id: 'r1', supplier_id: 's1' }],
+      })
+      .mockResolvedValueOnce({ rows: [{ restaurant_ok: false, supplier_ok: true }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'inv-sub' }] })
+
+    const result = await checkOverdueInvoices()
+
+    expect(result).toEqual({ processed: 1, notified: 0, skippedLocked: 1 })
+    expect(String(query.mock.calls[2][0])).toContain("SET status = 'OVERDUE'")
     expect(notifyInvoiceOverdue).not.toHaveBeenCalled()
   })
 })

@@ -12,7 +12,7 @@ import {
   createReplacementOrderFromDispute,
   NO_REPLACEMENT_LINES_MESSAGE,
 } from '../lib/dispute-replacement-order.js'
-import { applyCreditToInvoice } from './invoice.service.js'
+import { applyCreditToInvoice, roundMoney } from './invoice.service.js'
 import { assertCleanUploadOwnership } from './storage/upload-security.service.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
@@ -692,6 +692,11 @@ export async function resolveDispute(
         throw new ValidationError(
           `Resolution amount cannot exceed disputed amount (${disputeRow.disputed_amount})`
         )
+      // Serialize concurrent credit/refund resolutions for the same order: the
+      // credited-so-far total below is only trustworthy while this row is locked.
+      await client.query(`SELECT id FROM customer_order WHERE id = $1 FOR UPDATE`, [
+        disputeRow.order_id,
+      ])
       const { rows: capRows } = await client.query(
         `
         SELECT
@@ -703,16 +708,30 @@ export async function resolveDispute(
         `,
         [disputeRow.order_id, disputeRow.supplier_id, disputeRow.invoice_id]
       )
+      // Credits and refunds already issued (any non-void status, including
+      // consumed ones) for this order or invoice count against the cap.
+      const { rows: creditedRows } = await client.query(
+        `
+        SELECT COALESCE(SUM(credit_amount), 0)::numeric AS credited_total
+        FROM credit_note
+        WHERE supplier_id = $1
+          AND status <> 'VOID'
+          AND (order_id = $2 OR ($3::uuid IS NOT NULL AND invoice_id = $3::uuid))
+        `,
+        [disputeRow.supplier_id, disputeRow.order_id, disputeRow.invoice_id]
+      )
+      const creditedTotal = Number(creditedRows?.[0]?.credited_total || 0)
       const supplierTotal = Number(capRows[0]?.supplier_total || 0)
       const invoiceTotal =
         capRows[0]?.invoice_total == null ? null : Number(capRows[0].invoice_total)
-      const amountCap =
+      const baseCap =
         invoiceTotal != null && Number.isFinite(invoiceTotal)
           ? Math.min(supplierTotal, invoiceTotal)
           : supplierTotal
+      const amountCap = Math.max(0, roundMoney(baseCap - creditedTotal))
       if (amount - amountCap > 0.0001) {
         throw new ValidationError(
-          `Resolution amount cannot exceed the supplier total for this order (${amountCap})`
+          `Resolution amount cannot exceed the supplier total for this order less credits already issued (${amountCap})`
         )
       }
       if (resolutionType === 'refund' && !refundReference?.trim())
@@ -750,15 +769,16 @@ export async function resolveDispute(
     }
 
     if (resolutionType === 'credit_note' || resolutionType === 'refund') {
+      const isRefund = resolutionType === 'refund'
       const creditNoteNumber = await generateCreditNoteNumber(client)
-      const reason = resolutionType === 'refund' ? 'OTHER' : 'RETURN'
+      const reason = isRefund ? 'OTHER' : 'RETURN'
       const description =
         resolutionType === 'refund'
           ? `Auditable refund adjustment: ${refundReference.trim()}`
           : creditNoteNotes || `Credit for dispute ${disputeId.slice(0, 8)}`
       const { rows } = await client.query(
         `INSERT INTO credit_note (credit_note_number, invoice_id, supplier_id, restaurant_id, issue_date, reason, description, credit_amount, applied_amount, remaining_amount, status, currency, order_id, notes, dispute_id)
-         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, 0, $7, 'ISSUED', $8, $9, $10, $11) RETURNING *`,
+         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $12, $13, $14, $8, $9, $10, $11) RETURNING *`,
         [
           creditNoteNumber,
           disputeRow.invoice_id,
@@ -771,10 +791,22 @@ export async function resolveDispute(
           disputeRow.order_id,
           resolutionNotes || null,
           disputeId,
+          // A refund is paid back outside the platform, so its note is an
+          // audit record that is born consumed: never redeemable, and it still
+          // counts against the invoice credit cap.
+          isRefund ? amount : 0,
+          isRefund ? 0 : amount,
+          isRefund ? 'APPLIED' : 'ISSUED',
         ]
       )
       creditNote = rows[0] || null
-      if (creditNote && disputeRow.invoice_id) {
+      if (isRefund) {
+        invoiceAdjustment = {
+          status: 'refunded_externally',
+          invoiceId: disputeRow.invoice_id ?? null,
+          amount,
+        }
+      } else if (creditNote && disputeRow.invoice_id) {
         try {
           const applied = await applyCreditToInvoice(client, {
             creditNoteId: creditNote.id,

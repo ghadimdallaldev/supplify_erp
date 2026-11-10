@@ -479,6 +479,113 @@ describe('Disputes Service', () => {
     })
   })
 
+  describe('resolveDispute credit caps and refunds', () => {
+    const disputeRow = {
+      id: 'd-2',
+      supplier_id: 's-1',
+      restaurant_id: 'r-1',
+      order_id: 'o-1',
+      invoice_id: 'inv-1',
+      disputed_amount: null,
+      status: 'under_review',
+      replacement_order_id: null,
+    }
+    let clientQuery
+
+    function mockTransaction({
+      invoiceTotal = '100.00',
+      supplierTotal = '100.00',
+      credited = '0',
+    }) {
+      withTransactionMock.mockImplementation(async (handler) => {
+        clientQuery = vi.fn(async (sql) => {
+          const text = String(sql)
+          if (text.includes('FROM disputes') && text.includes('FOR UPDATE'))
+            return { rows: [disputeRow] }
+          if (text.includes('supplier_total'))
+            return { rows: [{ supplier_total: supplierTotal, invoice_total: invoiceTotal }] }
+          if (text.includes('credited_total')) return { rows: [{ credited_total: credited }] }
+          if (text.includes('INSERT INTO credit_note')) return { rows: [{ id: 'cn-1' }] }
+          if (text.includes('FROM credit_note')) return { rows: [] }
+          return { rows: [] }
+        })
+        return handler({ query: clientQuery })
+      })
+    }
+
+    it('caps a second credit at the invoice total minus credits already issued', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction({ credited: '70.00' })
+
+      await expect(
+        resolveDispute('d-2', 's-1', { resolutionType: 'credit_note', creditNoteAmount: 40 })
+      ).rejects.toThrow(/less credits already issued \(30\)/)
+
+      const sqls = clientQuery.mock.calls.map(([sql]) => String(sql))
+      expect(
+        sqls.some((t) => t.includes('FROM customer_order WHERE id') && t.includes('FOR UPDATE'))
+      ).toBe(true)
+      const creditedQuery = sqls.find((t) => t.includes('credited_total'))
+      expect(creditedQuery).toContain("status <> 'VOID'")
+    })
+
+    it('rejects any further credit once the invoice is fully credited', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction({ credited: '100.00' })
+
+      await expect(
+        resolveDispute('d-2', 's-1', {
+          resolutionType: 'refund',
+          refundAmount: 1,
+          refundReference: 'R',
+        })
+      ).rejects.toThrow(/less credits already issued \(0\)/)
+    })
+
+    it('records a refund as a consumed audit note and never applies it to the invoice', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction({ credited: '0' })
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'd-2', order_id: 'o-1', restaurant_id: 'r-1', supplier_id: 's-1' }],
+      })
+      queryMock.mockResolvedValue({ rows: [] })
+
+      await resolveDispute('d-2', 's-1', {
+        resolutionType: 'refund',
+        refundAmount: 25,
+        refundReference: 'WIRE-9',
+      })
+
+      const insert = clientQuery.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO credit_note')
+      )
+      expect(insert).toBeTruthy()
+      const params = insert[1]
+      // credit_amount, applied_amount, remaining_amount, status
+      expect(params[6]).toBe(25)
+      expect(params.slice(-3)).toEqual([25, 0, 'APPLIED'])
+      const sqls = clientQuery.mock.calls.map(([sql]) => String(sql))
+      expect(sqls.some((t) => t.includes('UPDATE credit_note'))).toBe(false)
+      expect(sqls.some((t) => t.includes('INSERT INTO payment'))).toBe(false)
+    })
+
+    it('still issues a redeemable ISSUED note for credit_note resolutions', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction({ credited: '0' })
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'd-2', order_id: 'o-1', restaurant_id: 'r-1', supplier_id: 's-1' }],
+      })
+      queryMock.mockResolvedValue({ rows: [] })
+
+      await resolveDispute('d-2', 's-1', { resolutionType: 'credit_note', creditNoteAmount: 25 })
+
+      const insert = clientQuery.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO credit_note')
+      )
+      expect(insert[1].slice(-3)).toEqual([0, 25, 'ISSUED'])
+    })
+  })
+
   describe('rejectDispute', () => {
     it('requires resolution notes', async () => {
       await expect(rejectDispute('d-1', 's-1', '')).rejects.toMatchObject({
@@ -545,6 +652,9 @@ describe('Disputes Service', () => {
             order_status: 'RECEIVED_PARTIAL',
           },
         ],
+      })
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'd-2', order_id: 'o-1', restaurant_id: 'r-1', supplier_id: 's-1' }],
       })
       queryMock.mockResolvedValue({ rows: [] })
     }

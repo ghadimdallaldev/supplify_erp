@@ -642,6 +642,7 @@ router.post(
         // Existing manual invoice is reused — never roll status back from INVOICED.
         let createdInvoice = null
         let invoiceNewlyCreated = false
+        let overbilledAmount = 0
         if (billableAcceptedQty > 0) {
           try {
             const invoiceResult = await withSavepoint(client, () =>
@@ -655,6 +656,7 @@ router.post(
             )
             createdInvoice = invoiceResult?.invoice ?? null
             invoiceNewlyCreated = Boolean(invoiceResult?.created)
+            overbilledAmount = Number(invoiceResult?.overbilledAmount || 0)
             if (createdInvoice) {
               nextStatus = 'INVOICED'
             }
@@ -674,6 +676,29 @@ router.post(
             [autoDispute.id, createdInvoice.id]
           )
           autoDispute = rows[0]
+        }
+
+        // A prior manual invoice that already has payments keeps its old total, so
+        // the restaurant is over-billed for rejected/short items. Record the real
+        // difference on the dispute so resolution can credit it back.
+        if (overbilledAmount > 0) {
+          if (autoDispute) {
+            const { rows } = await client.query(
+              `UPDATE disputes
+               SET disputed_amount = GREATEST(COALESCE(disputed_amount, 0), $2),
+                   updated_at = now()
+               WHERE id = $1
+               RETURNING *`,
+              [autoDispute.id, overbilledAmount]
+            )
+            autoDispute = rows[0] ?? autoDispute
+          } else {
+            logger.warn('Paid manual invoice exceeds received value without a dispute', {
+              orderId,
+              invoiceId: createdInvoice?.id,
+              overbilledAmount,
+            })
+          }
         }
 
         const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0

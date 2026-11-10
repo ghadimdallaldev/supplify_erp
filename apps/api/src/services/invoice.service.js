@@ -17,7 +17,7 @@ const VALID_STATUS_TRANSITIONS = {
 
 const MONEY_SCALE = 2
 
-function roundMoney(value) {
+export function roundMoney(value) {
   const n = Number(value)
   if (!Number.isFinite(n)) return 0
   return Math.round(n * 10 ** MONEY_SCALE) / 10 ** MONEY_SCALE
@@ -112,10 +112,14 @@ export async function generatePaymentNumber(client, prefix = 'PAY') {
   return rows[0]?.payment_number
 }
 
+/** The order's active invoice. Voided invoices are ignored so a corrected one can be issued. */
 export async function findInvoiceForOrder(client, { orderId, supplierId }) {
   if (!orderId) return null
   const { rows } = await client.query(
-    `SELECT * FROM invoice WHERE order_id = $1 AND supplier_id = $2 LIMIT 1`,
+    `SELECT * FROM invoice
+     WHERE order_id = $1 AND supplier_id = $2 AND status <> 'VOID'
+     ORDER BY created_at DESC
+     LIMIT 1`,
     [orderId, supplierId]
   )
   return rows[0] || null
@@ -212,15 +216,26 @@ export async function getOrderAdjustments(client, orderId) {
     `
     SELECT
       COALESCE(SUM(pu.discount_applied), 0)::numeric AS order_discount,
-      COALESCE(SUM(pu.delivery_discount_applied), 0)::numeric AS delivery_discount
+      COALESCE(SUM(pu.delivery_discount_applied), 0)::numeric AS delivery_discount,
+      (
+        SELECT COALESCE(SUM(GREATEST(ll.monetary_value, 0)), 0)
+        FROM loyalty_ledger ll
+        WHERE ll.order_id = $1 AND ll.entry_type = 'REDEEM'
+      )::numeric AS loyalty_discount
     FROM promotion_usages pu
     WHERE pu.order_id = $1
     `,
     [orderId]
   )
   const row = rows[0] || {}
+  const promotionDiscount = roundMoney(row.order_discount || 0)
+  // Points redeemed at checkout already reduced customer_order.total_amount,
+  // so the invoice must carry the same reduction as an order-level discount.
+  const loyaltyDiscount = roundMoney(row.loyalty_discount || 0)
   return {
-    orderDiscount: roundMoney(row.order_discount || 0),
+    orderDiscount: roundMoney(promotionDiscount + loyaltyDiscount),
+    promotionDiscount,
+    loyaltyDiscount,
     deliveryDiscount: roundMoney(row.delivery_discount || 0),
   }
 }
@@ -409,28 +424,17 @@ async function insertInvoiceLineItems(
   }
 }
 
-export async function createInvoiceFromReceiving(
+/**
+ * Billable lines and totals for what the restaurant actually accepted.
+ * Returns null when nothing was accepted.
+ */
+async function buildReceivingInvoiceDraft(
   client,
-  { order, report, supplierId, restaurantId, receivedBy }
+  { order, report, supplierId, taxRate, taxIncluded = false }
 ) {
-  // Prior manual invoice must not block receiving — reuse it and keep INVOICED.
-  const existing = await findInvoiceForOrder(client, { orderId: order.id, supplierId })
-  if (existing) {
-    await client.query(
-      `UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1`,
-      [order.id]
-    )
-    return { invoice: existing, created: false }
-  }
-
   const lineItems = await buildLineItemsFromReceiving(client, report.id)
-  if (lineItems.length === 0) {
-    logger.info('Skipping invoice: no accepted receiving lines', { orderId: order.id })
-    return null
-  }
+  if (lineItems.length === 0) return null
 
-  const taxConfig = await getSupplierTaxConfig(client, supplierId)
-  const taxRate = parseFloat(taxConfig.tax_rate || 0)
   const { orderDiscount: fullOrderDiscount } = await getOrderAdjustments(client, order.id)
   // Discount share follows ordered prices and accepted quantity. The billed
   // unit price can differ and must not enlarge or shrink the promotion.
@@ -447,10 +451,104 @@ export async function createInvoiceFromReceiving(
     acceptedOrderedValue,
     supplierSubtotal
   )
-  const paymentTermsDays = await getSupplierPaymentTermsDays(client, supplierId)
+  const totals = calculateInvoiceTotals(lineItems, { taxRate, orderDiscount, taxIncluded })
+  return { lineItems, totals, allLines: [...lineItems, ...totals.extraLines] }
+}
 
-  const totals = calculateInvoiceTotals(lineItems, { taxRate, orderDiscount })
-  const allLines = [...lineItems, ...totals.extraLines]
+/**
+ * A manual invoice was issued (from ordered quantities) before the restaurant
+ * received the goods. Receiving is the source of truth for what is billable:
+ * - unpaid invoice: lines and totals are rewritten to the accepted quantities;
+ * - invoice with completed payments (or credit applications): left untouched,
+ *   and the over-billed difference is returned so the caller can record it on
+ *   the auto-dispute instead of a zero amount.
+ */
+async function reconcileManualInvoiceWithReceiving(
+  client,
+  { existing, order, report, supplierId }
+) {
+  await client.query(
+    `UPDATE customer_order SET status = 'INVOICED', updated_at = now() WHERE id = $1`,
+    [order.id]
+  )
+  const { rows: lockedRows } = await client.query(
+    `SELECT * FROM invoice WHERE id = $1 FOR UPDATE`,
+    [existing.id]
+  )
+  const invoice = lockedRows[0] || existing
+  const taxRate = parseFloat(invoice.tax_rate || 0)
+  const taxIncluded = invoice.tax_included === true
+  const draft = await buildReceivingInvoiceDraft(client, {
+    order,
+    report,
+    supplierId,
+    taxRate,
+    taxIncluded,
+  })
+  const previousTotal = roundMoney(invoice.total_amount)
+  if (!draft) {
+    return { invoice, created: false, adjusted: false, overbilledAmount: 0 }
+  }
+
+  const { rows: paymentRows } = await client.query(
+    `
+    SELECT COUNT(*)::int AS payment_count
+    FROM payment WHERE invoice_id = $1 AND status = 'COMPLETED'
+    `,
+    [invoice.id]
+  )
+  const hasPayments = Number(paymentRows[0]?.payment_count || 0) > 0
+  const newTotal = draft.totals.totalAmount
+  if (hasPayments || invoice.status === 'PAID' || invoice.status === 'VOID') {
+    return {
+      invoice,
+      created: false,
+      adjusted: false,
+      overbilledAmount: Math.max(0, roundMoney(previousTotal - newTotal)),
+    }
+  }
+
+  await client.query(`DELETE FROM invoice_line_item WHERE invoice_id = $1`, [invoice.id])
+  await insertInvoiceLineItems(client, invoice.id, draft.allLines, taxRate, { taxIncluded })
+  const { rows: updatedRows } = await client.query(
+    `
+    UPDATE invoice
+    SET subtotal = $2, tax_amount = $3, total_amount = $4, balance_due = $4,
+        updated_at = now()
+    WHERE id = $1
+    RETURNING *
+    `,
+    [invoice.id, draft.totals.subtotal, draft.totals.taxAmount, newTotal]
+  )
+  return {
+    invoice: updatedRows[0] || invoice,
+    created: false,
+    adjusted: true,
+    previousTotal,
+    overbilledAmount: 0,
+  }
+}
+
+export async function createInvoiceFromReceiving(
+  client,
+  { order, report, supplierId, restaurantId, receivedBy }
+) {
+  // A prior manual invoice must not block receiving, but it must not override it either.
+  const existing = await findInvoiceForOrder(client, { orderId: order.id, supplierId })
+  if (existing) {
+    return reconcileManualInvoiceWithReceiving(client, { existing, order, report, supplierId })
+  }
+
+  const taxConfig = await getSupplierTaxConfig(client, supplierId)
+  const taxRate = parseFloat(taxConfig.tax_rate || 0)
+  const draft = await buildReceivingInvoiceDraft(client, { order, report, supplierId, taxRate })
+  if (!draft) {
+    logger.info('Skipping invoice: no accepted receiving lines', { orderId: order.id })
+    return null
+  }
+  const { totals, allLines } = draft
+
+  const paymentTermsDays = await getSupplierPaymentTermsDays(client, supplierId)
 
   const invoiceNumber = await generateInvoiceNumber(client, supplierId)
   const dueDate = new Date()
@@ -1000,6 +1098,38 @@ export async function recordCashPayment(
   return { payment: paymentRows[0], invoice: updatedInvoice[0] }
 }
 
+/**
+ * Voiding leaves payments and applied credit notes untouched, so an invoice
+ * that has any settlement must have it reversed first. Credit applications are
+ * recorded as COMPLETED payments, so the payment check covers them as well.
+ */
+async function assertInvoiceHasNoSettlement(client, invoiceId) {
+  const { rows } = await client.query(
+    `
+    SELECT
+      COUNT(*) FILTER (WHERE p.status = 'COMPLETED')::int AS completed_payments,
+      COUNT(*) FILTER (
+        WHERE p.status = 'COMPLETED' AND p.payment_number LIKE 'CREDIT%'
+      )::int AS applied_credits
+    FROM payment p
+    WHERE p.invoice_id = $1
+    `,
+    [invoiceId]
+  )
+  const completed = Number(rows[0]?.completed_payments || 0)
+  if (completed === 0) return
+  const credits = Number(rows[0]?.applied_credits || 0)
+  const payments = completed - credits
+  const parts = []
+  if (payments > 0) parts.push(`${payments} completed payment${payments === 1 ? '' : 's'}`)
+  if (credits > 0) parts.push(`${credits} applied credit note${credits === 1 ? '' : 's'}`)
+  const error = new ConflictError(
+    `Cannot void an invoice with ${parts.join(' and ')}. Reverse them first, then void the invoice.`
+  )
+  error.statusCode = 409
+  throw error
+}
+
 export async function updateInvoiceStatus(client, invoiceId, { status, notes, userId }) {
   const { rows: current } = await client.query(`SELECT * FROM invoice WHERE id = $1 FOR UPDATE`, [
     invoiceId,
@@ -1017,6 +1147,9 @@ export async function updateInvoiceStatus(client, invoiceId, { status, notes, us
   }
   if (status !== invoice.status) {
     assertValidStatusTransition(invoice.status, status)
+  }
+  if (status === 'VOID') {
+    await assertInvoiceHasNoSettlement(client, invoice.id)
   }
 
   const voidedBy = status === 'VOID' ? userId : null

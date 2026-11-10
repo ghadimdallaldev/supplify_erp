@@ -102,7 +102,8 @@ Resolution runs in a transaction while locking the dispute row. A dispute can ha
 
 - credit_note creates one credit note and attempts to apply it to the linked outstanding invoice when parties and balance permit.
 - replacement creates one linked PLACED replacement order and reserves its inventory.
-- refund requires refundAmount and refundReference. It records an auditable invoice adjustment/credit-note effect; it does not claim that an external PSP refund occurred.
+- refund requires refundAmount and refundReference. The money went back outside the platform, so the credit note it writes is an audit record that is born consumed (`status = APPLIED`, `applied_amount = amount`, `remaining_amount = 0`). It is never offered as available credit, never applied to the invoice (so a PAID invoice cannot be refunded and credited twice), and still counts toward the credit cap below. The effect reports `invoiceAdjustment.status = refunded_externally`. It does not claim that an external PSP refund occurred.
+- Credit cap (2026-11-10): every credit_note or refund resolution is capped at the supplier's order total (or the linked invoice total when lower) **minus the non-void credit notes and refunds already issued for that order or invoice**. The check runs in the resolve transaction under a lock on the order row, so concurrent resolutions cannot together exceed the invoice. A second dispute can only be credited for the remainder.
 - no_action and reject close the dispute without financial or fulfillment mutation.
 
 The detail response includes resolutionEffect so web, Android, and iOS can show the resulting credit, refund reference, or replacement order.
