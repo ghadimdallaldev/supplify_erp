@@ -2,6 +2,18 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 — Driver route stop "items · amount" formatting (mobile skipped, web-only UI)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Web-only layout fix in `DriverRoutePanel.tsx`: the item count and stop total were adjacent text nodes in one flex item, so they rendered as "5 items108.76". Each now has its own element with a "·" separator, and the total uses `formatCurrency` with the stop's currency, matching `FulfillmentRouteDetailPanel`. The mobile driver screens don't render this line the same way. No API or type change.
+
+---
+
+## 2026-11-11 — HORECA demo dataset seed for the dev environment (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). This adds only a seed script (`apps/api/scripts/seed-horeca-demo.mjs`, `pnpm seed:horeca-demo`) and a demo cheat sheet (`docs/guides/horeca-demo-2026-11.md`). No API endpoint, type, auth, RBAC or feature-key change. The seeded data (orders, deliveries, GPS, invoices) is visible in the mobile apps through the existing endpoints.
+
+---
+
 ## 2026-11-11 — promotions.status column widened (mobile skipped, DB-only)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Migration `0230_promotions_status_width.sql` widens `promotions.status` from VARCHAR(20) to VARCHAR(32). The statuses `pending_admin_approval` and `approved_pending_payment` were already allowed by the check constraint and API, but writes failed because they didn't fit the column. No status values, endpoints or payloads change.
