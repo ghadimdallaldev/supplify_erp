@@ -17,7 +17,7 @@ Active audit reports, route inventories, and performance/cache analysis. Histori
 
 | File                                                                                                                       | Topic                               |
 | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| [FINAL_PRODUCTION_AUDIT_2026-10-07.md](../archive/audits/FINAL_PRODUCTION_AUDIT_2026-10-07.md)                             | Final API/web production readiness  |
+| [FINAL_PRODUCTION_AUDIT_2026-10-22.md](./FINAL_PRODUCTION_AUDIT_2026-10-22.md)                                             | Final API/web production readiness  |
 | [CRON_AND_BACKGROUND_JOBS_AUDIT.md](./CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                   | Cron and background jobs            |
 | [REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)   | Reorder, branding, deals, warehouse |
 | [SUPPLIFY_DEMO_READINESS_AUDIT.md](../archive/audits/SUPPLIFY_DEMO_READINESS_AUDIT.md)                                     | Demo environment gaps               |
@@ -35,6 +35,10 @@ Active audit reports, route inventories, and performance/cache analysis. Histori
 | [performance/](./performance/) | Global performance audit, current state, safe fix plan |
 | [cache/](./cache/)             | Cache inventory and fix plan                           |
 
-## Archived (June 2026)
+## Archived
+
+Dated one-off reports (2026-07 security and pilot audits, 2026-09 demo audit, 2026-10-07 production audit, July 2026 performance reports, and the other rows above that link into `archive/`) live in [`../archive/audits/`](../archive/audits/).
+
+### Archived (June 2026)
 
 Moved to [`../archive/audits/`](../archive/audits/): `SUPPLIFY_FULL_DEV_AUDIT_2026.md`, `2026-06-17-full-app-audit-and-fixes.md`, `SUPPLIFY_AUDIT_FIX_LOG.md`, `ADMIN_UI_PERFORMANCE_REGRESSION_AUDIT.md`, `fixes-applied.json`.

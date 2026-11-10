@@ -167,12 +167,12 @@ When product behavior changes:
 
 ## External references
 
-| Topic                      | Location                                                          |
-| -------------------------- | ----------------------------------------------------------------- |
-| Product marketing overview | `docs/product/overview.md`                                        |
-| Feature list (compact)     | `docs/product/features.md`                                        |
-| RBAC architecture          | `docs/architecture/rbac-overview.md`, `rbac-permission-matrix.md` |
-| Access control layers      | `docs/architecture/access-control.md`                             |
-| Admin impersonation        | `docs/features/admin-impersonation.md`                            |
-| Inventory & reorder        | `docs/features/inventory-expiry-and-reorder.md`                   |
-| Mobile parity              | `docs/mobile/MOBILE_FEATURE_PARITY.md`                            |
+| Topic                      | Location                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| Product marketing overview | `docs/product/overview.md`                                                      |
+| Feature list (compact)     | `docs/product/features.md`                                                      |
+| RBAC architecture          | `docs/architecture/rbac-overview.md`, `docs/security/rbac-permission-matrix.md` |
+| Access control layers      | `docs/architecture/access-control.md`                                           |
+| Admin impersonation        | `docs/features/admin-impersonation.md`                                          |
+| Inventory & reorder        | `docs/features/inventory-expiry-and-reorder.md`                                 |
+| Mobile parity              | `docs/mobile/MOBILE_FEATURE_PARITY.md`                                          |

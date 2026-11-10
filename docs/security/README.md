@@ -11,6 +11,6 @@
 | [rbac.md](./rbac.md)                                                        | RBAC and tenancy index                                       |
 | [security-audit-report.md](./security-audit-report.md)                      | May 2026 historical audit                                    |
 
-Architecture detail: [../architecture/security-baseline.md](security-baseline.md), [../architecture/hardening.md](hardening.md).
+Detail: [security-baseline.md](./security-baseline.md), [hardening.md](./hardening.md). RBAC architecture: [../architecture/rbac-overview.md](../architecture/rbac-overview.md).
 
 Historical: [../archive/audits/security-audit.md](../archive/audits/security-audit.md), [../archive/audits/](../archive/audits/).

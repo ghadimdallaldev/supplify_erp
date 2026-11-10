@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Docs and repo restructure (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Documentation and repo hygiene only: docs moved into a new folder layout (architecture, security, product, guides, archive), root audit docs moved under `docs/`, dead husky/lint-staged configs removed, and the onboarding generator helpers restored. No API, auth, RBAC, type, notification or feature change. Paths cited by `CLAUDE.md`, `AGENTS.md` and `.cursor/rules/mobile-parity.mdc` are unchanged.
+
+---
+
 ## 2026-11-10 — Dispute credit application isolated in a savepoint (mobile skipped, no client contract change)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Internal transaction safety only: `resolveDispute` now applies the credit note to the invoice inside `withSavepoint`, so a failed application rolls back to the savepoint instead of aborting the resolve transaction. Request and response shapes are unchanged.

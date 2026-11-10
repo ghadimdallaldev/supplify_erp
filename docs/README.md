@@ -4,57 +4,38 @@ Restaurant & F&B supplier marketplace monorepo (`apps/api`, `apps/web`).
 
 **Policy:** Documentation lives on **`dev` only**. Release branches (`staging`, `preprod`, `prod`) contain runtime code — no `docs/`.
 
-## Quick links
+## Start here
 
-| I want to…                              | Start here                                                                                                                                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Set up locally                          | [guides/setup.md](./guides/setup.md) · [guides/developer-handbook.md](./guides/developer-handbook.md)                                                   |
-| Understand the product                  | [product/overview.md](./product/overview.md)                                                                                                            |
-| Plans & limits                          | [product/plans-and-limits.md](./product/plans-and-limits.md) · [product/four-plan-pricing-model.md](./product/four-plan-pricing-model.md)               |
-| Feature behavior                        | [features/README.md](./features/README.md)                                                                                                              |
-| Recipe costing (restaurant Scale)       | [features/recipe-costing.md](./features/recipe-costing.md) · migration `0186`                                                                           |
-| Responsive lists (card ↔ table)        | [ui/responsive-data-list.md](./guides/ui/responsive-data-list.md)                                                                                       |
-| Bulk product image import (supplier)    | [features/bulk-product-image-import.md](./features/bulk-product-image-import.md)                                                                        |
-| Supplier customer growth (referral)     | [features/supplier-customer-growth.md](./features/supplier-customer-growth.md) · migration `0169`                                                       |
-| Deploy to Railway                       | [operations/deployment.md](./operations/deployment.md)                                                                                                  |
-| Env variables                           | [operations/environment-variables.md](./operations/environment-variables.md)                                                                            |
-| Performance / Railway latency           | [operations/railway-performance.md](./operations/railway-performance.md)                                                                                |
-| RBAC & security                         | [security/rbac.md](./security/rbac.md) · [security/security-audit-report.md](./security/security-audit-report.md)                                       |
-| Admin console                           | [admin/admin-operations-console.md](./admin/admin-operations-console.md)                                                                                |
-| Run tests / QA                          | [qa/testing-guide.md](./guides/qa/testing-guide.md) · [qa/regression-checklist.md](./guides/qa/regression-checklist.md)                                 |
-| Notifications (email, WhatsApp, events) | [product/notifications-summary.md](./product/notifications-summary.md) · [features/notifications-and-alerts.md](./features/notifications-and-alerts.md) |
-| Release workflow                        | [operations/branching.md](./operations/branching.md)                                                                                                    |
-| **Pre-deploy (June 2026)**              | [releases/2026-06-09-pre-deploy-checklist.md](./archive/releases/2026-06-09-pre-deploy-checklist.md)                                                    |
-| **Refactoring-dev release (Jun 2026)**  | [releases/2026-06-11-refactoring-dev-release.md](./archive/releases/2026-06-11-refactoring-dev-release.md)                                              |
-| Quote requests & mini-store             | [product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md](./product/QUOTE_REQUESTS_AND_SUPPLIER_MINISTORE.md)                                                  |
-| Cron & background jobs audit            | [audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md](./audits/CRON_AND_BACKGROUND_JOBS_AUDIT.md)                                                                  |
-| Reorder / branding / deals audit        | [audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md](./audits/REORDER_BRANDING_DEALS_WAREHOUSE_SUPPORT_FEATURE_AUDIT.md)                  |
-| UI copy & legal gates                   | [ui/README.md](./ui/README.md)                                                                                                                          |
-| Historical audits                       | [archive/audits/](./archive/audits/)                                                                                                                    |
+- Set up locally: [guides/setup.md](./guides/setup.md), then [guides/developer-handbook.md](./guides/developer-handbook.md)
+- Understand the product: [product/overview.md](./product/overview.md)
+- Run tests / QA: [guides/qa/testing-guide.md](./guides/qa/testing-guide.md)
+- Deploy: [operations/deployment.md](./operations/deployment.md) and [operations/environment-variables.md](./operations/environment-variables.md)
+- Onboard a new person: [onboarding/README.md](./onboarding/README.md)
 
-## Folder map
+## Index
 
-```text
-docs/
-  README.md                 ← you are here
-  product/                  Product catalog, plans, monetization
-  features/                 Per-feature specs (ordering, GPS, deals, …)
-  architecture/             RBAC, tenancy, hardening, access control
-  operations/               Deploy, env, performance, cron, storage
-  security/                 RBAC index, security audits
-  admin/                    Admin guide, flags, operations console
-  qa/                       Testing guide, regression checklist
-  ui/                       UI copy maps, legal re-acceptance, admin UX notes
-  releases/                 Pre-deploy checklists per coordinated release
-  guides/                   Setup, handbook, migrations, seeding
-  api/                      API route index
-  diagrams/                 Canonical Mermaid diagrams
-  sales/                    Sales / enterprise narrative
-  audits/                   Route inventories, feature audits, performance & cache
-  archive/                  Historical audits, old plans, archived scripts
-  onboarding/               Onboarding library, handbooks, generated PDF/PPTX
-```
+| Area                             | What it holds                                                         | Key links                                                                                                                                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [architecture/](./architecture/) | System design: RBAC, tenancy, routing, API index, Mermaid diagrams    | [rbac-overview](./architecture/rbac-overview.md) · [tenancy](./architecture/tenancy.md) · [api-routes](./architecture/api-routes.md) · [diagrams](./architecture/diagrams/README.md)                                                                   |
+| [features/](./features/)         | One spec per feature (ordering, GPS, deals, recipe costing, ...)      | [features/README](./features/README.md)                                                                                                                                                                                                                |
+| [operations/](./operations/)     | Deploy, env vars, Railway, cron, storage, observability, runbooks     | [deployment](./operations/deployment.md) · [environment-variables](./operations/environment-variables.md) · [railway-environments](./operations/railway-environments.md) · [branching](./operations/branching.md) · [runbooks](./operations/runbooks/) |
+| [guides/](./guides/)             | Developer how-tos, QA, and UI conventions                             | [setup](./guides/setup.md) · [database-migrations](./guides/database-migrations.md) · [qa/](./guides/qa/) · [ui/](./guides/ui/)                                                                                                                        |
+| [mobile/](./mobile/)             | Mobile parity log, parity checklist, store readiness                  | [MOBILE_FEATURE_PARITY](./mobile/MOBILE_FEATURE_PARITY.md) · [MOBILE_PARITY_CHECKLIST](./mobile/MOBILE_PARITY_CHECKLIST.md)                                                                                                                            |
+| [admin/](./admin/)               | Admin console, feature flags                                          | [admin-guide](./admin/admin-guide.md) · [feature-flags](./admin/feature-flags.md)                                                                                                                                                                      |
+| [security/](./security/)         | RBAC matrices, hardening, security baseline and audits                | [security/README](./security/README.md) · [rbac-permission-matrix](./security/rbac-permission-matrix.md) · [hardening](./security/hardening.md)                                                                                                        |
+| [product/](./product/)           | Plans and pricing, feature catalogs, capabilities, strategy, sales    | [product/README](./product/README.md) · [four-plan-pricing-model](./product/four-plan-pricing-model.md) · [strategy/](./product/strategy/) · [sales/](./product/sales/)                                                                                |
+| [audits/](./audits/)             | Current-state audits and script-generated outputs                     | [audits/README](./audits/README.md) · [latest production audit](./audits/FINAL_PRODUCTION_AUDIT_2026-10-22.md)                                                                                                                                         |
+| [onboarding/](./onboarding/)     | Onboarding library, generated handbook/PDF/PPTX, printable guides     | [onboarding/README](./onboarding/README.md) · [GENERATION](./onboarding/GENERATION.md) · [printable/](./onboarding/printable/)                                                                                                                         |
+| [archive/](./archive/)           | Historical audits, plans, reports, releases (not deployed or checked) | [archive/README](./archive/README.md)                                                                                                                                                                                                                  |
 
-## Repo root
+## Conventions
 
-Only **`README.md`** belongs at the repository root. All other markdown goes under `docs/`.
+- File names are lowercase kebab-case. UPPERCASE is kept only for existing parity and audit files that agent docs cite.
+- New dated one-off reports go straight to `archive/audits/` or are named `YYYY-MM-DD-*`.
+- Generated files and the command that regenerates them:
+  - `onboarding/output/*`, `onboarding/Supplify-Complete-Handbook.md`: `pnpm docs:onboarding:all` (see [onboarding/GENERATION.md](./onboarding/GENERATION.md)); intermediate `.html` is gitignored
+  - `guides/qa/output/*`: `pnpm docs:qa:pdf`
+  - `audits/route-inventory.json`, `audits/DEV_API_ROUTE_TEST_*`, `audits/dev-api-*`, `audits/performance/perf-*`: API and perf scripts under `apps/api/scripts/` and `scripts/`
+  - Mermaid index check: `pnpm docs:diagrams:check`
+- `archive/` is Prettier-ignored and not link-checked; links inside it may point at files that no longer exist.
+- Repo root holds only `README.md`, `CLAUDE.md`, `AGENTS.md` and `PRODUCT.md`. All other markdown goes under `docs/`.
