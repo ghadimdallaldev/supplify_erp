@@ -263,12 +263,16 @@ router.post(
       SELECT oi.id, oi.quantity, oi.product_id, oi.unit_price, oi.supplier_id,
              p.unit, p.name AS product_name, p.sku
       FROM order_item oi
+      JOIN customer_order co ON co.id = oi.order_id AND co.restaurant_id = $2
       LEFT JOIN product p ON p.id = oi.product_id
       WHERE oi.order_id = $1
       ORDER BY oi.created_at
     `,
-        [orderId]
+        [orderId, restaurantId]
       )
+
+      // Ownership is enforced by the join above, before any line validation runs, so a caller
+      // can never probe another tenant's ordered quantities via validation error messages.
 
       if (orderItems.length === 0) {
         throw new NotFoundError('Order items not found')

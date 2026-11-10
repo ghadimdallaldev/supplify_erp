@@ -30,6 +30,7 @@ const mockConfig = vi.hoisted(() => ({
   PAYMENTS_WEBHOOK_SECRET: 'whsec_test',
   REDIS_URL: 'redis://localhost:6379',
   ALLOW_AUTO_SUPER_ADMIN: false,
+  OAUTH_CALLBACK_BASE_URL: 'https://app.example.com',
 }))
 
 vi.mock('../config/env.js', () => ({
@@ -58,7 +59,22 @@ describe('validateProductionConfig prod safety', () => {
       COOKIE_SECURE: true,
       RATE_LIMIT_ENABLED: true,
       ALLOW_AUTO_SUPER_ADMIN: false,
+      OAUTH_CALLBACK_BASE_URL: 'https://app.example.com',
     })
+  })
+
+  it('requires OAUTH_CALLBACK_BASE_URL in prod', async () => {
+    mockConfig.OAUTH_CALLBACK_BASE_URL = ''
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/OAUTH_CALLBACK_BASE_URL/)
+  })
+
+  it('requires OAUTH_CALLBACK_BASE_URL in preprod', async () => {
+    mockConfig.APP_ENV = 'preprod'
+    mockConfig.PAYMENTS_MODE = 'test'
+    mockConfig.OAUTH_CALLBACK_BASE_URL = ''
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/OAUTH_CALLBACK_BASE_URL/)
   })
 
   it('accepts a valid prod configuration', async () => {
@@ -138,14 +154,49 @@ describe('validateProductionConfig prod safety', () => {
 })
 
 describe('validateProductionConfig dev (Railway)', () => {
+  const hostedDev = {
+    APP_ENV: 'dev',
+    NODE_ENV: 'production',
+    KEYCLOAK_CLIENT_SECRET: 'changeme',
+    SESSION_SECRET: 'short-but-not-default',
+    IMPERSONATION_SECRET: 'short-but-not-default-2',
+    ACTIVE_TENANT_SECRET: 'short-but-not-default-3',
+    CONSUMER_AUTH_SECRET: 'short-but-not-default-4',
+    RATE_LIMIT_ENABLED: true,
+    OAUTH_CALLBACK_BASE_URL: '',
+    SMTP_HOST: '',
+    SMTP_PASS: '',
+  }
+
   it('skips strict checks when APP_ENV=dev even if NODE_ENV=production', async () => {
-    Object.assign(mockConfig, {
-      APP_ENV: 'dev',
-      NODE_ENV: 'production',
-      KEYCLOAK_CLIENT_SECRET: 'changeme',
-      SESSION_SECRET: 'short',
-      SMTP_HOST: '',
-      SMTP_PASS: '',
+    Object.assign(mockConfig, hostedDev)
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).not.toThrow()
+  })
+
+  it('refuses disabled rate limiting on a hosted dev image', async () => {
+    Object.assign(mockConfig, hostedDev, { RATE_LIMIT_ENABLED: false })
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/RATE_LIMIT_ENABLED/)
+  })
+
+  it('refuses default or empty signing secrets on a hosted dev image', async () => {
+    Object.assign(mockConfig, hostedDev, {
+      SESSION_SECRET: 'dev-session-secret-change-me',
+      CONSUMER_AUTH_SECRET: 'dev-consumer-auth-secret',
+      ACTIVE_TENANT_SECRET: '',
+    })
+    const { validateProductionConfig } = await import('./validate-config.js')
+    expect(() => validateProductionConfig()).toThrow(/SESSION_SECRET/)
+    expect(() => validateProductionConfig()).toThrow(/CONSUMER_AUTH_SECRET/)
+    expect(() => validateProductionConfig()).toThrow(/ACTIVE_TENANT_SECRET/)
+  })
+
+  it('stays relaxed for local dev (NODE_ENV=development)', async () => {
+    Object.assign(mockConfig, hostedDev, {
+      NODE_ENV: 'development',
+      RATE_LIMIT_ENABLED: false,
+      SESSION_SECRET: 'dev-session-secret-change-me',
     })
     const { validateProductionConfig } = await import('./validate-config.js')
     expect(() => validateProductionConfig()).not.toThrow()

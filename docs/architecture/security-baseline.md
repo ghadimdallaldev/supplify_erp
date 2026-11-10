@@ -60,10 +60,12 @@ Apply dependency upgrades and, where needed, `pnpm overrides` for transitive pac
 - **Current** (`apps/api/src/middlewares/csrf.js`): state-changing requests that carry the session cookie must send the non-simple header `X-Requested-With: Supplify` and an `Origin`/`Referer` in `WEB_ORIGINS`; otherwise 403 `CSRF_FORBIDDEN`. Valid Bearer tokens (mobile) skip the check.
 - **Exemptions**: safe methods; `/health`; `/webhooks/*` (signature-verified); e2e and HMAC upload endpoints; `POST /auth/mobile/refresh` (refresh token in the JSON body, never read from cookies); and `/auth/*` and `/api/public/*` requests **without** a session cookie (anonymous callers and Bearer clients). The OAuth flows (`/auth/login`, `/register`, `/callback`, `GET /logout`) are GET redirects and unaffected.
 - **Cookie requests under `/auth` and `/api/public`** (`POST /auth/refresh`, `/auth/logout`, `/auth/legal-acceptance`, `PATCH /auth/me/locale`, `/auth/admin-preferences`, `POST /api/public/invitations/accept|reject|branch/accept`) are no longer exempt. Fixed 2026-11-10; relevant when `COOKIE_SAME_SITE=none`. The web client already sends the header on every call (RTK base query and `authSessionRefresh.ts`).
-- **Not covered**: the consumer shop cookie (`consumer_auth_token`) under `/api/public/consumer/*` is outside this check; custom-domain shops may not be in `WEB_ORIGINS`.
+- **Consumer shop cookie** (`consumer_auth_token`) under `/api/public/consumer/*`: writes that carry the cookie must send `X-Requested-With: Supplify` (403 `CSRF_FORBIDDEN` otherwise). The Origin allowlist is intentionally **not** applied there because tenant custom shop domains (`tenant_custom_domain`) are not in `WEB_ORIGINS`; the header alone blocks cross-site forms and, with the CORS preflight, cross-origin fetch. The web client (`services/api/base.ts`) and both mobile clients already send the header on every non-GET. Anonymous consumer writes (login, register, guest checkout) are unchanged. Added 2026-11-10 (batch F).
 
 ### 3. Secrets and config
 
+- **Hosted dev images** (`APP_ENV=dev` with `NODE_ENV=production`) are no longer fully exempt from `validateProductionConfig`: `RATE_LIMIT_ENABLED` must be true and `SESSION_SECRET` / `IMPERSONATION_SECRET` / `ACTIVE_TENANT_SECRET` / `CONSUMER_AUTH_SECRET` must not be empty or a built-in development default. `OAUTH_CALLBACK_BASE_URL` is required in preprod and prod. `consumer-auth.service.js` refuses the `dev-consumer-auth-secret` fallback when `NODE_ENV=production`. The `/api/e2e` secret comparison is constant-time. (Batch F, 2026-11-10.)
+- **Dev auto-grants**: the seeded-email role grants (`admin@supplify.com`, `supplifyadmin@supplify.com`, `supplier@`, `restaurant@`) only apply when `APP_ENV=dev`, `NODE_ENV!=='production'` **and** the token has `email_verified=true`.
 - **Default secrets** in `config/env.js` (e.g. `SESSION_SECRET`, `KEYCLOAK_CLIENT_SECRET`) must **never** be used in production.
 - **Recommendation**: In production, require explicit env vars and fail startup if critical secrets are missing or still default.
 
@@ -83,6 +85,16 @@ Apply dependency upgrades and, where needed, `pnpm overrides` for transitive pac
 - **scriptSrc**: `'self'` only (good).
 - **styleSrc**: includes `'unsafe-inline'` for styles.
 - **Recommendation**: When feasible, move to nonce- or hash-based CSP for styles to phase out `'unsafe-inline'`.
+
+### 7. Account linking, OAuth redirect, SSRF, error bodies (batch F, 2026-11-10)
+
+- **Account linking** (`lib/rbac.js`): an existing `app_user` is re-bound to a Keycloak `sub` by email only when the token has `email_verified === true`, and never when the row already holds a real (UUID) different `sub` (403 `ACCOUNT_LINK_CONFLICT`; unverified: 403 `EMAIL_NOT_VERIFIED`). Non-UUID seed placeholders (`admin-sub`) can still be adopted by a verified login. Bearer (mobile) requests now apply the same unverified-email gate as the web callback (`mustBlockUnverifiedEmail`, active when `AUTH_EMAIL_OTP_ENABLED=true`) and answer 403 `EMAIL_NOT_VERIFIED`.
+- **OAuth redirect_uri** (`lib/oauth-callback-origin.js`): when `OAUTH_CALLBACK_BASE_URL` is unset, `X-Forwarded-Host` and `Host` are honoured only if they match `WEB_ORIGINS` or `PUBLIC_API_URL` (scheme taken from the allowlisted origin); otherwise the configured web origin is used. Local dev still trusts the request host.
+- **SSRF guard** (`lib/ssrf-guard.js`): IPv6 literals are fully parsed. IPv4-mapped (dotted or WHATWG hex), IPv4-compatible `::/96`, NAT64 `64:ff9b::/96` (embedded v4 checked) and `64:ff9b:1::/48`, 6to4 `2002::/16` (embedded v4 checked), Teredo, ULA, link-local, site-local, multicast, discard and unparseable literals are rejected. `pinned-fetch.js` already applies the same check to every resolved DNS answer.
+- **5xx bodies** (`middlewares/sanitizeServerErrors.js`, mounted in `server.js`): outside local dev, any 5xx JSON body with an `error` object loses `details`/`stack` and gets the generic message `Internal server error` (503 keeps its curated message). `name`, `ok`, `data` and `requestId` are kept; 4xx/2xx are never modified; the original text is logged with the requestId.
+- **Guest checkout** (`public-sales.routes.js`): added a global 20/hour/IP limit across suppliers and a per-recipient cap (3/hour per email, 3/hour per phone for WhatsApp, Redis-backed with in-memory fallback) on outbound order notifications.
+- **Other**: driver-to-user links require supplier tenant membership (and `linked_user_email` is only returned for members); receiving checks order ownership in the same query that loads order items, before line validation; `chatSendGuard` exempts only the exact read-receipt routes; dispute resolution with credit note/refund needs `INVOICES_MANAGE`.
+- **Deferred**: raw card / PCI handling and Stripe webhook de-duplication (billing is mock-only).
 
 ---
 

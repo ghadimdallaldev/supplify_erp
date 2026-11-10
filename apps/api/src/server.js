@@ -14,6 +14,7 @@ import { logEmailBootMode } from './services/email/email.service.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
+import { sanitizeServerErrors } from './middlewares/sanitizeServerErrors.js'
 import { requestLogger } from './middlewares/requestLogger.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
 import { activeTenantContext } from './middlewares/activeTenantContext.js'
@@ -387,6 +388,8 @@ const sessionMiddleware = session({
 app.use('/auth', sessionMiddleware)
 
 app.use(requestContext)
+// Strip error.message/details from 5xx bodies outside local dev (handlers echo raw error.message).
+app.use(sanitizeServerErrors())
 if (config.ENABLE_REQUEST_LOGGING) {
   app.use(requestLogger)
 }

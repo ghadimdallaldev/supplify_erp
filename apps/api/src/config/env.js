@@ -49,6 +49,8 @@ export const config = {
   PORT: process.env.PORT || 4000,
   WEB_ORIGIN: primaryWebOrigin,
   WEB_ORIGINS,
+  /** Explicit web origin for the OAuth callback (required in preprod/prod; see validate-config). */
+  OAUTH_CALLBACK_BASE_URL: process.env.OAUTH_CALLBACK_BASE_URL || '',
   /** Alias documented for Railway; same as WEB_ORIGINS primary list source */
   CORS_ORIGIN: process.env.CORS_ORIGIN || '',
   PUBLIC_API_URL:

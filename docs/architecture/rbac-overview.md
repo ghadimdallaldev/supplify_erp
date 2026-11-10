@@ -31,17 +31,17 @@ Role identifiers are name strings (not uppercase codes) as defined in `role-matr
 
 ### Supplier roles (9)
 
-| Name                    | Description                                                      |
-| ----------------------- | ---------------------------------------------------------------- |
-| Owner                   | Full access to supplier tenant                                   |
-| Supplier Manager        | Catalog, orders, fulfillment, warehouses; no subscription manage |
-| Warehouse Manager       | Warehouse operations, receiving, fulfillment; no catalog billing |
-| Order Fulfillment Staff | Fulfillment board only; cannot edit warehouse or catalog         |
-| Driver                  | Driver deliveries and GPS tracking only                          |
-| Catalog Manager         | Product catalog and images; no orders or fulfillment             |
-| Promotions Manager      | Deals/promotions with order manage + catalog view for deal ops   |
-| Accountant              | Invoices, payments, reports; read-only orders                    |
-| Viewer                  | Read-only across all supplier areas                              |
+| Name                    | Description                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------- |
+| Owner                   | Full access to supplier tenant                                                                 |
+| Supplier Manager        | Catalog, orders, fulfillment, warehouses; no subscription manage                               |
+| Warehouse Manager       | Warehouse operations, receiving, fulfillment; no catalog billing                               |
+| Order Fulfillment Staff | Fulfillment board only; cannot edit warehouse or catalog                                       |
+| Driver                  | Driver deliveries and GPS tracking only                                                        |
+| Catalog Manager         | Product catalog and images; no orders or fulfillment                                           |
+| Promotions Manager      | Deals/promotions with read-only order + catalog view (no order accept/cancel since 2026-11-10) |
+| Accountant              | Invoices, payments, reports; read-only orders                                                  |
+| Viewer                  | Read-only across all supplier areas                                                            |
 
 ### Admin roles
 
@@ -107,7 +107,7 @@ Permission codes are string enums used in code and DB. `*_MANAGE` implies all ac
 
 ### Fulfillment (supplier)
 
-- `FULFILLMENT_VIEW`, `FULFILLMENT_MANAGE`, `FULFILLMENT_TRANSFER`
+- `FULFILLMENT_VIEW`, `FULFILLMENT_MANAGE`, `FULFILLMENT_TRANSFER` (dispute credit-note/refund resolution needs `INVOICES_MANAGE`, not fulfillment)
 
 ### Promotions (supplier)
 
