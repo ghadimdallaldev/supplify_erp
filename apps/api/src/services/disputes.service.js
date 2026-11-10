@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../lib/db.js'
+import { query, withSavepoint, withTransaction } from '../lib/db.js'
 import { createFulfillmentException } from '../lib/fulfillment-exceptions.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
@@ -808,12 +808,16 @@ export async function resolveDispute(
         }
       } else if (creditNote && disputeRow.invoice_id) {
         try {
-          const applied = await applyCreditToInvoice(client, {
-            creditNoteId: creditNote.id,
-            invoiceId: disputeRow.invoice_id,
-            creditAmount: amount,
-            recordedBy: userId,
-          })
+          // Savepoint so a SQL-level failure here only rolls back this step and
+          // does not leave the outer transaction aborted (COMMIT => silent ROLLBACK).
+          const applied = await withSavepoint(client, () =>
+            applyCreditToInvoice(client, {
+              creditNoteId: creditNote.id,
+              invoiceId: disputeRow.invoice_id,
+              creditAmount: amount,
+              recordedBy: userId,
+            })
+          )
           invoiceAdjustment = {
             status: 'applied',
             invoiceId: disputeRow.invoice_id,

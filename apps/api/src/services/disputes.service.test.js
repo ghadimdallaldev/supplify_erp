@@ -12,6 +12,18 @@ const withTransactionMock = vi.fn()
 
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
+  // Mirrors lib/db.js withSavepoint: SAVEPOINT, run fn, RELEASE or ROLLBACK TO + rethrow.
+  withSavepoint: async (client, fn) => {
+    await client.query('SAVEPOINT sp_test')
+    try {
+      const result = await fn()
+      await client.query('RELEASE SAVEPOINT sp_test')
+      return result
+    } catch (error) {
+      await client.query('ROLLBACK TO SAVEPOINT sp_test')
+      throw error
+    }
+  },
   withTransaction: (handler) => withTransactionMock(handler),
 }))
 
@@ -583,6 +595,85 @@ describe('Disputes Service', () => {
         String(sql).includes('INSERT INTO credit_note')
       )
       expect(insert[1].slice(-3)).toEqual([0, 25, 'ISSUED'])
+    })
+  })
+
+  describe('resolveDispute credit application savepoint', () => {
+    const disputeRow = {
+      id: 'd-2',
+      supplier_id: 's-1',
+      restaurant_id: 'r-1',
+      order_id: 'o-1',
+      invoice_id: 'inv-1',
+      disputed_amount: null,
+      status: 'under_review',
+      replacement_order_id: null,
+    }
+    let clientQuery
+
+    function mockTransaction(failApplyWith) {
+      withTransactionMock.mockImplementation(async (handler) => {
+        clientQuery = vi.fn(async (sql) => {
+          const text = String(sql)
+          if (text.includes('FROM disputes') && text.includes('FOR UPDATE'))
+            return { rows: [disputeRow] }
+          if (text.includes('supplier_total'))
+            return { rows: [{ supplier_total: '100.00', invoice_total: '100.00' }] }
+          if (text.includes('credited_total')) return { rows: [{ credited_total: '0' }] }
+          if (text.includes('INSERT INTO credit_note')) return { rows: [{ id: 'cn-1' }] }
+          // First query issued by applyCreditToInvoice
+          if (text.includes('FROM credit_note') && text.includes('FOR UPDATE')) {
+            if (failApplyWith) throw failApplyWith
+            return { rows: [] }
+          }
+          if (text.includes('INSERT INTO dispute_resolution_effects'))
+            return { rows: [{ id: 'eff-1' }] }
+          return { rows: [] }
+        })
+        return handler({ query: clientQuery })
+      })
+    }
+
+    const sqls = () => clientQuery.mock.calls.map(([sql]) => String(sql))
+
+    it('rolls back to the savepoint and records not_applied when credit application fails', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction()
+      queryMock.mockResolvedValueOnce({
+        rows: [{ id: 'd-2', order_id: 'o-1', restaurant_id: 'r-1', supplier_id: 's-1' }],
+      })
+      queryMock.mockResolvedValue({ rows: [] })
+
+      await resolveDispute('d-2', 's-1', { resolutionType: 'credit_note', creditNoteAmount: 25 })
+
+      const all = sqls()
+      const spIdx = all.findIndex((t) => t.startsWith('SAVEPOINT'))
+      const rbIdx = all.findIndex((t) => t.startsWith('ROLLBACK TO SAVEPOINT'))
+      const effIdx = all.findIndex((t) => t.includes('INSERT INTO dispute_resolution_effects'))
+      expect(spIdx).toBeGreaterThan(-1)
+      expect(rbIdx).toBeGreaterThan(spIdx)
+      expect(effIdx).toBeGreaterThan(rbIdx)
+      expect(all.some((t) => t.startsWith('RELEASE SAVEPOINT'))).toBe(false)
+
+      const effectCall = clientQuery.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO dispute_resolution_effects')
+      )
+      const effectData = JSON.parse(effectCall[1][7])
+      expect(effectData.invoiceAdjustment).toMatchObject({
+        status: 'not_applied',
+        invoiceId: 'inv-1',
+      })
+    })
+
+    it('rolls back to the savepoint before rethrowing an unexpected SQL error', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockTransaction(new Error('current transaction is aborted'))
+
+      await expect(
+        resolveDispute('d-2', 's-1', { resolutionType: 'credit_note', creditNoteAmount: 25 })
+      ).rejects.toThrow('current transaction is aborted')
+
+      expect(sqls().some((t) => t.startsWith('ROLLBACK TO SAVEPOINT'))).toBe(true)
     })
   })
 
