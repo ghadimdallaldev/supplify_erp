@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-10 — Dispute credit application isolated in a savepoint (mobile skipped, no client contract change)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Internal transaction safety only: `resolveDispute` now applies the credit note to the invoice inside `withSavepoint`, so a failed application rolls back to the savepoint instead of aborting the resolve transaction. Request and response shapes are unchanged.
+
+---
+
 ## 2026-11-10 — Audit batch E: web UI bug fixes (type and notification-route parity only)
 
 **Mobile impact:** Two small identical changes in both `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS); everything else is web-only UI behavior with no API, auth, RBAC or notification payload change. `npx tsc --noEmit` passes in both repos.
