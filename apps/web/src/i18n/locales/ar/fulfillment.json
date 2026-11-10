@@ -492,5 +492,9 @@
       "reassignFirst": "أعد تعيين التسليمات النشطة أولاً",
       "deactivateFailed": "تعذّر إلغاء تفعيل السائق"
     }
+  },
+  "toastMessages": {
+    "retryReasonRequired": "سبب إعادة المحاولة مطلوب.",
+    "reassignReasonRequired": "سبب إعادة التعيين مطلوب."
   }
 }

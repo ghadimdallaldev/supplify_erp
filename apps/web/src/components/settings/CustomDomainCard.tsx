@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Globe, Loader2, Save, ShieldCheck, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -18,6 +19,7 @@ type Props = {
 }
 
 export function CustomDomainCard({ allowed, planName, planCode }: Props) {
+  const { t } = useTranslation('common')
   const { data, isLoading, refetch } = useGetSupplierCustomDomainQuery()
   const [updateDomain, { isLoading: saving }] = useUpdateSupplierCustomDomainMutation()
   const [verifyDomain, { isLoading: verifying }] = useVerifySupplierCustomDomainMutation()
@@ -42,13 +44,13 @@ export function CustomDomainCard({ allowed, planName, planCode }: Props) {
   const handleSave = async () => {
     const trimmed = hostname.trim().toLowerCase()
     if (!trimmed) {
-      toast.error('Enter a hostname')
+      toast.error(t('toastMessages.hostnameRequired'))
       return
     }
     try {
       const result = await updateDomain({ hostname: trimmed }).unwrap()
       setInstructions(result.customDomain.verificationInstructions ?? null)
-      toast.success('Domain saved — add DNS records then verify')
+      toast.success(t('toastMessages.domainSavedPending'))
       refetch()
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to save domain')
@@ -58,7 +60,7 @@ export function CustomDomainCard({ allowed, planName, planCode }: Props) {
   const handleVerify = async () => {
     try {
       await verifyDomain().unwrap()
-      toast.success('Domain verified')
+      toast.success(t('toastMessages.domainVerified'))
       setInstructions(null)
       refetch()
     } catch (error: any) {

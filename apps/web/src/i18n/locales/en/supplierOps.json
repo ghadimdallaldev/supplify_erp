@@ -319,5 +319,9 @@
         "paymentsFailed_other": "{{count}} payments failed"
       }
     }
+  },
+  "toastMessages": {
+    "sponsorshipPaymentSubmitted": "Sponsorship payment submitted",
+    "sponsorshipCancelled": "Sponsorship cancelled"
   }
 }

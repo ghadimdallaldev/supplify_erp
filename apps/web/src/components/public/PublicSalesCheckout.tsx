@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Loader2, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -45,6 +46,7 @@ export function PublicSalesCheckout({
   onQuantity,
   onClear,
 }: Props) {
+  const { t: tCommon } = useTranslation('common')
   const sales = supplier.salesLocations?.find(
     (entry) => entry.supplierId === lines[0]?.supplierLocationId
   )
@@ -124,7 +126,7 @@ export function PublicSalesCheckout({
   const place = async () => {
     if (!preview) return
     if (!name.trim() || !phone.trim()) {
-      toast.error('Name and phone are required.')
+      toast.error(tCommon('toastMessages.checkoutNamePhoneRequired'))
       return
     }
     const placementFingerprint = JSON.stringify({
@@ -330,7 +332,7 @@ export function PublicSalesCheckout({
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
                   }),
-                () => toast.error('Could not read your current location.')
+                () => toast.error(tCommon('toastMessages.locationReadFailed'))
               )
             }}
           >

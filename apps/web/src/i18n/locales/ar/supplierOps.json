@@ -319,5 +319,9 @@
         "paymentsFailed_other": "{{count}} دفعات فاشلة"
       }
     }
+  },
+  "toastMessages": {
+    "sponsorshipPaymentSubmitted": "تم إرسال دفعة الرعاية",
+    "sponsorshipCancelled": "تم إلغاء الرعاية"
   }
 }
