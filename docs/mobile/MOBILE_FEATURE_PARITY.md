@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 — promotions.status column widened (mobile skipped, DB-only)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Migration `0230_promotions_status_width.sql` widens `promotions.status` from VARCHAR(20) to VARCHAR(32). The statuses `pending_admin_approval` and `approved_pending_payment` were already allowed by the check constraint and API, but writes failed because they didn't fit the column. No status values, endpoints or payloads change.
+
+---
+
 ## 2026-11-10 — Resend HTTPS API email transport (mobile skipped, server-side only)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). Server-side email transport only: `EMAIL_PROVIDER=resend` sends through `POST https://api.resend.com/emails` because Railway blocks outbound SMTP. New API env vars `RESEND_API_KEY`, `RESEND_API_URL`, `RESEND_TIMEOUT_MS`. No endpoint, auth, RBAC, type, notification payload or mobile env var change.

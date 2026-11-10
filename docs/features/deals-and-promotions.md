@@ -172,14 +172,15 @@ Supplier list responses include `boost_status`: `active` (days remaining, ends a
 
 ## Database
 
-| Migration                                    | Tables                                                                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `0074_promotions.sql`                        | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`             |
-| `0095_deal_promotions_system.sql`            | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config`    |
-| `0123_deal_boost_packages.sql`               | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing                  |
-| `0197_promotion_ad_billing.sql`              | `billing_invoice_id` on promotions, deal_promotions, featured placements; refunded payment status |
-| `0203_promotion_ad_disputed.sql`             | `disputed` payment_status for promotions + featured; `DISPUTED` on billing_payment                |
-| `0216_featured_placement_admin_approval.sql` | Featured placement approval/rejection audit fields and pending-review index                       |
+| Migration                                    | Tables                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `0074_promotions.sql`                        | `promotions`, `promotion_targets`, `promotion_restaurant_targets`, `promotion_usages`                  |
+| `0095_deal_promotions_system.sql`            | Extended promotion columns, `deal_promotions`, `deal_interactions`, `promotion_pricing_config`         |
+| `0123_deal_boost_packages.sql`               | Boost package fields, purchase snapshots, default Starter/Weekly/Monthly pricing                       |
+| `0197_promotion_ad_billing.sql`              | `billing_invoice_id` on promotions, deal_promotions, featured placements; refunded payment status      |
+| `0203_promotion_ad_disputed.sql`             | `disputed` payment_status for promotions + featured; `DISPUTED` on billing_payment                     |
+| `0216_featured_placement_admin_approval.sql` | Featured placement approval/rejection audit fields and pending-review index                            |
+| `0230_promotions_status_width.sql`           | Widens `promotions.status` to VARCHAR(32) so `pending_admin_approval` / `approved_pending_payment` fit |
 
 ## Frontend
 
