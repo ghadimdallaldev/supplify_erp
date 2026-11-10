@@ -53,7 +53,7 @@ After any qualifying change, update:
 
 1. **`docs/mobile/MOBILE_FEATURE_PARITY.md`** — dated entry always (implemented or skipped-with-reason)
 2. **Domain docs** (`docs/features/`, `docs/architecture/`, `docs/operations/`) — update if the change affects documented behavior
-3. **`docs/guides/environment-variables.md`** — add any new env vars
+3. **`docs/operations/environment-variables.md`** — add any new env vars
 4. **`docs/admin/feature-flags.md`** — add any new feature keys
 5. **`docs/architecture/rbac-overview.md`** — add any new permission keys or roles
 

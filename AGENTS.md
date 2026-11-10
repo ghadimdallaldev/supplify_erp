@@ -46,7 +46,7 @@ Priority docs to check:
 
 1. `docs/mobile/MOBILE_FEATURE_PARITY.md` — dated entry always required
 2. `docs/features/`, `docs/architecture/`, `docs/operations/` — update if behavior documented there changed
-3. `docs/guides/environment-variables.md` — new env vars
+3. `docs/operations/environment-variables.md` — new env vars
 4. `docs/admin/feature-flags.md` — new feature keys
 5. `docs/architecture/rbac-overview.md` — new permission keys or roles
 

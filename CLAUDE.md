@@ -50,7 +50,7 @@ Required docs checks after any change:
 
 1. `docs/mobile/MOBILE_FEATURE_PARITY.md` — Add a dated entry for the change (implemented or skipped-with-reason)
 2. Domain docs in `docs/features/`, `docs/architecture/`, `docs/operations/` — Update if the change affects behavior documented there
-3. `docs/guides/environment-variables.md` — Add any new env vars
+3. `docs/operations/environment-variables.md` — Add any new env vars
 4. `docs/admin/feature-flags.md` — Add any new feature keys
 5. `docs/architecture/rbac-overview.md` — Add any new permission keys or roles
 6. Onboarding docs (`docs/onboarding/`) — Update counts (migrations, keys, routes) if they change
