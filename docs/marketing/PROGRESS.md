@@ -4,6 +4,24 @@ Plan: `C:\Users\ghadi.mdallal\.claude\plans\vectorized-greeting-mccarthy.md`
 Video project: `C:\myProjects\video-studio` (Remotion, HyperFrames, GSAP, agent skills)
 Rule: nothing is marked done until the artifact has been rendered/run and inspected.
 
+## Verified full release (2026-11-11)
+
+The complete runtime release is live on dev, preprod and production. HORECA is included in the existing Supplify web/API services; no separate app, database or domain was created. All existing PostgreSQL/Redis volumes and service configuration were preserved during the explicitly approved infrastructure and authentication restarts.
+
+| Repository | Dev runtime source | Preprod    | Prod       |
+| ---------- | ------------------ | ---------- | ---------- |
+| ERP        | `18f7d4a2`         | `76c23759` | `9586ab72` |
+| Android    | `17e5682`          | `c147756`  | `43f03e0`  |
+| iOS        | `d26631e`          | `31d6399`  | `9aa4a79`  |
+
+- Production and preprod runtime trees match across apps, deployment configuration, lockfiles and vendored dependencies. Native source/assets/build configuration match their tested dev runtime trees; native binary builds/store submissions were not part of this release.
+- All **six services in each of preprod and production** are online. Dev web/API/auth/database/Redis are online. All **15 live checks per environment** pass: health/readiness, correct ERP/demo entries, three attribution-preserving aliases, video ranges, QR download, consent/form validation, honeypot, database-backed campaign events, anonymous rejection for campaign admin and ERP APIs, and correct Keycloak discovery/signing keys.
+- All **10 browser checks per environment** pass on dev, preprod and production (30 total), including actual film playback, both complete seven-step phone walkthroughs, all six gallery images at five viewport widths, enlargement/Escape, anonymous submission with an existing ERP cookie, and the campaign sign-in state. Form requests in browser tests are mocked; the separate live event checks verify migration 0231 and the real API/database proxy path without storing a real lead.
+- Final root `pnpm typecheck` passes. Earlier full suites passed **585 web** and **2,542 API** tests; the subsequent storage compatibility fix passes all **17 focused storage security tests**, including six new real-response regressions. Read-only checks against both existing buckets confirm private readiness and anonymous listing denial (403). No bucket policy, credential or access setting was changed.
+- All **12 QR PNG/phone/PDF variants decode and verify**. Production: `https://app.supplifyerp.com/demo/`; phone QR: `/demo/qr/supplify-horeca2026-general_phone.png`; print: `/demo/qr/supplify-horeca2026-general_A5.pdf`.
+- Follow-up: production invoice-overdue, collections-reminder and subscription-billing jobs logged one batch of database connection timeouts during initial startup. No further occurrence was observed during verification; readiness and subsequent DB-backed API checks pass. These billing/notification jobs were not manually rerun, so their next scheduled executions remain to be observed. Runtime SSH diagnostics were unavailable because the workstation has no registered SSH key.
+- Evidence is retained locally under `test-results/horeca-integration/` (three `health-*.json` reports, browser logs, release logs, storage tests and typechecks). Working repositories remain on dev; release pruning ran only in isolated checkouts.
+
 ## Main-app integration and complete release (2026-11-11)
 
 - Live follow-up: all **10 browser checks pass on dev and all 10 on preprod**, including the deployed relative-redirect correction. Final root `pnpm typecheck` passes. Dev API readiness, migration/event persistence, anonymous validation and admin protection also pass through the main web proxy.

@@ -2,6 +2,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 - Full runtime branch promotion verified
+
+The complete Android runtime is promoted through dev `17e5682`, preprod `c147756` and prod `43f03e0`; iOS through dev `d26631e`, preprod `31d6399` and prod `9aa4a79`. Both native typechecks pass and their source/assets/build configuration match the promoted runtime. ERP preprod `76c23759` and prod `9586ab72` are live with the same runtime tree; API readiness, auth realm discovery and anonymous campaign contracts are verified. Native binary builds/store releases were not requested. The storage compatibility correction is server-only and introduces no native client contract change. See `docs/marketing/PROGRESS.md` for release checks and the startup background-job follow-up.
+
 ## 2026-11-11 - Hosted release dependency restoration (infrastructure-only)
 
 The existing preprod/production PostgreSQL, Redis, ClamAV and Keycloak services were started with explicit user approval, preserving their current configuration and data volumes. The server storage readiness verifier also recognizes explicit `NotImplemented` public-access-block responses from documented private-only Railway endpoints after private ACL/configuration checks. This restores existing dependencies without a new native API contract, auth/session flow, permission, feature, notification or required environment key. No additional Android/iOS source change is required; their full release branches already contain the matching campaign clients.

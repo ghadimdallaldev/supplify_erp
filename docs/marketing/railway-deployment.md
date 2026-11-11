@@ -2,6 +2,8 @@
 
 Updated 2026-11-11. This replaces the former standalone Next.js/Railway plan.
 
+Verified live release on 2026-11-11: dev, preprod and production pass their public URL, API readiness, authentication discovery and campaign checks. Production `9586ab72` promotes the complete preprod `76c23759` runtime. Full verification results and the initial background-job timeout follow-up are recorded in `docs/marketing/PROGRESS.md`.
+
 ## URLs
 
 - Dev: https://app-dev.supplifyerp.com/demo/
