@@ -421,7 +421,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void } = {
                           closeNotifications()
                           return
                         }
-                        navigate(resolveNotificationUrl(notification))
+                        navigate(
+                          resolveNotificationUrl(notification, {
+                            tenantType: isEffectiveSupplier ? 'SUPPLIER' : 'RESTAURANT',
+                          })
+                        )
                         closeNotifications()
                       }}
                     >

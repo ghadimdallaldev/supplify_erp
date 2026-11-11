@@ -591,5 +591,8 @@
     "pending_other": "{{count}} طلبات استبدال في انتظار رد المطعم.",
     "orderLine": "بند الطلب",
     "propose": "اقتراح"
+  },
+  "toastMessages": {
+    "publicSalesUpdated": "تم تحديث إعدادات المبيعات العامة"
   }
 }

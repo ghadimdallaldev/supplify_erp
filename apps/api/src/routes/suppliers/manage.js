@@ -17,6 +17,7 @@ import { invalidateTenantProfileCache } from '../../lib/tenant-profile-cache.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import { createPendingActivationSubscription } from '../../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../../lib/tenant-roles.js'
+import { canChangeTenantContactEmail } from '../../lib/tenant-profile-redaction.js'
 import { restaurantSupplierMutationGuard } from '../../lib/route-permissions.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../../lib/safe-update.js'
@@ -78,6 +79,18 @@ router.patch(
           error: {
             name: 'FORBIDDEN',
             message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      if (!canChangeTenantContactEmail(req, supplier.contact_email, updateData.contactEmail)) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Only a workspace owner can change the contact email',
           },
           requestId: req.requestId,
         })

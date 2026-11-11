@@ -45,6 +45,7 @@ export function hasPrivateAccessProof({
   publicGrant,
   publicPolicy,
   publicAccessBlockConfiguration,
+  publicAccessBlockUnsupported = false,
 }) {
   if (storagePublicRead !== false || publicGrant || publicPolicy) return false
 
@@ -56,12 +57,13 @@ export function hasPrivateAccessProof({
   )
   if (blockPublic) return true
 
-  // Railway Buckets are private-only and expose an empty public-access-block
-  // configuration because public buckets/policies are not supported.
+  // Railway Buckets are private-only. Their S3 endpoint can return an empty
+  // access-block configuration or explicitly reject this AWS-only API with 501.
+  // ACL checks and public-read configuration must still pass above.
   return (
     isRailwayStorageEndpoint(endpoint) &&
-    publicAccessBlockConfiguration &&
-    Object.keys(publicAccessBlockConfiguration).length === 0
+    ((publicAccessBlockConfiguration && Object.keys(publicAccessBlockConfiguration).length === 0) ||
+      (publicAccessBlockConfiguration == null && publicAccessBlockUnsupported === true))
   )
 }
 
@@ -178,11 +180,13 @@ export function createS3CompatibleProvider(cfg) {
             }
           }
           let publicAccessBlockConfiguration = null
+          let publicAccessBlockUnsupported = false
           try {
             const block = await s3.send(new GetPublicAccessBlockCommand({ Bucket: bucket }))
             publicAccessBlockConfiguration = block?.PublicAccessBlockConfiguration || null
           } catch (error) {
             if (error?.name !== 'NotImplemented') throw error
+            publicAccessBlockUnsupported = true
           }
           bucketResults.push({
             bucket,
@@ -193,6 +197,7 @@ export function createS3CompatibleProvider(cfg) {
               publicGrant,
               publicPolicy,
               publicAccessBlockConfiguration,
+              publicAccessBlockUnsupported,
             }),
           })
         } catch (error) {

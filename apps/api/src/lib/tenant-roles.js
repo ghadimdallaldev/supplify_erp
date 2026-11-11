@@ -14,6 +14,9 @@ export { RESTAURANT_SYSTEM_ROLES, SUPPLIER_SYSTEM_ROLES }
 
 export const RESERVED_SYSTEM_ROLE_NAMES = Object.freeze([
   'Owner',
+  // Owner-bypass identifiers (TENANT_OWNER_ROLE_NAMES) — a custom role must never carry these.
+  'RESTAURANT_OWNER',
+  'SUPPLIER_OWNER',
   'Restaurant Manager',
   'Supplier Manager',
   'Purchaser',
@@ -93,6 +96,32 @@ export const TENANT_OWNER_ROLE_NAMES = Object.freeze([
   'SUPPLIER_OWNER',
 ])
 
+/** Canonical form for role-name comparisons: trimmed, whitespace-collapsed, lower-cased. */
+export function normalizeRoleName(name) {
+  return String(name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
+const RESERVED_ROLE_NAME_SET = new Set(RESERVED_SYSTEM_ROLE_NAMES.map(normalizeRoleName))
+const OWNER_ROLE_NAME_SET = new Set(TENANT_OWNER_ROLE_NAMES.map(normalizeRoleName))
+
+/** True when a tenant-defined (custom) role may not use this name. */
+export function isReservedRoleName(name) {
+  return RESERVED_ROLE_NAME_SET.has(normalizeRoleName(name))
+}
+
+/** True when the name is one of the owner-bypass identifiers (case-insensitive, trimmed). */
+export function isOwnerRoleName(name) {
+  return OWNER_ROLE_NAME_SET.has(normalizeRoleName(name))
+}
+
+/**
+ * Owner bypass check on a resolved role-name list.
+ * SECURITY: the list comes from getRolesForUser(), which only emits owner names for system
+ * roles (custom roles carrying owner-like names are neutralised there), so exact-match is safe.
+ */
 export function rolesIncludeOwner(roles) {
   if (!Array.isArray(roles) || roles.length === 0) return false
   return roles.some((name) => TENANT_OWNER_ROLE_NAMES.includes(name))
@@ -292,10 +321,58 @@ export async function userHasOwnerRole(userId, tenantId, tenantType) {
      FROM tenant_user_roles tur
      JOIN tenant_roles tr ON tr.id = tur.role_id
      WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
-       AND tr.name = 'Owner'`,
+       AND tr.name = 'Owner' AND tr.is_system = true`,
     [userId, tenantId, tenantType]
   )
   return rows.some((row) => row.is_owner === true)
+}
+
+/**
+ * Verified workspace ownership for authorization decisions (invite acceptance, linked-account
+ * access, branch parent resolution). contact_email is editable tenant data, so it is never proof
+ * of ownership on its own. A user qualifies when they hold the system Owner role, or, only for
+ * legacy tenants that have no role members at all (tenant_user_roles and user_role both empty),
+ * when their email is the tenant contact_email (bootstrap owner). Once a tenant has any member,
+ * editing contact_email can no longer grant ownership.
+ */
+export async function userIsVerifiedTenantOwner(
+  userId,
+  email,
+  tenantId,
+  tenantType,
+  client = null
+) {
+  if (!userId || !tenantId) return false
+  if (tenantType !== 'RESTAURANT' && tenantType !== 'SUPPLIER') return false
+  const db = client ? (sql, params) => client.query(sql, params) : query
+
+  const { rows: ownerRows } = await db(
+    `SELECT 1
+     FROM tenant_user_roles tur
+     JOIN tenant_roles tr ON tr.id = tur.role_id
+     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
+       AND tr.name = 'Owner' AND tr.is_system = true
+     LIMIT 1`,
+    [userId, tenantId, tenantType]
+  )
+  if (ownerRows.length > 0) return true
+
+  const emailLower = String(email ?? '')
+    .trim()
+    .toLowerCase()
+  if (!emailLower) return false
+
+  const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows } = await db(
+    `SELECT (LOWER(TRIM(t.contact_email)) = $3) AS email_match,
+            (NOT EXISTS (SELECT 1 FROM tenant_user_roles WHERE tenant_id = $1 AND tenant_type = $2)
+             AND NOT EXISTS (SELECT 1 FROM user_role WHERE tenant_id = $1 AND tenant_type = $2)
+            ) AS has_no_members
+     FROM ${table} t
+     WHERE t.id = $1`,
+    [tenantId, tenantType, emailLower]
+  )
+  return rows[0]?.email_match === true && rows[0]?.has_no_members === true
 }
 
 export async function assignOwnerRoleForUser(

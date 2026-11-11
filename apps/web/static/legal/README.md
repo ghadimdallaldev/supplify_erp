@@ -26,7 +26,7 @@ Professional Arabic (`ar/`) mirrors the English documents in this directory. Eac
 ## Recommended app acceptance points
 
 - **Registration:** Terms + Privacy acceptance checkbox (full registration pack).
-- **Login (existing users):** When `LEGAL_PACK_VERSION` bumps, users with stale acceptances are redirected to **`/legal/reaccept`** before using `/app/*` or `/staff/dashboard`. See [`docs/ui/LEGAL_PACK_REACCEPTANCE.md`](../../../docs/ui/LEGAL_PACK_REACCEPTANCE.md).
+- **Login (existing users):** When `LEGAL_PACK_VERSION` bumps, users with stale acceptances are redirected to **`/legal/reaccept`** before using `/app/*` or `/staff/dashboard`. See [`docs/guides/ui/LEGAL_PACK_REACCEPTANCE.md`](../../../../docs/guides/ui/LEGAL_PACK_REACCEPTANCE.md).
 - **Supplier deal/boost submission:** Deals & Boost Terms acceptance (included in registration pack for suppliers).
 - **Subscription checkout:** Subscription & Add-on Terms acceptance.
 - **Mobile first login:** Mobile App Terms + push/device permission explanation.

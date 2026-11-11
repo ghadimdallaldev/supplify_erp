@@ -270,7 +270,7 @@ export function ReorderAssistancePanel({
         recommendedQuantity: rec?.recommendedQuantity ?? item.suggestedQty,
         feedbackReason: 'user_marked_incorrect',
       }).unwrap()
-      toast.success('Thanks — we recorded that this recommendation looks incorrect')
+      toast.success(t('toastMessages.recommendationFeedbackRecorded'))
     } catch (e: any) {
       toast.error(e?.data?.error?.message || 'Could not send feedback')
     }

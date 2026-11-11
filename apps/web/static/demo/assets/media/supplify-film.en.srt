@@ -1,0 +1,103 @@
+1
+00:00:00,461 --> 00:00:01,154
+Every day,
+
+2
+00:00:01,164 --> 00:00:03,365
+restaurants and suppliers run on calls,
+
+3
+00:00:03,375 --> 00:00:04,779
+chats and paper.
+
+4
+00:00:04,961 --> 00:00:06,180
+Orders get lost.
+
+5
+00:00:06,190 --> 00:00:07,576
+Stock is a guess.
+
+6
+00:00:07,861 --> 00:00:09,985
+Nobody knows where the delivery is.
+
+7
+00:00:10,661 --> 00:00:13,212
+Supplify puts every order on one line.
+
+8
+00:00:13,901 --> 00:00:15,018
+From the first tap,
+
+9
+00:00:15,028 --> 00:00:16,616
+to the final invoice.
+
+10
+00:00:20,340 --> 00:00:22,276
+A restaurant finds its suppliers,
+
+11
+00:00:22,286 --> 00:00:23,098
+builds an order,
+
+12
+00:00:23,108 --> 00:00:24,189
+and sends it.
+
+13
+00:00:25,100 --> 00:00:26,737
+Then it follows every step,
+
+14
+00:00:26,747 --> 00:00:28,111
+all the way to the door.
+
+15
+00:00:29,141 --> 00:00:30,957
+It confirms what arrived.
+
+16
+00:00:30,967 --> 00:00:31,599
+Next week,
+
+17
+00:00:31,609 --> 00:00:33,474
+reordering takes a few taps.
+
+18
+00:00:35,300 --> 00:00:37,433
+The supplier sees it the moment it lands.
+
+19
+00:00:37,443 --> 00:00:39,565
+Accepts it. Checks stock.
+
+20
+00:00:40,341 --> 00:00:42,379
+A driver takes it from the warehouse,
+
+21
+00:00:42,389 --> 00:00:44,636
+and every status update follows.
+
+22
+00:00:45,301 --> 00:00:46,917
+And you can see who is ordering,
+
+23
+00:00:46,927 --> 00:00:48,070
+and who is due.
+
+24
+00:00:49,601 --> 00:00:52,139
+Your colours. Your logo. Same line.
+
+25
+00:00:52,761 --> 00:00:55,212
+Supplify. Every order, one line.
+
+26
+00:00:55,642 --> 00:00:57,515
+Request a personal demo.

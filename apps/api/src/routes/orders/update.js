@@ -25,7 +25,9 @@ import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
   hasActiveSupplierOrderPromotions,
+  releasePromotionUsageForOrder,
 } from '../../services/promotions.service.js'
+import { reverseSupplierLoyaltyRedeemOnOrderCancel } from '../../services/loyalty.service.js'
 import {
   applyPromotionByIdToOrder,
   validateCouponForOrder,
@@ -54,6 +56,7 @@ import {
 } from '../../services/supplier-inventory.service.js'
 import { ordersRouterMutationGuard } from '../../lib/route-permissions.js'
 import { releaseOrderFromPlannedRoutes } from '../../services/delivery-routes.service.js'
+import { reserveStockForPlacedOrder } from '../../services/supplier-order-stock.service.js'
 import { invalidateDispatchCacheForSupplier } from '../../lib/dispatch-cache.js'
 
 import {
@@ -73,6 +76,46 @@ import {
   assertValidOrderStatusTransition,
   requiresDriverAssignment,
 } from '../../lib/order-status-transitions.js'
+
+/**
+ * Reserve stock for an existing order that is being placed (DRAFT -> PLACED).
+ * Mirrors the direct-place path (restaurant-order-create.service.js / orders/create.js):
+ * same reserveStockForPlacedOrder arguments, inside the caller's transaction, so an
+ * insufficient-stock ValidationError rolls the status change back.
+ */
+async function reserveStockForDraftPlacement(client, order) {
+  const { rows: orderItems } = await client.query(
+    `SELECT oi.*, p.sku
+     FROM order_item oi
+     LEFT JOIN product p ON p.id = oi.product_id
+     WHERE oi.order_id = $1`,
+    [order.id]
+  )
+  if (!orderItems.length) return null
+  const supplierId = orderItems[0].supplier_id
+  if (!supplierId) return null
+
+  const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
+    supplierId,
+  ])
+  const multiWarehouseActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+
+  return reserveStockForPlacedOrder(client, {
+    supplierId,
+    supplier: supplierRows[0] || { id: supplierId },
+    order: { ...order, restaurant_id: order.restaurant_id },
+    orderItems,
+    multiWarehouseActive,
+    // reserveLegacy: true so the legacy cancel path (reserved_qty decrement) stays symmetric.
+    reserveLegacy: true,
+    legacyLineItems: orderItems.map((oi) => ({
+      productId: oi.product_id,
+      quantity: oi.quantity,
+      sku: oi.sku,
+      reserve: true,
+    })),
+  })
+}
 
 const router = express.Router()
 
@@ -400,6 +443,10 @@ router.patch('/:id', async (req, res) => {
       })
     }
 
+    if (order.status === 'DRAFT' && updateData.status === 'PLACED') {
+      updateFields.push(`placed_at = now()`)
+    }
+
     updateFields.push(`updated_at = now()`)
 
     // Now add the WHERE clause with the order id
@@ -491,6 +538,12 @@ router.patch('/:id', async (req, res) => {
         updateValues
       )
 
+      // DRAFT -> PLACED reserves stock exactly like a direct place. A ValidationError
+      // (insufficient stock) aborts this transaction, so the order stays DRAFT.
+      if (lockedOrder.status === 'DRAFT' && updateData.status === 'PLACED') {
+        await reserveStockForDraftPlacement(client, updated[0])
+      }
+
       if (markingDelivered && !isPickup) {
         await client.query(
           `
@@ -521,9 +574,28 @@ router.patch('/:id', async (req, res) => {
       // branch is kept as a safety net but will never trigger in normal operation.
       if (
         (updateData.status === 'CANCELLED' || updateData.status === 'REJECTED') &&
-        lockedOrder.status !== updateData.status
+        lockedOrder.status !== updateData.status &&
+        // Stock is only reserved when an order is PLACED. A DRAFT never reserved
+        // anything, so releasing here would mint inventory out of thin air.
+        lockedOrder.status !== 'DRAFT'
       ) {
         await restoreSupplierStockForOrder(client, id)
+      }
+
+      // Cancelling gives back what checkout consumed: redeemed loyalty points (compensating
+      // REVERSAL ledger entry) and promotion redemptions (usage_count). Both are idempotent
+      // and run in this transaction, so a failure rolls the cancel back instead of leaving
+      // the restaurant out of points.
+      if (
+        updateData.status === 'CANCELLED' &&
+        lockedOrder.status !== 'CANCELLED' &&
+        lockedOrder.status !== 'DRAFT'
+      ) {
+        await reverseSupplierLoyaltyRedeemOnOrderCancel(client, {
+          orderId: id,
+          createdBy: req.userData?.id,
+        })
+        await releasePromotionUsageForOrder(client, id)
       }
 
       if (
@@ -585,6 +657,17 @@ router.patch('/:id', async (req, res) => {
           message: 'Invalid update data',
           details: error.errors,
         },
+        requestId: req.requestId,
+      })
+    }
+
+    // Must precede the ValidationError branch: the concurrent-state error is a
+    // ValidationError subclass instance, and its intended status is 409, not 400.
+    if (error?.code === 'ORDER_STATE_CHANGED') {
+      return res.status(409).json({
+        ok: false,
+        data: null,
+        error: { name: 'ORDER_STATE_CHANGED', message: error.message },
         requestId: req.requestId,
       })
     }

@@ -58,7 +58,7 @@ export function ChatHeader({
             className="h-8 shrink-0 px-2 lg:hidden"
             onClick={onBack}
           >
-            <ArrowLeft className="mr-1 h-4 w-4" />
+            <ArrowLeft className="me-1 h-4 w-4 rtl:rotate-180" />
             {t('header.back')}
           </Button>
         ) : null}
@@ -111,21 +111,21 @@ export function ChatHeader({
 
           <div className="relative hidden md:block">
             <Search
-              className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+              className="pointer-events-none absolute start-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
               aria-hidden
             />
             <Input
               placeholder={t('header.searchInThread')}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-8 w-36 pl-8 lg:w-44"
+              className="h-8 w-36 ps-8 lg:w-44"
               aria-label={t('header.searchMessagesAria')}
             />
             {searchQuery ? (
               <button
                 type="button"
                 onClick={() => onSearchChange('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
+                className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
                 aria-label={t('header.clearMessageSearchAria')}
               >
                 <X className="h-4 w-4" />
@@ -146,7 +146,7 @@ export function ChatHeader({
               <MoreVertical className="h-4 w-4" />
             </Button>
             {showMenu ? (
-              <div className="absolute right-0 top-9 z-50 w-44 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-1">
+              <div className="absolute end-0 top-9 z-50 w-44 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -194,14 +194,14 @@ export function ChatHeader({
 
       <div className="relative md:hidden">
         <Search
-          className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+          className="pointer-events-none absolute start-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
           aria-hidden
         />
         <Input
           placeholder={t('header.searchInThread')}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-8 pl-8"
+          className="h-8 ps-8"
           aria-label={t('header.searchMessagesAria')}
         />
       </div>

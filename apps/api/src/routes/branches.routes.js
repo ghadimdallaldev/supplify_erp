@@ -128,7 +128,11 @@ router.post('/', requireRole(['RESTAURANT', 'SUPPLIER']), multiBranchFeature, as
       })
     }
 
-    const primary = await getPrimaryTenantForUser(req.userData.email, parent.parentType)
+    const primary = await getPrimaryTenantForUser(
+      req.userData.email,
+      parent.parentType,
+      req.userData.id
+    )
     const parentId = primary?.id || parent.parentId
 
     const limitCheck = await checkLinkedAccountLimit(parentId, parent.parentType)
@@ -319,7 +323,11 @@ router.delete(
         })
       }
 
-      const primary = await getPrimaryTenantForUser(req.userData.email, parent.parentType)
+      const primary = await getPrimaryTenantForUser(
+        req.userData.email,
+        parent.parentType,
+        req.userData.id
+      )
       const parentId = primary?.id || parent.parentId
 
       const removed = await removeLinkedBranchAccount({

@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, MapPin, Navigation, Package, Star } from 'lucide-re
 import { Button } from '../ui/button'
 import { formatDeliveryStatus } from '../../lib/deliveryStatusLabels'
 import { formatOrderRef } from '../fulfillment/fulfillmentDispatchUtils'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 import {
   driverStatusBadgeClass,
   getDriverStatusTone,
@@ -129,8 +129,13 @@ function StopDetails({ stop, highlight }: { stop: DeliveryRouteStop; highlight?:
         {(stop.itemCount > 0 || stop.totalAmount > 0) && (
           <p className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
             <Package className="h-3.5 w-3.5" aria-hidden />
-            {stop.itemCount > 0 ? `${stop.itemCount} items` : null}
-            {stop.totalAmount > 0 ? formatPrice(stop.totalAmount) : null}
+            {stop.itemCount > 0 ? (
+              <span>{stop.itemCount === 1 ? '1 item' : `${stop.itemCount} items`}</span>
+            ) : null}
+            {stop.itemCount > 0 && stop.totalAmount > 0 ? <span aria-hidden>·</span> : null}
+            {stop.totalAmount > 0 ? (
+              <span>{formatCurrency(stop.totalAmount, { currency: stop.currency || 'USD' })}</span>
+            ) : null}
           </p>
         )}
         <span

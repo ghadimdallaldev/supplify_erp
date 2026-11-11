@@ -33,6 +33,13 @@ import { ReceivingPendingTab } from '../components/receiving/ReceivingPendingTab
 import { ReceivingHistoryTab } from '../components/receiving/ReceivingHistoryTab'
 import { ReceivingSummaryStrip } from '../components/receiving/ReceivingPendingOrderRow'
 import { SupplierReliabilityCard } from '../components/receiving/SupplierReliabilityCard'
+import {
+  loadReceivingEntries,
+  pruneReceivingEntries,
+  receivingStorageKey,
+  saveReceivingEntries,
+  type ReceivingEntries,
+} from '../lib/receivingOrderStore'
 
 export function ReceivingPage() {
   const { t } = useTranslation('orders')
@@ -88,19 +95,40 @@ export function ReceivingPage() {
     })
   }
 
-  const [receivingOrderIds, setReceivingOrderIds] = useState<Set<string>>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('receivingOrderIds')
-      return stored ? new Set(JSON.parse(stored)) : new Set()
-    }
-    return new Set()
-  })
+  // id -> timestamp it was marked "receiving". Entries expire (see receivingOrderStore) so a
+  // stale id can never leave the Receive button disabled indefinitely.
+  const receivingStorageKeyForUser = receivingStorageKey(user?.id)
+  const [receivingEntries, setReceivingEntries] = useState<ReceivingEntries>(() =>
+    loadReceivingEntries(receivingStorageKeyForUser)
+  )
+  const receivingOrderIds = useMemo(
+    () => new Set(Object.keys(receivingEntries)),
+    [receivingEntries]
+  )
+
+  const markReceiving = (id: string) =>
+    setReceivingEntries((prev) => ({ ...prev, [id]: Date.now() }))
+  const unmarkReceiving = (id: string) =>
+    setReceivingEntries((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('receivingOrderIds', JSON.stringify(Array.from(receivingOrderIds)))
-    }
-  }, [receivingOrderIds])
+    saveReceivingEntries(receivingStorageKeyForUser, receivingEntries)
+  }, [receivingStorageKeyForUser, receivingEntries])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setReceivingEntries((prev) => {
+        const pruned = pruneReceivingEntries(prev)
+        return Object.keys(pruned).length === Object.keys(prev).length ? prev : pruned
+      })
+    }, 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const {
     data: pendingData,
@@ -122,7 +150,7 @@ export function ReceivingPage() {
   const handleSubmitReceiving = async (formData: any) => {
     const orderId = selectedOrder.id
     try {
-      setReceivingOrderIds((prev) => new Set([...prev, orderId]))
+      markReceiving(orderId)
 
       const result = await createReport({
         orderId: selectedOrder.id,
@@ -219,21 +247,15 @@ export function ReceivingPage() {
       )
 
       if (!orderStillPending && reportFound) {
-        setReceivingOrderIds((prev) => {
-          const next = new Set(prev)
-          next.delete(orderId)
-          return next
-        })
+        unmarkReceiving(orderId)
       } else if (!reportFound) {
         console.error('Receiving report not found in history after', maxRetries, 'retries')
+        // Don't leave the order stuck in "processing"; the next refetch reflects server truth.
+        unmarkReceiving(orderId)
       }
     } catch (error: any) {
       toast.error(error?.data?.error?.message || t('receiving.createFailed'))
-      setReceivingOrderIds((prev) => {
-        const next = new Set(prev)
-        next.delete(orderId)
-        return next
-      })
+      unmarkReceiving(orderId)
     }
   }
 
@@ -256,17 +278,18 @@ export function ReceivingPage() {
 
   useEffect(() => {
     if (pendingData?.orders) {
-      setReceivingOrderIds((prev) => {
-        const next = new Set(prev)
+      setReceivingEntries((prev) => {
         const pendingIds = new Set(pendingData.orders.map((o: any) => o.id))
+        const next: ReceivingEntries = {}
         let changed = false
 
-        next.forEach((id) => {
-          if (!pendingIds.has(id)) {
-            next.delete(id)
+        for (const [id, addedAt] of Object.entries(prev)) {
+          if (pendingIds.has(id)) {
+            next[id] = addedAt
+          } else {
             changed = true
           }
-        })
+        }
 
         return changed ? next : prev
       })

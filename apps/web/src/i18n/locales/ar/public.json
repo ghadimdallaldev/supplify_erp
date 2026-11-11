@@ -57,5 +57,8 @@
       "linkCopied": "تم نسخ رابط الكتالوج",
       "copyFailed": "تعذّر نسخ الرابط"
     }
+  },
+  "toastMessages": {
+    "addedToCart": "تمت الإضافة إلى سلتك"
   }
 }

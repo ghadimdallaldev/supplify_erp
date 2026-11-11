@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { apiUrl } from '../lib/apiBase'
+import { CSRF_HEADERS } from '../lib/csrfHeaders'
 import { useSendDriverLocationMutation } from '../services/api'
 import { isTrackableDeliveryStatus } from '../lib/driverGpsTracking'
 import { createDriverLocationProvider } from '../lib/driverLocationPlatform'
@@ -29,6 +31,15 @@ type ActiveDelivery = {
 
 type SessionResponse = { ok: boolean; data?: { session?: { id: string } } }
 
+function stopTrackingSession(sessionId: string, reason: string) {
+  return fetch(apiUrl(`/api/driver/tracking-sessions/${sessionId}/stop`), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
+    body: JSON.stringify({ reason }),
+  })
+}
+
 export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
   const [sendLocation] = useSendDriverLocationMutation()
   const providerRef = useRef(createDriverLocationProvider())
@@ -51,12 +62,15 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
     async function sendPoint(point: DriverLocationPoint) {
       const sessionId = sessionIdRef.current
       if (sessionId) {
-        const response = await fetch(`/api/driver/tracking-sessions/${sessionId}/locations`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(point),
-        })
+        const response = await fetch(
+          apiUrl(`/api/driver/tracking-sessions/${sessionId}/locations`),
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
+            body: JSON.stringify(point),
+          }
+        )
         if (!response.ok) {
           enqueueDriverLocation({ ...point, sessionId })
           setTrackingStatus((prev) =>
@@ -121,16 +135,25 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
       }
       try {
         if (isSessionTrackingEnabledClient()) {
-          const response = await fetch('/api/driver/tracking-sessions', {
+          const response = await fetch(apiUrl('/api/driver/tracking-sessions'), {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
             body: JSON.stringify({ routeId: trackableRef.current[0]?.routeId ?? null }),
           })
           const payload = (await response.json()) as SessionResponse
           if (!response.ok || !payload.data?.session?.id)
             throw new Error('Unable to start the tracking session')
-          sessionIdRef.current = payload.data.session.id
+          const createdSessionId = payload.data.session.id
+          if (cancelled) {
+            // Unmounted (or deps changed) while the session was being created: the cleanup
+            // already ran and never saw this id, so close it here and don't start the watch.
+            void stopTrackingSession(createdSessionId, 'active_assignment_changed').catch(
+              () => undefined
+            )
+            return
+          }
+          sessionIdRef.current = createdSessionId
         }
         await provider.startTracking({
           routeId: trackableRef.current[0]?.routeId ?? null,
@@ -144,7 +167,13 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
             setPermissionDenied(status.gpsState === 'LOCATION_PERMISSION_DENIED')
           },
         })
-        if (!cancelled) setTrackingActive(true)
+        if (cancelled) {
+          // Cleanup ran while startTracking was in flight, so the watch it registered
+          // afterwards would keep tracking GPS after unmount. Stop it again.
+          await provider.stopTracking()
+          return
+        }
+        setTrackingActive(true)
       } catch (error) {
         if (cancelled) return
         setTrackingActive(false)
@@ -159,12 +188,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
       const sessionId = sessionIdRef.current
       sessionIdRef.current = null
       if (sessionId) {
-        void fetch(`/api/driver/tracking-sessions/${sessionId}/stop`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason: 'active_assignment_changed' }),
-        })
+        void stopTrackingSession(sessionId, 'active_assignment_changed').catch(() => undefined)
       }
     }
   }, [sendLocation, trackableKey, trackingRestartToken])
@@ -180,12 +204,7 @@ export function useDriverLocationTracking(activeDeliveries: ActiveDelivery[]) {
     sessionIdRef.current = null
     setTrackingActive(false)
     if (sessionId) {
-      await fetch(`/api/driver/tracking-sessions/${sessionId}/stop`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'driver_action' }),
-      })
+      await stopTrackingSession(sessionId, 'driver_action')
     }
   }
 

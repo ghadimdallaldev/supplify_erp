@@ -1,0 +1,5 @@
+# Retired local authoring archive. The live demo is part of apps/web and apps/api.
+# Preserve local source, dependencies and credentials without shipping a second app.
+*
+!.gitignore
+!README.md

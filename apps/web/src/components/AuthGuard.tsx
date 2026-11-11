@@ -6,6 +6,9 @@ import { setUser, clearUser, setLoading } from '../features/auth/authSlice'
 import { refetchAppSession, hasStaleRegistrationState } from '../lib/refetchAppSession'
 import { needsLegalReacceptance } from '../lib/legalReacceptanceGate'
 import { getRegisterCompletePath } from '../lib/referralToken'
+import { loginPathWithReturnTo } from '../lib/returnTo'
+import { useTranslation } from 'react-i18next'
+import { Button } from './ui/button'
 import { applyAdminPreferences, clearAdminPreferences } from '../lib/adminPreferences'
 import { changeAppLanguage, readStoredLocale } from '../i18n'
 import { isSupportedLocale } from '../i18n/config'
@@ -20,6 +23,12 @@ function isAppShellRoute(pathname: string): boolean {
   return pathname === '/' || pathname.startsWith('/app')
 }
 
+/** Only an explicit auth rejection means "signed out"; network/5xx errors are transient. */
+function isAuthRejection(error: unknown): boolean {
+  const status = (error as { status?: unknown } | undefined)?.status
+  return status === 401 || status === 403
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -28,7 +37,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const isAppRoute = isAppShellRoute(location.pathname)
   const onLegalReacceptPage = location.pathname === '/legal/reaccept'
 
-  const { data, error, isLoading } = useGetMeQuery(undefined, {
+  const { t } = useTranslation()
+  const { data, error, isLoading, refetch } = useGetMeQuery(undefined, {
     refetchOnMountOrArgChange: false,
     refetchOnFocus: false,
     refetchOnReconnect: true,
@@ -88,14 +98,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
       dispatch(setLoading(true))
       return
     }
-    if (error) {
+    if (error && isAuthRejection(error)) {
       stopAuthSessionRefresh()
       dispatch(clearUser())
       dispatch(setLoading(false))
-      navigate('/login')
+      navigate(loginPathWithReturnTo(`${location.pathname}${location.search}${location.hash}`))
       return
     }
-    if (!data) return
+    if (!data) {
+      // Transient failure (network / 5xx) with no session data: keep the user, show retry UI.
+      if (error) dispatch(setLoading(false))
+      return
+    }
 
     dispatch(setUser(data))
     dispatch(setLoading(false))
@@ -137,6 +151,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     dispatch,
     navigate,
     isAppRoute,
+    location.pathname,
+    location.search,
+    location.hash,
   ])
 
   if (!isAppRoute) {
@@ -155,8 +172,22 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  if (error) {
+  if (error && isAuthRejection(error)) {
     return null
+  }
+
+  if (error && !data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-full max-w-md space-y-4 px-6 text-center" role="alert">
+          <h1 className="text-lg font-semibold text-[var(--text)]">{t('sessionError.title')}</h1>
+          <p className="text-sm text-[var(--text-muted)]">{t('sessionError.message')}</p>
+          <Button type="button" onClick={() => void refetch()}>
+            {t('sessionError.retry')}
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (data?.role === 'PENDING' && registerStatusLoading) {

@@ -14,6 +14,7 @@ import { logEmailBootMode } from './services/email/email.service.js'
 import { logger } from './lib/logger.js'
 import { createSessionStore } from './lib/session-store.js'
 import { requestContext } from './middlewares/requestContext.js'
+import { sanitizeServerErrors } from './middlewares/sanitizeServerErrors.js'
 import { requestLogger } from './middlewares/requestLogger.js'
 import { impersonationContext } from './middlewares/impersonationContext.js'
 import { activeTenantContext } from './middlewares/activeTenantContext.js'
@@ -56,6 +57,7 @@ import { billingRoutes } from './routes/billing.routes.js'
 import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
+import { demoCampaignRoutes } from './routes/demo-campaign.routes.js'
 import { publicSalesRoutes } from './routes/public-sales.routes.js'
 import { supplierPublicSalesRoutes } from './routes/supplier-public-sales.routes.js'
 import { consumerAccountRoutes } from './routes/consumer-account.routes.js'
@@ -386,6 +388,8 @@ const sessionMiddleware = session({
 app.use('/auth', sessionMiddleware)
 
 app.use(requestContext)
+// Strip error.message/details from 5xx bodies outside local dev (handlers echo raw error.message).
+app.use(sanitizeServerErrors())
 if (config.ENABLE_REQUEST_LOGGING) {
   app.use(requestLogger)
 }
@@ -397,8 +401,9 @@ app.use(activeTenantContext)
 // Block locked tenants except billing/subscription read endpoints
 app.use(billingAccessMiddleware)
 
-// CSRF protection for state-changing operations (skip for public APIs)
-const csrfBypassPrefixes = ['/api/public', '/webhooks']
+// CSRF protection for state-changing operations. Only signature-verified webhooks bypass it here;
+// /api/public and /auth are handled inside csrfProtection (exempt only when not cookie-authenticated).
+const csrfBypassPrefixes = ['/webhooks']
 app.use((req, res, next) => {
   if (csrfBypassPrefixes.some((prefix) => req.path.startsWith(prefix))) {
     return next()
@@ -511,6 +516,7 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
+app.use('/api/public/demo', demoCampaignRoutes)
 app.use('/api/public', publicSalesRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api/internal', internalAuthRoutes)
@@ -519,9 +525,6 @@ app.use('/api/consumer', consumerAccountRoutes)
 app.use('/api/consumer', consumerRoutes)
 app.use('/api/account', accountRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
-if (allowE2eRoutes()) {
-  app.use('/api/e2e', e2eRoutes)
-}
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)

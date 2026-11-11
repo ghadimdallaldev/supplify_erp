@@ -163,7 +163,6 @@ export async function chargeSupplierSponsorshipInvoice({
   supplierId,
   paymentMethodId = null,
   idempotencyKey,
-  provider = null,
 }) {
   if (!idempotencyKey) {
     throw new SponsorshipError(
@@ -219,7 +218,7 @@ export async function chargeSupplierSponsorshipInvoice({
     }
 
     const method = await getPaymentMethodForCharge(client, supplierId, 'SUPPLIER', paymentMethodId)
-    const gateway = getBillingGateway(provider || method.provider)
+    const gateway = getBillingGateway(method.provider)
     const amount = Number(invoice.amount)
 
     const { rows: paymentRows } = await client.query(

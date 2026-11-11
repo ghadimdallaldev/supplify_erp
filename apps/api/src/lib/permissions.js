@@ -13,6 +13,7 @@ import { getRestaurantOrgRolePermissions } from './restaurant-org.js'
 import {
   ensureTenantSystemRoles,
   getAllPermissionsForTenantType,
+  isOwnerRoleName,
   userHasOwnerRole,
 } from './tenant-roles.js'
 
@@ -75,14 +76,19 @@ async function getLegacyPermissionsForUser(userId, tenantId, tenantType) {
 async function getTenantNamedRoleCodes(userId, tenantId, tenantType) {
   const { rows } = await query(
     `
-    SELECT tr.name
+    SELECT tr.name, tr.is_system
     FROM tenant_user_roles tur
     JOIN tenant_roles tr ON tr.id = tur.role_id
     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
   `,
     [userId, tenantId, tenantType]
   )
-  return rows.map((r) => r.name)
+  // SECURITY: owner-bypass names (Owner / RESTAURANT_OWNER / SUPPLIER_OWNER) only count when
+  // they come from a system role. A custom role that happens to carry one of those names
+  // (legacy rows created before the names were reserved) is surfaced under a neutral label.
+  return rows.map((r) =>
+    !r.is_system && isOwnerRoleName(r.name) ? `Custom: ${r.name.trim()}` : r.name
+  )
 }
 
 async function getTenantNamedPermissionsForUser(userId, tenantId, tenantType) {

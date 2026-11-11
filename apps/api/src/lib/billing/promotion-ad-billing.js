@@ -277,7 +277,6 @@ export async function chargePromotionAdInvoice({
   supplierId,
   paymentMethodId = null,
   idempotencyKey,
-  provider = null,
   expectedType = null,
 }) {
   if (!idempotencyKey) {
@@ -342,7 +341,7 @@ export async function chargePromotionAdInvoice({
     }
 
     const method = await getPaymentMethodForCharge(client, supplierId, 'SUPPLIER', paymentMethodId)
-    const gateway = getBillingGateway(provider || method.provider)
+    const gateway = getBillingGateway(method.provider)
     const amount = Number(invoice.amount)
 
     const { rows: paymentRows } = await client.query(

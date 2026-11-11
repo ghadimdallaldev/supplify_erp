@@ -14,12 +14,18 @@ const ALG = 'HS256'
 const BCRYPT_ROUNDS = 10
 const TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
 
+export const DEV_CONSUMER_AUTH_SECRET = 'dev-consumer-auth-secret'
+
 function secret() {
-  const raw =
-    config.CONSUMER_AUTH_SECRET ||
-    config.JWT_SECRET ||
-    config.SESSION_SECRET ||
-    'dev-consumer-auth-secret'
+  const configured = config.CONSUMER_AUTH_SECRET || config.JWT_SECRET || config.SESSION_SECRET
+  // The development fallback must never sign tokens on a production-built image.
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('CONSUMER_AUTH_SECRET (or SESSION_SECRET) must be set in production')
+  }
+  const raw = configured || DEV_CONSUMER_AUTH_SECRET
+  if (raw === DEV_CONSUMER_AUTH_SECRET && process.env.NODE_ENV === 'production') {
+    throw new Error('CONSUMER_AUTH_SECRET must not use the development default in production')
+  }
   return new TextEncoder().encode(raw)
 }
 

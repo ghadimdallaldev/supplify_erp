@@ -9,7 +9,7 @@ import {
   resolveTenantContext,
   requirePermission,
 } from '../../lib/rbac.js'
-import { query, withTransaction } from '../../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../../lib/db.js'
 import { logger } from '../../lib/logger.js'
 import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.js'
 import {
@@ -448,15 +448,19 @@ export async function createInvoiceFromOrder(order, orderItems, supplierId, clie
       const month = new Date().getMonth() + 1
 
       // Try to use invoice sequence table if available
-      const { rows: sequences } = await client.query(
-        `
+      // Savepoint: a missing table/column must not abort the surrounding transaction
+      // before the timestamp fallback below can run.
+      const { rows: sequences } = await withSavepoint(client, () =>
+        client.query(
+          `
         INSERT INTO invoice_sequence (supplier_id, year, month, current_number, next_number)
         VALUES ($1, $2, $3, 0, 1)
         ON CONFLICT (supplier_id, year, month) 
         DO UPDATE SET next_number = invoice_sequence.next_number + 1
         RETURNING next_number, prefix, format
       `,
-        [supplierId, year, month]
+          [supplierId, year, month]
+        )
       )
 
       if (sequences.length > 0) {

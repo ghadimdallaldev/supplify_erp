@@ -42,5 +42,13 @@
     "createFailed": "فشل إنشاء الفرع",
     "removed": "تمت إزالة الفرع",
     "removeFailed": "فشلت إزالة الفرع"
+  },
+  "toastMessages": {
+    "branchReactivated": "تمت إعادة تفعيل حساب الفرع",
+    "branchUnlinked": "تم فصل حساب الفرع",
+    "ownerEmailRequired": "البريد الإلكتروني للمالك مطلوب",
+    "invitationCancelled": "تم إلغاء الدعوة",
+    "cancelInvitationFailed": "تعذّر إلغاء الدعوة",
+    "resendInvitationFailed": "تعذّر إعادة إرسال الدعوة"
   }
 }

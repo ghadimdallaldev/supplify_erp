@@ -39,7 +39,8 @@ import { toast } from 'sonner'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { formatPrice } from '../utils/format'
+import { formatCurrency, formatPrice } from '../utils/format'
+import { currencyTotals, groupCurrency, DEFAULT_CART_CURRENCY } from '../lib/cartCurrency'
 import { usePermissions } from '../hooks/usePermissions'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { RequirePermission } from '../components/RequirePermission'
@@ -68,19 +69,31 @@ export function CartPage() {
   )
   const dealRedeemGate = getDealRedeemGate(entitlementsData?.entitlements)
   const canRedeemDeals = dealRedeemGate.canRedeem
-  const estimatedPromoDiscount = canRedeemDeals
-    ? (dealsData?.promotions || []).reduce((max, p) => {
-        const val = Number(p.discount_value || 0)
-        if (p.type === 'percentage_discount') {
-          return Math.max(max, (total * val) / 100)
-        }
-        if (p.type === 'fixed_discount') {
-          return Math.max(max, val)
-        }
-        return max
-      }, 0)
-    : 0
+  // Never add different currencies together: one total per currency when suppliers differ.
+  const cartCurrencyTotals = useMemo(() => currencyTotals(groups), [groups])
+  const isMultiCurrency = cartCurrencyTotals.length > 1
+  const cartCurrency = cartCurrencyTotals[0]?.currency ?? DEFAULT_CART_CURRENCY
+  const formatMoney = (amount: number, currency: string = cartCurrency) =>
+    formatCurrency(amount, { currency })
+  const estimatedPromoDiscount =
+    canRedeemDeals && !isMultiCurrency
+      ? (dealsData?.promotions || []).reduce((max, p) => {
+          const val = Number(p.discount_value || 0)
+          if (p.type === 'percentage_discount') {
+            return Math.max(max, (total * val) / 100)
+          }
+          if (p.type === 'fixed_discount') {
+            return Math.max(max, val)
+          }
+          return max
+        }, 0)
+      : 0
   const checkoutTotal = Math.max(0, total - estimatedPromoDiscount)
+  const multiCurrencyTotalLabel = cartCurrencyTotals
+    .map((entry) => formatMoney(entry.subtotal, entry.currency))
+    .join(' + ')
+  const subtotalLabel = isMultiCurrency ? multiCurrencyTotalLabel : formatMoney(total)
+  const checkoutTotalLabel = isMultiCurrency ? multiCurrencyTotalLabel : formatMoney(checkoutTotal)
   const supplierOrderCount = groups.length
   const placeOrderLabel =
     supplierOrderCount > 1
@@ -156,13 +169,21 @@ export function CartPage() {
     rehydrateCart()
   }, [rehydrateCart])
 
+  // Request counter per product so a slow, stale response can't overwrite a newer one
+  // (e.g. rapid +/- taps resolve out of order).
+  const resolveSeqRef = useRef(0)
+  const latestResolveSeqByProduct = useRef(new Map<string, number>())
+
   const applyResolvedPrices = useCallback(
     async (lineItems: Array<{ productId: string; supplierId: string; quantity: number }>) => {
       if (!lineItems.length) return
+      const seq = ++resolveSeqRef.current
+      for (const line of lineItems) latestResolveSeqByProduct.current.set(line.productId, seq)
       try {
         const result = await resolveContractPrices({ items: lineItems }).unwrap()
         for (const resolved of result.items) {
           if (resolved?.unitPrice == null) continue
+          if (latestResolveSeqByProduct.current.get(resolved.productId) !== seq) continue
           dispatch(
             updateItemResolvedPrice({
               productId: resolved.productId,
@@ -455,7 +476,7 @@ export function CartPage() {
                         {group.supplierName}
                       </span>
                       <Badge variant="secondary" className="shrink-0">
-                        ${formatPrice(group.subtotal)}
+                        {formatMoney(group.subtotal, groupCurrency(group))}
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-sm text-[var(--text-muted)]">
@@ -511,6 +532,7 @@ export function CartPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              aria-label={t('page.decreaseQuantity', { name: item.product.name })}
                               onClick={() =>
                                 handleUpdateQuantity(
                                   item.productId,
@@ -524,6 +546,7 @@ export function CartPage() {
                             <Button
                               variant="outline"
                               size="sm"
+                              aria-label={t('page.increaseQuantity', { name: item.product.name })}
                               onClick={() =>
                                 handleUpdateQuantity(
                                   item.productId,
@@ -586,7 +609,7 @@ export function CartPage() {
                           <span className="truncate">{group.supplierName}</span>
                           <span className="shrink-0 tabular-nums">
                             {t('page.groupLine', {
-                              amount: formatPrice(group.subtotal),
+                              amount: formatMoney(group.subtotal, groupCurrency(group)),
                               count: group.items.length,
                             })}
                           </span>
@@ -606,12 +629,12 @@ export function CartPage() {
                 )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[var(--text-muted)]">{t('page.subtotal')}</span>
-                  <span>${formatPrice(total)}</span>
+                  <span>{subtotalLabel}</span>
                 </div>
                 {estimatedPromoDiscount > 0 ? (
                   <div className="flex items-center justify-between text-sm text-[var(--mint)]">
                     <span>{t('page.estDealSavings')}</span>
-                    <span>-${formatPrice(estimatedPromoDiscount)}</span>
+                    <span>-{formatMoney(estimatedPromoDiscount)}</span>
                   </div>
                 ) : dealRedeemGate.limit != null ? (
                   <p className="text-xs text-[var(--text-muted)]">
@@ -626,14 +649,14 @@ export function CartPage() {
                 ) : null}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[var(--text-muted)]">{t('page.tax')}</span>
-                  <span>$0.00</span>
+                  <span>{formatMoney(0)}</span>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between font-semibold text-lg">
                     <span>
                       {supplierOrderCount > 1 ? t('page.combinedTotal') : t('page.total')}
                     </span>
-                    <span>${formatPrice(checkoutTotal)}</span>
+                    <span>{checkoutTotalLabel}</span>
                   </div>
                 </div>
                 {estimatedPromoDiscount > 0 ? (
@@ -690,7 +713,7 @@ export function CartPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-[var(--text-muted)]">{t('page.total')}</p>
-              <p className="text-lg font-semibold tabular-nums">${formatPrice(checkoutTotal)}</p>
+              <p className="text-lg font-semibold tabular-nums">{checkoutTotalLabel}</p>
             </div>
             {canPlaceOrders ? (
               <Button
@@ -809,13 +832,13 @@ export function CartPage() {
                     <div key={group.supplierId} className="flex justify-between gap-2">
                       <span className="font-medium truncate">{group.supplierName}</span>
                       <span className="text-[var(--text-muted)] shrink-0 tabular-nums">
-                        ${formatPrice(group.subtotal)}
+                        {formatMoney(group.subtotal, groupCurrency(group))}
                       </span>
                     </div>
                   ))}
                   <div className="flex justify-between gap-2 pt-2 border-t border-[var(--app-border)] font-semibold">
                     <span>{t('page.combinedTotal')}</span>
-                    <span>${formatPrice(checkoutTotal)}</span>
+                    <span>{checkoutTotalLabel}</span>
                   </div>
                 </div>
               )}

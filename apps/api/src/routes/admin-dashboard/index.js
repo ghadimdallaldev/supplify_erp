@@ -11,6 +11,7 @@ import limitsRouter from './limits.js'
 import healthRouter from './health.js'
 import financeRouter from './finance.js'
 import featuresRouter from './features.js'
+import { demoCampaignAdminRoutes } from '../demo-campaign.routes.js'
 
 const router = Router()
 
@@ -38,5 +39,6 @@ router.use(limitsRouter)
 router.use(healthRouter)
 router.use(financeRouter)
 router.use(featuresRouter)
+router.use('/demo', demoCampaignAdminRoutes)
 
 export default router

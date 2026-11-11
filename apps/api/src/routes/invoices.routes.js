@@ -374,7 +374,10 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
     })
   } catch (error) {
     logger.error('Update invoice error:', error)
-    res.status(error.statusCode || 500).json({
+    const statusCode =
+      error.statusCode ||
+      (error.name === 'ConflictError' ? 409 : error.name === 'ValidationError' ? 400 : 500)
+    res.status(statusCode).json({
       ok: false,
       data: null,
       error: {

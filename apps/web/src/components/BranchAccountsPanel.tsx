@@ -200,7 +200,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       if (useSupplierOrg) await reactivateOrgBranch(branchId).unwrap()
       else if (useRestaurantOrg) await reactivateRestaurantOrgBranch(branchId).unwrap()
       refetch()
-      toast.success('Branch Account reactivated')
+      toast.success(t('toastMessages.branchReactivated'))
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
@@ -221,7 +221,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       if (useSupplierOrg) await unlinkOrgBranch(branchId).unwrap()
       else if (useRestaurantOrg) await unlinkRestaurantOrgBranch(branchId).unwrap()
       refetch()
-      toast.success('Branch Account unlinked')
+      toast.success(t('toastMessages.branchUnlinked'))
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: { message?: string } } })?.data?.error?.message ||
@@ -233,7 +233,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
   const handleInviteExisting = async () => {
     const email = linkEmail.trim()
     if (!email) {
-      toast.error('Owner email is required')
+      toast.error(t('toastMessages.ownerEmailRequired'))
       return
     }
     try {
@@ -261,9 +261,9 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       if (useSupplierOrg) await cancelOrgLinkInvite(id).unwrap()
       else await cancelRestaurantLinkInvite(id).unwrap()
       refetch()
-      toast.success('Invitation cancelled')
+      toast.success(t('toastMessages.invitationCancelled'))
     } catch {
-      toast.error('Failed to cancel invitation')
+      toast.error(t('toastMessages.cancelInvitationFailed'))
     }
   }
 
@@ -275,7 +275,7 @@ export function BranchAccountsPanel({ entityLabel = 'location' }: { entityLabel?
       toast.success(result.invite_url ? `Resent. Share: ${result.invite_url}` : 'Invitation resent')
       refetch()
     } catch {
-      toast.error('Failed to resend invitation')
+      toast.error(t('toastMessages.resendInvitationFailed'))
     }
   }
 

@@ -49,3 +49,21 @@ export function presentSupplier(req, row, options = {}) {
 export function presentPublicSupplier(row) {
   return stripFinancialFields(row)
 }
+
+function normalizeContactEmail(email) {
+  return String(email ?? '')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * contact_email is an ownership hint (bootstrap owner, notification target), so only a workspace
+ * owner (or an admin) may change it; SETTINGS_EDIT alone is not enough. Resubmitting the current
+ * value is always allowed so settings forms that send the whole profile keep working.
+ */
+export function canChangeTenantContactEmail(req, currentEmail, nextEmail) {
+  if (nextEmail === undefined) return true
+  if (normalizeContactEmail(nextEmail) === normalizeContactEmail(currentEmail)) return true
+  if (req.userData?.role === 'ADMIN') return true
+  return rolesIncludeOwner(req.tenantContext?.roles)
+}

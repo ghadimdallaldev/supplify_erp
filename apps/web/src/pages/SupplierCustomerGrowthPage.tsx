@@ -735,7 +735,9 @@ export function SupplierCustomerGrowthPage() {
                       </td>
                       <td className="py-3 pr-4">
                         {s.sponsored_amount != null
-                          ? `$${Number(s.sponsored_amount).toFixed(2)} ${s.currency || 'USD'}`
+                          ? formatCurrency(Number(s.sponsored_amount), {
+                              currency: s.currency || 'USD',
+                            })
                           : '—'}
                       </td>
                       <td className="py-3">
@@ -758,7 +760,7 @@ export function SupplierCustomerGrowthPage() {
                                         idempotencyKey: key,
                                       }).unwrap()
                                     }
-                                    toast.success('Sponsorship payment submitted')
+                                    toast.success(t('toastMessages.sponsorshipPaymentSubmitted'))
                                     refetchSponsorships()
                                   } catch (e: unknown) {
                                     toast.error(
@@ -781,7 +783,7 @@ export function SupplierCustomerGrowthPage() {
                                 onClick={async () => {
                                   try {
                                     await cancelSponsorship({ id: s.id }).unwrap()
-                                    toast.success('Sponsorship cancelled')
+                                    toast.success(t('toastMessages.sponsorshipCancelled'))
                                     refetchSponsorships()
                                   } catch (e: unknown) {
                                     toast.error(

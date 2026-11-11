@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Pool } from 'pg'
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
@@ -175,6 +176,42 @@ export async function withTransaction(fn) {
     throw error
   } finally {
     client.release()
+  }
+}
+
+let savepointCounter = 0
+const SAVEPOINT_NAME_RE = /^[a-z_][a-z0-9_]*$/
+
+/**
+ * Run `fn` inside a SAVEPOINT on an open transaction client.
+ *
+ * Postgres aborts the whole transaction on the first failed statement, and a later
+ * COMMIT silently becomes a ROLLBACK. Wrap best-effort work that is followed by
+ * try/catch in this helper so a failure only rolls back to the savepoint and the
+ * outer transaction stays usable.
+ *
+ * @param {{ query: Function }} client - client inside BEGIN
+ * @param {() => Promise<any>} fn
+ * @param {string} [name] - optional identifier (lowercase letters, digits, underscore)
+ */
+export async function withSavepoint(client, fn, name) {
+  savepointCounter = (savepointCounter + 1) % Number.MAX_SAFE_INTEGER
+  const spName = name || `sp_${savepointCounter.toString(16)}_${randomBytes(4).toString('hex')}`
+  if (!SAVEPOINT_NAME_RE.test(spName)) {
+    throw new Error(`Invalid savepoint name: ${spName}`)
+  }
+  await client.query(`SAVEPOINT ${spName}`)
+  try {
+    const result = await fn()
+    await client.query(`RELEASE SAVEPOINT ${spName}`)
+    return result
+  } catch (error) {
+    try {
+      await client.query(`ROLLBACK TO SAVEPOINT ${spName}`)
+    } catch (rollbackError) {
+      logger.error('Savepoint rollback failed', { savepoint: spName, error: rollbackError.message })
+    }
+    throw error
   }
 }
 

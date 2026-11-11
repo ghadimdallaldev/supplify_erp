@@ -4,7 +4,11 @@
 import { query } from './db.js'
 import { ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
 import { MAIN_ADMIN_ROLE_NAME } from './workspace-membership.js'
-import { getAllPermissionsForTenantType, userHasOwnerRole } from './tenant-roles.js'
+import {
+  getAllPermissionsForTenantType,
+  isOwnerRoleName,
+  userHasOwnerRole,
+} from './tenant-roles.js'
 import { getPermissionsForUser, hasPermission } from './permissions.js'
 
 export async function getRolePermissionSet(roleId, client = null) {
@@ -142,7 +146,7 @@ export async function assertCanAssignRole({
     throw new ValidationError('Role does not belong to this tenant')
   }
 
-  if (role.name === MAIN_ADMIN_ROLE_NAME) {
+  if (isOwnerRoleName(role.name)) {
     if (!requesterIsPlatformAdmin) {
       const requesterIsTenantOwner = await userHasOwnerRole(requesterId, tenantId, tenantType)
       const requesterIsOrgOwner = organizationId

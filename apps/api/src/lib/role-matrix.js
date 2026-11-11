@@ -195,13 +195,7 @@ export const SUPPLIER_SYSTEM_ROLES = [
     name: 'Promotions Manager',
     legacyNames: ['Sales Rep', 'Sales/Deals Manager'],
     description: 'Deals, promotions, and reorder intelligence; read-only order/catalog context',
-    permissions: [
-      P.PROMOTIONS_VIEW,
-      P.PROMOTIONS_MANAGE,
-      P.ORDERS_VIEW,
-      P.ORDERS_MANAGE,
-      P.CATALOG_VIEW,
-    ],
+    permissions: [P.PROMOTIONS_VIEW, P.PROMOTIONS_MANAGE, P.ORDERS_VIEW, P.CATALOG_VIEW],
   },
   {
     name: 'Accountant',

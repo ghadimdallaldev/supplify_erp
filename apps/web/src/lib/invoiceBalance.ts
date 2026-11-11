@@ -1,3 +1,18 @@
+/** Round a money amount to 2 decimals (avoids 0.1 + 0.2 style float drift). */
+export function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+/** Integer cents, for exact comparisons. */
+export function toCents(value: number): number {
+  return Math.round((Number(value) || 0) * 100)
+}
+
+/** True when `amount` is strictly more than `limit`, compared in cents. */
+export function exceedsAmount(amount: number, limit: number): boolean {
+  return toCents(amount) > toCents(limit)
+}
+
 /** Canonical remaining balance from list/detail invoice rows. */
 export function invoiceRemainingBalance(
   invoice:
@@ -12,14 +27,14 @@ export function invoiceRemainingBalance(
 ): number {
   if (!invoice) return 0
   if (invoice.remaining_balance != null && invoice.remaining_balance !== '') {
-    return Math.max(0, parseFloat(String(invoice.remaining_balance)))
+    return Math.max(0, roundMoney(parseFloat(String(invoice.remaining_balance))))
   }
   if (invoice.balance_due != null && invoice.balance_due !== '') {
-    return Math.max(0, parseFloat(String(invoice.balance_due)))
+    return Math.max(0, roundMoney(parseFloat(String(invoice.balance_due))))
   }
   const total = parseFloat(String(invoice.total_amount ?? 0))
   const paid = parseFloat(String(invoice.total_paid ?? 0))
-  return Math.max(0, total - paid)
+  return Math.max(0, roundMoney(total - paid))
 }
 
 /** Calendar day from a DATE (`YYYY-MM-DD`) or an ISO instant, in local time. */

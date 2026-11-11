@@ -155,12 +155,13 @@ export async function initializeSocket(server) {
 
   io.use(async (socket, next) => {
     try {
-      const { user, tenantId } = await resolveSocketUserFromCookieHeader(
+      const { user, tenantId, tenantType } = await resolveSocketUserFromCookieHeader(
         socket.handshake.headers.cookie || ''
       )
       socket.data.userId = user.id
       socket.data.role = user.role
       socket.data.tenantId = tenantId
+      socket.data.tenantType = tenantType
       next()
     } catch (error) {
       const message =
@@ -175,10 +176,12 @@ export async function initializeSocket(server) {
     if (userId) {
       socket.join(userRoom(userId))
     }
-    if (socket.data.tenantId && socket.data.role === 'RESTAURANT') {
+    // tenantId is only set after resolveSocketUserFromCookieHeader verified membership
+    // (userCanAccessTenant); rooms follow the verified tenant type, not the client-visible role.
+    if (socket.data.tenantId && socket.data.tenantType === 'RESTAURANT') {
       socket.join(restaurantRoom(socket.data.tenantId))
     }
-    if (socket.data.tenantId && (socket.data.role === 'SUPPLIER' || socket.data.role === 'ADMIN')) {
+    if (socket.data.tenantId && socket.data.tenantType === 'SUPPLIER') {
       socket.join(supplierRoom(socket.data.tenantId))
     }
 
