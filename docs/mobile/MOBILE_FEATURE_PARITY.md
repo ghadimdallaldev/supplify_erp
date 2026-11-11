@@ -2,6 +2,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 - Railway demo alias correction (web-only)
+
+Demo aliases now emit relative redirects behind Railway TLS so QR attribution remains on the public HTTPS origin. This Nginx-only correction has no API, auth, RBAC, shared type, feature, notification or environment contract impact; Android and iOS require no additional source changes. Both native full runtime trees are already promoted through preprod and prod with their anonymous campaign clients.
+
 ## 2026-11-11 — Public demo integrated into the main Supplify deployment
 
 **Mobile impact:** Both Android (`supplify-mobile`) and iOS (`supplify-mobile-ios`) now include matching `src/types/demoCampaign.ts` and `src/services/api/demoCampaign.ts` for `/api/public/demo/leads` and `/api/public/demo/events`. These helpers omit ERP cookies/tokens and do not refresh, sign out or create accounts. Web contracts are exported from `apps/web/src/types/demoCampaign.ts`. Operational screens, auth/session behavior and notifications are unchanged. Campaign lead administration is web-only and reuses `ADMIN_GROWTH`; no new permission/feature/environment key. See `docs/features/demo-experience.md` for payloads, migration 0231 and deployment URLs. The complete dev release, including prior Android/iOS changes, follows dev → preprod → prod.

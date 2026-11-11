@@ -7,7 +7,13 @@ test.beforeEach(async ({ page }) => {
 
 test('public aliases preserve the QR attribution and use the main web demo entry', async ({
   page,
+  request,
 }) => {
+  for (const alias of ['/demo', '/horeca', '/horeca/']) {
+    const response = await request.get(`${alias}?utm_source=qr`, { maxRedirects: 0 })
+    expect(response.status()).toBe(308)
+    expect(response.headers().location).toBe('/demo/?utm_source=qr')
+  }
   await page.goto('/horeca?utm_source=qr&utm_content=supplier&role=supplier')
   await expect(page).toHaveURL(/\/demo\/\?utm_source=qr&utm_content=supplier&role=supplier$/)
   await expect(page.locator('#sim-supplier')).toBeVisible()
@@ -29,10 +35,12 @@ test('video supports range requests and actually plays', async ({ page, request 
     .toBeGreaterThan(0)
 })
 
-test('demo request is anonymous even with an existing ERP cookie', async ({ page, context }) => {
-  await context.addCookies([
-    { name: 'access_token', value: 'existing-session', url: 'http://127.0.0.1:5180' },
-  ])
+test('demo request is anonymous even with an existing ERP cookie', async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await context.addCookies([{ name: 'access_token', value: 'existing-session', url: baseURL! }])
   let submitted: Record<string, unknown> | undefined
   await page.route('**/api/public/demo/leads', async (route) => {
     expect((await route.request().allHeaders()).cookie).toBeUndefined()
