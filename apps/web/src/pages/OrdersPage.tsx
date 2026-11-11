@@ -47,6 +47,7 @@ import { formatPrice } from '../utils/format'
 import { DeclineOrderDialog } from '../components/orders/DeclineOrderDialog'
 import { OrdersResponsiveList } from '../components/orders/OrdersResponsiveList'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
+import { orderMatchesTab, serverStatusForTab } from '../lib/orderTabs'
 
 const ORDERS_PAGE_SIZE = 20
 
@@ -126,11 +127,14 @@ export function OrdersPage() {
 
   useEffect(() => {
     setOffset(0)
-  }, [status, debouncedSearch, dateFrom, dateTo, restaurantFilter])
+  }, [status, activeTab, debouncedSearch, dateFrom, dateTo, restaurantFilter])
+
+  // The API takes a single status, so single-status tabs (new, shipped) filter server side.
+  const effectiveStatus = status || serverStatusForTab(activeTab)
 
   const { data, isLoading, isFetching, error, refetch } = useGetOrdersQuery(
     {
-      status: status || undefined,
+      status: effectiveStatus || undefined,
       restaurant: restaurantFilter || undefined,
       q: debouncedSearch || undefined,
       from: dateFrom || undefined,
@@ -321,18 +325,7 @@ export function OrdersPage() {
   const filteredOrders = useMemo(() => {
     return (data?.orders ?? []).filter((order: any) => {
       if (status) return true
-      if (activeTab === 'all') return true
-      if (activeTab === 'new') return order.status === 'PLACED'
-      if (activeTab === 'processing') {
-        return ['ACKNOWLEDGED', 'PROCESSING', 'SHIPPED'].includes(order.status)
-      }
-      if (activeTab === 'shipped') return order.status === 'SHIPPED'
-      if (activeTab === 'completed') {
-        return ['RECEIVED_FULL', 'RECEIVED_WITH_DISPUTE', 'INVOICED', 'COMPLETED'].includes(
-          order.status
-        )
-      }
-      return true
+      return orderMatchesTab(activeTab, order.status)
     })
   }, [data?.orders, status, activeTab])
 

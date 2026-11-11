@@ -118,12 +118,21 @@ export async function saveExpoPushDevice(userId, { token, platform }) {
   if (!isValidExpoPushToken(token) || !['ios', 'android'].includes(platform)) {
     throw new Error('Invalid expo push device payload')
   }
-  return upsertOwnedPushSubscription(userId, {
-    endpoint: expoPushEndpoint(token),
-    p256dh: 'expo',
-    auth: platform,
-    userAgent: null,
-  })
+  // An Expo token identifies the phone, not the account. When someone else was signed in on this
+  // phone before (and its revoke never ran), the device moves to the user who is signed in now;
+  // otherwise that user would get a 409 here and never receive push.
+  const { rows } = await query(
+    `
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+    VALUES ($1, $2, 'expo', $3, NULL)
+    ON CONFLICT (endpoint)
+    DO UPDATE SET user_id = EXCLUDED.user_id,
+                  auth = EXCLUDED.auth
+    RETURNING *
+    `,
+    [userId, expoPushEndpoint(token), platform]
+  )
+  return rows[0]
 }
 
 export async function removeExpoPushDevice(userId, token) {

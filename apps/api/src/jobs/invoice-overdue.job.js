@@ -42,22 +42,32 @@ export async function checkOverdueInvoices() {
             OR (sub.tenant_id = $2 AND sub.tenant_type = 'SUPPLIER')`,
         [billingRestaurantId, billingSupplierId]
       )
-      if (!subCheck[0]?.restaurant_ok || !subCheck[0]?.supplier_ok) {
-        skippedLocked++
-        continue
+      let locked = !subCheck[0]?.restaurant_ok || !subCheck[0]?.supplier_ok
+      if (!locked) {
+        const [restaurantUnlocked, supplierUnlocked] = await Promise.all([
+          isTenantUnlockedForBackgroundWrites({
+            tenantId: restaurantId,
+            tenantType: 'RESTAURANT',
+          }),
+          isTenantUnlockedForBackgroundWrites({
+            tenantId: supplierId,
+            tenantType: 'SUPPLIER',
+          }),
+        ])
+        locked = !restaurantUnlocked || !supplierUnlocked
       }
-
-      const [restaurantUnlocked, supplierUnlocked] = await Promise.all([
-        isTenantUnlockedForBackgroundWrites({
-          tenantId: restaurantId,
-          tenantType: 'RESTAURANT',
-        }),
-        isTenantUnlockedForBackgroundWrites({
-          tenantId: supplierId,
-          tenantType: 'SUPPLIER',
-        }),
-      ])
-      if (!restaurantUnlocked || !supplierUnlocked) {
+      if (locked) {
+        // The invoice is overdue regardless of the tenants' subscription state, so
+        // reports and balances must show it. Only the notification is skipped; the
+        // invoice keeps overdue_notified_at NULL so it is notified once unlocked.
+        await query(
+          `UPDATE invoice
+           SET status = 'OVERDUE', updated_at = NOW()
+           WHERE id = $1
+             AND balance_due > 0
+             AND status IN ('ISSUED', 'PARTIALLY_PAID')`,
+          [id]
+        )
         skippedLocked++
         continue
       }

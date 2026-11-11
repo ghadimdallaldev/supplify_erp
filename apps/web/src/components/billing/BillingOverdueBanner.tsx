@@ -6,10 +6,13 @@ import { useGetBillingStatusQuery } from '../../services/api'
 import { useAppDispatch } from '../../hooks/redux'
 import { openOverduePayment } from '../../lib/openPaymentModal'
 import { openBrowseUpgrade } from '../../lib/openBrowseUpgrade'
+import { useImpersonation } from '../../hooks/useImpersonation'
+import { billingSettingsPath } from '../../lib/notificationAlerts'
 
 export function BillingOverdueBanner() {
   const { t } = useTranslation('common')
   const dispatch = useAppDispatch()
+  const { isEffectiveSupplier } = useImpersonation()
   const { data: billing } = useGetBillingStatusQuery()
 
   if (!billing?.access) return null
@@ -37,7 +40,13 @@ export function BillingOverdueBanner() {
             type="button"
             size="sm"
             className="shrink-0"
-            onClick={() => openBrowseUpgrade(dispatch, { upgradeUrl: '/app/settings?tab=plan' })}
+            onClick={() =>
+              openBrowseUpgrade(dispatch, {
+                upgradeUrl: billingSettingsPath({
+                  tenantType: isEffectiveSupplier ? 'SUPPLIER' : 'RESTAURANT',
+                }),
+              })
+            }
           >
             {t('billingOverdue.freeTrial.cta')}
           </Button>

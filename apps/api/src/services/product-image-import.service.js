@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import yauzl from 'yauzl'
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { config } from '../config/env.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
@@ -969,13 +969,16 @@ export async function processImageImportJob(jobId) {
               buffer,
             })
 
-            await client.query(
-              `
+            // Savepoint so a failed UPDATE only fails this match, not the rest of the batch.
+            await withSavepoint(client, () =>
+              client.query(
+                `
                 UPDATE product
                 SET image_url = $1, image_thumb_url = $2, updated_at = now()
                 WHERE id = $3 AND supplier_id = $4
               `,
-              [uploaded.imageUrl, uploaded.imageThumbUrl, match.productId, job.supplier_id]
+                [uploaded.imageUrl, uploaded.imageThumbUrl, match.productId, job.supplier_id]
+              )
             )
 
             matched += 1

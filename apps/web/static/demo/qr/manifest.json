@@ -1,0 +1,22 @@
+{
+  "staging": false,
+  "base_url": "https://app.supplifyerp.com/demo",
+  "campaign": "horeca-beirut-2026",
+  "files": [
+    {
+      "variant": "general",
+      "url": "https://app.supplifyerp.com/demo/?utm_source=qr&utm_medium=horeca2026&utm_campaign=horeca-beirut-2026&utm_content=general",
+      "stem": "supplify-horeca2026-general"
+    },
+    {
+      "variant": "restaurant",
+      "url": "https://app.supplifyerp.com/demo/?utm_source=qr&utm_medium=horeca2026&utm_campaign=horeca-beirut-2026&utm_content=restaurant&role=restaurant",
+      "stem": "supplify-horeca2026-restaurant"
+    },
+    {
+      "variant": "supplier",
+      "url": "https://app.supplifyerp.com/demo/?utm_source=qr&utm_medium=horeca2026&utm_campaign=horeca-beirut-2026&utm_content=supplier&role=supplier",
+      "stem": "supplify-horeca2026-supplier"
+    }
+  ]
+}

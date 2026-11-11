@@ -353,6 +353,89 @@ export async function redeemLoyaltyAtCheckout(
   }
 }
 
+/**
+ * Cancelling an order gives back the points redeemed at checkout. Writes a compensating
+ * REVERSAL ledger row (the ledger is append-only) and restores the balance, in the caller's
+ * transaction. Idempotent: the balance row is locked first, then an existing REVERSAL for
+ * this order/program makes a repeat a no-op. Points earned on receive cannot exist for an
+ * order that is still cancellable (cancel is blocked after SHIPPED).
+ */
+export async function reverseSupplierLoyaltyRedeemOnOrderCancel(
+  client,
+  { orderId, createdBy = null }
+) {
+  const { rows: redeems } = await client.query(
+    `
+    SELECT supplier_id, restaurant_id,
+           COALESCE(SUM(-points_delta), 0)::int AS points,
+           COALESCE(SUM(monetary_value), 0) AS monetary_value
+    FROM loyalty_ledger
+    WHERE order_id = $1 AND entry_type = 'REDEEM'
+    GROUP BY supplier_id, restaurant_id
+    `,
+    [orderId]
+  )
+
+  const reversed = []
+  for (const redeem of redeems) {
+    const points = Number(redeem.points) || 0
+    if (points <= 0) continue
+
+    // Locks the balance row, serialising concurrent cancels of the same order.
+    const balance = await getOrCreateBalance(client, redeem.supplier_id, redeem.restaurant_id)
+
+    const { rows: existing } = await client.query(
+      `
+      SELECT id FROM loyalty_ledger
+      WHERE order_id = $1 AND supplier_id = $2 AND restaurant_id = $3
+        AND entry_type = 'REVERSAL' AND reference_type = 'order_cancel'
+      LIMIT 1
+      `,
+      [orderId, redeem.supplier_id, redeem.restaurant_id]
+    )
+    if (existing.length > 0) continue
+
+    const balanceAfter = Number(balance.points_balance) + points
+    await client.query(
+      `
+      UPDATE restaurant_loyalty_balance
+      SET points_balance = $1,
+          lifetime_redeemed = GREATEST(0, lifetime_redeemed - $2),
+          updated_at = NOW()
+      WHERE supplier_id = $3 AND restaurant_id = $4
+      `,
+      [balanceAfter, points, redeem.supplier_id, redeem.restaurant_id]
+    )
+    await client.query(
+      `
+      INSERT INTO loyalty_ledger (
+        supplier_id, restaurant_id, order_id,
+        entry_type, points_delta, balance_after,
+        monetary_value, reference_id, reference_type, notes, created_by
+      )
+      VALUES ($1, $2, $3, 'REVERSAL', $4, $5, $6, $7, 'order_cancel', $8, $9)
+      `,
+      [
+        redeem.supplier_id,
+        redeem.restaurant_id,
+        orderId,
+        points,
+        balanceAfter,
+        redeem.monetary_value,
+        orderId,
+        'Redeemed points returned: order cancelled',
+        createdBy || null,
+      ]
+    )
+    reversed.push({
+      supplierId: redeem.supplier_id,
+      restaurantId: redeem.restaurant_id,
+      points,
+    })
+  }
+  return { reversed }
+}
+
 export async function earnLoyaltyOnOrderReceive(
   client,
   { supplierId, restaurantId, orderId, receiveAmount, createdBy }

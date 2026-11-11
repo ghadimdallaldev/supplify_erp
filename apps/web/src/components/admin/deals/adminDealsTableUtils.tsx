@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
 import { formatDealTypeLabel } from '../../../lib/dealDisplayLabels'
 import { cn } from '../../../lib/utils'
+import { formatCurrency } from '../../../utils/format'
 
 export type DealSortKey =
   | 'name'
@@ -12,6 +13,11 @@ export type DealSortKey =
   | 'created_at'
 
 export type DealRow = Record<string, unknown>
+
+/** Currency of a deal record, defaulting to USD when the row doesn't carry one. */
+export function dealCurrency(deal: DealRow): string {
+  return String(deal.currency || '') || 'USD'
+}
 
 export function formatDealType(type: unknown): string {
   return formatDealTypeLabel(type)
@@ -25,7 +31,7 @@ export function formatDealValue(deal: DealRow): string | null {
   if (!Number.isFinite(n)) return String(raw)
   if (type === 'percentage_off') return `${n}% off`
   if (type === 'free_shipping') return 'Free shipping'
-  if (type === 'fixed_off') return `$${n.toFixed(2)} off`
+  if (type === 'fixed_off') return `${formatCurrency(n, { currency: dealCurrency(deal) })} off`
   return String(raw)
 }
 

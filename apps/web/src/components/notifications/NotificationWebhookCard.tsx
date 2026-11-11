@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Webhook, Loader2, Save, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
@@ -56,6 +57,7 @@ export function NotificationChannelPlanNotice() {
  * self-contained and safe to mount in any settings surface.
  */
 export function NotificationWebhookCard() {
+  const { t } = useTranslation('common')
   const { data, isLoading } = useGetNotificationWebhookQuery()
   const [saveWebhook, { isLoading: isSaving }] = useUpdateNotificationWebhookMutation()
 
@@ -79,7 +81,7 @@ export function NotificationWebhookCard() {
   const handleSave = async () => {
     const trimmed = url.trim()
     if (!/^https:\/\//i.test(trimmed)) {
-      toast.error('Webhook URL must start with https://')
+      toast.error(t('toastMessages.webhookHttpsRequired'))
       return
     }
     try {
@@ -89,7 +91,7 @@ export function NotificationWebhookCard() {
         secret: secret.trim() ? secret.trim() : undefined,
       }).unwrap()
       setSecret('')
-      toast.success('Webhook saved')
+      toast.success(t('toastMessages.webhookSaved'))
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Failed to save webhook')
     }

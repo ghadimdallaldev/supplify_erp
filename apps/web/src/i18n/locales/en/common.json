@@ -106,5 +106,24 @@
     "startTrialOf": "Start {{planName}} trial",
     "recommendedPlanFallback": "recommended plan",
     "nextPlanFallback": "next plan"
+  },
+  "sessionError": {
+    "title": "We couldn't load your session",
+    "message": "There was a problem reaching the server. Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "toastMessages": {
+    "webhookHttpsRequired": "Webhook URL must start with https://",
+    "webhookSaved": "Webhook saved",
+    "hostnameRequired": "Enter a hostname",
+    "domainSavedPending": "Domain saved — add DNS records then verify",
+    "domainVerified": "Domain verified",
+    "featuredPaymentReceived": "Payment received — awaiting admin approval",
+    "sponsorshipDeclined": "Sponsorship declined",
+    "sponsorshipDeclineFailed": "Could not decline sponsorship",
+    "checkoutNamePhoneRequired": "Name and phone are required.",
+    "locationReadFailed": "Could not read your current location.",
+    "reorderNoItems": "No items from this order are currently available.",
+    "reorderFailed": "Unable to rebuild this order."
   }
 }

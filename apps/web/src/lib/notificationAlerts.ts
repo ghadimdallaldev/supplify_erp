@@ -13,23 +13,51 @@ export type NotificationLike = {
   is_read?: boolean
 }
 
+export type NotificationRouteOptions = {
+  /** Tenant the viewer is acting as; settings tabs and inventory routes differ per tenant. */
+  tenantType?: 'SUPPLIER' | 'RESTAURANT' | null
+}
+
 /** Billing lives under Settings — `/app/billing` was never a route. */
 const BILLING_SETTINGS_PATH = '/app/settings?tab=subscription'
+/** Supplier settings have a `plan` tab (no `subscription`); restaurants are the opposite. */
+const SUPPLIER_BILLING_SETTINGS_PATH = '/app/settings?tab=plan'
 
-function normalizeNotificationPath(path: string): string {
+export function billingSettingsPath(options?: NotificationRouteOptions): string {
+  return options?.tenantType === 'SUPPLIER' ? SUPPLIER_BILLING_SETTINGS_PATH : BILLING_SETTINGS_PATH
+}
+
+function normalizeNotificationPath(path: string, options?: NotificationRouteOptions): string {
   if (path === '/app/billing' || path.startsWith('/app/billing?')) {
-    return BILLING_SETTINGS_PATH
+    return billingSettingsPath(options)
+  }
+  // Server-provided links may name the other tenant's settings tab.
+  if (
+    options?.tenantType === 'SUPPLIER' &&
+    /^\/app\/settings\?tab=subscription(?:&|$)/.test(path)
+  ) {
+    return path.replace('tab=subscription', 'tab=plan')
+  }
+  if (options?.tenantType === 'RESTAURANT' && /^\/app\/settings\?tab=plan(?:&|$)/.test(path)) {
+    return path.replace('tab=plan', 'tab=subscription')
   }
   return path
 }
 
-function pathFromMetaUrl(raw: string | null): string | null {
+/** Same-origin path only: `/x` is allowed, protocol-relative `//host` and `/\host` are not. */
+function isSafeRelativePath(raw: string): boolean {
+  return raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\')
+}
+
+function pathFromMetaUrl(raw: string | null, options?: NotificationRouteOptions): string | null {
   if (!raw) return null
-  if (raw.startsWith('/')) return normalizeNotificationPath(raw)
+  if (raw.startsWith('/')) {
+    return isSafeRelativePath(raw) ? normalizeNotificationPath(raw, options) : null
+  }
   if (!/^https?:\/\//i.test(raw)) return null
   try {
     const url = new URL(raw)
-    return normalizeNotificationPath(`${url.pathname}${url.search}`)
+    return normalizeNotificationPath(`${url.pathname}${url.search}`, options)
   } catch {
     return null
   }
@@ -47,13 +75,16 @@ function notificationMetadata(metadata: unknown): Record<string, unknown> | null
   }
 }
 
-export function resolveNotificationUrl(notification: NotificationLike): string {
+export function resolveNotificationUrl(
+  notification: NotificationLike,
+  options?: NotificationRouteOptions
+): string {
   const type = String(notification.reference_type || '').toUpperCase()
   const id = notification.reference_id
   const meta = notificationMetadata(notification.metadata)
   const metaLink = typeof meta?.link === 'string' ? meta.link : null
   const metaCta = typeof meta?.ctaUrl === 'string' ? meta.ctaUrl : null
-  const fromMeta = pathFromMetaUrl(metaLink) || pathFromMetaUrl(metaCta)
+  const fromMeta = pathFromMetaUrl(metaLink, options) || pathFromMetaUrl(metaCta, options)
   if (fromMeta) return fromMeta
 
   if (type === 'ORDER' && id) return `/app/orders/${id}`
@@ -62,12 +93,16 @@ export function resolveNotificationUrl(notification: NotificationLike): string {
   if (type === 'INVOICE') return id ? `/app/invoices?invoice=${id}` : '/app/invoices'
   if (type === 'CONVERSATION' || type === 'CHAT' || type === 'MESSAGE') return '/app/chat'
   if (type === 'QUICK_LIST' && id) return '/app/quick-lists'
-  // NOTE: expiry lives on /app/restaurant-inventory for restaurants; this module has no
-  // tenant context, so supplier /app/inventory is kept as the shared target here.
-  if (type === 'INVENTORY_EXPIRY') return '/app/inventory?tab=expiry'
+  // Expiry lives on /app/restaurant-inventory for restaurants; without tenant context the
+  // supplier /app/inventory target is kept.
+  if (type === 'INVENTORY_EXPIRY') {
+    return options?.tenantType === 'RESTAURANT'
+      ? '/app/restaurant-inventory'
+      : '/app/inventory?tab=expiry'
+  }
   if (type === 'PRODUCT') return '/app/products'
   if (type === 'STAFF_PTO' || type === 'STAFF_SWAP') return '/app/staff'
-  if (type === 'SUBSCRIPTION' || type === 'BILLING') return BILLING_SETTINGS_PATH
+  if (type === 'SUBSCRIPTION' || type === 'BILLING') return billingSettingsPath(options)
   // No /app/notifications route exists — fall back to the dashboard home.
   return '/app'
 }

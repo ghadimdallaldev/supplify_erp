@@ -569,6 +569,7 @@ router.post(
                     supplierId,
                     restaurantId: restId,
                     subtotal: promoEligibleSubtotal,
+                    orderSubtotal: totalAmount,
                     lineItems: promoEligibleLines,
                   })
                 } else if (payload.couponCode && promoEligibleLines.length) {
@@ -587,6 +588,7 @@ router.post(
                       supplierId,
                       restaurantId: restId,
                       subtotal: promoEligibleSubtotal,
+                      orderSubtotal: totalAmount,
                       lineItems: promoEligibleLines,
                     })
                   }
@@ -599,6 +601,7 @@ router.post(
                     supplierId,
                     restaurantId: restId,
                     subtotal: promoEligibleSubtotal,
+                    orderSubtotal: totalAmount,
                     lineItems: promoEligibleLines,
                     skipDealPreflight: true,
                   })

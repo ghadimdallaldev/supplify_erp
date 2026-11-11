@@ -192,6 +192,7 @@ export function ChatComposer({
               size="sm"
               className="h-8 w-8 p-0 text-[var(--text-mid)] hover:text-[var(--brand-mid)]"
               onClick={() => fileInputRef.current?.click()}
+              disabled={isSending || isUploading}
               title={t('composer.attachFileTitle')}
             >
               <Paperclip className="h-4 w-4" />
@@ -230,7 +231,7 @@ export function ChatComposer({
               e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
             }}
             onKeyDown={(e: KeyboardEvent<HTMLTextAreaElement>) => {
-              if (e.key === 'Enter' && !e.shiftKey && !isSending) {
+              if (e.key === 'Enter' && !e.shiftKey && !isSending && !isUploading) {
                 e.preventDefault()
                 onSend()
               }

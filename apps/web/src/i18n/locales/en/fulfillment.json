@@ -492,5 +492,9 @@
       "reassignFirst": "Reassign active deliveries first",
       "deactivateFailed": "Cannot deactivate driver"
     }
+  },
+  "toastMessages": {
+    "retryReasonRequired": "A retry reason is required.",
+    "reassignReasonRequired": "A reassignment reason is required."
   }
 }

@@ -137,27 +137,41 @@ export async function releaseStockForOrder(client, orderId) {
     return { mode: 'warehouse' }
   }
 
+  // legacy_stock_committed_at is set when the order shipped and its reservation was consumed
+  // (commitLegacyReservedStockForOrder); reserved_qty must not be released a second time then.
   const { rows: items } = await client.query(
-    `SELECT product_id, quantity FROM order_item WHERE order_id = $1`,
+    `SELECT oi.product_id, oi.quantity, co.legacy_stock_committed_at
+     FROM order_item oi
+     JOIN customer_order co ON co.id = oi.order_id
+     WHERE oi.order_id = $1`,
     [orderId]
   )
+  const alreadyCommitted = items.some((item) => item.legacy_stock_committed_at)
 
-  const releaseRows = items
-    .map((item) => ({
-      productId: item.product_id,
-      quantity: Number(item.quantity),
-    }))
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
+  // UPDATE ... FROM unnest only applies one row per product, so sum duplicate lines
+  // (same aggregation as the deduct path).
+  const byProduct = new Map()
+  for (const item of items) {
+    const quantity = Number(item.quantity)
+    if (!Number.isFinite(quantity) || quantity <= 0) continue
+    byProduct.set(item.product_id, (byProduct.get(item.product_id) || 0) + quantity)
+  }
 
-  if (releaseRows.length > 0) {
+  if (byProduct.size > 0) {
     await client.query(
-      `UPDATE inventory AS inv
-       SET available_qty = inv.available_qty + src.qty,
-           reserved_qty = GREATEST(0, inv.reserved_qty - src.qty),
-           updated_at = now()
-       FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
-       WHERE inv.product_id = src.product_id`,
-      [releaseRows.map((row) => row.productId), releaseRows.map((row) => row.quantity)]
+      alreadyCommitted
+        ? `UPDATE inventory AS inv
+           SET available_qty = inv.available_qty + src.qty,
+               updated_at = now()
+           FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
+           WHERE inv.product_id = src.product_id`
+        : `UPDATE inventory AS inv
+           SET available_qty = inv.available_qty + src.qty,
+               reserved_qty = GREATEST(0, inv.reserved_qty - src.qty),
+               updated_at = now()
+           FROM unnest($1::uuid[], $2::numeric[]) AS src(product_id, qty)
+           WHERE inv.product_id = src.product_id`,
+      [[...byProduct.keys()], [...byProduct.values()]]
     )
   }
 

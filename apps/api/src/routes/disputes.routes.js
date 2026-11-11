@@ -94,6 +94,21 @@ function requireDisputeReadAccess(req, res, next) {
   return middleware(req, res, next)
 }
 
+/**
+ * Resolving with a credit note or refund moves money, so it needs a finance permission
+ * (INVOICES_MANAGE: Owner, Accountant) instead of FULFILLMENT_MANAGE, which Warehouse /
+ * Fulfillment staff hold. Non-monetary outcomes (replacement, no_action) stay on FULFILLMENT_MANAGE.
+ * The permission is chosen per request body, so this is a dynamic requirePermission like the
+ * read gate above (requireAnyPermission with one key would be identical to requirePermission).
+ */
+const FINANCIAL_RESOLUTIONS = new Set(['credit_note', 'refund'])
+function requireDisputeResolvePermission(req, res, next) {
+  const middleware = requirePermission(
+    FINANCIAL_RESOLUTIONS.has(req.body?.resolutionType) ? 'INVOICES_MANAGE' : 'FULFILLMENT_MANAGE'
+  )
+  return middleware(req, res, next)
+}
+
 // Supplier: list incoming (before /:id)
 router.get(
   '/incoming',
@@ -239,7 +254,7 @@ router.post(
 router.post(
   '/:id/resolve',
   requireRole(['SUPPLIER', 'ADMIN']),
-  requirePermission('FULFILLMENT_MANAGE'),
+  requireDisputeResolvePermission,
   async (req, res, next) => {
     try {
       const body = resolveSchema.parse(req.body)

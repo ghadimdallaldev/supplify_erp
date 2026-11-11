@@ -116,7 +116,7 @@ export function SupplierProfileTab() {
         pickupWarehouseId: publicSalesForm.pickupWarehouseId || null,
         bankTransferInstructions: publicSalesForm.bankTransferInstructions || null,
       }).unwrap()
-      toast.success('Public sales settings updated')
+      toast.success(t('toastMessages.publicSalesUpdated'))
     } catch (error: any) {
       toast.error(error?.data?.error?.message || 'Unable to update public sales settings')
     }

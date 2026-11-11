@@ -327,7 +327,7 @@ export function PublicSupplierCatalogPage({
           : [...cart.lines, { product, quantity: minimum, supplierLocationId }]
         return { supplierLocationId, lines }
       })
-      toast.success('Added to your cart')
+      toast.success(t('toastMessages.addedToCart'))
       return
     }
     addItem({

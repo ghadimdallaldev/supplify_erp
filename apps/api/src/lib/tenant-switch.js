@@ -2,6 +2,7 @@ import * as jose from 'jose'
 import { config } from '../config/env.js'
 import { query } from './db.js'
 import { logger } from './logger.js'
+import { userIsVerifiedTenantOwner } from './tenant-roles.js'
 import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonation.js'
 
 const COOKIE_NAME = 'active_tenant_token'
@@ -181,20 +182,25 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
     if (err.code !== '42P01') throw err
   }
 
-  const primary = await getPrimaryTenantForUser(normalizedEmail, tenantType)
-  if (primary) {
-    const { rows: linkRows } = await query(
-      `
-      SELECT 1 FROM tenant_account_link
-      WHERE parent_tenant_id = $1
-        AND parent_tenant_type = $2
-        AND child_tenant_id = $3
-        AND child_tenant_type = $2
-      LIMIT 1
+  // Linked child accounts: the user must be a verified owner of a parent account that links to
+  // this tenant (system Owner role, or bootstrap contact of a memberless legacy parent).
+  // The parent's contact_email is never proof of ownership on its own.
+  const parentTable = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+  const { rows: parents } = await query(
+    `
+      SELECT l.parent_tenant_id AS id
+      FROM tenant_account_link l
+      JOIN ${parentTable} p ON p.id = l.parent_tenant_id
+      WHERE l.child_tenant_id = $1
+        AND l.child_tenant_type = $2
+        AND l.parent_tenant_type = $2
     `,
-      [primary.id, tenantType, tenantId]
-    )
-    if (linkRows.length > 0) return true
+    [tenantId, tenantType]
+  )
+  for (const parent of parents) {
+    if (await userIsVerifiedTenantOwner(userId, normalizedEmail, parent.id, tenantType)) {
+      return true
+    }
   }
 
   try {
@@ -208,34 +214,34 @@ export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
   return false
 }
 
-export async function getPrimaryTenantForUser(email, tenantType) {
+/**
+ * The user's primary (non-child) account of the given type, among tenants whose contact_email
+ * matches and where the user is a verified owner (see userIsVerifiedTenantOwner). Fails closed
+ * without a userId: contact_email on its own is never proof of ownership.
+ */
+export async function getPrimaryTenantForUser(email, tenantType, userId) {
+  if (!userId || !email) return null
   const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
   const { rows } = await query(
     `
       SELECT t.id, t.name
       FROM ${table} t
       WHERE LOWER(TRIM(t.contact_email)) = $1
-        AND t.id NOT IN (
-          SELECT child_tenant_id FROM tenant_account_link
-          WHERE child_tenant_type = $2
-        )
-      ORDER BY t.created_at ASC
-      LIMIT 1
+      ORDER BY
+        CASE WHEN t.id IN (
+          SELECT child_tenant_id FROM tenant_account_link WHERE child_tenant_type = $2
+        ) THEN 1 ELSE 0 END,
+        t.created_at ASC
+      LIMIT 10
     `,
     [email, tenantType]
   )
-  if (rows.length) return rows[0]
-
-  const { rows: fallback } = await query(
-    `
-      SELECT id, name FROM ${table}
-      WHERE LOWER(TRIM(contact_email)) = $1
-      ORDER BY created_at ASC
-      LIMIT 1
-    `,
-    [email]
-  )
-  return fallback[0] || null
+  for (const row of rows) {
+    if (await userIsVerifiedTenantOwner(userId, email, row.id, tenantType)) {
+      return row
+    }
+  }
+  return null
 }
 
 export async function getActiveTenantFromRequest(req) {

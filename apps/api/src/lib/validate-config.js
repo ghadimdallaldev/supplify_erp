@@ -17,6 +17,18 @@ function isWeakSecret(value) {
   return WEAK_SECRETS.has(normalized)
 }
 
+const DEFAULT_DEV_SECRETS = new Set([
+  'dev-session-secret-change-me',
+  'dev-consumer-auth-secret',
+  'changeme',
+  'change_me',
+])
+
+function isDefaultSecret(value) {
+  if (!value || typeof value !== 'string') return true
+  return DEFAULT_DEV_SECRETS.has(value.trim().toLowerCase())
+}
+
 function validateSharedProductionRules(issues) {
   if (isWeakSecret(config.SESSION_SECRET)) {
     issues.push('SESSION_SECRET must be at least 32 characters and not a default value')
@@ -68,10 +80,42 @@ function validateSharedProductionRules(issues) {
   if (config.AUTH_EMAIL_OTP_ENABLED && config.EMAIL_LOG_ONLY && config.APP_ENV !== 'dev') {
     issues.push('EMAIL_LOG_ONLY is not allowed for enabled email OTP outside dev')
   }
-  const emailConfigured =
-    !config.EMAIL_ENABLED || config.EMAIL_LOG_ONLY || Boolean(config.SMTP_HOST && config.SMTP_PASS)
-  if (config.EMAIL_ENABLED && !emailConfigured && !config.EMAIL_LOG_ONLY) {
-    issues.push('EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS or EMAIL_LOG_ONLY=true')
+  if (config.EMAIL_ENABLED && !config.EMAIL_LOG_ONLY) {
+    if (String(config.EMAIL_PROVIDER || '').toLowerCase() === 'resend') {
+      const resendHost = String(config.SMTP_HOST || '').toLowerCase() === 'smtp.resend.com'
+      if (!config.RESEND_API_KEY && !(resendHost && config.SMTP_PASS)) {
+        issues.push(
+          'EMAIL_PROVIDER=resend requires RESEND_API_KEY (or SMTP_PASS with SMTP_HOST=smtp.resend.com)'
+        )
+      }
+    } else if (!(config.SMTP_HOST && config.SMTP_PASS)) {
+      issues.push('EMAIL_ENABLED=true requires SMTP_HOST+SMTP_PASS or EMAIL_LOG_ONLY=true')
+    }
+  }
+}
+
+/**
+ * Hosted dev (APP_ENV=dev but NODE_ENV=production, e.g. a Railway dev image) is internet-reachable.
+ * Everything else stays relaxed, but the dangerous defaults are refused: rate limiting must be on and
+ * signing secrets must not be empty or the built-in development literals.
+ */
+function validateHostedDevRules(issues) {
+  if (!config.RATE_LIMIT_ENABLED) {
+    issues.push('RATE_LIMIT_ENABLED must be true on a hosted dev image (NODE_ENV=production)')
+  }
+  const secrets = {
+    SESSION_SECRET: config.SESSION_SECRET,
+    IMPERSONATION_SECRET: config.IMPERSONATION_SECRET,
+    ACTIVE_TENANT_SECRET: config.ACTIVE_TENANT_SECRET,
+  }
+  if (config.CONSUMER_AUTH_SECRET !== undefined)
+    secrets.CONSUMER_AUTH_SECRET = config.CONSUMER_AUTH_SECRET
+  for (const [name, value] of Object.entries(secrets)) {
+    if (isDefaultSecret(value)) {
+      issues.push(
+        `${name} must be set to a non-default value on a hosted dev image (NODE_ENV=production)`
+      )
+    }
   }
 }
 
@@ -92,6 +136,7 @@ function validateHostedSafetyRules(issues, envLabel) {
 
 function validatePreprodRules(issues) {
   validateHostedSafetyRules(issues, 'preprod')
+  validateOauthCallbackBase(issues, 'preprod')
   if (!config.REDIS_URL) {
     issues.push('REDIS_URL must be set in preprod')
   }
@@ -106,8 +151,18 @@ function validatePreprodRules(issues) {
   }
 }
 
+function validateOauthCallbackBase(issues, envLabel) {
+  // Without an explicit base the callback origin depends on forwarded headers / the request host.
+  if (!String(config.OAUTH_CALLBACK_BASE_URL || '').trim()) {
+    issues.push(
+      `OAUTH_CALLBACK_BASE_URL must be set in ${envLabel} (web origin that serves /auth/callback)`
+    )
+  }
+}
+
 function validateProdRules(issues) {
   validateHostedSafetyRules(issues, 'production')
+  validateOauthCallbackBase(issues, 'production')
   if (config.ALLOW_AUTO_SUPER_ADMIN) {
     issues.push('ALLOW_AUTO_SUPER_ADMIN must be false in production')
   }
@@ -121,6 +176,11 @@ function validateProdRules(issues) {
   if (config.PAYMENTS_MODE === 'live' && config.BILLING_GATEWAY === 'stub') {
     issues.push(
       'BILLING_GATEWAY=stub is not allowed with PAYMENTS_MODE=live — set BILLING_GATEWAY=manual for pilot or register a live PSP'
+    )
+  }
+  if (config.PAYMENTS_MODE === 'live' && !config.BILLING_GATEWAY_EXPLICIT) {
+    issues.push(
+      'BILLING_GATEWAY must be set explicitly with PAYMENTS_MODE=live (no silent default to manual) — set it to a registered PSP (e.g. stripe) or manual (admin-confirmed payments only)'
     )
   }
   if (config.STORAGE_DRIVER === 'local') {
@@ -150,7 +210,19 @@ function validateProdRules(issues) {
  * APP_ENV=dev is skipped (Railway dev images still use NODE_ENV=production from Docker).
  */
 export function validateProductionConfig() {
-  if (config.APP_ENV === 'dev') return
+  if (config.APP_ENV === 'dev') {
+    if (config.NODE_ENV === 'production') {
+      const devIssues = []
+      validateHostedDevRules(devIssues)
+      if (devIssues.length > 0) {
+        for (const issue of devIssues) {
+          logger.error('Deployment configuration error', { issue, appEnv: config.APP_ENV })
+        }
+        throw new Error(`Invalid configuration for dev:\n- ${[...new Set(devIssues)].join('\n- ')}`)
+      }
+    }
+    return
+  }
 
   const hosted = config.APP_ENV === 'preprod' || config.APP_ENV === 'prod'
   if (config.NODE_ENV !== 'production' && !hosted) return

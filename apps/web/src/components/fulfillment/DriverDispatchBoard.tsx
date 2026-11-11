@@ -96,7 +96,7 @@ export function DriverDispatchBoard({
       if (assignOrder.assignment?.status === 'failed') {
         const reason = window.prompt('Why is this failed delivery being retried?')?.trim() || ''
         if (reason.length < 3) {
-          toast.error('A retry reason is required.')
+          toast.error(t('toastMessages.retryReasonRequired'))
           return
         }
         await retryFailedDelivery({
@@ -126,7 +126,7 @@ export function DriverDispatchBoard({
   const handleReassign = async () => {
     if (!reassignOrder || !selectedDriverId) return
     if (reassignReason.trim().length < 3) {
-      toast.error('A reassignment reason is required.')
+      toast.error(t('toastMessages.reassignReasonRequired'))
       return
     }
     try {

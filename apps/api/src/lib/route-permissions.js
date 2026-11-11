@@ -102,6 +102,7 @@ export function resolveAdminDashboardPermission(path) {
   if (p.startsWith('/tenants')) return P.ADMIN_TENANTS
   if (p.startsWith('/users')) return P.ADMIN_SUPPORT
   if (p.startsWith('/impersonate')) return P.ADMIN_SUPPORT
+  if (p === '/demo' || p.startsWith('/demo/')) return P.ADMIN_GROWTH
   if (p.startsWith('/feature-flags') || p.includes('/feature-overrides')) return P.ADMIN_GROWTH
   return P.ADMIN_ACCESS
 }
@@ -119,15 +120,17 @@ export function inventoryMutationGuard(req, res, next) {
   return requireAnyPermission(P.INVENTORY_EDIT, P.INVENTORY_MANAGE)(req, res, next)
 }
 
+/** PATCH|PUT /conversations/:id/read and /messages/:id/read (one path segment id, optional slash). */
+const CHAT_READ_RECEIPT_PATH = /^\/(?:conversations|messages)\/[^/]+\/read\/?$/
+
 /** After CHAT_VIEW. */
 export function chatSendGuard(req, res, next) {
   const method = req.method.toUpperCase()
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next()
   const path = req.path || ''
-  if (
-    (method === 'PATCH' || method === 'PUT') &&
-    (path.endsWith('/read') || path.includes('/read'))
-  ) {
+  // Only the exact read-receipt routes skip CHAT_SEND (a substring match would also exempt any
+  // future route whose path merely contains "/read").
+  if ((method === 'PATCH' || method === 'PUT') && CHAT_READ_RECEIPT_PATH.test(path)) {
     return next()
   }
   return requireAnyPermission(P.CHAT_SEND, P.CHAT_MANAGE)(req, res, next)

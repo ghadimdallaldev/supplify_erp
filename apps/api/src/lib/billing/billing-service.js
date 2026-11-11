@@ -277,12 +277,9 @@ export async function listPaymentMethods(tenantId, tenantType) {
   return rows
 }
 
-export async function addPaymentMethod(
-  tenantId,
-  tenantType,
-  { type, card, provider, setAsDefault }
-) {
-  const gateway = getBillingGateway(provider)
+export async function addPaymentMethod(tenantId, tenantType, { type, card, setAsDefault }) {
+  // Gateway is resolved server-side (config.BILLING_GATEWAY); never client-chosen.
+  const gateway = getBillingGateway()
   const tokenized = await gateway.tokenizePaymentMethod({ type, card })
 
   return withTransaction(async (client) => {
@@ -427,7 +424,6 @@ export async function checkoutSubscription({
   billingCycle,
   paymentMethodId,
   idempotencyKey,
-  provider,
   trialTargetPlanId = null,
 }) {
   const { rows: planRows } = await query(
@@ -507,7 +503,6 @@ export async function checkoutSubscription({
       tenantType,
       paymentMethodId,
       idempotencyKey: idempotencyKey || `checkout_${invoice.id}`,
-      provider,
     })
 
     if (!paymentResult.success) {
@@ -689,10 +684,11 @@ async function getPaymentMethodForCharge(client, tenantId, tenantType, paymentMe
 
 async function processInvoicePayment(
   client,
-  { invoice, subscription, tenantId, tenantType, paymentMethodId, idempotencyKey, provider }
+  { invoice, subscription, tenantId, tenantType, paymentMethodId, idempotencyKey }
 ) {
   const method = await getPaymentMethodForCharge(client, tenantId, tenantType, paymentMethodId)
-  const gateway = getBillingGateway(provider || method.provider)
+  // Only the gateway that tokenized the stored method may charge it (never a client override).
+  const gateway = getBillingGateway(method.provider)
   const amount = Number(invoice.amount)
 
   const { rows: existing } = await client.query(
@@ -817,13 +813,7 @@ async function applyPaidSubscription(
   await invalidateFeatureFlagCache(tenantId, tenantType).catch(() => {})
 }
 
-export async function payOpenInvoices({
-  tenantId,
-  tenantType,
-  paymentMethodId,
-  idempotencyKey,
-  provider,
-}) {
+export async function payOpenInvoices({ tenantId, tenantType, paymentMethodId, idempotencyKey }) {
   const { rows: invoices } = await query(
     `SELECT * FROM billing_invoice
      WHERE tenant_id = $1 AND tenant_type = $2 AND status = 'OPEN'
@@ -852,7 +842,6 @@ export async function payOpenInvoices({
         idempotencyKey: idempotencyKey
           ? `${idempotencyKey}_${invoice.id}`
           : `pay_${invoice.id}_${Date.now()}`,
-        provider,
       })
     )
     results.push({ invoiceId: invoice.id, ...result })

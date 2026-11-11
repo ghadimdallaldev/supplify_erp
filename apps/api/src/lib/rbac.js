@@ -6,6 +6,7 @@ import { syncRequestLogContext } from './request-log-context.js'
 import { getCache, setCache, deleteCache } from './cache.js'
 import { singleflight } from './singleflight.js'
 import { emitAuthSessionEvent } from './auth-session-events.js'
+import { mustBlockUnverifiedEmail } from './email-verification-gate.js'
 import { startStage, mark, noteCacheHit } from '../middlewares/request-timing.js'
 import {
   resolveRequestBillingSubscription,
@@ -187,9 +188,19 @@ export async function ensureUserForAccessPayload(payload, req = null) {
       email: payload.email ?? payload.preferred_username,
       given_name: payload.given_name,
       family_name: payload.family_name,
+      email_verified: payload.email_verified === true,
     },
     rolesFromAccessPayload(payload)
   )
+}
+
+// Real Keycloak subs are UUIDs. Anything else in app_user.keycloak_sub is a seed placeholder
+// (e.g. 'admin-sub') that may be re-bound to the real sub on first verified login.
+const KEYCLOAK_SUB_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Dev-only role auto-grant for seeded demo emails. Never on a production-built image. */
+function devAutoGrantEnabled() {
+  return config.APP_ENV === 'dev' && process.env.NODE_ENV !== 'production'
 }
 
 // Create or update user in database
@@ -219,7 +230,8 @@ export async function upsertUser(userInfo, roles = []) {
       explicitRole = STAFF_PORTAL_APP_ROLE
     } else {
       const emailLower = normalizedEmail
-      if (config.APP_ENV === 'dev') {
+      // Seeded-email auto-grant: local dev only, and only for a Keycloak-verified email.
+      if (devAutoGrantEnabled() && userInfo.email_verified === true) {
         if (emailLower === 'admin@supplify.com' || emailLower === 'supplifyadmin@supplify.com') {
           explicitRole = 'ADMIN'
         } else if (emailLower === 'supplier@supplify.com') {
@@ -233,10 +245,35 @@ export async function upsertUser(userInfo, roles = []) {
 
     const PLATFORM_ROLES = new Set(['ADMIN', 'SUPPLIER', 'RESTAURANT', 'CONSUMER'])
     const existingLookup = await query(
-      `SELECT role, is_active FROM app_user WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+      `SELECT role, is_active, keycloak_sub FROM app_user
+       WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)
+       ORDER BY (keycloak_sub = $1) DESC
+       LIMIT 1`,
       [sub, normalizedEmail]
     )
     const existingUser = existingLookup.rows[0]
+    // Matched by email only (different or missing sub): this would re-bind the account to a new
+    // Keycloak identity. Only allowed for a verified email and never over a real (UUID) sub.
+    if (existingUser && existingUser.keycloak_sub !== sub) {
+      const existingSub = existingUser.keycloak_sub
+      if (userInfo.email_verified !== true) {
+        logger.warn('Refusing to link account by email: email_verified is not true', { sub })
+        throw Object.assign(
+          new Error('Email must be verified before linking an existing account'),
+          { name: 'EMAIL_NOT_VERIFIED', code: 'EMAIL_NOT_VERIFIED' }
+        )
+      }
+      if (existingSub && KEYCLOAK_SUB_UUID_RE.test(existingSub)) {
+        logger.warn('Refusing to re-bind account already linked to a different Keycloak sub', {
+          sub,
+          existingSub,
+        })
+        throw Object.assign(new Error('Account is already linked to a different identity'), {
+          name: 'ACCOUNT_LINK_CONFLICT',
+          code: 'ACCOUNT_LINK_CONFLICT',
+        })
+      }
+    }
     if (existingUser && existingUser.is_active === false) {
       throw Object.assign(new Error('Account is deactivated'), {
         name: 'ACCOUNT_DEACTIVATED',
@@ -263,7 +300,14 @@ export async function upsertUser(userInfo, roles = []) {
           display_name = $3,
           role = COALESCE($4, role),
           updated_at = now()
-        WHERE keycloak_sub = $1 OR LOWER(email) = LOWER($2)
+        WHERE keycloak_sub = $1
+          OR (
+            LOWER(email) = LOWER($2)
+            AND (
+              keycloak_sub IS NULL
+              OR keycloak_sub !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            )
+          )
         RETURNING *
       ),
       inserted AS (
@@ -317,10 +361,49 @@ export async function requireAuth(req, res, next) {
       req.userSub = payload.sub
       req.accessTokenExpiresAt = getAccessTokenExpiresAtMs(accessToken)
 
+      // Same unverified-email gate as the web /auth/callback: with email OTP enabled a Bearer
+      // session must carry email_verified=true (Keycloak `email` scope claim).
+      if (
+        bearerToken &&
+        mustBlockUnverifiedEmail({
+          otpEnabled: config.AUTH_EMAIL_OTP_ENABLED,
+          emailVerified: payload.email_verified,
+        })
+      ) {
+        mark(req, 'auth')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'EMAIL_NOT_VERIFIED',
+            message: 'Email verification is required before using the app',
+          },
+          requestId: req.requestId,
+        })
+      }
+
       // Get user from database (mobile bearer upserts on first login)
-      const user = bearerToken
-        ? await ensureUserForAccessPayload(payload, req)
-        : await getUserBySub(payload.sub, req)
+      let user
+      try {
+        user = bearerToken
+          ? await ensureUserForAccessPayload(payload, req)
+          : await getUserBySub(payload.sub, req)
+      } catch (linkError) {
+        if (
+          linkError?.code === 'ACCOUNT_LINK_CONFLICT' ||
+          linkError?.code === 'EMAIL_NOT_VERIFIED' ||
+          linkError?.code === 'ACCOUNT_DEACTIVATED'
+        ) {
+          mark(req, 'auth')
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: { name: linkError.code, message: linkError.message },
+            requestId: req.requestId,
+          })
+        }
+        throw linkError
+      }
       if (!user) {
         mark(req, 'auth')
         return res.status(401).json({

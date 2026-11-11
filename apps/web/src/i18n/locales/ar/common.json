@@ -106,5 +106,24 @@
     "startTrialOf": "ابدأ تجربة {{planName}}",
     "recommendedPlanFallback": "الخطة الموصى بها",
     "nextPlanFallback": "الخطة التالية"
+  },
+  "sessionError": {
+    "title": "تعذّر تحميل جلستك",
+    "message": "حدثت مشكلة في الاتصال بالخادم. تحقق من اتصالك وحاول مرة أخرى.",
+    "retry": "حاول مرة أخرى"
+  },
+  "toastMessages": {
+    "webhookHttpsRequired": "يجب أن يبدأ عنوان الـ Webhook بـ https://",
+    "webhookSaved": "تم حفظ الـ Webhook",
+    "hostnameRequired": "أدخل اسم المضيف",
+    "domainSavedPending": "تم حفظ النطاق — أضف سجلات DNS ثم تحقق",
+    "domainVerified": "تم التحقق من النطاق",
+    "featuredPaymentReceived": "تم استلام الدفعة — بانتظار موافقة المسؤول",
+    "sponsorshipDeclined": "تم رفض الرعاية",
+    "sponsorshipDeclineFailed": "تعذّر رفض الرعاية",
+    "checkoutNamePhoneRequired": "الاسم ورقم الهاتف مطلوبان.",
+    "locationReadFailed": "تعذّر قراءة موقعك الحالي.",
+    "reorderNoItems": "لا تتوفر حاليًا أي عناصر من هذا الطلب.",
+    "reorderFailed": "تعذّرت إعادة إنشاء هذا الطلب."
   }
 }

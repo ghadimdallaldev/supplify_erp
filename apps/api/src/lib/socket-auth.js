@@ -2,10 +2,10 @@ import { verifyToken, refreshAccessTokenSingleFlight } from './auth.js'
 import { getUserBySub } from './rbac.js'
 import {
   getActiveTenantCookieName,
-  getPrimaryTenantForUser,
   userCanAccessTenant,
   verifyActiveTenantToken,
 } from './tenant-switch.js'
+import { getTenantAssignmentForUser } from './workspace-tenant.js'
 import { logger } from './logger.js'
 
 export function parseCookieHeader(cookieHeader = '') {
@@ -84,7 +84,10 @@ export async function resolveSocketUserFromCookieHeader(cookieHeader) {
 
   const cookies = parseCookieHeader(cookieHeader)
   let tenantId = null
+  let tenantType = null
 
+  // Every tenant resolved here must pass userCanAccessTenant (same gate as HTTP getRequestTenant);
+  // contact_email is never treated as proof of membership.
   const activeToken = cookies[getActiveTenantCookieName()]
   if (activeToken && user.role !== 'ADMIN') {
     const ctx = await verifyActiveTenantToken(activeToken)
@@ -92,15 +95,26 @@ export async function resolveSocketUserFromCookieHeader(cookieHeader) {
       const allowed = await userCanAccessTenant(user.id, user.email, ctx.tenantId, ctx.tenantType)
       if (allowed) {
         tenantId = ctx.tenantId
+        tenantType = ctx.tenantType
       }
     }
   }
 
   if (!tenantId && (user.role === 'SUPPLIER' || user.role === 'RESTAURANT')) {
-    const email = (user.email || '').trim().toLowerCase()
-    const primary = await getPrimaryTenantForUser(email, user.role)
-    tenantId = primary?.id || null
+    const assignment = await getTenantAssignmentForUser(user.id, user.role)
+    if (assignment?.tenantId) {
+      const allowed = await userCanAccessTenant(
+        user.id,
+        user.email,
+        assignment.tenantId,
+        assignment.tenantType
+      )
+      if (allowed) {
+        tenantId = assignment.tenantId
+        tenantType = assignment.tenantType
+      }
+    }
   }
 
-  return { user, tenantId, newTokens }
+  return { user, tenantId, tenantType, newTokens }
 }

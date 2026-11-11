@@ -15,6 +15,14 @@ import {
   notifyBillingAccountLocked,
 } from '../services/notification.service.js'
 
+// Retry cadence for a FAILED renewal charge. Dunning runs inside the 7-day grace period
+// (GRACE_PERIOD_DAYS); once the account is locked the subscription leaves the due query.
+const RENEWAL_RETRY_INTERVAL_HOURS = 24
+const MAX_RENEWAL_ATTEMPTS = 7
+// A PROCESSING row older than this is assumed to be a crashed worker. It is never
+// re-charged automatically (the gateway may already have charged); it is surfaced instead.
+const STALE_PROCESSING_MINUTES = 30
+
 function addDays(date, days) {
   const d = new Date(date)
   d.setDate(d.getDate() + days)
@@ -38,6 +46,54 @@ async function lockDueSubscription(client, subscriptionId) {
     [subscriptionId]
   )
   return rows[0] ?? null
+}
+
+/**
+ * The renewal claim INSERT/UPDATE returned no row. Work out why, and surface anything that
+ * needs a human: a PROCESSING row that never completed is NOT retried (possible double charge).
+ */
+async function describeUnclaimedRenewal(subscription, renewalIdempotencyKey) {
+  const { rows } = await query(
+    `SELECT id, status,
+            COALESCE((metadata->>'attempt')::int, 1) AS attempt,
+            EXTRACT(EPOCH FROM (now() - updated_at)) / 60 AS age_minutes
+     FROM billing_payment
+     WHERE subscription_id = $1 AND idempotency_key = $2
+     LIMIT 1`,
+    [subscription.id, renewalIdempotencyKey]
+  )
+  const payment = rows[0]
+  if (!payment) return { skipped: true, reason: 'renewal_in_progress' }
+
+  if (payment.status === 'PROCESSING') {
+    if (Number(payment.age_minutes) >= STALE_PROCESSING_MINUTES) {
+      logger.error('Renewal payment stuck in PROCESSING; manual reconciliation required', {
+        subscriptionId: subscription.id,
+        tenantId: subscription.tenant_id,
+        tenantType: subscription.tenant_type,
+        paymentId: payment.id,
+        idempotencyKey: renewalIdempotencyKey,
+        ageMinutes: Math.round(Number(payment.age_minutes)),
+        attempt: Number(payment.attempt),
+      })
+      return { skipped: true, reason: 'renewal_stuck_processing' }
+    }
+    return { skipped: true, reason: 'renewal_in_progress' }
+  }
+
+  if (payment.status === 'FAILED') {
+    if (Number(payment.attempt) >= MAX_RENEWAL_ATTEMPTS) {
+      logger.warn('Renewal retries exhausted; waiting for grace period lock', {
+        subscriptionId: subscription.id,
+        paymentId: payment.id,
+        attempts: Number(payment.attempt),
+      })
+      return { skipped: true, reason: 'retries_exhausted' }
+    }
+    return { skipped: true, reason: 'retry_not_due' }
+  }
+
+  return { skipped: true, reason: 'renewal_in_progress' }
 }
 
 async function attemptAutoRenewal(subscription) {
@@ -139,8 +195,26 @@ async function attemptAutoRenewal(subscription) {
       invoice_id, subscription_id, tenant_id, tenant_type, payment_method_id,
       provider, amount, currency, status, idempotency_key, metadata
     ) VALUES (NULL, $1, $2, $3, $4, $5, $6, 'USD', 'PROCESSING', $7, $8::jsonb)
-    ON CONFLICT (idempotency_key) DO NOTHING
-    RETURNING id`,
+    ON CONFLICT (idempotency_key) DO UPDATE SET
+      -- Re-claim only a FAILED attempt that is old enough; PROCESSING/SUCCEEDED rows are untouched.
+      status = 'PROCESSING',
+      payment_method_id = EXCLUDED.payment_method_id,
+      provider = EXCLUDED.provider,
+      amount = EXCLUDED.amount,
+      provider_payment_id = NULL,
+      failure_code = NULL,
+      failure_message = NULL,
+      metadata = billing_payment.metadata || jsonb_build_object(
+        'renewal', true,
+        'phase', 'auto_renewal_retry_claim',
+        'attempt', COALESCE((billing_payment.metadata->>'attempt')::int, 1) + 1,
+        'previousFailureCode', billing_payment.failure_code
+      ),
+      updated_at = now()
+    WHERE billing_payment.status = 'FAILED'
+      AND billing_payment.updated_at <= now() - ($9::int * INTERVAL '1 hour')
+      AND COALESCE((billing_payment.metadata->>'attempt')::int, 1) < $10::int
+    RETURNING id, COALESCE((metadata->>'attempt')::int, 1) AS attempt`,
     [
       subscription.id,
       subscription.tenant_id,
@@ -149,20 +223,28 @@ async function attemptAutoRenewal(subscription) {
       gateway.id,
       amount,
       renewalIdempotencyKey,
-      JSON.stringify({ renewal: true, phase: 'auto_renewal_claim' }),
+      JSON.stringify({ renewal: true, phase: 'auto_renewal_claim', attempt: 1 }),
+      RENEWAL_RETRY_INTERVAL_HOURS,
+      MAX_RENEWAL_ATTEMPTS,
     ]
   )
 
   if (renewalPaymentRows.length === 0) {
-    return { skipped: true, reason: 'renewal_in_progress' }
+    return describeUnclaimedRenewal(subscription, renewalIdempotencyKey)
   }
   const renewalPaymentId = renewalPaymentRows[0].id
+  const attempt = Number(renewalPaymentRows[0].attempt) || 1
+  // Gateways (Stripe) replay the stored result for a repeated idempotency key, including
+  // declines. Each attempt therefore gets its own gateway key; retries of the SAME attempt
+  // (e.g. a crash-and-resume) can never double-charge.
+  const gatewayIdempotencyKey =
+    attempt > 1 ? `${renewalIdempotencyKey}_a${attempt}` : renewalIdempotencyKey
 
   const chargeResult = await gateway.chargeOffSession({
     amount,
     currency: 'USD',
     providerPaymentMethodId: method.provider_payment_method_id,
-    idempotencyKey: renewalIdempotencyKey,
+    idempotencyKey: gatewayIdempotencyKey,
   })
 
   if (chargeResult.status === 'succeeded') {

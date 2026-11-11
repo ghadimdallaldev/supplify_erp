@@ -42,5 +42,13 @@
     "createFailed": "Failed to create branch",
     "removed": "Branch removed",
     "removeFailed": "Failed to remove branch"
+  },
+  "toastMessages": {
+    "branchReactivated": "Branch Account reactivated",
+    "branchUnlinked": "Branch Account unlinked",
+    "ownerEmailRequired": "Owner email is required",
+    "invitationCancelled": "Invitation cancelled",
+    "cancelInvitationFailed": "Failed to cancel invitation",
+    "resendInvitationFailed": "Failed to resend invitation"
   }
 }

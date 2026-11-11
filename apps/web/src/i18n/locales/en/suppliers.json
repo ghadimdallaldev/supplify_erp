@@ -591,5 +591,8 @@
     "pending_other": "{{count}} substitution requests awaiting restaurant response.",
     "orderLine": "Order line",
     "propose": "Propose"
+  },
+  "toastMessages": {
+    "publicSalesUpdated": "Public sales settings updated"
   }
 }

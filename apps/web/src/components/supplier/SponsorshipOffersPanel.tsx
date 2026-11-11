@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   useGetRestaurantSponsorshipOffersQuery,
@@ -12,6 +13,7 @@ import { Skeleton } from '../ui/skeleton'
 import { Gift } from 'lucide-react'
 
 export function SponsorshipOffersPanel() {
+  const { t: tCommon } = useTranslation('common')
   const { data, isLoading, isError, refetch } = useGetRestaurantSponsorshipOffersQuery()
   const [acceptOffer, { isLoading: accepting }] = useAcceptSponsorshipOfferMutation()
   const [declineOffer, { isLoading: declining }] = useDeclineSponsorshipOfferMutation()
@@ -158,9 +160,9 @@ export function SponsorshipOffersPanel() {
                       onClick={async () => {
                         try {
                           await declineOffer(offer.id).unwrap()
-                          toast.success('Sponsorship declined')
+                          toast.success(tCommon('toastMessages.sponsorshipDeclined'))
                         } catch {
-                          toast.error('Could not decline sponsorship')
+                          toast.error(tCommon('toastMessages.sponsorshipDeclineFailed'))
                         }
                       }}
                     >

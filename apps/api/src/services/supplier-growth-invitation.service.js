@@ -1,4 +1,4 @@
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { getReferralProgramConfig, getFreeSandboxDays } from '../lib/platform-settings.js'
 import { generateInviteToken, buildInviteUrl, inviteExpiresAt } from './invitationTokens.js'
@@ -195,12 +195,16 @@ export async function acceptReferralOnRegistration({ token, restaurantId, client
     const { linkSponsorshipsOnRestaurantRegistration } = await import(
       './supplier-sponsorship.service.js'
     )
-    await linkSponsorshipsOnRestaurantRegistration({
-      prospectId: inv.prospect_id,
-      restaurantId,
-      invitationId: inv.id,
-      client: db,
-    })
+    const linkSponsorships = () =>
+      linkSponsorshipsOnRestaurantRegistration({
+        prospectId: inv.prospect_id,
+        restaurantId,
+        invitationId: inv.id,
+        client: db,
+      })
+    // Inside the registration transaction a failure would abort it; isolate with a savepoint.
+    if (client === query) await linkSponsorships()
+    else await withSavepoint(client, linkSponsorships)
   } catch {
     /* sponsorship link is best-effort if table columns not migrated yet */
   }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../components/ui/button'
@@ -50,23 +50,59 @@ import { getWeekdayLabels } from '../components/staff/staffShared'
 
 const PTO_TYPE_VALUES = ['VACATION', 'SICK', 'PERSONAL', 'UNPAID', 'OTHER'] as const
 
+const STAFF_TOKEN_KEY = 'staff.portal.token'
+
+// localStorage can throw (private mode, blocked site data), so every access is guarded.
+function readStoredStaffToken(): string {
+  try {
+    return localStorage.getItem(STAFF_TOKEN_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function writeStoredStaffToken(token: string) {
+  try {
+    localStorage.setItem(STAFF_TOKEN_KEY, token)
+  } catch {
+    /* storage unavailable: the token still works for this page load via state */
+  }
+}
+
+function removeStoredStaffToken() {
+  try {
+    localStorage.removeItem(STAFF_TOKEN_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True when the API says the magic-link session is expired, invalid or forbidden. */
+function isStaffTokenAuthError(error: unknown): boolean {
+  const status = (error as { status?: unknown } | undefined)?.status
+  return status === 401 || status === 403 || status === 404 || status === 410
+}
+
 function useStaffToken() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlToken = searchParams.get('token')
-  const [storedToken, setStoredToken] = useState(
-    () => localStorage.getItem('staff.portal.token') ?? ''
-  )
+  const [storedToken, setStoredToken] = useState(readStoredStaffToken)
 
   useEffect(() => {
     if (!urlToken) return
-    localStorage.setItem('staff.portal.token', urlToken)
+    writeStoredStaffToken(urlToken)
     setStoredToken(urlToken)
     const next = new URLSearchParams(searchParams)
     next.delete('token')
     setSearchParams(next, { replace: true })
   }, [urlToken, searchParams, setSearchParams])
 
-  return urlToken ?? storedToken
+  const clearToken = useCallback(() => {
+    removeStoredStaffToken()
+    setStoredToken('')
+  }, [])
+
+  return { token: urlToken ?? storedToken, clearToken }
 }
 
 function formatShiftTime(iso: string) {
@@ -76,7 +112,7 @@ function formatShiftTime(iso: string) {
 export function StaffSelfServiceDashboard() {
   const { t } = useTranslation('staff')
   const navigate = useNavigate()
-  const token = useStaffToken()
+  const { token, clearToken } = useStaffToken()
   const magicLinkMode = Boolean(token)
   const [activeTab, setActiveTab] = useState<StaffPortalTab>('home')
 
@@ -98,6 +134,14 @@ export function StaffSelfServiceDashboard() {
     error: accountErrorDetail,
     refetch: refetchAccount,
   } = useGetStaffSelfDashboardQuery(undefined, { skip: !accountMode })
+
+  // An expired or invalid stored token must not force magic-link mode forever:
+  // drop it and fall back to account mode.
+  useEffect(() => {
+    if (magicLinkMode && magicError && isStaffTokenAuthError(magicErrorDetail)) {
+      clearToken()
+    }
+  }, [magicLinkMode, magicError, magicErrorDetail, clearToken])
 
   const data = magicLinkMode ? magicData : accountData
   const isLoading = magicLinkMode ? magicLoading : accountLoading

@@ -8,7 +8,7 @@ import {
   getRestaurantIdForRequest,
   getSupplierIdForRequest,
 } from '../lib/rbac.js'
-import { query, withTransaction } from '../lib/db.js'
+import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { ConflictError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -263,12 +263,16 @@ router.post(
       SELECT oi.id, oi.quantity, oi.product_id, oi.unit_price, oi.supplier_id,
              p.unit, p.name AS product_name, p.sku
       FROM order_item oi
+      JOIN customer_order co ON co.id = oi.order_id AND co.restaurant_id = $2
       LEFT JOIN product p ON p.id = oi.product_id
       WHERE oi.order_id = $1
       ORDER BY oi.created_at
     `,
-        [orderId]
+        [orderId, restaurantId]
       )
+
+      // Ownership is enforced by the join above, before any line validation runs, so a caller
+      // can never probe another tenant's ordered quantities via validation error messages.
 
       if (orderItems.length === 0) {
         throw new NotFoundError('Order items not found')
@@ -642,17 +646,21 @@ router.post(
         // Existing manual invoice is reused — never roll status back from INVOICED.
         let createdInvoice = null
         let invoiceNewlyCreated = false
+        let overbilledAmount = 0
         if (billableAcceptedQty > 0) {
           try {
-            const invoiceResult = await createInvoiceFromReceiving(client, {
-              order,
-              report,
-              supplierId,
-              restaurantId,
-              receivedBy: receiverId,
-            })
+            const invoiceResult = await withSavepoint(client, () =>
+              createInvoiceFromReceiving(client, {
+                order,
+                report,
+                supplierId,
+                restaurantId,
+                receivedBy: receiverId,
+              })
+            )
             createdInvoice = invoiceResult?.invoice ?? null
             invoiceNewlyCreated = Boolean(invoiceResult?.created)
+            overbilledAmount = Number(invoiceResult?.overbilledAmount || 0)
             if (createdInvoice) {
               nextStatus = 'INVOICED'
             }
@@ -674,16 +682,41 @@ router.post(
           autoDispute = rows[0]
         }
 
+        // A prior manual invoice that already has payments keeps its old total, so
+        // the restaurant is over-billed for rejected/short items. Record the real
+        // difference on the dispute so resolution can credit it back.
+        if (overbilledAmount > 0) {
+          if (autoDispute) {
+            const { rows } = await client.query(
+              `UPDATE disputes
+               SET disputed_amount = GREATEST(COALESCE(disputed_amount, 0), $2),
+                   updated_at = now()
+               WHERE id = $1
+               RETURNING *`,
+              [autoDispute.id, overbilledAmount]
+            )
+            autoDispute = rows[0] ?? autoDispute
+          } else {
+            logger.warn('Paid manual invoice exceeds received value without a dispute', {
+              orderId,
+              invoiceId: createdInvoice?.id,
+              overbilledAmount,
+            })
+          }
+        }
+
         const earnBaseAmount = totalActualCost > 0 ? totalActualCost : 0
         let loyaltyEarn = null
         try {
-          loyaltyEarn = await earnLoyaltyOnOrderReceive(client, {
-            supplierId,
-            restaurantId,
-            orderId,
-            receiveAmount: earnBaseAmount,
-            createdBy: receiverId,
-          })
+          loyaltyEarn = await withSavepoint(client, () =>
+            earnLoyaltyOnOrderReceive(client, {
+              supplierId,
+              restaurantId,
+              orderId,
+              receiveAmount: earnBaseAmount,
+              createdBy: receiverId,
+            })
+          )
         } catch (loyaltyErr) {
           logger.warn('Loyalty earn after receiving failed', {
             error: loyaltyErr.message,

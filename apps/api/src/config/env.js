@@ -49,6 +49,8 @@ export const config = {
   PORT: process.env.PORT || 4000,
   WEB_ORIGIN: primaryWebOrigin,
   WEB_ORIGINS,
+  /** Explicit web origin for the OAuth callback (required in preprod/prod; see validate-config). */
+  OAUTH_CALLBACK_BASE_URL: process.env.OAUTH_CALLBACK_BASE_URL || '',
   /** Alias documented for Railway; same as WEB_ORIGINS primary list source */
   CORS_ORIGIN: process.env.CORS_ORIGIN || '',
   PUBLIC_API_URL:
@@ -225,6 +227,9 @@ export const config = {
     process.env.EMAIL_FROM_ADDRESS ||
     process.env.SMTP_USER ||
     'noreply@supplify.local',
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  RESEND_API_URL: process.env.RESEND_API_URL || 'https://api.resend.com',
+  RESEND_TIMEOUT_MS: envInt(process.env.RESEND_TIMEOUT_MS, 15000),
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: envInt(process.env.SMTP_PORT, 587),
   SMTP_USER: process.env.SMTP_USER || '',
@@ -258,6 +263,9 @@ export const config = {
   PAYMENTS_SECRET_KEY: process.env.PAYMENTS_SECRET_KEY || '',
   PAYMENTS_WEBHOOK_SECRET: process.env.PAYMENTS_WEBHOOK_SECRET || '',
   BILLING_GATEWAY: resolveBillingGatewayId(PAYMENTS_MODE),
+  BILLING_GATEWAY_EXPLICIT: Boolean(
+    process.env.BILLING_GATEWAY?.trim() || process.env.PAYMENTS_PROVIDER?.trim()
+  ),
   LOG_LEVEL:
     process.env.LOG_LEVEL || (APP_ENV === 'dev' ? 'debug' : APP_ENV === 'prod' ? 'warn' : 'info'),
   ENABLE_REQUEST_LOGGING: envBool(process.env.ENABLE_REQUEST_LOGGING, APP_ENV !== 'prod'),
