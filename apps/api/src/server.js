@@ -525,9 +525,6 @@ app.use('/api/consumer', consumerAccountRoutes)
 app.use('/api/consumer', consumerRoutes)
 app.use('/api/account', accountRoutes)
 app.use('/api/admin-dashboard', adminDashboardRoutes)
-if (allowE2eRoutes()) {
-  app.use('/api/e2e', e2eRoutes)
-}
 app.use('/api/branches', branchesRoutes)
 app.use('/api/org', orgRoutes)
 app.use('/api/org/invitations', branchInvitationsRoutes)
