@@ -2,6 +2,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 - Hosted release dependency restoration (infrastructure-only)
+
+The existing preprod/production PostgreSQL, Redis, ClamAV and Keycloak services were started with explicit user approval, preserving their current configuration and data volumes. The server storage readiness verifier also recognizes explicit `NotImplemented` public-access-block responses from documented private-only Railway endpoints after private ACL/configuration checks. This restores existing dependencies without a new native API contract, auth/session flow, permission, feature, notification or required environment key. No additional Android/iOS source change is required; their full release branches already contain the matching campaign clients.
+
 ## 2026-11-11 - Railway demo alias correction (web-only)
 
 Demo aliases now emit relative redirects behind Railway TLS so QR attribution remains on the public HTTPS origin. This Nginx-only correction has no API, auth, RBAC, shared type, feature, notification or environment contract impact; Android and iOS require no additional source changes. Both native full runtime trees are already promoted through preprod and prod with their anonymous campaign clients.

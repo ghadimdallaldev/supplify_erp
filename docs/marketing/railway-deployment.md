@@ -22,6 +22,8 @@ Commit the full release to dev, verify it, then promote dev → preprod → prod
 
 ## Checks before sharing the QR code
 
+If an environment is offline, restore its existing PostgreSQL, Redis and ClamAV dependencies before starting API/auth services. Preserve volume mounts, existing credentials and environment isolation. Check Keycloak realm discovery as well as API health; a public campaign page can load while authenticated ERP access is unavailable. Infrastructure or authentication restarts rejected by automatic approval review require explicit user approval, never an indirect branch-trigger workaround.
+
 1. Check each environment's API `/ready` and `/health`, main web page, and public `/demo/` route independently.
 2. Verify the API deployment applied migration 0231. Validate a demo submission without creating an ERP tenant. Confirm campaign admin endpoints reject anonymous visitors.
 3. Play the film, verify byte ranges, complete both seven-step walkthroughs, and check a phone viewport. Confirm `/horeca` retains attribution on redirect.
