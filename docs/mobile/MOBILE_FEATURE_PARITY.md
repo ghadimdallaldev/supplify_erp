@@ -2,6 +2,24 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 — Public demo integrated into the main Supplify deployment
+
+**Mobile impact:** Both Android (`supplify-mobile`) and iOS (`supplify-mobile-ios`) now include matching `src/types/demoCampaign.ts` and `src/services/api/demoCampaign.ts` for `/api/public/demo/leads` and `/api/public/demo/events`. These helpers omit ERP cookies/tokens and do not refresh, sign out or create accounts. Web contracts are exported from `apps/web/src/types/demoCampaign.ts`. Operational screens, auth/session behavior and notifications are unchanged. Campaign lead administration is web-only and reuses `ADMIN_GROWTH`; no new permission/feature/environment key. See `docs/features/demo-experience.md` for payloads, migration 0231 and deployment URLs. The complete dev release, including prior Android/iOS changes, follows dev → preprod → prod.
+
+---
+
+## 2026-11-11 — HORECA business messaging and image fit (mobile skipped, web-only campaign)
+
+**Mobile impact:** None for `supplify-mobile` (Android) or `supplify-mobile-ios` (iOS). Campaign copy now highlights existing supplier Deals/Boosts, 40+ supplier/restaurant capabilities, separate company workspaces and implemented security safeguards, with a fuller personal-demo invitation. Product-gallery screenshots now fit fully on phones and within bounded desktop frames, retaining enlargement. No product capability, API, auth, RBAC, shared type, notification, feature-key or environment-variable contract changes. Evidence and wording limits: `docs/marketing/feature-coverage.md`.
+
+---
+
+## 2026-11-11 — HORECA microsite UI refresh (mobile skipped, web-only presentation)
+
+**Mobile impact:** None for `supplify-mobile` (Android) or `supplify-mobile-ios` (iOS). Refreshed `apps/horeca-experience` with a Cartify-inspired two-audience hero, staggered real product previews, feature cards, responsive navigation, role selection shortcuts, a refined guided-demo frame and a rounded demo-request banner. Existing sample walkthrough actions and backend contracts are preserved. The accent selector now supports arrow keys, Home and End. No ERP API, auth, RBAC, shared type, notification, feature-key or environment-variable change. See `docs/marketing/creative-direction.md` and `docs/marketing/PROGRESS.md`.
+
+---
+
 ## 2026-11-11 — HORECA Beirut 2026 microsite `apps/horeca-experience` (mobile skipped, standalone marketing app)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). `apps/horeca-experience` is a standalone Next.js campaign site with its own Postgres (leads and anonymous funnel events), admin page, QR generator and Railway deployment files. It is excluded from the pnpm workspace (`!apps/horeca-experience`), does not call any Supplify API, and adds no ERP API, auth, RBAC, feature-key, type or notification change. Its walkthroughs use fictitious sample data. Docs: `docs/marketing/` (`railway-deployment.md`, `PROGRESS.md`).

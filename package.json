@@ -27,6 +27,7 @@
     "qa": "pnpm lint && pnpm typecheck && pnpm test:ci && pnpm verify:tier-matrix && pnpm audit:prod && pnpm build",
     "e2e": "pnpm --filter @supplify/api test:e2e",
     "e2e:playwright": "node tests/scripts/probe-urls.mjs && playwright test --config=tests/playwright.config.ts",
+    "test:demo": "playwright test --config=tests/horeca/playwright.config.ts",
     "test:coverage-map": "node tests/scripts/check-coverage-map.mjs",
     "db:migrate": "node apps/api/scripts/migrate.js",
     "db:sync-roles": "node apps/api/scripts/sync-system-roles.mjs",

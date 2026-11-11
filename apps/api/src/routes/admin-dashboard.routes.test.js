@@ -11,6 +11,7 @@ vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
 vi.mock('../lib/cache.js', () => ({
+  getRedisClient: vi.fn().mockReturnValue(null),
   getCache: vi.fn().mockResolvedValue(null),
   setCache: vi.fn().mockResolvedValue(undefined),
   deleteCache: vi.fn().mockResolvedValue(undefined),

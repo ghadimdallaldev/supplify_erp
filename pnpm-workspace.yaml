@@ -1,5 +1,6 @@
 packages:
   - 'apps/*'
+  - '!apps/horeca-experience'
   - 'packages/*'
 
 # Enable pnpm workspaces

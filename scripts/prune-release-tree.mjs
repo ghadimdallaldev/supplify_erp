@@ -25,15 +25,23 @@ const tier = (() => {
   return t
 })()
 
+function releaseTarget(target) {
+  const abs = path.resolve(ROOT, target)
+  const rel = path.relative(ROOT, abs)
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel))
+    throw new Error(`Unsafe release prune target: ${target}`)
+  return abs
+}
+
 function rm(target) {
-  const abs = path.join(ROOT, target)
+  const abs = releaseTarget(target)
   if (!fs.existsSync(abs)) return
   fs.rmSync(abs, { recursive: true, force: true })
   console.log(`removed ${target}`)
 }
 
 function rmFile(target) {
-  const abs = path.join(ROOT, target)
+  const abs = releaseTarget(target)
   if (!fs.existsSync(abs)) return
   fs.unlinkSync(abs)
   console.log(`removed ${target}`)
@@ -94,7 +102,7 @@ function patchServerJs() {
   let src = fs.readFileSync(abs, 'utf8')
   src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\r?\n/, '')
   src = src.replace(
-    /\r?\nif \(config\.E2E_SECRET\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n\}\r?\n/,
+    /\r?\nif \((?:config\.E2E_SECRET|allowE2eRoutes\(\))\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n\}\r?\n/,
     '\n'
   )
   fs.writeFileSync(abs, src)

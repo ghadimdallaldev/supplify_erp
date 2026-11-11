@@ -316,6 +316,11 @@ export function LoginPage() {
             </CardContent>
           </Card>
 
+          <p className="mt-5 text-center text-sm text-[var(--text-muted)]">
+            <a href="/demo/" className="font-medium text-[var(--brand-mid)] hover:underline">
+              Explore the Supplify interactive demo
+            </a>
+          </p>
           <LegalFooterLinks />
         </div>
       </div>

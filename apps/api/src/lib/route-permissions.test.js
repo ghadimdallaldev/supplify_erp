@@ -238,6 +238,17 @@ describe('chatSendGuard', () => {
 })
 
 describe('adminDashboardPermissionGuard', () => {
+  it('requires growth permission for campaign leads, summary, updates and export', () => {
+    for (const path of ['/demo/leads', '/demo/summary', '/demo/leads/1', '/demo/export.csv'])
+      expect(resolveAdminDashboardPermission(path)).toBe(P.ADMIN_GROWTH)
+    const req = {
+      ...mockReq('GET', '/demo/leads'),
+      tenantContext: { permissions: [P.ADMIN_ACCESS] },
+    }
+    const response = mockResWithPerms([P.ADMIN_ACCESS])
+    adminDashboardPermissionGuard(req, response, next)
+    expect(response.status).toHaveBeenCalledWith(403)
+  })
   beforeEach(() => next.mockReset())
 
   it('maps finance routes to ADMIN_FINANCE', () => {

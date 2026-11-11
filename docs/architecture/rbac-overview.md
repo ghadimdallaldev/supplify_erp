@@ -276,3 +276,7 @@ Supplier `/api/inventory` mutations require `INVENTORY_EDIT` or `INVENTORY_MANAG
 - Inventory list, alerts, product GET/PATCH, adjustments, and adjustment history require the supplier tenant (admins must impersonate). Product create `initialStock` mirrors into warehouse inventory for warehouse-mode suppliers. Warehouse-mode PATCH/adjustments write `warehouse_inventory` first and mirror the total into `inventory`. Inventory settings PATCH and alert acknowledge are supplier-scoped the same way. `GET /api/orders/:id/warehouses` uses `assertOrderReadAccess`. Order amendments require a restaurant or supplier tenant (no unscoped admin access).
 - Seeded Accountant roles drop `RECIPES_*` on the next `pnpm db:sync-roles`.
 - Web `/app/restaurants` and `/app/restaurants/:id` are gated with `ORDERS_VIEW`, matching the supplier sidebar and API.
+
+## Public demo campaign administration (2026-11-11)
+
+The `/api/admin-dashboard/demo/*` lead, summary, update and CSV routes inherit existing ADMIN authentication/context and require `ADMIN_GROWTH`. Anonymous visitors may only submit consented requests or allowed funnel events through `/api/public/demo/*`; those calls have no tenant/account privileges. No new permission key is introduced. See `../features/demo-experience.md`.

@@ -2,6 +2,14 @@
 
 Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBAC.
 
+## 2026-11-11 — Public demo campaign API
+
+- [x] Public lead/event payloads and response types mirrored in Android and iOS.
+- [x] Anonymous client helpers avoid ERP authentication state and cookies.
+- [x] Native operational screens remain unchanged; QR/video/walkthrough presentation stays on the web.
+- [x] Campaign lead administration uses existing admin auth and ADMIN_GROWTH on web only.
+- [x] Main-web entry, API migration and release URLs documented in `docs/features/demo-experience.md`.
+
 ## 2026-09-29 - Supplier public shopping and personal consumers
 
 - [x] `CONSUMER` role, registration, auth types, and role navigation synchronized on Android and iOS.

@@ -102,6 +102,7 @@ export function resolveAdminDashboardPermission(path) {
   if (p.startsWith('/tenants')) return P.ADMIN_TENANTS
   if (p.startsWith('/users')) return P.ADMIN_SUPPORT
   if (p.startsWith('/impersonate')) return P.ADMIN_SUPPORT
+  if (p === '/demo' || p.startsWith('/demo/')) return P.ADMIN_GROWTH
   if (p.startsWith('/feature-flags') || p.includes('/feature-overrides')) return P.ADMIN_GROWTH
   return P.ADMIN_ACCESS
 }

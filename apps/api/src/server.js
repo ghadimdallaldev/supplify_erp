@@ -57,6 +57,7 @@ import { billingRoutes } from './routes/billing.routes.js'
 import { ensureOrderCancellationColumns } from './lib/migrator.js'
 import { staffRoutes } from './routes/staff.routes.js'
 import { publicRoutes } from './routes/public.routes.js'
+import { demoCampaignRoutes } from './routes/demo-campaign.routes.js'
 import { publicSalesRoutes } from './routes/public-sales.routes.js'
 import { supplierPublicSalesRoutes } from './routes/supplier-public-sales.routes.js'
 import { consumerAccountRoutes } from './routes/consumer-account.routes.js'
@@ -516,6 +517,7 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/subscriptions', subscriptionsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/public/staff/request-link', staffLinkLimiter)
+app.use('/api/public/demo', demoCampaignRoutes)
 app.use('/api/public', publicSalesRoutes)
 app.use('/api/public', publicRoutes)
 app.use('/api/internal', internalAuthRoutes)

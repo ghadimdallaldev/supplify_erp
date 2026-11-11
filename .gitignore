@@ -137,5 +137,6 @@ backups-preprod/
 .playwright-mcp/
 
 # Generated intermediates (PDF/PPTX deliverables stay tracked)
+.release-checkouts/
 docs/onboarding/output/*.html
 docs/guides/qa/output/*.html

@@ -57,6 +57,18 @@ server {
 
     include /etc/supplify/proxy-api.conf;
 
+    # Public demo is built with the main web app. Preserve attribution on aliases.
+    location = /demo { return 308 /demo/$is_args$args; }
+    location = /horeca { return 308 /demo/$is_args$args; }
+    location = /horeca/ { return 308 /demo/$is_args$args; }
+    location ^~ /demo/assets/ {
+        expires 1d;
+        try_files $uri =404;
+    }
+    location ^~ /demo/ {
+        expires -1;
+        try_files $uri $uri/ /demo/index.html;
+    }
     # Handle client-side routing
     location / {
         try_files $uri $uri/ /index.html;

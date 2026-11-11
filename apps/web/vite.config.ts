@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -23,10 +24,34 @@ async function loadVisualizer() {
 
 const visualizerPlugin = await loadVisualizer()
 
+// The public campaign is a second HTML entry in the same web deployment. Keeping its
+// entry separate prevents campaign CSS/auth concerns from leaking into the ERP shell.
+function demoEntryRoutes(): Plugin {
+  const middleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const url = new URL(req.url || '/', 'http://localhost')
+    if (['/demo', '/horeca', '/horeca/'].includes(url.pathname)) {
+      res.writeHead(308, { Location: `/demo/${url.search}` })
+      res.end()
+      return
+    }
+    if (/^\/demo\/admin\/?$/.test(url.pathname)) req.url = `/demo/index.html${url.search}`
+    next()
+  }
+  return {
+    name: 'supplify-demo-entry',
+    configureServer(server) {
+      server.middlewares.use(middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware)
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
   publicDir: path.resolve(rootDir, 'static'),
-  plugins: [react(), visualizerPlugin].filter(Boolean),
+  plugins: [react(), demoEntryRoutes(), visualizerPlugin].filter(Boolean),
   // Strip console/debugger from production bundles only — dev keeps console output.
   esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : undefined,
   build: {
@@ -34,6 +59,10 @@ export default defineConfig(({ command }) => ({
     // Skip gzip-size reporting on build — it adds time and we analyze via `pnpm analyze`.
     reportCompressedSize: false,
     rollupOptions: {
+      input: {
+        app: path.resolve(rootDir, 'index.html'),
+        demo: path.resolve(rootDir, 'demo/index.html'),
+      },
       output: {
         // Group vendor libs into shared chunks to reduce per-route request count.
         // Heavy, route-specific libs get their OWN chunks so they load lazily with
