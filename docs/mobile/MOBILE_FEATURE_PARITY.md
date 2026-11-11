@@ -2,6 +2,23 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 — HORECA Beirut 2026 microsite `apps/horeca-experience` (mobile skipped, standalone marketing app)
+
+**Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). `apps/horeca-experience` is a standalone Next.js campaign site with its own Postgres (leads and anonymous funnel events), admin page, QR generator and Railway deployment files. It is excluded from the pnpm workspace (`!apps/horeca-experience`), does not call any Supplify API, and adds no ERP API, auth, RBAC, feature-key, type or notification change. Its walkthroughs use fictitious sample data. Docs: `docs/marketing/` (`railway-deployment.md`, `PROGRESS.md`).
+
+---
+
+## 2026-11-11 — Mobile violet theme, driver run sheet + notification settings, EAS environments (implemented in both mobile repos)
+
+**Mobile impact:** Implemented in `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS), no API or type change.
+
+- **Theme:** the teal/green brand palette in `src/theme/colors.ts`, `theme/index.ts` shadows, `ui/v2.tsx` brand pill and the Android notification accent in `app.json` now use the web violet (`--primary` 262 68% 42% = `#5822B4`) for every role. Semantic success/warning/danger colors are unchanged. App icon, adaptive icon (background `#5B21B6`), splash and favicon were regenerated from the web violet hexagon mark; the driver GPS banners use the brand tint instead of success green.
+- **Driver run sheet:** `DriverRunSheetScreen` was the supplier run sheet (KPIs, orders to pick, priorities, fulfillment alerts). It now shows only the driver own stops from the driver board (waiting / en route / delivered / issues) and opens each stop.
+- **Driver notification settings:** drivers see only push + in-app channels and a Delivery confirmations toggle (`notify_order_delivered`, the only preference key the server applies to driver milestones). Assignment, reschedule and failed-delivery alerts have no preference key and are always sent on the enabled channels. Email, WhatsApp, invoices, stock, deals and billing toggles are hidden for the driver role.
+- **Push on dev builds (root cause):** the dev API logged `POST /api/push/devices → 409 "Push endpoint is already registered to another account"` for the installed `demo` build. The Expo token identifies the phone, and it was still registered to a previous account on the dev DB, so the signed-in user never got push. `saveExpoPushDevice` (`apps/api/src/services/push.service.js`) now moves the device to the authenticated user; web-push endpoints keep the strict owner check. Mobile needs no change (the 409 simply no longer occurs); it takes effect when the API is redeployed to dev. The `demo` build already contained `GOOGLE_SERVICES_JSON` and pointed at `api-dev`, so Firebase config and environment were not the cause. `eas.json` profiles now also set an explicit `environment` so this stays deterministic.
+
+---
+
 ## 2026-11-11 — HORECA demo seed script (mobile skipped, dev tooling only)
 
 **Mobile impact:** None for `supplify-mobile` (Android) and `supplify-mobile-ios` (iOS). `apps/api/scripts/seed-horeca-demo.mjs` (`pnpm --filter api seed:horeca-demo`) only writes demo data. Its `--only=today` section refreshes today's orders and GPS for the supplier Command Center. The B2C demo seeder's `delivery_zone` insert was also fixed to drop the removed `postcode_prefix` column. No API, type or client contract change. Cheat sheet: `docs/guides/horeca-demo-2026-11.md`.

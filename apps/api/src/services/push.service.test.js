@@ -156,23 +156,23 @@ describe('Push Service', () => {
     expect(row.id).toBe('device-1')
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO push_subscriptions'),
-      ['user-1', 'expo:ExponentPushToken[abc]', 'expo', 'ios', null]
+      ['user-1', 'expo:ExponentPushToken[abc]', 'ios']
     )
     const [sql] = queryMock.mock.calls[0]
     expect(sql).toContain('ON CONFLICT (endpoint)')
-    expect(sql).toContain('WHERE push_subscriptions.user_id = EXCLUDED.user_id')
-    expect(sql).not.toContain('DO UPDATE SET user_id')
   })
 
-  it('saveExpoPushDevice rejects a token owned by another user', async () => {
-    queryMock.mockResolvedValueOnce({ rows: [] })
+  it('saveExpoPushDevice moves a token previously owned by another user to the caller', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 'device-1', user_id: 'user-2' }] })
     const { saveExpoPushDevice } = await import('./push.service.js')
-    await expect(
-      saveExpoPushDevice('user-2', {
-        token: 'ExponentPushToken[abc]',
-        platform: 'ios',
-      })
-    ).rejects.toMatchObject({ name: 'ConflictError' })
+    const row = await saveExpoPushDevice('user-2', {
+      token: 'ExponentPushToken[abc]',
+      platform: 'ios',
+    })
+    expect(row.user_id).toBe('user-2')
+    const [sql] = queryMock.mock.calls[0]
+    expect(sql).toContain('DO UPDATE SET user_id = EXCLUDED.user_id')
+    expect(sql).not.toContain('WHERE push_subscriptions.user_id')
   })
 
   it('removeExpoPushDevice deletes by expo endpoint', async () => {
