@@ -1280,6 +1280,34 @@ h2 em {
   border: 1px solid #d7c8e4;
   box-shadow: 0 24px 40px -30px #30143f77;
 }
+.film-frame video {
+  object-fit: contain;
+}
+.film-frame[data-format='portrait'] {
+  aspect-ratio: 9 / 16;
+  width: min(100%, calc(78svh * 9 / 16));
+  max-width: 380px;
+}
+.film-caption,
+.film-error {
+  margin: 18px auto 0;
+  max-width: 50ch;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.film-error {
+  color: var(--ink);
+}
+.film-error .link {
+  border: 0;
+  background: none;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .film-frame[data-state='idle'] .film-play {
   font-size: 13px;
   padding: 6px 20px 6px 6px;

@@ -17,12 +17,12 @@ export default function Page() {
       <main id="top">
         <Hero />
         <FeatureStrip />
+        <Film />
         <Features />
         <World />
         <Experience />
         <Ecosystem />
         <Preview />
-        <Film />
         <Faq />
         <FinalCta />
       </main>
