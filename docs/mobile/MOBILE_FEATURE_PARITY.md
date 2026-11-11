@@ -2,6 +2,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-11 - Responsive v3 demo film (web-only)
+
+Replaced the public demo player with the supplied v3 landscape/portrait films, matching posters and English captions. The film now sits immediately below the hero/capability strip; phones receive the portrait composition, with no cropping or automatic video download. Rotation during playback preserves position. This affects only public web presentation/static assets and introduces no API, auth/session, RBAC, shared type, notification, feature-key or environment-variable change. Android and iOS require no additional source update.
+
 ## 2026-11-11 - Full runtime branch promotion verified
 
 The complete Android runtime is promoted through dev `17e5682`, preprod `c147756` and prod `43f03e0`; iOS through dev `d26631e`, preprod `31d6399` and prod `9aa4a79`. Both native typechecks pass and their source/assets/build configuration match the promoted runtime. ERP preprod `76c23759` and prod `9586ab72` are live with the same runtime tree; API readiness, auth realm discovery and anonymous campaign contracts are verified. Native binary builds/store releases were not requested. The storage compatibility correction is server-only and introduces no native client contract change. See `docs/marketing/PROGRESS.md` for release checks and the startup background-job follow-up.

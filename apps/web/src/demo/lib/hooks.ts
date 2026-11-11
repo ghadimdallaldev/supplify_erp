@@ -38,15 +38,3 @@ export function useInView<T extends HTMLElement>(threshold = 0.3) {
   }, [seen, threshold])
   return [ref, seen] as const
 }
-
-const MEDIA = new Set([
-  'supplify-film-web.mp4',
-  'supplify-film-poster.jpg',
-  'supplify-hero-loop.mp4',
-  'supplify-film-captions.en.vtt',
-])
-
-/** These assets ship with the main web build; playback errors retain the existing fallback. */
-export function useAssetExists(url: string): boolean {
-  return MEDIA.has(url.split('/').pop() || '')
-}

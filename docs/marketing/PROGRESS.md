@@ -4,6 +4,12 @@ Plan: `C:\Users\ghadi.mdallal\.claude\plans\vectorized-greeting-mccarthy.md`
 Video project: `C:\myProjects\video-studio` (Remotion, HyperFrames, GSAP, agent skills)
 Rule: nothing is marked done until the artifact has been rendered/run and inspected.
 
+## Responsive v3 film replacement (2026-11-11)
+
+- Uses the user-provided `supplify-v3-landscape-1920x1080.mp4` and `supplify-v3-portrait-1080x1920.mp4`. Both are 60 seconds. Browser encodes retain 1920×1080 / 1080×1920 resolution, H.264 video, AAC stereo audio and fast-start delivery, at approximately 12.0 / 12.4 MB versus 27.8 / 28.2 MB masters.
+- Moved the film below the hero/capability strip. Portrait phones select the portrait film and poster; wider screens select landscape. The frame contains the full composition, stays within the phone viewport and retains playback position through rotation. The supplied v3 caption track replaces the old narration captions. No media downloads until play; legacy files remain only for older open pages.
+- Validation: main web build and root `pnpm typecheck` pass; all **13 browser tests** pass against the main production build. Checks cover both real video compositions, duration/dimensions, matching captions, no idle video fetch, viewport changes, playback continuity, failure/retry and existing responsive walkthroughs. Both encodes retain BT.709 colour and fast-start `moov` metadata before `mdat`. Desktop/phone playback screenshots were visually reviewed. Release continues through the existing main-app dev → preprod → prod flow. Web-only mobile skip is dated in the parity log; there is no client/API contract change.
+
 ## Verified full release (2026-11-11)
 
 The complete runtime release is live on dev, preprod and production. HORECA is included in the existing Supplify web/API services; no separate app, database or domain was created. All existing PostgreSQL/Redis volumes and service configuration were preserved during the explicitly approved infrastructure and authentication restarts.

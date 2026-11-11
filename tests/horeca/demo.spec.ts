@@ -20,19 +20,101 @@ test('public aliases preserve the QR attribution and use the main web demo entry
   await expect(page.getByRole('heading', { name: 'Every order, one line.' })).toBeVisible()
 })
 
-test('video supports range requests and actually plays', async ({ page, request }) => {
-  const response = await request.get('/demo/assets/media/supplify-film-web.mp4', {
-    headers: { Range: 'bytes=0-1023' },
-  })
-  expect(response.status()).toBe(206)
-  expect(response.headers()['content-type']).toContain('video/mp4')
-  await page.goto('/demo/')
-  await page.getByRole('button', { name: /Get the whole picture in 60 seconds/ }).click()
-  await expect
-    .poll(() =>
-      page.locator('#film video[controls]').evaluate((v: HTMLVideoElement) => v.currentTime)
+for (const format of ['landscape', 'portrait'] as const) {
+  test(`${format} v3 film plays with the matching composition and captions`, async ({
+    page,
+    request,
+  }) => {
+    await page.setViewportSize(
+      format === 'portrait' ? { width: 390, height: 844 } : { width: 1440, height: 900 }
     )
+    const film = `/demo/assets/media/supplify-film-v3-${format}.mp4`
+    const response = await request.get(film, { headers: { Range: 'bytes=0-1023' } })
+    expect(response.status()).toBe(206)
+    expect(response.headers()['content-type']).toContain('video/mp4')
+    const mediaRequests: string[] = []
+    page.on('request', (req) => {
+      if (req.url().endsWith('.mp4')) mediaRequests.push(req.url())
+    })
+    await page.goto('/demo/')
+    const video = page.locator('#film video')
+    await expect(video).toHaveAttribute('src', film)
+    await expect(video).toHaveAttribute(
+      'poster',
+      `/demo/assets/media/supplify-film-v3-${format}.jpg`
+    )
+    await expect(video).toHaveAttribute('preload', 'none')
+    expect(mediaRequests).toEqual([])
+    expect(await page.locator('main').evaluate((main) => main.children[2].id)).toBe('film')
+    await page.getByRole('button', { name: /Get the whole picture in 60 seconds/ }).click()
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThan(0)
+    const info = await video.evaluate((v: HTMLVideoElement) => ({
+      width: v.videoWidth,
+      height: v.videoHeight,
+      duration: v.duration,
+      fit: getComputedStyle(v).objectFit,
+      muted: v.muted,
+    }))
+    expect(info.width / info.height).toBeCloseTo(format === 'portrait' ? 9 / 16 : 16 / 9, 2)
+    expect(info.duration).toBeCloseTo(60, 1)
+    expect(info.fit).toBe('contain')
+    expect(info.muted).toBe(false)
+    expect(mediaRequests.every((url) => url.endsWith(film))).toBe(true)
+    await video.evaluate((v: HTMLVideoElement) => {
+      v.textTracks[0].mode = 'hidden'
+    })
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.textTracks[0].cues?.length || 0))
+      .toBeGreaterThan(20)
+    expect(
+      await video.evaluate((v: HTMLVideoElement) => (v.textTracks[0].cues![0] as VTTCue).text)
+    ).toBe('Running a restaurant means chasing orders.')
+    await page
+      .locator('#film')
+      .screenshot({ path: `test-results/demo-film-v3/${format}-playing.png` })
+  })
+}
+
+test('film adapts before play and retains its position when a phone rotates during playback', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/demo/')
+  const video = page.locator('#film video')
+  await expect(video).toHaveAttribute('src', /v3-portrait\.mp4$/)
+  await page.setViewportSize({ width: 844, height: 390 })
+  await expect(video).toHaveAttribute('src', /v3-landscape\.mp4$/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(video).toHaveAttribute('src', /v3-portrait\.mp4$/)
+  await page.getByRole('button', { name: 'Play the film', exact: true }).click()
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0)
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.currentTime = 20
+  })
+  await page.setViewportSize({ width: 844, height: 390 })
+  await expect(video).toHaveAttribute('src', /v3-portrait\.mp4$/)
+  await expect
+    .poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThanOrEqual(20)
+  const frame = await page.locator('.film-frame').boundingBox()
+  expect(frame!.height).toBeLessThanOrEqual(390 * 0.8)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+})
+
+test('a film network failure can be retried without blocking the demo', async ({ page }) => {
+  const film = '**/supplify-film-v3-landscape.mp4'
+  await page.route(film, (route) => route.abort())
+  await page.goto('/demo/')
+  await page.getByRole('button', { name: 'Play the film', exact: true }).click()
+  await expect(page.locator('.film-error')).toContainText('The film could not load')
+  await page.unroute(film)
+  await page.getByRole('button', { name: 'Try the film again', exact: true }).click()
+  await expect
+    .poll(() => page.locator('#film video').evaluate((v: HTMLVideoElement) => v.currentTime))
     .toBeGreaterThan(0)
+  await expect(page.locator('.film-error')).toHaveCount(0)
 })
 
 test('demo request is anonymous even with an existing ERP cookie', async ({

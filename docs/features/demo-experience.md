@@ -17,6 +17,12 @@ Updated 2026-11-11. The HORECA experience ships with the existing Supplify web a
 - `apps/api/src/routes/demo-campaign.routes.js` handles campaign requests in the main API. Migration `0231_demo_campaign.sql` adds platform-owned `demo_campaign_lead` and `demo_campaign_event` tables to each environment's existing database.
 - `apps/horeca-experience/` is a retired, ignored local authoring archive. Its old Next server, database configuration and standalone admin password are not deployed.
 
+## Responsive product film (2026-11-11)
+
+The 60-second v3 illustrated film appears immediately after the hero/capability strip, before feature cards and interactive walkthroughs. It uses the supplied landscape and portrait masters from `video-studio/out/v3/`, encoded as full-resolution 1080p H.264/AAC fast-start MP4s. Wider screens use `supplify-film-v3-landscape.mp4`; portrait phone viewports (at most 600px wide) use `supplify-film-v3-portrait.mp4`. Both have matching v3 posters and the supplied English `supplify-film-v3.en.vtt` captions. Native controls preserve the entire composition with `object-fit: contain`.
+
+Only the selected composition loads, after a visitor presses play (`preload="none"`). No silent teaser downloads automatically. Selection follows the viewport before playback; once playing, rotating/resizing retains the selected composition and current position. The portrait frame fits the visible viewport height. Playback begins directly from the user gesture for inline mobile playback; a failed load offers retry and the personal-demo link. Versioned filenames avoid stale video/poster/caption caches. Legacy media files remain available for already-open older pages, but the current player does not reference them.
+
 ## Public API
 
 | Method | Route                     | Purpose                                                               |
