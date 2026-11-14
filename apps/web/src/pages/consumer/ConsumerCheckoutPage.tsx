@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -32,6 +32,7 @@ import {
   type CartLine,
 } from '../../lib/consumerCart'
 import { useConsumerCart } from '../../hooks/useConsumerCart'
+import { clearGuestCheckoutKey, guestCheckoutKey } from '../../lib/guestCheckoutKey'
 import { matchDeliveryZone, zoneDeliveryFee, zoneMinOrder } from '../../lib/deliveryZones'
 import {
   orderingStatusFromBranch,
@@ -139,6 +140,11 @@ export function ConsumerCheckoutPage() {
       { skip: !slug }
     )
   const [createOrder, { isLoading: placing }] = useCreatePublicConsumerOrderMutation()
+  type CheckoutPayload = Parameters<typeof createOrder>[0]
+  const attempt = useRef<{ payload: CheckoutPayload; key: string } | null>(null)
+  const submitting = useRef(false)
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  const checkoutScope = `${slug}:${member?.id ?? 'guest'}`
 
   const branches = useMemo(
     () => fulfillmentData?.branches ?? storefront?.branches ?? [],
@@ -263,8 +269,38 @@ export function ConsumerCheckoutPage() {
     preview?.programEnabled &&
     (preview.suggestedRedeemPoints ?? 0) >= (preview.minRedeemPoints ?? 0)
 
+  const submitAttempt = async (current: NonNullable<typeof attempt.current>) => {
+    submitting.current = true
+    attempt.current = current
+    try {
+      const result = await createOrder({ ...current.payload, idempotencyKey: current.key }).unwrap()
+      attempt.current = null
+      setUnconfirmed(false)
+      clearGuestCheckoutKey(checkoutScope)
+      clearCartStorage(slug)
+      toast.success(t('checkout.orderPlaced'))
+      navigate(`/order/${slug}/receipt/${result.receiptToken ?? result.order.receipt_token}`)
+    } catch (error: any) {
+      const status = error?.status
+      const rejected =
+        typeof status === 'number' && status < 500 && status !== 408 && status !== 409
+      if (rejected) attempt.current = null
+      setUnconfirmed(!rejected)
+      toast.error(
+        error?.data?.message || error?.data?.error?.message || t('checkout.unableToPlace')
+      )
+    } finally {
+      submitting.current = false
+    }
+  }
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (submitting.current || placing) return
+    if (attempt.current) {
+      await submitAttempt(attempt.current)
+      return
+    }
     if (!slug || !branchId || !cart.length) {
       toast.error(t('checkout.completeCart'))
       return
@@ -328,46 +364,45 @@ export function ConsumerCheckoutPage() {
       return
     }
 
-    try {
-      const result = await createOrder({
-        restaurantSlug: slug,
-        branchId,
-        fulfillmentType,
-        guestName: form.guestName.trim(),
-        guestEmail: form.guestEmail.trim() || undefined,
-        guestPhone: form.guestPhone.trim() || undefined,
-        notes: form.notes.trim() || undefined,
-        pointsToRedeem: redeemPoints ? pointsToRedeem : undefined,
-        deliveryZoneId: fulfillmentType === 'DELIVERY' ? deliveryZoneId : undefined,
-        scheduledFor:
-          scheduleMode === 'scheduled' && scheduledFor
+    const payload: CheckoutPayload = {
+      restaurantSlug: slug,
+      branchId,
+      fulfillmentType,
+      guestName: form.guestName.trim(),
+      guestEmail: form.guestEmail.trim() || undefined,
+      guestPhone: form.guestPhone.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+      pointsToRedeem: redeemPoints ? pointsToRedeem : undefined,
+      deliveryZoneId: fulfillmentType === 'DELIVERY' ? deliveryZoneId : undefined,
+      scheduledFor:
+        scheduleMode === 'scheduled' && scheduledFor
+          ? scheduledInstant(scheduledFor, restaurantTimeZone).toISOString()
+          : orderingStatus.mode === 'PREORDER_ONLY' && scheduledFor
             ? scheduledInstant(scheduledFor, restaurantTimeZone).toISOString()
-            : orderingStatus.mode === 'PREORDER_ONLY' && scheduledFor
-              ? scheduledInstant(scheduledFor, restaurantTimeZone).toISOString()
-              : undefined,
-        deliveryAddress:
-          fulfillmentType === 'DELIVERY'
-            ? {
-                line1: form.addressLine1.trim(),
-                city: form.city.trim(),
-                postcode: form.postcode.trim(),
-              }
             : undefined,
-        lines: cart.map((line) => ({
-          menuItemId: line.menuItemId,
-          quantity: line.quantity,
-          modifierOptionIds: line.modifierOptionIds?.length ? line.modifierOptionIds : undefined,
-          notes: line.notes,
-        })),
-      }).unwrap()
-
-      clearCartStorage(slug)
-      toast.success(t('checkout.orderPlaced'))
-      navigate(`/order/${slug}/receipt/${result.receiptToken ?? result.order.receipt_token}`)
-    } catch (error: any) {
-      toast.error(
-        error?.data?.message || error?.data?.error?.message || t('checkout.unableToPlace')
-      )
+      deliveryAddress:
+        fulfillmentType === 'DELIVERY'
+          ? {
+              line1: form.addressLine1.trim(),
+              city: form.city.trim(),
+              postcode: form.postcode.trim(),
+            }
+          : undefined,
+      lines: cart.map((line) => ({
+        menuItemId: line.menuItemId,
+        quantity: line.quantity,
+        modifierOptionIds: line.modifierOptionIds?.length ? line.modifierOptionIds : undefined,
+        notes: line.notes,
+      })),
+    }
+    submitting.current = true
+    try {
+      const key = await guestCheckoutKey(checkoutScope, payload)
+      await submitAttempt({ payload, key })
+    } catch {
+      toast.error(t('checkout.unableToPlace'))
+    } finally {
+      submitting.current = false
     }
   }
 
@@ -435,365 +470,380 @@ export function ConsumerCheckoutPage() {
 
       {!!cart.length && (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {orderingStatus.mode !== 'LIVE' && (
-            <Alert
-              variant={orderingStatus.mode === 'CLOSED' ? 'destructive' : 'default'}
-              className={
-                orderingStatus.mode === 'PREORDER_ONLY'
-                  ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
-                  : undefined
-              }
-            >
-              <CalendarClock className="h-4 w-4" />
-              <AlertDescription>{orderingMessage}</AlertDescription>
-            </Alert>
-          )}
-
-          {unavailableLines.length > 0 && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{t('checkout.itemUnavailable')}</AlertDescription>
-            </Alert>
-          )}
-
-          {pricedCart?.priceChanged && unavailableLines.length === 0 && (
+          {unconfirmed && (
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{t('checkout.pricesUpdated')}</AlertDescription>
-            </Alert>
-          )}
-
-          {belowMinOrder && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                {t('checkout.minOrderAlert', {
-                  min: formatPrice(minOrderAmount),
-                  remaining: formatPrice(minOrderAmount - subtotal),
+                {t('checkout.unconfirmed', {
+                  defaultValue:
+                    'Your order status is unconfirmed. Retry to check the same order safely, or check your orders before starting another.',
                 })}
               </AlertDescription>
             </Alert>
           )}
+          <fieldset disabled={placing || unconfirmed} className="min-w-0 space-y-4">
+            {orderingStatus.mode !== 'LIVE' && (
+              <Alert
+                variant={orderingStatus.mode === 'CLOSED' ? 'destructive' : 'default'}
+                className={
+                  orderingStatus.mode === 'PREORDER_ONLY'
+                    ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
+                    : undefined
+                }
+              >
+                <CalendarClock className="h-4 w-4" />
+                <AlertDescription>{orderingMessage}</AlertDescription>
+              </Alert>
+            )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('checkout.yourOrder')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {orderLines.map((line: CartLine) => (
-                <div key={line.cartKey} className="space-y-0.5">
-                  <div className="flex justify-between text-sm">
-                    <span>
-                      {line.quantity}× {line.name}
-                    </span>
-                    <span>{formatPrice(cartLineTotal(line))}</span>
-                  </div>
-                  {formatModifierLabels(line) && (
-                    <p className="text-xs text-muted-foreground">{formatModifierLabels(line)}</p>
-                  )}
-                  {line.notes && (
-                    <p className="text-xs italic text-muted-foreground">
-                      {t('common.note', { note: line.notes })}
-                    </p>
-                  )}
-                </div>
-              ))}
-              <div className="flex justify-between border-t pt-2 text-sm">
-                <span className="text-muted-foreground">{t('common.subtotal')}</span>
-                <span>{formatPrice(subtotal)}</span>
-              </div>
-              {deliveryFee > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {matchedZone
-                      ? t('checkout.deliveryZone', { zone: matchedZone.name })
-                      : t('common.delivery')}
-                  </span>
-                  <span>{formatPrice(deliveryFee)}</span>
-                </div>
-              )}
-              {effectiveDiscount > 0 && (
-                <div className="flex justify-between text-sm text-green-700 dark:text-green-400">
-                  <span>{t('checkout.rewardsDiscount')}</span>
-                  <span>-{formatPrice(effectiveDiscount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t pt-2 font-medium">
-                <span>
-                  {t('checkout.totalCashOn', {
-                    method:
-                      fulfillmentType === 'DELIVERY'
-                        ? t('checkout.cashOnDelivery')
-                        : t('checkout.cashOnPickup'),
+            {unavailableLines.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{t('checkout.itemUnavailable')}</AlertDescription>
+              </Alert>
+            )}
+
+            {pricedCart?.priceChanged && unavailableLines.length === 0 && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{t('checkout.pricesUpdated')}</AlertDescription>
+              </Alert>
+            )}
+
+            {belowMinOrder && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {t('checkout.minOrderAlert', {
+                    min: formatPrice(minOrderAmount),
+                    remaining: formatPrice(minOrderAmount - subtotal),
                   })}
-                </span>
-                <span>{formatPrice(effectiveTotal)}</span>
-              </div>
-            </CardContent>
-          </Card>
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {canRedeem && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{t('checkout.useRewards')}</CardTitle>
-                <CardDescription>
-                  {t('checkout.rewardsBalance', {
-                    balance: preview?.memberBalance ?? 0,
-                    points: preview?.suggestedRedeemPoints ?? 0,
-                    discount: formatPrice(preview?.suggestedDiscount ?? 0),
-                  })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex items-center justify-between gap-4">
-                <Label htmlFor="redeem-toggle" className="flex-1 cursor-pointer">
-                  {t('checkout.applyPoints')}
-                </Label>
-                <Switch
-                  id="redeem-toggle"
-                  checked={redeemPoints}
-                  onCheckedChange={setRedeemPoints}
-                />
-              </CardContent>
-              {redeemPoints && redeemError && (
-                <CardContent className="pt-0 text-sm text-destructive">{redeemError}</CardContent>
-              )}
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('common.branch')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingFulfillment ? (
-                <Skeleton className="h-10 w-full" />
-              ) : branches.length ? (
-                <select
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={branchId}
-                  onChange={(e) => setBranchId(e.target.value)}
-                >
-                  {branches.map((branch) => (
-                    <option key={branch.branchId} value={branch.branchId}>
-                      {branch.branchName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="text-sm text-muted-foreground">{t('common.noBranches')}</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('checkout.fulfillment')}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-3">
-              {fulfillmentOptions.map(({ value, label, icon: Icon }) => {
-                const available = isFulfillmentAvailable(value)
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={!available}
-                    onClick={() => setFulfillmentType(value)}
-                    className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition ${
-                      fulfillmentType === value
-                        ? 'border-[var(--brand-mid)] bg-[var(--brand-pale)]'
-                        : 'hover:bg-muted/50'
-                    } ${!available ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span>{label}</span>
-                    {!available && <Badge variant="secondary">{t('common.unavailable')}</Badge>}
-                  </button>
-                )
-              })}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('checkout.when')}</CardTitle>
-              <CardDescription>
-                {orderingStatus.mode === 'LIVE'
-                  ? t('checkout.whenLive')
-                  : orderingStatus.mode === 'PREORDER_ONLY'
-                    ? t('checkout.whenPreorder')
-                    : t('checkout.whenClosed')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {orderingStatus.allowAsap && (
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={scheduleMode === 'asap' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setScheduleMode('asap')}
-                  >
-                    {t('checkout.asap', { minutes: prepMinutes })}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={scheduleMode === 'scheduled' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setScheduleMode('scheduled')}
-                  >
-                    {t('checkout.schedule')}
-                  </Button>
-                </div>
-              )}
-              {(scheduleMode === 'scheduled' || !orderingStatus.allowAsap) && (
-                <div className="space-y-1">
-                  <Label htmlFor="scheduledFor">
-                    {orderingStatus.mode === 'PREORDER_ONLY'
-                      ? t('checkout.preorderFor')
-                      : t('checkout.preferredTime')}
-                  </Label>
-                  <Input
-                    id="scheduledFor"
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(e) => setScheduledFor(e.target.value)}
-                    min={minScheduleValue}
-                    required={!orderingStatus.allowAsap}
-                  />
-                  {restaurantTimeZone ? (
-                    <p className="text-xs text-muted-foreground">
-                      {t('checkout.restaurantLocalTime', { timeZone: restaurantTimeZone })}
-                    </p>
-                  ) : null}
-                  {orderingStatus.nextLiveOrderAt && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('checkout.earliest', {
-                        time: toDatetimeLocalValueInZone(
-                          new Date(orderingStatus.nextLiveOrderAt),
-                          restaurantTimeZone
-                        ).replace('T', ' '),
-                      })}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('checkout.contact')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="guestName">{t('common.nameRequired')}</Label>
-                <Input
-                  id="guestName"
-                  value={form.guestName}
-                  onChange={(e) => setForm((f) => ({ ...f, guestName: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="guestEmail">{t('common.email')}</Label>
-                <Input
-                  id="guestEmail"
-                  type="email"
-                  value={form.guestEmail}
-                  onChange={(e) => setForm((f) => ({ ...f, guestEmail: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="guestPhone">{t('common.phone')}</Label>
-                <Input
-                  id="guestPhone"
-                  value={form.guestPhone}
-                  onChange={(e) => setForm((f) => ({ ...f, guestPhone: e.target.value }))}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {fulfillmentType === 'DELIVERY' && (
             <Card>
               <CardHeader>
-                <CardTitle>{t('checkout.deliveryAddress')}</CardTitle>
+                <CardTitle>{t('checkout.yourOrder')}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label htmlFor="addressLine1">{t('common.addressRequired')}</Label>
-                  <Input
-                    id="addressLine1"
-                    value={form.addressLine1}
-                    onChange={(e) => setForm((f) => ({ ...f, addressLine1: e.target.value }))}
+              <CardContent className="space-y-2">
+                {orderLines.map((line: CartLine) => (
+                  <div key={line.cartKey} className="space-y-0.5">
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        {line.quantity}× {line.name}
+                      </span>
+                      <span>{formatPrice(cartLineTotal(line))}</span>
+                    </div>
+                    {formatModifierLabels(line) && (
+                      <p className="text-xs text-muted-foreground">{formatModifierLabels(line)}</p>
+                    )}
+                    {line.notes && (
+                      <p className="text-xs italic text-muted-foreground">
+                        {t('common.note', { note: line.notes })}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                <div className="flex justify-between border-t pt-2 text-sm">
+                  <span className="text-muted-foreground">{t('common.subtotal')}</span>
+                  <span>{formatPrice(subtotal)}</span>
+                </div>
+                {deliveryFee > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {matchedZone
+                        ? t('checkout.deliveryZone', { zone: matchedZone.name })
+                        : t('common.delivery')}
+                    </span>
+                    <span>{formatPrice(deliveryFee)}</span>
+                  </div>
+                )}
+                {effectiveDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-700 dark:text-green-400">
+                    <span>{t('checkout.rewardsDiscount')}</span>
+                    <span>-{formatPrice(effectiveDiscount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-2 font-medium">
+                  <span>
+                    {t('checkout.totalCashOn', {
+                      method:
+                        fulfillmentType === 'DELIVERY'
+                          ? t('checkout.cashOnDelivery')
+                          : t('checkout.cashOnPickup'),
+                    })}
+                  </span>
+                  <span>{formatPrice(effectiveTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {canRedeem && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">{t('checkout.useRewards')}</CardTitle>
+                  <CardDescription>
+                    {t('checkout.rewardsBalance', {
+                      balance: preview?.memberBalance ?? 0,
+                      points: preview?.suggestedRedeemPoints ?? 0,
+                      discount: formatPrice(preview?.suggestedDiscount ?? 0),
+                    })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between gap-4">
+                  <Label htmlFor="redeem-toggle" className="flex-1 cursor-pointer">
+                    {t('checkout.applyPoints')}
+                  </Label>
+                  <Switch
+                    id="redeem-toggle"
+                    checked={redeemPoints}
+                    onCheckedChange={setRedeemPoints}
                   />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="city">{t('common.city')}</Label>
-                    <Input
-                      id="city"
-                      value={form.city}
-                      onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="postcode">{t('common.postcodeRequired')}</Label>
-                    <Input
-                      id="postcode"
-                      value={form.postcode}
-                      onChange={(e) => setForm((f) => ({ ...f, postcode: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                {form.postcode.trim() && (
-                  <p className="text-xs text-muted-foreground">
-                    {matchedZone
-                      ? t('checkout.deliveryZoneHint', {
-                          zone: matchedZone.name,
-                          fee: formatPrice(deliveryFee),
-                        })
-                      : t('checkout.postcodeHint')}
-                  </p>
+                </CardContent>
+                {redeemPoints && redeemError && (
+                  <CardContent className="pt-0 text-sm text-destructive">{redeemError}</CardContent>
+                )}
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('common.branch')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingFulfillment ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : branches.length ? (
+                  <select
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={branchId}
+                    onChange={(e) => setBranchId(e.target.value)}
+                  >
+                    {branches.map((branch) => (
+                      <option key={branch.branchId} value={branch.branchId}>
+                        {branch.branchName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{t('common.noBranches')}</p>
                 )}
               </CardContent>
             </Card>
-          )}
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-1">
-                <Label htmlFor="notes">{t('checkout.orderNotes')}</Label>
-                <Textarea
-                  id="notes"
-                  value={form.notes}
-                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('checkout.fulfillment')}</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 sm:grid-cols-3">
+                {fulfillmentOptions.map(({ value, label, icon: Icon }) => {
+                  const available = isFulfillmentAvailable(value)
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={!available}
+                      onClick={() => setFulfillmentType(value)}
+                      className={`flex flex-col items-center gap-2 rounded-lg border p-4 text-sm transition ${
+                        fulfillmentType === value
+                          ? 'border-[var(--brand-mid)] bg-[var(--brand-pale)]'
+                          : 'hover:bg-muted/50'
+                      } ${!available ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{label}</span>
+                      {!available && <Badge variant="secondary">{t('common.unavailable')}</Badge>}
+                    </button>
+                  )
+                })}
+              </CardContent>
+            </Card>
 
-          <ConsumerGuestPrivacyNotice restaurantName={restaurant?.name} className="px-1" />
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('checkout.when')}</CardTitle>
+                <CardDescription>
+                  {orderingStatus.mode === 'LIVE'
+                    ? t('checkout.whenLive')
+                    : orderingStatus.mode === 'PREORDER_ONLY'
+                      ? t('checkout.whenPreorder')
+                      : t('checkout.whenClosed')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {orderingStatus.allowAsap && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={scheduleMode === 'asap' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setScheduleMode('asap')}
+                    >
+                      {t('checkout.asap', { minutes: prepMinutes })}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={scheduleMode === 'scheduled' ? 'default' : 'outline'}
+                      className="flex-1"
+                      onClick={() => setScheduleMode('scheduled')}
+                    >
+                      {t('checkout.schedule')}
+                    </Button>
+                  </div>
+                )}
+                {(scheduleMode === 'scheduled' || !orderingStatus.allowAsap) && (
+                  <div className="space-y-1">
+                    <Label htmlFor="scheduledFor">
+                      {orderingStatus.mode === 'PREORDER_ONLY'
+                        ? t('checkout.preorderFor')
+                        : t('checkout.preferredTime')}
+                    </Label>
+                    <Input
+                      id="scheduledFor"
+                      type="datetime-local"
+                      value={scheduledFor}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                      min={minScheduleValue}
+                      required={!orderingStatus.allowAsap}
+                    />
+                    {restaurantTimeZone ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('checkout.restaurantLocalTime', { timeZone: restaurantTimeZone })}
+                      </p>
+                    ) : null}
+                    {orderingStatus.nextLiveOrderAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('checkout.earliest', {
+                          time: toDatetimeLocalValueInZone(
+                            new Date(orderingStatus.nextLiveOrderAt),
+                            restaurantTimeZone
+                          ).replace('T', ' '),
+                        })}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('checkout.contact')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="guestName">{t('common.nameRequired')}</Label>
+                  <Input
+                    id="guestName"
+                    value={form.guestName}
+                    onChange={(e) => setForm((f) => ({ ...f, guestName: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="guestEmail">{t('common.email')}</Label>
+                  <Input
+                    id="guestEmail"
+                    type="email"
+                    value={form.guestEmail}
+                    onChange={(e) => setForm((f) => ({ ...f, guestEmail: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="guestPhone">{t('common.phone')}</Label>
+                  <Input
+                    id="guestPhone"
+                    value={form.guestPhone}
+                    onChange={(e) => setForm((f) => ({ ...f, guestPhone: e.target.value }))}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {fulfillmentType === 'DELIVERY' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('checkout.deliveryAddress')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="addressLine1">{t('common.addressRequired')}</Label>
+                    <Input
+                      id="addressLine1"
+                      value={form.addressLine1}
+                      onChange={(e) => setForm((f) => ({ ...f, addressLine1: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="city">{t('common.city')}</Label>
+                      <Input
+                        id="city"
+                        value={form.city}
+                        onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="postcode">{t('common.postcodeRequired')}</Label>
+                      <Input
+                        id="postcode"
+                        value={form.postcode}
+                        onChange={(e) => setForm((f) => ({ ...f, postcode: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  {form.postcode.trim() && (
+                    <p className="text-xs text-muted-foreground">
+                      {matchedZone
+                        ? t('checkout.deliveryZoneHint', {
+                            zone: matchedZone.name,
+                            fee: formatPrice(deliveryFee),
+                          })
+                        : t('checkout.postcodeHint')}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-1">
+                  <Label htmlFor="notes">{t('checkout.orderNotes')}</Label>
+                  <Textarea
+                    id="notes"
+                    value={form.notes}
+                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <ConsumerGuestPrivacyNotice restaurantName={restaurant?.name} className="px-1" />
+          </fieldset>
 
           <Button
             type="submit"
             className="w-full bg-[var(--brand-mid)] hover:bg-[var(--brand)]"
             disabled={
               placing ||
-              !branchId ||
-              belowMinOrder ||
-              unavailableLines.length > 0 ||
-              orderingStatus.mode === 'CLOSED' ||
-              (fulfillmentType === 'DELIVERY' &&
-                !!form.postcode.trim() &&
-                !matchedZone &&
-                (selectedBranch?.deliveryZones?.length ?? 0) > 0)
+              (!unconfirmed &&
+                (!branchId ||
+                  belowMinOrder ||
+                  unavailableLines.length > 0 ||
+                  orderingStatus.mode === 'CLOSED' ||
+                  (fulfillmentType === 'DELIVERY' &&
+                    !!form.postcode.trim() &&
+                    !matchedZone &&
+                    (selectedBranch?.deliveryZones?.length ?? 0) > 0)))
             }
           >
             {placing
               ? t('checkout.placingOrder')
-              : t('checkout.placeOrder', { total: formatPrice(effectiveTotal) })}
+              : unconfirmed
+                ? t('checkout.retryOrder', { defaultValue: 'Check and retry order' })
+                : t('checkout.placeOrder', { total: formatPrice(effectiveTotal) })}
           </Button>
         </form>
       )}

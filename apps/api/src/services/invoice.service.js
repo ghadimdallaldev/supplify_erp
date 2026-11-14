@@ -731,8 +731,8 @@ const INVOICE_DETAIL_SELECT = `
     i.*,
     r.name AS restaurant_name,
     r.timezone AS restaurant_timezone,
-    r.contact_name AS restaurant_contact,
-    r.email AS restaurant_email,
+    NULL::text AS restaurant_contact,
+    r.contact_email AS restaurant_email,
     r.phone AS restaurant_phone,
     s.name AS supplier_name,
     s.contact_email AS supplier_email,
@@ -792,7 +792,7 @@ export async function getInvoiceDetail(
   if (includePayments) {
     const { rows: paymentRows } = await query(
       `
-      SELECT p.*, pm.name AS recorded_by_name
+      SELECT p.*, pm.display_name AS recorded_by_name
       FROM payment p
       LEFT JOIN app_user pm ON pm.id::text = p.recorded_by
       WHERE p.invoice_id = $1

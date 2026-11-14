@@ -102,7 +102,11 @@
     "waitlistJoined": "You are on the waitlist. We will contact you when a table opens.",
     "joinWaitlistFailed": "Could not join waitlist",
     "depositFixed": "Deposit: {{amount}}. This confirms the policy and is not a payment.",
-    "depositPercent": "Deposit: {{percent}}% of the booking. This confirms the policy and is not a payment."
+    "depositPercent": "Deposit: {{percent}}% of the booking. This confirms the policy and is not a payment.",
+    "invalidPartySize": "Choose a whole-number party size between 1 and 50.",
+    "enterContactForWaitlist": "Enter your name and phone number to join the waitlist.",
+    "onlineUnavailable": "Online booking is currently unavailable. Please contact the restaurant to make a reservation.",
+    "contactRestaurant": "Contact the restaurant"
   },
   "manage": {
     "linkRequiredTitle": "Link required",

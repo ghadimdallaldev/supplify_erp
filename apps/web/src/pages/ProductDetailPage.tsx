@@ -1,4 +1,5 @@
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useGetProductQuery } from '../services/api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -14,22 +15,54 @@ import { toast } from 'sonner'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { ProductSubstitutesSection } from '../components/supplier/ProductSubstitutesSection'
-import { getProductMoq } from '../lib/orderQuantityRules'
+import {
+  getProductMoq,
+  getProductOrderMultiple,
+  normalizeCartQuantity,
+} from '../lib/orderQuantityRules'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
 
 export function ProductDetailPage() {
   const { t } = useTranslation('products')
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
+  const requestedQty = Number((location.state as { addToCartQty?: number } | null)?.addToCartQty)
+  const [quantity, setQuantity] = useState('')
   const { addItem } = useCartActions()
   const { isEffectiveSupplier } = useImpersonation()
 
-  const { data, isLoading, error } = useGetProductQuery(id!)
+  const {
+    currentData: data,
+    isFetching: isLoading,
+    error,
+    refetch,
+  } = useGetProductQuery(id!, { skip: !id })
+  const product = data?.product
+  useEffect(() => {
+    if (product)
+      setQuantity(
+        String(
+          normalizeCartQuantity(requestedQty > 0 ? requestedQty : getProductMoq(product), product)
+        )
+      )
+  }, [product, requestedQty])
 
   const handleAddToCart = () => {
     if (data?.product) {
+      const normalizedQty = normalizeCartQuantity(Number(quantity), data.product)
+      if (!normalizedQty || normalizedQty > Number(data.product.available_qty ?? 0)) {
+        toast.error(
+          t('detail.quantityUnavailable', {
+            defaultValue: 'Choose a quantity within the available stock.',
+          })
+        )
+        return
+      }
       addItem({
         productId: data.product.id,
         product: data.product,
-        quantity: getProductMoq(data.product),
+        quantity: normalizedQty,
       })
       toast.success(t('toast.addedToCart'))
     }
@@ -39,7 +72,8 @@ export function ProductDetailPage() {
     return <DetailPageSkeleton />
   }
 
-  if (error || !data) {
+  if (error || !product) {
+    const notFound = error && 'status' in error && error.status === 404
     return (
       <PageShell data-testid="product-detail-page">
         <PageHeader
@@ -53,12 +87,23 @@ export function ProductDetailPage() {
             </Button>
           }
         />
-        <p className="text-center text-[var(--red)]">{t('detail.notFound')}</p>
+        <div role="alert" className="space-y-3 text-center">
+          <p>
+            {notFound
+              ? t('detail.notFound')
+              : t('detail.loadFailed', {
+                  defaultValue: 'Unable to load this product. Please try again.',
+                })}
+          </p>
+          {!notFound && (
+            <Button variant="outline" onClick={() => refetch()}>
+              {t('detail.retry', { defaultValue: 'Try again' })}
+            </Button>
+          )}
+        </div>
       </PageShell>
     )
   }
-
-  const product = data.product
 
   return (
     <PageShell data-testid="product-detail-page">
@@ -139,10 +184,29 @@ export function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="flex space-x-4">
+          <div className="space-y-2">
+            <Label htmlFor="product-quantity">
+              {t('detail.quantity', { defaultValue: 'Quantity' })}
+            </Label>
+            <Input
+              id="product-quantity"
+              type="number"
+              min={getProductMoq(product)}
+              step={getProductOrderMultiple(product)}
+              max={Number(product.available_qty ?? 0)}
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-3">
             <Button
               onClick={handleAddToCart}
-              disabled={!product.available_qty || product.available_qty <= 0}
+              disabled={
+                !product.available_qty ||
+                product.available_qty <= 0 ||
+                Number(quantity) <= 0 ||
+                !Number.isFinite(Number(quantity))
+              }
               className="flex-1"
             >
               {t('detail.addToCart')}

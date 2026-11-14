@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ensureNamespace } from '../i18n'
@@ -20,6 +20,7 @@ import { ReservationTimeSlotGrid, formatTime } from '../components/public/Reserv
 import { cn } from '../lib/utils'
 import { localDateKey } from '../lib/invoiceBalance'
 import { CalendarDays, Clock3, Sparkles, Users } from 'lucide-react'
+import type { PublicAvailabilityResponse } from '../types'
 
 export function PublicReservationPortal() {
   const { t } = useTranslation('reservations')
@@ -35,7 +36,7 @@ export function PublicReservationPortal() {
     isLoading: loadingRestaurant,
     isError: restaurantNotFound,
   } = useGetPublicRestaurantQuery(restaurantIdOrSlug ?? '', { skip: !restaurantIdOrSlug })
-  const [fetchAvailability, { data: availabilityData, isFetching: loadingAvailability }] =
+  const [fetchAvailability, { isFetching: loadingAvailability }] =
     useLazyGetPublicReservationAvailabilityQuery()
   const [createReservation, { isLoading: creatingReservation }] =
     useCreatePublicReservationMutation()
@@ -54,31 +55,81 @@ export function PublicReservationPortal() {
     allergies: '',
   })
   const [depositAcknowledged, setDepositAcknowledged] = useState(false)
-  const [availabilityChecked, setAvailabilityChecked] = useState(false)
+  const [availabilitySnapshot, setAvailabilitySnapshot] = useState<{
+    key: string
+    data: PublicAvailabilityResponse
+  } | null>(null)
+  const availabilityKey = `${restaurant?.id}:${form.date}:${form.partySize}`
+  const currentAvailabilityKey = useRef(availabilityKey)
+  currentAvailabilityKey.current = availabilityKey
+  const availabilityRequest = useRef(0)
+  const bookingPending = useRef(false)
+  const availabilityData =
+    availabilitySnapshot?.key === availabilityKey ? availabilitySnapshot.data : undefined
+  const availabilityChecked = Boolean(availabilityData)
+  useEffect(() => {
+    availabilityRequest.current += 1
+    setAvailabilitySnapshot(null)
+    setDepositAcknowledged(false)
+    setShowWaitlistForm(false)
+  }, [availabilityKey])
 
   const slots = useMemo(() => availabilityData?.slots ?? [], [availabilityData?.slots])
   const totalCapacity = availabilityData?.totalCapacity
+  const onlineBookingUnavailable =
+    availabilityChecked && (availabilityData?.tableCount === 0 || totalCapacity === 0)
   const bookingWindow = availabilityData?.bookingWindow
   const hasBookableSlot = slots.some((slot) => slot.isAvailable)
   const selectedSlotDetails = useMemo(
     () => slots.find((slot) => slot.startTime === form.selectedSlot),
     [slots, form.selectedSlot]
   )
+  const waitlistSlot =
+    availabilityChecked &&
+    !bookingWindow?.closed &&
+    !availabilityData?.blackout &&
+    !availabilityData?.partySizeRejected
+      ? slots.find(
+          (slot) => slot.status !== 'past' && new Date(slot.startTime).getTime() > Date.now()
+        )
+      : undefined
 
   const handleCheckAvailability = async () => {
     if (!restaurant?.id) return
-    if (!form.date) {
+    if (!Number.isInteger(form.partySize) || form.partySize < 1 || form.partySize > 50) {
+      toast.error(
+        t('portal.invalidPartySize', {
+          defaultValue: 'Choose a whole-number party size between 1 and 50.',
+        })
+      )
+      return
+    }
+    if (!form.date || form.date < localDateKey()) {
       toast.error(t('portal.chooseDate'))
       return
     }
 
+    const requestKey = availabilityKey
+    const requestId = ++availabilityRequest.current
+    setAvailabilitySnapshot(null)
+    setDepositAcknowledged(false)
+    setForm((prev) => ({ ...prev, selectedSlot: '' }))
     try {
       const result = await fetchAvailability({
         restaurantId: restaurant.id,
         partySize: form.partySize,
         date: form.date,
       }).unwrap()
-      setAvailabilityChecked(true)
+      if (
+        currentAvailabilityKey.current !== requestKey ||
+        availabilityRequest.current !== requestId
+      )
+        return
+      setAvailabilitySnapshot({ key: requestKey, data: result })
+      if (result.tableCount === 0 || result.totalCapacity === 0) {
+        setShowWaitlistForm(false)
+        return
+      }
       if (result.totalCapacity != null && form.partySize > result.totalCapacity) {
         toast.error(t('portal.maxCapacity', { capacity: result.totalCapacity }))
         setShowWaitlistForm(true)
@@ -87,7 +138,12 @@ export function PublicReservationPortal() {
       setShowWaitlistForm(false)
       toast.success(t('portal.availabilityUpdated'))
     } catch (error: unknown) {
-      setAvailabilityChecked(false)
+      if (
+        currentAvailabilityKey.current !== requestKey ||
+        availabilityRequest.current !== requestId
+      )
+        return
+      setAvailabilitySnapshot(null)
       const err = error as { data?: { message?: string; error?: { message?: string } } }
       toast.error(
         err?.data?.message || err?.data?.error?.message || t('portal.checkAvailabilityFailed')
@@ -101,12 +157,17 @@ export function PublicReservationPortal() {
     form.customerPhone.trim().length > 0
   const depositRequired = Boolean(availabilityData?.depositRequired)
   const canConfirm = Boolean(
-    form.selectedSlot && guestContactComplete && (!depositRequired || depositAcknowledged)
+    availabilityChecked &&
+      !onlineBookingUnavailable &&
+      selectedSlotDetails?.isAvailable &&
+      guestContactComplete &&
+      (!depositRequired || depositAcknowledged)
   )
 
   const handleCreateReservation = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!restaurant?.id || !form.selectedSlot) {
+    if (bookingPending.current) return
+    if (!restaurant?.id || !canConfirm) {
       toast.error(t('portal.selectTimeSlot'))
       return
     }
@@ -119,6 +180,7 @@ export function PublicReservationPortal() {
       return
     }
 
+    bookingPending.current = true
     try {
       const response = await createReservation({
         restaurantId: restaurant.id,
@@ -148,12 +210,23 @@ export function PublicReservationPortal() {
         setForm((prev) => ({ ...prev, selectedSlot: '' }))
         void handleCheckAvailability()
       }
+    } finally {
+      bookingPending.current = false
     }
   }
 
   const handleJoinWaitlist = async () => {
-    if (!restaurant?.id || !form.customerName.trim()) {
-      toast.error(t('portal.enterNameForWaitlist'))
+    if (
+      !restaurant?.id ||
+      !waitlistSlot ||
+      !form.customerName.trim() ||
+      !form.customerPhone.trim()
+    ) {
+      toast.error(
+        t('portal.enterContactForWaitlist', {
+          defaultValue: 'Enter your name and phone number to join the waitlist.',
+        })
+      )
       return
     }
     try {
@@ -161,8 +234,8 @@ export function PublicReservationPortal() {
         restaurantId: restaurant.id,
         partySize: form.partySize,
         customerName: form.customerName.trim(),
-        customerPhone: form.customerPhone.trim() || 'n/a',
-        desiredAt: form.selectedSlot || undefined,
+        customerPhone: form.customerPhone.trim(),
+        desiredAt: form.selectedSlot || waitlistSlot.startTime,
         notes: form.notes || undefined,
       }).unwrap()
       toast.success(t('portal.waitlistJoined'))
@@ -211,21 +284,22 @@ export function PublicReservationPortal() {
 
   return (
     <PublicPageLayout
+      wide
       title={t('portal.bookAt', { name: restaurantName })}
       subtitle={t('portal.bookAtSubtitle')}
       logoInitial={restaurantName.charAt(0).toUpperCase()}
       className="pb-12"
       data-testid="public-reserve-page"
     >
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+      <div className="mx-auto grid w-full max-w-3xl gap-5 xl:max-w-5xl xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] xl:items-start xl:gap-6">
         <PublicPanel
           title={t('portal.whenComingTitle')}
           description={t('portal.whenComingDescription')}
-          className="lg:sticky lg:top-6 lg:w-[42%] lg:shrink-0"
+          className="xl:sticky xl:top-6"
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
                 <Label
                   htmlFor="partySize"
                   className="flex items-center gap-1.5 text-[var(--text-mid)]"
@@ -241,7 +315,6 @@ export function PublicReservationPortal() {
                   className="mt-1.5 h-11"
                   value={form.partySize}
                   onChange={(event) => {
-                    setAvailabilityChecked(false)
                     setForm((prev) => ({
                       ...prev,
                       partySize: Number(event.target.value) || prev.partySize,
@@ -250,7 +323,7 @@ export function PublicReservationPortal() {
                   }}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label
                   htmlFor="resDate"
                   className="flex items-center gap-1.5 text-[var(--text-mid)]"
@@ -261,10 +334,10 @@ export function PublicReservationPortal() {
                 <Input
                   id="resDate"
                   type="date"
+                  min={localDateKey()}
                   className="mt-1.5 h-11"
                   value={form.date}
                   onChange={(event) => {
-                    setAvailabilityChecked(false)
                     setForm((prev) => ({ ...prev, date: event.target.value, selectedSlot: '' }))
                   }}
                 />
@@ -280,7 +353,7 @@ export function PublicReservationPortal() {
               {loadingAvailability ? t('portal.checking') : t('portal.checkAvailability')}
             </Button>
 
-            <div className="space-y-2">
+            <div className="space-y-2" aria-live="polite" aria-busy={loadingAvailability}>
               <Label className="flex items-center gap-1.5 text-[var(--text-mid)]">
                 <Clock3 className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
                 {t('portal.availableTimes')}
@@ -297,7 +370,19 @@ export function PublicReservationPortal() {
                 </p>
               ) : null}
 
-              {slots.length === 0 ? (
+              {onlineBookingUnavailable ? (
+                <div
+                  role="status"
+                  className="space-y-3 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] p-3 text-sm"
+                >
+                  <p>{t('portal.onlineUnavailable')}</p>
+                  {restaurant.phone && (
+                    <Button variant="outline" className="min-h-11" asChild>
+                      <a href={`tel:${restaurant.phone}`}>{t('portal.contactRestaurant')}</a>
+                    </Button>
+                  )}
+                </div>
+              ) : slots.length === 0 ? (
                 <p className="rounded-lg bg-[var(--brand-ultra)] px-3 py-2.5 text-sm text-[var(--text-muted)]">
                   {!availabilityChecked ? t('portal.pickDateHint') : t('portal.noSlotsHint')}
                 </p>
@@ -318,6 +403,7 @@ export function PublicReservationPortal() {
             </div>
 
             {(showWaitlistForm || (availabilityChecked && !hasBookableSlot)) &&
+            waitlistSlot &&
             totalCapacity != null &&
             form.partySize <= totalCapacity ? (
               <div className="space-y-2 rounded-xl border border-[var(--amber-mid)]/30 bg-[var(--amber-pale)] p-3">
@@ -333,7 +419,9 @@ export function PublicReservationPortal() {
                   variant="outline"
                   size="sm"
                   className="consumer-pressable w-full border-[var(--amber-mid)]/40"
-                  disabled={joiningWaitlist || !form.customerName.trim()}
+                  disabled={
+                    joiningWaitlist || !form.customerName.trim() || !form.customerPhone.trim()
+                  }
                   onClick={handleJoinWaitlist}
                 >
                   {joiningWaitlist ? t('portal.joining') : t('portal.joinWaitlist')}
@@ -341,7 +429,9 @@ export function PublicReservationPortal() {
               </div>
             ) : null}
 
-            {totalCapacity != null && form.partySize > totalCapacity ? (
+            {!onlineBookingUnavailable &&
+            totalCapacity != null &&
+            form.partySize > totalCapacity ? (
               <p className="text-sm text-[var(--red)]">
                 {t('portal.partyExceedsCapacity', {
                   partySize: form.partySize,

@@ -440,22 +440,22 @@ export function ProductsPage() {
             data-testid="products-table-shell"
             stickyHeader
             search={
-              <SearchHistoryDropdown
-                entityType="product"
-                value={search}
-                onChange={setSearch}
-                placeholder={t('page.searchPlaceholder')}
-                aria-label={t('page.searchAriaLabel')}
-                inputClassName={cn(filterControlClass, 'pl-10')}
-              />
-            }
-            filters={
-              <>
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SearchHistoryDropdown
+                    entityType="product"
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={t('page.searchPlaceholder')}
+                    aria-label={t('page.searchAriaLabel')}
+                    inputClassName={cn(filterControlClass, 'pl-10')}
+                  />
+                </div>
                 {isRestaurant && (
                   <Button
                     variant={favoritesOnly ? 'default' : 'outline'}
                     size="sm"
-                    className="h-10"
+                    className="h-10 shrink-0"
                     onClick={() => setFavoritesOnly((prev) => !prev)}
                   >
                     <Heart
@@ -465,21 +465,23 @@ export function ProductsPage() {
                     {t('page.favorites')}
                   </Button>
                 )}
-                <ProductFilterFields
-                  isSupplier={isSupplier}
-                  supplierFilter={supplierFilter}
-                  setSupplierFilter={setSupplierFilter}
-                  uniqueSuppliers={uniqueSuppliers}
-                  categoryId={categoryId}
-                  setCategoryId={setCategoryId}
-                  setCategory={setCategory}
-                  categoriesData={categoriesData}
-                  minPrice={minPrice}
-                  maxPrice={maxPrice}
-                  setMinPrice={setMinPrice}
-                  setMaxPrice={setMaxPrice}
-                />
-              </>
+              </div>
+            }
+            filters={
+              <ProductFilterFields
+                isSupplier={isSupplier}
+                supplierFilter={supplierFilter}
+                setSupplierFilter={setSupplierFilter}
+                uniqueSuppliers={uniqueSuppliers}
+                categoryId={categoryId}
+                setCategoryId={setCategoryId}
+                setCategory={setCategory}
+                categoriesData={categoriesData}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                setMinPrice={setMinPrice}
+                setMaxPrice={setMaxPrice}
+              />
             }
             footer={
               (total != null ? total > 0 : filteredProducts.length > 0) ? (

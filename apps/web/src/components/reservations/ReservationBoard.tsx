@@ -99,7 +99,7 @@ function SortableReservationCard({
 
   useEffect(() => {
     const ids = reservationTableIds(reservation)
-    if (ids[0]) setPickTableId(ids[0])
+    setPickTableId(ids[0] ?? '')
   }, [reservation])
 
   const style: CSSProperties = {
@@ -131,7 +131,7 @@ function SortableReservationCard({
         {!readOnly ? (
           <button
             type="button"
-            className="mt-0.5 shrink-0 touch-none cursor-grab rounded p-1 text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] active:cursor-grabbing"
+            className="mt-0.5 flex h-11 w-8 shrink-0 touch-none items-center justify-center cursor-grab rounded text-[var(--text-muted)] hover:bg-[var(--brand-ultra)] active:cursor-grabbing"
             aria-label={t('board.dragAriaLabel')}
             {...attributes}
             {...listeners}
@@ -140,9 +140,9 @@ function SortableReservationCard({
           </button>
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-semibold text-[var(--text)]">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 basis-28">
+              <p className="break-words text-sm font-semibold text-[var(--text)]">
                 {reservation.customer_name}
               </p>
               <p className="text-xs text-[var(--text-muted)]">
@@ -191,7 +191,7 @@ function SortableReservationCard({
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="h-7 w-full text-[10px]"
+                className="min-h-11 w-full text-xs"
                 disabled={updating || !pickTableId}
                 onClick={async () => {
                   if (!pickTableId) return
@@ -215,7 +215,7 @@ function SortableReservationCard({
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-7 px-2 text-[10px]"
+                  className="min-h-11 px-3 text-xs"
                   disabled={updating}
                   onClick={async () => {
                     await onStatusChange(reservation.id, action.status)
@@ -344,7 +344,7 @@ export function ReservationBoard({
     .reduce((sum, table) => sum + Number(table.capacity || 0), 0)
   const coversBooked = reservations.reduce(
     (sum, reservation) =>
-      reservation.status !== 'CANCELLED' && reservation.status !== 'COMPLETED'
+      ['PENDING', 'CONFIRMED', 'SEATED'].includes(reservation.status)
         ? sum + Number(reservation.party_size || 0)
         : sum,
     0
@@ -370,11 +370,11 @@ export function ReservationBoard({
       </CardHeader>
       <CardContent className="px-0">
         <DndContext sensors={dragSensors} onDragEnd={readOnly ? () => undefined : handleDragEnd}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {columns.map((column) => (
               <div
                 key={column.id}
-                className="flex flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/70 p-4"
+                className="flex min-w-0 flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--brand-ultra)]/70 p-3 sm:p-4"
               >
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--text-muted)]">

@@ -41,7 +41,7 @@ export function CartDrawer({
           {lines.map((line) => (
             <div
               key={line.cartKey}
-              className="flex items-start justify-between gap-3 rounded-lg border p-3"
+              className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{line.name}</p>
@@ -55,13 +55,13 @@ export function CartDrawer({
                   <p className="mt-1 text-sm">{formatPrice(line.unitPrice)} each</p>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-col sm:items-end">
                 <div className="flex items-center gap-1">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     onClick={() => onUpdateQuantity(line.cartKey, line.quantity - 1)}
                     aria-label="Decrease quantity"
                   >
@@ -72,7 +72,7 @@ export function CartDrawer({
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-11 w-11"
                     onClick={() => onUpdateQuantity(line.cartKey, line.quantity + 1)}
                     aria-label="Increase quantity"
                   >
@@ -84,7 +84,7 @@ export function CartDrawer({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-destructive"
+                  className="min-h-11 text-destructive"
                   onClick={() => onRemoveLine(line.cartKey)}
                 >
                   <Trash2 className="me-1 h-3 w-3" />
@@ -100,7 +100,14 @@ export function CartDrawer({
             <span className="font-medium">Subtotal</span>
             <span className="text-lg font-semibold">{formatPrice(total)}</span>
           </div>
-          <Button type="button" className="w-full" disabled={!lines.length} onClick={onCheckout}>
+          <Button
+            type="button"
+            className="w-full min-h-11"
+            disabled={
+              !lines.length || lines.some((line) => 'unavailable' in line && line.unavailable)
+            }
+            onClick={onCheckout}
+          >
             <ShoppingCart className="me-2 h-4 w-4" />
             Checkout
           </Button>

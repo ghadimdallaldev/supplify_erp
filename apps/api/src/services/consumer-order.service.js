@@ -10,6 +10,10 @@ import {
 import { validateConsumerOrderSchedule } from '../lib/consumer-ordering-hours.js'
 import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 import { addCalendarDays, getZonedParts } from '../lib/delivery-rollover-time.js'
+import {
+  consumerCheckoutPayloadHash,
+  findConsumerCheckoutReplay,
+} from '../lib/consumer-checkout-idempotency.js'
 
 function digitsOnlyPhone(phone) {
   return String(phone || '').replace(/\D/g, '')
@@ -95,10 +99,10 @@ export function minimumOrderError(subtotal, minimum) {
   })
 }
 
-async function loadItemPricing(itemIds, restaurantId, branchId) {
+async function loadItemPricing(itemIds, restaurantId, branchId, runQuery = query) {
   if (!itemIds.length) return { items: {}, groups: {}, options: {} }
 
-  const { rows: items } = await query(
+  const { rows: items } = await runQuery(
     `
     SELECT i.id, i.name, i.base_price, i.is_available
     FROM menu_item i
@@ -112,7 +116,7 @@ async function loadItemPricing(itemIds, restaurantId, branchId) {
     [itemIds, restaurantId, branchId]
   )
 
-  const { rows: groups } = await query(
+  const { rows: groups } = await runQuery(
     `
     SELECT g.id, g.menu_item_id, g.name, g.min_selections, g.max_selections, g.is_required
     FROM menu_modifier_group g
@@ -124,7 +128,7 @@ async function loadItemPricing(itemIds, restaurantId, branchId) {
   const groupIds = groups.map((g) => g.id)
   let options = []
   if (groupIds.length) {
-    const { rows: optionRows } = await query(
+    const { rows: optionRows } = await runQuery(
       `
       SELECT o.id, o.modifier_group_id, o.name, o.price_delta, o.is_available
       FROM menu_modifier_option o
@@ -225,8 +229,14 @@ function validateAndPriceLine(line, pricing) {
   }
 }
 
-async function resolveDeliveryFee(branchId, fulfillmentType, subtotal, deliveryZoneId) {
-  const { rows: configs } = await query(
+async function resolveDeliveryFee(
+  branchId,
+  fulfillmentType,
+  subtotal,
+  deliveryZoneId,
+  runQuery = query
+) {
+  const { rows: configs } = await runQuery(
     `SELECT * FROM branch_fulfillment_config WHERE branch_id = $1`,
     [branchId]
   )
@@ -239,7 +249,7 @@ async function resolveDeliveryFee(branchId, fulfillmentType, subtotal, deliveryZ
   }
 
   if (deliveryZoneId) {
-    const { rows: zones } = await query(
+    const { rows: zones } = await runQuery(
       `SELECT * FROM delivery_zone WHERE id = $1 AND branch_id = $2 AND is_active = TRUE`,
       [deliveryZoneId, branchId]
     )
@@ -305,6 +315,28 @@ async function allocateConsumerOrderNumber(restaurantId, client, timeZone) {
 }
 
 export async function createConsumerOrder(restaurantId, payload) {
+  const { idempotencyKey } = payload
+  const payloadHash = idempotencyKey ? consumerCheckoutPayloadHash(payload) : null
+  const replay = await findConsumerCheckoutReplay(query, restaurantId, idempotencyKey, payloadHash)
+  if (replay) return replay
+  if (!idempotencyKey) return createConsumerOrderOnce(restaurantId, payload)
+  return withTransaction(async (client) => {
+    await client.query(`SELECT id FROM restaurant WHERE id = $1 FOR UPDATE`, [restaurantId])
+    const replay = await findConsumerCheckoutReplay(
+      client.query.bind(client),
+      restaurantId,
+      idempotencyKey,
+      payloadHash
+    )
+    if (replay) return replay
+    return createConsumerOrderOnce(restaurantId, payload, client)
+  })
+}
+
+async function createConsumerOrderOnce(restaurantId, payload, checkoutClient = null) {
+  const runQuery = checkoutClient ? checkoutClient.query.bind(checkoutClient) : query
+  const { idempotencyKey } = payload
+  const payloadHash = idempotencyKey ? consumerCheckoutPayloadHash(payload) : null
   const {
     branchId,
     fulfillmentType,
@@ -324,7 +356,7 @@ export async function createConsumerOrder(restaurantId, payload) {
     throw Object.assign(new Error('Order must include at least one line'), { name: 'EMPTY_ORDER' })
   }
 
-  const { rows: branchRows } = await query(
+  const { rows: branchRows } = await runQuery(
     `SELECT id FROM branch WHERE id = $1 AND tenant_id = $2 AND is_active = TRUE`,
     [branchId, restaurantId]
   )
@@ -333,7 +365,7 @@ export async function createConsumerOrder(restaurantId, payload) {
   }
 
   const itemIds = [...new Set(lines.map((l) => l.menuItemId))]
-  const pricing = await loadItemPricing(itemIds, restaurantId, branchId)
+  const pricing = await loadItemPricing(itemIds, restaurantId, branchId, runQuery)
   const pricedLines = lines.map((line) => validateAndPriceLine(line, pricing))
   const subtotal = roundMoney(pricedLines.reduce((sum, line) => sum + line.lineTotal, 0))
 
@@ -341,11 +373,12 @@ export async function createConsumerOrder(restaurantId, payload) {
     branchId,
     fulfillmentType,
     subtotal,
-    deliveryZoneId
+    deliveryZoneId,
+    runQuery
   )
   assertFulfillmentAllowed(fulfillmentType, config)
 
-  const timeZone = await getRestaurantTimezone(restaurantId)
+  const timeZone = await getRestaurantTimezone(restaurantId, runQuery)
   validateConsumerOrderSchedule(config, scheduledFor || null, new Date(), 'en', timeZone)
 
   if (fulfillmentType === 'DELIVERY' && !deliveryAddress) {
@@ -364,6 +397,7 @@ export async function createConsumerOrder(restaurantId, payload) {
     }
     try {
       const preview = await validateConsumerLoyaltyRedeem({
+        client: checkoutClient,
         restaurantId,
         memberId: authMemberId,
         pointsToRedeem,
@@ -378,7 +412,7 @@ export async function createConsumerOrder(restaurantId, payload) {
 
   const totalAmount = roundMoney(Math.max(0, subtotal - loyaltyDiscount + deliveryFee))
 
-  return withTransaction(async (client) => {
+  const saveOrder = async (client) => {
     const consumerMemberId = authMemberId || null
 
     const orderNumber = await allocateConsumerOrderNumber(restaurantId, client, timeZone)
@@ -498,11 +532,15 @@ export async function createConsumerOrder(restaurantId, payload) {
       [order.id]
     )
 
-    // L7: return isNew flag so callers can guard side-effects (notifications,
-    // socket events) and skip them on idempotent replays once full dedup is
-    // implemented (requires idempotency_key column on consumer_order).
+    if (idempotencyKey) {
+      await client.query(
+        `INSERT INTO consumer_checkout_attempt (restaurant_id,idempotency_key,payload_hash,consumer_order_id) VALUES ($1,$2,$3,$4)`,
+        [restaurantId, idempotencyKey, payloadHash, order.id]
+      )
+    }
     return { order, lines: orderLines, isNew: true }
-  })
+  }
+  return checkoutClient ? saveOrder(checkoutClient) : withTransaction(saveOrder)
 }
 
 export async function getOrderReceipt(receiptToken) {

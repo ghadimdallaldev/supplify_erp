@@ -33,27 +33,37 @@ export function DealsPage() {
   const canRedeem = dealRedeemGate.canRedeem
   const redeemCopy = LIMIT_UPGRADE_COPY.deal_redemptions_per_day
 
-  const queryParams = useMemo(
-    () => ({
-      sort,
-      expiringSoon: expiringSoon ? 'true' : undefined,
-      supplierId: supplierFilter || undefined,
-    }),
-    [sort, expiringSoon, supplierFilter]
-  )
+  const queryParams = useMemo(() => ({ sort }), [sort])
 
-  const { data, isLoading } = useGetActivePromotionsQuery(queryParams)
-  const promotions = useMemo(() => data?.promotions || [], [data])
+  const { data, isLoading, isError, refetch } = useGetActivePromotionsQuery(queryParams, {
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  })
+  const allPromotions = useMemo(() => data?.promotions || [], [data])
+  const promotions = useMemo(
+    () =>
+      allPromotions.filter((deal) => {
+        if (supplierFilter && String(deal.supplier_id) !== supplierFilter) return false
+        if (
+          expiringSoon &&
+          (!deal.ends_at || new Date(String(deal.ends_at)).getTime() > Date.now() + 7 * 86_400_000)
+        )
+          return false
+        return true
+      }),
+    [allPromotions, supplierFilter, expiringSoon]
+  )
 
   const suppliers = useMemo(() => {
     const map = new Map<string, string>()
-    for (const p of promotions) {
+    for (const p of allPromotions) {
       if (p.supplier_id && p.supplier_name) {
         map.set(String(p.supplier_id), String(p.supplier_name))
       }
     }
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [promotions])
+  }, [allPromotions])
 
   const sponsoredCount = promotions.filter((p) => p.is_sponsored).length
 
@@ -73,7 +83,7 @@ export function DealsPage() {
 
   useEffect(() => {
     const supplierFromUrl = searchParams.get('supplierId')
-    if (supplierFromUrl) setSupplierFilter(supplierFromUrl)
+    setSupplierFilter(supplierFromUrl || '')
   }, [searchParams])
 
   useEffect(() => {
@@ -102,11 +112,11 @@ export function DealsPage() {
           </p>
         ) : null}
         <Card>
-          <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
-            <div>
-              <Label>{t('page.sort')}</Label>
+          <CardContent className="grid grid-cols-1 gap-4 pt-6 sm:grid-cols-2 xl:grid-cols-3 items-end">
+            <div className="min-w-0">
+              <Label htmlFor="deals-sort">{t('page.sort')}</Label>
               <Select value={sort} onValueChange={setSort}>
-                <SelectTrigger className="mt-1 min-w-[160px]">
+                <SelectTrigger id="deals-sort" className="mt-1">
                   {sortOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -115,10 +125,10 @@ export function DealsPage() {
                 </SelectTrigger>
               </Select>
             </div>
-            <div>
-              <Label>{t('page.supplier')}</Label>
+            <div className="min-w-0">
+              <Label htmlFor="deals-supplier">{t('page.supplier')}</Label>
               <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-                <SelectTrigger className="mt-1 min-w-[180px]">
+                <SelectTrigger id="deals-supplier" className="mt-1">
                   <option value="">{t('page.allSuppliers')}</option>
                   {suppliers.map(([id, name]) => (
                     <option key={id} value={id}>
@@ -145,7 +155,19 @@ export function DealsPage() {
           </p>
         ) : null}
 
-        {isLoading ? (
+        {isError ? (
+          <EmptyState
+            title={t('page.loadFailed', { defaultValue: 'Unable to load deals' })}
+            description={t('page.loadFailedDescription', {
+              defaultValue: 'Please try again. Your suppliers and offers could not be loaded.',
+            })}
+            action={
+              <Button variant="outline" onClick={() => refetch()}>
+                {t('page.retry', { defaultValue: 'Try again' })}
+              </Button>
+            }
+          />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">
             {Array.from({ length: 6 }).map((_, i) => (
               <div

@@ -37,7 +37,11 @@
     "addToCart": "إضافة إلى السلة",
     "viewCart": "عرض السلة",
     "notAvailable": "غ/م",
-    "units": "وحدات"
+    "units": "وحدات",
+    "quantityUnavailable": "اختر كمية ضمن المخزون المتاح.",
+    "loadFailed": "تعذر تحميل هذا المنتج. يرجى المحاولة مجددًا.",
+    "retry": "حاول مجددًا",
+    "quantity": "الكمية"
   },
   "catalog": {
     "product": "المنتج",
