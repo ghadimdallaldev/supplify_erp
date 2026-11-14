@@ -233,12 +233,13 @@ router.get('/', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req, r
           p.sku as product_sku,
           p.unit as product_unit,
           pr.amount as product_price,
+          pr.currency as product_currency,
           s.name as supplier_name
         FROM quick_list_item qli
         JOIN product p ON p.id = qli.product_id
         JOIN supplier s ON s.id = qli.supplier_id
         LEFT JOIN LATERAL (
-          SELECT amount
+          SELECT amount, currency
           FROM price
           WHERE price.product_id = p.id
             AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())
@@ -328,12 +329,13 @@ router.get('/:id', requireAuth, requireRole(['RESTAURANT', 'ADMIN']), async (req
         p.sku as product_sku,
         p.unit as product_unit,
         pr.amount as product_price,
+        pr.currency as product_currency,
         s.name as supplier_name
       FROM quick_list_item qli
       JOIN product p ON p.id = qli.product_id
       JOIN supplier s ON s.id = qli.supplier_id
       LEFT JOIN LATERAL (
-        SELECT amount
+        SELECT amount, currency
         FROM price
         WHERE price.product_id = p.id
           AND valid_from <= now() AND (valid_to IS NULL OR valid_to >= now())

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Provider } from 'react-redux'
+import { setupListeners } from '@reduxjs/toolkit/query'
 import { Toaster } from './components/ui/sonner.tsx'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
@@ -14,6 +15,7 @@ import { perfLog } from './lib/perfLog'
 import './i18n/index.ts'
 
 assertHostedWebConfig()
+setupListeners(store.dispatch)
 registerServiceWorker()
 
 const PRELOAD_RELOAD_KEY = 'vite-preload-reload'

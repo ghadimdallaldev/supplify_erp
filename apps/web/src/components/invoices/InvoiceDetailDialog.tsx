@@ -21,7 +21,7 @@ import {
   invoiceRemainingBalance,
   invoiceIsOverdue,
 } from '../../lib/invoiceBalance'
-import { apiUrl } from '../../lib/apiBase'
+import { downloadAuthenticatedFile } from '../../lib/downloadFile'
 
 export function InvoiceDetailDialog(props: any) {
   const {
@@ -30,6 +30,8 @@ export function InvoiceDetailDialog(props: any) {
     selectedInvoice,
     invoiceDetail,
     isLoadingDetail,
+    isErrorDetail,
+    onRetryDetail,
     downloadingPdfId,
     setDownloadingPdfId,
     isRestaurant,
@@ -47,62 +49,69 @@ export function InvoiceDetailDialog(props: any) {
     <Dialog open={showInvoiceDetail} onOpenChange={setShowInvoiceDetail}>
       <DialogContent size="wide">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{t('detail.title', { number: selectedInvoice?.invoice_number })}</span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!selectedInvoice?.id || downloadingPdfId === selectedInvoice.id}
-                onClick={async () => {
-                  if (!selectedInvoice?.id) return
-                  setDownloadingPdfId(selectedInvoice.id)
-                  try {
-                    const res = await fetch(apiUrl(`/api/invoices/${selectedInvoice.id}/pdf`), {
-                      credentials: 'include',
-                    })
-                    if (!res.ok) throw new Error('Failed to download PDF')
-                    const blob = await res.blob()
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `invoice-${(selectedInvoice.invoice_number || selectedInvoice.id).replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                    toast.success(t('toasts.pdfDownloaded'))
-                  } catch (e) {
-                    toast.error(t('toasts.pdfFailed'))
-                  } finally {
-                    setDownloadingPdfId(null)
-                  }
-                }}
-              >
-                {downloadingPdfId === selectedInvoice?.id ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                {t('detail.pdf')}
-              </Button>
-              {isRestaurant &&
-                canRecordPayments &&
-                selectedInvoice &&
-                invoiceRemainingBalance(selectedInvoice) > 0 && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setShowInvoiceDetail(false)
-                      handleOpenPaymentDialog(selectedInvoice)
-                    }}
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    {t('detail.makePayment')}
-                  </Button>
-                )}
-            </div>
+          <DialogTitle className="break-words leading-snug">
+            {t('detail.title', { number: selectedInvoice?.invoice_number })}
           </DialogTitle>
           <DialogDescription>{t('detail.description')}</DialogDescription>
+          <div className="flex flex-wrap gap-2 pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!selectedInvoice?.id || downloadingPdfId === selectedInvoice.id}
+              onClick={async () => {
+                if (!selectedInvoice?.id) return
+                setDownloadingPdfId(selectedInvoice.id)
+                try {
+                  await downloadAuthenticatedFile(
+                    `/api/invoices/${selectedInvoice.id}/pdf`,
+                    `invoice-${(selectedInvoice.invoice_number || selectedInvoice.id).replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`,
+                    'application/pdf'
+                  )
+                  toast.success(t('toasts.pdfDownloaded'))
+                } catch (e) {
+                  toast.error(t('toasts.pdfFailed'))
+                } finally {
+                  setDownloadingPdfId(null)
+                }
+              }}
+            >
+              {downloadingPdfId === selectedInvoice?.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {t('detail.pdf')}
+            </Button>
+            {isRestaurant &&
+              canRecordPayments &&
+              selectedInvoice &&
+              invoiceRemainingBalance(selectedInvoice) > 0 && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setShowInvoiceDetail(false)
+                    handleOpenPaymentDialog(selectedInvoice)
+                  }}
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {t('detail.makePayment')}
+                </Button>
+              )}
+          </div>
         </DialogHeader>
+
+        {isErrorDetail && (
+          <div role="alert" className="space-y-3 rounded-lg border border-[var(--red)]/30 p-4">
+            <p>
+              {t('detail.loadFailed', {
+                defaultValue: 'Unable to load this invoice. Please try again.',
+              })}
+            </p>
+            <Button variant="outline" onClick={onRetryDetail}>
+              {t('detail.retry', { defaultValue: 'Try again' })}
+            </Button>
+          </div>
+        )}
 
         {selectedInvoice && (
           <Tabs defaultValue="details" className="w-full">
@@ -183,8 +192,8 @@ export function InvoiceDetailDialog(props: any) {
                   {/* Items Table */}
                   <div>
                     <h3 className="font-semibold mb-4">{t('detail.lineItems')}</h3>
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full">
+                    <div className="border rounded-lg overflow-x-auto">
+                      <table className="w-full min-w-[540px]">
                         <thead className="bg-[var(--brand-ultra)]">
                           <tr>
                             <th className="text-left py-3 px-4 text-sm font-medium">
@@ -208,6 +217,15 @@ export function InvoiceDetailDialog(props: any) {
                           </tr>
                         </thead>
                         <tbody>
+                          {!invoiceDetail.lineItems?.length && (
+                            <tr>
+                              <td colSpan={6} className="p-4 text-sm text-[var(--text-muted)]">
+                                {t('detail.noLineItems', {
+                                  defaultValue: 'No line items were recorded for this invoice.',
+                                })}
+                              </td>
+                            </tr>
+                          )}
                           {invoiceDetail.lineItems?.map((item: any) => (
                             <tr key={item.id} className="border-b hover:bg-[var(--brand-ultra)]">
                               <td className="py-3 px-4">{item.description}</td>
@@ -235,7 +253,7 @@ export function InvoiceDetailDialog(props: any) {
                   </div>
 
                   {/* Totals */}
-                  <div className="ml-auto w-80">
+                  <div className="ms-auto w-full max-w-xs">
                     <div className="space-y-2 border rounded-lg p-4 bg-[var(--brand-ultra)]">
                       <div className="flex justify-between">
                         <span className="text-[var(--text-muted)]">{t('detail.subtotal')}</span>

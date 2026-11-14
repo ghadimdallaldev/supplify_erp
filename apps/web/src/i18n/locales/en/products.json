@@ -37,7 +37,11 @@
     "addToCart": "Add to Cart",
     "viewCart": "View Cart",
     "notAvailable": "N/A",
-    "units": "units"
+    "units": "units",
+    "quantityUnavailable": "Choose a quantity within the available stock.",
+    "loadFailed": "Unable to load this product. Please try again.",
+    "retry": "Try again",
+    "quantity": "Quantity"
   },
   "catalog": {
     "product": "Product",

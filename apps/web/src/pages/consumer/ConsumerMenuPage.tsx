@@ -24,6 +24,8 @@ import { Alert, AlertDescription } from '../../components/ui/alert'
 import { orderingStatusFromBranch, formatMinutesToTime } from '../../lib/consumerOrderingHours'
 import type { ConsumerOrderingStatus } from '../../services/consumerApi'
 import { ensureNamespace } from '../../i18n'
+import { Label } from '../../components/ui/label'
+import { Select, SelectTrigger } from '../../components/ui/select'
 
 function parseTimeToMinutes(timeStr?: string | null): number | null {
   if (!timeStr) return null
@@ -55,10 +57,6 @@ function localizedOrderingMessage(
     default:
       return status.message
   }
-}
-
-function countMenuItems(categories: Array<{ items: unknown[] }> | undefined) {
-  return categories?.reduce((sum, cat) => sum + cat.items.length, 0) ?? 0
 }
 
 export function ConsumerMenuPage() {
@@ -99,42 +97,16 @@ export function ConsumerMenuPage() {
   )
   const orderingClosed = orderingStatus.mode === 'CLOSED'
 
+  const menuBranchId = branchId ?? activeBranch?.branchId
   const {
-    data: branchMenuData,
-    isLoading: branchMenuLoading,
-    isError: branchMenuError,
+    currentData: data,
+    isFetching: isLoading,
+    isError,
+    refetch,
   } = useGetPublicConsumerMenuQuery(
-    { restaurantSlug: slug, branchId },
-    { skip: !slug || !branchId }
+    { restaurantSlug: slug, branchId: menuBranchId },
+    { skip: !slug }
   )
-
-  const {
-    data: allBranchesMenuData,
-    isLoading: allMenuLoading,
-    isError: allMenuError,
-  } = useGetPublicConsumerMenuQuery({ restaurantSlug: slug }, { skip: !slug || !!branchId })
-
-  const branchMenuEmpty =
-    !!branchId && !branchMenuLoading && countMenuItems(branchMenuData?.menu.categories) === 0
-
-  const { data: fallbackMenuData, isLoading: fallbackLoading } = useGetPublicConsumerMenuQuery(
-    { restaurantSlug: slug },
-    { skip: !slug || !branchMenuEmpty }
-  )
-
-  const data = branchId
-    ? branchMenuEmpty
-      ? fallbackMenuData
-      : branchMenuData
-    : allBranchesMenuData
-
-  const isLoading = branchId
-    ? branchMenuLoading || (branchMenuEmpty && fallbackLoading)
-    : allMenuLoading
-
-  const isError = branchId ? branchMenuError && !branchMenuEmpty : allMenuError
-
-  const usingFallbackMenu = branchMenuEmpty && countMenuItems(fallbackMenuData?.menu.categories) > 0
 
   const pricedCart = useMemo(
     () => priceCartAgainstMenu(cart, data?.menu.categories),
@@ -247,6 +219,15 @@ export function ConsumerMenuPage() {
   const checkoutBranchId = branchId ?? storefront?.branches[0]?.branchId
 
   const goCheckout = () => {
+    if (!pricedCart || pricedCart.unavailable.length > 0 || isError || isLoading) {
+      toast.error(
+        t('menu.unavailableCart', {
+          defaultValue:
+            'Review your cart. Some items or customizations are no longer available at this branch.',
+        })
+      )
+      return
+    }
     if (orderingClosed) {
       toast.error(orderingMessage)
       return
@@ -268,6 +249,30 @@ export function ConsumerMenuPage() {
 
   return (
     <PageShell className="space-y-5 p-4 pb-28" data-testid="consumer-menu-page">
+      {(storefront?.branches?.length ?? 0) > 1 && (
+        <div className="max-w-sm min-w-0 space-y-1.5">
+          <Label htmlFor="menu-branch">{t('menu.branch', { defaultValue: 'Branch' })}</Label>
+          <Select
+            value={menuBranchId ?? ''}
+            onValueChange={(next) => {
+              setOrderItem(null)
+              setSearchParams((previous) => {
+                const params = new URLSearchParams(previous)
+                params.set('branchId', next)
+                return params
+              })
+            }}
+          >
+            <SelectTrigger id="menu-branch">
+              {storefront?.branches.map((branch) => (
+                <option key={branch.branchId} value={branch.branchId}>
+                  {branch.branchName}
+                </option>
+              ))}
+            </SelectTrigger>
+          </Select>
+        </div>
+      )}
       {orderingStatus.mode !== 'LIVE' && (
         <Alert
           className={
@@ -324,10 +329,10 @@ export function ConsumerMenuPage() {
         ) : null}
       </div>
 
-      {usingFallbackMenu && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          {t('menu.fallbackNotice')}
-        </p>
+      {isError && (
+        <Button variant="outline" onClick={() => refetch()}>
+          {t('menu.retry', { defaultValue: 'Try again' })}
+        </Button>
       )}
 
       {!searchQuery && filteredCategories.length > 0 && (
@@ -348,11 +353,13 @@ export function ConsumerMenuPage() {
           </h2>
           <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {chefPicks.map((item) => (
-              <div key={`pick-${item.id}`} className="w-[220px] shrink-0">
+              <div key={`pick-${item.id}`} className="w-[240px] shrink-0 sm:w-[264px]">
                 <MenuItemCard
                   item={item}
                   onSelect={() => handleItemSelect(item)}
                   disabled={orderingClosed || item.is_available === false}
+                  orderingMode={orderingStatus.mode}
+                  featured
                 />
               </div>
             ))}

@@ -20,8 +20,11 @@ function formatDiscount(
 export function NewDealsBanner() {
   const { t } = useTranslation('deals')
   const { data } = useGetNewDealsBannerQuery(undefined, {
-    pollingInterval: 0,
-    refetchOnMountOrArgChange: false,
+    pollingInterval: 60_000,
+    skipPollingIfUnfocused: true,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   })
   const [dismissBanner] = useDismissDealBannerMutation()
 

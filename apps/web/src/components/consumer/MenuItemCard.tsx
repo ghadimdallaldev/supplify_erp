@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, SlidersHorizontal, Calendar } from 'lucide-react'
 import { Button } from '../ui/button'
@@ -15,6 +15,7 @@ type MenuItemCardProps = {
   orderingMode?: ConsumerOrderingMode
   disabled?: boolean
   className?: string
+  featured?: boolean
 }
 
 export function MenuItemCard({
@@ -23,10 +24,12 @@ export function MenuItemCard({
   disabled = false,
   orderingMode = 'LIVE',
   className,
+  featured = false,
 }: MenuItemCardProps) {
   const { t } = useTranslation('consumer')
   const hasModifiers = (item.modifierGroups?.length ?? 0) > 0
   const imageUrl = item.image_url
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null)
   const soldOut = item.is_available === false
   const orderingClosed = orderingMode === 'CLOSED'
   const preorderOnly = orderingMode === 'PREORDER_ONLY'
@@ -39,7 +42,10 @@ export function MenuItemCard({
   return (
     <div
       className={cn(
-        'consumer-menu-item flex w-full gap-3 border-b border-[var(--app-border)] py-3.5 last:border-b-0',
+        'consumer-menu-item flex w-full gap-3',
+        featured
+          ? 'h-full flex-col rounded-2xl border border-[var(--app-border)] bg-[var(--surface)] p-3'
+          : 'border-b border-[var(--app-border)] py-3.5 last:border-b-0',
         soldOut && 'opacity-70',
         className
       )}
@@ -48,28 +54,43 @@ export function MenuItemCard({
         type="button"
         onClick={() => onSelect(item)}
         disabled={addDisabled}
-        className="flex min-w-0 flex-1 gap-3 text-start disabled:cursor-not-allowed"
+        className={cn(
+          'flex min-w-0 flex-1 gap-3 text-start disabled:cursor-not-allowed',
+          featured && 'flex-col'
+        )}
       >
-        {imageUrl ? (
+        {imageUrl && failedImageUrl !== imageUrl ? (
           <img
             src={imageUrl}
             alt=""
-            className="h-[72px] w-[72px] shrink-0 rounded-xl object-cover"
+            className={cn(
+              'shrink-0 rounded-xl object-cover',
+              featured ? 'h-32 w-full' : 'h-[72px] w-[72px]'
+            )}
             loading="lazy"
             decoding="async"
+            onError={() => setFailedImageUrl(imageUrl)}
           />
         ) : (
           <div
             aria-hidden
-            className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl bg-[var(--brand-pale)] text-xl font-semibold text-[var(--brand-mid)]"
+            className={cn(
+              'flex shrink-0 items-center justify-center rounded-xl bg-[var(--brand-pale)] text-xl font-semibold text-[var(--brand-mid)]',
+              featured ? 'h-32 w-full' : 'h-[72px] w-[72px]'
+            )}
           >
             {item.name.charAt(0).toUpperCase()}
           </div>
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 w-full">
+          <div
+            className={cn(
+              'flex items-start',
+              featured ? 'flex-col gap-1.5' : 'justify-between gap-3'
+            )}
+          >
             <div className="min-w-0">
-              <p className="font-medium leading-snug text-[var(--text)]">{item.name}</p>
+              <p className="break-words font-medium leading-snug text-[var(--text)]">{item.name}</p>
               {soldOut ? (
                 <Badge variant="secondary" className="mt-1 text-[10px] uppercase tracking-wide">
                   {t('menuItem.soldOut')}
@@ -101,7 +122,7 @@ export function MenuItemCard({
         disabled={addDisabled}
         className={cn(
           'consumer-pressable shrink-0 self-center rounded-full bg-[var(--brand-pale)] text-[var(--brand-mid)] hover:bg-[var(--brand-mid)] hover:text-white disabled:opacity-50',
-          preorderOnly ? 'h-10 gap-1 px-3' : 'h-10 w-10'
+          preorderOnly ? 'min-h-11 gap-1 px-3' : 'h-11 w-11'
         )}
         onClick={() => onSelect(item)}
         aria-label={t('menuItem.addAria', { name: item.name })}

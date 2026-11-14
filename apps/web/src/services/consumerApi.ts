@@ -251,6 +251,7 @@ export const consumerApi = api.injectEndpoints({
     createPublicConsumerOrder: build.mutation<
       { order: ConsumerOrderSummary; lines: unknown[]; receiptToken: string },
       {
+        idempotencyKey?: string
         restaurantSlug: string
         branchId: string
         fulfillmentType: ConsumerFulfillmentType

@@ -72,7 +72,7 @@ export function ReceivingHistoryRow({ report }: { report: ReceivingReport }) {
             <div className="flex items-center gap-1 rounded-lg bg-[var(--brand-pale)] px-2.5 py-1.5">
               <Star className="h-4 w-4 fill-[var(--amber)] text-[var(--amber)]" aria-hidden />
               <span className="text-sm font-semibold tabular-nums text-[var(--text)]">
-                {report.quality_score}
+                {formatQualityScore(report.quality_score)}
               </span>
               <span className="sr-only">Quality score</span>
             </div>
@@ -94,3 +94,4 @@ export function ReceivingHistoryRow({ report }: { report: ReceivingReport }) {
 export function ReceivingHistoryEmptyIcon() {
   return <History className="h-6 w-6" aria-hidden />
 }
+import { formatQualityScore } from '../../lib/qualityScore'

@@ -153,8 +153,12 @@ export async function csrfProtection(req, res, next) {
     return next()
   }
 
-  // E2E helpers use shared secret header, not session cookies
-  if (req.path === '/api/internal/auth/otp/email' || req.path.startsWith('/api/e2e')) {
+  // Exact internal mail routes authenticate a shared secret, not a session JWT.
+  if (
+    req.path === '/api/internal/auth/otp/email' ||
+    req.path === '/api/internal/auth/keycloak/email' ||
+    req.path.startsWith('/api/e2e')
+  ) {
     return next()
   }
 

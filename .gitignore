@@ -130,6 +130,7 @@ backups-preprod/
 
 # Android / Gradle machine state and signing material
 /.gradle-user-home/
+/deploy/keycloak/providers/email-otp/target/
 *.jks
 *.keystore
 

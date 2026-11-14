@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useAppDispatch } from '../hooks/redux'
 import {
   consumerApi,
   useConsumerLoginMutation,
@@ -8,15 +9,18 @@ import {
   type ConsumerLoyaltyLedgerEntry,
   type ConsumerMember,
   type ConsumerMemberOrder,
+  type ConsumerLoyaltyProgram,
 } from '../services/consumerApi'
 
 type ConsumerAuthContextValue = {
   restaurantSlug: string
   member: ConsumerMember | null
   loyaltyPoints: number
+  loyaltyProgram: ConsumerLoyaltyProgram | null
   recentLedger: ConsumerLoyaltyLedgerEntry[]
   recentOrders: ConsumerMemberOrder[]
   isLoading: boolean
+  isError: boolean
   isAuthenticated: boolean
   login: (username: string, password: string) => Promise<void>
   signup: (username: string, password: string, displayName?: string) => Promise<void>
@@ -34,8 +38,18 @@ export function ConsumerAuthProvider({
   children: ReactNode
 }) {
   const skip = !restaurantSlug
-  const { data, isLoading, isFetching, refetch } = useGetConsumerMeQuery(restaurantSlug, {
+  const dispatch = useAppDispatch()
+  const [signedOutSlug, setSignedOutSlug] = useState<string | null>(null)
+  const {
+    currentData: data,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetConsumerMeQuery(restaurantSlug, {
     skip,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
   })
   const [loginMutation] = useConsumerLoginMutation()
   const [signupMutation] = useConsumerSignupMutation()
@@ -45,7 +59,8 @@ export function ConsumerAuthProvider({
     async (username: string, password: string) => {
       if (!restaurantSlug) return
       await loginMutation({ restaurantSlug, username, password }).unwrap()
-      refetch()
+      await refetch().unwrap()
+      setSignedOutSlug(null)
     },
     [loginMutation, refetch, restaurantSlug]
   )
@@ -54,7 +69,8 @@ export function ConsumerAuthProvider({
     async (username: string, password: string, displayName?: string) => {
       if (!restaurantSlug) return
       await signupMutation({ restaurantSlug, username, password, displayName }).unwrap()
-      refetch()
+      await refetch().unwrap()
+      setSignedOutSlug(null)
     },
     [refetch, restaurantSlug, signupMutation]
   )
@@ -62,19 +78,22 @@ export function ConsumerAuthProvider({
   const logout = useCallback(async () => {
     if (!restaurantSlug) return
     await logoutMutation(restaurantSlug).unwrap()
-    consumerApi.util.invalidateTags([{ type: 'ConsumerAuth', id: restaurantSlug }])
-  }, [logoutMutation, restaurantSlug])
+    setSignedOutSlug(restaurantSlug)
+    dispatch(consumerApi.util.invalidateTags([{ type: 'ConsumerAuth', id: restaurantSlug }]))
+  }, [dispatch, logoutMutation, restaurantSlug])
 
-  const member = data?.member ?? null
+  const member = signedOutSlug === restaurantSlug ? null : (data?.member ?? null)
 
   const value = useMemo<ConsumerAuthContextValue>(
     () => ({
       restaurantSlug,
       member,
       loyaltyPoints: member?.loyaltyPoints ?? 0,
-      recentLedger: data?.recentLedger ?? [],
-      recentOrders: data?.recentOrders ?? [],
+      loyaltyProgram: data?.program ?? null,
+      recentLedger: member ? (data?.recentLedger ?? []) : [],
+      recentOrders: member ? (data?.recentOrders ?? []) : [],
       isLoading: isLoading || isFetching,
+      isError,
       isAuthenticated: Boolean(member),
       login,
       signup,
@@ -85,9 +104,11 @@ export function ConsumerAuthProvider({
     }),
     [
       data?.recentLedger,
+      data?.program,
       data?.recentOrders,
       isFetching,
       isLoading,
+      isError,
       login,
       logout,
       member,

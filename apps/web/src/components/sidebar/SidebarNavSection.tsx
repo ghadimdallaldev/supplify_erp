@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useId, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { prefetchRouteChunk } from '../../lib/routeChunkPrefetch'
 import { cn } from '../../lib/utils'
@@ -38,28 +40,47 @@ export function SidebarNavSection({
 }: SidebarNavSectionProps) {
   const { t } = useTranslation('navigation')
   const sectionLabel = resolveSectionLabel(section, t)
+  const [expanded, setExpanded] = useState(true)
+  const contentId = useId()
+  const containsActiveRoute = section.items.some((item) => isNavItemActive(pathname, item.href))
+  useEffect(() => {
+    if (containsActiveRoute) setExpanded(true)
+  }, [pathname, containsActiveRoute])
   const { pendingOrders, unreadCount, activeDisputeCount, orderUsageBadge, showOrderUsageOnCart } =
     badges
 
   return (
     <div className="mb-3 first:mb-2">
-      <div className="section-label px-2 pb-1.5 pt-3 text-[var(--sidebar-section)] first:pt-1.5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        onClick={() => setExpanded((value) => !value)}
+        className="section-label flex min-h-10 w-full items-center justify-between gap-2 rounded-md px-2 text-start text-[var(--sidebar-section)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+      >
         {sectionLabel}
-      </div>
-      {section.items.map((item) => (
-        <SidebarNavLink
-          key={item.testId ?? item.href}
-          item={item}
-          label={resolveNavItemLabel(item, t)}
-          isActive={isNavItemActive(pathname, item.href)}
-          pendingOrders={pendingOrders}
-          unreadCount={unreadCount}
-          activeDisputeCount={activeDisputeCount}
-          orderUsageBadge={orderUsageBadge}
-          showOrderUsage={item.testId === 'nav-cart' && showOrderUsageOnCart}
-          onNavigate={onNavigate}
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={cn('shrink-0 transition-transform', !expanded && '-rotate-90')}
         />
-      ))}
+      </button>
+      <div id={contentId} hidden={!expanded}>
+        {section.items.map((item) => (
+          <SidebarNavLink
+            key={item.testId ?? item.href}
+            item={item}
+            label={resolveNavItemLabel(item, t)}
+            isActive={isNavItemActive(pathname, item.href)}
+            pendingOrders={pendingOrders}
+            unreadCount={unreadCount}
+            activeDisputeCount={activeDisputeCount}
+            orderUsageBadge={orderUsageBadge}
+            showOrderUsage={item.testId === 'nav-cart' && showOrderUsageOnCart}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -100,7 +121,7 @@ function SidebarNavLink({
       onClick={() => onNavigate?.()}
       data-testid={item.testId || `nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={cn(
-        'sidebar-nav-item relative mb-0.5 flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] no-underline',
+        'sidebar-nav-item relative mb-0.5 flex min-h-10 items-center gap-2 rounded-md px-2.5 py-2 text-[13px] no-underline',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-1',
         isActive ? 'font-semibold text-[var(--text)]' : 'font-medium text-[var(--text-muted)]'
       )}
@@ -110,7 +131,7 @@ function SidebarNavLink({
         className={cn('shrink-0', isActive ? 'text-[var(--brand)]' : 'text-[var(--text-muted)]')}
         aria-hidden
       />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 break-words">{label}</span>
       {showPendingBadge && (
         <NavCountBadge count={pendingOrders} variant="amber" title={t('badge.pendingOrders')} />
       )}
