@@ -29,6 +29,18 @@ export function shouldRegisterCrons(nodeEnv = config.NODE_ENV) {
   return nodeEnv !== 'test'
 }
 
+// Handlers may need additional connections while holding their advisory lock.
+// Do not exhaust the pool by starting every job concurrently during boot.
+export async function runInitialCronJobs(jobs) {
+  for (const job of jobs) {
+    try {
+      await job.run()
+    } catch (error) {
+      logger.error({ event: 'cron.initial_run_failed', job: job.name, error })
+    }
+  }
+}
+
 /**
  * Register all in-process cron jobs. Skipped when NODE_ENV=test or CRONS_ENABLED=false
  * (individual ticks still respect CRONS_ENABLED via runCronJob).
@@ -244,9 +256,9 @@ export function registerCronJobs({ trackInterval }) {
   ]
 
   for (const job of jobs) {
-    job.run()
     trackInterval(job.run, job.intervalMs)
   }
+  void runInitialCronJobs(jobs)
 
   logger.info({
     event: 'cron.registration_complete',

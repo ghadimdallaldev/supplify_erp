@@ -210,10 +210,6 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
     ) dp ON TRUE
     WHERE p.status = 'active'
       AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
-      AND p.boost_start_at IS NOT NULL
-      AND p.boost_start_at <= NOW()
-      AND p.boost_end_at IS NOT NULL
-      AND p.boost_end_at > NOW()
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
@@ -225,7 +221,12 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
           WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
         )
       )
-      AND dp.id IS NOT NULL
+      AND (
+        EXISTS (SELECT 1 FROM supplier_follow sf WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1)
+        OR EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1)
+        OR dp.id IS NOT NULL
+      )
+      AND NOT EXISTS (SELECT 1 FROM supplier_blocklist sb WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1)
   `
 
   if (previewSupplierId) {
@@ -314,10 +315,6 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
     WHERE p.id = $2
       AND p.status = 'active'
       AND COALESCE(p.payment_status, 'not_required') IN ('not_required', 'paid')
-      AND p.boost_start_at IS NOT NULL
-      AND p.boost_start_at <= NOW()
-      AND p.boost_end_at IS NOT NULL
-      AND p.boost_end_at > NOW()
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
@@ -329,7 +326,12 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
           WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
         )
       )
-      AND dp.id IS NOT NULL
+      AND (
+        EXISTS (SELECT 1 FROM supplier_follow sf WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1)
+        OR EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1)
+        OR dp.id IS NOT NULL
+      )
+      AND NOT EXISTS (SELECT 1 FROM supplier_blocklist sb WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1)
     `,
     [restaurantId, dealId]
   )
@@ -346,7 +348,10 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
   const { rows: targets } = await query(
     `
     SELECT pt.product_id, pt.category_id,
-      pr.name AS product_name, pr.price AS product_price,
+      pr.name AS product_name,
+      (SELECT amount FROM price WHERE product_id = pr.id
+         AND valid_from <= NOW() AND (valid_to IS NULL OR valid_to > NOW())
+       ORDER BY valid_from DESC LIMIT 1) AS product_price,
       pc.name AS category_name
     FROM promotion_targets pt
     LEFT JOIN product pr ON pr.id = pt.product_id

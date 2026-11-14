@@ -30,7 +30,11 @@ export function ReservationTimeSlotGrid({
   showCapacity = false,
 }: ReservationTimeSlotGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div
+      className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+      role="group"
+      aria-label="Available reservation times"
+    >
       {slots.map((slot) => {
         const selected = slot.startTime === selectedSlot
         return (
@@ -38,6 +42,7 @@ export function ReservationTimeSlotGrid({
             key={slot.startTime}
             type="button"
             disabled={!slot.isAvailable}
+            aria-pressed={selected}
             onClick={() => onSelect(slot.startTime)}
             className={cn(
               'public-slot consumer-pressable flex min-h-[52px] flex-col rounded-xl border px-3 py-2.5 text-left text-xs',

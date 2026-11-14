@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2, CreditCard, CheckCircle } from 'lucide-react'
 import { formatCurrency } from '../../utils/format'
 import { formatCalendarDate, localDateKey, roundMoney } from '../../lib/invoiceBalance'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 const PAYMENT_METHODS = [
   'BANK_TRANSFER',
@@ -64,6 +64,8 @@ export function InvoicePaymentDialog(props: any) {
   } = props
 
   const { t } = useTranslation('invoices')
+  const paymentDateId = useId()
+  const paymentMethodId = useId()
   // Raw text while typing, so "0", "0." and "0.5" aren't reset by the numeric parse. The
   // numeric state in the parent is parsed from it; null means "show the parent's value".
   const [paymentAmountText, setPaymentAmountText] = useState<string | null>(null)
@@ -143,15 +145,16 @@ export function InvoicePaymentDialog(props: any) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>{t('payment.paymentMethod')}</Label>
+                    <Label htmlFor={paymentMethodId}>{t('payment.paymentMethod')}</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger>{paymentMethodOptions}</SelectTrigger>
+                      <SelectTrigger id={paymentMethodId}>{paymentMethodOptions}</SelectTrigger>
                     </Select>
                   </div>
 
                   <div>
-                    <Label>{t('payment.paymentDate')}</Label>
+                    <Label htmlFor={paymentDateId}>{t('payment.paymentDate')}</Label>
                     <Input
+                      id={paymentDateId}
                       type="date"
                       value={paymentDate}
                       max={localDateKey()}
@@ -224,15 +227,16 @@ export function InvoicePaymentDialog(props: any) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>{t('payment.paymentMethod')}</Label>
+                    <Label htmlFor={paymentMethodId}>{t('payment.paymentMethod')}</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger>{paymentMethodOptions}</SelectTrigger>
+                      <SelectTrigger id={paymentMethodId}>{paymentMethodOptions}</SelectTrigger>
                     </Select>
                   </div>
 
                   <div>
-                    <Label>{t('payment.paymentDate')}</Label>
+                    <Label htmlFor={paymentDateId}>{t('payment.paymentDate')}</Label>
                     <Input
+                      id={paymentDateId}
                       type="date"
                       value={paymentDate}
                       max={localDateKey()}
@@ -404,8 +408,9 @@ export function InvoicePaymentDialog(props: any) {
                     )}
 
                     <div>
-                      <Label>{t('payment.paymentDate')}</Label>
+                      <Label htmlFor={paymentDateId}>{t('payment.paymentDate')}</Label>
                       <Input
+                        id={paymentDateId}
                         type="date"
                         value={paymentDate}
                         max={localDateKey()}

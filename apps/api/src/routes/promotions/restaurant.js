@@ -676,7 +676,7 @@ router.get(
       const restaurantId = await getRestaurantId(req)
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
-      const activePromo = await getActiveDealPromotion(query, deal.id)
+      const activePromo = await getActiveDealPromotion({ query }, deal.id)
       await recordDealInteraction({
         dealId: deal.id,
         restaurantId,
@@ -704,7 +704,7 @@ router.post(
       const body = interactBodySchema.parse(req.body)
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
-      const activePromo = await getActiveDealPromotion(query, deal.id)
+      const activePromo = await getActiveDealPromotion({ query }, deal.id)
       const interaction = await recordDealInteraction({
         dealId: deal.id,
         restaurantId,
@@ -758,7 +758,7 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
       if (!deal.coupon_code) throw new ValidationError('This deal has no coupon code')
-      const activePromo = await getActiveDealPromotion(query, deal.id)
+      const activePromo = await getActiveDealPromotion({ query }, deal.id)
       await recordDealInteraction({
         dealId: deal.id,
         restaurantId,
@@ -807,7 +807,7 @@ router.post(
         [conversation.id, restaurantId, initialMessage]
       )
 
-      const activePromo = await getActiveDealPromotion(query, deal.id)
+      const activePromo = await getActiveDealPromotion({ query }, deal.id)
       await recordDealInteraction({
         dealId: deal.id,
         restaurantId,

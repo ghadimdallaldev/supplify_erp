@@ -21,6 +21,8 @@ import { Skeleton } from '../ui/skeleton'
 import { EmptyState } from '../ui/empty-state'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Select, SelectTrigger } from '../ui/select'
 import {
   ShoppingCart,
   ListPlus,
@@ -90,10 +92,8 @@ function recommendationLabel(source?: string): string {
 }
 
 function resolveQty(item: ReorderAssistanceItem, recommendation?: ReorderAiRecommendation): number {
-  if (recommendation?.recommendedQuantity != null && recommendation.recommendedQuantity > 0) {
-    return recommendation.recommendedQuantity
-  }
-  return item.suggestedQty ?? 1
+  const quantity = Number(recommendation?.recommendedQuantity ?? item.suggestedQty ?? 1)
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1
 }
 
 const REASON_STYLES: Record<string, string> = {
@@ -130,6 +130,10 @@ export function ReorderAssistancePanel({
   const [aiRecommend, { isLoading: isAiRecommending }] = useAiRecommendReorderAssistanceMutation()
   const [sendFeedback] = useFeedbackReorderAssistanceMutation()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [selectedListId, setSelectedListId] = useState('')
+  const lists = quickListsData?.quickLists || []
+  const selectedList =
+    lists.find((list) => list.id === selectedListId) ?? (lists.length === 1 ? lists[0] : undefined)
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainResult, setExplainResult] = useState<ReorderAiExplainResult | null>(null)
   const [askQuery, setAskQuery] = useState('')
@@ -277,9 +281,12 @@ export function ReorderAssistancePanel({
   }
 
   const handleAddToQuickList = async (item: (typeof suggestions)[0]) => {
-    const lists = quickListsData?.quickLists || []
     if (lists.length === 0) {
       toast.error(t('toast.createOrderingListFirst'))
+      return
+    }
+    if (!selectedList) {
+      toast.error(t('toast.chooseOrderingList', { defaultValue: 'Choose an ordering list first.' }))
       return
     }
     if (!item.productId) {
@@ -291,14 +298,14 @@ export function ReorderAssistancePanel({
       const rec = recommendationsByProduct[String(item.productId)]
       const qty = resolveQty(item, rec)
       await addItemToQuickList({
-        quickListId: lists[0].id,
+        quickListId: selectedList.id,
         body: {
           productId: item.productId,
           supplierId: rec?.supplierId || item.supplierId,
           quantity: qty,
         },
       }).unwrap()
-      toast.success(t('toast.addedToList', { listName: lists[0].name }))
+      toast.success(t('toast.addedToList', { listName: selectedList.name }))
     } catch (e: any) {
       toast.error(e?.data?.error?.message || t('toast.addToListFailed'))
     } finally {
@@ -357,23 +364,27 @@ export function ReorderAssistancePanel({
   }
 
   const handleAskAddToList = async (match: ReorderAiAskResult['matchedProducts'][0]) => {
-    const lists = quickListsData?.quickLists || []
     if (lists.length === 0) {
       toast.error(t('toast.createOrderingListFirst'))
+      return
+    }
+    if (!selectedList) {
+      toast.error(t('toast.chooseOrderingList', { defaultValue: 'Choose an ordering list first.' }))
       return
     }
     const suggestion = suggestions.find((s) => s.productId === match.productId)
     setAskBusyProductId(match.productId)
     try {
       await addItemToQuickList({
-        quickListId: lists[0].id,
+        quickListId: selectedList.id,
         body: {
           productId: match.productId,
           supplierId: suggestion?.supplierId,
-          quantity: match.qty ?? 1,
+          quantity:
+            Number.isFinite(Number(match.qty)) && Number(match.qty) > 0 ? Number(match.qty) : 1,
         },
       }).unwrap()
-      toast.success(t('toast.addedToList', { listName: lists[0].name }))
+      toast.success(t('toast.addedToList', { listName: selectedList.name }))
     } catch (e: any) {
       toast.error(e?.data?.error?.message || t('toast.addToListFailed'))
     } finally {
@@ -444,6 +455,25 @@ export function ReorderAssistancePanel({
               </Button>
             )}
           </div>
+          {lists.length > 1 && (
+            <div className="mt-3 max-w-sm min-w-0 space-y-1.5">
+              <Label htmlFor={compact ? 'reorder-list-compact' : 'reorder-list'}>
+                {t('reorderList.label', { defaultValue: 'Ordering list' })}
+              </Label>
+              <Select value={selectedList?.id ?? ''} onValueChange={setSelectedListId}>
+                <SelectTrigger id={compact ? 'reorder-list-compact' : 'reorder-list'}>
+                  <option value="">
+                    {t('reorderList.choose', { defaultValue: 'Choose an ordering list' })}
+                  </option>
+                  {lists.map((list) => (
+                    <option key={list.id} value={list.id}>
+                      {list.name}
+                    </option>
+                  ))}
+                </SelectTrigger>
+              </Select>
+            </div>
+          )}
           {(canExplain || canAsk) && !compact && (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               {canExplain && (

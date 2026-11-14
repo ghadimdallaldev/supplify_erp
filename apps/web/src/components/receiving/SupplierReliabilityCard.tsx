@@ -52,7 +52,7 @@ export function SupplierReliabilityCard({ days = 90 }: { days?: number }) {
                   </span>
                   <span>
                     {t('supplierReliability.quality')}:{' '}
-                    <strong>{supplier.receiving.averageQualityScore ?? '—'}</strong>
+                    <strong>{formatQualityScore(supplier.receiving.averageQualityScore)}</strong>
                   </span>
                   <span>
                     {t('supplierReliability.onTime')}:{' '}
@@ -81,3 +81,4 @@ export function SupplierReliabilityCard({ days = 90 }: { days?: number }) {
     </Card>
   )
 }
+import { formatQualityScore } from '../../lib/qualityScore'

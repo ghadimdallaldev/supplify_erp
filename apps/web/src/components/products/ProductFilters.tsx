@@ -1,11 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { SlidersHorizontal } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { filterControlClass } from '../ui/filter-control'
 import { cn } from '../../lib/utils'
 
@@ -61,7 +59,7 @@ export function ProductFilterFields({
 
   const priceRangeFields = (
     <>
-      <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)] xl:sr-only">
+      <Label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">
         {t('filters.priceRange')}
       </Label>
       <div className="flex items-center gap-2">
@@ -73,7 +71,7 @@ export function ProductFilterFields({
           onChange={(e) => setMinPrice(e.target.value)}
           min="0"
           step="0.01"
-          className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
+          className={cn(filterControlClass, 'min-w-0 flex-1')}
         />
         <span className="shrink-0 text-sm text-[var(--text-muted)]">–</span>
         <Input
@@ -84,7 +82,7 @@ export function ProductFilterFields({
           onChange={(e) => setMaxPrice(e.target.value)}
           min="0"
           step="0.01"
-          className={cn(filterControlClass, 'min-w-0 sm:max-w-[7.5rem]')}
+          className={cn(filterControlClass, 'min-w-0 flex-1')}
         />
         {hasPriceFilter && (
           <Button
@@ -104,10 +102,13 @@ export function ProductFilterFields({
   )
 
   return (
-    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-12 xl:items-end">
+    <div className="grid min-w-0 w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)]">
       {!isSupplier && (
-        <div className="min-w-0 xl:col-span-2">
-          <Label htmlFor="product-supplier-filter" className="sr-only">
+        <div className="min-w-0">
+          <Label
+            htmlFor="product-supplier-filter"
+            className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]"
+          >
             {t('filters.supplier')}
           </Label>
           <Select value={supplierFilter} onValueChange={setSupplierFilter}>
@@ -122,8 +123,11 @@ export function ProductFilterFields({
           </Select>
         </div>
       )}
-      <div className={`min-w-0 ${!isSupplier ? 'xl:col-span-2' : 'sm:col-span-1 xl:col-span-3'}`}>
-        <Label htmlFor="product-category-filter" className="sr-only">
+      <div className="min-w-0">
+        <Label
+          htmlFor="product-category-filter"
+          className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]"
+        >
           {t('filters.category')}
         </Label>
         <Select
@@ -143,36 +147,7 @@ export function ProductFilterFields({
           </SelectTrigger>
         </Select>
       </div>
-      {!isSupplier && (
-        <>
-          <div className="min-w-0 xl:hidden">
-            <Label className="sr-only">{t('filters.priceRange')}</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant={hasPriceFilter ? 'default' : 'outline'}
-                  className={cn(filterControlClass, 'w-full justify-start gap-2')}
-                >
-                  <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
-                  {t('filters.priceRange')}
-                  {hasPriceFilter && (
-                    <Badge variant="secondary" className="ms-auto text-xs">
-                      {minPrice || '0'}–{maxPrice || '∞'}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-[min(calc(100vw-2rem),20rem)]">
-                {priceRangeFields}
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="hidden min-w-0 sm:col-span-2 xl:col-span-4 xl:block">
-            {priceRangeFields}
-          </div>
-        </>
-      )}
+      {!isSupplier && <div className="min-w-0 sm:col-span-2 xl:col-span-1">{priceRangeFields}</div>}
     </div>
   )
 }
@@ -190,10 +165,13 @@ export function ProductTagFilters({
       <Label className="text-sm font-medium">{t('filters.filterByTags')}</Label>
       <div className="mt-2 flex flex-wrap gap-2">
         {tagsData.tags.map((tag) => (
-          <Badge
+          <Button
             key={tag}
+            type="button"
+            size="sm"
             variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-            className="cursor-pointer hover:bg-[var(--bg)]"
+            className="min-h-10 rounded-full px-3 text-xs"
+            aria-pressed={selectedTags.includes(tag)}
             onClick={() => {
               setSelectedTags((prev) =>
                 prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
@@ -201,7 +179,7 @@ export function ProductTagFilters({
             }}
           >
             {tag}
-          </Badge>
+          </Button>
         ))}
       </div>
     </div>

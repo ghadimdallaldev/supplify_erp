@@ -11,6 +11,7 @@ import { PageShell } from '../../components/ui/page-shell'
 import { ArrowLeft, Gift, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { ensureNamespace } from '../../i18n'
+import { Progress } from '../../components/ui/progress'
 
 function formatLedgerType(type: string, t: TFunction<'consumer'>) {
   switch (type) {
@@ -42,12 +43,38 @@ export function ConsumerRewardsPage() {
 
   const { restaurantSlug } = useParams<{ restaurantSlug: string }>()
   const slug = restaurantSlug ?? ''
-  const { isAuthenticated, isLoading, member, loyaltyPoints, recentLedger, recentOrders, logout } =
-    useConsumerAuth()
+  const {
+    isAuthenticated,
+    isLoading,
+    isError,
+    member,
+    loyaltyPoints,
+    loyaltyProgram,
+    recentLedger,
+    recentOrders,
+    logout,
+    refreshMe,
+  } = useConsumerAuth()
 
+  if (isError && !isLoading) {
+    return (
+      <PageShell className="mx-auto max-w-lg space-y-4 p-4">
+        <p role="alert">
+          {t('rewards.loadFailed', {
+            defaultValue: 'Unable to load your rewards. Please try again.',
+          })}
+        </p>
+        <Button variant="outline" onClick={refreshMe}>
+          {t('rewards.retry', { defaultValue: 'Try again' })}
+        </Button>
+      </PageShell>
+    )
+  }
   if (!isLoading && !isAuthenticated) {
     return <Navigate to={`/order/${slug}/account`} replace />
   }
+  const minimumPoints = Math.max(0, Number(loyaltyProgram?.min_redeem_points ?? 0))
+  const remainingPoints = Math.max(0, minimumPoints - loyaltyPoints)
 
   const handleLogout = async () => {
     try {
@@ -95,6 +122,35 @@ export function ConsumerRewardsPage() {
                   {t('rewards.greeting', { name: member.displayName })}
                 </p>
               )}
+              {loyaltyProgram?.enabled && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium">
+                    {remainingPoints > 0
+                      ? t('rewards.pointsUntilReady', {
+                          count: remainingPoints,
+                          defaultValue: '{{count}} more points to use rewards',
+                        })
+                      : t('rewards.readyToRedeem', {
+                          defaultValue: 'Ready to use your points at checkout',
+                        })}
+                  </p>
+                  <Progress
+                    value={
+                      minimumPoints > 0 ? Math.min(100, (loyaltyPoints / minimumPoints) * 100) : 100
+                    }
+                    aria-label={t('rewards.progress', {
+                      defaultValue: 'Progress toward using rewards',
+                    })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('rewards.redemptionCap', {
+                      percent: loyaltyProgram.max_redeem_percent ?? 50,
+                      defaultValue:
+                        'Use points at checkout for up to {{percent}}% of the food subtotal.',
+                    })}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -109,10 +165,14 @@ export function ConsumerRewardsPage() {
               {recentOrders.map((order) => (
                 <Link
                   key={order.id}
-                  to={`/order/${slug}/receipt/${order.receipt_token}`}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3 transition hover:border-[var(--brand-light)]"
+                  to={
+                    order.receipt_token
+                      ? `/order/${slug}/receipt/${order.receipt_token}`
+                      : `/order/${slug}/orders`
+                  }
+                  className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border p-3 transition hover:border-[var(--brand-light)]"
                 >
-                  <div>
+                  <div className="min-w-0 break-words">
                     <p className="text-sm font-medium">{order.order_number}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(order.created_at).toLocaleString()} ·{' '}

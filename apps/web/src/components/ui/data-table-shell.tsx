@@ -44,7 +44,9 @@ export function DataTableShell({
       {hasToolbar && (
         <div className="flex flex-col gap-3 border-b border-[var(--app-border)] p-3 sm:flex-row sm:flex-wrap sm:items-end lg:p-4">
           {search && <div className="min-w-0 flex-1 sm:max-w-sm">{search}</div>}
-          {filters && <div className="flex flex-wrap items-end gap-3">{filters}</div>}
+          {filters && (
+            <div className="flex min-w-0 flex-wrap items-end gap-3 sm:basis-full">{filters}</div>
+          )}
           {actions && <div className="flex flex-wrap items-center gap-2 sm:ms-auto">{actions}</div>}
         </div>
       )}

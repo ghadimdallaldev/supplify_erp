@@ -11,6 +11,7 @@ export type QuickListItemRow = {
   product_sku?: string | null
   product_unit?: string | null
   product_price?: number | string | null
+  product_currency?: string | null
   supplier_name?: string | null
   created_at?: string
   updated_at?: string
@@ -35,6 +36,7 @@ export function quickListItemToProduct(item: QuickListItemRow): Product | null {
     name: String(item.product_name ?? 'Product'),
     unit: item.product_unit ?? item.default_unit ?? undefined,
     current_price: Number.isFinite(price as number) ? (price as number) : undefined,
+    currency: item.product_currency ?? undefined,
     supplier_name: item.supplier_name ?? undefined,
     created_at: item.created_at ?? '',
     updated_at: item.updated_at ?? '',
