@@ -91,6 +91,22 @@ export async function sendEmail({
     return { sent: false, skipped: true, reason: 'missing_recipient' }
   }
 
+  // Seeded demo tenants must never generate outbound mail on a live transport.
+  // Reject the whole envelope so CC/BCC cannot bypass the same safeguard.
+  const envelope = [...recipients, ...normalizeRecipients(cc), ...normalizeRecipients(bcc)]
+  if (
+    envelope.some((recipient) =>
+      /@[^\s<>]+\.(?:demo|test|invalid|localhost)(?:>|\s|$)/i.test(String(recipient))
+    )
+  ) {
+    logger.info('Email skipped for a non-deliverable demo/test recipient', {
+      eventType,
+      tenantId,
+      entityId,
+    })
+    return { sent: false, skipped: true, reason: 'non_deliverable_recipient' }
+  }
+
   if (!config.EMAIL_ENABLED) {
     logger.info('Email skipped (EMAIL_ENABLED=false)', {
       eventType,

@@ -33,7 +33,10 @@
     "filtersTitle": "Dietary filters",
     "clearFilters": "Clear filters",
     "noTag": "No {{tag}}",
-    "excludeAllergenAria": "Hide items containing {{allergen}}"
+    "excludeAllergenAria": "Hide items containing {{allergen}}",
+    "branch": "Branch",
+    "unavailableCart": "Review your cart. Some items or customizations are no longer available at this branch.",
+    "retry": "Try again"
   },
   "menuTags": {
     "allergensLabel": "Contains allergens",
@@ -240,7 +243,9 @@
     "pricesUpdated": "Menu prices changed. Your total now matches the current menu.",
     "itemUnavailable": "An item in your cart is no longer available. Go back and choose again.",
     "orderPlaced": "Order placed!",
-    "unableToPlace": "Unable to place order"
+    "unableToPlace": "Unable to place order",
+    "unconfirmed": "Your order status is unconfirmed. Retry to check the same order safely, or check your orders before starting another.",
+    "retryOrder": "Check and retry order"
   },
   "orders": {
     "title": "Guest orders",
@@ -286,7 +291,13 @@
     "ledgerAdjust": "Adjustment",
     "orderNow": "Order now",
     "signedOut": "Signed out",
-    "unableToSignOut": "Unable to sign out"
+    "unableToSignOut": "Unable to sign out",
+    "loadFailed": "Unable to load your rewards. Please try again.",
+    "retry": "Try again",
+    "pointsUntilReady": "{{count}} more points to use rewards",
+    "readyToRedeem": "Ready to use your points at checkout",
+    "progress": "Progress toward using rewards",
+    "redemptionCap": "Use points at checkout for up to {{percent}}% of the food subtotal."
   },
   "storefront": {
     "cashPayment": "{{fulfillment}} · Cash on delivery or pickup",

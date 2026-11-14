@@ -1,12 +1,12 @@
 import express from 'express'
 import rateLimit from 'express-rate-limit'
-import { timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { config } from '../config/env.js'
 import { normalizeIdentityEmail } from '../lib/identity-normalize.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { writeAuditLog } from '../lib/audit.js'
-import { sendTemplateEmail } from '../services/email/email.service.js'
+import { sendEmail, sendTemplateEmail } from '../services/email/email.service.js'
 
 const router = express.Router()
 const otpEmailSchema = z.object({
@@ -44,6 +44,74 @@ const otpEmailLimiter = rateLimit({
   },
   store: createRateLimitStore('rl:auth-email-otp'),
   message: { ok: false, error: { name: 'OTP_RATE_LIMITED', message: 'Too many code requests' } },
+})
+
+const keycloakEmailSchema = z
+  .object({
+    email: z.string().max(320),
+    subject: z
+      .string()
+      .min(1)
+      .max(200)
+      .regex(/^[^\r\n]+$/),
+    text: z.string().max(180000).nullable().optional(),
+    html: z.string().max(180000).nullable().optional(),
+  })
+  .refine((message) => Boolean(message.text || message.html))
+
+// Keycloak renders its own expiring recovery/verification links. This internal
+// relay uses the same shared secret and transport as OTP, with no stored body.
+router.post('/auth/keycloak/email', otpEmailLimiter, async (req, res, next) => {
+  if (!validSecret(req)) {
+    return res
+      .status(401)
+      .json({ ok: false, error: { name: 'UNAUTHORIZED', message: 'Unauthorized' } })
+  }
+  const parsed = keycloakEmailSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ ok: false, error: { name: 'VALIDATION_ERROR', message: 'Invalid email request' } })
+  }
+  let email
+  try {
+    email = normalizeIdentityEmail(parsed.data.email)
+  } catch {
+    return res
+      .status(400)
+      .json({ ok: false, error: { name: 'VALIDATION_ERROR', message: 'Invalid email address' } })
+  }
+  try {
+    const { subject, text, html } = parsed.data
+    const eventKey =
+      'auth:keycloak:' +
+      createHash('sha256')
+        .update(JSON.stringify([email, subject, text, html]))
+        .digest('hex')
+    const result = await sendEmail({
+      to: email,
+      subject,
+      text,
+      html,
+      eventType: 'auth.keycloak_email',
+      eventKey,
+      sensitive: true,
+      throwOnError: true,
+    })
+    if (!result.sent && !result.duplicate) {
+      return res.status(503).json({
+        ok: false,
+        error: { name: 'EMAIL_NOT_DELIVERED', message: 'Email delivery unavailable' },
+      })
+    }
+    await writeAuditLog(req, {
+      action_type: 'auth.keycloak_email.sent',
+      payload_json: { recipient: redactEmail(email), delivery: result.provider || 'duplicate' },
+    })
+    return res.json({ ok: true, data: { sent: true }, error: null })
+  } catch (error) {
+    return next(error)
+  }
 })
 
 router.post('/auth/otp/email', otpEmailLimiter, async (req, res) => {

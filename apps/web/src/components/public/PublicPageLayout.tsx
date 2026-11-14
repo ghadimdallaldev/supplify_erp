@@ -114,7 +114,7 @@ export function PublicPanel({ children, title, description, className }: PublicP
   return (
     <section
       className={cn(
-        'rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 sm:p-5',
+        'min-w-0 rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-4 sm:p-5',
         className
       )}
     >

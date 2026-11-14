@@ -26,6 +26,9 @@ function getSmtpTransporter() {
     host,
     port,
     secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: user && pass ? { user, pass } : undefined,
   })
 

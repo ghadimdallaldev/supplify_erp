@@ -26,7 +26,10 @@
       "defaultTitle": "No active deals right now",
       "defaultDescription": "When your suppliers publish offers, they'll appear here.",
       "browseSuppliers": "Browse suppliers"
-    }
+    },
+    "loadFailed": "Unable to load deals",
+    "loadFailedDescription": "Please try again. Your suppliers and offers could not be loaded.",
+    "retry": "Try again"
   },
   "labels": {
     "emDash": "—",

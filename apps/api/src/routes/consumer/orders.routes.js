@@ -73,6 +73,7 @@ const orderLineSchema = z.object({
 })
 
 const createOrderSchema = z.object({
+  idempotencyKey: z.string().uuid().optional(),
   branchId: z.string().uuid(),
   fulfillmentType: z.enum(['DELIVERY', 'TAKEAWAY', 'DINE_IN']),
   lines: z.array(orderLineSchema).min(1),
@@ -127,14 +128,12 @@ consumerOrdersPublicRoutes.post('/', createOrderLimiter, optionalAuthConsumer, a
       return jsonError(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found')
     }
 
-    // Rate-limited above; full Idempotency-Key replay store can follow public-sales later.
     const result = await createConsumerOrder(restaurant.id, {
       ...body,
       consumerMemberId: req.consumerMember?.id ?? null,
       pointsToRedeem: body.pointsToRedeem,
     })
-    // L7: only notify/emit when the order was freshly created, not on idempotent
-    // replay (result.isNew will be false once dedup is wired up).
+    // Replays return the original receipt without creating another kitchen event.
     if (result.isNew !== false) {
       emitConsumerOrderNew(restaurant.id, result.order)
     }
@@ -146,24 +145,26 @@ consumerOrdersPublicRoutes.post('/', createOrderLimiter, optionalAuthConsumer, a
   } catch (error) {
     if (error.name && error.name !== 'Error') {
       const status =
-        error.name === 'MIN_ORDER_NOT_MET' ||
-        error.name === 'FULFILLMENT_NOT_AVAILABLE' ||
-        error.name === 'DELIVERY_ADDRESS_REQUIRED' ||
-        error.name === 'MODIFIER_MIN_NOT_MET' ||
-        error.name === 'MODIFIER_MAX_EXCEEDED' ||
-        error.name === 'INVALID_MODIFIER' ||
-        error.name === 'LOYALTY_REDEEM_INVALID' ||
-        error.name === 'LOYALTY_AUTH_REQUIRED' ||
-        error.name === 'ORDERING_PREORDER_REQUIRED' ||
-        error.name === 'ORDERING_SCHEDULE_TOO_EARLY' ||
-        error.name === 'ORDERING_WINDOW_CLOSED' ||
-        error.name === 'SCHEDULE_INVALID'
-          ? 400
-          : error.name === 'BRANCH_NOT_FOUND' ||
-              error.name === 'MENU_ITEM_UNAVAILABLE' ||
-              error.name === 'MODIFIER_UNAVAILABLE'
-            ? 404
-            : 400
+        error.name === 'IDEMPOTENCY_KEY_REUSED'
+          ? 409
+          : error.name === 'MIN_ORDER_NOT_MET' ||
+              error.name === 'FULFILLMENT_NOT_AVAILABLE' ||
+              error.name === 'DELIVERY_ADDRESS_REQUIRED' ||
+              error.name === 'MODIFIER_MIN_NOT_MET' ||
+              error.name === 'MODIFIER_MAX_EXCEEDED' ||
+              error.name === 'INVALID_MODIFIER' ||
+              error.name === 'LOYALTY_REDEEM_INVALID' ||
+              error.name === 'LOYALTY_AUTH_REQUIRED' ||
+              error.name === 'ORDERING_PREORDER_REQUIRED' ||
+              error.name === 'ORDERING_SCHEDULE_TOO_EARLY' ||
+              error.name === 'ORDERING_WINDOW_CLOSED' ||
+              error.name === 'SCHEDULE_INVALID'
+            ? 400
+            : error.name === 'BRANCH_NOT_FOUND' ||
+                error.name === 'MENU_ITEM_UNAVAILABLE' ||
+                error.name === 'MODIFIER_UNAVAILABLE'
+              ? 404
+              : 400
       return jsonError(res, status, error.name, error.message, error.details)
     }
     logger.error('Create consumer order failed', { error: error.message })

@@ -90,10 +90,12 @@ export async function runCronJob(jobName, fn, { manual = false } = {}) {
 
   runningJobs.add(jobName)
 
-  const client = await pool.connect()
+  let client
   let acquired = false
+  const startedAt = Date.now()
 
   try {
+    client = await pool.connect()
     const { rows } = await client.query(
       `SELECT pg_try_advisory_lock(hashtext($1::text)) AS acquired`,
       [advisoryLockKey(jobName)]
@@ -104,7 +106,6 @@ export async function runCronJob(jobName, fn, { manual = false } = {}) {
       return { ran: false, skipped: 'advisory_lock_held' }
     }
 
-    const startedAt = Date.now()
     logger.info({ event: 'cron.started', job: jobName, dryRun })
 
     try {
@@ -133,9 +134,24 @@ export async function runCronJob(jobName, fn, { manual = false } = {}) {
       })
       throw error
     }
+  } catch (error) {
+    // A pool acquisition failure happens before the handler's failure path. It
+    // must still be visible and release the in-process guard for the next tick.
+    if (!client) {
+      const durationMs = Date.now() - startedAt
+      recordCronFailure(jobName, error, durationMs)
+      logger.error({
+        event: 'cron.failed',
+        job: jobName,
+        phase: 'connection',
+        durationMs,
+        error: error.message,
+      })
+    }
+    throw error
   } finally {
     runningJobs.delete(jobName)
-    if (acquired) {
+    if (acquired && client) {
       await client
         .query(`SELECT pg_advisory_unlock(hashtext($1::text))`, [advisoryLockKey(jobName)])
         .catch((unlockErr) => {
@@ -146,7 +162,7 @@ export async function runCronJob(jobName, fn, { manual = false } = {}) {
           })
         })
     }
-    client.release()
+    client?.release()
   }
 }
 

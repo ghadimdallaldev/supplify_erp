@@ -302,7 +302,8 @@
     "orderingListItemFallback": "صنف",
     "addToOrderingListFailed": "تعذّرت الإضافة إلى القائمة",
     "createdListAndAddedItem": "تم إنشاء القائمة وإضافة الصنف",
-    "createOrderingListFailed": "تعذّر إنشاء القائمة"
+    "createOrderingListFailed": "تعذّر إنشاء القائمة",
+    "chooseOrderingList": "اختر قائمة طلبات أولًا."
   },
   "priceIntelligence": {
     "title": "ذكاء الأسعار",
@@ -381,5 +382,9 @@
   },
   "toastMessages": {
     "recommendationFeedbackRecorded": "شكرًا — سجّلنا أن هذه التوصية تبدو غير صحيحة"
+  },
+  "reorderList": {
+    "label": "قائمة الطلبات",
+    "choose": "اختر قائمة طلبات"
   }
 }

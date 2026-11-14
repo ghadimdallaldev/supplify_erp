@@ -35,8 +35,8 @@ export function getZonedDayOfWeek(date, timeZone) {
  * Resolve restaurant timezone (falls back to platform default).
  * @param {string} restaurantId
  */
-export async function getRestaurantTimezone(restaurantId) {
-  const { rows } = await query(`SELECT timezone FROM restaurant WHERE id = $1`, [restaurantId])
+export async function getRestaurantTimezone(restaurantId, runQuery = query) {
+  const { rows } = await runQuery(`SELECT timezone FROM restaurant WHERE id = $1`, [restaurantId])
   return rows[0]?.timezone || getDefaultTenantTimezone()
 }
 

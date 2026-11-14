@@ -514,10 +514,12 @@ export async function earnLoyaltyOnOrderReceive(
 // D2: Consumer loyalty
 // ---------------------------------------------------------------------------
 
-export async function getConsumerLoyaltyProgram(restaurantId) {
-  const { rows } = await query(`SELECT * FROM consumer_loyalty_program WHERE restaurant_id = $1`, [
-    restaurantId,
-  ])
+export async function getConsumerLoyaltyProgram(restaurantId, client = null) {
+  const runQuery = client ? client.query.bind(client) : query
+  const { rows } = await runQuery(
+    `SELECT * FROM consumer_loyalty_program WHERE restaurant_id = $1`,
+    [restaurantId]
+  )
   return mapConsumerProgramRow(rows[0])
 }
 
@@ -785,6 +787,7 @@ export async function reverseConsumerLoyaltyOnOrderCancel(
 }
 
 export async function validateConsumerLoyaltyRedeem({
+  client = null,
   restaurantId,
   memberId,
   pointsToRedeem,
@@ -795,7 +798,7 @@ export async function validateConsumerLoyaltyRedeem({
     throw new ValidationError('Points to redeem must be a positive integer')
   }
 
-  const program = await getConsumerLoyaltyProgram(restaurantId)
+  const program = await getConsumerLoyaltyProgram(restaurantId, client)
   if (!program?.enabled) {
     throw new ValidationError('Rewards program is not enabled')
   }
@@ -804,7 +807,8 @@ export async function validateConsumerLoyaltyRedeem({
     throw new ValidationError(`Minimum redeem is ${program.min_redeem_points} points`)
   }
 
-  const { rows: memberRows } = await query(
+  const runQuery = client ? client.query.bind(client) : query
+  const { rows: memberRows } = await runQuery(
     `SELECT loyalty_points FROM consumer_member WHERE id = $1 AND restaurant_id = $2`,
     [memberId, restaurantId]
   )
@@ -833,6 +837,7 @@ export async function redeemConsumerLoyaltyAtCheckout(
   { restaurantId, memberId, consumerOrderId, pointsToRedeem, orderSubtotal }
 ) {
   const preview = await validateConsumerLoyaltyRedeem({
+    client,
     restaurantId,
     memberId,
     pointsToRedeem,
