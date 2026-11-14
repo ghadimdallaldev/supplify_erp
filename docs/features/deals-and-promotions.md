@@ -4,6 +4,12 @@
 
 ## Overview
 
+Development verification (2026-11-14): restaurant detail, interaction, coupon and
+message routes pass the database query adapter expected by the active-boost
+lookup. Both organic and sponsored deals retain their existing response shapes;
+an organic deal can record an interaction without an active boost. Four route
+regressions exercise the real boost lookup with an isolated database.
+
 Suppliers create **deals** (stored in `promotions`) — percentage/fixed discounts, buy-X-get-Y, free shipping, coupons, and CTAs. Restaurants discover deals from followed suppliers plus **sponsored** deals from boosted suppliers they do not follow.
 
 **Boosts** (paid visibility layer, stored in `deal_promotions`) are separate: suppliers pay to run a boost campaign that surfaces deals to non-followers with analytics (views, clicks, orders, messages, coupon uses).
@@ -68,6 +74,16 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 - **Organic:** restaurants that **follow** the supplier (or explicit restaurant targets)
 - **Sponsored:** active `deal_promotions` campaign + audience match, even without follow
 - Expired, paused, draft, or over-limit deals are hidden from restaurant discovery
+
+The new-deals banner starts from this same discoverable set, then applies its
+14-day recency window and dismissals. An organic follower/explicit-target deal
+does not require a paid boost. Blocklisted suppliers are excluded. The web supplier
+filter derives its choices from the complete eligible result, so selecting one
+supplier does not remove the others from the dropdown. Load failures show a retry.
+
+The banner refreshes every minute while focused, and on entry, focus, or network
+reconnection. The destination page also refreshes on entry/focus/reconnect. Web
+bootstrap registers RTK Query's focus/connection listeners so these options work.
 
 ## API — Supplier (`CATALOG_MANAGE`, feature `promotions`)
 

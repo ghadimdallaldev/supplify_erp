@@ -38,6 +38,10 @@ Restaurant tenant resolution uses active branch context (`getRestaurantIdForRequ
 
 ## Frontend
 
+Receiving history and supplier-reliability quality averages display at most one
+decimal place (for example, `4.5454545454545` displays as `4.5`). Missing or invalid
+scores display a dash; the stored score and aggregate precision are unchanged.
+
 - `apps/web/src/lib/orderReceiving.ts` — `isOrderReadyForReceiving()` for `DELIVERED` / `COMPLETED`.
 - `ReceivingPage.tsx` — enables **Receive Now** when delivered; no “waiting for supplier to complete” for `DELIVERED`.
 - `RestaurantOrderTrackingPanel.tsx` — restaurant order detail; **Receive order** CTA when delivered (links to `/app/receiving?order={id}`).

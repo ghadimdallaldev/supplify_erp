@@ -112,3 +112,12 @@ Due dates and `preferred_time` for quick lists are still evaluated in **UTC**. R
 - Run `pnpm db:migrate` per environment; Railway uses `RUN_MIGRATIONS_ON_START=true` (committed default in all `deploy/railway/*/api.env` files).
 - Inspect runs: `SELECT * FROM quick_list_execution ORDER BY created_at DESC LIMIT 50;`
 - Logs: search for `event: cron.started` / `cron.completed` / `cron.skipped`.
+
+## 2026-11-13 startup and retry hardening
+
+Initial cron runs execute sequentially after timer registration so advisory-lock
+connections and handler queries do not exhaust the pool together at boot.
+Recurring schedules are unchanged. Connection acquisition failures are recorded
+and release the local running guard, allowing a later tick to retry. Check
+`cron.completed` for each affected job after deployment; passing unit tests is
+not evidence that a deployed tick succeeded.

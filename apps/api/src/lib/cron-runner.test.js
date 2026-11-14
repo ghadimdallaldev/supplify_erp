@@ -6,6 +6,7 @@ import {
   _clearRecentCronFailuresForTests,
   getRecentCronFailures,
 } from './cron-runner.js'
+import { pool } from './db.js'
 
 const mockClient = {
   query: vi.fn(),
@@ -83,6 +84,24 @@ describe('cron-runner', () => {
         result: { notified: 3, scanned: 10 },
       })
     )
+  })
+
+  it('records a pool timeout and allows the next scheduled tick to run', async () => {
+    pool.connect.mockRejectedValueOnce(new Error('connection timeout'))
+    const fn = vi.fn().mockResolvedValue({ processed: 1 })
+    await expect(runCronJob(CRON_JOBS.INVOICE_OVERDUE, fn)).rejects.toThrow('connection timeout')
+    expect(getRecentCronFailures()).toEqual([
+      expect.objectContaining({ job: CRON_JOBS.INVOICE_OVERDUE, error: 'connection timeout' }),
+    ])
+    expect(fn).not.toHaveBeenCalled()
+    expect(mockClient.release).not.toHaveBeenCalled()
+
+    mockClient.query
+      .mockResolvedValueOnce({ rows: [{ acquired: true }] })
+      .mockResolvedValueOnce({ rows: [{ pg_advisory_unlock: true }] })
+    await expect(runCronJob(CRON_JOBS.INVOICE_OVERDUE, fn)).resolves.toMatchObject({ ran: true })
+    expect(fn).toHaveBeenCalledOnce()
+    expect(mockClient.release).toHaveBeenCalledOnce()
   })
 
   it('skips scheduled jobs when CRONS_ENABLED is false', async () => {

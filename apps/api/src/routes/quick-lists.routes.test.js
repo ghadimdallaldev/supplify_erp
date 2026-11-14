@@ -66,6 +66,24 @@ describe('Quick Lists Routes', () => {
   })
 
   describe('GET /api/quick-lists', () => {
+    it('preserves joined price currency in list items', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [{ id: 'ql-1', name: 'Weekly', item_count: 1 }] })
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              quick_list_id: 'ql-1',
+              product_id: 'p-1',
+              product_price: '100000',
+              product_currency: 'LBP',
+            },
+          ],
+        })
+      const response = await request(app).get('/api/quick-lists?includeItems=true').expect(200)
+      expect(response.body.data.quickLists[0].items[0]).toMatchObject({ product_currency: 'LBP' })
+      expect(db.query.mock.calls[2][0]).toContain('pr.currency as product_currency')
+    })
     it('returns paginated quick lists with total', async () => {
       db.query
         .mockResolvedValueOnce({

@@ -2,6 +2,94 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
+## 2026-11-14 - Development verification and unconfigured public booking
+
+Release follow-up: the owner requested committing and promoting the verified ERP
+and both native sources through `dev`, `preprod` and `prod`. No new contracts or
+native binaries are introduced by promotion. See
+[all-environment release](../operations/ALL_ENV_RELEASE_2026-11-14.md).
+
+The iPad repair API and migration `0232_consumer_checkout_idempotency.sql` are
+verified in Development. Invoice detail/PDF, product detail, organic deals and
+banner eligibility use the contracts already mirrored in both sibling clients
+in the November 13 entry. No additional native client contract changed.
+
+A live card-view check also exposed four deal routes passing a query function
+where the existing boost lookup requires a database adapter. Detail, interaction,
+coupon and message routes now pass `{ query }`, restoring their existing response
+shapes. This is an internal database-adapter correction with no new mobile
+endpoint, payload, permission, notification or feature contract. Both native deal
+clients still use the mirrored active-deal API; no native detail/coupon/message
+screen is introduced. The shared native files were rechecked byte-for-byte.
+
+The public web booking page now gives contact guidance when a restaurant has
+no tables or no seating capacity, instead of reporting that a guest's party
+exceeds a capacity of zero. Confirmation remains disabled. This is a web-only
+presentation change. Guest-menu featured cards also use a separate vertical
+layout, recover from failed photo URLs, and respect the current preorder/closed
+mode. Payment date/method labels are associated with their controls for accessible
+names and easier touch focus. Android/iOS source updates are not needed for these
+web-only follow-ups. The focused menu/booking suites pass six regressions, and root typecheck,
+web build and web lint pass. Deployment and live checks are recorded in
+[Development rollout](../operations/DEV_IPAD_ROLLOUT_2026-11-14.md).
+
+## 2026-11-13 - iPad web defects and guest checkout reliability
+
+Both sibling Expo clients now parse the actual promotion type/discount fields,
+distinguish a failed deal request from an empty offer list, and support refresh.
+Both include matching public diner checkout request types, API helpers, and
+regressions carrying the additive `idempotencyKey` field unchanged on retries.
+Public diner ordering screens remain web portals; native guest-order and rewards
+administration continues using its existing contracts.
+
+Final parity validation: 30 suites / 116 tests and TypeScript pass in each sibling;
+the seven changed source/test files match byte-for-byte. No new signed binaries
+were produced in this pass.
+
+Product supplier authorization and invoice detail/PDF SQL fixes restore the existing
+response shapes; native product lists and invoice clients require no payload or
+navigation changes. Organic deal discovery now matches the documented follower,
+explicit-target, or sponsored eligibility; both native deal clients consume the
+same corrected endpoint. No new permission, feature flag, notification payload,
+or runtime environment variable is introduced.
+
+iPad filter/dialog layouts, reorder quantity handoff/list selection, public booking
+availability state, public guest-menu cart/branch behavior, guest session display,
+and rewards progress are web-only. The server checkout replay store is introduced
+by migration `0232_consumer_checkout_idempotency.sql`; apply it with the API before
+releasing clients that send checkout keys. Native public API contracts are mirrored
+even though no native diner checkout screen is introduced.
+
+Evidence and deployment limits: [iPad and guest-flow review](../operations/IPAD_WEB_REVIEW_2026-11-13.md).
+
+## 2026-11-13 - Supervised web and Android pilot readiness
+
+Both sibling clients now share currency-separated cart/dashboard estimates,
+per-supplier checkout summaries, stable checkout retries, account/workspace
+cache/cart/request isolation, serialized token writes and notification target
+isolation. Quick-list clients/types preserve the API's additive
+`product_currency` field. Native cart/product controls use 48-pixel targets and
+responsive rows; recent dashboard figures identify their ten-order sample.
+The Android-only `pilot` EAS profile inherits production API/Keycloak settings
+and emits an internally distributed signed APK. iOS distribution is intentionally
+outside this pilot; its shared source and tests are updated.
+
+Cron startup/retry fixes, bounded SMTP transport and suppression of demo/test
+email envelopes have no client contract change. Keycloak's server-side email
+adapter also relays rendered recovery/verification mail through the existing
+authenticated API mail channel; `/api/internal/auth/keycloak/email` is strictly
+server-to-server and requires no native API client, token, type, or navigation
+change. Both clients' session/navigation/chat isolation fixes are already
+propagated; their final suites pass 113 tests each plus TypeScript.
+Web collapsible navigation and supplier currency presentation are web-only.
+No new permission, feature flag,
+notification payload or required environment key is introduced. Validation and
+remaining live/device gates: [pilot readiness](../operations/PILOT_READINESS_2026-11-13.md).
+
+## 2026-11-11 - Original bilingual print flyer (marketing-only)
+
+Created original English/Arabic A5/A4 print and share artwork under `output/horeca-flyer/`, with an ivory/ink/citrus identity, supplier-promotion and 40+ feature messaging, protected business workspaces and live demo QR codes. The QR attribution uses the existing public campaign path and fields. These static marketing deliverables change no API, auth/session flow, RBAC, shared type, notification, feature key or required environment variable. Android and iOS require no source update. Print/verification instructions: `docs/marketing/flyer-print-guide.md`.
+
 ## 2026-11-11 - Responsive v3 demo film (web-only)
 
 Replaced the public demo player with the supplied v3 landscape/portrait films, matching posters and English captions. The film now sits immediately below the hero/capability strip; phones receive the portrait composition, with no cropping or automatic video download. Rotation during playback preserves position. This affects only public web presentation/static assets and introduces no API, auth/session, RBAC, shared type, notification, feature-key or environment-variable change. Android and iOS require no additional source update.

@@ -86,6 +86,19 @@ describe('email.service', () => {
     expect(sendMailMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    { to: 'owner@restaurant.demo' },
+    { to: ['owner@outlook.com', 'Demo <owner@RESTAURANT.DEMO>'] },
+    { to: 'owner@outlook.com', cc: 'staff@restaurant.test' },
+    { to: 'owner@outlook.com', bcc: ['staff@restaurant.invalid'] },
+  ])('blocks demo/test addresses across the entire envelope: %j', async (envelope) => {
+    const { sendEmail } = await import('./email.service.js')
+    const result = await sendEmail({ ...envelope, subject: 'Reminder', text: 'Body' })
+    expect(result).toEqual({ sent: false, skipped: true, reason: 'non_deliverable_recipient' })
+    expect(sendMailMock).not.toHaveBeenCalled()
+    expect(queryMock).not.toHaveBeenCalled()
+  })
+
   it('duplicate event_key does not send twice', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [{ id: 'log-1' }] }) // claim first send

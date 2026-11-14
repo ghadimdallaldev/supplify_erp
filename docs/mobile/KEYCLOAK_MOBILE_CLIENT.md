@@ -113,7 +113,20 @@ After Keycloak client creation, confirm API mobile auth tests:
 
 ```bash
 # From supplify_erp API tests
-cd apps/api && npm test -- mobile-auth csrf activeTenant auth.routes
+pnpm --filter @supplify/api exec vitest run src/routes/mobile-auth.routes.test.js src/middlewares/csrf.test.js
 ```
 
 Mobile app login should reach `GET /auth/me` with a Bearer token and receive user + tenant permissions.
+
+## 2026-11-13 native session isolation
+
+Both native clients clear business query caches, cart and pending checkout on
+logout, 401 or identity/workspace change. Scoped requests, token refreshes and
+chat handshakes cannot populate the next session. Token writes are serialized;
+late notification targets are discarded. Navigators remount when the business
+identity changes so workspace-specific screen state is cleared too.
+
+The server's Keycloak recovery-mail adapter reuses the authenticated OTP mail
+channel and introduces no mobile auth endpoint or credential-storage contract.
+See [pilot readiness](../operations/PILOT_READINESS_2026-11-13.md) for deployment,
+delivery and physical-device validation evidence.

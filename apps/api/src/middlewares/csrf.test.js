@@ -65,6 +65,17 @@ describe('csrfProtection — mobile bearer vs web cookie', () => {
     expect(res.body.error.name).toBe('UNAUTHORIZED')
   })
 
+  it('keeps other internal routes behind normal bearer checks', async () => {
+    verifyToken.mockRejectedValueOnce(new Error('not a session JWT'))
+    app.post('/api/internal/auth/other', (_req, res) => res.json({ ok: true }))
+    await request(app)
+      .post('/api/internal/auth/other')
+      .set('Authorization', 'Bearer shared-secret')
+      .send({})
+      .expect(401)
+    expect(verifyToken).toHaveBeenCalledWith('shared-secret')
+  })
+
   it('requires CSRF header for cookie-based mutations', async () => {
     const res = await request(app)
       .post('/api/test-mutation')

@@ -28,22 +28,52 @@ function cartStorageKey(slug: string): string {
 export function loadCart(slug: string): CartLine[] {
   if (!slug) return []
   try {
-    const raw =
-      localStorage.getItem(cartStorageKey(slug)) ?? sessionStorage.getItem(cartStorageKey(slug))
+    let raw: string | null = null
+    let fromSession = false
+    try {
+      raw = localStorage.getItem(cartStorageKey(slug))
+    } catch {
+      /* try session storage */
+    }
+    if (!raw) {
+      try {
+        raw = sessionStorage.getItem(cartStorageKey(slug))
+        fromSession = Boolean(raw)
+      } catch {
+        /* memory only */
+      }
+    }
     if (!raw) return []
     const parsed = JSON.parse(raw) as CartLine[]
     if (!Array.isArray(parsed)) return []
-    if (
-      sessionStorage.getItem(cartStorageKey(slug)) &&
-      !localStorage.getItem(cartStorageKey(slug))
-    ) {
-      localStorage.setItem(cartStorageKey(slug), raw)
-      sessionStorage.removeItem(cartStorageKey(slug))
+    if (fromSession) {
+      try {
+        localStorage.setItem(cartStorageKey(slug), raw)
+        sessionStorage.removeItem(cartStorageKey(slug))
+      } catch {
+        /* keep the readable session copy */
+      }
     }
-    return parsed.map((line) => ({
-      ...line,
-      modifierOptionIds: line.modifierOptionIds ?? [],
-    }))
+    return parsed
+      .filter(
+        (line) =>
+          line &&
+          typeof line.cartKey === 'string' &&
+          typeof line.menuItemId === 'string' &&
+          typeof line.name === 'string' &&
+          Number.isFinite(Number(line.unitPrice)) &&
+          Number(line.unitPrice) >= 0 &&
+          Number.isInteger(line.quantity) &&
+          line.quantity > 0 &&
+          (line.modifierOptionIds == null ||
+            (Array.isArray(line.modifierOptionIds) &&
+              line.modifierOptionIds.every((id) => typeof id === 'string')))
+      )
+      .map((line) => ({
+        ...line,
+        unitPrice: Number(line.unitPrice),
+        modifierOptionIds: line.modifierOptionIds ?? [],
+      }))
   } catch {
     return []
   }
@@ -51,13 +81,32 @@ export function loadCart(slug: string): CartLine[] {
 
 export function saveCart(slug: string, lines: CartLine[]) {
   if (!slug) return
-  localStorage.setItem(cartStorageKey(slug), JSON.stringify(lines))
+  const payload = JSON.stringify(lines)
+  try {
+    localStorage.setItem(cartStorageKey(slug), payload)
+  } catch {
+    // Safari may deny persistent storage or run out of quota. Keep ordering
+    // usable with session storage (and the hook's in-memory cart as a fallback).
+    try {
+      sessionStorage.setItem(cartStorageKey(slug), payload)
+    } catch {
+      /* memory only */
+    }
+  }
 }
 
 export function clearCartStorage(slug: string) {
   if (!slug) return
-  localStorage.removeItem(cartStorageKey(slug))
-  sessionStorage.removeItem(cartStorageKey(slug))
+  try {
+    localStorage.removeItem(cartStorageKey(slug))
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    sessionStorage.removeItem(cartStorageKey(slug))
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function roundMoney(value: number) {
@@ -70,6 +119,9 @@ type MenuPriceItem = {
   base_price: number
   is_available?: boolean
   modifierGroups?: Array<{
+    min_selections?: number
+    max_selections?: number
+    is_required?: boolean
     options: Array<{ id: string; price_delta: number }>
   }>
 }
@@ -96,8 +148,18 @@ export function priceCartAgainstMenu(
     }
     const options = new Map<string, number>()
     for (const group of item.modifierGroups ?? []) {
+      const count = (line.modifierOptionIds ?? []).filter((id) =>
+        group.options.some((option) => option.id === id)
+      ).length
+      const min = group.is_required
+        ? Math.max(1, group.min_selections ?? 0)
+        : (group.min_selections ?? 0)
+      if (count < min || (group.max_selections != null && count > group.max_selections))
+        return { ...line, unavailable: true }
       for (const option of group.options) options.set(option.id, Number(option.price_delta))
     }
+    if (new Set(line.modifierOptionIds).size !== line.modifierOptionIds.length)
+      return { ...line, unavailable: true }
     let modifierTotal = 0
     for (const optionId of line.modifierOptionIds ?? []) {
       const delta = options.get(optionId)
@@ -105,7 +167,13 @@ export function priceCartAgainstMenu(
       modifierTotal += delta
     }
     const unitPrice = roundMoney(Number(item.base_price) + modifierTotal)
-    if (unitPrice < 0) return { ...line, unavailable: true }
+    if (
+      !Number.isFinite(unitPrice) ||
+      unitPrice < 0 ||
+      !Number.isInteger(line.quantity) ||
+      line.quantity <= 0
+    )
+      return { ...line, unavailable: true }
     if (unitPrice !== roundMoney(line.unitPrice)) priceChanged = true
     return { ...line, name: item.name, unitPrice, unavailable: false }
   })

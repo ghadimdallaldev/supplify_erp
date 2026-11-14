@@ -33,3 +33,17 @@ Design: [2026-08-21-transactional-email-design.md](../archive/superpowers/specs/
 | Growth       | `growth.connection_accepted`, `supplier.access_request`, …                       | `notifyTenantUsers`                      |
 
 Dedup: `email_delivery_log.event_key`. Retries: `email-retry` cron job.
+
+## 2026-11-13 pilot mail checks
+
+The application skips an entire envelope if To, CC or BCC includes a `.demo`,
+`.test`, `.invalid` or `.localhost` recipient domain, returning
+`non_deliverable_recipient` before deduplication/transport. Seeded reminders
+must not reach the live mail provider. SMTP connect/greeting timeouts are ten
+seconds and socket inactivity timeout is fifteen seconds.
+
+For Railway Resend delivery use `EMAIL_PROVIDER=resend`; the existing transport
+can resolve its key from `SMTP_PASS` when `SMTP_HOST=smtp.resend.com`. API OTP
+mail and Keycloak's built-in password recovery are distinct paths. Verify both;
+successful OTP delivery does not prove password recovery is configured. See the
+[pilot release record](./PILOT_READINESS_2026-11-13.md) for current evidence.

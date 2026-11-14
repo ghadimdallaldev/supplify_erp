@@ -2,6 +2,15 @@
 
 Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBAC.
 
+## 2026-11-13 - iPad and guest-flow repair
+
+- [x] Promotion response parsing, error handling, refresh, and discount labels match in Android and iOS.
+- [x] Optional server `idempotencyKey` contract mirrored in both native public-checkout request helpers and tests.
+- [x] Existing invoice and product response shapes preserved; compatible native clients inspected.
+- [x] Web public booking/menu/rewards UI changes recorded as web-only; native administration contracts remain compatible.
+- [x] Migration `0232` and API-before-web release order documented.
+- [x] Dated parity entry and domain documentation updated.
+
 ## 2026-11-11 — Public demo campaign API
 
 - [x] Public lead/event payloads and response types mirrored in Android and iOS.
@@ -64,7 +73,7 @@ Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBA
 - [x] Chat alerts invalidate the chat list and open the target conversation on both platforms.
 - [x] Push endpoint ownership is globally unique; explicit push opt-out is preserved.
 - [x] Focused API and both mobile push/deep-link tests pass.
-- [x] Android EAS build fails closed unless the `GOOGLE_SERVICES_JSON` file variable is available; the default `supplify-alerts` channel resolves in both app configs.
+- [x] Android config maps the EAS `GOOGLE_SERVICES_JSON` file variable; the default `supplify-alerts` channel resolves in both app configs. Current config warns when the file is missing, so a successful APK build alone does not prove push readiness. Production file-variable presence was verified on 2026-11-13.
 - [ ] Physical-device delivery after a new credentialed build: populate Android `GOOGLE_SERVICES_JSON`, verify matching FCM V1 credentials, and verify iOS APNs in EAS before the client demo.
 
 ## 2026-09-12 — Native release audit

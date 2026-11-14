@@ -150,3 +150,7 @@ Primary canonical sources:
 - Feature specs: `docs/features/README.md`
 
 See [20-source-evidence-index.md](./20-source-evidence-index.md) for claim-level verification.
+
+> 2026-11-13: Public diner checkout now accepts a UUID `idempotencyKey` and requires
+> migration `0232_consumer_checkout_idempotency.sql` for keyed retries. Deployment
+> order and iPad/guest-flow evidence: [review](../operations/IPAD_WEB_REVIEW_2026-11-13.md).

@@ -302,7 +302,8 @@
     "orderingListItemFallback": "item",
     "addToOrderingListFailed": "Could not add to list",
     "createdListAndAddedItem": "Created list and added item",
-    "createOrderingListFailed": "Could not create list"
+    "createOrderingListFailed": "Could not create list",
+    "chooseOrderingList": "Choose an ordering list first."
   },
   "priceIntelligence": {
     "title": "Price intelligence",
@@ -381,5 +382,9 @@
   },
   "toastMessages": {
     "recommendationFeedbackRecorded": "Thanks — we recorded that this recommendation looks incorrect"
+  },
+  "reorderList": {
+    "label": "Ordering list",
+    "choose": "Choose an ordering list"
   }
 }

@@ -35,6 +35,16 @@ Resolved from plan feature `smart_reorder` via `resolveSmartReorderCapabilities(
 
 Quantities are normalized to the product base unit (`product.unit`). Recommendations are rounded to supplier `moq` and `order_multiple` from `product_inventory_settings`.
 
+### Web ordering handoff (2026-11-13)
+
+The assistance panel's Cart action carries the suggested quantity into product
+details. The guest reviews that quantity; adding to the purchasing cart enforces
+the product MOQ, pack multiple, and available stock. When multiple ordering lists
+exist, the panel requires a list choice rather than silently adding to the first.
+A single list is selected automatically. Invalid/nonpositive recommendation
+quantities fall back to one unit before product quantity rules are applied.
+Suggestions never place a supplier order automatically.
+
 ## Branch Scope
 
 Forecasts are keyed by `(restaurant_id, branch_id, product_id)`. `branch_id` NULL is the restaurant-wide aggregate.

@@ -10,6 +10,7 @@ const sampleItem = {
   product_sku: 'OO-1',
   product_unit: 'L',
   product_price: '12.5',
+  product_currency: 'LBP',
   supplier_name: 'Acme Foods',
   notes: 'extra virgin',
 }
@@ -23,6 +24,7 @@ describe('quickListItemToProduct', () => {
       name: 'Olive Oil',
       unit: 'L',
       current_price: 12.5,
+      currency: 'LBP',
       supplier_name: 'Acme Foods',
       created_at: '',
       updated_at: '',

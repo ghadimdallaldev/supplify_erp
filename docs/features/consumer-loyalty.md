@@ -57,3 +57,13 @@ Restaurants configure a **diner-facing rewards program**. Only **signed-up membe
 
 - `earnConsumerLoyaltyOnOrderComplete()` — called on `DELIVERED`
 - `getConsumerLoyaltyPreview()`, `validateConsumerLoyaltyRedeem()`, `redeemConsumerLoyaltyAtCheckout()` in `loyalty.service.js`
+
+## Guest rewards guidance (2026-11-13)
+
+The public rewards page shows the points still needed for redemption, progress to
+the configured minimum, and the program's maximum percentage of the food subtotal.
+Load failures offer a retry instead of being presented as a signed-out guest.
+Logout clears the previous guest's points and histories from view. Checkout retries
+with the same idempotency key do not redeem points again. Internal validation accepts
+the active checkout transaction connection so concurrent checkouts do not exhaust
+the pool while waiting for a restaurant lock.

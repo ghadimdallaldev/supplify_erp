@@ -26,7 +26,7 @@ How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture,
 - Native registration requires an installed development/preview/production build. It retries transient failures and exposes its state in mobile Notification settings instead of failing silently.
 - Native payloads include `notificationId`, `notificationType`, `notificationCategory`, `referenceId`, `referenceType`, their snake_case equivalents, metadata, and the resolved web URL. Chat uses `referenceType: CONVERSATION` with `conversationId` metadata.
 - Expo ticket acceptance is not treated as delivery. The API reconciles Expo receipts, marks `notification_log.push_sent` only after FCM/APNs returns success, and removes stale `DeviceNotRegistered` subscriptions.
-- Android release builds require Firebase `google-services.json` plus a matching EAS FCM V1 service-account credential. Both mobile repos accept the client file through the EAS file variable `GOOGLE_SERVICES_JSON`; `app.config.js` fails Android EAS builds when it is absent. iOS device builds require a valid APNs key in EAS. Validate both with physical-device background and terminated-app tests before release.
+- Android remote push requires Firebase `google-services.json` plus a matching EAS FCM V1 service-account credential. Both mobile repos accept the client file through the EAS file variable `GOOGLE_SERVICES_JSON`; current `app.config.js` warns when it is absent and still allows an APK build. A successful build does not prove push readiness. iOS device builds require a valid APNs key in EAS. Validate both with physical-device background and terminated-app tests before release.
 
 ## Recipients
 

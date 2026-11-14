@@ -57,3 +57,12 @@ Scheduled cron (`scheduled-orders.service`) applies smart quantities when `quick
 ## Honest Labeling
 
 UI copy uses **Smart quantities from usage forecast** rather than generic AI copy. Optional LLM copy is only available when `ai_platform` is enabled and the reorder-assist family makes a genuine provider/model call. Forecast and rule-based fallbacks must stay labeled as forecast/rule-based output.
+
+## 2026-11-13 cart currency preservation
+
+Quick-list detail and `includeItems` responses include `product_currency` from
+the selected price row alongside `product_price`. Web, Android and iOS preserve
+that currency when constructing cart products. Native totals remain separated
+by currency, and a supplier cart containing multiple currencies must be split
+before checkout. A pending uncertain checkout must be resolved before a quick
+list can replace the native cart.

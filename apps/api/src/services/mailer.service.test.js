@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import nodemailer from 'nodemailer'
 
 const smtpSendMail = vi.fn().mockResolvedValue({ messageId: 'smtp-1' })
 vi.mock('nodemailer', () => ({
@@ -66,6 +67,13 @@ describe('mailer.service', () => {
     })
 
     expect(smtpSendMail).toHaveBeenCalled()
+    expect(nodemailer.createTransport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+      })
+    )
     expect(result.provider).toBe('smtp')
   })
 

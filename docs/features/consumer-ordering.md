@@ -8,6 +8,40 @@
 
 Guest-facing online ordering for restaurants: menu with modifiers, cart, fulfillment picker (delivery / takeaway / dine-in), COD checkout, and **universal live order tracking** via receipt link (no login required).
 
+## Guest reliability and iPad layout (2026-11-13)
+
+Development follow-up (2026-11-14): Chef picks use vertical cards so long dish
+names and prices have separate space. Cards replace failed image URLs with a
+branded initial placeholder and retry when the URL changes. Featured actions use
+the same live/preorder/closed state as the main menu; a featured pick does not
+present a live-order action during preorder-only hours.
+
+- The menu loads the selected branch, including global items allowed at that branch.
+  An empty branch menu no longer falls back to another branch's dishes. Guests can
+  change branches explicitly. Cart pricing rechecks current prices, availability,
+  removed options, and required/minimum/maximum modifier selections.
+- Cart controls have larger touch targets and wrap at narrow widths. Denied/full
+  browser storage falls back to session storage or the current in-memory cart.
+  A session cart remains readable when migration into persistent storage fails.
+- Guest logout clears the visible member, points, order history, and reward ledger
+  immediately after the server confirms logout; restaurant-specific queries use
+  current-argument data and refresh on entry/focus.
+- `POST /api/public/consumer/:slug/orders` accepts optional UUID `idempotencyKey`.
+  Same restaurant/key/member/payload returns the original order and receipt, with
+  no second kitchen event or rewards debit. Changed payload with the same key is
+  rejected with `409 IDEMPOTENCY_KEY_REUSED`. Clients without a key retain their
+  existing behavior. Migration `0232_consumer_checkout_idempotency.sql` adds the
+  replay store; apply it with the API before releasing the updated web client.
+- Web checkout retains the key and payload for an uncertain network/server response,
+  disables editing, and retries that same order. Successful checkout clears the
+  browser key so an intentional identical later order can be placed. Only a digest
+  and key are persisted; contact/address details are not stored in that key record.
+  If storage is unavailable, retry protection is retained within the current page.
+
+The local SQL regression covers concurrent keyed requests with a two-connection
+pool. Server-side preparation/validation uses that transaction's connection to avoid
+waiting for an extra pool connection while holding the restaurant lock.
+
 ## Web routes
 
 | Route                                          | Purpose                                                                           |

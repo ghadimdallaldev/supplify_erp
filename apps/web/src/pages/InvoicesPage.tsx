@@ -114,15 +114,17 @@ export function InvoicesPage() {
   const isLoading = isRestaurant ? isLoadingRestaurant : isLoadingSupplier
   const refetch = isRestaurant ? refetchRestaurant : refetchSupplier
   const {
-    data: restaurantInvoiceDetail,
-    isLoading: isLoadingRestaurantDetail,
+    currentData: restaurantInvoiceDetail,
+    isFetching: isLoadingRestaurantDetail,
+    isError: isRestaurantDetailError,
     refetch: refetchRestaurantDetail,
   } = useGetRestaurantInvoiceQuery(selectedInvoice?.id || '', {
     skip: !selectedInvoice?.id || !isRestaurant,
   })
   const {
-    data: supplierInvoiceDetail,
-    isLoading: isLoadingSupplierDetail,
+    currentData: supplierInvoiceDetail,
+    isFetching: isLoadingSupplierDetail,
+    isError: isSupplierDetailError,
     refetch: refetchSupplierDetail,
   } = useGetSupplierInvoiceQuery(selectedInvoice?.id || '', {
     skip: !selectedInvoice?.id || isRestaurant,
@@ -522,6 +524,8 @@ export function InvoicesPage() {
               setShowInvoiceDetail={setShowInvoiceDetail}
               selectedInvoice={selectedInvoice}
               invoiceDetail={invoiceDetail}
+              isErrorDetail={isRestaurant ? isRestaurantDetailError : isSupplierDetailError}
+              onRetryDetail={refetchDetail}
               isLoadingDetail={isLoadingDetail}
               downloadingPdfId={downloadingPdfId}
               setDownloadingPdfId={setDownloadingPdfId}

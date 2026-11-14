@@ -138,3 +138,28 @@ describe('shouldRegisterCrons', () => {
     expect(shouldRegisterCrons('development')).toBe(true)
   })
 })
+
+describe('runInitialCronJobs', () => {
+  it('waits for each startup job and continues after a failure', async () => {
+    const { runInitialCronJobs } = await import('./register-cron-jobs.js')
+    let release
+    const second = vi.fn().mockRejectedValue(new Error('temporary failure'))
+    const third = vi.fn().mockResolvedValue(undefined)
+    const running = runInitialCronJobs([
+      {
+        name: 'first',
+        run: () =>
+          new Promise((resolve) => {
+            release = resolve
+          }),
+      },
+      { name: 'second', run: second },
+      { name: 'third', run: third },
+    ])
+    expect(second).not.toHaveBeenCalled()
+    release()
+    await running
+    expect(second).toHaveBeenCalledOnce()
+    expect(third).toHaveBeenCalledOnce()
+  })
+})

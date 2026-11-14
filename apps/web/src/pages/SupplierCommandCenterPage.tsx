@@ -510,7 +510,10 @@ export function SupplierCommandCenterPage() {
               <KpiCard
                 testId="kpi-unpaid-balance"
                 label={t('commandCenter.kpis.unpaidBalance')}
-                value={formatCurrency(kpis?.unpaidBalance ?? 0)}
+                value={formatReceivablesAmount(
+                  kpis?.unpaidBalance,
+                  previews?.receivables?.byCurrency
+                )}
                 icon={DollarSign}
                 href="/app/invoices"
               />
@@ -553,7 +556,15 @@ export function SupplierCommandCenterPage() {
                       data-testid={`priority-${item.id}`}
                       className="flex items-center justify-between gap-2 rounded-[10px] border border-[var(--app-border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] font-semibold text-[var(--text)] no-underline hover:border-[var(--brand-light)]"
                     >
-                      {item.title}
+                      {item.id === 'overdue-invoices'
+                        ? t('commandCenter.previews.overdue', {
+                            amount: formatReceivablesAmount(
+                              kpis?.overdueBalance,
+                              previews?.receivables?.byCurrency,
+                              'overdueTotal'
+                            ),
+                          })
+                        : item.title}
                       <ArrowRight size={14} className="text-[var(--text-muted)] shrink-0" />
                     </Link>
                   </li>

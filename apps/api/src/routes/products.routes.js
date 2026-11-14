@@ -1116,33 +1116,10 @@ router.get('/:id', async (req, res) => {
           requestId: req.requestId,
         })
       }
-      const { rows: linked } = await query(
-        `
-        SELECT 1
-        FROM supplier_follow sf
-        JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
-        WHERE COALESCE(followed_supplier.organization_id, followed_supplier.id) =
-              COALESCE(s.organization_id, s.id)
-          AND sf.restaurant_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM supplier_blocklist sb
-            JOIN supplier blocked_supplier ON blocked_supplier.id = sb.supplier_id
-            WHERE COALESCE(blocked_supplier.organization_id, blocked_supplier.id) =
-                  COALESCE(s.organization_id, s.id)
-              AND sb.restaurant_id = $2
-          )
-        UNION
-        SELECT 1
-        FROM customer_order o
-        JOIN order_item oi ON oi.order_id = o.id
-        JOIN supplier historical_supplier ON historical_supplier.id = oi.supplier_id
-        WHERE o.restaurant_id = $2
-          AND COALESCE(historical_supplier.organization_id, historical_supplier.id) =
-              COALESCE(s.organization_id, s.id)
-        LIMIT 1
-      `,
-        [product.supplier_id, restaurantId]
-      )
+      const { rows: linked } = await query(RESTAURANT_PRODUCT_SUPPLIER_ACCESS_SQL, [
+        product.supplier_id,
+        restaurantId,
+      ])
       if (!linked.length) {
         return res.status(404).json({
           ok: false,
@@ -1592,3 +1569,4 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
 })
 
 export { router as productsRoutes }
+import { RESTAURANT_PRODUCT_SUPPLIER_ACCESS_SQL } from '../lib/product-supplier-access.js'

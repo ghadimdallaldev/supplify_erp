@@ -47,6 +47,15 @@ vi.mock('../lib/audit.js', () => ({
   writeAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn().mockResolvedValue(null),
+  setCache: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('./chat/chat.helpers.js', () => ({
+  getOrCreateConversation: vi.fn().mockResolvedValue({ id: 'conversation-1' }),
+}))
+
 vi.mock('../services/notification.service.js', () => ({
   notifyDealApproved: vi.fn().mockResolvedValue(undefined),
   notifyDealRejected: vi.fn().mockResolvedValue(undefined),
@@ -100,6 +109,46 @@ describe('promotions.routes admin', () => {
       })
     })
   })
+
+  it.each([
+    ['get', 'detail', undefined, 'view'],
+    ['post', 'interact', { interactionType: 'click' }, 'click'],
+    ['post', 'use-coupon', {}, 'coupon_used'],
+    ['post', 'message', {}, 'message'],
+  ])(
+    'serves %s /:id/%s using the real boost lookup adapter',
+    async (method, path, body, interactionType) => {
+      const service = await import('../services/deal-promotions.service.js')
+      const actualService = await vi.importActual('../services/deal-promotions.service.js')
+      const deal = {
+        id: 'deal-1',
+        supplier_id: 'supplier-1',
+        coupon_code: 'QA10',
+        name: 'QA offer',
+      }
+      service.loadDealDetailForRestaurant.mockResolvedValue(deal)
+      service.recordDealInteraction.mockResolvedValue({ id: 'interaction-1' })
+      service.getActiveDealPromotion.mockImplementation(actualService.getActiveDealPromotion)
+      db.query.mockResolvedValue({ rows: [{ id: 'boost-1' }] })
+      try {
+        const req = request(app)[method](`/api/promotions/deal-1/${path}`)
+        const response = await (body ? req.send(body) : req).expect(200)
+        expect(response.body.ok).toBe(true)
+        expect(service.recordDealInteraction).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dealId: deal.id,
+            interactionType,
+            dealPromotionId: 'boost-1',
+          })
+        )
+        expect(db.query).toHaveBeenCalledWith(expect.stringContaining('FROM deal_promotions'), [
+          'deal-1',
+        ])
+      } finally {
+        service.getActiveDealPromotion.mockReset()
+      }
+    }
+  )
 
   it('GET /admin/pending returns pending deals', async () => {
     db.query.mockResolvedValueOnce({

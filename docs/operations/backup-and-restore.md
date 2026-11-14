@@ -1,10 +1,18 @@
 # Database backup and restore runbook
 
 **Audience:** Ops / on-call before first pilot client and for production incidents.  
-**Last drill:** 2026-07-24 (local Postgres logical dump → restore into scratch DB).  
+**Last drill:** 2026-11-13 (hosted production app and Keycloak logical snapshots restored into isolated local PostgreSQL 18).
+
 **Related:** [railway-environments.md](./railway-environments.md), [deployment.md](./deployment.md).
 
 ## Principles
+
+The November drill restored 234 application tables (233 migration records) and
+92 Keycloak tables. The unique scratch container, anonymous volume and snapshots
+were deleted after verification. It did not overwrite the source database or
+prove an application login against the restore. Automated backup schedule and
+retention remain a separate dashboard gate. Sanitized evidence and remaining
+gates: [pilot readiness](./PILOT_READINESS_2026-11-13.md).
 
 1. Prefer **logical dumps** (`pg_dump` / `pg_restore`) for portable restores and drills.
 2. Keep **one Postgres per environment** — never restore prod into preprod without renaming DBs and rotating secrets.

@@ -26,7 +26,10 @@
       "defaultTitle": "لا توجد عروض نشطة حالياً",
       "defaultDescription": "عندما ينشر موردوك عروضاً، ستظهر هنا.",
       "browseSuppliers": "تصفّح الموردين"
-    }
+    },
+    "loadFailed": "تعذر تحميل العروض",
+    "loadFailedDescription": "تعذر تحميل الموردين والعروض. يرجى المحاولة مجددًا.",
+    "retry": "حاول مجددًا"
   },
   "labels": {
     "emDash": "—",

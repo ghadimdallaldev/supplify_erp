@@ -60,7 +60,7 @@ export const productsApi = api.injectEndpoints({
       providesTags: ['Product'],
       keepUnusedDataFor: 300,
     }),
-    getProduct: builder.query<Product, string>({
+    getProduct: builder.query<{ product: Product }, string>({
       query: (id) => `/api/products/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Product', id }],
     }),

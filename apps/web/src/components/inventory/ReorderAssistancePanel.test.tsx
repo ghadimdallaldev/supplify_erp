@@ -15,6 +15,7 @@ let mockEntitlements: any = {
   limits: { ai_requests_per_day: 20 },
   usage: { ai_requests_per_day: 1 },
 }
+let mockLists = [{ id: 'ql1', name: 'Weekly' }]
 
 vi.mock('../../services/api', () => ({
   useGetReorderAssistanceQuery: () => ({
@@ -52,7 +53,7 @@ vi.mock('../../services/api', () => ({
   useGetEntitlementsQuery: () => ({
     data: { entitlements: mockEntitlements },
   }),
-  useGetQuickListsQuery: () => ({ data: { quickLists: [{ id: 'ql1', name: 'Weekly' }] } }),
+  useGetQuickListsQuery: () => ({ data: { quickLists: mockLists } }),
   useSuppressReorderSuggestionMutation: () => [mockSuppress, { isLoading: false }],
   useAddItemToQuickListMutation: () => [mockAddItem],
   useExplainReorderAssistanceMutation: () => [vi.fn(), { isLoading: false }],
@@ -75,6 +76,7 @@ function renderPanel() {
 describe('ReorderAssistancePanel AI vs forecast labels', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    mockLists = [{ id: 'ql1', name: 'Weekly' }]
     await resetTestI18n()
     mockEntitlements = { limits: { ai_requests_per_day: 20 }, usage: { ai_requests_per_day: 1 } }
     mockAiRecommend.mockReturnValue({
@@ -171,6 +173,25 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
         })
       )
     })
+  })
+
+  it('adds to the chosen ordering list instead of silently using the first list', async () => {
+    mockLists = [
+      { id: 'ql1', name: 'Weekly' },
+      { id: 'ql2', name: 'Weekend' },
+    ]
+    renderPanel()
+    await userEvent.selectOptions(screen.getByLabelText('Ordering list'), 'ql2')
+    await waitFor(() =>
+      expect(screen.getByTestId('recommendation-source-label')).toBeInTheDocument()
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'List' }))
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quickListId: 'ql2',
+        body: expect.objectContaining({ quantity: 12 }),
+      })
+    )
   })
 
   it('shows Forecast Reorder Recommendation when source is forecast', async () => {

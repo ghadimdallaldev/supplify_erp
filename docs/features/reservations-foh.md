@@ -2,6 +2,23 @@
 
 Restaurant front-of-house: floor plan, day board, table assignment, public booking, guest reviews, and team notifications.
 
+## iPad and booking state repair (2026-11-13)
+
+The host board uses wider responsive columns and larger assignment/status actions.
+Removing a table assignment elsewhere clears the card's old selection. Booked-cover
+badges count pending, confirmed, and seated reservations only.
+
+The public portal stacks its panels at tablet widths and keeps date/party controls
+within their grid cells. Availability belongs to the current restaurant, date,
+and party size. Changing any of those clears the result, slot selection, and deposit
+acknowledgment; late results cannot restore an older selection. Confirmation requires
+a currently available slot, contact details, and any required deposit acknowledgment.
+A synchronous submit guard prevents double taps while booking is in flight.
+
+Waitlist entry requires a real name and phone, and retains a future slot from the
+chosen date. Closed, blackout, rejected-party-size, and past-only availability do
+not offer a waitlist action. Capacity and overlap enforcement remain server-owned.
+
 ## Web routes
 
 | Route                                                                 | Purpose                                                                    |
@@ -28,6 +45,13 @@ Migration `0103_reservation_availability_indexes.sql` supports slot/overlap quer
 Guest cancel enforces `_booking.cancelWindowHours` via `reservation-policy.js`. Public book requires `depositAcknowledged` when a fixed amount or a percent above zero is configured. A zero deposit does not ask the guest to accept a charge. The public availability response includes `depositRequired`, the amount, and the percent, and the booking page shows that amount only when a deposit is actually required. The checkbox confirms the policy and is not a payment. Booking settings cannot set a minimum party larger than the maximum. A party outside that range, or a time when the restaurant is closed, gets that reason instead of “this time was just booked.”
 
 ## Lifecycle extras (0198+)
+
+When public availability reports no configured tables or zero total capacity,
+the web portal displays that online booking is unavailable and offers the
+restaurant's public phone contact when present. It does not show a misleading
+party-size error for zero capacity or allow confirmation. Hosts must configure
+tables and capacity before online seating can be offered. This does not change
+the availability API or automatically create restaurant tables.
 
 - Statuses include **NO_SHOW** (host board actions + analytics `no_shows`).
 - A **COMPLETED** visit cannot change status, so visit counts are not incremented twice. **CANCELLED** and **NO_SHOW** can be restored to confirmed or pending only when that table and the remaining seats are still free. Restoring a no-show removes that no-show from the guest’s count. Guest emails, waitlist promotion, and visit/no-show counts run only when the status actually changes. The host who created the booking is stored as the app user.
