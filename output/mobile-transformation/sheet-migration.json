@@ -1,0 +1,26 @@
+[
+  {
+    "file": "features\\chat\\screens\\ChatThreadScreen.tsx",
+    "sheets": 1
+  },
+  {
+    "file": "features\\restaurant\\screens\\ConsumerMenuScreen.tsx",
+    "sheets": 2
+  },
+  {
+    "file": "features\\restaurant\\screens\\InventoryAdjustSheet.tsx",
+    "sheets": 1
+  },
+  {
+    "file": "features\\shared\\BranchPickerSheet.tsx",
+    "sheets": 1
+  },
+  {
+    "file": "features\\supplier\\screens\\FulfillmentScreen.tsx",
+    "sheets": 1
+  },
+  {
+    "file": "features\\supplier\\screens\\SupplierInventoryAdjustSheet.tsx",
+    "sheets": 1
+  }
+]

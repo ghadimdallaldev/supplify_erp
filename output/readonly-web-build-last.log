@@ -1,0 +1,365 @@
+
+> @supplify/web@2.0.0 build C:\myProjects\supplify_erp\apps\web
+> node scripts/generate-pwa-icons.mjs && tsc && vite build
+
+(node:9124) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Wrote icon-192.png
+Wrote icon-512.png
+Wrote icon-maskable-512.png
+vite v5.4.21 building for production...
+(!) %VITE_APP_ENV% is not defined in env variables found in /index.html. Is the variable mistyped?
+(!) %VITE_CLIENT_STATE_RESET_TOKEN% is not defined in env variables found in /index.html. Is the variable mistyped?
+transforming...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Browserslist: browsers data (caniuse-lite) is 13 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+warn - The class `data-[state=open]:duration-[var(--duration-drawer)]` is ambiguous and matches multiple utilities.
+warn - If this is content and not a class, replace it with `data-&lsqb;state=open&rsqb;:duration-[var(--duration-drawer)]` to silence this warning.
+
+warn - The class `duration-[160ms]` is ambiguous and matches multiple utilities.
+warn - If this is content and not a class, replace it with `duration-&lsqb;160ms&rsqb;` to silence this warning.
+
+warn - The class `duration-[180ms]` is ambiguous and matches multiple utilities.
+warn - If this is content and not a class, replace it with `duration-&lsqb;180ms&rsqb;` to silence this warning.
+
+warn - The class `ease-[var(--ease-drawer)]` is ambiguous and matches multiple utilities.
+warn - If this is content and not a class, replace it with `ease-&lsqb;var(--ease-drawer)&rsqb;` to silence this warning.
+✓ 3470 modules transformed.
+rendering chunks...
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/i18n/locales/en/common.json is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/loadNamespace.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/i18n/locales/en/navigation.json is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/loadNamespace.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/i18n/locales/ar/common.json is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/loadNamespace.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/i18n/locales/ar/navigation.json is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/loadNamespace.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/lib/authSessionRefresh.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/components/Header.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/shell/AdminTopBar.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/StaffSelfServiceDashboard.tsx but also statically imported by C:/myProjects/supplify_erp/apps/web/src/components/AuthGuard.tsx, C:/myProjects/supplify_erp/apps/web/src/lib/downloadFile.ts, C:/myProjects/supplify_erp/apps/web/src/services/api/base.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/services/api.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/components/ActivityLogTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/AuthGuard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/BranchAccountsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/CalendarView.tsx, C:/myProjects/supplify_erp/apps/web/src/components/Header.tsx, C:/myProjects/supplify_erp/apps/web/src/components/ImpersonationBanner.tsx, C:/myProjects/supplify_erp/apps/web/src/components/Layout.tsx, C:/myProjects/supplify_erp/apps/web/src/components/RestaurantMobileNav.tsx, C:/myProjects/supplify_erp/apps/web/src/components/Sidebar.tsx, C:/myProjects/supplify_erp/apps/web/src/components/StaffPortalGuard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/SubscriptionInfo.tsx, C:/myProjects/supplify_erp/apps/web/src/components/SupplierMobileNav.tsx, C:/myProjects/supplify_erp/apps/web/src/components/TeamRolesPanel.jsx, C:/myProjects/supplify_erp/apps/web/src/components/TenantBrandingProvider.tsx, C:/myProjects/supplify_erp/apps/web/src/components/UpgradeModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminDealsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminFeatureFlagsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminFeaturedPlacementsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminLimitsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminOperationsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminOverviewExtras.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminPlatformSettingsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminResetPasswordDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminSupportChatPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminTenantDiagnosticsDrawer.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/AdminUsersTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminActivityTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminAuditTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminChangePlanDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminFeaturesTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminFinanceTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminHealthTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminOverviewTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminPlansTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminSubscriptionsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminTenantsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/dashboard/AdminUsageTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/deals/AdminDealsBoostSection.tsx, C:/myProjects/supplify_erp/apps/web/src/components/admin/shell/AdminTopBar.tsx, C:/myProjects/supplify_erp/apps/web/src/components/assistant/AssistantFab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/billing/BillingOverdueBanner.tsx, C:/myProjects/supplify_erp/apps/web/src/components/billing/PaymentModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/chat/NewConversationDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/dashboard/DashboardWidgetGrid.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/DealAnalyticsDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/DealBoostPackagePicker.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/DealCard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/DealTargetingPickers.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/NewDealsBanner.tsx, C:/myProjects/supplify_erp/apps/web/src/components/deals/SubmitDealDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/disputes/OpenDisputeDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/CreateRouteDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/DeliveryTrackingDrawer.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/DriverDispatchBoard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/DriversSettingsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/FulfillmentDispatchPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/FulfillmentExceptionsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/FulfillmentRouteDetailPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/FulfillmentRoutesTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/FulfillmentTrackingTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/OrderProofOfDeliveryPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/PickListsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/ProofOfDeliveryDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/fulfillment/RestaurantConfirmPodButton.tsx, C:/myProjects/supplify_erp/apps/web/src/components/inventory/ExpiryInventoryTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/inventory/ReorderAssistancePanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/inventory/RestaurantWastePanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/invoices/SupplierStatementPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/notifications/NotificationWebhookCard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/ordering/AddToOrderingListButton.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/OrderDeliveryTrackingPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/RestaurantOrderTrackingPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderDeliveryTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderDetailsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderInvoiceTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderItemsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderPackingTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderPickingTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/orders/detail/OrderTimelineTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/AddBranchModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/BranchInvitationsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/BranchInviteModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/RestaurantAddBranchModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/RestaurantMemberInviteModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/org/RestaurantPendingInvitations.tsx, C:/myProjects/supplify_erp/apps/web/src/components/products/InventoryAdjustmentDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/products/ProductCategoriesDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/products/ProductImageImportDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/promotions/DealsPerformanceSummary.tsx, C:/myProjects/supplify_erp/apps/web/src/components/public/CustomDomainCatalogHost.tsx, C:/myProjects/supplify_erp/apps/web/src/components/public/PublicSalesCheckout.tsx, C:/myProjects/supplify_erp/apps/web/src/components/reports/ReportPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/RestaurantDeliveryLocationCard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/RestaurantPayablesPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/inventory/HistoryTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/inventory/InventoryBulkImportPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/inventory/InventoryTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/inventory/TotalsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/inventory/WasteTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/onboarding/OnboardingBranchesTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/onboarding/OnboardingNotificationsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/onboarding/OnboardingProfileTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/onboarding/OnboardingReviewsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/restaurant/onboarding/OnboardingTeamTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/reviews/SupplierReviewModal.tsx, C:/myProjects/supplify_erp/apps/web/src/components/settings/BrandingSettingsSection.tsx, C:/myProjects/supplify_erp/apps/web/src/components/settings/CustomDomainCard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/settings/WarehouseFulfillmentSettings.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/ConnectionRequestsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/FeaturedPlacementPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/FeaturedPlacementPaymentDialog.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/OrderSubstitutionPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/ProductSubstitutesSection.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SponsorshipOffersPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierCrossSellPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierDemandForecastPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierFollowUpPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierFulfillmentIssuePanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierPriceComparisonPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierReceivablesPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierSlowMovingInventoryPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierStockoutRiskPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierSuggestedDealsPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierWarehouseDemandForecastPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierWarehousePerformancePanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/SupplierWeeklyIntelligenceSummaryPanel.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/SupplierPushNotificationBanner.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierContactsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierDeliveryZonesTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierNotificationsTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierProfileTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierTeamTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/supplier/settings/tabs/SupplierWarehousesTab.tsx, C:/myProjects/supplify_erp/apps/web/src/components/support/SupportContactCard.tsx, C:/myProjects/supplify_erp/apps/web/src/contexts/BranchContext.tsx, C:/myProjects/supplify_erp/apps/web/src/hooks/useChatRealtime.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/useDriverLocationTracking.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/useEntitlements.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/useImpersonation.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/useNotificationAlerts.tsx, C:/myProjects/supplify_erp/apps/web/src/hooks/useNotificationBadge.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/useProductCatalogImport.ts, C:/myProjects/supplify_erp/apps/web/src/hooks/usePushNotifications.ts, C:/myProjects/supplify_erp/apps/web/src/lib/activateFreePlan.ts, C:/myProjects/supplify_erp/apps/web/src/lib/refetchAppSession.ts, C:/myProjects/supplify_erp/apps/web/src/pages/AccountActivationPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/AccountDeletionPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/AdminDashboardPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/BranchDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/BranchInviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/CartPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ChatPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ContractPricingPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/CreateQuoteRequestPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/DashboardPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/DriverDeliveriesPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/FulfillmentPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/InventoryPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/InviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/InvoicesPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/LegalReacceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/MyContractPricesPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/OrderDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/OrdersPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/OrgOverviewPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PriceIntelligencePage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ProductDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ProductsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PublicReservationConfirmation.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PublicReservationManage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PublicReservationPortal.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PublicReservationWaitlistOffer.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/PublicSupplierCatalogPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/QuickListsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/QuoteRequestDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/QuoteRequestsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ReceivingPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RegisterCompletePage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/ReservationsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RestaurantDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RestaurantInventoryPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RestaurantOnboardingPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RestaurantOrgOverviewPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RestaurantsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SettingsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/StaffSelfServiceDashboard.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/StaffSelfServiceLogin.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierCommandCenterPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierCustomerGrowthPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierQuoteInboxPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierQuoteResponsePage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierRunSheetPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SupplierSettingsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/SuppliersPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/consumer/ConsumerOrdersPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/consumer/MenuAdminPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/deals/DealsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/disputes/DisputeDetailPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/disputes/DisputesPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/loyalty/LoyaltyProgramPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/promotions/PromotionsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/publicSales/ConsumerShopPages.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/recipes/RecipeBuilderPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/recipes/RecipeCostingDashboardPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/reports/ReportsPage.tsx, C:/myProjects/supplify_erp/apps/web/src/store/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/lib/refetchAppSession.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/pages/BranchInviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/BranchInviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/InviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/InviteAcceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/services/api/endpoints/billing.ts, C:/myProjects/supplify_erp/apps/web/src/services/api/endpoints/billing.ts, C:/myProjects/supplify_erp/apps/web/src/services/api/endpoints/billing.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/components/AuthGuard.tsx, C:/myProjects/supplify_erp/apps/web/src/components/billing/PaymentModal.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/AccountActivationPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/LegalReacceptPage.tsx, C:/myProjects/supplify_erp/apps/web/src/pages/RegisterCompletePage.tsx, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/features/monetization/monetizationSlice.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/services/api/base.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/components/Layout.tsx, C:/myProjects/supplify_erp/apps/web/src/components/LayoutTenantAlerts.tsx, C:/myProjects/supplify_erp/apps/web/src/components/LimitExceededBanner.tsx, C:/myProjects/supplify_erp/apps/web/src/components/SubscriptionInfo.tsx, C:/myProjects/supplify_erp/apps/web/src/components/UpgradeModal.tsx, C:/myProjects/supplify_erp/apps/web/src/lib/openBrowseUpgrade.ts, C:/myProjects/supplify_erp/apps/web/src/store/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/features/billing/billingSlice.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/services/api/base.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/components/billing/PaymentModal.tsx, C:/myProjects/supplify_erp/apps/web/src/lib/openPaymentModal.ts, C:/myProjects/supplify_erp/apps/web/src/store/index.ts, dynamic import will not move module into another chunk.
+
+[plugin:vite:reporter] [plugin vite:reporter] 
+(!) C:/myProjects/supplify_erp/apps/web/src/store/index.ts is dynamically imported by C:/myProjects/supplify_erp/apps/web/src/i18n/index.ts but also statically imported by C:/myProjects/supplify_erp/apps/web/src/main.tsx, dynamic import will not move module into another chunk.
+
+dist/demo/index.html                                      1.33 kB
+dist/index.html                                           3.19 kB
+dist/assets/vendor-CVXAapp1.css                          14.58 kB
+dist/assets/useDeliveryLeafletMap-Dgihpmma.css           15.04 kB
+dist/assets/demo-BU-oCFBP.css                            65.54 kB
+dist/assets/app-CHvp6AC2.css                            129.64 kB
+dist/assets/usageDisplay-BRu_u605.js                      0.21 kB
+dist/assets/LazyTabMount-Cm2-fRRB.js                      0.24 kB
+dist/assets/orderPlacement-BLjpUeiF.js                    0.28 kB
+dist/assets/restaurantBusinessTypes-CwGATlEr.js           0.33 kB
+dist/assets/csvExport-BeajQqCa.js                         0.37 kB
+dist/assets/SettingsHubLayout-CNkHTiiI.js                 0.39 kB
+dist/assets/checkbox-BIkF1uuQ.js                          0.39 kB
+dist/assets/growthSponsorshipPlans-2O0_POPa.js            0.43 kB
+dist/assets/publicSalesCart-BGNWQ8aq.js                   0.45 kB
+dist/assets/useMediaQuery-DXHbFaj1.js                     0.47 kB
+dist/assets/page-shell-5xzjzzRz.js                        0.48 kB
+dist/assets/deliveryStatusLabels-Cv9DZfrD.js              0.51 kB
+dist/assets/clipboard-BWLazlPL.js                         0.52 kB
+dist/assets/progress-CH6vGpmM.js                          0.53 kB
+dist/assets/consumerMenuTags-9_jJ5mSu.js                  0.56 kB
+dist/assets/SupplierActivityTab-BprMFJZ4.js               0.56 kB
+dist/assets/OnboardingActivityTab-DbvC8Uvg.js             0.56 kB
+dist/assets/SupplierBranchesTab-CnCd1v-6.js               0.58 kB
+dist/assets/adminTenantSearch-DIe1Ia9P.js                 0.62 kB
+dist/assets/OnboardingSubscriptionTab-BKE51FB4.js         0.64 kB
+dist/assets/detail-page-skeleton-YvcT9jgw.js              0.66 kB
+dist/assets/RecipeStatusBadge-Cnhk1TFl.js                 0.67 kB
+dist/assets/textarea-sBP1atoY.js                          0.68 kB
+dist/assets/SupplierHome-CXtFuPcI.js                      0.73 kB
+dist/assets/address-B296Xy03.js                           0.74 kB
+dist/assets/switch-C6L-1PZK.js                            0.83 kB
+dist/assets/error-state-DVo7tKIu.js                       0.84 kB
+dist/assets/empty-state-RcdmKUHQ.js                       0.85 kB
+dist/assets/RestaurantConfirmPodButton-Bb1uhNe1.js        0.87 kB
+dist/assets/consumerOrderTracking-By8m8IgQ.js             0.88 kB
+dist/assets/SpendTrendChart-DfpxRrZp.js                   0.95 kB
+dist/assets/ContractPriceDisplay-CEAzfuU6.js              1.04 kB
+dist/assets/SupplierTeamTab-DA8cX60v.js                   1.10 kB
+dist/assets/CategoryNav-D-vdZkBA.js                       1.15 kB
+dist/assets/format-Oq8XFpmA.js                            1.22 kB
+dist/assets/responsive-data-list-Dm8ttkx5.js              1.22 kB
+dist/assets/SupportContactCard-CKg--01m.js                1.22 kB
+dist/assets/table-scroll-DwBnQzy5.js                      1.22 kB
+dist/assets/loyalty-CCVr3vv3.js                           1.23 kB
+dist/assets/filter-control-BA13XmiH.js                    1.24 kB
+dist/assets/invoiceBalance-IcBg0sZ6.js                    1.26 kB
+dist/assets/loyalty-2FC4A3c3.js                           1.26 kB
+dist/assets/data-table-shell-DbeyvGAl.js                  1.29 kB
+dist/assets/auth-Dt59sxzW.js                              1.35 kB
+dist/assets/FeatureLockedCard-P4IW2f6n.js                 1.38 kB
+dist/assets/auth-eUO5u0ez.js                              1.41 kB
+dist/assets/kpi-card-CkJm0Oi-.js                          1.45 kB
+dist/assets/tabs-nho2pROq.js                              1.48 kB
+dist/assets/ReservationTimeSlotGrid-DSAhPYqq.js           1.60 kB
+dist/assets/OnboardingReviewsTab-9pNy9J9Q.js              1.69 kB
+dist/assets/preload-helper-CS1eXPs2.js                    1.70 kB
+dist/assets/BranchDetailPage-xKFWgdaj.js                  1.70 kB
+dist/assets/calendar-sAx6RmRD.js                          1.81 kB
+dist/assets/OrderStatusStepper-NExqnYiG.js                1.82 kB
+dist/assets/fulfillmentDispatchUtils-HoNP11qc.js          1.83 kB
+dist/assets/RecipeAttentionBanner-Bxt9666m.js             1.83 kB
+dist/assets/QuickListCreateDialog-D76EZUvF.js             1.88 kB
+dist/assets/public-k7DMSo0i.js                            1.92 kB
+dist/assets/branches-xyhkGQj5.js                          1.95 kB
+dist/assets/contracts-fAkTX1K6.js                         1.96 kB
+dist/assets/AdminFeaturesTab-D6Pwzyfw.js                  1.97 kB
+dist/assets/calendar-BJrWFpPF.js                          1.98 kB
+dist/assets/ConsumerShopShell-BglMkAmq.js                 1.98 kB
+dist/assets/public-DJ8NeiaV.js                            2.01 kB
+dist/assets/UsageStatusBadge-CEHSnclC.js                  2.05 kB
+dist/assets/QuickListProductDialog-BG8HxGlu.js            2.06 kB
+dist/assets/FoodCostBar-CoQ-d_iB.js                       2.08 kB
+dist/assets/branches-CcVP1Bf1.js                          2.09 kB
+dist/assets/card-layout-iE8qaMf6.js                       2.09 kB
+dist/assets/PublicPageLayout-vN6M6aFZ.js                  2.13 kB
+dist/assets/contracts-Bkm_Wsfn.js                         2.15 kB
+dist/assets/select-D7wM6aYc.js                            2.18 kB
+dist/assets/staffShared-Di7O6kv0.js                       2.28 kB
+dist/assets/OrderItemsTab-D8WrtVFY.js                     2.57 kB
+dist/assets/restaurants-BkNZ62RW.js                       2.59 kB
+dist/assets/LegalReacceptPage-CGHT0btj.js                 2.68 kB
+dist/assets/app-panel-Dp2JZzrq.js                         2.69 kB
+dist/assets/QuoteRequestsPage-vrFuf2e3.js                 2.72 kB
+dist/assets/restaurants-BnHJKCXz.js                       2.77 kB
+dist/assets/LogoUpload-0Ws3zhha.js                        2.77 kB
+dist/assets/PublicReservationWaitlistOffer-DZUgd9Uv.js    2.84 kB
+dist/assets/dealDisplayLabels-P7tYlJ2r.js                 2.86 kB
+dist/assets/SearchHistoryDropdown-Dvnm9cEx.js             2.88 kB
+dist/assets/dashboard-BoqE1103.js                         2.95 kB
+dist/assets/dashboard-CLi9nDD1.js                         2.97 kB
+dist/assets/ReportFiltersBar-D_TotgSl.js                  3.00 kB
+dist/assets/legal-BN3oHS-1.js                             3.18 kB
+dist/assets/loyaltyShared-BSWwsg-i.js                     3.19 kB
+dist/assets/SupplierReviewModal-D0EFdoe6.js               3.19 kB
+dist/assets/InviteSignupEmailField-cQy03RnO.js            3.22 kB
+dist/assets/disputes-BD_eX3b7.js                          3.23 kB
+dist/assets/consumerOrderingHours-B3QkW72h.js             3.24 kB
+dist/assets/legal-DEs7eM14.js                             3.28 kB
+dist/assets/ConsumerAccountPage-B7B9cDI0.js               3.29 kB
+dist/assets/StaffSelfServiceLogin-C01iBZN2.js             3.43 kB
+dist/assets/DeliveryTrackingDrawer-DTCR2svg.js            3.45 kB
+dist/assets/useConsumerCart-BULFMw2H.js                   3.48 kB
+dist/assets/disputes-BWxxHgmd.js                          3.63 kB
+dist/assets/chat-B1hx6Yjx.js                              3.70 kB
+dist/assets/assistant-BzHByk7K.js                         3.74 kB
+dist/assets/adminUi-BZ0HhdxQ.js                           3.75 kB
+dist/assets/InventoryAdjustmentDialog-CSFEtcG7.js         3.78 kB
+dist/assets/PublicReservationConfirmation-DR2DdfmE.js     3.80 kB
+dist/assets/NotificationWebhookCard-BMwGjTTo.js           3.81 kB
+dist/assets/TotalsTab-BHVPCLy9.js                         3.88 kB
+dist/assets/assistant-CZucOHyK.js                         3.91 kB
+dist/assets/AccountActivationPage-DDJ8zg__.js             3.98 kB
+dist/assets/StaffAnnouncementsTab-BO9Iu_TU.js             4.01 kB
+dist/assets/chat-DmRbgxND.js                              4.03 kB
+dist/assets/SupplierDeliveryZonesTab-1SStRF-Q.js          4.05 kB
+dist/assets/ConsumerTrackOrderPage-CF50eqFj.js            4.16 kB
+dist/assets/OrderInvoiceTab-QCyfakIC.js                   4.17 kB
+dist/assets/PushEnableBanner-AL-2M06Z.js                  4.20 kB
+dist/assets/SupplierContactsTab-FY-44iia.js               4.22 kB
+dist/assets/orderDetailShared-B0QpSgs2.js                 4.32 kB
+dist/assets/OrderPackingTab-Bz9xX-xM.js                   4.34 kB
+dist/assets/AdminTenantPicker-CDBBGk2e.js                 4.40 kB
+dist/assets/OrderDeliveryTab-D_mWj5m4.js                  4.93 kB
+dist/assets/ActiveDeliveriesMap-C5ta5oaz.js               5.03 kB
+dist/assets/RestaurantAddBranchModal-cPICtAci.js          5.04 kB
+dist/assets/ConsumerRewardsPage-Cj924qC1.js               5.12 kB
+dist/assets/ConsumerShell-DwBLoXJe.js                     5.13 kB
+dist/assets/SupplierNotificationsTab-BGMy2Odv.js          5.16 kB
+dist/assets/DeliveryTrackingMap-CC3Or3yO.js               5.20 kB
+dist/assets/OrderPickingTab-Cl1lxhIA.js                   5.22 kB
+dist/assets/Admin-5Jqonwqo.js                             5.25 kB
+dist/assets/QuickListDetailsDialog-81snTLg7.js            5.27 kB
+dist/assets/quotes-CQpoiUqq.js                            5.30 kB
+dist/assets/HistoryTab-BOnYZIUb.js                        5.36 kB
+dist/assets/reports-B3sGxU6H.js                           5.43 kB
+dist/assets/ProductFormDialog-tOzX4uKa.js                 5.43 kB
+dist/assets/QuickListScheduleDialog-BYEQm6u7.js           5.52 kB
+dist/assets/quotes-C8XHHBRN.js                            5.59 kB
+dist/assets/ConsumerReceiptPage-ndHgRy1N.js               5.63 kB
+dist/assets/ActivityLogTab-WlkxA7V-.js                    5.67 kB
+dist/assets/reports-61tgiMQX.js                           5.69 kB
+dist/assets/ProofOfDeliveryDialog-Vi0zRER7.js             5.70 kB
+dist/assets/OnboardingBranchesTab-CGdtjkgo.js             5.70 kB
+dist/assets/ProductBulkUploadDialog-BamehAEP.js           5.74 kB
+dist/assets/PriceIntelligencePage-DFizMhdO.js             5.85 kB
+dist/assets/LoyaltyProgramPage-DwUrXCGT.js                5.93 kB
+dist/assets/FulfillmentPage-CWTXKXlU.js                   5.94 kB
+dist/assets/ExpiryTab-CzXwbCs3.js                         5.98 kB
+dist/assets/OnboardingNotificationsTab-B-D4IHkD.js        5.98 kB
+dist/assets/StaffPage-CoCKh8SC.js                         6.00 kB
+dist/assets/invoices-Bi5KpM4z.js                          6.01 kB
+dist/assets/SupplierQuoteResponsePage-DoYwn5dV.js         6.01 kB
+dist/assets/invoices-DE9SHqlP.js                          6.17 kB
+dist/assets/OpenDisputeDialog-5MVLm8v0.js                 6.22 kB
+dist/assets/DeliveryTrackingEtaSection-C1B_U29p.js        6.31 kB
+dist/assets/SupplierQuoteInboxPage-DOj7YYSf.js            6.43 kB
+dist/assets/BranchInviteAcceptPage-CzRol8b-.js            6.43 kB
+dist/assets/AdminDealsBoostSection-DyvDRnyP.js            6.53 kB
+dist/assets/QuoteRequestDetailPage-LpA3YhO7.js            6.53 kB
+dist/assets/onboarding-B8FhyQ4M.js                        6.55 kB
+dist/assets/SupplierDriversTab-eHgf1R1R.js                6.60 kB
+dist/assets/settings-Ci9tWOEx.js                          6.62 kB
+dist/assets/RegisterCompletePage-D8mp2T8v.js              6.69 kB
+dist/assets/recipes-n4n_yvtX.js                           6.80 kB
+dist/assets/LegalAcceptancePanel-B9G-y64z.js              6.85 kB
+dist/assets/RecipeDetailPage-B6R9JQpJ.js                  6.90 kB
+dist/assets/RecipePriceImpactPage-Bk4CtbhF.js             6.91 kB
+dist/assets/BranchInvitationsPanel-Cv4FLUla.js            6.94 kB
+dist/assets/ConsumerLoyaltyPage-B0gXLg40.js               6.94 kB
+dist/assets/settings-C908SzQU.js                          6.97 kB
+dist/assets/recipes-DQ3P68QM.js                           7.00 kB
+dist/assets/PublicReservationManage-CupUckVa.js           7.06 kB
+dist/assets/AccountDeletionPage-D3UMsxlv.js               7.09 kB
+dist/assets/ProductDetailPage-D7mnkeo8.js                 7.11 kB
+dist/assets/LegalDocumentPage-BEXJyKbp.js                 7.16 kB
+dist/assets/StaffReportsTab-NYRxPpJo.js                   7.18 kB
+dist/assets/onboarding-BfLB5PJ8.js                        7.23 kB
+dist/assets/ConsumerShopPages-CY3-cEGk.js                 7.48 kB
+dist/assets/CreateQuoteRequestPage-XK1b_x1O.js            7.51 kB
+dist/assets/OnboardingTeamTab-CpgG4VwH.js                 7.63 kB
+dist/assets/RecipeBuilderPage-BTBaArcx.js                 7.85 kB
+dist/assets/AdminFinanceTab-UX04J2Ae.js                   7.87 kB
+dist/assets/FulfillmentExceptionsTab-ByxDmSKS.js          7.91 kB
+dist/assets/AdminUsersTab-DtHvq-Ys.js                     8.07 kB
+dist/assets/PickListsTab-CbDoEikn.js                      8.09 kB
+dist/assets/SupplierPlanTab-CwZOj1Iv.js                   8.13 kB
+dist/assets/WarehouseZonesPanel-5yC3peyN.js               8.26 kB
+dist/assets/FulfillmentTrackingTab-DcvYsXGE.js            8.28 kB
+dist/assets/InviteAcceptPage-D8HFZKgs.js                  8.35 kB
+dist/assets/OrderDetailsTab-CX2YTC7Q.js                   8.36 kB
+dist/assets/RestaurantDetailPage-VfRD2fNS.js              8.44 kB
+dist/assets/TenantBrandingPanel-BryB6Dvt.js               8.67 kB
+dist/assets/BranchAccountsPanel-CjeuMcnW.js               9.13 kB
+dist/assets/ConsumerOrdersPage-BYy-fXhC.js                9.16 kB
+dist/assets/deals-eiNGKKl2.js                             9.22 kB
+dist/assets/RecipeCostingDashboardPage-Dl6EsedE.js        9.24 kB
+dist/assets/StaffPtoTab-Db237Io_.js                       9.44 kB
+dist/assets/AdminActivityTab-BrRuA7d8.js                  9.56 kB
+dist/assets/StaffDocumentsTab-DDKK3rYx.js                 9.84 kB
+dist/assets/StaffTodayTab-DXxhl1cg.js                    10.10 kB
+dist/assets/SupplierSettingsPage-N_VEIDaV.js             10.11 kB
+dist/assets/deals-B4wFyZvV.js                            10.15 kB
+dist/assets/InvoicePaymentDialog-DvIwj5i2.js             10.16 kB
+dist/assets/products-Cqqzx4lz.js                         10.31 kB
+dist/assets/SupplierBusinessTab-C57Hg6UP.js              10.47 kB
+dist/assets/AdminSubscriptionsTab-BXxsNPnY.js            10.84 kB
+dist/assets/AdminAuditTab-BY-2kRM2.js                    10.86 kB
+dist/assets/MyContractPricesPage-DoC-nCOI.js             10.86 kB
+dist/assets/products-BK9CRtSb.js                         10.88 kB
+dist/assets/ConsumerStorefrontPage-OOCSwfDd.js           11.00 kB
+dist/assets/StaffScheduleTab-DYlphPsu.js                 11.08 kB
+dist/assets/supplierOps-BivV5DIQ.js                      11.45 kB
+dist/assets/DealsPage-CfeMEX8l.js                        11.54 kB
+dist/assets/SupplierWarehousesTab-DHbzO7DP.js            11.70 kB
+dist/assets/SupplierProfileTab-7AujmONl.js               11.85 kB
+dist/assets/InvoiceDetailDialog-DZYdA67C.js              11.99 kB
+dist/assets/cart-C54gVsja.js                             12.03 kB
+dist/assets/DisputeDetailPage-CWVSdm-p.js                12.12 kB
+dist/assets/OrderDetailPage-Ds0lQzE7.js                  12.26 kB
+dist/assets/RestaurantOnboardingPage-DZ0MtnYa.js         12.34 kB
+dist/assets/supplierOps-BfsJA9_Y.js                      12.37 kB
+dist/assets/AdminHealthTab-g5QQYxcQ.js                   12.41 kB
+dist/assets/DashboardPage-ixzc4Dri.js                    12.51 kB
+dist/assets/WasteTab-DwxOHSCp.js                         12.76 kB
+dist/assets/SettingsPage-DIxt9C6m.js                     12.76 kB
+dist/assets/PublicReservationPortal-Bhjgu4Dq.js          12.85 kB
+dist/assets/cart-CArOHIPx.js                             12.90 kB
+dist/assets/ProductImageImportDialog-yfnqX1yE.js         12.93 kB
+dist/assets/inventory-qrrO_xTC.js                        13.88 kB
+dist/assets/SupplierRunSheetPage-CzvY8P19.js             13.88 kB
+dist/assets/ContractPricingPage-BkYjYfPG.js              14.06 kB
+dist/assets/fulfillment-Df3rJflq.js                      14.31 kB
+dist/assets/AdminFeatureFlagsPanel-C74VJF9E.js           14.65 kB
+dist/assets/inventory-BLf8ak8Y.js                        14.67 kB
+dist/assets/fulfillment-B2Y1JcDu.js                      14.87 kB
+dist/assets/DashboardWidgetGrid-DpmW4Bn8.js              15.05 kB
+dist/assets/reservations-WxpVJBOu.js                     15.06 kB
+dist/assets/SubscriptionInfo-CS21fZwC.js                 15.11 kB
+dist/assets/RecipesListPage-lBuNpRrQ.js                  15.20 kB
+dist/assets/DisputesPage-DfrhHmQt.js                     15.33 kB
+dist/assets/OnboardingProfileTab-BDXigAl8.js             15.40 kB
+dist/assets/SupplierDetailPage-DMTcRy-O.js               15.82 kB
+dist/assets/consumer-DM9iUtyv.js                         15.88 kB
+dist/assets/RestaurantsPage-CBBrmH-X.js                  15.98 kB
+dist/assets/consumer-B1tOe3eu.js                         16.21 kB
+dist/assets/orders-BDcNbp-k.js                           16.26 kB
+dist/assets/reservations-BZoaR46b.js                     16.51 kB
+dist/assets/suppliers-DJPPjNF1.js                        16.69 kB
+dist/assets/AdminOperationsPanel-Bp8Ikcgn.js             16.71 kB
+dist/assets/InventoryPage-VCfW5qB4.js                    16.80 kB
+dist/assets/TeamRolesPanel-CQR_D4Y0.js                   16.89 kB
+dist/assets/ReportsPage-nxwtQ5MV.js                      17.17 kB
+dist/assets/StaffTeamTab-CVku1W4o.js                     17.24 kB
+dist/assets/CalendarView-nvZ9Llcr.js                     17.32 kB
+dist/assets/SupplierCustomerGrowthPage-DnsT0SKP.js       17.60 kB
+dist/assets/orders-CaFnl8yP.js                           17.61 kB
+dist/assets/ConsumerCheckoutPage-BLyFdeOn.js             17.62 kB
+dist/assets/suppliers-QuDrBxtF.js                        17.88 kB
+dist/assets/staff-Di2CZTUt.js                            18.05 kB
+dist/assets/OrgOverviewPage-D-mCbQze.js                  18.16 kB
+dist/assets/CartPage-DqJIXIec.js                         18.27 kB
+dist/assets/FulfillmentRoutesTab-DYWjq6fD.js             18.51 kB
+dist/assets/staff-kugovIBz.js                            18.70 kB
+dist/assets/AdminDealsPanel-DeEYAPVU.js                  19.22 kB
+dist/assets/AdminTenantsTab-Dx9Iw81G.js                  19.37 kB
+dist/assets/AdminPlansTab-fp6LcJgP.js                    20.50 kB
+dist/assets/StaffSelfServiceDashboard-BIwLu0X4.js        21.22 kB
+dist/assets/PublicSupplierCatalogPage-Bdkq23dm.js        21.58 kB
+dist/assets/AdminOverviewTab-y7xSJsTh.js                 22.43 kB
+dist/assets/QuickListsPage-flaGAgRD.js                   22.84 kB
+dist/assets/AdminUsageTab-tKEbZFB2.js                    24.29 kB
+dist/assets/ConsumerMenuPage-6y-nsfQ5.js                 24.31 kB
+dist/assets/AdminDashboardPage-DwQng5_B.js               24.46 kB
+dist/assets/ReceivingPage-pt4bBvMw.js                    24.95 kB
+dist/assets/FulfillmentDispatchPanel-BxUQE6aI.js         25.57 kB
+dist/assets/OrdersPage-BAqF_LQ1.js                       26.46 kB
+dist/assets/SuppliersPage-BlP624P4.js                    26.93 kB
+dist/assets/AdminLimitsTab-dNy9_HO8.js                   27.31 kB
+dist/assets/RestaurantInventoryPage-CRNtwMZD.js          30.60 kB
+dist/assets/OrderTimelineTab-By6z0ftP.js                 30.63 kB
+dist/assets/DriverDeliveriesPage-h-nbx8JM.js             30.70 kB
+dist/assets/query-vendor-BEMkS4wr.js                     32.89 kB
+dist/assets/MenuAdminPage-Cg0kYgHF.js                    34.70 kB
+dist/assets/SupplierCommandCenterPage-DFan4Ob7.js        35.18 kB
+dist/assets/ProductsPage-D1yHRJPI.js                     36.01 kB
+dist/assets/PromotionsPage-12nfhqu3.js                   36.52 kB
+dist/assets/ChatPage-COsZjNqU.js                         37.54 kB
+dist/assets/InventoryTab-CNPbbsvA.js                     37.88 kB
+dist/assets/InvoicesPage-Dq5NyyAw.js                     40.65 kB
+dist/assets/admin-DvkWSGJm.js                            46.63 kB
+dist/assets/admin-CoypzO6D.js                            48.31 kB
+dist/assets/redux-vendor-Dh9oKuUk.js                     56.03 kB
+dist/assets/demo-BU017Zhn.js                             65.71 kB
+dist/assets/ReservationsPage-VLXxHmZ8.js                 70.57 kB
+dist/assets/router-vendor-DZFXwDnV.js                    90.50 kB
+dist/assets/ui-vendor-edl8AZws.js                       137.60 kB
+dist/assets/react-vendor-CC-BBUpm.js                    142.66 kB
+dist/assets/useDeliveryLeafletMap-C7EJrkqi.js           151.18 kB
+dist/assets/calendar-BXgOQpoh.js                        267.58 kB
+dist/assets/charts-BOnosuNC.js                          321.07 kB
+dist/assets/vendor-DmQJOKMB.js                          412.39 kB
+dist/assets/app-elzKhMyz.js                             430.35 kB
+✓ built in 17.27s

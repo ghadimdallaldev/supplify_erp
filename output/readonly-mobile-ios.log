@@ -1,0 +1,38 @@
+PASS src/features/assistant/__tests__/AssistantScreen.test.tsx (6.852 s)
+PASS src/features/restaurant/__tests__/ReorderGuidance.test.tsx
+PASS src/services/api/consumerCheckout.test.ts
+PASS src/hooks/useEntitlements.test.ts
+PASS src/navigation/notificationNavigation.test.ts
+PASS src/hooks/usePermissions.test.ts
+PASS src/hooks/useNetworkStatus.test.ts
+PASS src/services/api/queries/auth.test.ts
+PASS src/services/api/client.test.ts
+PASS src/services/api/queries/orders.test.ts
+PASS src/features/auth/session.test.ts
+PASS src/services/push.test.ts
+PASS src/lib/dealDisplay.test.ts
+PASS src/lib/cartCurrency.test.ts
+PASS src/store/cartStore.test.ts
+PASS src/utils/format.test.ts
+PASS src/utils/driverSchedule.test.ts
+PASS src/utils/runSheetDate.test.ts
+PASS src/utils/deliveryEtaDisplay.test.ts
+PASS src/features/auth/sessionIsolation.test.ts
+PASS src/utils/podValidation.test.ts
+PASS src/features/publicShop/store.test.ts
+PASS src/services/api/queries/keys.test.ts
+PASS src/utils/podConfirmation.test.ts
+PASS src/services/pushRegistration.test.ts
+PASS src/services/chatSocket.test.ts
+PASS src/utils/orderDisputeEligibility.test.ts
+PASS src/config/env.test.ts
+PASS src/types/supplify.test.ts
+PASS src/lib/orderQuantityRules.test.ts
+PASS src/features/auth/tokenStorage.test.ts
+PASS src/utils/driverDeliveryUi.test.ts
+
+Test Suites: 32 passed, 32 total
+Tests:       119 passed, 119 total
+Snapshots:   0 total
+Time:        20.182 s, estimated 31 s
+Ran all test suites.

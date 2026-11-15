@@ -1,0 +1,12 @@
+{
+  "database": "isolated synthetic PostgreSQL 16",
+  "migrations": 233,
+  "checks": 13,
+  "incomingRemaining": 6,
+  "netNeed": 31,
+  "roundedPurchase": 32,
+  "assistantMatchesPanel": true,
+  "currencyIsolation": true,
+  "branchStockIsolation": true,
+  "supplierCadenceDistinctOrders": true
+}

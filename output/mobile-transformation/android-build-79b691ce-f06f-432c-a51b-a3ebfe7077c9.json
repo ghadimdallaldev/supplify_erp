@@ -1,0 +1,14 @@
+{
+  "id": "79b691ce-f06f-432c-a51b-a3ebfe7077c9",
+  "status": "CANCELED",
+  "error": null,
+  "profile": "demo",
+  "platform": "ANDROID",
+  "appVersion": "1.1.0",
+  "buildVersion": "27",
+  "createdAt": "2026-11-15T14:59:30.026Z",
+  "completedAt": "2026-11-15T15:13:58.754Z",
+  "artifact": null,
+  "buildUrl": "https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/79b691ce-f06f-432c-a51b-a3ebfe7077c9",
+  "api": "https://api-dev.supplifyerp.com"
+}

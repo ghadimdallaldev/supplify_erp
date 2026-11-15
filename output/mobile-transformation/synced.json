@@ -1,0 +1,18 @@
+[
+  {
+    "root": "C:/myProjects/supplify-mobile",
+    "file": "src/components/ui/motion.tsx"
+  },
+  {
+    "root": "C:/myProjects/supplify-mobile",
+    "file": "src/components/ui/SheetSurface.tsx"
+  },
+  {
+    "root": "C:/myProjects/supplify-mobile-ios",
+    "file": "src/components/ui/motion.tsx"
+  },
+  {
+    "root": "C:/myProjects/supplify-mobile-ios",
+    "file": "src/components/ui/SheetSurface.tsx"
+  }
+]

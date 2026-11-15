@@ -1,0 +1,36 @@
+{
+  "environment": "Development",
+  "verifiedAt": "2026-11-14T01:32:26.729Z",
+  "apiDeployment": "356738b9-8e3d-4434-a156-12cf358378d6",
+  "webDeployment": "641a7c31-1f11-4065-bc25-e7afdaa5e1b1",
+  "apiChecks": 18,
+  "apiFailures": [],
+  "browserFunctionalChecks": 12,
+  "browserFunctionalFailures": [],
+  "browserLayoutChecks": 17,
+  "browserLayoutFailures": [],
+  "localChecks": [
+    {
+      "name": "typecheck-final",
+      "exitCode": 0
+    },
+    {
+      "name": "web-lint-final",
+      "exitCode": 0
+    },
+    {
+      "name": "web-build-final",
+      "exitCode": 0
+    }
+  ],
+  "consentFixture": {
+    "name": "test-boundary",
+    "legalConsentGate": "browser-only fixture for seeded demo account; no acceptance submitted",
+    "businessData": "live Development API"
+  },
+  "transactionWrites": "No orders, payments, reservations, customer messages or coupon redemptions submitted; normal deal view analytics recorded",
+  "remaining": [
+    "Physical iPad Safari pass",
+    "Owner-observed real booking and guest checkout/rewards receipt"
+  ]
+}

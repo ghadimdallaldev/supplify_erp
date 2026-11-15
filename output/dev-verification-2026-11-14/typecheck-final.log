@@ -1,0 +1,8 @@
+
+> supplify@1.0.0 typecheck C:\myProjects\supplify_erp
+> pnpm --filter @supplify/web type-check
+
+
+> @supplify/web@2.0.0 type-check C:\myProjects\supplify_erp\apps\web
+> tsc --noEmit
+

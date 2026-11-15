@@ -1,0 +1,333 @@
+ WARN  Moving @react-native/jest-preset that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @testing-library/react-native that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @types/react that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @types/jest that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving typescript that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving jest that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving jest-expo that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @expo/vector-icons that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @react-native-community/netinfo that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @react-navigation/bottom-tabs that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @react-navigation/native that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @tanstack/react-query that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @react-navigation/native-stack that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-auth-session that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-crypto that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-document-picker that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-file-system that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-font that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-image that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-image-picker that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-linear-gradient that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-linking that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-location that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-notifications that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-secure-store that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving @shopify/flash-list that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-web-browser that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving expo-status-bar that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-maps that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-safe-area-context that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-screens that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-web that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-signature-canvas that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-dom that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving react-native-webview that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving socket.io-client that was installed by a different package manager to "node_modules/.ignored"
+ WARN  Moving zustand that was installed by a different package manager to "node_modules/.ignored"
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 2, reused 0, downloaded 0, added 0
+Progress: resolved 5, reused 0, downloaded 0, added 0
+Progress: resolved 7, reused 0, downloaded 1, added 0
+Progress: resolved 11, reused 0, downloaded 2, added 0
+Progress: resolved 13, reused 0, downloaded 4, added 0
+Progress: resolved 15, reused 0, downloaded 4, added 0
+Progress: resolved 18, reused 0, downloaded 5, added 0
+Progress: resolved 18, reused 0, downloaded 8, added 0
+Progress: resolved 20, reused 0, downloaded 9, added 0
+Progress: resolved 21, reused 0, downloaded 10, added 0
+Progress: resolved 22, reused 0, downloaded 10, added 0
+Progress: resolved 23, reused 0, downloaded 11, added 0
+Progress: resolved 25, reused 0, downloaded 13, added 0
+Progress: resolved 26, reused 0, downloaded 13, added 0
+Progress: resolved 27, reused 0, downloaded 13, added 0
+Progress: resolved 29, reused 0, downloaded 15, added 0
+Progress: resolved 29, reused 0, downloaded 17, added 0
+Progress: resolved 32, reused 0, downloaded 19, added 0
+Progress: resolved 34, reused 0, downloaded 19, added 0
+Progress: resolved 36, reused 0, downloaded 21, added 0
+Progress: resolved 36, reused 0, downloaded 26, added 0
+Progress: resolved 36, reused 0, downloaded 27, added 0
+Progress: resolved 37, reused 0, downloaded 27, added 0
+Progress: resolved 37, reused 0, downloaded 28, added 0
+Progress: resolved 37, reused 0, downloaded 29, added 0
+Progress: resolved 37, reused 0, downloaded 30, added 0
+Progress: resolved 37, reused 0, downloaded 31, added 0
+Progress: resolved 37, reused 0, downloaded 32, added 0
+Progress: resolved 38, reused 1, downloaded 32, added 0
+Progress: resolved 38, reused 1, downloaded 33, added 0
+Progress: resolved 40, reused 1, downloaded 34, added 0
+ WARN  GET https://registry.npmjs.org/expo-file-system/-/expo-file-system-56.0.11.tgz error (ECONNRESET). Will retry in 10 seconds. 2 retries left.
+Progress: resolved 40, reused 1, downloaded 35, added 0
+
+   ╭───────────────────────────────────────────────────────────────────╮
+   │                                                                   │
+   │                Update available! 8.15.9 → 12.21.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.21.0   │
+   │                 Run "pnpm add -g pnpm" to update.                 │
+   │                                                                   │
+   │      Follow @pnpmjs for updates: https://twitter.com/pnpmjs       │
+   │                                                                   │
+   ╰───────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 41, reused 1, downloaded 35, added 0
+Progress: resolved 42, reused 1, downloaded 35, added 0
+Progress: resolved 43, reused 1, downloaded 35, added 0
+Progress: resolved 43, reused 1, downloaded 36, added 0
+Progress: resolved 43, reused 1, downloaded 37, added 0
+Progress: resolved 43, reused 1, downloaded 38, added 0
+Progress: resolved 43, reused 1, downloaded 39, added 0
+Progress: resolved 43, reused 1, downloaded 40, added 0
+ WARN  GET https://registry.npmjs.org/expo-location/-/expo-location-56.0.26.tgz error (ECONNRESET). Will retry in 10 seconds. 2 retries left.
+Progress: resolved 44, reused 1, downloaded 40, added 0
+Progress: resolved 56, reused 6, downloaded 42, added 0
+Progress: resolved 65, reused 10, downloaded 45, added 0
+Progress: resolved 69, reused 10, downloaded 51, added 0
+Progress: resolved 79, reused 13, downloaded 59, added 0
+Progress: resolved 82, reused 14, downloaded 61, added 0
+Progress: resolved 85, reused 14, downloaded 62, added 0
+Progress: resolved 86, reused 14, downloaded 62, added 0
+Progress: resolved 88, reused 14, downloaded 62, added 0
+Progress: resolved 91, reused 14, downloaded 65, added 0
+Progress: resolved 92, reused 14, downloaded 65, added 0
+Progress: resolved 93, reused 14, downloaded 66, added 0
+Progress: resolved 97, reused 14, downloaded 66, added 0
+Progress: resolved 98, reused 14, downloaded 69, added 0
+Progress: resolved 101, reused 14, downloaded 71, added 0
+Progress: resolved 103, reused 14, downloaded 75, added 0
+Progress: resolved 108, reused 14, downloaded 80, added 0
+Progress: resolved 119, reused 20, downloaded 88, added 0
+Progress: resolved 123, reused 20, downloaded 91, added 0
+Progress: resolved 125, reused 20, downloaded 91, added 0
+Progress: resolved 129, reused 20, downloaded 95, added 0
+Progress: resolved 130, reused 20, downloaded 96, added 0
+Progress: resolved 139, reused 22, downloaded 98, added 0
+Progress: resolved 141, reused 23, downloaded 103, added 0
+Progress: resolved 145, reused 25, downloaded 105, added 0
+Progress: resolved 150, reused 27, downloaded 107, added 0
+Progress: resolved 151, reused 28, downloaded 108, added 0
+Progress: resolved 155, reused 30, downloaded 110, added 0
+Progress: resolved 158, reused 32, downloaded 112, added 0
+Progress: resolved 160, reused 33, downloaded 114, added 0
+Progress: resolved 163, reused 33, downloaded 115, added 0
+Progress: resolved 168, reused 36, downloaded 117, added 0
+Progress: resolved 169, reused 36, downloaded 117, added 0
+Progress: resolved 171, reused 36, downloaded 120, added 0
+Progress: resolved 172, reused 36, downloaded 121, added 0
+Progress: resolved 172, reused 36, downloaded 122, added 0
+Progress: resolved 174, reused 36, downloaded 122, added 0
+Progress: resolved 176, reused 36, downloaded 124, added 0
+Progress: resolved 178, reused 36, downloaded 127, added 0
+Progress: resolved 181, reused 36, downloaded 128, added 0
+Progress: resolved 184, reused 36, downloaded 133, added 0
+Progress: resolved 192, reused 36, downloaded 140, added 0
+Progress: resolved 199, reused 38, downloaded 144, added 0
+Progress: resolved 204, reused 40, downloaded 148, added 0
+Progress: resolved 210, reused 42, downloaded 151, added 0
+Progress: resolved 216, reused 45, downloaded 153, added 0
+Progress: resolved 221, reused 46, downloaded 158, added 0
+Progress: resolved 225, reused 46, downloaded 161, added 0
+Progress: resolved 230, reused 47, downloaded 166, added 0
+Progress: resolved 236, reused 47, downloaded 169, added 0
+Progress: resolved 237, reused 48, downloaded 170, added 0
+Progress: resolved 239, reused 48, downloaded 172, added 0
+Progress: resolved 245, reused 48, downloaded 177, added 0
+Progress: resolved 256, reused 49, downloaded 185, added 0
+Progress: resolved 260, reused 51, downloaded 188, added 0
+Progress: resolved 264, reused 53, downloaded 190, added 0
+Progress: resolved 268, reused 54, downloaded 194, added 0
+Progress: resolved 271, reused 55, downloaded 195, added 0
+Progress: resolved 272, reused 55, downloaded 196, added 0
+Progress: resolved 276, reused 55, downloaded 200, added 0
+Progress: resolved 283, reused 56, downloaded 207, added 0
+Progress: resolved 295, reused 63, downloaded 214, added 0
+Progress: resolved 302, reused 65, downloaded 216, added 0
+Progress: resolved 307, reused 67, downloaded 218, added 0
+Progress: resolved 317, reused 71, downloaded 224, added 0
+Progress: resolved 321, reused 72, downloaded 225, added 0
+Progress: resolved 323, reused 73, downloaded 225, added 0
+Progress: resolved 327, reused 73, downloaded 229, added 0
+Progress: resolved 327, reused 73, downloaded 232, added 0
+Progress: resolved 338, reused 75, downloaded 239, added 0
+Progress: resolved 343, reused 77, downloaded 242, added 0
+Progress: resolved 354, reused 82, downloaded 249, added 0
+Progress: resolved 363, reused 88, downloaded 255, added 0
+Progress: resolved 368, reused 88, downloaded 256, added 0
+Progress: resolved 375, reused 90, downloaded 259, added 0
+Progress: resolved 380, reused 94, downloaded 264, added 0
+Progress: resolved 391, reused 101, downloaded 267, added 0
+Progress: resolved 407, reused 108, downloaded 274, added 0
+Progress: resolved 415, reused 109, downloaded 284, added 0
+Progress: resolved 432, reused 114, downloaded 294, added 0
+Progress: resolved 460, reused 131, downloaded 304, added 0
+Progress: resolved 472, reused 141, downloaded 307, added 0
+Progress: resolved 488, reused 147, downloaded 315, added 0
+Progress: resolved 498, reused 151, downloaded 323, added 0
+Progress: resolved 505, reused 154, downloaded 327, added 0
+Progress: resolved 513, reused 154, downloaded 330, added 0
+Progress: resolved 517, reused 154, downloaded 331, added 0
+Progress: resolved 527, reused 160, downloaded 332, added 0
+Progress: resolved 531, reused 160, downloaded 333, added 0
+Progress: resolved 533, reused 160, downloaded 335, added 0
+Progress: resolved 538, reused 161, downloaded 337, added 0
+Progress: resolved 539, reused 161, downloaded 339, added 0
+Progress: resolved 541, reused 161, downloaded 339, added 0
+Progress: resolved 541, reused 161, downloaded 341, added 0
+Progress: resolved 545, reused 163, downloaded 344, added 0
+Progress: resolved 553, reused 167, downloaded 346, added 0
+Progress: resolved 560, reused 169, downloaded 351, added 0
+Progress: resolved 569, reused 171, downloaded 357, added 0
+Progress: resolved 577, reused 171, downloaded 364, added 0
+Progress: resolved 581, reused 171, downloaded 370, added 0
+Progress: resolved 582, reused 171, downloaded 371, added 0
+Progress: resolved 582, reused 171, downloaded 372, added 0
+Progress: resolved 583, reused 172, downloaded 373, added 0
+Progress: resolved 585, reused 173, downloaded 374, added 0
+Progress: resolved 587, reused 174, downloaded 376, added 0
+Progress: resolved 594, reused 177, downloaded 379, added 0
+Progress: resolved 601, reused 178, downloaded 385, added 0
+ WARN  GET https://registry.npmjs.org/typescript/-/typescript-6.0.3.tgz error (ECONNRESET). Will retry in 10 seconds. 2 retries left.
+Progress: resolved 613, reused 184, downloaded 390, added 0
+Progress: resolved 629, reused 197, downloaded 393, added 0
+Progress: resolved 642, reused 203, downloaded 399, added 0
+Progress: resolved 662, reused 217, downloaded 404, added 0
+Progress: resolved 671, reused 225, downloaded 407, added 0
+Progress: resolved 678, reused 232, downloaded 407, added 0
+Progress: resolved 685, reused 237, downloaded 408, added 0
+Progress: resolved 696, reused 246, downloaded 411, added 0
+Progress: resolved 703, reused 248, downloaded 411, added 0
+Progress: resolved 716, reused 253, downloaded 420, added 0
+Progress: resolved 729, reused 261, downloaded 427, added 0
+Progress: resolved 748, reused 277, downloaded 431, added 0
+Progress: resolved 767, reused 293, downloaded 441, added 0
+Progress: resolved 773, reused 296, downloaded 453, added 0
+Progress: resolved 773, reused 296, downloaded 457, added 0
+Progress: resolved 773, reused 296, downloaded 458, added 0
+Progress: resolved 774, reused 296, downloaded 458, added 0
+Progress: resolved 775, reused 296, downloaded 458, added 0
+Progress: resolved 777, reused 297, downloaded 458, added 0
+Progress: resolved 778, reused 298, downloaded 458, added 0
+Progress: resolved 781, reused 298, downloaded 462, added 0
+Progress: resolved 781, reused 298, downloaded 463, added 0
+Progress: resolved 781, reused 298, downloaded 464, added 0
+Progress: resolved 781, reused 298, downloaded 465, added 0
+Progress: resolved 782, reused 298, downloaded 465, added 0
+Progress: resolved 783, reused 298, downloaded 465, added 0
+Progress: resolved 783, reused 298, downloaded 466, added 0
+Progress: resolved 784, reused 298, downloaded 466, added 0
+Progress: resolved 785, reused 298, downloaded 466, added 0
+Progress: resolved 785, reused 298, downloaded 468, added 0
+Progress: resolved 785, reused 298, downloaded 469, added 0
+Progress: resolved 785, reused 298, downloaded 470, added 0
+Progress: resolved 787, reused 298, downloaded 471, added 0
+Progress: resolved 787, reused 298, downloaded 473, added 0
+Progress: resolved 788, reused 298, downloaded 473, added 0
+Progress: resolved 788, reused 298, downloaded 474, added 0
+Progress: resolved 790, reused 298, downloaded 474, added 0
+Progress: resolved 790, reused 298, downloaded 475, added 0
+Progress: resolved 793, reused 298, downloaded 479, added 0
+Progress: resolved 797, reused 298, downloaded 480, added 0
+Progress: resolved 805, reused 298, downloaded 483, added 0
+Progress: resolved 805, reused 298, downloaded 492, added 0
+Progress: resolved 806, reused 298, downloaded 492, added 0
+Progress: resolved 806, reused 298, downloaded 493, added 0
+Progress: resolved 807, reused 298, downloaded 493, added 0
+Progress: resolved 809, reused 298, downloaded 495, added 0
+Progress: resolved 813, reused 299, downloaded 497, added 0
+Progress: resolved 814, reused 299, downloaded 499, added 0
+Progress: resolved 815, reused 300, downloaded 500, added 0
+Progress: resolved 815, reused 300, downloaded 501, added 0
+Progress: resolved 815, reused 300, downloaded 502, added 0
+Progress: resolved 815, reused 300, downloaded 503, added 0
+Progress: resolved 816, reused 300, downloaded 503, added 0
+ WARN  5 deprecated subdependencies found: abab@2.0.6, domexception@4.0.0, glob@7.2.3, inflight@1.0.6, whatwg-encoding@2.0.0
+Packages: +806
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 817, reused 301, downloaded 503, added 0
+Progress: resolved 817, reused 301, downloaded 504, added 182
+Progress: resolved 817, reused 301, downloaded 504, added 333
+Progress: resolved 817, reused 301, downloaded 504, added 412
+Progress: resolved 817, reused 301, downloaded 504, added 503
+Progress: resolved 817, reused 301, downloaded 504, added 564
+Progress: resolved 817, reused 301, downloaded 504, added 651
+Progress: resolved 817, reused 301, downloaded 504, added 682
+Progress: resolved 817, reused 301, downloaded 504, added 739
+Progress: resolved 817, reused 301, downloaded 504, added 787
+Progress: resolved 817, reused 301, downloaded 504, added 797
+Progress: resolved 817, reused 301, downloaded 504, added 801
+Progress: resolved 817, reused 301, downloaded 504, added 802
+Progress: resolved 817, reused 301, downloaded 504, added 804
+Progress: resolved 817, reused 301, downloaded 504, added 805
+Progress: resolved 817, reused 301, downloaded 505, added 805
+Progress: resolved 817, reused 301, downloaded 505, added 806, done
+
+dependencies:
++ @expo/vector-icons 15.1.1
++ @react-native-community/netinfo 12.0.1
++ @react-navigation/bottom-tabs 7.21.0
++ @react-navigation/native 7.5.1
++ @react-navigation/native-stack 7.21.0
++ @shopify/flash-list 2.0.2 (2.3.3 is available)
++ @tanstack/react-query 5.107.1
++ expo 56.0.24 (58.0.25 is available)
++ expo-auth-session 56.0.20 (58.0.18 is available)
++ expo-crypto 56.0.5 (58.0.8 is available)
++ expo-document-picker 56.0.4 (58.0.5 is available)
++ expo-file-system 56.0.11 (58.0.13 is available)
++ expo-font 56.0.7 (58.0.12 is available)
++ expo-haptics 56.0.3 (58.0.8 is available)
++ expo-image 56.0.13 (58.0.18 is available)
++ expo-image-picker 56.0.25 (58.0.10 is available)
++ expo-linear-gradient 56.0.4 (58.0.4 is available)
++ expo-linking 56.0.19 (58.0.17 is available)
++ expo-location 56.0.26 (58.0.22 is available)
++ expo-notifications 56.0.26 (58.1.9 is available)
++ expo-secure-store 56.0.4 (58.0.3 is available)
++ expo-status-bar 56.0.4 (58.0.5 is available)
++ expo-web-browser 56.0.6 (58.0.8 is available)
++ react 19.2.3 (19.2.8 is available)
++ react-dom 19.2.3 (19.2.8 is available)
++ react-native 0.85.3 (0.88.1 is available)
++ react-native-gesture-handler 2.31.2 (3.5.0 is available)
++ react-native-maps 1.27.2 (1.29.11 is available)
++ react-native-reanimated 4.3.1 (4.7.1 is available)
++ react-native-safe-area-context 5.7.0 (5.11.1 is available)
++ react-native-screens 4.26.2 (4.30.1 is available)
++ react-native-signature-canvas 5.1.1
++ react-native-web 0.21.4
++ react-native-webview 13.16.1 (14.0.1 is available)
++ react-native-worklets 0.8.3 (0.13.1 is available)
++ socket.io-client 4.8.4
++ zustand 5.1.0
+
+devDependencies:
++ @react-native/jest-preset 0.85.3 (0.88.1 is available) already in devDependencies, was not moved to dependencies.
++ @testing-library/react-native 13.3.3 (14.1.0 is available) already in devDependencies, was not moved to dependencies.
++ @types/jest 29.5.14 (30.0.0 is available) already in devDependencies, was not moved to dependencies.
++ @types/react 19.2.18 (19.3.0 is available) already in devDependencies, was not moved to dependencies.
++ jest 29.7.0 (30.5.2 is available) already in devDependencies, was not moved to dependencies.
++ jest-expo 56.0.6 (58.0.14 is available) already in devDependencies, was not moved to dependencies.
++ typescript 6.0.3 (7.0.2 is available) already in devDependencies, was not moved to dependencies.
+
+ WARN  Issues with peer dependencies found
+.
+├─┬ react-native 0.85.3
+│ └─┬ @react-native/community-cli-plugin 0.85.3
+│   └── ✕ unmet peer @react-native/metro-config@0.85.3: found 0.88.1
+└─┬ react-test-renderer 19.3.1
+  └── ✕ unmet peer react@^19.3.1: found 19.2.3
+
+Done in 5m 32.2s

@@ -1,0 +1,9 @@
+
+Pruning release tree (tier=prod)...
+
+removed scripts
+wrote package.json
+wrote README.md
+
+Done. Review with `git status`, then commit.
+

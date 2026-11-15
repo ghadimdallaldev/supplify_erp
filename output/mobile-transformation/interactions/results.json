@@ -1,0 +1,28 @@
+[
+  {
+    "width": 360,
+    "checks": [
+      "More search",
+      "invalid date feedback",
+      "calendar selection",
+      "time selection",
+      "reactive Arabic retains draft"
+    ],
+    "errors": [],
+    "writes": [],
+    "overflow": false
+  },
+  {
+    "width": 1024,
+    "checks": [
+      "More search",
+      "invalid date feedback",
+      "calendar selection",
+      "time selection",
+      "reactive Arabic retains draft"
+    ],
+    "errors": [],
+    "writes": [],
+    "overflow": false
+  }
+]

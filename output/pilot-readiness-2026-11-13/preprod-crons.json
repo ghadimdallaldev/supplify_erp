@@ -1,0 +1,222 @@
+{
+  "deployment": "8e0c944f-cf3e-4f06-a4af-29f4e3f2a4b3",
+  "health": {
+    "health": {
+      "http": 200,
+      "body": {
+        "status": "ok",
+        "service": "supplify-api",
+        "env": "preprod"
+      }
+    },
+    "ready": {
+      "http": 200,
+      "body": {
+        "status": "ok",
+        "service": "supplify-api",
+        "env": "preprod"
+      }
+    }
+  },
+  "events": [
+    {
+      "timestamp": "2026-11-13T17:59:13.342721675Z",
+      "time": "2026-11-13T17:59:13.339Z",
+      "event": "cron.completed",
+      "job": "scheduled_orders",
+      "durationMs": 28
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.348391521Z",
+      "time": "2026-11-13T17:59:13.347Z",
+      "event": "cron.completed",
+      "job": "invoice_overdue",
+      "durationMs": 6
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.366838416Z",
+      "time": "2026-11-13T17:59:13.366Z",
+      "event": "cron.completed",
+      "job": "collections_reminders",
+      "durationMs": 14
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.378295493Z",
+      "time": "2026-11-13T17:59:13.374Z",
+      "event": "cron.completed",
+      "job": "subscription_billing",
+      "durationMs": 7
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.382244963Z",
+      "time": "2026-11-13T17:59:13.381Z",
+      "event": "cron.completed",
+      "job": "waitlist_offers",
+      "durationMs": 5
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.395622961Z",
+      "time": "2026-11-13T17:59:13.393Z",
+      "event": "cron.completed",
+      "job": "reservation_guest_comms",
+      "durationMs": 10
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.407515679Z",
+      "time": "2026-11-13T17:59:13.404Z",
+      "event": "cron.completed",
+      "job": "promotions_expiry",
+      "durationMs": 9
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.413050667Z",
+      "time": "2026-11-13T17:59:13.412Z",
+      "event": "cron.completed",
+      "job": "invitation_expiry",
+      "durationMs": 5
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.426707040Z",
+      "time": "2026-11-13T17:59:13.420Z",
+      "event": "cron.completed",
+      "job": "free_sandbox_expiry",
+      "durationMs": 5
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.434149749Z",
+      "time": "2026-11-13T17:59:13.431Z",
+      "event": "cron.completed",
+      "job": "trial_ending_soon",
+      "durationMs": 7
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.467704986Z",
+      "time": "2026-11-13T17:59:13.464Z",
+      "event": "cron.completed",
+      "job": "fulfillment_exceptions",
+      "durationMs": 31
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.474156016Z",
+      "time": "2026-11-13T17:59:13.469Z",
+      "event": "cron.completed",
+      "job": "delivery_rollover",
+      "durationMs": 3
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.644897218Z",
+      "time": "2026-11-13T17:59:13.638Z",
+      "event": "cron.completed",
+      "job": "operational_reminders",
+      "durationMs": 167
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.647010984Z",
+      "time": "2026-11-13T17:59:13.645Z",
+      "event": "cron.completed",
+      "job": "driver_location_retention",
+      "durationMs": 5
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.664502559Z",
+      "time": "2026-11-13T17:59:13.659Z",
+      "event": "cron.completed",
+      "job": "email_retry",
+      "durationMs": 12
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.671945998Z",
+      "time": "2026-11-13T17:59:13.668Z",
+      "event": "cron.completed",
+      "job": "email_digest",
+      "durationMs": 6
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.676837499Z",
+      "time": "2026-11-13T17:59:13.676Z",
+      "event": "cron.completed",
+      "job": "stale_gps_alerts",
+      "durationMs": 6
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.704455277Z",
+      "time": "2026-11-13T17:59:13.703Z",
+      "event": "cron.completed",
+      "job": "log_retention",
+      "durationMs": 25
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.714635850Z",
+      "time": "2026-11-13T17:59:13.713Z",
+      "event": "cron.completed",
+      "job": "reorder_forecast",
+      "durationMs": 8
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.720384664Z",
+      "time": "2026-11-13T17:59:13.719Z",
+      "event": "cron.completed",
+      "job": "recipe_recalc",
+      "durationMs": 4
+    },
+    {
+      "timestamp": "2026-11-13T17:59:13.739934077Z",
+      "time": "2026-11-13T17:59:13.739Z",
+      "event": "cron.completed",
+      "job": "growth_program_maintenance",
+      "durationMs": 18
+    },
+    {
+      "timestamp": "2026-11-13T18:02:18.982279692Z",
+      "time": "2026-11-13T18:02:13.317Z",
+      "event": "cron.completed",
+      "job": "recipe_recalc",
+      "durationMs": 6
+    },
+    {
+      "timestamp": "2026-11-13T18:05:20.214614718Z",
+      "time": "2026-11-13T18:05:13.320Z",
+      "event": "cron.completed",
+      "job": "recipe_recalc",
+      "durationMs": 8
+    },
+    {
+      "timestamp": "2026-11-13T18:08:22.231397072Z",
+      "time": "2026-11-13T18:08:13.344Z",
+      "event": "cron.completed",
+      "job": "recipe_recalc",
+      "durationMs": 6
+    },
+    {
+      "timestamp": "2026-11-13T18:11:13.562764468Z",
+      "time": "2026-11-13T18:11:13.372Z",
+      "event": "cron.completed",
+      "job": "recipe_recalc",
+      "durationMs": 8
+    }
+  ],
+  "completedJobs": [
+    "collections_reminders",
+    "delivery_rollover",
+    "driver_location_retention",
+    "email_digest",
+    "email_retry",
+    "free_sandbox_expiry",
+    "fulfillment_exceptions",
+    "growth_program_maintenance",
+    "invitation_expiry",
+    "invoice_overdue",
+    "log_retention",
+    "operational_reminders",
+    "promotions_expiry",
+    "recipe_recalc",
+    "reorder_forecast",
+    "reservation_guest_comms",
+    "scheduled_orders",
+    "stale_gps_alerts",
+    "subscription_billing",
+    "trial_ending_soon",
+    "waitlist_offers"
+  ],
+  "failureCount": 0
+}

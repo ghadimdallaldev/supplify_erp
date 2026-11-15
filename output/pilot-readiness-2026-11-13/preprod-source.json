@@ -1,0 +1,29 @@
+{
+  "baseCommit": "d744d99e29779ff33ed54abefb5d48fc64ee93bd",
+  "sourceFiles": {
+    "apps/web/src/components/sidebar/SidebarNavSection.test.tsx": "16c094bd7aa9ce72f3b7ec30a70374b469f57dbbfb166adec424fce8c3c452fa",
+    "deploy/keycloak/providers/email-otp/src/main/java/com/supplify/keycloak/emailotp/HttpEmailSenderProvider.java": "ee50fc2001cb19bdb215642652d4c44c205979f84c8ec8d26d7c06e7bb045dd7",
+    "deploy/keycloak/providers/email-otp/src/main/java/com/supplify/keycloak/emailotp/HttpEmailSenderProviderFactory.java": "5da062ab89f0508ed65456c7ec1e36f103f84b5eb90a18af8f73d3acb7d81341",
+    "deploy/keycloak/providers/email-otp/src/main/resources/META-INF/services/org.keycloak.email.EmailSenderProviderFactory": "b778ac459c462686bd9eda3b31d116298df7751789192d3c45f474e2131fc097",
+    "deploy/keycloak/providers/email-otp/src/test/java/com/supplify/keycloak/emailotp/HttpEmailSenderProviderTest.java": "4516f6cb8f4429a1222d67915d75293307aabeeabfa5b2f45cf45063fc1a077a",
+    "apps/api/src/lib/cron-runner.js": "f320db3b47e4af1eb411e8ee820e24493b33c4e8b95a79d2a78de2b6833004c7",
+    "apps/api/src/lib/cron-runner.test.js": "2ad5dbaca13d1a09f0857076214e004a2358374e64e809e275e3fff0cafc97dc",
+    "apps/api/src/lib/register-cron-jobs.js": "3f00785bd69fd40ee5b09a8e3e7b6a1596305a935168692c9bb9be786bf0969e",
+    "apps/api/src/lib/register-cron-jobs.test.js": "7bc3071b76a94a23d8d4f6b2a02fd9c4bd95e89975738ef2d360ab3aec57590e",
+    "apps/api/src/middlewares/csrf.js": "5c29cb32963802c14b1b58c4bf97c7a65d840e93ef96553a23c0551fcde5ea14",
+    "apps/api/src/middlewares/csrf.test.js": "19a31462bfb0221ddfc7f50c73b0c3d4ba301dff7eac60f85f88c8f03d596a78",
+    "apps/api/src/routes/internal-auth.routes.js": "848b4a9b68696125667870a69318f5d5e62202906a9eb7a23aa035e01f03ad3b",
+    "apps/api/src/routes/internal-auth.routes.test.js": "69f384a66f74843210edd6a74781b5679982920aa7c562e9cd9446fd17e1e2a7",
+    "apps/api/src/routes/quick-lists.routes.js": "18839188028474c1e1630484a65359b1086d39c53cc9ebe6a8a2d418a4e5d092",
+    "apps/api/src/routes/quick-lists.routes.test.js": "6deccd928de2b68510c3be8bdcc584f37fea5592c50a4ee9a074480984519897",
+    "apps/api/src/services/email/email.service.js": "b0cf68c71034d0fce4025c4fc59d07257a251ec55389dbc09d60db72c23cb0fe",
+    "apps/api/src/services/email/email.service.test.js": "fe34bde05bc4f1a69e31d8b6b6175637d7933b179b20c23b7e3f54fa46902329",
+    "apps/api/src/services/mailer.service.js": "977ffafb215432957f6fa2eae67af89324116d030cd36474550c6280ee9b7195",
+    "apps/api/src/services/mailer.service.test.js": "0434470dd19dc6626db7f76d45afa69f73dc439b1fda56c8193221e8d276b187",
+    "apps/web/src/components/sidebar/SidebarNavSection.tsx": "2945b55d99d3ec2e21f794db06066df7e5cafa5b67305c2b6724ae9dafbb2341",
+    "apps/web/src/lib/quickListCart.test.ts": "0740ea65a45f69968a6176ecf0b0628b82b38410329c9466d7c4bd0f251a0bd7",
+    "apps/web/src/lib/quickListCart.ts": "e4ec80ed523e79542b1865764d2e602077b5bcde6ee9ed88c7f09f7cc6de4350",
+    "apps/web/src/pages/SupplierCommandCenterPage.tsx": "a14d0db56fc7ab672ac78aca14fb58dc549af5f953e7498addc17725b66f4782"
+  },
+  "snapshot": "C:\\myProjects\\supplify_erp\\.release-checkouts\\pilot-2026-11-13-final"
+}

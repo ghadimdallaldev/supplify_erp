@@ -1,0 +1,4 @@
+CONFLICT (modify/delete): src/navigation/notificationNavigation.test.ts deleted in HEAD and modified in origin/dev.  Version origin/dev of src/navigation/notificationNavigation.test.ts left in tree.
+CONFLICT (modify/delete): src/services/api/client.test.ts deleted in HEAD and modified in origin/dev.  Version origin/dev of src/services/api/client.test.ts left in tree.
+CONFLICT (modify/delete): src/store/cartStore.test.ts deleted in HEAD and modified in origin/dev.  Version origin/dev of src/store/cartStore.test.ts left in tree.
+Automatic merge failed; fix conflicts and then commit the result.

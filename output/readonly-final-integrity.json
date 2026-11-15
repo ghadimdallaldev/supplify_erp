@@ -1,0 +1,26 @@
+{
+  "repos": [
+    {
+      "repo": "C:\\myProjects\\supplify_erp",
+      "files": 49,
+      "diffCheck": "passed",
+      "branch": "dev"
+    },
+    {
+      "repo": "C:/myProjects/supplify-mobile",
+      "files": 13,
+      "diffCheck": "passed",
+      "branch": "dev"
+    },
+    {
+      "repo": "C:/myProjects/supplify-mobile-ios",
+      "files": 13,
+      "diffCheck": "passed",
+      "branch": "dev"
+    }
+  ],
+  "nativeParity": "13 matching files",
+  "sharedTypeParity": "passed",
+  "changedJson": "valid",
+  "unrelatedMarketingWork": "excluded from task checks"
+}

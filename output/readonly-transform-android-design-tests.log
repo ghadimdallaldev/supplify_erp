@@ -1,0 +1,70 @@
+FAIL src/features/assistant/__tests__/AssistantScreen.test.tsx
+  ● Test suite failed to run
+
+    Cannot find native module 'ExpoSecureStore'
+
+      1 | import { useSyncExternalStore } from "react";
+      2 | import { I18nManager, Platform } from "react-native";
+    > 3 | import * as SecureStore from "expo-secure-store";
+        | ^
+      4 | import ar from "./ar.json";
+      5 | export type AppLocale = "en" | "ar";
+      6 | let locale: AppLocale = I18nManager.isRTL ? "ar" : "en";
+
+      at requireNativeModule (node_modules/.pnpm/jest-expo@56.0.6_@babel+core@7.29.13_@react-native+jest-preset@0.85.3_expo@56.0.24_jest@29.7._6tc4kvpr2snlds6pnh6ntsbyhe/node_modules/jest-expo/src/preset/setup.js:304:15)
+      at Object.<anonymous> (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/ExpoSecureStore.ts:2:35)
+      at Object.require (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/SecureStore.ts:1:1)
+      at Object.require (src/i18n/runtime.ts:3:1)
+      at Object.require (src/i18n/index.ts:1:1)
+      at requireActual (src/features/assistant/__tests__/AssistantScreen.test.tsx:42:11)
+      at Object.require (src/components/ui/primitives.tsx:11:1)
+      at Object.require (src/features/assistant/screens/AssistantScreen.tsx:1:1)
+      at Object.require (src/features/assistant/__tests__/AssistantScreen.test.tsx:3:1)
+
+FAIL src/features/restaurant/__tests__/ReservationBoard.test.tsx
+  ● Test suite failed to run
+
+    Cannot find native module 'ExpoSecureStore'
+
+      1 | import { useSyncExternalStore } from "react";
+      2 | import { I18nManager, Platform } from "react-native";
+    > 3 | import * as SecureStore from "expo-secure-store";
+        | ^
+      4 | import ar from "./ar.json";
+      5 | export type AppLocale = "en" | "ar";
+      6 | let locale: AppLocale = I18nManager.isRTL ? "ar" : "en";
+
+      at requireNativeModule (node_modules/.pnpm/jest-expo@56.0.6_@babel+core@7.29.13_@react-native+jest-preset@0.85.3_expo@56.0.24_jest@29.7._6tc4kvpr2snlds6pnh6ntsbyhe/node_modules/jest-expo/src/preset/setup.js:304:15)
+      at Object.<anonymous> (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/ExpoSecureStore.ts:2:35)
+      at Object.require (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/SecureStore.ts:1:1)
+      at Object.require (src/i18n/runtime.ts:3:1)
+      at Object.require (src/i18n/index.ts:1:1)
+      at Object.require (src/features/restaurant/screens/reservations/ReservationBoard.tsx:1:1)
+      at Object.require (src/features/restaurant/__tests__/ReservationBoard.test.tsx:3:1)
+
+FAIL src/components/ui/__tests__/design-system.test.tsx
+  ● Test suite failed to run
+
+    Cannot find native module 'ExpoSecureStore'
+
+      1 | import { useSyncExternalStore } from "react";
+      2 | import { I18nManager, Platform } from "react-native";
+    > 3 | import * as SecureStore from "expo-secure-store";
+        | ^
+      4 | import ar from "./ar.json";
+      5 | export type AppLocale = "en" | "ar";
+      6 | let locale: AppLocale = I18nManager.isRTL ? "ar" : "en";
+
+      at requireNativeModule (node_modules/.pnpm/jest-expo@56.0.6_@babel+core@7.29.13_@react-native+jest-preset@0.85.3_expo@56.0.24_jest@29.7._6tc4kvpr2snlds6pnh6ntsbyhe/node_modules/jest-expo/src/preset/setup.js:304:15)
+      at Object.<anonymous> (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/ExpoSecureStore.ts:2:35)
+      at Object.require (node_modules/.pnpm/expo-secure-store@56.0.4_expo@56.0.24/node_modules/expo-secure-store/src/SecureStore.ts:1:1)
+      at Object.require (src/i18n/runtime.ts:3:1)
+      at Object.require (src/i18n/index.ts:1:1)
+      at Object.require (src/components/ui/primitives.tsx:11:1)
+      at Object.require (src/components/ui/__tests__/design-system.test.tsx:3:1)
+
+Test Suites: 3 failed, 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        7.512 s, estimated 13 s
+Ran all test suites matching /src\\components\\ui\\__tests__\\design-system.test.tsx|src\\features\\restaurant\\__tests__\\ReservationBoard.test.tsx|src\\features\\assistant\\__tests__\\AssistantScreen.test.tsx/i.

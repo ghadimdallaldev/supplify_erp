@@ -1,0 +1,22 @@
+node:fs:2705
+      const stats = binding.lstat(base, true, undefined, true /* throwIfNoEntry */);
+                            ^
+
+Error: EPERM: operation not permitted, lstat 'C:\Users\GHADI~1.MDA'
+    at Object.realpathSync (node:fs:2705:29)
+    at ../node_modules/.pnpm/temp-dir@2.0.0/node_modules/temp-dir/index.js (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:112658:19)
+    at __require (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:12:50)
+    at ../node_modules/.pnpm/tempy@1.0.1/node_modules/tempy/index.js (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:113777:19)
+    at __require (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:12:50)
+    at ../env/node.fetcher/lib/index.js (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:113897:36)
+    at __require (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:12:50)
+    at ../env/plugin-commands-env/lib/node.js (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:115065:26)
+    at __require (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:12:50)
+    at ../env/plugin-commands-env/lib/downloadNodeVersion.js (C:\myProjects\supplify_erp\node_modules\.pnpm\pnpm@8.15.9\node_modules\pnpm\dist\pnpm.cjs:115170:18) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'lstat',
+  path: 'C:\\Users\\GHADI~1.MDA'
+}
+
+Node.js v22.11.0

@@ -1,0 +1,9 @@
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Progress: resolved 113, reused 113, downloaded 0, added 0
+Progress: resolved 747, reused 736, downloaded 0, added 0
+Progress: resolved 790, reused 779, downloaded 0, added 0
+ WARN  5 deprecated subdependencies found: abab@2.0.6, domexception@4.0.0, glob@7.2.3, inflight@1.0.6, whatwg-encoding@2.0.0
+Already up to date
+Progress: resolved 793, reused 782, downloaded 0, added 0, done
+
+Done in 5s

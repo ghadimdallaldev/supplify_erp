@@ -1,0 +1,12 @@
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+ RUN  v1.6.1 C:/myProjects/supplify_erp/apps/web
+
+ ✓ src/components/assistant/AssistantFab.test.tsx  (8 tests) 1128ms
+ ✓ src/components/inventory/ReorderAssistancePanel.test.tsx  (11 tests) 3317ms
+
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+   Start at  17:54:29
+   Duration  10.04s (transform 822ms, setup 4.55s, collect 2.01s, tests 4.45s, environment 4.49s, prepare 1.29s)
+

@@ -1,0 +1,18 @@
+{
+  "buildId": "b5bcb76b-d869-4c7c-9844-046348170400",
+  "apk": "C:\\myProjects\\supplify_erp\\output\\mobile-transformation\\android\\Supplify-dev-ui-2026-11-15.apk",
+  "bytes": 93949408,
+  "sha256": "1f82bdd20a0c96b1afd93a2bfd7d3162bc343b760015fcc40b2b7503c180bac9",
+  "package": "com.supplify.mobile",
+  "version": "1.1.0",
+  "versionCode": 27,
+  "api": "https://api-dev.supplifyerp.com",
+  "inspection": {
+    "bundles": [
+      "assets/index.android.bundle"
+    ],
+    "devApi": true,
+    "devIdentity": true,
+    "excludedNativeLibraries": []
+  }
+}

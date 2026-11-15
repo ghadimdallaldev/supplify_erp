@@ -1,0 +1,42 @@
+{
+  "checkedAt": "2026-11-14T13:41:39.419Z",
+  "repositories": [
+    {
+      "repository": "supplify_erp",
+      "heads": {
+        "dev": "292c8a95e0b2c478afae9e181de2ca741320f9d9",
+        "preprod": "04f91655aa27a9c6b64c02c9fca61481db4b77f0",
+        "prod": "ccd3bd7f1e608d5225203b9e3302fe9ae40c4024"
+      },
+      "promotionAncestry": true,
+      "productionRuntimeMatchesPreprod": true,
+      "localDevMatchesRemote": true,
+      "remainingWorkingTree": "M docs/marketing/PROGRESS.md\n?? docs/marketing/flyer-print-guide.md\n?? output/\n?? scripts/horeca/flyer/"
+    },
+    {
+      "repository": "supplify-mobile",
+      "heads": {
+        "dev": "c2bdf21b70cffa2111d3c1bc2a265cb48b78da0b",
+        "preprod": "bfad88d2cb6cd3f6a52d311e94aaded5e7ec4f44",
+        "prod": "12b128fb11fcc498c62ea252e22f7a0c6e628c63"
+      },
+      "promotionAncestry": true,
+      "productionRuntimeMatchesPreprod": true,
+      "localDevMatchesRemote": true,
+      "remainingWorkingTree": ""
+    },
+    {
+      "repository": "supplify-mobile-ios",
+      "heads": {
+        "dev": "c46b5db46a8c9120e5eb593ffe5ba77cf30e7144",
+        "preprod": "acc159529e1e479f3451f0ff791aa146e4bce6e1",
+        "prod": "369fd62407c63a8ba526e710b36026006f90c5f8"
+      },
+      "promotionAncestry": true,
+      "productionRuntimeMatchesPreprod": true,
+      "localDevMatchesRemote": true,
+      "remainingWorkingTree": ""
+    }
+  ],
+  "nativeFileComparisons": 87
+}

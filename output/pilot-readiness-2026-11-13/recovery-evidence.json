@@ -1,0 +1,9 @@
+{
+  "test": "Keycloak password recovery",
+  "smtpHost": "smtp.resend.com",
+  "smtpPort": "587",
+  "mailRequest": "failed",
+  "smtpConfiguration": "rolled back",
+  "error": "HTTPError",
+  "temporaryAccountRemoved": true
+}

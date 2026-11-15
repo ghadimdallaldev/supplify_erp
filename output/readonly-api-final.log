@@ -1,0 +1,29 @@
+
+ RUN  v1.6.1 C:/myProjects/supplify_erp/apps/api
+
+ ✓ src/services/assistant-tools/read-tools.test.js  (5 tests) 16ms
+ ✓ src/services/supplier-reorder-intelligence.service.test.js  (2 tests) 71ms
+ ✓ src/lib/reorder-ai-normalize.test.js  (18 tests) 14ms
+ ✓ src/services/reorder-forecast-model.test.js  (14 tests) 41ms
+ ✓ src/services/reorder-ai-context.service.test.js  (3 tests) 7ms
+ ✓ src/services/reorder-forecast-data.service.test.js  (4 tests) 10ms
+[2026-11-14 17:54:33.161 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:54:33.281 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:54:33.302 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:54:33.900 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:54:34.169 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:54:34.534 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/supplier-reorder-assistance.service.test.js  (3 tests) 2891ms
+ ✓ src/services/restaurant-reorder-assistance.service.test.js  (4 tests) 3058ms
+(node:27420) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:27420) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/assistant-chat.enhancements.test.js  (5 tests) 9ms
+ ✓ src/services/assistant-tools/index.test.js  (31 tests) 65ms
+
+ Test Files  10 passed (10)
+      Tests  89 passed (89)
+   Start at  17:54:30
+   Duration  4.97s (transform 1.92s, setup 132ms, collect 9.69s, tests 6.18s, environment 4ms, prepare 4.94s)
+

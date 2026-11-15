@@ -1,0 +1,5 @@
+[
+  "/api/restaurants/me/delivery-locations",
+  "/api/restaurant-finance/invoices",
+  "/api/reports/restaurant/order-volume"
+]

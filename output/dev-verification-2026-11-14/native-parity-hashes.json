@@ -1,0 +1,30 @@
+[
+    {
+        "File":  "src/lib/dealDisplay.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/lib/dealDisplay.test.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/services/api/consumerCheckout.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/services/api/consumerCheckout.test.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/services/api/queries/promotions.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/types/promotions.ts",
+        "Matches":  true
+    },
+    {
+        "File":  "src/features/restaurant/screens/DealsScreen.tsx",
+        "Matches":  true
+    }
+]

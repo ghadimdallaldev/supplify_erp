@@ -1,0 +1,8 @@
+{
+  "target": "API 35 emulator",
+  "buildVersionCode": 27,
+  "nativeSignInRendered": true,
+  "keycloakHostVisible": true,
+  "passwordInputVisible": true,
+  "authenticatedOrderFlowTested": false
+}

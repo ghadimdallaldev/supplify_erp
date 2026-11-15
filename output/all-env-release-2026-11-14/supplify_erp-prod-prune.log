@@ -1,0 +1,12 @@
+
+Pruning release tree (tier=prod)...
+
+removed scripts\prune-release-tree.mjs
+patched apps/api/src/server.js (removed e2e routes)
+wrote package.json
+wrote apps/api/package.json
+wrote apps/web/package.json
+wrote README.md
+
+Done. Review with `git status`, then commit.
+

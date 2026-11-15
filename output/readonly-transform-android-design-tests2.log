@@ -1,0 +1,27 @@
+PASS src/features/restaurant/__tests__/ReservationBoard.test.tsx (8.154 s)
+PASS src/features/assistant/__tests__/AssistantScreen.test.tsx
+FAIL src/components/ui/__tests__/design-system.test.tsx
+  ● Test suite failed to run
+
+    The method or property expo-modules-core.requireNativeViewManager is not available on ios, are you sure you've linked all the native dependencies properly?
+
+      10 |   ViewStyle,
+      11 | } from "react-native";
+    > 12 | import { Image } from "expo-image";
+         | ^
+      13 | import { Ionicons } from "@expo/vector-icons";
+      14 | import { colors, shadow, theme, type } from "../../theme";
+      15 | import {
+
+      at Object.requireNativeViewManager (node_modules/.pnpm/expo-modules-core@56.0.27_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/expo-modules-core/src/NativeViewManagerAdapter.tsx:12:9)
+      at Object.<anonymous> (node_modules/.pnpm/expo-image@56.0.13_expo@56.0.24_react-native-web@0.21.4_react-native@0.85.3_react@19.2.3/node_modules/expo-image/src/ExpoImage.tsx:13:49)
+      at Object.require (node_modules/.pnpm/expo-image@56.0.13_expo@56.0.24_react-native-web@0.21.4_react-native@0.85.3_react@19.2.3/node_modules/expo-image/src/Image.tsx:7:1)
+      at Object.require (node_modules/.pnpm/expo-image@56.0.13_expo@56.0.24_react-native-web@0.21.4_react-native@0.85.3_react@19.2.3/node_modules/expo-image/src/index.ts:2:1)
+      at Object.require (src/components/ui/v2.tsx:12:1)
+      at Object.require (src/components/ui/__tests__/design-system.test.tsx:4:1)
+
+Test Suites: 1 failed, 2 passed, 3 total
+Tests:       4 passed, 4 total
+Snapshots:   0 total
+Time:        11.779 s
+Ran all test suites matching /src\\components\\ui\\__tests__\\design-system.test.tsx|src\\features\\restaurant\\__tests__\\ReservationBoard.test.tsx|src\\features\\assistant\\__tests__\\AssistantScreen.test.tsx/i.

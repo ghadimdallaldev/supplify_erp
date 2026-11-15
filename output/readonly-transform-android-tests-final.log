@@ -1,0 +1,95 @@
+PASS src/features/assistant/__tests__/AssistantScreen.test.tsx (11.164 s)
+PASS src/features/restaurant/__tests__/ReservationBoard.test.tsx
+FAIL src/components/ui/__tests__/design-system.test.tsx
+  ● Test suite failed to run
+
+    WorkletsError: [Worklets] Native part of Worklets doesn't seem to be initialized.
+    See https://docs.swmansion.com/react-native-worklets/docs/guides/troubleshooting#native-part-of-worklets-doesnt-seem-to-be-initialized for more details.
+
+      1 | require('react-native-gesture-handler/jestSetup')
+    > 2 | jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'))
+        |                                                                                    ^
+      3 | jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined), notificationAsync: jest.fn().mockResolvedValue(undefined), NotificationFeedbackType: { Success: 'success', Error: 'error' } }))
+      4 |
+
+      at new WorkletsErrorConstructor (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/debug/WorkletsError.native.ts:14:25)
+      at new NativeWorklets (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/WorkletsModule/NativeWorklets.native.ts:37:13)
+      at Object.<anonymous> (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/WorkletsModule/NativeWorklets.native.ts:327:48)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/featureFlags/featureFlags.native.ts:3:1)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/initializers/initializers.native.ts:12:1)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/index.ts:3:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/initializers.ts:2:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/index.ts:5:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/mock.ts:20:1)
+      at Object.<anonymous> (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/mock.js:1:41)
+      at jest.setup.js:2:84
+      at Object.require (src/components/ui/motion.tsx:9:1)
+      at Object.require (src/components/ui/v2.tsx:23:1)
+      at Object.require (src/components/ui/__tests__/design-system.test.tsx:4:1)
+
+PASS src/navigation/notificationNavigation.test.ts
+PASS src/hooks/useEntitlements.test.ts
+PASS src/features/restaurant/__tests__/ReorderGuidance.test.tsx
+PASS src/hooks/usePermissions.test.ts
+PASS src/services/api/queries/orders.test.ts
+PASS src/services/api/queries/auth.test.ts
+PASS src/features/auth/session.test.ts
+PASS src/services/api/client.test.ts
+PASS src/hooks/useNetworkStatus.test.ts
+PASS src/services/push.test.ts
+PASS src/services/chatSocket.test.ts
+PASS src/config/env.test.ts
+PASS src/utils/podConfirmation.test.ts
+PASS src/services/api/consumerCheckout.test.ts
+PASS src/utils/format.test.ts
+PASS src/utils/podValidation.test.ts
+PASS src/utils/driverDeliveryUi.test.ts
+PASS src/services/api/queries/keys.test.ts
+PASS src/utils/driverSchedule.test.ts
+PASS src/lib/cartCurrency.test.ts
+PASS src/utils/orderDisputeEligibility.test.ts
+PASS src/store/cartStore.test.ts
+PASS src/features/auth/sessionIsolation.test.ts
+PASS src/utils/deliveryEtaDisplay.test.ts
+PASS src/features/auth/tokenStorage.test.ts
+PASS src/services/pushRegistration.test.ts
+PASS src/utils/runSheetDate.test.ts
+PASS src/features/publicShop/store.test.ts
+PASS src/lib/dealDisplay.test.ts
+PASS src/lib/orderQuantityRules.test.ts
+PASS src/types/supplify.test.ts
+
+Summary of all failing tests
+FAIL src/components/ui/__tests__/design-system.test.tsx
+  ● Test suite failed to run
+
+    WorkletsError: [Worklets] Native part of Worklets doesn't seem to be initialized.
+    See https://docs.swmansion.com/react-native-worklets/docs/guides/troubleshooting#native-part-of-worklets-doesnt-seem-to-be-initialized for more details.
+
+      1 | require('react-native-gesture-handler/jestSetup')
+    > 2 | jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'))
+        |                                                                                    ^
+      3 | jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined), notificationAsync: jest.fn().mockResolvedValue(undefined), NotificationFeedbackType: { Success: 'success', Error: 'error' } }))
+      4 |
+
+      at new WorkletsErrorConstructor (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/debug/WorkletsError.native.ts:14:25)
+      at new NativeWorklets (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/WorkletsModule/NativeWorklets.native.ts:37:13)
+      at Object.<anonymous> (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/WorkletsModule/NativeWorklets.native.ts:327:48)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/featureFlags/featureFlags.native.ts:3:1)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/initializers/initializers.native.ts:12:1)
+      at Object.require (node_modules/.pnpm/react-native-worklets@0.8.3_@babel+core@7.29.13_@react-native+metro-config@0.85.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-worklets/src/index.ts:3:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/initializers.ts:2:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/index.ts:5:1)
+      at Object.require (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/src/mock.ts:20:1)
+      at Object.<anonymous> (node_modules/.pnpm/react-native-reanimated@4.3.1_react-native-worklets@0.8.3_react-native@0.85.3_react@19.2.3/node_modules/react-native-reanimated/mock.js:1:41)
+      at jest.setup.js:2:84
+      at Object.require (src/components/ui/motion.tsx:9:1)
+      at Object.require (src/components/ui/v2.tsx:23:1)
+      at Object.require (src/components/ui/__tests__/design-system.test.tsx:4:1)
+
+
+Test Suites: 1 failed, 33 passed, 34 total
+Tests:       121 passed, 121 total
+Snapshots:   0 total
+Time:        39.268 s
+Ran all test suites.

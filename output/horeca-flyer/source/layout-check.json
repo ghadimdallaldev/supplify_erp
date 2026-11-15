@@ -1,0 +1,289 @@
+{
+  "errors": [],
+  "layout": [
+    {
+      "language": "en",
+      "width": 559.359375,
+      "height": 793.6875,
+      "items": [
+        {
+          "type": "edition",
+          "text": "HORECA / BEIRUTMEET THE CONNECTED WAY.",
+          "x": 393.89,
+          "y": 34.02,
+          "width": 127.69,
+          "height": 30.78,
+          "overflow": false
+        },
+        {
+          "type": "eyebrow",
+          "text": "RESTAURANTS + SUPPLIERS",
+          "x": 37.78,
+          "y": 95.61,
+          "width": 175.39,
+          "height": 11.19,
+          "overflow": false
+        },
+        {
+          "type": "H1",
+          "text": "SUPPLY.SIMPLIFIED.",
+          "x": 34.77,
+          "y": 122.08,
+          "width": 308.27,
+          "height": 113.5,
+          "overflow": false
+        },
+        {
+          "type": "feature-seal",
+          "text": "40+FEATURES",
+          "x": 436.7,
+          "y": 113.92,
+          "width": 92.65,
+          "height": 92.65,
+          "overflow": false
+        },
+        {
+          "type": "intro",
+          "text": "One connected platform for your orders,your stock, and the people behind them.",
+          "x": 37.78,
+          "y": 255.86,
+          "width": 251.63,
+          "height": 39.44,
+          "overflow": false
+        },
+        {
+          "type": "journey",
+          "text": "ORDERPREPAREDELIVERRECEIVE",
+          "x": 37.78,
+          "y": 521.56,
+          "width": 483.8,
+          "height": 11.27,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "Restaurants",
+          "x": 68,
+          "y": 552.8,
+          "width": 109.59,
+          "height": 18.84,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "Order, track and receive.Keep every supplier in view.",
+          "x": 187.03,
+          "y": 552.8,
+          "width": 334.55,
+          "height": 32.84,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "Suppliers",
+          "x": 68,
+          "y": 599.84,
+          "width": 109.59,
+          "height": 18.84,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "Manage stock. Fulfil orders.Promote your products with offers.",
+          "x": 187.03,
+          "y": 599.84,
+          "width": 334.55,
+          "height": 32.84,
+          "overflow": false
+        },
+        {
+          "type": "trust",
+          "text": "Private workspaces. Protected sign-in. Team permissions.",
+          "x": 37.78,
+          "y": 638.73,
+          "width": 483.8,
+          "height": 13,
+          "overflow": false
+        },
+        {
+          "type": "availability",
+          "text": "Features vary by business and plan. Ask for your personal demo.",
+          "x": 37.78,
+          "y": 653.09,
+          "width": 483.8,
+          "height": 10.88,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "See Supplifyin action↗",
+          "x": 37.8,
+          "y": 680.86,
+          "width": 340.16,
+          "height": 48.95,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "60-second film + interactive demo. No sign-in.",
+          "x": 37.8,
+          "y": 735.09,
+          "width": 340.16,
+          "height": 12.16,
+          "overflow": false
+        },
+        {
+          "type": "qr",
+          "text": "",
+          "x": 419.52,
+          "y": 680.3,
+          "width": 102.05,
+          "height": 102.05,
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "language": "ar",
+      "width": 559.359375,
+      "height": 793.6875,
+      "items": [
+        {
+          "type": "edition",
+          "text": "HORECA / BEIRUTطريقة أوضح للعمل معاً.",
+          "x": 37.78,
+          "y": 34.02,
+          "width": 86.08,
+          "height": 32.84,
+          "overflow": false
+        },
+        {
+          "type": "eyebrow",
+          "text": "للمطاعم والمورّدين",
+          "x": 431.3,
+          "y": 92.59,
+          "width": 90.28,
+          "height": 14.39,
+          "overflow": false
+        },
+        {
+          "type": "H1",
+          "text": "التوريد،بكلّ بساطة.",
+          "x": 301.98,
+          "y": 109.59,
+          "width": 222.98,
+          "height": 105.06,
+          "overflow": false
+        },
+        {
+          "type": "feature-seal",
+          "text": "40+ميزة وأكثر",
+          "x": 30.01,
+          "y": 113.92,
+          "width": 92.65,
+          "height": 92.65,
+          "overflow": false
+        },
+        {
+          "type": "intro",
+          "text": "منصة واحدة تجمع طلباتك ومخزونك،وتربطك بمن تعمل معهم.",
+          "x": 317.13,
+          "y": 253.59,
+          "width": 204.45,
+          "height": 42.53,
+          "overflow": false
+        },
+        {
+          "type": "journey",
+          "text": "اطلبجهّزوصّلاستلم",
+          "x": 37.78,
+          "y": 516.66,
+          "width": 483.8,
+          "height": 15.25,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "للمطاعم",
+          "x": 381.77,
+          "y": 552.8,
+          "width": 109.59,
+          "height": 19.44,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "اطلب وتابع التوصيل وأكّد الاستلام.كلّ مورّديك في صورة أوضح.",
+          "x": 37.78,
+          "y": 552.8,
+          "width": 334.55,
+          "height": 33.47,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "للمورّدين",
+          "x": 381.77,
+          "y": 600.47,
+          "width": 109.59,
+          "height": 19.44,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "نظّم المخزون وجهّز الطلبات.روّج لمنتجاتك بعروض مميّزة.",
+          "x": 37.78,
+          "y": 600.47,
+          "width": 334.55,
+          "height": 33.47,
+          "overflow": false
+        },
+        {
+          "type": "trust",
+          "text": "مساحة خاصة لكل شركة. دخول محمي. صلاحيات واضحة للفريق.",
+          "x": 37.78,
+          "y": 637.97,
+          "width": 483.8,
+          "height": 13.86,
+          "overflow": false
+        },
+        {
+          "type": "availability",
+          "text": "تختلف المزايا حسب النشاط والخطة. اكتشف المزيد في عرضك الخاص.",
+          "x": 37.78,
+          "y": 653.09,
+          "width": 483.8,
+          "height": 11.19,
+          "overflow": false
+        },
+        {
+          "type": "H2",
+          "text": "شاهد المنصة.وجرّبها بنفسك↖",
+          "x": 181.41,
+          "y": 680.86,
+          "width": 340.16,
+          "height": 53.75,
+          "overflow": false
+        },
+        {
+          "type": "P",
+          "text": "فيديو بدقيقة وتجربة تفاعلية، من دون تسجيل دخول.",
+          "x": 181.41,
+          "y": 737.63,
+          "width": 340.16,
+          "height": 14.41,
+          "overflow": false
+        },
+        {
+          "type": "qr",
+          "text": "",
+          "x": 37.8,
+          "y": 680.3,
+          "width": 102.05,
+          "height": 102.05,
+          "overflow": false
+        }
+      ]
+    }
+  ]
+}

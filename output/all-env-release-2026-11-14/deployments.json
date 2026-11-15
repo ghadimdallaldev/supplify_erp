@@ -1,0 +1,77 @@
+{
+  "verifiedAt": "2026-11-14T13:42:21.037Z",
+  "deployments": [
+    {
+      "environment": "dev",
+      "serviceId": "84b7bcdb-f5c9-4bfc-ac86-1ae9113672ce",
+      "deploymentId": "7539eb8b-fe5e-42d0-97c4-a5e1868dc4ac",
+      "status": "SUCCESS",
+      "commit": "292c8a95e0b2c478afae9e181de2ca741320f9d9",
+      "branch": "dev"
+    },
+    {
+      "environment": "dev",
+      "serviceId": "e8158ff7-35dc-4f38-9163-6b94d14dd499",
+      "deploymentId": "21d606ab-9765-48fa-987b-1c6861cffaf0",
+      "status": "SUCCESS",
+      "commit": "292c8a95e0b2c478afae9e181de2ca741320f9d9",
+      "branch": "dev"
+    },
+    {
+      "environment": "dev",
+      "serviceId": "e42456ad-a51c-4a8e-a9d6-718d15527ca0",
+      "deploymentId": "b513f3a5-598a-49e1-9d97-baeb90ac2661",
+      "status": "SUCCESS",
+      "commit": "292c8a95e0b2c478afae9e181de2ca741320f9d9",
+      "branch": "dev"
+    },
+    {
+      "environment": "preprod",
+      "serviceId": "0efcfe8e-df71-4dd1-b2d5-5a81c88d2904",
+      "deploymentId": "256797e2-d182-4ac1-bbe3-c4bb1dbec079",
+      "status": "SUCCESS",
+      "commit": "04f91655aa27a9c6b64c02c9fca61481db4b77f0",
+      "branch": "preprod"
+    },
+    {
+      "environment": "preprod",
+      "serviceId": "9da0ec97-0e28-4c33-92f0-57182f7cd884",
+      "deploymentId": "7888d75b-b9b5-4a9b-88fb-2d26d38ce7cc",
+      "status": "SUCCESS",
+      "commit": "04f91655aa27a9c6b64c02c9fca61481db4b77f0",
+      "branch": "preprod"
+    },
+    {
+      "environment": "preprod",
+      "serviceId": "7d24dab5-57f4-4dbf-9609-12b3b2b29ba2",
+      "deploymentId": "e1f2c5f6-d088-4f7f-bb07-705ac589099c",
+      "status": "SUCCESS",
+      "commit": "04f91655aa27a9c6b64c02c9fca61481db4b77f0",
+      "branch": "preprod"
+    },
+    {
+      "environment": "prod",
+      "serviceId": "c384fd8a-a6c5-4851-a2e8-623b7dbeba81",
+      "deploymentId": "4b9fc693-ed4b-43ec-9d7b-6eeb13a61f67",
+      "status": "SUCCESS",
+      "commit": "ccd3bd7f1e608d5225203b9e3302fe9ae40c4024",
+      "branch": "prod"
+    },
+    {
+      "environment": "prod",
+      "serviceId": "7911e104-9093-472b-ab68-f29026b3d790",
+      "deploymentId": "27b1a391-d2b8-414d-a279-d2a026108830",
+      "status": "SUCCESS",
+      "commit": "ccd3bd7f1e608d5225203b9e3302fe9ae40c4024",
+      "branch": "prod"
+    },
+    {
+      "environment": "prod",
+      "serviceId": "2745e741-1f54-4e31-846a-25d7790c26f4",
+      "deploymentId": "6a3dceb0-310a-4d87-b077-d508e0c7f14e",
+      "status": "SUCCESS",
+      "commit": "ccd3bd7f1e608d5225203b9e3302fe9ae40c4024",
+      "branch": "prod"
+    }
+  ]
+}

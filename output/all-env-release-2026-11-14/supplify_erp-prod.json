@@ -1,0 +1,12 @@
+{
+  "repository": "supplify_erp",
+  "tier": "prod",
+  "source": "preprod",
+  "sourceSha": "04f91655aa27a9c6b64c02c9fca61481db4b77f0",
+  "baseSha": "a4c141a392db98f18bd9a995d24d14f2e368bcee",
+  "branch": "release/2026-11-14-prod-pilot-ipad",
+  "head": "c554e69654c4c8cc9f938e26fe701fd35e99604d",
+  "checkout": "C:\\myProjects\\supplify_erp\\.release-checkouts\\all-env-20261114\\supplify_erp-prod",
+  "runtimeFiles": 1708,
+  "createdAt": "2026-11-14T13:33:55.136Z"
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "9a8c9d28-373a-4ad5-a148-8886454d1b7c",
+    "volumeId": "55d73333-3def-4779-bad4-d9e3469e76f8",
+    "serviceId": "ee4799d5-2e8d-4892-b943-109745bb0637",
+    "mountPath": "/var/lib/postgresql/data",
+    "schedules": [],
+    "backups": []
+  }
+]

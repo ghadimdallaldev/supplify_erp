@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+const base='output/mobile-transformation';
+const read=file=>JSON.parse(fs.readFileSync(file,'utf8'));
+const route=read(base+'/screens/results.json'),responsive=read(base+'/responsive/results.json'),interactions=read(base+'/interactions/results.json');
+const invalid=rows=>rows.filter(row=>(row.errors?.length??0)||(row.writes?.length??0)||row.overflow);
+if(route.length!==137||responsive.length!==40||interactions.length!==2||invalid([...route,...responsive,...interactions]).length)throw Error('Visual validation failed or incomplete');
+const parity=JSON.parse(execFileSync(process.execPath,['scripts/mobile/verify-ui-parity.mjs'],{encoding:'utf8'}));
+const testLogs=['transform-final-android-tests','transform-final-ios-tests'].map(label=>{const log=fs.readFileSync('output/readonly-'+label+'.log','utf8');if(!/34 passed, 34 total/.test(log)||!/125 passed, 125 total/.test(log)||/^FAIL /m.test(log))throw Error('Tests failed: '+label);return{label,suites:34,tests:125};});
+const build=read(base+'/android-build.json');
+const artifactFile=base+'/android/artifact.json';
+const artifact=fs.existsSync(artifactFile)?read(artifactFile):null;
+const nativeFile=base+'/android/native-smoke.json';
+const nativeSmoke=fs.existsSync(nativeFile)?read(nativeFile):null;
+const report={date:'2026-11-15',parity,tests:testLogs,visual:{routes:route.length,responsive:responsive.length,interactionScenarios:interactions.length,issues:[]},build,artifact,nativeSmoke};
+fs.writeFileSync(base+'/verification.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({sourceFiles:parity.sourceFiles,copyKeys:parity.registeredCopy,testsPerPlatform:125,renderedRoutes:route.length,responsive:responsive.length,interactions:interactions.length,build:build.status,artifact:artifact?.sha256??null}));

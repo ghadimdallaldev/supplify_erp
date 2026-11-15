@@ -1,0 +1,5 @@
+(node:23388) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Using EAS CLI without version control system is not recommended, use this mode only if you know what you are doing.
+- Fetching the build…
+✔ Found a matching build for the project @supplify-team/supplify-mobile

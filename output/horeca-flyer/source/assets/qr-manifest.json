@@ -1,0 +1,12 @@
+{
+  "en": {
+    "url": "https://app.supplifyerp.com/demo/?utm_source=flyer-en",
+    "version": 5,
+    "modules": 45
+  },
+  "ar": {
+    "url": "https://app.supplifyerp.com/demo/?utm_source=flyer-ar",
+    "version": 5,
+    "modules": 45
+  }
+}

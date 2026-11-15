@@ -1,0 +1,30 @@
+{
+  "source": "Railway production logical snapshot",
+  "startedAt": "2026-11-13T17:11:19Z",
+  "databases": [
+    {
+      "sourceDatabase": "keycloak",
+      "sourceVersion": "18.6 (Debian 18.6-1.pgdg13+2)",
+      "restoredTableCount": 92,
+      "checks": {
+        "public.realm": 3,
+        "public.user_entity": 5
+      },
+      "restore": "passed"
+    },
+    {
+      "sourceDatabase": "railway",
+      "sourceVersion": "18.6 (Debian 18.6-1.pgdg13+2)",
+      "restoredTableCount": 234,
+      "checks": {
+        "public.schema_migrations": 233,
+        "public.app_user": 0,
+        "public.customer_order": 0
+      },
+      "restore": "passed"
+    }
+  ],
+  "status": "passed",
+  "scratchRemoved": true,
+  "durationSeconds": 167.3
+}

@@ -1,0 +1,8 @@
+{
+  "test": "Keycloak password recovery",
+  "environment": "preprod",
+  "transport": "supplify-http",
+  "phase": "send_recovery",
+  "mailRequest": "accepted",
+  "smtpConfiguration": "applied"
+}

@@ -1,0 +1,204 @@
+--------- beginning of main
+11-15 17:33:13.707  4452  4452 I supplify.mobile: Using CollectorTypeCMC GC.
+11-15 17:33:13.708  4452  4452 W supplify.mobile: Unexpected CPU variant for x86: x86_64.
+11-15 17:33:13.708  4452  4452 W supplify.mobile: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, goldmont-without-sha-xsaves, tremont, kabylake, default
+11-15 17:33:13.713  4452  4452 E supplify.mobile: Not starting debugger since process cannot load the jdwp agent.
+11-15 17:33:13.716  4452  4452 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+11-15 17:33:13.772  4452  4452 D ApplicationLoaders: Returning zygote-cached class loader: /system/framework/org.apache.http.legacy.jar
+11-15 17:33:13.778  4452  4452 D nativeloader: Configuring clns-7 for other apk /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/lib/x86_64:/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.supplify.mobile
+11-15 17:33:13.819  4452  4452 V GraphicsEnvironment: Currently set values for:
+11-15 17:33:13.819  4452  4452 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+11-15 17:33:13.819  4452  4452 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+11-15 17:33:13.819  4452  4452 V GraphicsEnvironment: Global.Settings values are invalid: number of packages: 0, number of values: 0
+11-15 17:33:13.819  4452  4452 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+11-15 17:33:13.947  4452  4452 I FirebaseApp: Device unlocked: initializing all Firebase APIs for app [DEFAULT]
+11-15 17:33:13.962  4452  4452 I FirebaseInitProvider: FirebaseApp initialization successful
+11-15 17:33:13.972  4452  4452 D WM-WrkMgrInitializer: Initializing WorkManager with default configuration.
+11-15 17:33:13.999  4452  4452 D WM-PackageManagerHelper: Skipping component enablement for androidx.work.impl.background.systemjob.SystemJobService
+11-15 17:33:14.001  4452  4452 D WM-Schedulers: Created SystemJobScheduler and enabled SystemJobService
+11-15 17:33:14.040  4452  4452 W SoLoader: Initializing SoLoader: 0
+11-15 17:33:14.040  4452  4452 W SoLoader: Recording new base apk path: /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk
+11-15 17:33:14.040  4452  4452 W SoLoader: Previously recorded 0 base apk paths.
+11-15 17:33:14.044  4452  4452 I SoLoader: Preparing SO source: DirectorySoSource[root = /vendor/lib64 flags = 2]
+11-15 17:33:14.045  4452  4452 I SoLoader: Preparing SO source: DirectorySoSource[root = /system/lib64 flags = 2]
+11-15 17:33:14.045  4452  4452 I SoLoader: Preparing SO source: DirectApkSoSource[root = [/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64]]
+11-15 17:33:14.063  4452  4452 I SoLoader: Preparing SO source: ApplicationSoSource[DirectorySoSource[root = /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/lib/x86_64 flags = 0]]
+11-15 17:33:14.063  4452  4452 I SoLoader: init finish: 4 SO sources prepared
+11-15 17:33:14.063  4452  4452 W SoLoader: SoLoader initialized: 8
+11-15 17:33:14.288  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libc++_shared.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.376  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libjsi.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.409  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libfbjni.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.469  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libreactnative.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Entering merged library JNI_OnLoad.
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7f9355f51a20
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7f9356036550
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x7f9356048a90
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7f93560835a0
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7f9356179870
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7f9356185db0
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7f9356188c20
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7f93561b0af0
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7f9356257d70
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7f935625ecd0
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7f9356266350
+11-15 17:33:14.470  4452  4452 D jni_lib_merge: About to register 11 actual methods.
+11-15 17:33:14.509  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libreact_codegen_rnscreens.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Entering merged library JNI_OnLoad.
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7f9355f51a20
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7f9356036550
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x7f9356048a90
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7f93560835a0
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7f9356179870
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7f9356185db0
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7f9356188c20
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7f93561b0af0
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7f9356257d70
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7f935625ecd0
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7f9356266350
+11-15 17:33:14.509  4452  4452 D jni_lib_merge: About to register 11 actual methods.
+11-15 17:33:14.522  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libreact_codegen_safeareacontext.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.527  4452  4452 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libappmodules.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.546  4452  4480 W supplify.mobile: Long monitor contention with owner Firebase Background Thread #0 (4479) at java.lang.Void com.google.firebase.heartbeatinfo.DefaultHeartBeatController.lambda$registerHeartBeat$0$com-google-firebase-heartbeatinfo-DefaultHeartBeatController()(DefaultHeartBeatController.java:71) waiters=1 in java.lang.Void com.google.firebase.heartbeatinfo.DefaultHeartBeatController.lambda$registerHeartBeat$0$com-google-firebase-heartbeatinfo-DefaultHeartBeatController() for 451ms
+11-15 17:33:14.628  4452  4482 W supplify.mobile: Long monitor contention with owner Firebase Background Thread #0 (4479) at java.lang.Void com.google.firebase.heartbeatinfo.DefaultHeartBeatController.lambda$registerHeartBeat$0$com-google-firebase-heartbeatinfo-DefaultHeartBeatController()(DefaultHeartBeatController.java:71) waiters=0 in java.lang.Void com.google.firebase.heartbeatinfo.DefaultHeartBeatController.lambda$registerHeartBeat$0$com-google-firebase-heartbeatinfo-DefaultHeartBeatController() for 556ms
+11-15 17:33:14.638  4452  4452 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+11-15 17:33:14.727  4452  4452 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+11-15 17:33:14.878  4452  4452 W unknown:BridgelessReact: ReactHost{0}.startSurface(surfaceId = 0): Schedule
+11-15 17:33:14.878  4452  4452 W unknown:BridgelessReact: ReactHost{0}.attachSurface(surfaceId = 0)
+11-15 17:33:14.882  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask()
+11-15 17:33:14.882  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Start
+11-15 17:33:14.882  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getJSBundleLoader()
+11-15 17:33:14.883  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Creating BridgelessReactContext
+11-15 17:33:14.891  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Creating ReactInstance
+11-15 17:33:14.926  4452  4452 W unknown:BridgelessReact: ReactHost{0}.onHostResume(activity)
+11-15 17:33:14.926  4452  4452 W unknown:BridgelessReact: ReactHost{0}.ReactContext.onHostResume()
+11-15 17:33:14.957  4452  4452 W HWUI    : Unknown dataspace 0
+11-15 17:33:14.983  4452  4510 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libhermesvm.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.997  4452  4510 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libhermestooling.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: Entering merged library JNI_OnLoad.
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: Preparing 4 pre-merged libs (including stub)
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: Preparing to register libhermes_executor_so.  onload_func: 0x7f93563ad990
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: Preparing to register libhermesinstancejni_so.  onload_func: 0x7f93563b50f0
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: Preparing to register libjsijniprofiler_so.  onload_func: 0x7f93563b5880
+11-15 17:33:14.997  4452  4510 D jni_lib_merge: About to register 3 actual methods.
+11-15 17:33:15.045  4452  4501 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+11-15 17:33:15.046  4452  4501 I EGL_emulation: Opening libGLESv2_emulation.so
+11-15 17:33:15.113  4452  4501 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-15 17:33:15.162  4452  4510 I ExpoModulesCore: ✅ AppContext was initialized
+11-15 17:33:15.214  4452  4501 I Gralloc4: mapper 4.x is not supported
+11-15 17:33:15.216  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Loading JS Bundle
+11-15 17:33:15.217  4452  4510 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): DevSupportManager.onNewReactContextCreated()
+11-15 17:33:15.217  4452  4510 W unknown:BridgelessReact: ReactHost{0}.startSurface(surfaceId = 0): Execute
+11-15 17:33:15.259  4452  4511 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libexpo-modules-core.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:15.262  4452  4511 W BridgelessReactContext: [WARNING] Bridgeless doesn't support CatalystInstance. Accessing an API that's not part of the new architecture is not encouraged usage.
+11-15 17:33:15.274  4452  4511 I ExpoModulesCore: ✅ JSI interop was installed
+11-15 17:33:15.288  4452  4511 I ExpoModulesCore: ✅ Constants were exported
+11-15 17:33:15.324  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenFooterManager
+11-15 17:33:15.328  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.uimanager.LayoutShadowNode
+11-15 17:33:15.329  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.GroupViewManagerWrapper
+11-15 17:33:15.330  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContainerViewManager
+11-15 17:33:15.332  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.CalloutManager
+11-15 17:33:15.333  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.maps.MapLocalTileManager
+11-15 17:33:15.337  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.MapViewManager
+11-15 17:33:15.338  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ModalScreenViewManager
+11-15 17:33:15.339  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.WMSTileManager
+11-15 17:33:15.341  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewManager
+11-15 17:33:15.342  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewShadowNode
+11-15 17:33:15.343  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.safearea.SafeAreaViewManager
+11-15 17:33:15.344  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenViewManager
+11-15 17:33:15.344  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.SimpleViewManagerWrapper
+11-15 17:33:15.345  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.PolylineManager
+11-15 17:33:15.345  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackViewManager
+11-15 17:33:15.346  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.stack.header.config.StackHeaderConfigViewManager
+11-15 17:33:15.347  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.PolygonManager
+11-15 17:33:15.347  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaProviderManager
+11-15 17:33:15.348  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.SearchBarManager
+11-15 17:33:15.349  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.maps.MapGradientPolylineManager
+11-15 17:33:15.350  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.maps.MapHeatmapManager
+11-15 17:33:15.352  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.host.TabsHostViewManager
+11-15 17:33:15.353  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.stack.header.subview.StackHeaderSubviewViewManager
+11-15 17:33:15.354  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.reactnativecommunity.webview.RNCWebViewManager
+11-15 17:33:15.356  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.OverlayManager
+11-15 17:33:15.356  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.scrollviewmarker.ScrollViewMarkerViewManager
+11-15 17:33:15.357  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.UrlTileManager
+11-15 17:33:15.357  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderConfigViewManager
+11-15 17:33:15.357  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.modals.formsheet.FormSheetContentWrapperViewManager
+11-15 17:33:15.358  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContentWrapperManager
+11-15 17:33:15.358  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.MarkerManager
+11-15 17:33:15.359  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.stack.host.StackHostViewManager
+11-15 17:33:15.360  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderSubviewManager
+11-15 17:33:15.362  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.stack.screen.StackScreenViewManager
+11-15 17:33:15.363  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.modals.formsheet.FormSheetHostViewManager
+11-15 17:33:15.364  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.gamma.tabs.screen.TabsScreenViewManager
+11-15 17:33:15.365  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.rnmaps.fabric.CircleManager
+11-15 17:33:15.393  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerButtonViewManager
+11-15 17:33:15.394  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.safeareaview.ReactSafeAreaViewManager
+11-15 17:33:15.397  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ReactModalHostManager
+11-15 17:33:15.400  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ReactProgressBarViewManager
+11-15 17:33:15.402  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollViewManager
+11-15 17:33:15.405  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.image.ReactImageManager
+11-15 17:33:15.407  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextViewManager
+11-15 17:33:15.409  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollContainerViewManager
+11-15 17:33:15.411  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.unimplementedview.ReactUnimplementedViewManager
+11-15 17:33:15.413  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactScrollViewManager
+11-15 17:33:15.417  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.view.ReactViewManager
+11-15 17:33:15.420  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.drawer.ReactDrawerLayoutManager
+11-15 17:33:15.422  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager
+11-15 17:33:15.426  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.swiperefresh.SwipeRefreshLayoutManager
+11-15 17:33:15.432  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputManager
+11-15 17:33:15.435  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.SelectableTextViewManager
+11-15 17:33:15.436  4452  4452 W unknown:BridgelessReact: ReactHost{0}.ReactContext.onHostResume()
+11-15 17:33:15.436  4452  4452 W unknown:BridgelessReact: ReactHost{0}.getOrCreateReactInstanceTask(): Executing ReactInstanceEventListeners
+11-15 17:33:15.437  4452  4511 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerRootViewManager
+11-15 17:33:15.651  4452  4511 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/librnscreens.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes3.dex): ok
+11-15 17:33:15.683  4452  4511 I ReactNativeJS: Running "main"
+11-15 17:33:15.698  4452  4511 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libgesturehandler.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Entering merged library JNI_OnLoad.
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing 12 pre-merged libs (including stub)
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libfabricjni_so.  onload_func: 0x7f9355f51a20
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreact_devsupportjni_so.  onload_func: 0x7f9356036550
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreact_featureflagsjni_so.  onload_func: 0x7f9356048a90
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreact_newarchdefaults_so.  onload_func: 0x7f93560835a0
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreactnativeblob_so.  onload_func: 0x7f9356179870
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreactnativejni_so.  onload_func: 0x7f9356185db0
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libreactnativejni_common_so.  onload_func: 0x7f9356188c20
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register librninstance_so.  onload_func: 0x7f93561b0af0
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libturbomodulejsijni_so.  onload_func: 0x7f9356257d70
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libuimanagerjni_so.  onload_func: 0x7f935625ecd0
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: Preparing to register libyoga_so.  onload_func: 0x7f9356266350
+11-15 17:33:15.698  4452  4511 D jni_lib_merge: About to register 11 actual methods.
+11-15 17:33:15.704  4452  4452 I ReactNative: [GESTURE HANDLER] Initialize gesture handler for root view com.facebook.react.runtime.ReactSurfaceView{870fbe V.E...... ......ID 0,0-1080,2400 #1}
+11-15 17:33:16.029  4452  4538 I WebViewFactory: Loading com.google.android.webview version 124.0.6367.219 (code 636771938)
+--------- beginning of system
+11-15 17:33:16.040  4452  4538 V ResourcesManager: The following library key has been added: ResourcesKey{ mHash=2bc42942 mResDir=null mSplitDirs=[] mOverlayDirs=[/product/overlay/EmulationPixel6/EmulationPixel6Overlay.apk,/product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk] mLibDirs=[/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk,/data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.apk,/system_ext/framework/androidx.window.extensions.jar] mDisplayId=0 mOverrideConfig=v35 mCompatInfo={420dpi always-compat} mLoaders=[]}
+11-15 17:33:16.043  4452  4538 W ziparchive: Unable to open '/data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.dm': No such file or directory
+11-15 17:33:16.043  4452  4538 W ziparchive: Unable to open '/data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.dm': No such file or directory
+11-15 17:33:16.044  4452  4538 W supplify.mobile: Entry not found
+11-15 17:33:16.049  4452  4538 D nativeloader: Configuring clns-8 for other apk /data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/lib/x86_64:/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk!/lib/x86_64:/data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.apk!/lib/x86_64, permitted_path=/data:/mnt/expand
+11-15 17:33:16.063  4452  4538 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+11-15 17:33:16.081  4452  4538 D nativeloader: Configuring clns-9 for other apk /data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/lib/x86_64:/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk!/lib/x86_64:/data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.apk!/lib/x86_64, permitted_path=/data:/mnt/expand
+11-15 17:33:16.167  4452  4541 D nativeloader: Load /data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!/lib/x86_64/libimagepipeline.so using ns clns-7 from class loader (caller=/data/app/~~7u2vZx70agjjLFqXSweZNQ==/com.supplify.mobile-_wV0HlKmHEnsg6ESPOiRcg==/base.apk!classes2.dex): ok
+11-15 17:33:16.178  4452  4538 I cr_WVCFactoryProvider: Loaded version=124.0.6367.219 minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+11-15 17:33:16.202  4452  4538 D nativeloader: Load /data/app/~~QSJTj3MrFmkfijOR-_TxLw==/com.google.android.trichromelibrary_636771938-cQ5tUd61moym57bKaqMZ6A==/TrichromeLibrary.apk!/lib/x86_64/libmonochrome_64.so using ns clns-9 from class loader (caller=/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk): ok
+11-15 17:33:16.210  4452  4538 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using ns clns-9 from class loader (caller=/data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk): ok
+11-15 17:33:16.236  4452  4547 I chromium: [1115/173316.234896:INFO:variations_seed_loader.cc(66)] Failed to open file for reading.: No such file or directory (2)
+11-15 17:33:16.236  4452  4547 I cr_VariationsUtils: Failed reading seed file "/data/user/0/com.supplify.mobile/app_webview/variations_seed_new"
+11-15 17:33:16.248  4452  4548 I cr_VariationsUtils: Requesting new seed from IVariationsSeedServer
+11-15 17:33:16.278  4452  4538 I cr_LibraryLoader: Successfully loaded native library
+11-15 17:33:16.292  4452  4538 I cr_CachingUmaRecorder: Flushed 6 samples from 6 histograms, 0 samples were dropped.
+11-15 17:33:17.264  4452  4538 D TrafficStats: tagSocket(128) with statsTag=0xffffffff, statsUid=-1
+11-15 17:33:17.586  4452  4501 D EGL_emulation: app_time_stats: avg=195.00ms min=5.40ms max=1048.48ms count=11
+11-15 17:33:20.544  4452  4579 D ProfileInstaller: Installing profile for com.supplify.mobile
+11-15 17:33:26.083  4452  4461 W supplify.mobile: ApkAssets: Deleting an ApkAssets object '<empty> and /data/app/~~LTxQViKjHfd8Sqho8bxg4Q==/com.google.android.webview-UDAHZim06F70O__cAj29aA==/WebViewGoogle.apk' with 2 weak references
+11-15 17:34:02.891  4452  4501 D EGL_emulation: app_time_stats: avg=2664.96ms min=14.04ms max=45037.72ms count=17
+11-15 17:34:03.833  4452  4538 D TrafficStats: tagSocket(134) with statsTag=0xffffffff, statsUid=-1
+11-15 17:34:03.891  4452  4501 D EGL_emulation: app_time_stats: avg=15.77ms min=3.89ms max=23.67ms count=60
+11-15 17:34:04.905  4452  4501 D EGL_emulation: app_time_stats: avg=9.24ms min=3.96ms max=29.00ms count=52
+11-15 17:34:05.737  4452  4452 W unknown:BridgelessReact: ReactHost{0}.onUserLeaveHint(activity)
+11-15 17:34:05.741  4452  4452 W unknown:BridgelessReact: ReactHost{0}.onHostPause(activity)
+11-15 17:34:05.741  4452  4452 W unknown:BridgelessReact: ReactHost{0}.ReactContext.onHostPause()
+11-15 17:34:05.911  4452  4501 D EGL_emulation: app_time_stats: avg=14.92ms min=5.32ms max=30.36ms count=57
+11-15 17:34:06.922  4452  4501 D EGL_emulation: app_time_stats: avg=11.13ms min=3.83ms max=32.14ms count=56
+11-15 17:34:07.942  4452  4501 D EGL_emulation: app_time_stats: avg=14.92ms min=4.42ms max=119.55ms count=44
+11-15 17:34:08.169  4452  4452 D VRI[MainActivity]: visibilityChanged oldVisibility=true newVisibility=false

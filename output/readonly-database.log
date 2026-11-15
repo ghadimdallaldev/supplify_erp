@@ -1,0 +1,1426 @@
+[2026-11-14 17:54:34.834 +0200] [33mWARN[39m: [36mREDIS_URL is not set — API caches use in-process memory only (no cross-replica sharing)[39m
+(node:6944) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-11-14 17:54:35.972 +0200] [32mINFO[39m: [36mRunning startup SQL migrations[39m
+    runMigrationsOnStart: false
+    baseSchemaExists: false
+    forced: true
+[2026-11-14 17:54:35.972 +0200] [32mINFO[39m: [36mEnsuring schema_migrations table exists[39m
+[2026-11-14 17:54:35.993 +0200] [32mINFO[39m: [36mApplying pending SQL migrations[39m
+    pending: 233
+    total: 233
+[2026-11-14 17:54:35.993 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0000_schema_migrations.sql"
+[2026-11-14 17:54:36.004 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0000_schema_migrations.sql"
+[2026-11-14 17:54:36.004 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0001_init.sql"
+[2026-11-14 17:54:36.220 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0001_init.sql"
+[2026-11-14 17:54:36.220 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0002_inventory_enhancements.sql"
+[2026-11-14 17:54:36.316 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0002_inventory_enhancements.sql"
+[2026-11-14 17:54:36.316 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0003_chat_system.sql"
+[2026-11-14 17:54:36.458 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0003_chat_system.sql"
+[2026-11-14 17:54:36.458 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0004_restaurant_inventory.sql"
+[2026-11-14 17:54:36.516 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0004_restaurant_inventory.sql"
+[2026-11-14 17:54:36.516 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0005_supplier_onboarding.sql"
+[2026-11-14 17:54:36.659 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0005_supplier_onboarding.sql"
+[2026-11-14 17:54:36.660 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0006_fulfillment_logistics.sql"
+[2026-11-14 17:54:36.898 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0006_fulfillment_logistics.sql"
+[2026-11-14 17:54:36.898 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0007_session_store.sql"
+[2026-11-14 17:54:36.921 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0007_session_store.sql"
+[2026-11-14 17:54:36.921 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0008_add_reserved_qty.sql"
+[2026-11-14 17:54:36.935 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0008_add_reserved_qty.sql"
+[2026-11-14 17:54:36.935 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0009_finance_billing.sql"
+[2026-11-14 17:54:37.273 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0009_finance_billing.sql"
+[2026-11-14 17:54:37.273 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0011_quick_lists.sql"
+[2026-11-14 17:54:37.326 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0011_quick_lists.sql"
+[2026-11-14 17:54:37.326 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0014_restaurant_inventory_enhancements.sql"
+[2026-11-14 17:54:37.394 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0014_restaurant_inventory_enhancements.sql"
+[2026-11-14 17:54:37.394 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0015_restaurant_onboarding.sql"
+[2026-11-14 17:54:37.544 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0015_restaurant_onboarding.sql"
+[2026-11-14 17:54:37.544 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0016_receiving_system.sql"
+[2026-11-14 17:54:37.615 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0016_receiving_system.sql"
+[2026-11-14 17:54:37.615 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0018_waste_tracking.sql"
+[2026-11-14 17:54:37.706 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0018_waste_tracking.sql"
+[2026-11-14 17:54:37.706 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0019_restaurant_pricing.sql"
+[2026-11-14 17:54:37.773 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0019_restaurant_pricing.sql"
+[2026-11-14 17:54:37.773 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0020_notifications.sql"
+[2026-11-14 17:54:37.899 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0020_notifications.sql"
+[2026-11-14 17:54:37.899 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0021_update_order_status_enum.sql"
+[2026-11-14 17:54:37.944 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0021_update_order_status_enum.sql"
+[2026-11-14 17:54:37.944 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0022_subscription_system.sql"
+[2026-11-14 17:54:38.182 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0022_subscription_system.sql"
+[2026-11-14 17:54:38.182 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0023_branches_warehouses.sql"
+[2026-11-14 17:54:38.366 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0023_branches_warehouses.sql"
+[2026-11-14 17:54:38.366 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0024_admin_overrides_chat_updates.sql"
+[2026-11-14 17:54:38.431 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0024_admin_overrides_chat_updates.sql"
+[2026-11-14 17:54:38.431 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0025_order_reminders.sql"
+[2026-11-14 17:54:38.446 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0025_order_reminders.sql"
+[2026-11-14 17:54:38.446 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0026_product_tags_categories.sql"
+[2026-11-14 17:54:38.512 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0026_product_tags_categories.sql"
+[2026-11-14 17:54:38.512 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0027_add_order_reminder_columns.sql"
+[2026-11-14 17:54:38.526 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0027_add_order_reminder_columns.sql"
+[2026-11-14 17:54:38.526 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0028_order_status_enhancements.sql"
+[2026-11-14 17:54:38.535 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0028_order_status_enhancements.sql"
+[2026-11-14 17:54:38.535 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0029_add_quick_list_scheduling_columns.sql"
+[2026-11-14 17:54:38.580 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0029_add_quick_list_scheduling_columns.sql"
+[2026-11-14 17:54:38.580 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0030_add_message_reply_to.sql"
+[2026-11-14 17:54:38.596 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0030_add_message_reply_to.sql"
+[2026-11-14 17:54:38.596 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0031_add_conversation_management.sql"
+[2026-11-14 17:54:38.630 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0031_add_conversation_management.sql"
+[2026-11-14 17:54:38.630 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0032_remove_feature_flags.sql"
+[2026-11-14 17:54:38.653 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0032_remove_feature_flags.sql"
+[2026-11-14 17:54:38.653 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0033_reservations_system.sql"
+[2026-11-14 17:54:38.733 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0033_reservations_system.sql"
+[2026-11-14 17:54:38.733 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0034_staff_app.sql"
+[2026-11-14 17:54:38.815 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0034_staff_app.sql"
+[2026-11-14 17:54:38.815 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0035_staff_app_extensions.sql"
+[2026-11-14 17:54:39.005 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0035_staff_app_extensions.sql"
+[2026-11-14 17:54:39.005 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0036_notification_enhancements.sql"
+[2026-11-14 17:54:39.016 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0036_notification_enhancements.sql"
+[2026-11-14 17:54:39.016 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0037_portal_support.sql"
+[2026-11-14 17:54:39.064 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0037_portal_support.sql"
+[2026-11-14 17:54:39.064 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0038_orders_list_indexes.sql"
+[2026-11-14 17:54:39.081 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0038_orders_list_indexes.sql"
+[2026-11-14 17:54:39.081 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0039_notification_preferences_user_schema.sql"
+[2026-11-14 17:54:39.126 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0039_notification_preferences_user_schema.sql"
+[2026-11-14 17:54:39.126 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0040_attachment_file_size.sql"
+[2026-11-14 17:54:39.135 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0040_attachment_file_size.sql"
+[2026-11-14 17:54:39.135 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0041_rbac_tenant_roles.sql"
+[2026-11-14 17:54:39.277 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0041_rbac_tenant_roles.sql"
+[2026-11-14 17:54:39.277 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0042_rbac_seed_roles_permissions.sql"
+[2026-11-14 17:54:39.341 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0042_rbac_seed_roles_permissions.sql"
+[2026-11-14 17:54:39.341 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0043_rbac_assign_default_owner_roles.sql"
+[2026-11-14 17:54:39.355 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0043_rbac_assign_default_owner_roles.sql"
+[2026-11-14 17:54:39.355 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0044_plan_catalog_by_tenant_type.sql"
+[2026-11-14 17:54:39.404 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0044_plan_catalog_by_tenant_type.sql"
+[2026-11-14 17:54:39.404 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0045_rbac_receiving_payments_permissions.sql"
+[2026-11-14 17:54:39.415 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0045_rbac_receiving_payments_permissions.sql"
+[2026-11-14 17:54:39.415 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0046_hardening_audit_subscription_usage.sql"
+[2026-11-14 17:54:39.514 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0046_hardening_audit_subscription_usage.sql"
+[2026-11-14 17:54:39.514 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0047_system_events_observability.sql"
+[2026-11-14 17:54:39.565 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0047_system_events_observability.sql"
+[2026-11-14 17:54:39.565 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0048_ensure_all_tenants_have_free_subscription.sql"
+[2026-11-14 17:54:39.581 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0048_ensure_all_tenants_have_free_subscription.sql"
+[2026-11-14 17:54:39.581 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0049_reduce_free_plan_revenue_focus.sql"
+[2026-11-14 17:54:39.599 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0049_reduce_free_plan_revenue_focus.sql"
+[2026-11-14 17:54:39.599 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0050_conversion_events.sql"
+[2026-11-14 17:54:39.634 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0050_conversion_events.sql"
+[2026-11-14 17:54:39.634 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0051_enterprise_plan.sql"
+[2026-11-14 17:54:39.654 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0051_enterprise_plan.sql"
+[2026-11-14 17:54:39.654 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0052_conversion_event_types.sql"
+[2026-11-14 17:54:39.665 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0052_conversion_event_types.sql"
+[2026-11-14 17:54:39.665 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0053_restaurant_catalog_view.sql"
+[2026-11-14 17:54:39.679 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0053_restaurant_catalog_view.sql"
+[2026-11-14 17:54:39.679 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0054_enterprise_plan_full_features.sql"
+[2026-11-14 17:54:39.690 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0054_enterprise_plan_full_features.sql"
+[2026-11-14 17:54:39.690 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0055_admin_feature_toggles.sql"
+[2026-11-14 17:54:39.743 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0055_admin_feature_toggles.sql"
+[2026-11-14 17:54:39.743 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0056_app_user_pending_role.sql"
+[2026-11-14 17:54:39.755 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0056_app_user_pending_role.sql"
+[2026-11-14 17:54:39.755 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0057_reduce_gold_plan_limits.sql"
+[2026-11-14 17:54:39.766 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0057_reduce_gold_plan_limits.sql"
+[2026-11-14 17:54:39.766 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0058_whatsapp_guest_notifications.sql"
+[2026-11-14 17:54:39.781 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0058_whatsapp_guest_notifications.sql"
+[2026-11-14 17:54:39.781 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0059_tenant_account_links.sql"
+[2026-11-14 17:54:39.816 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0059_tenant_account_links.sql"
+[2026-11-14 17:54:39.816 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0060_fix_notification_plan_feature_strings.sql"
+[2026-11-14 17:54:39.830 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0060_fix_notification_plan_feature_strings.sql"
+[2026-11-14 17:54:39.830 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0061_invoice_overdue_notified_at.sql"
+[2026-11-14 17:54:39.846 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0061_invoice_overdue_notified_at.sql"
+[2026-11-14 17:54:39.846 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0062_restore_gold_limits_above_bronze.sql"
+[2026-11-14 17:54:39.857 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0062_restore_gold_limits_above_bronze.sql"
+[2026-11-14 17:54:39.857 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0063_rebalance_restaurant_plan_limits.sql"
+[2026-11-14 17:54:39.876 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0063_rebalance_restaurant_plan_limits.sql"
+[2026-11-14 17:54:39.876 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0064_align_plan_catalog_limits.sql"
+[2026-11-14 17:54:39.893 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0064_align_plan_catalog_limits.sql"
+[2026-11-14 17:54:39.893 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0065_custom_branding_gold_platinum.sql"
+[2026-11-14 17:54:39.909 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0065_custom_branding_gold_platinum.sql"
+[2026-11-14 17:54:39.910 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0066_remove_enterprise_tier.sql"
+[2026-11-14 17:54:39.920 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0066_remove_enterprise_tier.sql"
+[2026-11-14 17:54:39.920 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0067_subscription_billing.sql"
+[2026-11-14 17:54:40.008 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0067_subscription_billing.sql"
+[2026-11-14 17:54:40.008 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0068_order_calendar_plan_feature.sql"
+[2026-11-14 17:54:40.019 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0068_order_calendar_plan_feature.sql"
+[2026-11-14 17:54:40.019 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0069_approvals_budgets.sql"
+[2026-11-14 17:54:40.096 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0069_approvals_budgets.sql"
+[2026-11-14 17:54:40.096 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0070_supplier_reviews.sql"
+[2026-11-14 17:54:40.147 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0070_supplier_reviews.sql"
+[2026-11-14 17:54:40.147 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0071_reports_analytics_indexes.sql"
+[2026-11-14 17:54:40.195 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0071_reports_analytics_indexes.sql"
+[2026-11-14 17:54:40.195 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0072_disputes.sql"
+[2026-11-14 17:54:40.314 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0072_disputes.sql"
+[2026-11-14 17:54:40.314 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0073_push_subscriptions.sql"
+[2026-11-14 17:54:40.338 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0073_push_subscriptions.sql"
+[2026-11-14 17:54:40.338 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0074_promotions.sql"
+[2026-11-14 17:54:40.426 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0074_promotions.sql"
+[2026-11-14 17:54:40.426 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0076_order_amendments.sql"
+[2026-11-14 17:54:40.475 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0076_order_amendments.sql"
+[2026-11-14 17:54:40.475 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0077_waitlist_auto_promotion.sql"
+[2026-11-14 17:54:40.508 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0077_waitlist_auto_promotion.sql"
+[2026-11-14 17:54:40.509 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0078_tenant_named_roles.sql"
+[2026-11-14 17:54:40.574 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0078_tenant_named_roles.sql"
+[2026-11-14 17:54:40.574 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0079_advanced_roles_feature.sql"
+[2026-11-14 17:54:40.585 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0079_advanced_roles_feature.sql"
+[2026-11-14 17:54:40.585 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0080_supplier_branch_limits.sql"
+[2026-11-14 17:54:40.601 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0080_supplier_branch_limits.sql"
+[2026-11-14 17:54:40.601 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0081_warehouse_fulfillment.sql"
+[2026-11-14 17:54:40.715 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0081_warehouse_fulfillment.sql"
+[2026-11-14 17:54:40.715 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0082_supplier_branch_accounts.sql"
+[2026-11-14 17:54:40.801 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0082_supplier_branch_accounts.sql"
+[2026-11-14 17:54:40.801 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0083_warehouse_contact_columns.sql"
+[2026-11-14 17:54:40.815 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0083_warehouse_contact_columns.sql"
+[2026-11-14 17:54:40.815 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0084_fulfillment_role_permissions.sql"
+[2026-11-14 17:54:40.828 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0084_fulfillment_role_permissions.sql"
+[2026-11-14 17:54:40.828 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0085_branch_invitations.sql"
+[2026-11-14 17:54:40.865 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0085_branch_invitations.sql"
+[2026-11-14 17:54:40.865 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0086_restaurant_branch_accounts.sql"
+[2026-11-14 17:54:40.950 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0086_restaurant_branch_accounts.sql"
+[2026-11-14 17:54:40.950 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0087_restaurant_invitations.sql"
+[2026-11-14 17:54:40.993 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0087_restaurant_invitations.sql"
+[2026-11-14 17:54:40.993 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0088_drivers_fulfillment.sql"
+[2026-11-14 17:54:41.080 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0088_drivers_fulfillment.sql"
+[2026-11-14 17:54:41.080 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0089_fulfillment_driver_feature_flags.sql"
+[2026-11-14 17:54:41.090 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0089_fulfillment_driver_feature_flags.sql"
+[2026-11-14 17:54:41.090 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0090_feature_flag_plan_seeds.sql"
+[2026-11-14 17:54:41.131 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0090_feature_flag_plan_seeds.sql"
+[2026-11-14 17:54:41.131 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0091_performance_indexes.sql"
+[2026-11-14 17:54:41.156 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0091_performance_indexes.sql"
+[2026-11-14 17:54:41.156 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0092_restaurant_tenant_catalog_view.sql"
+[2026-11-14 17:54:41.166 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0092_restaurant_tenant_catalog_view.sql"
+[2026-11-14 17:54:41.166 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0093_free_plan_disable_quick_lists.sql"
+[2026-11-14 17:54:41.176 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0093_free_plan_disable_quick_lists.sql"
+[2026-11-14 17:54:41.176 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0094_free_tier_testing_sandbox.sql"
+[2026-11-14 17:54:41.197 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0094_free_tier_testing_sandbox.sql"
+[2026-11-14 17:54:41.197 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0095_deal_promotions_system.sql"
+[2026-11-14 17:54:41.349 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0095_deal_promotions_system.sql"
+[2026-11-14 17:54:41.349 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0096_free_single_scheduled_quick_list.sql"
+[2026-11-14 17:54:41.360 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0096_free_single_scheduled_quick_list.sql"
+[2026-11-14 17:54:41.360 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0097_free_scheduled_order_grace.sql"
+[2026-11-14 17:54:41.374 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0097_free_scheduled_order_grace.sql"
+[2026-11-14 17:54:41.374 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0098_ensure_free_quick_list_schedule.sql"
+[2026-11-14 17:54:41.381 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0098_ensure_free_quick_list_schedule.sql"
+[2026-11-14 17:54:41.381 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0099_limit_override_system_open_conversations.sql"
+[2026-11-14 17:54:41.429 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0099_limit_override_system_open_conversations.sql"
+[2026-11-14 17:54:41.429 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0100_enable_free_supplier_deals.sql"
+[2026-11-14 17:54:41.436 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0100_enable_free_supplier_deals.sql"
+[2026-11-14 17:54:41.436 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0101_free_tier_chat_limits.sql"
+[2026-11-14 17:54:41.444 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0101_free_tier_chat_limits.sql"
+[2026-11-14 17:54:41.444 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0102_deal_lifecycle_extended.sql"
+[2026-11-14 17:54:41.529 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0102_deal_lifecycle_extended.sql"
+[2026-11-14 17:54:41.529 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0103_customer_order_placed_at_index.sql"
+[2026-11-14 17:54:41.544 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0103_customer_order_placed_at_index.sql"
+[2026-11-14 17:54:41.544 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0103_reservation_availability_indexes.sql"
+[2026-11-14 17:54:41.569 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0103_reservation_availability_indexes.sql"
+[2026-11-14 17:54:41.570 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0104_user_workspace_membership.sql"
+[2026-11-14 17:54:41.615 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0104_user_workspace_membership.sql"
+[2026-11-14 17:54:41.615 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0105_rbac_system_roles_matrix.sql"
+[2026-11-14 17:54:41.627 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0105_rbac_system_roles_matrix.sql"
+[2026-11-14 17:54:41.627 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0106_viewer_read_only_permissions.sql"
+[2026-11-14 17:54:41.639 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0106_viewer_read_only_permissions.sql"
+[2026-11-14 17:54:41.640 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0107_supplier_tenant_viewer_permissions.sql"
+[2026-11-14 17:54:41.648 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0107_supplier_tenant_viewer_permissions.sql"
+[2026-11-14 17:54:41.648 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0108_order_cancellation_details.sql"
+[2026-11-14 17:54:41.662 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0108_order_cancellation_details.sql"
+[2026-11-14 17:54:41.662 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0108_staff_portal_accounts.sql"
+[2026-11-14 17:54:41.691 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0108_staff_portal_accounts.sql"
+[2026-11-14 17:54:41.691 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0109_supplier_free_disputes_returns.sql"
+[2026-11-14 17:54:41.703 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0109_supplier_free_disputes_returns.sql"
+[2026-11-14 17:54:41.703 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0110_order_status_received_with_dispute.sql"
+[2026-11-14 17:54:41.712 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0110_order_status_received_with_dispute.sql"
+[2026-11-14 17:54:41.712 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0111_dispute_replacement_orders.sql"
+[2026-11-14 17:54:41.776 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0111_dispute_replacement_orders.sql"
+[2026-11-14 17:54:41.776 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0112_free_gold_feature_parity.sql"
+[2026-11-14 17:54:41.796 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0112_free_gold_feature_parity.sql"
+[2026-11-14 17:54:41.796 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0113_free_sandbox_expiry.sql"
+[2026-11-14 17:54:41.839 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0113_free_sandbox_expiry.sql"
+[2026-11-14 17:54:41.839 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0114_remove_approvals_budgets_feature.sql"
+[2026-11-14 17:54:41.854 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0114_remove_approvals_budgets_feature.sql"
+[2026-11-14 17:54:41.854 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0115_enable_waste_tracking_free_gold.sql"
+[2026-11-14 17:54:41.864 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0115_enable_waste_tracking_free_gold.sql"
+[2026-11-14 17:54:41.864 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0116_rename_bronze_to_silver.sql"
+[2026-11-14 17:54:41.883 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0116_rename_bronze_to_silver.sql"
+[2026-11-14 17:54:41.883 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0117_silver_tier_limits_features.sql"
+[2026-11-14 17:54:41.896 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0117_silver_tier_limits_features.sql"
+[2026-11-14 17:54:41.896 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0118_unstick_pending_approval_orders.sql"
+[2026-11-14 17:54:41.910 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0118_unstick_pending_approval_orders.sql"
+[2026-11-14 17:54:41.910 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0119_gold_tier_limits_features.sql"
+[2026-11-14 17:54:41.923 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0119_gold_tier_limits_features.sql"
+[2026-11-14 17:54:41.923 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0120_platinum_tier_limits_features.sql"
+[2026-11-14 17:54:41.936 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0120_platinum_tier_limits_features.sql"
+[2026-11-14 17:54:41.936 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0121_branch_warehouse_plan_limits.sql"
+[2026-11-14 17:54:41.957 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0121_branch_warehouse_plan_limits.sql"
+[2026-11-14 17:54:41.957 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0122_tenant_subscription_addons.sql"
+[2026-11-14 17:54:41.995 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0122_tenant_subscription_addons.sql"
+[2026-11-14 17:54:41.995 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0123_deal_boost_packages.sql"
+[2026-11-14 17:54:42.032 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0123_deal_boost_packages.sql"
+[2026-11-14 17:54:42.032 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0124_deal_boost_publish_flow.sql"
+[2026-11-14 17:54:42.074 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0124_deal_boost_publish_flow.sql"
+[2026-11-14 17:54:42.074 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0125_supplier_pain_killer_features.sql"
+[2026-11-14 17:54:42.138 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0125_supplier_pain_killer_features.sql"
+[2026-11-14 17:54:42.138 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0126_rbac_driver_role_hardening.sql"
+[2026-11-14 17:54:42.166 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0126_rbac_driver_role_hardening.sql"
+[2026-11-14 17:54:42.166 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0127_delivery_route_planning.sql"
+[2026-11-14 17:54:42.198 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0127_delivery_route_planning.sql"
+[2026-11-14 17:54:42.198 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0128_staging_launch_perf_indexes.sql"
+[2026-11-14 17:54:42.226 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0128_staging_launch_perf_indexes.sql"
+[2026-11-14 17:54:42.226 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0129_legal_acceptances.sql"
+[2026-11-14 17:54:42.258 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0129_legal_acceptances.sql"
+[2026-11-14 17:54:42.259 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0130_contract_pricing_productization.sql"
+[2026-11-14 17:54:42.278 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0130_contract_pricing_productization.sql"
+[2026-11-14 17:54:42.278 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0130_quick_list_execution_ledger.sql"
+[2026-11-14 17:54:42.301 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0130_quick_list_execution_ledger.sql"
+[2026-11-14 17:54:42.301 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0131_free_trial_deal_redemptions.sql"
+[2026-11-14 17:54:42.308 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0131_free_trial_deal_redemptions.sql"
+[2026-11-14 17:54:42.308 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0132_production_readiness_perf_indexes.sql"
+[2026-11-14 17:54:42.328 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0132_production_readiness_perf_indexes.sql"
+[2026-11-14 17:54:42.328 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0133_restaurant_inventory_lots.sql"
+[2026-11-14 17:54:42.408 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0133_restaurant_inventory_lots.sql"
+[2026-11-14 17:54:42.408 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0134_order_fulfillment_issues.sql"
+[2026-11-14 17:54:42.476 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0134_order_fulfillment_issues.sql"
+[2026-11-14 17:54:42.476 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0135_reorder_cadence_and_quick_list_branch.sql"
+[2026-11-14 17:54:42.539 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0135_reorder_cadence_and_quick_list_branch.sql"
+[2026-11-14 17:54:42.539 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0136_email_delivery_log.sql"
+[2026-11-14 17:54:42.570 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0136_email_delivery_log.sql"
+[2026-11-14 17:54:42.570 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0137_driver_location_tracking.sql"
+[2026-11-14 17:54:42.612 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0137_driver_location_tracking.sql"
+[2026-11-14 17:54:42.612 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0138_performance_indexes.sql"
+[2026-11-14 17:54:42.679 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0138_performance_indexes.sql"
+[2026-11-14 17:54:42.679 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0139_railway_hot_path_indexes.sql"
+[2026-11-14 17:54:42.725 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0139_railway_hot_path_indexes.sql"
+[2026-11-14 17:54:42.725 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0140_railway_cold_path_indexes.sql"
+[2026-11-14 17:54:42.761 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0140_railway_cold_path_indexes.sql"
+[2026-11-14 17:54:42.761 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0141_query_driven_indexes.sql"
+[2026-11-14 17:54:42.872 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0141_query_driven_indexes.sql"
+[2026-11-14 17:54:42.872 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0142_order_create_hot_path_indexes.sql"
+[2026-11-14 17:54:42.892 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0142_order_create_hot_path_indexes.sql"
+[2026-11-14 17:54:42.892 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0143_delivery_rollover.sql"
+[2026-11-14 17:54:42.934 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0143_delivery_rollover.sql"
+[2026-11-14 17:54:42.934 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0143_restaurant_delivery_coordinates.sql"
+[2026-11-14 17:54:42.957 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0143_restaurant_delivery_coordinates.sql"
+[2026-11-14 17:54:42.957 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0144_supplier_finance_invoices_plan_features.sql"
+[2026-11-14 17:54:42.971 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0144_supplier_finance_invoices_plan_features.sql"
+[2026-11-14 17:54:42.971 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0145_plan_catalog_audit_sync.sql"
+[2026-11-14 17:54:42.999 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0145_plan_catalog_audit_sync.sql"
+[2026-11-14 17:54:42.999 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0146_admin_user_preferences.sql"
+[2026-11-14 17:54:43.018 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0146_admin_user_preferences.sql"
+[2026-11-14 17:54:43.018 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0147_reorder_assistance_suppressions.sql"
+[2026-11-14 17:54:43.049 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0147_reorder_assistance_suppressions.sql"
+[2026-11-14 17:54:43.049 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0148_tenant_branding_columns.sql"
+[2026-11-14 17:54:43.067 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0148_tenant_branding_columns.sql"
+[2026-11-14 17:54:43.067 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0149_support_chat_schema.sql"
+[2026-11-14 17:54:43.114 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0149_support_chat_schema.sql"
+[2026-11-14 17:54:43.114 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0150_supplier_featured_placements.sql"
+[2026-11-14 17:54:43.165 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0150_supplier_featured_placements.sql"
+[2026-11-14 17:54:43.165 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0151_deal_banner_dismiss.sql"
+[2026-11-14 17:54:43.182 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0151_deal_banner_dismiss.sql"
+[2026-11-14 17:54:43.182 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0152_billing_trial_reminder_log.sql"
+[2026-11-14 17:54:43.206 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0152_billing_trial_reminder_log.sql"
+[2026-11-14 17:54:43.206 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0153_cron_followup_infrastructure.sql"
+[2026-11-14 17:54:43.272 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0153_cron_followup_infrastructure.sql"
+[2026-11-14 17:54:43.272 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0154_quote_requests_and_public_catalog.sql"
+[2026-11-14 17:54:43.383 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0154_quote_requests_and_public_catalog.sql"
+[2026-11-14 17:54:43.383 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0155_ensure_quote_request_schema.sql"
+[2026-11-14 17:54:43.410 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0155_ensure_quote_request_schema.sql"
+[2026-11-14 17:54:43.410 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0156_supplier_smart_reorder_plan_features.sql"
+[2026-11-14 17:54:43.421 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0156_supplier_smart_reorder_plan_features.sql"
+[2026-11-14 17:54:43.421 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0157_ensure_tenant_branding_columns.sql"
+[2026-11-14 17:54:43.432 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0157_ensure_tenant_branding_columns.sql"
+[2026-11-14 17:54:43.432 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0158_ensure_tenant_logo_url_columns.sql"
+[2026-11-14 17:54:43.443 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0158_ensure_tenant_logo_url_columns.sql"
+[2026-11-14 17:54:43.443 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0159_restaurant_reviews.sql"
+[2026-11-14 17:54:43.493 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0159_restaurant_reviews.sql"
+[2026-11-14 17:54:43.493 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0160_loyalty_programs.sql"
+[2026-11-14 17:54:43.567 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0160_loyalty_programs.sql"
+[2026-11-14 17:54:43.568 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0161_consumer_ordering.sql"
+[2026-11-14 17:54:43.797 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0161_consumer_ordering.sql"
+[2026-11-14 17:54:43.797 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0162_search_b2c_loyalty.sql"
+[2026-11-14 17:54:43.915 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0162_search_b2c_loyalty.sql"
+[2026-11-14 17:54:43.915 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0163_consumer_b2c_complete.sql"
+[2026-11-14 17:54:43.953 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0163_consumer_b2c_complete.sql"
+[2026-11-14 17:54:43.953 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0164_consumer_ordering_hours.sql"
+[2026-11-14 17:54:43.971 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0164_consumer_ordering_hours.sql"
+[2026-11-14 17:54:43.971 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0165_supplier_delivery_zone_columns.sql"
+[2026-11-14 17:54:43.989 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0165_supplier_delivery_zone_columns.sql"
+[2026-11-14 17:54:43.989 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0166_reorder_forecast.sql"
+[2026-11-14 17:54:44.045 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0166_reorder_forecast.sql"
+[2026-11-14 17:54:44.046 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0167_ai_platform_and_usage.sql"
+[2026-11-14 17:54:44.076 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0167_ai_platform_and_usage.sql"
+[2026-11-14 17:54:44.076 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0168_catalog_image_import.sql"
+[2026-11-14 17:54:44.105 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0168_catalog_image_import.sql"
+[2026-11-14 17:54:44.105 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0169_supplier_growth_program.sql"
+[2026-11-14 17:54:44.247 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0169_supplier_growth_program.sql"
+[2026-11-14 17:54:44.247 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0170_schema_hardening_and_integrity.sql"
+[2026-11-14 17:54:44.287 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0170_schema_hardening_and_integrity.sql"
+[2026-11-14 17:54:44.287 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0171_audit_integrity_fixes.sql"
+[2026-11-14 17:54:44.368 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0171_audit_integrity_fixes.sql"
+[2026-11-14 17:54:44.368 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0172_supplier_growth_plan_feature.sql"
+[2026-11-14 17:54:44.377 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0172_supplier_growth_plan_feature.sql"
+[2026-11-14 17:54:44.377 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0173_catalog_product_import_job.sql"
+[2026-11-14 17:54:44.416 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0173_catalog_product_import_job.sql"
+[2026-11-14 17:54:44.416 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0174_platform_setting_seed_fix.sql"
+[2026-11-14 17:54:44.425 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0174_platform_setting_seed_fix.sql"
+[2026-11-14 17:54:44.425 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0175_free_trial_supplier_growth_parity.sql"
+[2026-11-14 17:54:44.442 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0175_free_trial_supplier_growth_parity.sql"
+[2026-11-14 17:54:44.442 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0176_invoice_reminder_log.sql"
+[2026-11-14 17:54:44.490 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0176_invoice_reminder_log.sql"
+[2026-11-14 17:54:44.490 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0177_pick_lists_hardening.sql"
+[2026-11-14 17:54:44.510 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0177_pick_lists_hardening.sql"
+[2026-11-14 17:54:44.510 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0177_supplier_business_settings.sql"
+[2026-11-14 17:54:44.525 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0177_supplier_business_settings.sql"
+[2026-11-14 17:54:44.525 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0178_quote_price_lock.sql"
+[2026-11-14 17:54:44.546 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0178_quote_price_lock.sql"
+[2026-11-14 17:54:44.546 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0179_pod_media_fields.sql"
+[2026-11-14 17:54:44.560 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0179_pod_media_fields.sql"
+[2026-11-14 17:54:44.560 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0180_user_preferred_locale.sql"
+[2026-11-14 17:54:44.572 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0180_user_preferred_locale.sql"
+[2026-11-14 17:54:44.572 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0181_whatsapp_delivery.sql"
+[2026-11-14 17:54:44.610 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0181_whatsapp_delivery.sql"
+[2026-11-14 17:54:44.611 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0182_notification_webhook.sql"
+[2026-11-14 17:54:44.647 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0182_notification_webhook.sql"
+[2026-11-14 17:54:44.647 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0183_invoice_integrity.sql"
+[2026-11-14 17:54:44.697 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0183_invoice_integrity.sql"
+[2026-11-14 17:54:44.697 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0184_quick_list_smart_quantities.sql"
+[2026-11-14 17:54:44.709 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0184_quick_list_smart_quantities.sql"
+[2026-11-14 17:54:44.709 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0185_tenant_custom_domain.sql"
+[2026-11-14 17:54:44.739 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0185_tenant_custom_domain.sql"
+[2026-11-14 17:54:44.739 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0186_recipe_costing.sql"
+[2026-11-14 17:54:45.009 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0186_recipe_costing.sql"
+[2026-11-14 17:54:45.009 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0187_whatsapp_webhook.sql"
+[2026-11-14 17:54:45.046 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0187_whatsapp_webhook.sql"
+[2026-11-14 17:54:45.046 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0188_perf_audit_indexes.sql"
+[2026-11-14 17:54:45.062 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0188_perf_audit_indexes.sql"
+[2026-11-14 17:54:45.062 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0189_reorder_recommendation_feedback.sql"
+[2026-11-14 17:54:45.088 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0189_reorder_recommendation_feedback.sql"
+[2026-11-14 17:54:45.088 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0190_four_plan_pricing_model.sql"
+[2026-11-14 17:54:45.265 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0190_four_plan_pricing_model.sql"
+[2026-11-14 17:54:45.265 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0191_branch_account_link_invitations.sql"
+[2026-11-14 17:54:45.424 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0191_branch_account_link_invitations.sql"
+[2026-11-14 17:54:45.424 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0192_supplier_sponsorship_lifecycle.sql"
+[2026-11-14 17:54:45.554 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0192_supplier_sponsorship_lifecycle.sql"
+[2026-11-14 17:54:45.554 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0193_identity_hardening.sql"
+[2026-11-14 17:54:45.581 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0193_identity_hardening.sql"
+[2026-11-14 17:54:45.581 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0194_driver_tracking_sessions.sql"
+[2026-11-14 17:54:45.661 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0194_driver_tracking_sessions.sql"
+[2026-11-14 17:54:45.661 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0195_assistant_conversations.sql"
+[2026-11-14 17:54:45.725 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0195_assistant_conversations.sql"
+[2026-11-14 17:54:45.725 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0196_public_catalog_product_indexes.sql"
+[2026-11-14 17:54:45.749 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0196_public_catalog_product_indexes.sql"
+[2026-11-14 17:54:45.749 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0197_promotion_ad_billing.sql"
+[2026-11-14 17:54:45.821 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0197_promotion_ad_billing.sql"
+[2026-11-14 17:54:45.821 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0198_reservation_excellence.sql"
+[2026-11-14 17:54:45.969 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0198_reservation_excellence.sql"
+[2026-11-14 17:54:45.969 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0199_supplier_last_order_rules.sql"
+[2026-11-14 17:54:45.991 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0199_supplier_last_order_rules.sql"
+[2026-11-14 17:54:45.991 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0200_pod_single_per_order.sql"
+[2026-11-14 17:54:46.006 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0200_pod_single_per_order.sql"
+[2026-11-14 17:54:46.006 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0201_menu_item_allergens.sql"
+[2026-11-14 17:54:46.023 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0201_menu_item_allergens.sql"
+[2026-11-14 17:54:46.024 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0202_quote_request_supplier_decline.sql"
+[2026-11-14 17:54:46.047 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0202_quote_request_supplier_decline.sql"
+[2026-11-14 17:54:46.047 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0203_promotion_ad_disputed.sql"
+[2026-11-14 17:54:46.069 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0203_promotion_ad_disputed.sql"
+[2026-11-14 17:54:46.069 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0204_push_subscription_endpoint_ownership.sql"
+[2026-11-14 17:54:46.088 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0204_push_subscription_endpoint_ownership.sql"
+[2026-11-14 17:54:46.088 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0205_supplier_pod_required.sql"
+[2026-11-14 17:54:46.099 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0205_supplier_pod_required.sql"
+[2026-11-14 17:54:46.099 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0206_route_stop_departed_at.sql"
+[2026-11-14 17:54:46.119 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0206_route_stop_departed_at.sql"
+[2026-11-14 17:54:46.119 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0207_ordering_multibranch_hardening.sql"
+[2026-11-14 17:54:46.210 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0207_ordering_multibranch_hardening.sql"
+[2026-11-14 17:54:46.210 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0208_delivery_retry_provenance.sql"
+[2026-11-14 17:54:46.263 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0208_delivery_retry_provenance.sql"
+[2026-11-14 17:54:46.263 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0209_dispute_resolution_effects.sql"
+[2026-11-14 17:54:46.310 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0209_dispute_resolution_effects.sql"
+[2026-11-14 17:54:46.310 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0210_file_security_upload_sessions.sql"
+[2026-11-14 17:54:46.396 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0210_file_security_upload_sessions.sql"
+[2026-11-14 17:54:46.396 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0211_supplier_product_categories.sql"
+[2026-11-14 17:54:46.441 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0211_supplier_product_categories.sql"
+[2026-11-14 17:54:46.441 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0212_final_intelligence_subscription_matrix.sql"
+[2026-11-14 17:54:46.472 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0212_final_intelligence_subscription_matrix.sql"
+[2026-11-14 17:54:46.472 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0213_active_driver_assignment_integrity.sql"
+[2026-11-14 17:54:46.494 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0213_active_driver_assignment_integrity.sql"
+[2026-11-14 17:54:46.494 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0214_recipe_recalc_retry_budget.sql"
+[2026-11-14 17:54:46.522 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0214_recipe_recalc_retry_budget.sql"
+[2026-11-14 17:54:46.522 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0215_smart_reorder_matrix_alignment.sql"
+[2026-11-14 17:54:46.541 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0215_smart_reorder_matrix_alignment.sql"
+[2026-11-14 17:54:46.541 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0216_featured_placement_admin_approval.sql"
+[2026-11-14 17:54:46.570 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0216_featured_placement_admin_approval.sql"
+[2026-11-14 17:54:46.570 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0217_ai_usage_per_user.sql"
+[2026-11-14 17:54:46.603 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0217_ai_usage_per_user.sql"
+[2026-11-14 17:54:46.603 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0218_rescheduled_driver_assignment_occupies_leg.sql"
+[2026-11-14 17:54:46.631 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0218_rescheduled_driver_assignment_occupies_leg.sql"
+[2026-11-14 17:54:46.631 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0219_proof_of_delivery_per_assignment.sql"
+[2026-11-14 17:54:46.650 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0219_proof_of_delivery_per_assignment.sql"
+[2026-11-14 17:54:46.651 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0220_invoice_balance_preserves_void_and_overdue.sql"
+[2026-11-14 17:54:46.659 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0220_invoice_balance_preserves_void_and_overdue.sql"
+[2026-11-14 17:54:46.659 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0221_supplier_price_event_currency.sql"
+[2026-11-14 17:54:46.674 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0221_supplier_price_event_currency.sql"
+[2026-11-14 17:54:46.674 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0222_one_open_staff_time_entry.sql"
+[2026-11-14 17:54:46.693 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0222_one_open_staff_time_entry.sql"
+[2026-11-14 17:54:46.693 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0223_supplier_public_sales.sql"
+[2026-11-14 17:54:46.841 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0223_supplier_public_sales.sql"
+[2026-11-14 17:54:46.841 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0224_account_deletion_org_close.sql"
+[2026-11-14 17:54:46.879 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0224_account_deletion_org_close.sql"
+[2026-11-14 17:54:46.879 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0225_cancel_spurious_free_over_past_due.sql"
+[2026-11-14 17:54:46.895 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0225_cancel_spurious_free_over_past_due.sql"
+[2026-11-14 17:54:46.895 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0226_mobile_public_shop_feature_flag.sql"
+[2026-11-14 17:54:46.909 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0226_mobile_public_shop_feature_flag.sql"
+[2026-11-14 17:54:46.909 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0227_allow_scan_unavailable_file_status.sql"
+[2026-11-14 17:54:46.930 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0227_allow_scan_unavailable_file_status.sql"
+[2026-11-14 17:54:46.930 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0228_invoice_unique_excludes_void.sql"
+[2026-11-14 17:54:46.951 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0228_invoice_unique_excludes_void.sql"
+[2026-11-14 17:54:46.951 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0229_order_cancel_stock_promo_release.sql"
+[2026-11-14 17:54:46.971 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0229_order_cancel_stock_promo_release.sql"
+[2026-11-14 17:54:46.971 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0230_promotions_status_width.sql"
+[2026-11-14 17:54:46.994 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0230_promotions_status_width.sql"
+[2026-11-14 17:54:46.994 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0231_demo_campaign.sql"
+[2026-11-14 17:54:47.076 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0231_demo_campaign.sql"
+[2026-11-14 17:54:47.076 +0200] [32mINFO[39m:
+    event: "db.migration.run"
+    file: "0232_consumer_checkout_idempotency.sql"
+[2026-11-14 17:54:47.103 +0200] [32mINFO[39m:
+    event: "db.migration.applied"
+    file: "0232_consumer_checkout_idempotency.sql"
+[2026-11-14 17:54:47.103 +0200] [32mINFO[39m: [36mSQL migrations completed[39m
+    applied: 233
+[2026-11-14 17:54:47.106 +0200] [32mINFO[39m: [36mQuote request schema ensure completed[39m
+[2026-11-14 17:54:47.136 +0200] [32mINFO[39m: [36mTenant branding schema ensure completed[39m
+[2026-11-14 17:54:47.152 +0200] [32mINFO[39m: [36mDelivery schema ensure completed[39m
+[2026-11-14 17:54:47.157 +0200] [34mDEBUG[39m: [36mStaff app base schema already present, skipping migration[39m
+[2026-11-14 17:54:47.157 +0200] [34mDEBUG[39m: [36mReservations schema already present, skipping migration 0033[39m
+[2026-11-14 17:54:47.159 +0200] [34mDEBUG[39m: [36mStaff app extensions already present, skipping migration[39m
+[2026-11-14 17:54:47.162 +0200] [34mDEBUG[39m: [36mPortal support schema already present, skipping migration 0037[39m
+[2026-11-14 17:54:47.162 +0200] [32mINFO[39m: [36mSKIP_TENANT_ROLE_BACKFILL=1 — tenant role backfill skipped[39m
+[2026-11-14 17:54:47.162 +0200] [32mINFO[39m: [36mSKIP_SUPPLIER_ORG_MIGRATION=1 — supplier org backfill skipped[39m
+[2026-11-14 17:54:47.162 +0200] [32mINFO[39m: [36mFull startup migrations completed[39m
+(node:6944) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+[2026-11-14 17:54:48.743 +0200] [32mINFO[39m: [36mCreated pending-activation Free subscription for tenant[39m
+    tenantId: "bfb51eb6-1bf4-45e1-827b-10ed6dbcb6b3"
+    tenantType: "RESTAURANT"
+    plan: "free"

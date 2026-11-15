@@ -1,0 +1,1934 @@
+
+> @supplify/api@2.0.0 lint C:\myProjects\supplify_erp\apps\api
+> eslint src --ext .js
+
+
+C:\myProjects\supplify_erp\apps\api\src\jobs\email-retry.job.js
+  7:7  warning  'DEFAULT_MAX_RETRIES' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\admin-overview-metrics.test.js
+  103:11  warning  'call' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\auth.js
+  307:11  warning  'header' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\auth.test.js
+  7:3  warning  'refreshAccessToken' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\billing\billing-service.js
+  3:10  warning  'logger' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\driver-user-link.js
+  4:17  warning  'withTransaction' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\feature-flags.js
+  6:3  warning  'ALL_FEATURE_KEYS' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\fulfillment-exceptions.js
+  12:9  warning  'db' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\plan-enforcement.js
+  318:13  warning  'subscription' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\plan-enforcement.test.js
+  7:3  warning  'countActiveWarehouses' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\rbac-full-app.test.js
+  6:8  warning  'express' is defined but never used  no-unused-vars
+  7:8  warning  'request' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\rbac-guards.js
+  100:9  warning  'newPerms' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\rbac-guards.test.js
+  252:12  warning  '_params' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\rbac-role-access.test.js
+  1:32  warning  'vi' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\rbac.js
+  19:3  warning  'isImpersonating' is defined but never used          no-unused-vars
+  24:3  warning  'getPrimaryTenantForUser' is defined but never used  no-unused-vars
+  51:3  warning  'extractRefreshToken' is defined but never used      no-unused-vars
+  52:3  warning  'isBearerAuthRequest' is defined but never used      no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\receiving-line-validation.test.js
+  7:10  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\reservation-availability.js
+  681:48  warning  'calendarDate' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\reservation-availability.test.js
+   3:3  warning  'buildTimeSlots' is defined but never used               no-unused-vars
+   7:3  warning  'reservationOverlapsSlot' is defined but never used      no-unused-vars
+  16:3  warning  'CAPACITY_CONSUMING_STATUSES' is defined but never used  no-unused-vars
+  26:9  warning  'totalCapacity' is assigned a value but never used       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\restaurant-org.js
+  10:3  warning  'getOwnerRoleId' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\restaurant-tracking-payload.js
+  2:10  warning  'buildTrackingPayload' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\subscription.test.js
+  538:42  warning  'params' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\subscription\entitlements.js
+  20:3   warning  'PLAN_TIER_ORDER' is defined but never used                  no-unused-vars
+  21:3   warning  'normalizePlanCode' is defined but never used                no-unused-vars
+  22:3   warning  'formatPlanDisplayName' is defined but never used            no-unused-vars
+  26:10  warning  'getWarehouseSupplierColumn' is defined but never used       no-unused-vars
+  77:7   warning  'SUBSCRIPTION_CACHE_TTL' is assigned a value but never used  no-unused-vars
+  89:11  warning  '_cachedAt' is assigned a value but never used               no-unused-vars
+  94:10  warning  'subscriptionCacheKey' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\subscription\plans.js
+    1:17  warning  'withTransaction' is defined but never used                no-unused-vars
+    3:10  warning  'resolveAllFeaturesForTenant' is defined but never used    no-unused-vars
+    7:10  warning  'startStage' is defined but never used                     no-unused-vars
+    7:22  warning  'mark' is defined but never used                           no-unused-vars
+    7:28  warning  'noteCacheHit' is defined but never used                   no-unused-vars
+    7:42  warning  'noteCacheMiss' is defined but never used                  no-unused-vars
+   11:3   warning  'resolveEffectiveLimit' is defined but never used          no-unused-vars
+   12:3   warning  'resolveAllEffectiveLimits' is defined but never used      no-unused-vars
+   13:3   warning  'discoverLimitKeys' is defined but never used              no-unused-vars
+   14:3   warning  'limitKeysForTenantType' is defined but never used         no-unused-vars
+   16:3   warning  'stripHiddenEntitlementLimits' is defined but never used   no-unused-vars
+   17:3   warning  'HIDDEN_ENTITLEMENT_LIMIT_KEYS' is defined but never used  no-unused-vars
+   18:3   warning  'isLimitKeyApplicable' is defined but never used           no-unused-vars
+   23:3   warning  'formatPlanDisplayName' is defined but never used          no-unused-vars
+   27:10  warning  'countActiveBranchLocations' is defined but never used     no-unused-vars
+   27:38  warning  'countActiveWarehouses' is defined but never used          no-unused-vars
+   28:10  warning  'getWarehouseSupplierColumn' is defined but never used     no-unused-vars
+   31:3   warning  'addonKeyForLimitKey' is defined but never used            no-unused-vars
+   32:3   warning  'computeEffectiveWithAddons' is defined but never used     no-unused-vars
+   33:3   warning  'ENTERPRISE_BRANCH_THRESHOLD' is defined but never used    no-unused-vars
+   34:3   warning  'getActiveTenantAddons' is defined but never used          no-unused-vars
+   39:10  warning  'getEnforcementPlanLimits' is defined but never used       no-unused-vars
+  292:9   warning  'currentIndex' is assigned a value but never used          no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\supplier-org.js
+    6:10  warning  'logger' is defined but never used             no-unused-vars
+   10:3   warning  'getOwnerRoleId' is defined but never used     no-unused-vars
+  239:9   warning  'roleName' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\lib\warehouse-helpers.js
+  110:9  warning  'getCol' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\middlewares\csrf.test.js
+  2:8  warning  'cookieParser' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\middlewares\errorHandler.js
+  75:45  warning  'next' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\middlewares\requestLogger.js
+  3:3  warning  'buildRequestIdentifiers' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\middlewares\sanitizeServerErrors.js
+  39:35  warning  'stack' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\audit.helpers.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   2:10  warning  'Router' is defined but never used                                  no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   5:10  warning  'z' is defined but never used                                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  65:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  66:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  67:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  70:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  73:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  74:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\audit.js
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  65:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  66:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  67:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  70:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\features.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:10  warning  'query' is defined but never used                                   no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   5:10  warning  'z' is defined but never used                                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  65:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  66:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  67:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  70:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  73:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  74:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\finance.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   5:10  warning  'z' is defined but never used                                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  65:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  66:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  67:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  70:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  73:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  74:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\health.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   5:10  warning  'z' is defined but never used                                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  73:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  74:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\limits.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  39:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  39:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  42:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  43:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  44:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  46:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  47:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  49:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  50:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  52:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  53:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  55:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  57:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  58:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  59:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  60:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  61:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  64:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  65:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  67:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  68:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  69:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  70:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  72:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  75:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  76:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  78:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  78:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  79:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\overview.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   5:10  warning  'z' is defined but never used                                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  55:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  56:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  57:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  58:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  59:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  66:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  67:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  69:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  70:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  71:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  74:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  75:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  77:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  77:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  78:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\plans.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  19:3   warning  'getEntitlements' is defined but never used                         no-unused-vars
+  20:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used                   no-unused-vars
+  21:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                     no-unused-vars
+  22:3   warning  'invalidateTenantSubscriptionCache' is defined but never used       no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  29:3   warning  'resolveActiveBillingSubscription' is defined but never used        no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  47:10  warning  'writeAuditLog' is defined but never used                           no-unused-vars
+  48:10  warning  'recordConversionEvent' is defined but never used                   no-unused-vars
+  50:3   warning  'extendFreeSandboxTrial' is defined but never used                  no-unused-vars
+  51:3   warning  'unlockSubscriptionAccount' is defined but never used               no-unused-vars
+  53:10  warning  'clampFreeTrialDays' is defined but never used                      no-unused-vars
+  61:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  62:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  65:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  66:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  67:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  68:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  69:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  70:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  73:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  74:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  76:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  76:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  77:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\subscriptions.js
+   1:10  warning  'randomUUID' is defined but never used                              no-unused-vars
+   3:17  warning  'pool' is defined but never used                                    no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                             no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                             no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                     no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                       no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                                no-unused-vars
+   8:10  warning  'config' is defined but never used                                  no-unused-vars
+   9:10  warning  'deliveredOrderStatusInSql' is defined but never used               no-unused-vars
+  10:10  warning  'parseAdminListPagination' is defined but never used                no-unused-vars
+  12:3   warning  'createImpersonationToken' is defined but never used                no-unused-vars
+  13:3   warning  'verifyImpersonationToken' is defined but never used                no-unused-vars
+  14:3   warning  'getImpersonationCookieName' is defined but never used              no-unused-vars
+  15:3   warning  'getEffectiveTenant' is defined but never used                      no-unused-vars
+  16:3   warning  'clearImpersonationCookie' is defined but never used                no-unused-vars
+  23:3   warning  'discoverLimitKeys' is defined but never used                       no-unused-vars
+  24:3   warning  'checkLimit' is defined but never used                              no-unused-vars
+  26:10  warning  'resolveEffectiveLimit' is defined but never used                   no-unused-vars
+  28:3   warning  'resolveOrgBillingTenantId' is defined but never used               no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscriptionsBatch' is defined but never used  no-unused-vars
+  32:10  warning  'clearActiveTenantCookie' is defined but never used                 no-unused-vars
+  34:3   warning  'defaultAddonUnitPrice' is defined but never used                   no-unused-vars
+  35:3   warning  'getActiveTenantAddons' is defined but never used                   no-unused-vars
+  36:3   warning  'isAddonKeyValidForTenant' is defined but never used                no-unused-vars
+  38:10  warning  'getAllowedFeatureKeys' is defined but never used                   no-unused-vars
+  38:33  warning  'featureDisplayName' is defined but never used                      no-unused-vars
+  40:3   warning  'listGlobalFeatureFlags' is defined but never used                  no-unused-vars
+  41:3   warning  'setGlobalFeatureOverride' is defined but never used                no-unused-vars
+  42:3   warning  'listTenantFeatureOverrides' is defined but never used              no-unused-vars
+  43:3   warning  'getEffectiveFeaturesForTenant' is defined but never used           no-unused-vars
+  44:3   warning  'setTenantFeatureOverride' is defined but never used                no-unused-vars
+  45:3   warning  'clearTenantFeatureOverride' is defined but never used              no-unused-vars
+  63:3   warning  'validatePlanLimitsAndFeatures' is defined but never used           no-unused-vars
+  64:3   warning  'validateFreePlanTrialDays' is defined but never used               no-unused-vars
+  65:3   warning  'validateEnterprisePlanActivation' is defined but never used        no-unused-vars
+  66:3   warning  'validateEnterprisePlanCreate' is defined but never used            no-unused-vars
+  67:3   warning  'buildTierLadderWarnings' is defined but never used                 no-unused-vars
+  69:10  warning  'isLimitKeyApplicable' is defined but never used                    no-unused-vars
+  70:10  warning  'buildAdminOverviewMetrics' is defined but never used               no-unused-vars
+  71:10  warning  'buildAdminActivityFeed' is defined but never used                  no-unused-vars
+  73:3   warning  'buildAdminOperationalSummary' is defined but never used            no-unused-vars
+  74:3   warning  'listAdminEmailDeliveryLogs' is defined but never used              no-unused-vars
+  75:3   warning  'listAdminFulfillmentIssues' is defined but never used              no-unused-vars
+  76:3   warning  'listAdminActiveDeliveries' is defined but never used               no-unused-vars
+  77:3   warning  'buildTenantOperationalSnapshot' is defined but never used          no-unused-vars
+  78:3   warning  'getAdminEmailHealthFailures' is defined but never used             no-unused-vars
+  81:3   warning  'adminResetUserPassword' is defined but never used                  no-unused-vars
+  82:3   warning  'listAdminUsers' is defined but never used                          no-unused-vars
+  84:10  warning  'adminDashboardPermissionGuard' is defined but never used           no-unused-vars
+  84:41  warning  'requireAnyPermission' is defined but never used                    no-unused-vars
+  85:29  warning  'P' is defined but never used                                       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\admin-dashboard\tenants.js
+   1:10  warning  'randomUUID' is defined but never used                         no-unused-vars
+   3:17  warning  'pool' is defined but never used                               no-unused-vars
+   4:10  warning  'requireAuth' is defined but never used                        no-unused-vars
+   4:23  warning  'requireRole' is defined but never used                        no-unused-vars
+   4:36  warning  'resolveAdminContext' is defined but never used                no-unused-vars
+   4:57  warning  'requirePermission' is defined but never used                  no-unused-vars
+   5:10  warning  'z' is defined but never used                                  no-unused-vars
+   7:10  warning  'ZodError' is defined but never used                           no-unused-vars
+   8:10  warning  'config' is defined but never used                             no-unused-vars
+  13:3   warning  'createImpersonationToken' is defined but never used           no-unused-vars
+  14:3   warning  'verifyImpersonationToken' is defined but never used           no-unused-vars
+  15:3   warning  'getImpersonationCookieName' is defined but never used         no-unused-vars
+  16:3   warning  'getEffectiveTenant' is defined but never used                 no-unused-vars
+  17:3   warning  'clearImpersonationCookie' is defined but never used           no-unused-vars
+  20:3   warning  'getEntitlements' is defined but never used                    no-unused-vars
+  21:3   warning  'RESTAURANT_LIMIT_KEYS' is defined but never used              no-unused-vars
+  22:3   warning  'SUPPLIER_LIMIT_KEYS' is defined but never used                no-unused-vars
+  23:3   warning  'invalidateTenantSubscriptionCache' is defined but never used  no-unused-vars
+  24:3   warning  'discoverLimitKeys' is defined but never used                  no-unused-vars
+  25:3   warning  'checkLimit' is defined but never used                         no-unused-vars
+  27:10  warning  'resolveEffectiveLimit' is defined but never used              no-unused-vars
+  29:3   warning  'resolveOrgBillingTenantId' is defined but never used          no-unused-vars
+  30:3   warning  'resolveActiveBillingSubscription' is defined but never used   no-unused-vars
+  33:10  warning  'clearActiveTenantCookie' is defined but never used            no-unused-vars
+  35:3   warning  'defaultAddonUnitPrice' is defined but never used              no-unused-vars
+  36:3   warning  'getActiveTenantAddons' is defined but never used              no-unused-vars
+  37:3   warning  'isAddonKeyValidForTenant' is defined but never used           no-unused-vars
+  39:10  warning  'getAllowedFeatureKeys' is defined but never used              no-unused-vars
+  39:33  warning  'featureDisplayName' is defined but never used                 no-unused-vars
+  41:3   warning  'listGlobalFeatureFlags' is defined but never used             no-unused-vars
+  42:3   warning  'setGlobalFeatureOverride' is defined but never used           no-unused-vars
+  43:3   warning  'listTenantFeatureOverrides' is defined but never used         no-unused-vars
+  44:3   warning  'getEffectiveFeaturesForTenant' is defined but never used      no-unused-vars
+  45:3   warning  'setTenantFeatureOverride' is defined but never used           no-unused-vars
+  46:3   warning  'clearTenantFeatureOverride' is defined but never used         no-unused-vars
+  48:10  warning  'writeAuditLog' is defined but never used                      no-unused-vars
+  49:10  warning  'recordConversionEvent' is defined but never used              no-unused-vars
+  51:3   warning  'extendFreeSandboxTrial' is defined but never used             no-unused-vars
+  52:3   warning  'unlockSubscriptionAccount' is defined but never used          no-unused-vars
+  54:10  warning  'clampFreeTrialDays' is defined but never used                 no-unused-vars
+  56:3   warning  'validatePlanLimitsAndFeatures' is defined but never used      no-unused-vars
+  57:3   warning  'validateFreePlanTrialDays' is defined but never used          no-unused-vars
+  58:3   warning  'validateEnterprisePlanActivation' is defined but never used   no-unused-vars
+  59:3   warning  'validateEnterprisePlanCreate' is defined but never used       no-unused-vars
+  60:3   warning  'buildTierLadderWarnings' is defined but never used            no-unused-vars
+  62:10  warning  'isLimitKeyApplicable' is defined but never used               no-unused-vars
+  63:10  warning  'buildAdminOverviewMetrics' is defined but never used          no-unused-vars
+  64:10  warning  'buildAdminActivityFeed' is defined but never used             no-unused-vars
+  66:3   warning  'buildAdminOperationalSummary' is defined but never used       no-unused-vars
+  67:3   warning  'listAdminEmailDeliveryLogs' is defined but never used         no-unused-vars
+  68:3   warning  'listAdminFulfillmentIssues' is defined but never used         no-unused-vars
+  69:3   warning  'listAdminActiveDeliveries' is defined but never used          no-unused-vars
+  70:3   warning  'buildTenantOperationalSnapshot' is defined but never used     no-unused-vars
+  71:3   warning  'getAdminEmailHealthFailures' is defined but never used        no-unused-vars
+  74:3   warning  'adminResetUserPassword' is defined but never used             no-unused-vars
+  75:3   warning  'listAdminUsers' is defined but never used                     no-unused-vars
+  77:10  warning  'adminDashboardPermissionGuard' is defined but never used      no-unused-vars
+  77:41  warning  'requireAnyPermission' is defined but never used               no-unused-vars
+  78:29  warning  'P' is defined but never used                                  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\assistant.routes.test.js
+  80:30  warning  '_next' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\auth.routes.js
+  21:3  warning  'assignDefaultRoleForTenant' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\auth.routes.test.js
+  447:13  warning  'response' is assigned a value but never used     no-unused-vars
+  700:15  warning  'revokeToken' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\branches.routes.test.js
+  4:20  warning  'mockSupplierUser' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\chat\admin.js
+   4:10  warning  'chatSendGuard' is defined but never used                      no-unused-vars
+   6:10  warning  'logger' is defined but never used                             no-unused-vars
+   9:3   warning  'checkAndIncrementUsage' is defined but never used             no-unused-vars
+  10:3   warning  'checkUsageWithWarning' is defined but never used              no-unused-vars
+  11:3   warning  'getTenantSubscription' is defined but never used              no-unused-vars
+  12:3   warning  'getRecommendedPlanNames' is defined but never used            no-unused-vars
+  13:3   warning  'buildLimitExceededPayload' is defined but never used          no-unused-vars
+  14:3   warning  'requireFeature' is defined but never used                     no-unused-vars
+  15:3   warning  'checkLimit' is defined but never used                         no-unused-vars
+  17:10  warning  'z' is defined but never used                                  no-unused-vars
+  18:10  warning  'notifyMessageReceived' is defined but never used              no-unused-vars
+  19:10  warning  'assertChatAttachmentUrl' is defined but never used            no-unused-vars
+  22:3   warning  'listSupportConversationsForTenant' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\chat\support.js
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used  no-unused-vars
+   9:3   warning  'getSupplierIdForRequest' is defined but never used    no-unused-vars
+  11:10  warning  'chatSendGuard' is defined but never used              no-unused-vars
+  12:10  warning  'logger' is defined but never used                     no-unused-vars
+  15:3   warning  'checkAndIncrementUsage' is defined but never used     no-unused-vars
+  16:3   warning  'checkUsageWithWarning' is defined but never used      no-unused-vars
+  17:3   warning  'getTenantSubscription' is defined but never used      no-unused-vars
+  18:3   warning  'getRecommendedPlanNames' is defined but never used    no-unused-vars
+  19:3   warning  'buildLimitExceededPayload' is defined but never used  no-unused-vars
+  21:3   warning  'checkLimit' is defined but never used                 no-unused-vars
+  24:10  warning  'notifyMessageReceived' is defined but never used      no-unused-vars
+  25:10  warning  'assertChatAttachmentUrl' is defined but never used    no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\credit-notes.routes.js
+  6:10  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\disputes.routes.js
+  12:10  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\drivers.routes.js
+  21:3  warning  'unlinkDriverUser' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\fulfillment\board.js
+   3:3   warning  'requireAuth' is defined but never used                        no-unused-vars
+   4:3   warning  'requireRole' is defined but never used                        no-unused-vars
+   5:3   warning  'resolveTenantContext' is defined but never used               no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                   no-unused-vars
+   9:10  warning  'hasPermission' is defined but never used                      no-unused-vars
+  10:29  warning  'P' is defined but never used                                  no-unused-vars
+  13:10  warning  'isFeatureEnabled' is defined but never used                   no-unused-vars
+  13:28  warning  'requireFeature' is defined but never used                     no-unused-vars
+  15:3   warning  'isMultiWarehouseFulfillmentActive' is defined but never used  no-unused-vars
+  18:10  warning  'z' is defined but never used                                  no-unused-vars
+  21:3   warning  'getDeliveryRoute' is defined but never used                   no-unused-vars
+  22:3   warning  'createDeliveryRoute' is defined but never used                no-unused-vars
+  23:3   warning  'updateDeliveryRoute' is defined but never used                no-unused-vars
+  24:3   warning  'reorderRouteStops' is defined but never used                  no-unused-vars
+  25:3   warning  'reorderRouteStopsByOrder' is defined but never used           no-unused-vars
+  26:3   warning  'setNextRouteStop' is defined but never used                   no-unused-vars
+  27:3   warning  'updateRouteStop' is defined but never used                    no-unused-vars
+  28:3   warning  'cancelDeliveryRoute' is defined but never used                no-unused-vars
+  29:3   warning  'getDriverActiveRoute' is defined but never used               no-unused-vars
+  30:3   warning  'addOrdersToPlannedRoute' is defined but never used            no-unused-vars
+  31:3   warning  'removeOrderFromPlannedRoute' is defined but never used        no-unused-vars
+  32:3   warning  'buildDriverRouteFromAssignments' is defined but never used    no-unused-vars
+  49:3   warning  'resolveRouteReorderAccess' is defined but never used          no-unused-vars
+  52:3   warning  'mapStopStatus' is defined but never used                      no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\fulfillment\exceptions.js
+   3:3   warning  'requireAuth' is defined but never used                        no-unused-vars
+   4:3   warning  'requireRole' is defined but never used                        no-unused-vars
+   5:3   warning  'resolveTenantContext' is defined but never used               no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                   no-unused-vars
+   9:10  warning  'hasPermission' is defined but never used                      no-unused-vars
+  10:29  warning  'P' is defined but never used                                  no-unused-vars
+  13:10  warning  'isFeatureEnabled' is defined but never used                   no-unused-vars
+  13:28  warning  'requireFeature' is defined but never used                     no-unused-vars
+  14:10  warning  'isMultiWarehouseFulfillmentActive' is defined but never used  no-unused-vars
+  17:3   warning  'listDeliveryRoutes' is defined but never used                 no-unused-vars
+  18:3   warning  'getDeliveryRoute' is defined but never used                   no-unused-vars
+  19:3   warning  'createDeliveryRoute' is defined but never used                no-unused-vars
+  20:3   warning  'updateDeliveryRoute' is defined but never used                no-unused-vars
+  21:3   warning  'reorderRouteStops' is defined but never used                  no-unused-vars
+  22:3   warning  'reorderRouteStopsByOrder' is defined but never used           no-unused-vars
+  23:3   warning  'setNextRouteStop' is defined but never used                   no-unused-vars
+  24:3   warning  'updateRouteStop' is defined but never used                    no-unused-vars
+  25:3   warning  'cancelDeliveryRoute' is defined but never used                no-unused-vars
+  26:3   warning  'getDriverActiveRoute' is defined but never used               no-unused-vars
+  27:3   warning  'addOrdersToPlannedRoute' is defined but never used            no-unused-vars
+  28:3   warning  'removeOrderFromPlannedRoute' is defined but never used        no-unused-vars
+  29:3   warning  'buildDriverRouteFromAssignments' is defined but never used    no-unused-vars
+  31:10  warning  'getLinkedDriverId' is defined but never used                  no-unused-vars
+  31:29  warning  'isDriverOnlyPermissions' is defined but never used            no-unused-vars
+  33:3   warning  'getLatestLocationsForDrivers' is defined but never used       no-unused-vars
+  34:3   warning  'isGpsTrackingEnabled' is defined but never used               no-unused-vars
+  37:3   warning  'buildTrackingPayload' is defined but never used               no-unused-vars
+  38:3   warning  'buildDriverLastSeenAlias' is defined but never used           no-unused-vars
+  40:10  warning  'rolloverAssignmentToNextDay' is defined but never used        no-unused-vars
+  41:10  warning  'invalidateUserAuthCaches' is defined but never used           no-unused-vars
+  44:3   warning  'resolveRouteReorderAccess' is defined but never used          no-unused-vars
+  45:3   warning  'parseWarehouseFilter' is defined but never used               no-unused-vars
+  47:3   warning  'mapStopStatus' is defined but never used                      no-unused-vars
+  49:3   warning  'loadStopsForRoutes' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\fulfillment\fulfillment.helpers.js
+   1:8   warning  'express' is defined but never used                          no-unused-vars
+   3:3   warning  'requireAuth' is defined but never used                      no-unused-vars
+   4:3   warning  'requireRole' is defined but never used                      no-unused-vars
+   5:3   warning  'resolveTenantContext' is defined but never used             no-unused-vars
+  14:10  warning  'logger' is defined but never used                           no-unused-vars
+  17:10  warning  'z' is defined but never used                                no-unused-vars
+  19:3   warning  'listDeliveryRoutes' is defined but never used               no-unused-vars
+  20:3   warning  'getDeliveryRoute' is defined but never used                 no-unused-vars
+  21:3   warning  'createDeliveryRoute' is defined but never used              no-unused-vars
+  22:3   warning  'updateDeliveryRoute' is defined but never used              no-unused-vars
+  23:3   warning  'reorderRouteStops' is defined but never used                no-unused-vars
+  24:3   warning  'reorderRouteStopsByOrder' is defined but never used         no-unused-vars
+  25:3   warning  'setNextRouteStop' is defined but never used                 no-unused-vars
+  26:3   warning  'updateRouteStop' is defined but never used                  no-unused-vars
+  27:3   warning  'cancelDeliveryRoute' is defined but never used              no-unused-vars
+  28:3   warning  'getDriverActiveRoute' is defined but never used             no-unused-vars
+  29:3   warning  'addOrdersToPlannedRoute' is defined but never used          no-unused-vars
+  30:3   warning  'removeOrderFromPlannedRoute' is defined but never used      no-unused-vars
+  31:3   warning  'buildDriverRouteFromAssignments' is defined but never used  no-unused-vars
+  35:3   warning  'getLatestLocationsForDrivers' is defined but never used     no-unused-vars
+  36:3   warning  'isGpsTrackingEnabled' is defined but never used             no-unused-vars
+  39:3   warning  'buildTrackingPayload' is defined but never used             no-unused-vars
+  40:3   warning  'buildDriverLastSeenAlias' is defined but never used         no-unused-vars
+  42:10  warning  'rolloverAssignmentToNextDay' is defined but never used      no-unused-vars
+  43:10  warning  'invalidateUserAuthCaches' is defined but never used         no-unused-vars
+  45:47  warning  'routeId' is defined but never used                          no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\fulfillment\routes.js
+   3:3   warning  'requireAuth' is defined but never used                        no-unused-vars
+   4:3   warning  'requireRole' is defined but never used                        no-unused-vars
+   5:3   warning  'resolveTenantContext' is defined but never used               no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                   no-unused-vars
+  12:10  warning  'query' is defined but never used                              no-unused-vars
+  13:10  warning  'logger' is defined but never used                             no-unused-vars
+  14:10  warning  'isFeatureEnabled' is defined but never used                   no-unused-vars
+  14:28  warning  'requireFeature' is defined but never used                     no-unused-vars
+  15:10  warning  'isMultiWarehouseFulfillmentActive' is defined but never used  no-unused-vars
+  18:3   warning  'listDeliveryRoutes' is defined but never used                 no-unused-vars
+  34:3   warning  'getLatestLocationsForDrivers' is defined but never used       no-unused-vars
+  35:3   warning  'isGpsTrackingEnabled' is defined but never used               no-unused-vars
+  38:3   warning  'buildTrackingPayload' is defined but never used               no-unused-vars
+  39:3   warning  'buildDriverLastSeenAlias' is defined but never used           no-unused-vars
+  41:10  warning  'rolloverAssignmentToNextDay' is defined but never used        no-unused-vars
+  42:10  warning  'invalidateUserAuthCaches' is defined but never used           no-unused-vars
+  47:3   warning  'parseWarehouseFilter' is defined but never used               no-unused-vars
+  48:3   warning  'warehouseFilterClause' is defined but never used              no-unused-vars
+  49:3   warning  'mapStopStatus' is defined but never used                      no-unused-vars
+  51:3   warning  'loadStopsForRoutes' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\inventory.routes.js
+  265:7  warning  'warehouseSchema' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders-driver-location.test.js
+  4:10  warning  'ForbiddenError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders.calendar.routes.js
+  67:7  warning  'PENDING_STATUSES' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\create.js
+   2:8   warning  'PDFDocument' is defined but never used                            no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                            no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                       no-unused-vars
+   9:3   warning  'resolveTenantContext' is defined but never used                   no-unused-vars
+  14:27  warning  'NotFoundError' is defined but never used                          no-unused-vars
+  25:10  warning  'notifyOrderStatusChange' is defined but never used                no-unused-vars
+  35:10  warning  'orderAmendmentsRouter' is defined but never used                  no-unused-vars
+  36:10  warning  'ordersDriverRoutes' is defined but never used                     no-unused-vars
+  37:10  warning  'syncWarehouseFulfillmentOnOrderStatus' is defined but never used  no-unused-vars
+  38:10  warning  'hasPermission' is defined but never used                          no-unused-vars
+  40:3   warning  'updateDriverDeliveryStatus' is defined but never used             no-unused-vars
+  41:3   warning  'getSupplierIdForOrder' is defined but never used                  no-unused-vars
+  42:3   warning  'orderHasProofOfDelivery' is defined but never used                no-unused-vars
+  65:10  warning  'ordersRouterMutationGuard' is defined but never used              no-unused-vars
+  66:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used          no-unused-vars
+  71:3   warning  'deliveryStatusSchema' is defined but never used                   no-unused-vars
+  72:3   warning  'orderUpdateSchema' is defined but never used                      no-unused-vars
+  73:3   warning  'orderListSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'scheduleOrderStatusNotification' is defined but never used        no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\detail.js
+   2:8   warning  'PDFDocument' is defined but never used                                   no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+   5:3   warning  'requireRole' is defined but never used                                   no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                              no-unused-vars
+   7:3   warning  'getRestaurantIdForRequest' is defined but never used                     no-unused-vars
+   8:3   warning  'getSupplierIdForRequest' is defined but never used                       no-unused-vars
+   9:3   warning  'resolveTenantContext' is defined but never used                          no-unused-vars
+  10:3   warning  'requirePermission' is defined but never used                             no-unused-vars
+  12:17  warning  'withTransaction' is defined but never used                               no-unused-vars
+  14:10  warning  'ValidationError' is defined but never used                               no-unused-vars
+  16:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+  17:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+  18:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+  19:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+  20:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+  21:3   warning  'isFeatureEnabled' is defined but never used                              no-unused-vars
+  23:10  warning  'z' is defined but never used                                             no-unused-vars
+  24:10  warning  'notifyOrderStatusChange' is defined but never used                       no-unused-vars
+  26:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+  27:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+  30:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+  31:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+  33:10  warning  'writeAuditLog' is defined but never used                                 no-unused-vars
+  34:10  warning  'orderAmendmentsRouter' is defined but never used                         no-unused-vars
+  35:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+  36:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+  37:10  warning  'syncWarehouseFulfillmentOnOrderStatus' is defined but never used         no-unused-vars
+  38:10  warning  'hasPermission' is defined but never used                                 no-unused-vars
+  40:3   warning  'updateDriverDeliveryStatus' is defined but never used                    no-unused-vars
+  41:3   warning  'getSupplierIdForOrder' is defined but never used                         no-unused-vars
+  42:3   warning  'orderHasProofOfDelivery' is defined but never used                       no-unused-vars
+  45:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+  46:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+  48:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+  50:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+  51:3   warning  'restoreSupplierStockForOrder' is defined but never used                  no-unused-vars
+  53:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+  54:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\documents.js
+   2:8   warning  'PDFDocument' is defined but never used                                   no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                              no-unused-vars
+   9:3   warning  'resolveTenantContext' is defined but never used                          no-unused-vars
+  10:3   warning  'requirePermission' is defined but never used                             no-unused-vars
+  13:17  warning  'withTransaction' is defined but never used                               no-unused-vars
+  15:10  warning  'ValidationError' is defined but never used                               no-unused-vars
+  17:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+  18:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+  19:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+  20:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+  21:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+  22:3   warning  'isFeatureEnabled' is defined but never used                              no-unused-vars
+  24:10  warning  'z' is defined but never used                                             no-unused-vars
+  25:10  warning  'notifyOrderStatusChange' is defined but never used                       no-unused-vars
+  27:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+  28:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+  31:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+  32:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+  34:10  warning  'writeAuditLog' is defined but never used                                 no-unused-vars
+  35:10  warning  'orderAmendmentsRouter' is defined but never used                         no-unused-vars
+  36:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+  37:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+  38:10  warning  'syncWarehouseFulfillmentOnOrderStatus' is defined but never used         no-unused-vars
+  39:10  warning  'hasPermission' is defined but never used                                 no-unused-vars
+  41:3   warning  'updateDriverDeliveryStatus' is defined but never used                    no-unused-vars
+  42:3   warning  'getSupplierIdForOrder' is defined but never used                         no-unused-vars
+  43:3   warning  'orderHasProofOfDelivery' is defined but never used                       no-unused-vars
+  46:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+  47:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+  49:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+  51:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+  52:3   warning  'restoreSupplierStockForOrder' is defined but never used                  no-unused-vars
+  54:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+  55:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\list.js
+   2:8   warning  'PDFDocument' is defined but never used                                   no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+   5:3   warning  'requireRole' is defined but never used                                   no-unused-vars
+   7:3   warning  'getRestaurantIdForRequest' is defined but never used                     no-unused-vars
+   8:3   warning  'getSupplierIdForRequest' is defined but never used                       no-unused-vars
+   9:3   warning  'resolveTenantContext' is defined but never used                          no-unused-vars
+  10:3   warning  'requirePermission' is defined but never used                             no-unused-vars
+  12:17  warning  'withTransaction' is defined but never used                               no-unused-vars
+  14:10  warning  'ValidationError' is defined but never used                               no-unused-vars
+  14:27  warning  'NotFoundError' is defined but never used                                 no-unused-vars
+  16:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+  17:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+  18:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+  19:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+  20:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+  21:3   warning  'isFeatureEnabled' is defined but never used                              no-unused-vars
+  24:10  warning  'notifyOrderStatusChange' is defined but never used                       no-unused-vars
+  26:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+  27:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+  30:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+  31:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+  33:10  warning  'writeAuditLog' is defined but never used                                 no-unused-vars
+  35:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+  36:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+  37:10  warning  'syncWarehouseFulfillmentOnOrderStatus' is defined but never used         no-unused-vars
+  38:10  warning  'hasPermission' is defined but never used                                 no-unused-vars
+  40:3   warning  'updateDriverDeliveryStatus' is defined but never used                    no-unused-vars
+  41:3   warning  'getSupplierIdForOrder' is defined but never used                         no-unused-vars
+  42:3   warning  'orderHasProofOfDelivery' is defined but never used                       no-unused-vars
+  45:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+  46:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+  48:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+  50:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+  51:3   warning  'restoreSupplierStockForOrder' is defined but never used                  no-unused-vars
+  53:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+  54:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used                 no-unused-vars
+  57:3   warning  'orderCreateSchema' is defined but never used                             no-unused-vars
+  58:3   warning  'supplierOrderCreateSchema' is defined but never used                     no-unused-vars
+  59:3   warning  'deliveryStatusSchema' is defined but never used                          no-unused-vars
+  60:3   warning  'orderUpdateSchema' is defined but never used                             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\orders.helpers.js
+    1:8   warning  'express' is defined but never used                                       no-unused-vars
+    4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+    5:3   warning  'requireRole' is defined but never used                                   no-unused-vars
+    9:3   warning  'resolveTenantContext' is defined but never used                          no-unused-vars
+   10:3   warning  'requirePermission' is defined but never used                             no-unused-vars
+   16:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+   17:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+   18:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+   19:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+   20:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+   21:3   warning  'isFeatureEnabled' is defined but never used                              no-unused-vars
+   26:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+   27:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+   28:3   warning  'hasActiveSupplierOrderPromotionsBatch' is defined but never used         no-unused-vars
+   31:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+   32:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+   34:10  warning  'writeAuditLog' is defined but never used                                 no-unused-vars
+   35:10  warning  'orderAmendmentsRouter' is defined but never used                         no-unused-vars
+   36:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+   37:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+   40:10  warning  'hasPermission' is defined but never used                                 no-unused-vars
+   42:3   warning  'updateDriverDeliveryStatus' is defined but never used                    no-unused-vars
+   43:3   warning  'getSupplierIdForOrder' is defined but never used                         no-unused-vars
+   44:3   warning  'orderHasProofOfDelivery' is defined but never used                       no-unused-vars
+   49:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+   50:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+   52:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+   54:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+   55:3   warning  'restoreSupplierStockForOrder' is defined but never used                  no-unused-vars
+   57:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+   58:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used                 no-unused-vars
+  648:65  warning  '_previousStatus' is assigned a value but never used                      no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\update.js
+   2:8   warning  'PDFDocument' is defined but never used                                   no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+   5:3   warning  'requireRole' is defined but never used                                   no-unused-vars
+   6:3   warning  'getRequestTenant' is defined but never used                              no-unused-vars
+   9:3   warning  'resolveTenantContext' is defined but never used                          no-unused-vars
+  10:3   warning  'requirePermission' is defined but never used                             no-unused-vars
+  16:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+  17:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+  18:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+  19:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+  20:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+  24:10  warning  'notifyOrderStatusChange' is defined but never used                       no-unused-vars
+  26:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+  27:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+  32:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+  33:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+  35:10  warning  'writeAuditLog' is defined but never used                                 no-unused-vars
+  36:10  warning  'orderAmendmentsRouter' is defined but never used                         no-unused-vars
+  37:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+  38:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+  49:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+  50:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+  52:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+  54:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+  57:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+  63:3   warning  'orderCreateSchema' is defined but never used                             no-unused-vars
+  64:3   warning  'supplierOrderCreateSchema' is defined but never used                     no-unused-vars
+  65:3   warning  'deliveryStatusSchema' is defined but never used                          no-unused-vars
+  67:3   warning  'orderListSchema' is defined but never used                               no-unused-vars
+  69:3   warning  'scheduleOrderPlacedNotification' is defined but never used               no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\orders\warehouses.js
+   2:8   warning  'PDFDocument' is defined but never used                                   no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                                   no-unused-vars
+   6:3   warning  'getRestaurantIdForRequest' is defined but never used                     no-unused-vars
+  13:10  warning  'ValidationError' is defined but never used                               no-unused-vars
+  15:3   warning  'DailyUsageLimitExceededError' is defined but never used                  no-unused-vars
+  16:3   warning  'resolveDailyMeterEnforcementFromSubscription' is defined but never used  no-unused-vars
+  17:3   warning  'getTenantSubscription' is defined but never used                         no-unused-vars
+  18:3   warning  'getRecommendedPlanNames' is defined but never used                       no-unused-vars
+  19:3   warning  'buildLimitExceededPayload' is defined but never used                     no-unused-vars
+  20:3   warning  'isFeatureEnabled' is defined but never used                              no-unused-vars
+  22:10  warning  'z' is defined but never used                                             no-unused-vars
+  25:3   warning  'notifyOrderStatusChange' is defined but never used                       no-unused-vars
+  28:3   warning  'applyBestPromotionToOrder' is defined but never used                     no-unused-vars
+  29:3   warning  'hasActiveSupplierOrderPromotions' is defined but never used              no-unused-vars
+  32:3   warning  'applyPromotionByIdToOrder' is defined but never used                     no-unused-vars
+  33:3   warning  'validateCouponForOrder' is defined but never used                        no-unused-vars
+  36:10  warning  'orderAmendmentsRouter' is defined but never used                         no-unused-vars
+  37:10  warning  'ordersDriverRoutes' is defined but never used                            no-unused-vars
+  38:10  warning  'assignWarehousesToOrder' is defined but never used                       no-unused-vars
+  40:3   warning  'syncWarehouseFulfillmentOnOrderStatus' is defined but never used         no-unused-vars
+  44:10  warning  'hasPermission' is defined but never used                                 no-unused-vars
+  46:3   warning  'updateDriverDeliveryStatus' is defined but never used                    no-unused-vars
+  47:3   warning  'getSupplierIdForOrder' is defined but never used                         no-unused-vars
+  48:3   warning  'orderHasProofOfDelivery' is defined but never used                       no-unused-vars
+  51:3   warning  'resolveProductPricesBatch' is defined but never used                     no-unused-vars
+  52:3   warning  'getDefaultCatalogPricesBatch' is defined but never used                  no-unused-vars
+  54:10  warning  'createRestaurantOrdersInTransaction' is defined but never used           no-unused-vars
+  56:3   warning  'assertAndDeductSupplierStock' is defined but never used                  no-unused-vars
+  57:3   warning  'restoreSupplierStockForOrder' is defined but never used                  no-unused-vars
+  59:10  warning  'ordersRouterMutationGuard' is defined but never used                     no-unused-vars
+  60:10  warning  'releaseOrderFromPlannedRoutes' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\promotions.routes.test.js
+  105:29  warning  'next' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\promotions\promotions.helpers.js
+   1:8   warning  'express' is defined but never used                           no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used              no-unused-vars
+  13:17  warning  'withTransaction' is defined but never used                   no-unused-vars
+  14:10  warning  'logger' is defined but never used                            no-unused-vars
+  16:10  warning  'loadActivePromotionsForSupplier' is defined but never used   no-unused-vars
+  18:3   warning  'discoverDealsForRestaurant' is defined but never used        no-unused-vars
+  19:3   warning  'loadDealDetailForRestaurant' is defined but never used       no-unused-vars
+  20:3   warning  'recordDealInteraction' is defined but never used             no-unused-vars
+  21:3   warning  'getDealAnalytics' is defined but never used                  no-unused-vars
+  22:3   warning  'getSupplierDealsAnalyticsSummary' is defined but never used  no-unused-vars
+  23:3   warning  'enrichPromotionRow' is defined but never used                no-unused-vars
+  24:3   warning  'enrichPromotionRows' is defined but never used               no-unused-vars
+  25:3   warning  'getEligibleProductsForDeal' is defined but never used        no-unused-vars
+  26:3   warning  'getActiveDealPromotion' is defined but never used            no-unused-vars
+  27:3   warning  'previewDealForCart' is defined but never used                no-unused-vars
+  30:3   warning  'DEAL_STATUSES' is defined but never used                     no-unused-vars
+  31:3   warning  'PAYMENT_STATUSES' is defined but never used                  no-unused-vars
+  32:3   warning  'resolveScheduledOrActive' is defined but never used          no-unused-vars
+  33:3   warning  'isPendingAdminReview' is defined but never used              no-unused-vars
+  34:3   warning  'shouldResetApprovalOnEdit' is defined but never used         no-unused-vars
+  37:3   warning  'applyBoostSelectionToDeal' is defined but never used         no-unused-vars
+  38:3   warning  'publishDealAfterApproval' is defined but never used          no-unused-vars
+  39:3   warning  'resolveStatusAfterBoostApproval' is defined but never used   no-unused-vars
+  40:3   warning  'buildBoostApprovalPreview' is defined but never used         no-unused-vars
+  41:3   warning  'isBoostPaymentWaived' is defined but never used              no-unused-vars
+  43:10  warning  'writeAuditLog' is defined but never used                     no-unused-vars
+  44:26  warning  'requireWithinLimit' is defined but never used                no-unused-vars
+  45:10  warning  'getNewDealsBanner' is defined but never used                 no-unused-vars
+  45:29  warning  'dismissDealBanner' is defined but never used                 no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\promotions\restaurant.js
+   7:3   warning  'resolveAdminContext' is defined but never used               no-unused-vars
+  10:3   warning  'getSupplierIdForRequest' is defined but never used           no-unused-vars
+  11:3   warning  'getRestaurantIdForRequest' is defined but never used         no-unused-vars
+  13:17  warning  'withTransaction' is defined but never used                   no-unused-vars
+  17:10  warning  'loadActivePromotionsForSupplier' is defined but never used   no-unused-vars
+  22:3   warning  'getDealAnalytics' is defined but never used                  no-unused-vars
+  23:3   warning  'getSupplierDealsAnalyticsSummary' is defined but never used  no-unused-vars
+  25:3   warning  'enrichPromotionRows' is defined but never used               no-unused-vars
+  35:3   warning  'shouldResetApprovalOnEdit' is defined but never used         no-unused-vars
+  39:3   warning  'applyBoostSelectionToDeal' is defined but never used         no-unused-vars
+  46:10  warning  'requireFeature' is defined but never used                    no-unused-vars
+  46:26  warning  'requireWithinLimit' is defined but never used                no-unused-vars
+  57:3   warning  'promotionBodySchema' is defined but never used               no-unused-vars
+  58:3   warning  'submitDealBodySchema' is defined but never used              no-unused-vars
+  59:3   warning  'promoteBodySchema' is defined but never used                 no-unused-vars
+  66:3   warning  'syncPromotionTargets' is defined but never used              no-unused-vars
+  67:3   warning  'syncRestaurantTargets' is defined but never used             no-unused-vars
+  68:3   warning  'mapPromotionInsertFields' is defined but never used          no-unused-vars
+  71:3   warning  'promotionsAccessGuard' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\promotions\supplier.js
+   7:3   warning  'resolveAdminContext' is defined but never used              no-unused-vars
+   8:3   warning  'requirePermission' is defined but never used                no-unused-vars
+   9:3   warning  'requireAnyPermission' is defined but never used             no-unused-vars
+  10:3   warning  'getSupplierIdForRequest' is defined but never used          no-unused-vars
+  11:3   warning  'getRestaurantIdForRequest' is defined but never used        no-unused-vars
+  20:10  warning  'logger' is defined but never used                           no-unused-vars
+  21:27  warning  'NotFoundError' is defined but never used                    no-unused-vars
+  22:10  warning  'loadActivePromotionsForSupplier' is defined but never used  no-unused-vars
+  24:3   warning  'discoverDealsForRestaurant' is defined but never used       no-unused-vars
+  25:3   warning  'loadDealDetailForRestaurant' is defined but never used      no-unused-vars
+  26:3   warning  'recordDealInteraction' is defined but never used            no-unused-vars
+  29:3   warning  'enrichPromotionRow' is defined but never used               no-unused-vars
+  31:3   warning  'getEligibleProductsForDeal' is defined but never used       no-unused-vars
+  32:3   warning  'getActiveDealPromotion' is defined but never used           no-unused-vars
+  33:3   warning  'previewDealForCart' is defined but never used               no-unused-vars
+  42:3   warning  'isPendingAdminReview' is defined but never used             no-unused-vars
+  48:3   warning  'resolveStatusAfterBoostApproval' is defined but never used  no-unused-vars
+  49:3   warning  'buildBoostApprovalPreview' is defined but never used        no-unused-vars
+  54:10  warning  'getNewDealsBanner' is defined but never used                no-unused-vars
+  54:29  warning  'dismissDealBanner' is defined but never used                no-unused-vars
+  57:3   warning  'adminDealGuards' is defined but never used                  no-unused-vars
+  61:3   warning  'interactBodySchema' is defined but never used               no-unused-vars
+  62:3   warning  'cartPreviewSchema' is defined but never used                no-unused-vars
+  63:3   warning  'rejectBodySchema' is defined but never used                 no-unused-vars
+  65:3   warning  'getRestaurantId' is defined but never used                  no-unused-vars
+  70:3   warning  'supplierDealsGate' is defined but never used                no-unused-vars
+  71:3   warning  'BOOST_PRICING_WHERE' is defined but never used              no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\public.routes.js
+  46:3  warning  'CAPACITY_CONSUMING_STATUSES' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\recipes.routes.js
+  80:5  warning  'costPerPortion' is assigned a value but never used         no-unused-vars
+  81:5  warning  'foodCostPct' is assigned a value but never used            no-unused-vars
+  82:5  warning  'grossProfit' is assigned a value but never used            no-unused-vars
+  83:5  warning  'grossMarginPct' is assigned a value but never used         no-unused-vars
+  84:5  warning  'suggestedSellingPrice' is assigned a value but never used  no-unused-vars
+  85:5  warning  'lastPriceImpact' is assigned a value but never used        no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\reports.routes.js
+  7:10  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\restaurant-finance.routes.js
+   7:3  warning  'getRestaurantIdForRequest' is defined but never used      no-unused-vars
+   8:3  warning  'getSupplierIdForRequest' is defined but never used        no-unused-vars
+  53:7  warning  'markPaidSchema' is assigned a value but never used        no-unused-vars
+  60:7  warning  'disputeInvoiceSchema' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\restaurant-onboarding.routes.js
+  10:17  warning  'withTransaction' is defined but never used  no-unused-vars
+  12:25  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\reviews.routes.js
+  7:10  warning  'ValidationError' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\announcements.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  13:3   warning  'cachedStaffList' is defined but never used                       no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  56:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  57:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  59:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  60:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  62:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  63:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  65:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  67:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  68:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  70:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  71:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  73:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  75:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  76:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  77:3   warning  'availabilitySchema' is defined but never used                    no-unused-vars
+  78:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  79:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  82:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+  83:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  84:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  85:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  86:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\documents.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  13:3   warning  'cachedStaffList' is defined but never used                       no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  56:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  57:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  59:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  60:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  61:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  63:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  65:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  67:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  68:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  70:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  71:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  73:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  75:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  76:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  77:3   warning  'availabilitySchema' is defined but never used                    no-unused-vars
+  78:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  79:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  80:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  81:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  83:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  84:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  85:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  86:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\portal.js
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  13:3   warning  'cachedStaffList' is defined but never used                       no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:10  warning  'query' is defined but never used                                 no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  57:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  59:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  60:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  61:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  62:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  63:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  65:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  66:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  67:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  68:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  70:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  71:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  73:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  74:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  76:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  77:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  79:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  80:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  81:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  82:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  83:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+  84:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  85:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  86:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  87:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\pto.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  56:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  57:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  60:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  61:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  62:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  63:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  65:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  67:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  68:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  70:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  71:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  73:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  80:3   warning  'availabilitySchema' is defined but never used                    no-unused-vars
+  81:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  82:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  83:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  84:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  85:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+  86:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  87:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  88:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  89:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\reports.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  56:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  57:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  59:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  60:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  61:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  62:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  67:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  68:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  70:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  71:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  73:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  75:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  76:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  77:3   warning  'availabilitySchema' is defined but never used                    no-unused-vars
+  78:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  79:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  80:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  81:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  82:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\schedule.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  56:3   warning  'mapStaffRow' is defined but never used                           no-unused-vars
+  59:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  61:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  62:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  63:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  65:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  67:3   warning  'createStaffSchema' is defined but never used                     no-unused-vars
+  68:3   warning  'updateStaffSchema' is defined but never used                     no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  81:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  82:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  83:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  87:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  88:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  89:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+  90:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  91:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  92:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  93:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\staff.shared.js
+   1:8   warning  'express' is defined but never used                               no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   4:3   warning  'requireAuth' is defined but never used                           no-unused-vars
+   5:3   warning  'requireRole' is defined but never used                           no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  13:3   warning  'cachedStaffList' is defined but never used                       no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  20:10  warning  'logger' is defined but never used                                no-unused-vars
+  22:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  24:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  25:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  26:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  27:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  28:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  29:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  30:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  33:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  34:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  35:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  36:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  37:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  38:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  39:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  40:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  41:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  43:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  45:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  46:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  49:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  50:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  51:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  52:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  53:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  54:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\staff\team.js
+   2:10  warning  'z' is defined but never used                                     no-unused-vars
+   2:13  warning  'ZodError' is defined but never used                              no-unused-vars
+   6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+   8:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:10  warning  'requireStaffPortalAuth' is defined but never used                no-unused-vars
+  10:34  warning  'requirePlatformAppAccess' is defined but never used              no-unused-vars
+  11:10  warning  'staffMutationGuard' is defined but never used                    no-unused-vars
+  14:3   warning  'staffListCacheInvalidationMiddleware' is defined but never used  no-unused-vars
+  16:17  warning  'withTransaction' is defined but never used                       no-unused-vars
+  18:10  warning  'getRestaurantIdByEmail' is defined but never used                no-unused-vars
+  19:10  warning  'assertPresignedFileUrl' is defined but never used                no-unused-vars
+  21:3   warning  'notifyStaffPtoRequest' is defined but never used                 no-unused-vars
+  22:3   warning  'notifyStaffSwapRequest' is defined but never used                no-unused-vars
+  23:3   warning  'notifyStaffAnnouncement' is defined but never used               no-unused-vars
+  24:3   warning  'notifyStaffDocumentUploaded' is defined but never used           no-unused-vars
+  25:3   warning  'notifyStaffShiftEvent' is defined but never used                 no-unused-vars
+  26:3   warning  'notifyStaffPtoDecision' is defined but never used                no-unused-vars
+  27:3   warning  'notifyStaffSwapDecision' is defined but never used               no-unused-vars
+  30:3   warning  'fetchStaffPortalDashboard' is defined but never used             no-unused-vars
+  31:3   warning  'fetchStaffPortalTimeEntries' is defined but never used           no-unused-vars
+  32:3   warning  'staffPortalCheckIn' is defined but never used                    no-unused-vars
+  33:3   warning  'staffPortalCheckOut' is defined but never used                   no-unused-vars
+  34:3   warning  'submitStaffPortalPto' is defined but never used                  no-unused-vars
+  35:3   warning  'submitStaffPortalSwap' is defined but never used                 no-unused-vars
+  36:3   warning  'acknowledgeStaffAnnouncement' is defined but never used          no-unused-vars
+  37:3   warning  'setStaffAvailability' is defined but never used                  no-unused-vars
+  38:3   warning  'getStaffAvailability' is defined but never used                  no-unused-vars
+  40:10  warning  'fetchLabourSummary' is defined but never used                    no-unused-vars
+  42:3   warning  'computePayrollPreview' is defined but never used                 no-unused-vars
+  43:3   warning  'previewToPayrollTotals' is defined but never used                no-unused-vars
+  46:3   warning  'createStaffPortalAccount' is defined but never used              no-unused-vars
+  47:3   warning  'sendStaffPortalInviteEmail' is defined but never used            no-unused-vars
+  48:3   warning  'disableStaffPortalAccess' is defined but never used              no-unused-vars
+  49:3   warning  'resetStaffPortalAccess' is defined but never used                no-unused-vars
+  50:3   warning  'getStaffPortalAccessRow' is defined but never used               no-unused-vars
+  51:3   warning  'mapPortalAccessInfo' is defined but never used                   no-unused-vars
+  57:3   warning  'mapShiftRow' is defined but never used                           no-unused-vars
+  58:3   warning  'mapTimeEntryRow' is defined but never used                       no-unused-vars
+  59:3   warning  'mapPtoRow' is defined but never used                             no-unused-vars
+  60:3   warning  'mapSwapRow' is defined but never used                            no-unused-vars
+  61:3   warning  'mapAnnouncementRow' is defined but never used                    no-unused-vars
+  62:3   warning  'mapDocumentRow' is defined but never used                        no-unused-vars
+  63:3   warning  'mapIncidentRow' is defined but never used                        no-unused-vars
+  64:3   warning  'mapPerformanceNoteRow' is defined but never used                 no-unused-vars
+  65:3   warning  'mapPayrollExportRow' is defined but never used                   no-unused-vars
+  66:3   warning  'staffStatusEnum' is defined but never used                       no-unused-vars
+  69:3   warning  'shiftStatusEnum' is defined but never used                       no-unused-vars
+  70:3   warning  'createShiftSchema' is defined but never used                     no-unused-vars
+  71:3   warning  'updateShiftSchema' is defined but never used                     no-unused-vars
+  72:3   warning  'checkInSchema' is defined but never used                         no-unused-vars
+  73:3   warning  'checkOutSchema' is defined but never used                        no-unused-vars
+  74:3   warning  'ptoTypeEnum' is defined but never used                           no-unused-vars
+  75:3   warning  'createPtoSchema' is defined but never used                       no-unused-vars
+  76:3   warning  'updatePtoSchema' is defined but never used                       no-unused-vars
+  77:3   warning  'availabilitySchema' is defined but never used                    no-unused-vars
+  78:3   warning  'createSwapSchema' is defined but never used                      no-unused-vars
+  79:3   warning  'decideSwapSchema' is defined but never used                      no-unused-vars
+  80:3   warning  'createAnnouncementSchema' is defined but never used              no-unused-vars
+  81:3   warning  'acknowledgeAnnouncementSchema' is defined but never used         no-unused-vars
+  82:3   warning  'createDocumentSchema' is defined but never used                  no-unused-vars
+  83:3   warning  'createIncidentSchema' is defined but never used                  no-unused-vars
+  84:3   warning  'createPerformanceNoteSchema' is defined but never used           no-unused-vars
+  85:3   warning  'createPayrollExportSchema' is defined but never used             no-unused-vars
+  86:3   warning  'updatePayrollExportSchema' is defined but never used             no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\suppliers\admin.js
+   6:3   warning  'optionalAuth' is defined but never used                          no-unused-vars
+   7:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+   9:3   warning  'getSupplierIdForRequest' is defined but never used               no-unused-vars
+  10:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  11:3   warning  'getRequestTenant' is defined but never used                      no-unused-vars
+  13:10  warning  'requireFeature' is defined but never used                        no-unused-vars
+  13:26  warning  'isFeatureEnabled' is defined but never used                      no-unused-vars
+  15:10  warning  'createModuleLogger' is defined but never used                    no-unused-vars
+  15:30  warning  'logEvent' is defined but never used                              no-unused-vars
+  15:40  warning  'logQueryDebug' is defined but never used                         no-unused-vars
+  16:10  warning  'patchRequestLogTenant' is defined but never used                 no-unused-vars
+  17:10  warning  'invalidateTenantProfileCache' is defined but never used          no-unused-vars
+  18:10  warning  'ValidationError' is defined but never used                       no-unused-vars
+  18:27  warning  'NotFoundError' is defined but never used                         no-unused-vars
+  21:10  warning  'restaurantSupplierMutationGuard' is defined but never used       no-unused-vars
+  23:10  warning  'buildWhitelistedUpdate' is defined but never used                no-unused-vars
+  25:3   warning  'getSupplierRatingSummary' is defined but never used              no-unused-vars
+  26:3   warning  'getRecentReviewsForSupplier' is defined but never used           no-unused-vars
+  27:3   warning  'getSupplierRatingSummariesBatch' is defined but never used       no-unused-vars
+  28:3   warning  'getRecentReviewsForSuppliersBatch' is defined but never used     no-unused-vars
+  31:3   warning  'listFeaturedPackages' is defined but never used                  no-unused-vars
+  32:3   warning  'purchaseAndActivateFeaturedPlacement' is defined but never used  no-unused-vars
+  33:3   warning  'listPlacementsForSupplier' is defined but never used             no-unused-vars
+  34:3   warning  'listAllActivePlacementsForAdmin' is defined but never used       no-unused-vars
+  38:3   warning  'attachReviewFields' is defined but never used                    no-unused-vars
+  40:3   warning  'supplierUpdateSchema' is defined but never used                  no-unused-vars
+  41:3   warning  'supplierListSchema' is defined but never used                    no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\suppliers\catalog.js
+    3:3   warning  'requireAuth' is defined but never used                           no-unused-vars
+    4:3   warning  'requireRole' is defined but never used                           no-unused-vars
+    6:3   warning  'resolveTenantContext' is defined but never used                  no-unused-vars
+    7:3   warning  'requirePermission' is defined but never used                     no-unused-vars
+    8:3   warning  'getSupplierIdForRequest' is defined but never used               no-unused-vars
+   10:3   warning  'getRequestTenant' is defined but never used                      no-unused-vars
+   12:10  warning  'requireFeature' is defined but never used                        no-unused-vars
+   12:26  warning  'isFeatureEnabled' is defined but never used                      no-unused-vars
+   14:55  warning  'logger' is defined but never used                                no-unused-vars
+   16:10  warning  'invalidateTenantProfileCache' is defined but never used          no-unused-vars
+   17:10  warning  'ValidationError' is defined but never used                       no-unused-vars
+   17:27  warning  'NotFoundError' is defined but never used                         no-unused-vars
+   18:10  warning  'createPendingActivationSubscription' is defined but never used   no-unused-vars
+   19:10  warning  'ensureTenantSystemRoles' is defined but never used               no-unused-vars
+   20:10  warning  'restaurantSupplierMutationGuard' is defined but never used       no-unused-vars
+   22:10  warning  'buildWhitelistedUpdate' is defined but never used                no-unused-vars
+   24:3   warning  'getSupplierRatingSummary' is defined but never used              no-unused-vars
+   25:3   warning  'getRecentReviewsForSupplier' is defined but never used           no-unused-vars
+   26:3   warning  'getSupplierRatingSummariesBatch' is defined but never used       no-unused-vars
+   27:3   warning  'getRecentReviewsForSuppliersBatch' is defined but never used     no-unused-vars
+   30:3   warning  'listFeaturedPackages' is defined but never used                  no-unused-vars
+   31:3   warning  'purchaseAndActivateFeaturedPlacement' is defined but never used  no-unused-vars
+   32:3   warning  'listPlacementsForSupplier' is defined but never used             no-unused-vars
+   33:3   warning  'listAllActivePlacementsForAdmin' is defined but never used       no-unused-vars
+   39:3   warning  'supplierCreateSchema' is defined but never used                  no-unused-vars
+   40:3   warning  'supplierUpdateSchema' is defined but never used                  no-unused-vars
+  193:55  warning  'supplier_ids' is defined but never used                          no-unused-vars
+  206:9   warning  'countParamIndex' is assigned a value but never used              no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\suppliers\manage.js
+   4:3   warning  'requireRole' is defined but never used                           no-unused-vars
+   5:3   warning  'optionalAuth' is defined but never used                          no-unused-vars
+   9:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  10:3   warning  'getRequestTenant' is defined but never used                      no-unused-vars
+  12:10  warning  'requireFeature' is defined but never used                        no-unused-vars
+  12:26  warning  'isFeatureEnabled' is defined but never used                      no-unused-vars
+  14:10  warning  'createModuleLogger' is defined but never used                    no-unused-vars
+  14:30  warning  'logEvent' is defined but never used                              no-unused-vars
+  14:40  warning  'logQueryDebug' is defined but never used                         no-unused-vars
+  15:10  warning  'patchRequestLogTenant' is defined but never used                 no-unused-vars
+  17:10  warning  'ValidationError' is defined but never used                       no-unused-vars
+  17:27  warning  'NotFoundError' is defined but never used                         no-unused-vars
+  18:10  warning  'createPendingActivationSubscription' is defined but never used   no-unused-vars
+  19:10  warning  'ensureTenantSystemRoles' is defined but never used               no-unused-vars
+  21:10  warning  'restaurantSupplierMutationGuard' is defined but never used       no-unused-vars
+  25:3   warning  'getSupplierRatingSummary' is defined but never used              no-unused-vars
+  26:3   warning  'getRecentReviewsForSupplier' is defined but never used           no-unused-vars
+  27:3   warning  'getSupplierRatingSummariesBatch' is defined but never used       no-unused-vars
+  28:3   warning  'getRecentReviewsForSuppliersBatch' is defined but never used     no-unused-vars
+  31:3   warning  'listFeaturedPackages' is defined but never used                  no-unused-vars
+  32:3   warning  'purchaseAndActivateFeaturedPlacement' is defined but never used  no-unused-vars
+  33:3   warning  'listPlacementsForSupplier' is defined but never used             no-unused-vars
+  34:3   warning  'listAllActivePlacementsForAdmin' is defined but never used       no-unused-vars
+  38:3   warning  'attachReviewFields' is defined but never used                    no-unused-vars
+  39:3   warning  'supplierCreateSchema' is defined but never used                  no-unused-vars
+  41:3   warning  'supplierListSchema' is defined but never used                    no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\suppliers\profile.js
+   5:3   warning  'optionalAuth' is defined but never used                         no-unused-vars
+  12:3   warning  'getRequestTenant' is defined but never used                     no-unused-vars
+  16:10  warning  'createModuleLogger' is defined but never used                   no-unused-vars
+  16:30  warning  'logEvent' is defined but never used                             no-unused-vars
+  16:40  warning  'logQueryDebug' is defined but never used                        no-unused-vars
+  17:10  warning  'patchRequestLogTenant' is defined but never used                no-unused-vars
+  20:10  warning  'createPendingActivationSubscription' is defined but never used  no-unused-vars
+  21:10  warning  'ensureTenantSystemRoles' is defined but never used              no-unused-vars
+  24:10  warning  'buildWhitelistedUpdate' is defined but never used               no-unused-vars
+  54:3   warning  'attachReviewFields' is defined but never used                   no-unused-vars
+  55:3   warning  'supplierCreateSchema' is defined but never used                 no-unused-vars
+  56:3   warning  'supplierUpdateSchema' is defined but never used                 no-unused-vars
+  57:3   warning  'supplierListSchema' is defined but never used                   no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\routes\suppliers\relationships.js
+   5:3   warning  'optionalAuth' is defined but never used                          no-unused-vars
+   8:3   warning  'getSupplierIdForRequest' is defined but never used               no-unused-vars
+   9:3   warning  'getRestaurantIdForRequest' is defined but never used             no-unused-vars
+  12:10  warning  'requireFeature' is defined but never used                        no-unused-vars
+  12:26  warning  'isFeatureEnabled' is defined but never used                      no-unused-vars
+  14:10  warning  'createModuleLogger' is defined but never used                    no-unused-vars
+  14:30  warning  'logEvent' is defined but never used                              no-unused-vars
+  14:40  warning  'logQueryDebug' is defined but never used                         no-unused-vars
+  15:10  warning  'patchRequestLogTenant' is defined but never used                 no-unused-vars
+  16:10  warning  'invalidateTenantProfileCache' is defined but never used          no-unused-vars
+  17:27  warning  'NotFoundError' is defined but never used                         no-unused-vars
+  18:10  warning  'createPendingActivationSubscription' is defined but never used   no-unused-vars
+  19:10  warning  'ensureTenantSystemRoles' is defined but never used               no-unused-vars
+  22:10  warning  'z' is defined but never used                                     no-unused-vars
+  23:10  warning  'buildWhitelistedUpdate' is defined but never used                no-unused-vars
+  25:3   warning  'getSupplierRatingSummary' is defined but never used              no-unused-vars
+  26:3   warning  'getRecentReviewsForSupplier' is defined but never used           no-unused-vars
+  27:3   warning  'getSupplierRatingSummariesBatch' is defined but never used       no-unused-vars
+  28:3   warning  'getRecentReviewsForSuppliersBatch' is defined but never used     no-unused-vars
+  31:3   warning  'listFeaturedPackages' is defined but never used                  no-unused-vars
+  32:3   warning  'purchaseAndActivateFeaturedPlacement' is defined but never used  no-unused-vars
+  33:3   warning  'listPlacementsForSupplier' is defined but never used             no-unused-vars
+  34:3   warning  'listAllActivePlacementsForAdmin' is defined but never used       no-unused-vars
+  38:3   warning  'attachReviewFields' is defined but never used                    no-unused-vars
+  39:3   warning  'supplierCreateSchema' is defined but never used                  no-unused-vars
+  40:3   warning  'supplierUpdateSchema' is defined but never used                  no-unused-vars
+  41:3   warning  'supplierListSchema' is defined but never used                    no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\consumer-menu-import.service.js
+  1:10  warning  'query' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\delivery-retry.service.js
+  1:10  warning  'query' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\delivery-routes.service.js
+    16:3   warning  'isPlannedRouteEligibleStatus' is defined but never used           no-unused-vars
+    22:7   warning  'DRIVER_ACTIVE_ROUTE_STATUSES' is assigned a value but never used  no-unused-vars
+  1022:43  warning  'permissions' is defined but never used                            no-unused-vars
+  1306:18  warning  'userId' is assigned a value but never used                        no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\disputes.service.js
+  3:10  warning  'logger' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\driver-fulfillment.service.js
+  405:3  warning  'userId' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\email\email.service.js
+  137:9  warning  'normalizedHtml' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\featured-supplier-placement.service.js
+  112:15  warning  '_invoice' is assigned a value but never used          no-unused-vars
+  112:25  warning  '_chargeNow' is assigned a value but never used        no-unused-vars
+  112:37  warning  '_paymentMethodId' is assigned a value but never used  no-unused-vars
+  112:55  warning  '_idempotencyKey' is assigned a value but never used   no-unused-vars
+  133:17  warning  '_invoice' is assigned a value but never used          no-unused-vars
+  133:27  warning  '_chargeNow' is assigned a value but never used        no-unused-vars
+  133:39  warning  '_paymentMethodId' is assigned a value but never used  no-unused-vars
+  133:57  warning  '_idempotencyKey' is assigned a value but never used   no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\notification\templates.js
+   223:9   warning  'userId' is assigned a value but never used          no-unused-vars
+   225:9   warning  'message' is assigned a value but never used         no-unused-vars
+   670:9   warning  'timeslot' is assigned a value but never used        no-unused-vars
+   792:9   warning  'displayName' is assigned a value but never used     no-unused-vars
+   934:68  warning  'locale' is assigned a value but never used          no-unused-vars
+   965:52  warning  'locale' is assigned a value but never used          no-unused-vars
+   990:54  warning  'locale' is assigned a value but never used          no-unused-vars
+  1014:72  warning  'locale' is assigned a value but never used          no-unused-vars
+  1038:53  warning  'locale' is assigned a value but never used          no-unused-vars
+  1085:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1118:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1218:52  warning  'locale' is assigned a value but never used          no-unused-vars
+  1255:9   warning  'dealName' is assigned a value but never used        no-unused-vars
+  1256:9   warning  'supplierLabel' is assigned a value but never used   no-unused-vars
+  1316:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1394:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1676:9   warning  'dealName' is assigned a value but never used        no-unused-vars
+  1746:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1770:3   warning  'locale' is assigned a value but never used          no-unused-vars
+  1833:11  warning  'restaurantName' is assigned a value but never used  no-unused-vars
+  1873:11  warning  'supplierName' is assigned a value but never used    no-unused-vars
+  1903:3   warning  'locale' is assigned a value but never used          no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\order-fulfillment-issues.service.js
+  355:3  warning  'createdByUserId' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\org-reports.service.js
+   94:11  warning  'params' is assigned a value but never used  no-unused-vars
+  188:11  warning  'params' is assigned a value but never used  no-unused-vars
+  630:11  warning  'params' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\recipe-recalc-queue.service.js
+  18:5  warning  'branchId' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\referral-conversion.service.js
+  58:65  warning  'planCode' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\reorder-ai.service.test.js
+  7:7  warning  'mockCompleteJson' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\reorder-cadence.service.js
+  185:51  warning  'now' is assigned a value but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\resolve-product-price.service.js
+  441:37  warning  '_itemDate' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\storage\upload-security.service.test.js
+  46:3  warning  'createUploadSession' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\supplier-growth-invitation.service.js
+  1:17  warning  'withTransaction' is defined but never used  no-unused-vars
+  4:47  warning  'inviteExpiresAt' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\supplier-reorder-intelligence.service.js
+  142:16  warning  'getSuggestedProducts' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\supplier-run-sheet.service.js
+  73:31  warning  '_dueDate' is defined but never used  no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\services\warehouseRouting.js
+    4:10  warning  'reserveWarehouseStock' is defined but never used  no-unused-vars
+  318:16  warning  'loadRoutingContext' is defined but never used     no-unused-vars
+  409:16  warning  'insertAssignment' is defined but never used       no-unused-vars
+
+C:\myProjects\supplify_erp\apps\api\src\test\feature-gate-mock.js
+  24:23  warning  'getTenantId' is defined but never used    no-unused-vars
+  24:36  warning  'getTenantType' is defined but never used  no-unused-vars
+
+✖ 1715 problems (0 errors, 1715 warnings)
+

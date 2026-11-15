@@ -1,0 +1,17 @@
+{
+  "id": "003a921d-f679-46ef-a8a9-c130ef422d0e",
+  "status": "ERRORED",
+  "error": {
+    "errorCode": "UNKNOWN_ERROR",
+    "message": "Unknown error. See logs of the Install dependencies build phase for more information."
+  },
+  "profile": "demo",
+  "platform": "ANDROID",
+  "appVersion": "1.1.0",
+  "buildVersion": "27",
+  "createdAt": "2026-11-15T14:41:42.287Z",
+  "completedAt": "2026-11-15T14:41:59.168Z",
+  "artifact": null,
+  "buildUrl": "https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/003a921d-f679-46ef-a8a9-c130ef422d0e",
+  "api": "https://api-dev.supplifyerp.com"
+}

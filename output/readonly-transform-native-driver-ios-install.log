@@ -1,0 +1,13 @@
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +27 -8
++++++++++++++++++++++++++++--------
+Progress: resolved 27, reused 27, downloaded 0, added 0
+Progress: resolved 27, reused 27, downloaded 0, added 1
+Progress: resolved 27, reused 27, downloaded 0, added 2, done
+
+dependencies:
+- react-native-reanimated 4.3.1
+- react-native-worklets 0.8.3
+
+Done in 6.4s

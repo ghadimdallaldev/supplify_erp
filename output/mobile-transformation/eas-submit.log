@@ -1,0 +1,23 @@
+(node:5020) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Using EAS CLI without version control system is not recommended, use this mode only if you know what you are doing.
+No environment variables with visibility "Plain text" and "Sensitive" found for the "development" environment on EAS.
+Environment variables loaded from the "demo" build profile "env" configuration: EXPO_PUBLIC_API_URL, EXPO_PUBLIC_KEYCLOAK_URL, EXPO_PUBLIC_KEYCLOAK_REALM, EXPO_PUBLIC_KEYCLOAK_CLIENT_ID, EXPO_PUBLIC_GPS_TRACKING_ENABLED, EXPO_PUBLIC_GPS_UPDATE_INTERVAL_SECONDS, EXPO_PUBLIC_MAP_PROVIDER.
+
+
+
+android.versionCode field in app config is ignored when version source is set to remote, but this value will still be in the manifest available via expo-constants. It's recommended to remove this value from app config.
+✔ Using remote Android credentials (Expo server)
+✔ Using Keystore from configuration: Build Credentials DvoiNckm5D (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+- Compressing project files
+- Uploading to EAS Build (0 / 540 KB)
+✔ Uploaded to EAS 
+- Computing project fingerprint
+⌛️ Computing the project fingerprint is taking longer than expected...
+⏩ To skip this step, set the environment variable: EAS_SKIP_AUTO_FINGERPRINT=1
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/b5bcb76b-d869-4c7c-9844-046348170400
+

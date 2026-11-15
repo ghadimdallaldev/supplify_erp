@@ -1,0 +1,1372 @@
+[
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Home",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Home.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Shop",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Shop.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "OrderDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-OrderDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Catalog",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Catalog.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Cart",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Cart.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "ReceivingHub",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-ReceivingHub.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Receive",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Receive.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "DeliveryLocation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-DeliveryLocation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Notifications",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Notifications.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "NotificationPreferences",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-NotificationPreferences.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "DeleteAccount",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-DeleteAccount.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Subscription",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Subscription.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "QuickLists",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-QuickLists.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Invoices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Invoices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "InvoiceStatement",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-InvoiceStatement.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Deals",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Deals.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Inventory",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Inventory.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "MyPrices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-MyPrices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "ConsumerMenu",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-ConsumerMenu.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "ConsumerOrders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-ConsumerOrders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "ConsumerLoyalty",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-ConsumerLoyalty.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Recipes",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Recipes.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "RecipeCosting",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-RecipeCosting.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Staff",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Staff.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Disputes",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Disputes.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "DisputeDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-DisputeDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "CreateDispute",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-CreateDispute.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "QuoteRequests",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-QuoteRequests.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "CreateQuoteRequest",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-CreateQuoteRequest.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "QuoteRequestDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-QuoteRequestDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Reservations",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Reservations.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "CreateReservation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-CreateReservation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "Assistant",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-Assistant.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "route": "MoreGroup",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-390-en-MoreGroup.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Dashboard",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Dashboard.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Fulfillment",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Fulfillment.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "OrderDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-OrderDetail.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "ActiveMap",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-ActiveMap.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Customers",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Customers.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Notifications",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Notifications.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "NotificationPreferences",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-NotificationPreferences.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "DeleteAccount",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-DeleteAccount.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Subscription",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Subscription.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "PublicSales",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-PublicSales.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "RunSheet",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-RunSheet.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "PickLists",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-PickLists.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Receivables",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Receivables.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "IncomingDisputes",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-IncomingDisputes.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "DisputeDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-DisputeDetail.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "QuoteInbox",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-QuoteInbox.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "QuoteResponse",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-QuoteResponse.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Promotions",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Promotions.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "CreateDeal",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-CreateDeal.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "DealAnalytics",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-DealAnalytics.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "FeaturedPlacement",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-FeaturedPlacement.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "SupplierProducts",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-SupplierProducts.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "ContractPricing",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-ContractPricing.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "SupplierLoyalty",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-SupplierLoyalty.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "SupplierInventory",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-SupplierInventory.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "Assistant",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-Assistant.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "route": "MoreGroup",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-390-en-MoreGroup.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "Deliveries",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-Deliveries.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "Notifications",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-Notifications.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "NotificationPreferences",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-NotificationPreferences.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "DeleteAccount",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-DeleteAccount.png",
+    "writes": []
+  },
+  {
+    "role": "DRIVER",
+    "width": 390,
+    "locale": "en",
+    "route": "DriverRunSheet",
+    "errors": [],
+    "overflow": false,
+    "file": "DRIVER-390-en-DriverRunSheet.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Discover",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Discover.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Notifications",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Notifications.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Account",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Account.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Storefront",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Storefront.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Cart",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Cart.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Checkout",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Checkout.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "Receipt",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-Receipt.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "ConsumerOrderDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-ConsumerOrderDetail.png",
+    "writes": []
+  },
+  {
+    "role": "CONSUMER",
+    "width": 390,
+    "locale": "en",
+    "route": "DeleteAccount",
+    "errors": [],
+    "overflow": false,
+    "file": "CONSUMER-390-en-DeleteAccount.png",
+    "writes": []
+  },
+  {
+    "role": "ADMIN",
+    "width": 390,
+    "locale": "en",
+    "route": "AdminHome",
+    "errors": [],
+    "overflow": false,
+    "file": "ADMIN-390-en-AdminHome.png",
+    "writes": []
+  },
+  {
+    "role": "PENDING",
+    "width": 390,
+    "locale": "en",
+    "route": "Login",
+    "errors": [],
+    "overflow": false,
+    "file": "PENDING-390-en-Login.png",
+    "writes": []
+  },
+  {
+    "role": "PENDING",
+    "width": 390,
+    "locale": "en",
+    "route": "Pending",
+    "errors": [],
+    "overflow": false,
+    "file": "PENDING-390-en-Pending.png",
+    "writes": []
+  },
+  {
+    "role": "PENDING",
+    "width": 390,
+    "locale": "en",
+    "route": "StaffDeferred",
+    "errors": [],
+    "overflow": false,
+    "file": "PENDING-390-en-StaffDeferred.png",
+    "writes": []
+  },
+  {
+    "role": "PENDING",
+    "width": 390,
+    "locale": "en",
+    "route": "BillingLocked",
+    "errors": [],
+    "overflow": false,
+    "file": "PENDING-390-en-BillingLocked.png",
+    "writes": []
+  },
+  {
+    "role": "PENDING",
+    "width": 390,
+    "locale": "en",
+    "route": "GuestShop",
+    "errors": [],
+    "overflow": false,
+    "file": "PENDING-390-en-GuestShop.png",
+    "writes": []
+  },
+  {
+    "role": "STAFF_PORTAL",
+    "width": 390,
+    "locale": "en",
+    "route": "Login",
+    "errors": [],
+    "overflow": false,
+    "file": "STAFF_PORTAL-390-en-Login.png",
+    "writes": []
+  },
+  {
+    "role": "STAFF_PORTAL",
+    "width": 390,
+    "locale": "en",
+    "route": "Pending",
+    "errors": [],
+    "overflow": false,
+    "file": "STAFF_PORTAL-390-en-Pending.png",
+    "writes": []
+  },
+  {
+    "role": "STAFF_PORTAL",
+    "width": 390,
+    "locale": "en",
+    "route": "StaffDeferred",
+    "errors": [],
+    "overflow": false,
+    "file": "STAFF_PORTAL-390-en-StaffDeferred.png",
+    "writes": []
+  },
+  {
+    "role": "STAFF_PORTAL",
+    "width": 390,
+    "locale": "en",
+    "route": "BillingLocked",
+    "errors": [],
+    "overflow": false,
+    "file": "STAFF_PORTAL-390-en-BillingLocked.png",
+    "writes": []
+  },
+  {
+    "role": "STAFF_PORTAL",
+    "width": 390,
+    "locale": "en",
+    "route": "GuestShop",
+    "errors": [],
+    "overflow": false,
+    "file": "STAFF_PORTAL-390-en-GuestShop.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Home",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Home.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Shop",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Shop.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-More.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "OrderDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-OrderDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Catalog",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Catalog.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Cart",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Cart.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "ReceivingHub",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-ReceivingHub.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Receive",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Receive.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "DeliveryLocation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-DeliveryLocation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Notifications",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Notifications.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "NotificationPreferences",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-NotificationPreferences.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "DeleteAccount",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-DeleteAccount.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Subscription",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Subscription.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "QuickLists",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-QuickLists.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Invoices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Invoices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "InvoiceStatement",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-InvoiceStatement.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Deals",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Deals.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Inventory",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Inventory.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "MyPrices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-MyPrices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "ConsumerMenu",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-ConsumerMenu.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "ConsumerOrders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-ConsumerOrders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "ConsumerLoyalty",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-ConsumerLoyalty.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Recipes",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Recipes.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "RecipeCosting",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-RecipeCosting.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Staff",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Staff.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Disputes",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Disputes.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "DisputeDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-DisputeDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "CreateDispute",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-CreateDispute.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "QuoteRequests",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-QuoteRequests.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "CreateQuoteRequest",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-CreateQuoteRequest.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "QuoteRequestDetail",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-QuoteRequestDetail.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Reservations",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Reservations.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "CreateReservation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-CreateReservation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "Assistant",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-Assistant.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "ar",
+    "route": "MoreGroup",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-1024-ar-MoreGroup.png",
+    "writes": []
+  }
+]

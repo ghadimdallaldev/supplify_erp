@@ -1,0 +1,14 @@
+[
+  {
+    "name": "typecheck-final",
+    "exitCode": 0
+  },
+  {
+    "name": "web-lint-final",
+    "exitCode": 0
+  },
+  {
+    "name": "web-build-final",
+    "exitCode": 0
+  }
+]

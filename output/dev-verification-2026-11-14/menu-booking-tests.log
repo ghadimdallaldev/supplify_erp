@@ -1,0 +1,12 @@
+
+ RUN  v1.6.1 C:/myProjects/supplify_erp/apps/web
+
+ ✓ src/components/consumer/MenuItemCard.test.tsx  (3 tests) 401ms
+ ✓ src/pages/PublicReservationPortal.test.tsx  (3 tests) 1152ms
+
+ Test Files  2 passed (2)
+      Tests  6 passed (6)
+   Start at  01:45:16
+   Duration  7.77s (transform 1.08s, setup 3.23s, collect 3.21s, tests 1.55s, environment 3.11s, prepare 882ms)
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`

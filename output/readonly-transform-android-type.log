@@ -1,0 +1,3 @@
+src/features/restaurant/screens/InventoryAdjustSheet.tsx(115,36): error TS2322: Type '(() => void) | undefined' is not assignable to type '() => void'.
+  Type 'undefined' is not assignable to type '() => void'.
+src/features/shared/screens/ReportsScreen.tsx(332,53): error TS2322: Type '{}' is not assignable to type 'string | number'.

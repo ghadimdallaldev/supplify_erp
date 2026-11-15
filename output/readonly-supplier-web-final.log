@@ -1,0 +1,11 @@
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+ RUN  v1.6.1 C:/myProjects/supplify_erp/apps/web
+
+ ✓ src/components/supplier/supplierPainKiller.test.tsx  (12 tests) 349ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  17:57:03
+   Duration  7.05s (transform 1.34s, setup 2.09s, collect 2.10s, tests 349ms, environment 1.75s, prepare 392ms)
+

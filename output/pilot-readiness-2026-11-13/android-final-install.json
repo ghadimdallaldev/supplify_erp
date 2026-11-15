@@ -1,0 +1,9 @@
+{
+  "buildId": "de477af2-8729-4411-84a8-534fa4e6d39f",
+  "installed": true,
+  "versions": [
+    "versionCode=27 minSdk=24 targetSdk=36",
+    "versionName=1.1.0"
+  ],
+  "target": "API 35 emulator"
+}

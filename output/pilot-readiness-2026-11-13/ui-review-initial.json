@@ -1,0 +1,40 @@
+[
+  {
+    "surface": "web",
+    "errors": [],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nDeals\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nPU\nPilot UI fixture\nRestaurant\nINTELLIGENCE\nOrders\nPU\nOrders inbox\n\nAll team orders and delivery status\n\nCreate New Order\nAll Statuses\nPlaced\nAcknowledged\nProcessing\nShipped\nDelivered\nReceived (Partial)\nReceived (Full)\nInvoiced\nCompleted\nCancelled\nMore Filters\nAll Orders\nNew (Needs Action)\nProcessing\nShipped\nCompleted\n\nNo orders yet\n\nCreate your first order to get started.\n\nCreate first order\nHome\nOrders\nCart\nProducts\nChat",
+    "buttons": [
+      "OVERVIEW",
+      "OPERATIONS",
+      "INTELLIGENCE",
+      "ACCOUNT",
+      "HOSPITALITY ADD-ONS",
+      "",
+      "",
+      "",
+      "",
+      "PU",
+      "More Filters"
+    ],
+    "tabs": [
+      "All Orders",
+      "New (Needs Action)",
+      "Processing",
+      "Shipped",
+      "Completed"
+    ]
+  },
+  {
+    "surface": "native-web-preview",
+    "errors": [],
+    "text": "Pilot UI fixture\n\nOwner\nSwitch branch\n\n0\nRecent open orders\n0\nReceiving queue\nOrder figures cover your 10 latest orders.\nUp next\n\nBrowse suppliers\nFind products and place an order\n\nQuick actions\n\nNew order\n\nQuick lists\nRECENT\n\nNo open orders\nOrders you place will appear here.\n\n\nHome\n\n\nOrders\n\n\nSuppliers\n\n\nMessages\n\n\nMore",
+    "buttons": [
+      "",
+      "All",
+      "My lists",
+      "Deals",
+      ""
+    ],
+    "tabs": []
+  }
+]

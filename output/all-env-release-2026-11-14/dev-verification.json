@@ -1,0 +1,37 @@
+{
+  "environment": "dev",
+  "checkedAt": "2026-11-14T13:32:33.921Z",
+  "checks": [
+    {
+      "name": "api-ready",
+      "status": 200
+    },
+    {
+      "name": "web-document",
+      "status": 200
+    },
+    {
+      "name": "web-health",
+      "status": 200
+    },
+    {
+      "name": "api-health",
+      "status": 200
+    },
+    {
+      "name": "realm-discovery",
+      "status": 200
+    },
+    {
+      "name": "realm-jwks",
+      "status": 200
+    }
+  ],
+  "configurationIsolated": true,
+  "database": {
+    "readOnly": true,
+    "migrationCount": 233,
+    "checkoutMigration0232": true,
+    "checkoutReplayTable": true
+  }
+}

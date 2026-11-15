@@ -1,0 +1,402 @@
+[
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Home",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Home.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Shop",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Shop.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Catalog",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Catalog.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Cart",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Cart.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Invoices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Invoices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Inventory",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Inventory.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "Reservations",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-Reservations.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "CreateReservation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-CreateReservation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 360,
+    "locale": "en",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-360-en-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "Dashboard",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-Dashboard.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "Fulfillment",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-Fulfillment.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-More.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 430,
+    "locale": "ar",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-430-ar-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Home",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Home.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Shop",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Shop.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Catalog",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Catalog.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Cart",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Cart.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Invoices",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Invoices.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Inventory",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Inventory.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "Reservations",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-Reservations.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "CreateReservation",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-CreateReservation.png",
+    "writes": []
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 768,
+    "locale": "en",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "RESTAURANT-768-en-ChatThread.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "Dashboard",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-Dashboard.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "Orders",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-Orders.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "Fulfillment",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-Fulfillment.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "Chat",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-Chat.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "More",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-More.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "Reports",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-Reports.png",
+    "writes": []
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 1366,
+    "locale": "en",
+    "route": "ChatThread",
+    "errors": [],
+    "overflow": false,
+    "file": "SUPPLIER-1366-en-ChatThread.png",
+    "writes": []
+  }
+]

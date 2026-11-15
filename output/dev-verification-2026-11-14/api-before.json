@@ -1,0 +1,91 @@
+{
+  "environment": "Development",
+  "restaurant": "Hamra Bistro",
+  "checkedAt": "2026-11-13T23:17:30.242Z",
+  "checks": [
+    {
+      "name": "session",
+      "status": 200
+    },
+    {
+      "name": "health",
+      "status": 200
+    },
+    {
+      "name": "ready",
+      "status": 200
+    },
+    {
+      "name": "invoices",
+      "status": 200,
+      "count": 5
+    },
+    {
+      "name": "invoice-detail",
+      "status": 500,
+      "error": "error",
+      "invoicePresent": false
+    },
+    {
+      "name": "invoice-pdf",
+      "status": 500,
+      "bytes": 121,
+      "pdf": false
+    },
+    {
+      "name": "products",
+      "status": 200,
+      "count": 5
+    },
+    {
+      "name": "product-detail",
+      "status": 500,
+      "error": "INTERNAL_ERROR",
+      "productPresent": false
+    },
+    {
+      "name": "deals",
+      "status": 200,
+      "count": 0
+    },
+    {
+      "name": "deals-banner",
+      "status": 200,
+      "count": 9
+    },
+    {
+      "name": "reorder-assistance",
+      "status": 200,
+      "count": 22
+    },
+    {
+      "name": "reservation-board",
+      "status": 200,
+      "reservations": 0,
+      "tables": 0
+    },
+    {
+      "name": "public-availability",
+      "status": 200,
+      "slots": 0,
+      "availableSlots": 0
+    },
+    {
+      "name": "guest-storefront",
+      "status": 200,
+      "branches": 1
+    },
+    {
+      "name": "guest-menu",
+      "status": 200,
+      "items": 23
+    },
+    {
+      "name": "guest-rewards-program",
+      "status": 200
+    }
+  ],
+  "restaurantId": "ae465fb9-d2b6-5d47-af40-25b5c44968ab",
+  "supplierChoices": [],
+  "bannerDealsDiscoverable": false
+}

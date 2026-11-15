@@ -1,0 +1,89 @@
+{
+  "date": "2026-11-15",
+  "parity": {
+    "sourceFiles": 267,
+    "registeredCopy": 1127,
+    "directImports": 29,
+    "errors": []
+  },
+  "tests": [
+    {
+      "label": "transform-final-android-tests",
+      "suites": 34,
+      "tests": 125
+    },
+    {
+      "label": "transform-final-ios-tests",
+      "suites": 34,
+      "tests": 125
+    }
+  ],
+  "visual": {
+    "routes": 137,
+    "responsive": 40,
+    "interactionScenarios": 2,
+    "issues": []
+  },
+  "build": {
+    "id": "b5bcb76b-d869-4c7c-9844-046348170400",
+    "status": "FINISHED",
+    "error": null,
+    "profile": "demo",
+    "platform": "ANDROID",
+    "appVersion": "1.1.0",
+    "buildVersion": "27",
+    "createdAt": "2026-11-15T15:15:59.700Z",
+    "completedAt": "2026-11-15T15:29:33.307Z",
+    "artifact": "https://expo.dev/artifacts/eas/LH5m8fUYgO22AMc3ue0UhcN2YpTbWGekIRyKwXmS9wc.apk",
+    "buildUrl": "https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/b5bcb76b-d869-4c7c-9844-046348170400",
+    "api": "https://api-dev.supplifyerp.com"
+  },
+  "artifact": {
+    "buildId": "b5bcb76b-d869-4c7c-9844-046348170400",
+    "apk": "C:\\myProjects\\supplify_erp\\output\\mobile-transformation\\android\\Supplify-dev-ui-2026-11-15.apk",
+    "bytes": 93949408,
+    "sha256": "1f82bdd20a0c96b1afd93a2bfd7d3162bc343b760015fcc40b2b7503c180bac9",
+    "package": "com.supplify.mobile",
+    "version": "1.1.0",
+    "versionCode": 27,
+    "api": "https://api-dev.supplifyerp.com",
+    "inspection": {
+      "bundles": [
+        "assets/index.android.bundle"
+      ],
+      "devApi": true,
+      "devIdentity": true,
+      "excludedNativeLibraries": []
+    }
+  },
+  "nativeSmoke": {
+    "buildId": "b5bcb76b-d869-4c7c-9844-046348170400",
+    "installation": "update install succeeded without data clearing",
+    "coldLaunch": "Status ok; 1886 ms measurement is a single launch only",
+    "identity": "Development Keycloak form loaded; no credentials entered",
+    "captures": [
+      {
+        "label": "launch",
+        "issues": []
+      },
+      {
+        "label": "signin-handoff",
+        "issues": []
+      },
+      {
+        "label": "signin-loaded",
+        "issues": []
+      },
+      {
+        "label": "native-landscape",
+        "issues": []
+      },
+      {
+        "label": "native-large-text",
+        "issues": []
+      }
+    ],
+    "scope": "Signed-out shell and identity handoff only; operational workflows and physical device UAT pending",
+    "displaySettingsRestored": true
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "environment": "preprod",
+  "authenticatedDemoApiPass": false,
+  "reason": "unauthorized_client: Client not allowed for direct access grants",
+  "interpretation": "Preproduction requires its normal browser authorization flow; the Development-only password-grant harness cannot obtain a test session.",
+  "configurationChanged": false,
+  "messagesSent": false,
+  "baselineAuthenticatedEvidence": "Development authenticated 18 API checks and 29 WebKit checks; local API/web/native regressions. Preproduction browser login entry/form, public health/readiness/realm and read-only migration checks are verified separately."
+}

@@ -1,0 +1,2 @@
+src/components/ui/SheetSurface.tsx(83,62): error TS2345: Argument of type 'ValueOf<{ readonly UNDETERMINED: 0; readonly FAILED: 1; readonly BEGAN: 2; readonly CANCELLED: 3; readonly ACTIVE: 4; readonly END: 5; }>' is not assignable to parameter of type '5 | 1 | 3'.
+  Type '0' is not assignable to type '5 | 1 | 3'.

@@ -1,0 +1,87 @@
+{
+  "name": "supplify-mobile",
+  "version": "1.1.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-community/netinfo": "^12.0.1",
+    "@react-navigation/bottom-tabs": "^7.17.0",
+    "@react-navigation/native": "^7.2.6",
+    "@react-navigation/native-stack": "^7.17.0",
+    "@shopify/flash-list": "2.0.2",
+    "@tanstack/react-query": "^5.101.0",
+    "expo": "~56.0.21",
+    "expo-auth-session": "~56.0.18",
+    "expo-crypto": "~56.0.5",
+    "expo-document-picker": "~56.0.4",
+    "expo-file-system": "~56.0.11",
+    "expo-font": "~56.0.7",
+    "expo-image": "~56.0.12",
+    "expo-image-picker": "~56.0.25",
+    "expo-linear-gradient": "~56.0.4",
+    "expo-linking": "~56.0.17",
+    "expo-location": "~56.0.25",
+    "expo-notifications": "~56.0.25",
+    "expo-secure-store": "~56.0.4",
+    "expo-status-bar": "~56.0.4",
+    "expo-web-browser": "~56.0.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-maps": "1.27.2",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-signature-canvas": "^5.0.2",
+    "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
+    "socket.io-client": "^4.8.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@react-native/jest-preset": "^0.85.3",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "29.5.14",
+    "@types/react": "~19.2.2",
+    "jest": "~29.7.0",
+    "jest-expo": "~56.0.5",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android --lan",
+    "android:dev": "powershell -ExecutionPolicy Bypass -File scripts/run-android-dev.ps1",
+    "android:go": "powershell -ExecutionPolicy Bypass -File scripts/run-android-dev.ps1",
+    "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-android-emulator.ps1",
+    "android:export": "expo export --platform android --output-dir dist/android",
+    "ios": "expo run:ios",
+    "ios:export": "expo export --platform ios --output-dir dist/ios",
+    "web": "expo start --web",
+    "verify:auth": "node scripts/verify-auth-flow.mjs",
+    "keycloak:realm:import": "node ../supplify_erp/scripts/import-keycloak-realm.mjs --url http://localhost:8180",
+    "keycloak:mobile:redirects": "powershell -ExecutionPolicy Bypass -File scripts/sync-keycloak-mobile-redirects.ps1",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "doctor": "npx --yes expo-doctor",
+    "verify": "npm run typecheck && npm test -- --runInBand && npx expo-doctor",
+    "release:preprod": "node scripts/promote-release.mjs --tier preprod",
+    "release:prod": "node scripts/promote-release.mjs --tier prod"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx",
+      "**/src/**/*.test.ts"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@tanstack/.*)"
+    ]
+  },
+  "private": true,
+  "overrides": {
+    "metro": "0.84.5",
+    "metro-config": "0.84.5",
+    "metro-transform-worker": "0.84.5"
+  }
+}

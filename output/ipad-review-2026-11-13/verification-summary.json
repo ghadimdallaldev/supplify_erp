@@ -1,0 +1,29 @@
+{
+  "browsers": {
+    "webkit": {
+      "cases": 37,
+      "failures": 0
+    },
+    "chromium": {
+      "cases": 37,
+      "failures": 0
+    }
+  },
+  "api": {
+    "suites": 390,
+    "tests": 2564
+  },
+  "web": {
+    "suites": 159,
+    "tests": 606
+  },
+  "nativeEach": {
+    "suites": 30,
+    "tests": 116,
+    "typecheck": true
+  },
+  "sqlDrills": 6,
+  "qaContainerRemoved": true,
+  "productionDeployed": false,
+  "physicalIPadTested": false
+}

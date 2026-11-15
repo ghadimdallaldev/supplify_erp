@@ -1,0 +1,20 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1
++
+Progress: resolved 1, reused 0, downloaded 1, added 0
+Progress: resolved 1, reused 0, downloaded 1, added 1, done
+Node.js (v22.11.0) is outdated and unsupported. Please update to a newer Node.js LTS version (required: >=22.13.0)
+Go to: https://nodejs.org/en/download
+
+Running 22 checks on your project...
+21/22 checks passed. 1 checks failed. Possible issues detected:
+Use the --verbose flag to see more details about passed checks.
+
+✖ Check for Expo SDK versions affected by Hermes V1 regressions
+This project uses Hermes V1 with expo@56.0.24, which is affected by a known memory regression.
+Detected Hermes V1 250829098.0.10 from React Native. Hermes V1 250829098.0.15 and earlier are affected by this regression; 250829098.0.16 is the first version that contains the fix.
+Advice:
+Upgrade to Expo SDK 57 and expo@57.0.9 or later by running `npx expo install expo@^57.0.9 --fix`. See https://expo.dev/changelog/sdk-57#known-regressions for the latest details.
+Upgrade to React Native 0.86.2 or later, which includes the fixed Hermes version. For Expo projects, install Expo SDK 57 with expo@57.0.9 or later and run `npx expo install --fix` to align React Native and other dependencies.
+
+1 check failed, indicating possible issues with the project.

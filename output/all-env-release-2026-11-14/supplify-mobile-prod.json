@@ -1,0 +1,12 @@
+{
+  "repository": "supplify-mobile",
+  "tier": "prod",
+  "source": "preprod",
+  "sourceSha": "bfad88d2cb6cd3f6a52d311e94aaded5e7ec4f44",
+  "baseSha": "43f03e04da2f08b6d1ecdb4ee543b6637c30db8a",
+  "branch": "release/2026-11-14-prod-pilot-ipad",
+  "head": "43585282cc6b68bddc6e780cfa448497eced550c",
+  "checkout": "C:\\myProjects\\supplify_erp\\.release-checkouts\\all-env-20261114\\supplify-mobile-prod",
+  "runtimeFiles": 229,
+  "createdAt": "2026-11-14T13:34:57.083Z"
+}

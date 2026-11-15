@@ -1,0 +1,462 @@
+@page {
+  size: 154mm 216mm;
+  margin: 0;
+}
+:root {
+  --paper: #f6f4ea;
+  --ink: #141c18;
+  --muted: #4f5c54;
+  --lime: #dff36a;
+  --violet: #5b21b6;
+  --rule: #cbd0c2;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #e5e4df;
+  color: var(--ink);
+  font-family: Inter, Arial, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sheet {
+  position: relative;
+  width: 154mm;
+  height: 216mm;
+  overflow: hidden;
+  background: var(--paper);
+  break-after: page;
+  page-break-after: always;
+}
+.sheet:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+.trim {
+  position: absolute;
+  inset: 3mm;
+  width: 148mm;
+  height: 210mm;
+}
+.masthead {
+  position: absolute;
+  top: 9mm;
+  inset-inline: 10mm;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  font-size: 23pt;
+  font-weight: 780;
+  letter-spacing: -1.2pt;
+  line-height: 1;
+  direction: ltr;
+}
+.brand img {
+  width: 8.4mm;
+  height: 7.2mm;
+  object-fit: contain;
+}
+.brand-dot {
+  color: var(--violet);
+}
+.edition {
+  font-size: 7pt;
+  line-height: 1.65;
+  letter-spacing: 0.65pt;
+  text-align: end;
+  font-weight: 700;
+}
+.edition > span {
+  font-weight: 500;
+  font-size: 6.4pt;
+  letter-spacing: 0.15pt;
+}
+.eyebrow {
+  position: absolute;
+  top: 25.3mm;
+  inset-inline-start: 10mm;
+  margin: 0;
+  font-size: 7pt;
+  line-height: 1.2;
+  letter-spacing: 1.45pt;
+  font-weight: 650;
+}
+h1 {
+  position: absolute;
+  top: 32.3mm;
+  inset-inline-start: 9.2mm;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  font-size: 43pt;
+  line-height: 0.99;
+  letter-spacing: -2.3pt;
+  font-weight: 850;
+  z-index: 1;
+}
+h1 span {
+  display: block;
+  position: relative;
+}
+.underline::after {
+  content: '';
+  position: absolute;
+  bottom: -0.9mm;
+  inset-inline: 0;
+  height: 2.2mm;
+  background: var(--lime);
+  z-index: -1;
+  transform: rotate(-1deg);
+}
+.feature-seal {
+  position: absolute;
+  top: 31.4mm;
+  inset-inline-end: 9.2mm;
+  width: 22mm;
+  height: 22mm;
+  border-radius: 50%;
+  background: var(--lime);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transform: rotate(7deg);
+  z-index: 2;
+}
+.feature-seal b {
+  font-size: 22pt;
+  font-weight: 800;
+  letter-spacing: -1.8pt;
+  line-height: 1.05;
+}
+.feature-seal b span {
+  font-size: 14pt;
+  vertical-align: top;
+  letter-spacing: -1pt;
+}
+.feature-seal small {
+  font-size: 7pt;
+  letter-spacing: 0.9pt;
+  font-weight: 750;
+  margin-top: 1mm;
+}
+.intro {
+  position: absolute;
+  top: 67.7mm;
+  inset-inline-start: 10mm;
+  margin: 0;
+  line-height: 1.48;
+  font-size: 10pt;
+  font-weight: 470;
+  letter-spacing: -0.1pt;
+  max-width: 124mm;
+  color: var(--muted);
+}
+.hero-art {
+  position: absolute;
+  top: 80.5mm;
+  left: 10mm;
+  width: 128mm;
+  height: 55.55mm;
+  object-fit: contain;
+}
+.journey {
+  position: absolute;
+  top: 138mm;
+  inset-inline: 10mm;
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  font-weight: 700;
+  font-size: 6.5pt;
+  line-height: 1.3;
+  letter-spacing: 1pt;
+}
+.journey i {
+  height: 0.22mm;
+  background: var(--ink);
+  flex: 1;
+  position: relative;
+}
+.journey i::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 0;
+  top: -0.55mm;
+  width: 1.35mm;
+  height: 1.35mm;
+  border-top: 0.22mm solid var(--ink);
+  border-inline-end: 0.22mm solid var(--ink);
+  transform: rotate(45deg);
+}
+.audiences {
+  position: absolute;
+  top: 144.5mm;
+  inset-inline: 10mm;
+  display: flex;
+  flex-direction: column;
+  gap: 2mm;
+}
+.audiences section {
+  display: grid;
+  grid-template-columns: 5.5mm 29mm 1fr;
+  align-items: start;
+  gap: 2.5mm;
+  border-top: 0.2mm solid var(--rule);
+  padding-top: 1.5mm;
+}
+.audience-number {
+  font-size: 6.6pt;
+  font-weight: 650;
+  line-height: 1.6;
+  padding-top: 0.7mm;
+  color: var(--muted);
+}
+.audiences h2 {
+  font-size: 9.8pt;
+  font-weight: 750;
+  letter-spacing: -0.35pt;
+  margin: 0;
+  line-height: 1.4;
+  padding-top: 0.15mm;
+}
+.audiences p {
+  font-size: 8.8pt;
+  line-height: 1.4;
+  font-weight: 450;
+  letter-spacing: -0.05pt;
+  margin: 0;
+}
+.trust {
+  position: absolute;
+  top: 169mm;
+  inset-inline: 10mm;
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  font-size: 7.5pt;
+  line-height: 1.3;
+  font-weight: 570;
+  letter-spacing: -0.04pt;
+}
+.trust svg {
+  width: 3.3mm;
+  height: 3.3mm;
+  stroke: var(--ink);
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.availability {
+  position: absolute;
+  top: 172.8mm;
+  inset-inline: 10mm;
+  margin: 0;
+  font-size: 6.8pt;
+  color: var(--muted);
+  line-height: 1.2;
+  letter-spacing: -0.02pt;
+}
+.action {
+  position: absolute;
+  top: 176mm;
+  bottom: -3mm;
+  left: -3mm;
+  right: -3mm;
+  background: var(--lime);
+  padding: 4mm 13mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.action-copy {
+  align-self: flex-start;
+  position: relative;
+  padding-top: 0.15mm;
+  width: 90mm;
+}
+.action h2 {
+  font-size: 17pt;
+  line-height: 1.02;
+  font-weight: 760;
+  letter-spacing: -0.8pt;
+  margin: 0 0 1.4mm;
+}
+.action h2 span {
+  display: inline-block;
+  font-size: 19pt;
+  margin-inline-start: 2mm;
+  font-weight: 500;
+}
+.action p {
+  font-size: 7.3pt;
+  line-height: 1.25;
+  margin: 0 0 1.4mm;
+  font-weight: 500;
+}
+.url {
+  font-size: 8pt;
+  font-weight: 740;
+  letter-spacing: -0.15pt;
+  line-height: 1.3;
+}
+.qr {
+  width: 27mm;
+  height: 27mm;
+  padding: 0;
+  background: #fff;
+  flex: none;
+  margin-top: 0;
+}
+.qr img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.latin {
+  font-family: Inter, Arial, sans-serif;
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+.arabic {
+  font-family: 'IBM Plex Sans Arabic', Arial, sans-serif;
+}
+.arabic .edition {
+  font-size: 7.7pt;
+  letter-spacing: 0;
+  line-height: 1.6;
+  text-align: end;
+}
+.arabic .edition > span {
+  font-size: 7pt;
+  letter-spacing: 0;
+}
+.arabic .edition .latin {
+  font-size: 6.3pt;
+  letter-spacing: 0.65pt;
+  font-weight: 700;
+}
+.arabic .eyebrow {
+  font-size: 9pt;
+  font-weight: 550;
+  letter-spacing: 0;
+  top: 24.5mm;
+}
+.arabic h1 {
+  font-family: 'IBM Plex Sans Arabic';
+  font-size: 35.5pt;
+  line-height: 1.11;
+  letter-spacing: -0.8pt;
+  font-weight: 700;
+  top: 29mm;
+  inset-inline-start: 9.1mm;
+  align-items: flex-start;
+}
+.arabic .underline::after {
+  bottom: 1mm;
+  transform: rotate(1deg);
+}
+.arabic .feature-seal {
+  transform: rotate(-7deg);
+}
+.arabic .feature-seal small {
+  font-size: 8pt;
+  letter-spacing: 0;
+  line-height: 1.3;
+  margin-top: 0.4mm;
+}
+.arabic .intro {
+  font-size: 11pt;
+  line-height: 1.45;
+  top: 67.1mm;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.arabic .journey {
+  font-size: 8.8pt;
+  letter-spacing: 0;
+  gap: 3.2mm;
+  top: 136.7mm;
+  font-weight: 600;
+}
+.arabic .journey i::after {
+  transform: rotate(-45deg);
+}
+.arabic .audiences h2 {
+  font-size: 10.8pt;
+  letter-spacing: 0;
+  line-height: 1.35;
+  font-weight: 650;
+  padding-top: 0;
+}
+.arabic .audiences p {
+  font-size: 9.3pt;
+  line-height: 1.35;
+  letter-spacing: 0;
+  font-weight: 450;
+}
+.arabic .audience-number {
+  padding-top: 0.5mm;
+}
+.arabic .trust {
+  font-size: 8pt;
+  letter-spacing: 0;
+  font-weight: 500;
+  top: 168.8mm;
+  gap: 1.5mm;
+}
+.arabic .availability {
+  font-size: 7pt;
+  letter-spacing: 0;
+  top: 172.8mm;
+}
+.arabic .action h2 {
+  font-size: 17.2pt;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: 0;
+  margin-bottom: 0.8mm;
+}
+.arabic .action h2 span {
+  font-family: Inter;
+  font-size: 17pt;
+  margin-inline-start: 1.5mm;
+}
+.arabic .action p {
+  font-size: 8pt;
+  line-height: 1.35;
+  margin-bottom: 0.7mm;
+  font-weight: 450;
+}
+.arabic .url {
+  font-size: 8pt;
+}
+@media screen {
+  body {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px;
+    min-width: 1240px;
+  }
+  .sheet {
+    flex: none;
+    box-shadow: 0 8px 40px #1a261422;
+  }
+}

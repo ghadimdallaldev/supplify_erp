@@ -1,0 +1,96 @@
+[
+  {
+    "name": "test-boundary",
+    "legalConsentGate": "browser-only fixture for seeded demo account; no acceptance submitted",
+    "businessData": "live Development API"
+  },
+  {
+    "name": "invoice-pdf",
+    "filename": "invoice-INV-MLM-2026-12017.pdf",
+    "download": true
+  },
+  {
+    "name": "payment-controls",
+    "controls": [
+      {
+        "tag": "SELECT",
+        "width": 415,
+        "height": 40
+      },
+      {
+        "tag": "INPUT",
+        "width": 415,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "name": "invoices",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/app/invoices"
+  },
+  {
+    "name": "products",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/app/products/1e3aee4b-a455-5c61-a3d8-9fdc94b0abe2"
+  },
+  {
+    "name": "supplier-filter",
+    "supplierChoices": 7,
+    "choicesRetained": true
+  },
+  {
+    "name": "deals",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/app/deals"
+  },
+  {
+    "name": "reservations",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/app/reservations"
+  },
+  {
+    "name": "booking-no-tables",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/reserve/hamra-bistro"
+  },
+  {
+    "name": "configured-public-availability",
+    "availableTimes": 10
+  },
+  {
+    "name": "booking-configured",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/reserve/ghaditestresto"
+  },
+  {
+    "name": "featured-menu-layout",
+    "widths": [
+      768,
+      1024,
+      1194
+    ],
+    "namePriceOverlap": false,
+    "brokenImageElements": 0,
+    "featuredPreorderActions": 6
+  },
+  {
+    "name": "guest-menu",
+    "errors": [],
+    "httpErrors": [],
+    "overflow": 0,
+    "url": "/order/hamra-bistro/menu"
+  }
+]

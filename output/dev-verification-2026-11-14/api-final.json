@@ -1,0 +1,108 @@
+{
+  "environment": "Development",
+  "restaurant": "Hamra Bistro",
+  "checkedAt": "2026-11-14T01:31:11.807Z",
+  "checks": [
+    {
+      "name": "session",
+      "status": 200
+    },
+    {
+      "name": "health",
+      "status": 200
+    },
+    {
+      "name": "ready",
+      "status": 200
+    },
+    {
+      "name": "invoices",
+      "status": 200,
+      "count": 5
+    },
+    {
+      "name": "invoice-detail",
+      "status": 200,
+      "invoicePresent": true,
+      "lineItems": 7
+    },
+    {
+      "name": "invoice-pdf",
+      "status": 200,
+      "bytes": 1974,
+      "pdf": true
+    },
+    {
+      "name": "products",
+      "status": 200,
+      "count": 5
+    },
+    {
+      "name": "product-detail",
+      "status": 200,
+      "productPresent": true
+    },
+    {
+      "name": "deals",
+      "status": 200,
+      "count": 20
+    },
+    {
+      "name": "organic-deal-detail",
+      "status": 200,
+      "dealPresent": true
+    },
+    {
+      "name": "sponsored-deal-detail",
+      "status": 200,
+      "dealPresent": true
+    },
+    {
+      "name": "deals-banner",
+      "status": 200,
+      "count": 8
+    },
+    {
+      "name": "reorder-assistance",
+      "status": 200,
+      "count": 22
+    },
+    {
+      "name": "reservation-board",
+      "status": 200,
+      "reservations": 0,
+      "tables": 0
+    },
+    {
+      "name": "public-availability",
+      "status": 200,
+      "slots": 0,
+      "availableSlots": 0
+    },
+    {
+      "name": "guest-storefront",
+      "status": 200,
+      "branches": 1
+    },
+    {
+      "name": "guest-menu",
+      "status": 200,
+      "items": 23
+    },
+    {
+      "name": "guest-rewards-program",
+      "status": 200
+    }
+  ],
+  "restaurantId": "ae465fb9-d2b6-5d47-af40-25b5c44968ab",
+  "supplierChoices": [
+    "Bekaa Valley Dairy Co.",
+    "Mount Lebanon Meats",
+    "Cedar Fresh Produce",
+    "Levant Dry Goods",
+    "Phoenicia Seafood Traders",
+    "Beirut Beverage Distribution",
+    "Coastline Packaging & Hygiene"
+  ],
+  "bannerDealsDiscoverable": true
+}

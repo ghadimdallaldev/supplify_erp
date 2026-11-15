@@ -1,0 +1,38 @@
+{
+  "trim_pdf": "output\\horeca-flyer\\supplify-flyer-A5.pdf",
+  "checks": [
+    {
+      "language": "en",
+      "qr_300dpi": true,
+      "qr_150dpi": true,
+      "qr_share_jpeg": true,
+      "url": "https://app.supplifyerp.com/demo/?utm_source=flyer-en",
+      "fonts_embedded": true,
+      "artwork_present": true,
+      "page_mm": [
+        148,
+        210
+      ]
+    },
+    {
+      "language": "ar",
+      "qr_300dpi": true,
+      "qr_150dpi": true,
+      "qr_share_jpeg": true,
+      "url": "https://app.supplifyerp.com/demo/?utm_source=flyer-ar",
+      "fonts_embedded": true,
+      "artwork_present": true,
+      "page_mm": [
+        148,
+        210
+      ]
+    }
+  ],
+  "press_geometry_verified": true,
+  "press_qrs_verified": true,
+  "colour_space": "RGB; printer converts with their press ICC profile",
+  "a4_geometry_verified": true,
+  "a4_qrs_verified": true,
+  "live_qr_destinations_verified": true,
+  "root_typecheck_passed": true
+}

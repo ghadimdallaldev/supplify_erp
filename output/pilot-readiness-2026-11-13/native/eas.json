@@ -1,0 +1,88 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "environment": "development",
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-dev.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://keycloak-dev.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_REALM": "Supplify",
+        "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "supplify-mobile",
+        "EXPO_PUBLIC_GPS_TRACKING_ENABLED": "true",
+        "EXPO_PUBLIC_GPS_UPDATE_INTERVAL_SECONDS": "15",
+        "EXPO_PUBLIC_MAP_PROVIDER": "osm"
+      }
+    },
+    "preprod": {
+      "environment": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-preprod.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://keycloak-preprod.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_REALM": "supplify-preprod",
+        "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "supplify-mobile",
+        "EXPO_PUBLIC_GPS_TRACKING_ENABLED": "true",
+        "EXPO_PUBLIC_GPS_UPDATE_INTERVAL_SECONDS": "15",
+        "EXPO_PUBLIC_MAP_PROVIDER": "osm"
+      }
+    },
+    "preview": {
+      "extends": "preprod"
+    },
+    "demo": {
+      "environment": "development",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api-dev.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://keycloak-dev.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_REALM": "Supplify",
+        "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "supplify-mobile",
+        "EXPO_PUBLIC_GPS_TRACKING_ENABLED": "true",
+        "EXPO_PUBLIC_GPS_UPDATE_INTERVAL_SECONDS": "15",
+        "EXPO_PUBLIC_MAP_PROVIDER": "osm"
+      }
+    },
+    "ios-simulator": {
+      "extends": "preprod",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "pilot": {
+      "extends": "production",
+      "environment": "production",
+      "distribution": "internal",
+      "android": { "buildType": "apk" }
+    },
+    "production": {
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://keycloak.supplifyerp.com",
+        "EXPO_PUBLIC_KEYCLOAK_REALM": "supplify-prod",
+        "EXPO_PUBLIC_KEYCLOAK_CLIENT_ID": "supplify-mobile",
+        "EXPO_PUBLIC_GPS_TRACKING_ENABLED": "true",
+        "EXPO_PUBLIC_GPS_UPDATE_INTERVAL_SECONDS": "15",
+        "EXPO_PUBLIC_MAP_PROVIDER": "osm"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

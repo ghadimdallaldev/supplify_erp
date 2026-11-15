@@ -1,0 +1,16 @@
+[
+  "/api/restaurants/me/delivery-locations",
+  "/api/notifications/preferences",
+  "/api/quick-lists",
+  "/api/restaurant-finance/invoices",
+  "/api/promotions/active",
+  "/api/restaurant-pricing/my-pricing",
+  "/api/consumer/menu",
+  "/api/consumer/orders",
+  "/api/loyalty/consumer/program",
+  "/api/recipes",
+  "/api/recipe-costing/dashboard",
+  "/api/recipe-costing/alerts",
+  "/api/reports/restaurant/order-volume",
+  "/api/staff/members"
+]

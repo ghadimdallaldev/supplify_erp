@@ -1,0 +1,17 @@
+{
+  "id": "22c60543-ba7c-4405-adf0-4ad6f0bdf270",
+  "status": "ERRORED",
+  "error": {
+    "errorCode": "UNKNOWN_ERROR",
+    "message": "Unknown error. See logs of the Bundle JavaScript build phase for more information."
+  },
+  "profile": "demo",
+  "platform": "ANDROID",
+  "appVersion": "1.1.0",
+  "buildVersion": "27",
+  "createdAt": "2026-11-15T14:51:57.775Z",
+  "completedAt": "2026-11-15T14:52:47.812Z",
+  "artifact": null,
+  "buildUrl": "https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/22c60543-ba7c-4405-adf0-4ad6f0bdf270",
+  "api": "https://api-dev.supplifyerp.com"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "b5bcb76b-d869-4c7c-9844-046348170400",
+  "status": "FINISHED",
+  "error": null,
+  "profile": "demo",
+  "platform": "ANDROID",
+  "appVersion": "1.1.0",
+  "buildVersion": "27",
+  "createdAt": "2026-11-15T15:15:59.700Z",
+  "completedAt": "2026-11-15T15:29:33.307Z",
+  "artifact": "https://expo.dev/artifacts/eas/LH5m8fUYgO22AMc3ue0UhcN2YpTbWGekIRyKwXmS9wc.apk",
+  "buildUrl": "https://expo.dev/accounts/supplify-team/projects/supplify-mobile/builds/b5bcb76b-d869-4c7c-9844-046348170400",
+  "api": "https://api-dev.supplifyerp.com"
+}

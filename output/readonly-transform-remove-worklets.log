@@ -1,0 +1,16 @@
+Progress: resolved 0, reused 1, downloaded 0, added 0
+Progress: resolved 45, reused 45, downloaded 0, added 0
+Progress: resolved 260, reused 260, downloaded 0, added 0
+Progress: resolved 784, reused 773, downloaded 0, added 0
+Progress: resolved 786, reused 775, downloaded 0, added 0
+ WARN  5 deprecated subdependencies found: abab@2.0.6, domexception@4.0.0, glob@7.2.3, inflight@1.0.6, whatwg-encoding@2.0.0
+Packages: -8
+--------
+Progress: resolved 787, reused 776, downloaded 0, added 1
+Progress: resolved 787, reused 776, downloaded 0, added 2, done
+
+dependencies:
+- react-native-reanimated 4.3.1
+- react-native-worklets 0.8.3
+
+Done in 8.1s

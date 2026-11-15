@@ -1,0 +1,318 @@
+[
+  {
+    "name": "reports",
+    "width": 768,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "text",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "text",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "reports",
+    "width": 1024,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "text",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "text",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 242,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "reports",
+    "width": 1194,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "text",
+        "width": 298.65625,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "text",
+        "width": 298.671875,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 298.671875,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "receiving",
+    "width": 768,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "receiving",
+    "width": 1024,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "receiving",
+    "width": 1194,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "live-reorder-quantity",
+    "suggested": 1,
+    "productQuantity": 1,
+    "productId": "d1de5390-620a-56b5-ae40-e53ff5b0efa0"
+  },
+  {
+    "name": "reorder",
+    "width": 768,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "reorder",
+    "width": 1024,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "reorder",
+    "width": 1194,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "invoice-close-payment-gap",
+    "verticalGap": 44
+  },
+  {
+    "name": "invoice-layout",
+    "width": 768,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "text",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "text",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      },
+      {
+        "id": ":rk:",
+        "type": "select-one",
+        "width": 327,
+        "height": 40
+      },
+      {
+        "id": ":rj:",
+        "type": "text",
+        "width": 327,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "invoice-layout",
+    "width": 1024,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "text",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "text",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      },
+      {
+        "id": ":rk:",
+        "type": "select-one",
+        "width": 415,
+        "height": 40
+      },
+      {
+        "id": ":rj:",
+        "type": "text",
+        "width": 415,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "invoice-layout",
+    "width": 1194,
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 298.65625,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "text",
+        "width": 298.671875,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "text",
+        "width": 298.671875,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      },
+      {
+        "id": ":rk:",
+        "type": "select-one",
+        "width": 415,
+        "height": 40
+      },
+      {
+        "id": ":rj:",
+        "type": "text",
+        "width": 415,
+        "height": 40
+      }
+    ],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "guest-rewards-signed-out",
+    "width": 768,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "guest-rewards-signed-out",
+    "width": 1024,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  },
+  {
+    "name": "guest-rewards-signed-out",
+    "width": 1194,
+    "overflow": 0,
+    "controls": [],
+    "errors": [],
+    "httpErrors": []
+  }
+]

@@ -1,0 +1,102 @@
+[
+  {
+    "engine": "chromium",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 768,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "chromium",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 1024,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "chromium",
+    "language": "ar",
+    "role": "RESTAURANT",
+    "width": 1194,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "chromium",
+    "language": "en",
+    "role": "SUPPLIER",
+    "width": 1024,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "chromium",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 390,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "webkit",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 768,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "webkit",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 1024,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "webkit",
+    "language": "ar",
+    "role": "RESTAURANT",
+    "width": 1194,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "webkit",
+    "language": "en",
+    "role": "SUPPLIER",
+    "width": 1024,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  },
+  {
+    "engine": "webkit",
+    "language": "en",
+    "role": "RESTAURANT",
+    "width": 390,
+    "overflow": 0,
+    "errors": [],
+    "automaticAiCalls": 0,
+    "listWrites": 0
+  }
+]

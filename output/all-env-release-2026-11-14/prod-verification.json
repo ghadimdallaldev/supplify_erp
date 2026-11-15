@@ -1,0 +1,45 @@
+{
+  "environment": "prod",
+  "checkedAt": "2026-11-14T13:42:15.523Z",
+  "checks": [
+    {
+      "name": "browser-login-entry",
+      "status": 302
+    },
+    {
+      "name": "browser-login-form",
+      "status": 200
+    },
+    {
+      "name": "web-health",
+      "status": 200
+    },
+    {
+      "name": "web-document",
+      "status": 200
+    },
+    {
+      "name": "realm-discovery",
+      "status": 200
+    },
+    {
+      "name": "api-ready",
+      "status": 200
+    },
+    {
+      "name": "realm-jwks",
+      "status": 200
+    },
+    {
+      "name": "api-health",
+      "status": 200
+    }
+  ],
+  "configurationIsolated": true,
+  "database": {
+    "readOnly": true,
+    "migrationCount": 234,
+    "checkoutMigration0232": true,
+    "checkoutReplayTable": true
+  }
+}

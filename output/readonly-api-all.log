@@ -1,0 +1,657 @@
+
+ RUN  v1.6.1 C:/myProjects/supplify_erp/apps/api
+
+ ✓ src/services/driver-fulfillment.service.test.js  (25 tests) 33ms
+ ✓ src/services/quote-requests.service.test.js  (22 tests) 48ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/services/resolve-product-price.service.test.js  (16 tests) 4046ms
+ ✓ src/services/delivery-routes.service.test.js  (26 tests) 3736ms
+ ✓ src/services/warehouseRouting.test.js  (19 tests) 163ms
+ ✓ src/services/warehouseInventory.test.js  (15 tests) 4700ms
+ ✓ src/lib/subscription.test.js  (24 tests) 5310ms
+[2026-11-14 17:32:18.548 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:32:19.068 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/notification.service.test.js  (22 tests) 195ms
+ ✓ src/routes/restaurant-org.routes.test.js  (24 tests) 916ms
+ ✓ src/lib/billing/billing-service.test.js  (19 tests) 1019ms
+ ✓ src/jobs/subscription-billing.job.test.js  (10 tests) 244ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/products.routes.test.js  (18 tests) 751ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/rbac.test.js  (27 tests) 112ms
+ ✓ src/lib/route-permissions.test.js  (43 tests) 65ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/disputes.service.test.js  (24 tests) 37ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/auth.routes.test.js  (21 tests) 446ms
+[2026-11-14 17:32:25.307 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/routes/tenant-roles.routes.test.js  (20 tests) 350ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/routes/admin-dashboard.routes.test.js  (42 tests) 711ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/feature-flags.test.js  (16 tests) 78ms
+ ✓ src/routes/restaurant-pricing.routes.test.js  (11 tests) 289ms
+ ✓ src/services/assistant-tools/index.test.js  (31 tests) 153ms
+ ✓ src/routes/subscriptions.routes.test.js  (16 tests) 8062ms
+ ✓ src/routes/inventory.routes.test.js  (15 tests) 595ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+ ✓ src/routes/restaurant-intelligence.routes.test.js  (27 tests) 775ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/services/scheduled-orders.service.test.js  (14 tests) 38ms
+ ✓ src/lib/validate-config.test.js  (23 tests) 137ms
+ ✓ src/routes/org.routes.test.js  (17 tests) 455ms
+[2026-11-14 17:32:28.811 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:32:28.752 +0200] [33mWARN[39m:
+    event: "recipe_costing.catalog_hook_failed"
+    productId: "prod-1"
+    error: "Cannot destructure property 'rows' of '(intermediate value)' as it is undefined."
+[2026-11-14 17:32:28.752 +0200] [33mWARN[39m:
+    event: "recipe_costing.catalog_hook_failed"
+    productId: "prod-2"
+    error: "Cannot destructure property 'rows' of '(intermediate value)' as it is undefined."
+ ✓ src/services/promotions.service.test.js  (19 tests) 85ms
+ ✓ src/routes/orders.routes.test.js  (32 tests) 884ms
+ ✓ src/lib/billing/promotion-ad-billing.test.js  (8 tests) 1105ms
+ ✓ src/services/delivery-eta.service.test.js  (19 tests) 48ms
+ ✓ src/services/reorder-ai.service.llm.test.js  (10 tests) 608ms
+[2026-11-14 17:32:29.341 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/waitlistPromotion.test.js  (12 tests) 87ms
+ ✓ src/lib/tenant-ownership.test.js  (14 tests) 423ms
+ ✓ src/services/driver-location.service.test.js  (15 tests) 74ms
+ ✓ src/services/supplier-pain-killer.test.js  (8 tests) 16148ms
+ ✓ src/services/push.service.test.js  (14 tests) 1043ms
+ ✓ src/routes/feature-gates.routes.test.js  (17 tests) 7187ms
+ ✓ src/lib/plan-enforcement.test.js  (14 tests) 33ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/services/deal-promotions.service.test.js  (10 tests) 28ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/restaurants.routes.test.js  (12 tests) 332ms
+ ✓ src/routes/supplier-intelligence.routes.test.js  (16 tests) 475ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/public.routes.test.js  (13 tests) 357ms
+ ✓ src/routes/branch-invitations.routes.test.js  (10 tests) 461ms
+ ✓ src/lib/invitation-role-assignment.test.js  (11 tests) 37ms
+[2026-11-14 17:32:33.522 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/reservation-availability.test.js  (21 tests) 64ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/orders.calendar.routes.test.js  (7 tests) 238ms
+ ✓ src/routes/receiving.routes.test.js  (6 tests) 274ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/storage/upload-security.service.test.js  (7 tests) 70ms
+ ✓ src/routes/warehouses.routes.test.js  (10 tests) 710ms
+ ✓ src/lib/rbac-full-app.test.js  (27 tests) 40ms
+ ✓ src/services/delivery-retry.service.test.js  (4 tests) 24ms
+ ✓ src/services/supplier-order-stock.service.test.js  (12 tests) 28ms
+ ✓ src/lib/permissions.test.js  (15 tests) 23ms
+[2026-11-14 17:32:39.912 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/middlewares/csrf.test.js  (19 tests) 959ms
+[2026-11-14 17:32:41.339 +0200] [31mERROR[39m: [36mReservation creation failed[39m
+    stack: "Error: This date is closed: Private event\n    at C:\myProjects\supplify_erp\apps\api\src\routes\reservations.routes.js:578:15\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at C:\myProjects\supplify_erp\apps\api\src\routes\reservations.routes.js:557:25"
+    error: "This date is closed: Private event"
+[2026-11-14 17:32:41.497 +0200] [31mERROR[39m: [36mGuest intelligence error[39m
+    error: "[\n  {\n    \"validation\": \"uuid\",\n    \"code\": \"invalid_string\",\n    \"message\": \"Invalid uuid\",\n    \"path\": [\n      \"branchId\"\n    ]\n  }\n]"
+[2026-11-14 17:32:41.558 +0200] [31mERROR[39m: [36mReservation board fetch failed[39m
+    error: "Branch not found for this restaurant"
+ ✓ src/routes/reservations.routes.test.js  (12 tests) 455ms
+ ✓ src/services/restaurant-price-intelligence.service.test.js  (17 tests) 45ms
+ ✓ src/services/branding.service.test.js  (18 tests) 95ms
+ ✓ src/services/pick-lists.service.test.js  (7 tests) 1152ms
+ ✓ src/lib/admin-operational-metrics.test.js  (12 tests) 30ms
+[2026-11-14 17:32:41.985 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/order-amendments.integrity.test.js  (11 tests) 74ms
+ ✓ src/middlewares/billingAccess.test.js  (14 tests) 8701ms
+[2026-11-14 17:32:42.736 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/public-sales.service.test.js  (9 tests) 104ms
+ ✓ src/routes/restaurant-inventory.routes.test.js  (9 tests) 551ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/services/invoice.service.receiving.test.js  (14 tests) 37ms
+ ✓ src/services/delivery-rollover.service.test.js  (7 tests) 27ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/routes/chat.routes.test.js  (7 tests) 326ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/order-amendments.service.test.js  (7 tests) 16ms
+ ✓ src/lib/rbac-guards.test.js  (16 tests) 28ms
+ ✓ src/lib/limit-resolution.test.js  (13 tests) 18ms
+ ✓ src/lib/reorder-ai-normalize.test.js  (18 tests) 80ms
+ ✓ src/routes/billing.routes.test.js  (9 tests) 800ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/register-account.test.js  (7 tests) 15777ms
+ ✓ src/routes/promotions.boost-money-flow.test.js  (4 tests) 308ms
+ ✓ src/services/restaurant-delivery-location.service.test.js  (13 tests) 56ms
+[2026-11-14 17:32:51.117 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/legal-acceptance.test.js  (10 tests) 29ms
+ ✓ src/services/org-reports.service.test.js  (5 tests) 15ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/rbac-suspended-access.test.js  (3 tests) 455ms
+ ✓ src/routes/promotions.routes.test.js  (11 tests) 1055ms
+ ✓ src/services/loyalty.service.test.js  (9 tests) 16ms
+ ✓ src/routes/staff.routes.test.js  (5 tests) 327ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+[2026-11-14 17:32:58.522 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/public-supplier-catalog.service.test.js  (7 tests) 17ms
+ ✓ src/lib/tenant-switch.test.js  (9 tests) 780ms
+[2026-11-14 17:32:57.793 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/suppliers/profile.routes.test.js  (6 tests) 242ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/routes/fulfillment.routes.test.js  (6 tests) 640ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/restaurant-payables.service.test.js  (7 tests) 6137ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/mobile-auth.integration.test.js  (7 tests) 288ms
+ ✓ src/services/collections-reminders.service.test.js  (4 tests) 1102ms
+ ✓ src/routes/orders-driver-access.routes.test.js  (8 tests) 443ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/tenant-role-matrix.test.js  (14 tests) 28ms
+ ✓ src/routes/suppliers.routes.test.js  (5 tests) 438ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/register.routes.test.js  (7 tests) 908ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+ ✓ src/routes/admin-dashboard/tenants.routes.test.js  (4 tests) 127ms
+ ✓ src/services/supplier-run-sheet.service.test.js  (3 tests) 23360ms
+ ✓ src/routes/orders-chat-permissions.routes.test.js  (8 tests) 511ms
+ ✓ src/services/supplier-deliveries.service.test.js  (6 tests) 18ms
+ ✓ src/services/product-import.service.test.js  (13 tests) 1078ms
+[2026-11-14 17:33:06.559 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/cron-runner.test.js  (8 tests) 168ms
+ ✓ src/routes/public-sales.routes.test.js  (8 tests) 1015ms
+ ✓ src/services/restaurant-reorder-ai-recommend.test.js  (4 tests) 33224ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/resend-transport.test.js  (8 tests) 106ms
+ ✓ src/routes/promotions.supplier-security.test.js  (3 tests) 250ms
+ ✓ src/lib/register-cron-jobs.test.js  (3 tests) 255ms
+ ✓ src/services/reorder-forecast-model.test.js  (14 tests) 50ms
+ ✓ src/services/restaurant-margin-intelligence.service.test.js  (14 tests) 52ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/recipe-recalc-queue.service.test.js  (5 tests) 35ms
+ ✓ src/routes/quote-requests.routes.test.js  (7 tests) 526ms
+[2026-11-14 17:33:12.631 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:33:13.044 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/plan-admin-validation.test.js  (20 tests) 128ms
+ ✓ src/routes/demo-campaign.routes.test.js  (10 tests) 287ms
+ ✓ src/services/order-fulfillment-issues.service.test.js  (3 tests) 12ms
+ ✓ src/routes/restaurant-inventory.pagination.test.js  (3 tests) 361ms
+ ✓ src/lib/admin-overview-metrics.test.js  (3 tests) 15ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/rbac-role-access.test.js  (13 tests) 36ms
+ ✓ src/services/account-deletion.service.test.js  (3 tests) 98ms
+ ✓ src/lib/restaurant-org.test.js  (5 tests) 48ms
+ ✓ src/services/restaurant-reorder-assistance.service.test.js  (4 tests) 33517ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/services/invoice.service.test.js  (12 tests) 20ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/jobs/free-sandbox-expiry.job.test.js  (7 tests) 206ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/deal-lifecycle.service.test.js  (12 tests) 11ms
+ ✓ src/services/restaurant-order-create.service.test.js  (2 tests) 15599ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/supplier-accounting-export.service.test.js  (6 tests) 13434ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/routes/internal-auth.routes.test.js  (6 tests) 375ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/lib/db.test.js  (9 tests) 21ms
+ ✓ src/services/product-image-import.service.test.js  (10 tests) 26ms
+ ✓ src/routes/payments.routes.test.js  (5 tests) 523ms
+ ✓ src/routes/prices.routes.test.js  (4 tests) 13989ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/supplier-org.test.js  (5 tests) 81ms
+ ✓ src/services/assistant-chat.enhancements.test.js  (5 tests) 26ms
+ ✓ src/routes/consumer/consumer-auth.routes.test.js  (5 tests) 492ms
+ ✓ src/lib/auth.test.js  (5 tests) 39ms
+ ✓ src/routes/orders-driver-location.test.js  (5 tests) 242ms
+ ✓ src/jobs/email-retry.job.test.js  (3 tests) 69ms
+ ✓ src/routes/restaurant-invitations.routes.test.js  (3 tests) 722ms
+ ✓ src/lib/admin-activity-feed.test.js  (3 tests) 20ms
+ ✓ src/services/email/email.service.test.js  (10 tests) 831ms
+ ✓ src/services/reorder-forecast-cache.service.test.js  (4 tests) 89ms
+ ✓ src/lib/billing/sponsorship-billing.test.js  (2 tests) 453ms
+ ✓ src/services/staff-labour-summary.service.test.js  (6 tests) 19ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/branches.routes.test.js  (6 tests) 350ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/inventory-expiry.service.test.js  (7 tests) 772ms
+ ✓ src/routes/restaurant-onboarding.routes.test.js  (5 tests) 339ms
+ ✓ src/services/supplier-stock.service.test.js  (5 tests) 19ms
+ ✓ src/services/notification/webhook.test.js  (6 tests) 92ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/billing/billing-manual-checkout.test.js  (3 tests) 5480ms
+ ✓ src/routes/restaurants.delivery-location.test.js  (6 tests) 245ms
+ ✓ src/routes/search.routes.test.js  (5 tests) 318ms
+ ✓ src/lib/final-intelligence-migrations.test.js  (5 tests) 8ms
+ ✓ src/lib/ssrf-guard.test.js  (16 tests) 52ms
+ ✓ src/services/reorder-cadence.service.test.js  (4 tests) 18189ms
+ ✓ src/jobs/invoice-overdue.job.test.js  (3 tests) 19ms
+ ✓ src/services/public-sales-notification.test.js  (3 tests) 32ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/routes/quick-lists.routes.test.js  (4 tests) 238ms
+ ✓ src/lib/auth-session.test.js  (6 tests) 45ms
+ ✓ src/lib/plan-catalog-audit.test.js  (6 tests) 9ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/intelligence-tier.guard.test.js  (8 tests) 19ms
+ ✓ src/lib/billing/billing-paid-checkout.test.js  (1 test) 8528ms
+ ✓ src/lib/tier-matrix-verify.test.js  (6 tests) 25ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/delivery-coordinates.test.js  (11 tests) 16ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/branch-invitations-public.routes.test.js  (3 tests) 223ms
+ ✓ src/lib/pod-requirement.test.js  (8 tests) 27ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+[2026-11-14 17:33:46.058 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/restaurant-weekly-intelligence-summary.service.test.js  (2 tests) 18ms
+ ✓ src/lib/impersonation-guards.test.js  (6 tests) 14ms
+ ✓ src/routes/invoices.routes.test.js  (3 tests) 182ms
+ ✓ src/routes/staff-portal-access.test.js  (4 tests) 466ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/middlewares/errorHandler.test.js  (6 tests) 53ms
+ ✓ src/routes/suppliers/manage.routes.test.js  (2 tests) 252ms
+ ✓ src/services/supplier-sponsorship.service.test.js  (5 tests) 3920ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/routes/disputes.resolve-permission.test.js  (6 tests) 172ms
+ ✓ src/lib/receiving-line-validation.test.js  (7 tests) 14ms
+ ✓ src/routes/invoice-flow.integration.test.js  (5 tests) 39ms
+ ✓ src/services/delivery-routes-planned.test.js  (2 tests) 9672ms
+[2026-11-14 17:33:48.040 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/branch-account-billing.test.js  (3 tests) 12ms
+[2026-11-14 17:33:48.912 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/order-amendments.currency.test.js  (2 tests) 910ms
+ ✓ src/routes/orders-driver-tracking.test.js  (5 tests) 1031ms
+ ✓ src/services/quick-list-ai.service.test.js  (3 tests) 4464ms
+ ✓ src/lib/driver-user-link.test.js  (5 tests) 485ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/admin.routes.test.js  (6 tests) 1405ms
+ ✓ src/services/warehouse-inventory-heal.test.js  (3 tests) 13ms
+ ✓ src/routes/promotions.rbac.test.js  (3 tests) 347ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/restaurants-delivery-location.routes.test.js  (4 tests) 219ms
+[2026-11-14 17:33:54.515 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/services/whatsapp.service.test.js  (8 tests) 48996ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/public-sales.limits.test.js  (2 tests) 713ms
+ ✓ src/routes/files.routes.test.js  (1 test) 216ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/assistant.routes.test.js  (5 tests) 244ms
+ ✓ src/lib/dispute-replacement-order.test.js  (9 tests) 14ms
+ ✓ src/services/assistant-tools/read-tools.test.js  (5 tests) 24ms
+ ✓ src/lib/reorder-quantity.test.js  (9 tests) 11ms
+ ✓ src/services/order-placement-idempotency.service.test.js  (6 tests) 53ms
+ ✓ src/lib/socket-auth.tenant.test.js  (5 tests) 164ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/routes/orders/orders.helpers.test.js  (8 tests) 23ms
+ ✓ src/lib/subscription-addons.test.js  (7 tests) 17ms
+ ✓ src/middlewares/sanitizeServerErrors.test.js  (5 tests) 258ms
+ ✓ src/services/driver-delivery-detail.service.test.js  (2 tests) 21ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/services/restaurant-supplier-reliability.service.test.js  (4 tests) 27ms
+ ✓ src/lib/restaurant-tracking-payload.test.js  (3 tests) 19ms
+ ✓ src/routes/account.routes.test.js  (4 tests) 735ms
+ ✓ src/lib/order-status-transitions.test.js  (8 tests) 15ms
+ ✓ src/lib/org-billing-entitlements.test.js  (1 test) 11361ms
+ ✓ src/services/assistant-chat.service.test.js  (3 tests) 20ms
+ ✓ src/lib/billing/subscription-activation.test.js  (4 tests) 40ms
+ ✓ src/services/featured-supplier-placement.service.test.js  (3 tests) 21ms
+ ✓ src/services/reports.service.test.js  (11 tests) 44ms
+[2026-11-14 17:34:09.110 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/routes/push.routes.test.js  (2 tests) 224ms
+ ✓ src/lib/whatsapp-webhook.test.js  (5 tests) 29ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/invitation-accept.test.js  (10 tests) 29ms
+ ✓ src/services/supplier-slow-moving-intelligence.service.test.js  (3 tests) 24ms
+ ✓ src/services/email/templates/registry.test.js  (7 tests) 2038ms
+[2026-11-14 17:34:13.583 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/deal-promotions.boost.test.js  (3 tests) 26ms
+[2026-11-14 17:34:14.424 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/tenant-roles.test.js  (9 tests) 16ms
+ ✓ src/services/restaurant-waste-intelligence.service.test.js  (5 tests) 164ms
+ ✓ src/jobs/email-digest.job.test.js  (2 tests) 90ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-11-14 17:34:16.061 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/chat-access.test.js  (8 tests) 166ms
+ ✓ src/services/reorder-ai.service.test.js  (2 tests) 1799ms
+ ✓ src/services/restaurant-over-ordering-intelligence.service.test.js  (4 tests) 33ms
+ ✓ src/services/recipe-cost-engine.service.test.js  (2 tests) 22ms
+ ✓ src/services/image-optimization.service.test.js  (6 tests) 190ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/intelligence-tier.test.js  (8 tests) 28ms
+ ✓ src/routes/reviews.routes.test.js  (4 tests) 186ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/supplier-stockout-intelligence.service.test.js  (2 tests) 42ms
+ ✓ src/lib/impersonation.test.js  (4 tests) 32ms
+ ✓ src/routes/notifications.routes.test.js  (4 tests) 852ms
+ ✓ src/services/restaurant-inventory-import.service.test.js  (4 tests) 15ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/storage/s3CompatibleProvider.privateAccess.test.js  (6 tests) 18ms
+ ✓ src/config/resolve-env.test.js  (8 tests) 25914ms
+ ✓ src/routes/whatsapp-webhook.routes.test.js  (4 tests) 176ms
+ ✓ src/lib/branch-lifecycle-guards.test.js  (3 tests) 14ms
+ ✓ src/middlewares/request-timing.test.js  (4 tests) 36ms
+ ✓ src/lib/subscription-plan-display.test.js  (1 test) 4364ms
+ ✓ src/lib/access-cache.test.js  (2 tests) 159ms
+ ✓ src/jobs/promotions-expiry.job.test.js  (3 tests) 80ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/lib/workspace-membership.test.js  (4 tests) 9ms
+ ✓ src/services/supplier-customer-import.service.test.js  (6 tests) 113ms
+ ✓ src/lib/billing/providers/stripe.test.js  (4 tests) 54ms
+ ✓ src/routes/fulfillment/board.test.js  (2 tests) 116ms
+ ✓ src/services/supplier-warehouse-demand-forecast.service.test.js  (2 tests) 20ms
+ ✓ src/services/supplier-demand-forecast.service.test.js  (2 tests) 16ms
+[2026-11-14 17:34:26.871 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/org-role-permissions.test.js  (4 tests) 20ms
+ ✓ src/lib/rate-limit-store.test.js  (4 tests) 114ms
+[2026-11-14 17:34:27.175 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/driver-tracking-session.service.test.js  (4 tests) 12ms
+ ✓ src/services/deal-publish.service.test.js  (6 tests) 31ms
+ ✓ src/services/staff-portal-mail.service.test.js  (4 tests) 123ms
+ ✓ src/services/supplier-warehouse-performance-intelligence.service.test.js  (2 tests) 32ms
+ ✓ src/lib/tenant-profile-redaction.test.js  (7 tests) 16ms
+[2026-11-14 17:34:29.815 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:34:29.676 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/reorder-forecast.service.test.js  (5 tests) 18ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/jobs/fulfillment-exceptions.job.test.js  (3 tests) 96ms
+ ✓ src/jobs/stale-gps-alerts.job.test.js  (2 tests) 118ms
+ ✓ src/lib/delivery-tracking-payload.test.js  (7 tests) 23ms
+ ✓ src/lib/money.test.js  (7 tests) 24ms
+ ✓ src/routes/reports.routes.test.js  (2 tests) 122ms
+ ✓ src/services/supplier-inventory.service.test.js  (5 tests) 22ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/mailer.service.test.js  (4 tests) 251ms
+ ✓ src/routes/restaurant-connection-requests.routes.test.js  (2 tests) 126ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/disputes.routes.test.js  (2 tests) 477ms
+ ✓ src/routes/consumer-reviews.routes.test.js  (3 tests) 231ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/supplier-suggested-deals-intelligence.service.test.js  (2 tests) 25ms
+ ✓ src/lib/ai/openai-provider.tools.test.js  (1 test) 16ms
+ ✓ src/lib/recipient-rate-limit.test.js  (4 tests) 30ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/lib/consumer-ordering-hours.test.js  (8 tests) 25ms
+ ✓ src/lib/tenant-context-cache.test.js  (3 tests) 6189ms
+ ✓ src/services/store-deals.service.test.js  (3 tests) 38ms
+ ✓ src/routes/staff/staff.shared.test.js  (10 tests) 17ms
+ ✓ src/lib/conversion-events.test.js  (4 tests) 44ms
+ ✓ src/lib/oauth-callback-origin.test.js  (7 tests) 12ms
+[2026-11-14 17:34:37.851 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/request-log-context.test.js  (3 tests) 11ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/reorder-ai-context.service.test.js  (3 tests) 149ms
+ ✓ src/routes/drivers.routes.test.js  (3 tests) 25303ms
+ ✓ src/services/admin-user-password.service.test.js  (3 tests) 4346ms
+ ✓ src/lib/smart-reorder-tier.test.js  (6 tests) 12ms
+ ✓ src/lib/admin-user-preferences.test.js  (3 tests) 16ms
+ ✓ src/lib/mobile-auth.test.js  (8 tests) 11ms
+ ✓ src/services/staff-payroll.service.test.js  (3 tests) 13ms
+ ✓ src/services/supplier-price-comparison.service.test.js  (1 test) 12ms
+ ✓ src/middlewares/activeTenantContext.test.js  (3 tests) 17ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/consumer/orders.routes.test.js  (2 tests) 87ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/ai-platform.test.js  (5 tests) 8457ms
+ ✓ src/services/notification/quote-notification-dedup.test.js  (2 tests) 13ms
+ ✓ src/services/supplier-reorder-assistance.service.test.js  (2 tests) 12887ms
+ ✓ src/lib/supplier-last-order.test.js  (5 tests) 20ms
+ ✓ src/lib/invoice-access.test.js  (4 tests) 18ms
+ ✓ src/services/supplier-cross-sell-intelligence.service.test.js  (2 tests) 46ms
+ ✓ src/services/supplier-reorder-intelligence.service.test.js  (2 tests) 113ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ src/lib/sanitize-upload.test.js  (6 tests) 28ms
+[2026-11-14 17:34:45.627 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/consumer-auth.service.test.js  (4 tests) 53ms
+ ✓ src/lib/billing/gateway-registry.test.js  (6 tests) 13539ms
+ ✓ src/services/reorder-forecast-data.service.test.js  (4 tests) 21ms
+[2026-11-14 17:34:47.266 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/dashboard-summary.public-orders.test.js  (1 test) 20ms
+ ✓ src/services/invitation-mail.service.test.js  (2 tests) 31ms
+ ✓ src/lib/supplier-business-settings.test.js  (3 tests) 37ms
+ ✓ src/lib/billing/billing-recovery-paths.test.js  (5 tests) 11ms
+ ✓ src/routes/order-amendments.schema.test.js  (6 tests) 21ms
+ ✓ src/services/restaurant-invoice-anomaly-intelligence.service.test.js  (2 tests) 34ms
+ ✓ src/services/deal-boost.helpers.test.js  (4 tests) 11ms
+ ✓ src/lib/viewer-permissions.test.js  (4 tests) 17ms
+ ✓ src/config/load-railway-env.test.js  (4 tests) 18ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/jobs/trial-ending-soon.job.test.js  (2 tests) 161ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/object-download-auth.test.js  (4 tests) 22ms
+ ✓ src/lib/org-billing-tenant.test.js  (4 tests) 24ms
+[2026-11-14 17:34:49.705 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+[2026-11-14 17:34:50.760 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/plan-codes.test.js  (4 tests) 14ms
+ ✓ src/routes/consumer/menu.routes.test.js  (4 tests) 818ms
+ ✓ src/lib/reservation-status.test.js  (6 tests) 14ms
+[2026-11-14 17:34:51.861 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/jobs/reservation-guest-comms.job.test.js  (1 test) 101ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/branch-invitations.test.js  (5 tests) 24ms
+ ✓ src/lib/restaurant-targeting.test.js  (4 tests) 72ms
+ ✓ src/services/deal-banner.service.test.js  (2 tests) 36ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/storage/s3CompatibleProvider.test.js  (4 tests) 8ms
+ ✓ src/lib/public-sales-migration.test.js  (4 tests) 13ms
+ ✓ src/routes/fulfillment/warehouse-filter.test.js  (4 tests) 17ms
+ ✓ src/services/email/templates/layout.test.js  (5 tests) 19ms
+ ✓ src/jobs/operational-reminders.job.test.js  (1 test) 40ms
+ ✓ src/lib/quick-list-tier.test.js  (5 tests) 9ms
+[2026-11-14 17:34:56.256 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/tier-binding.test.js  (4 tests) 11ms
+ ✓ src/services/recipe-price-impact.service.test.js  (2 tests) 10851ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/four-plan-migration-sql.test.js  (3 tests) 19ms
+ ✓ src/lib/billing/providers/stub.test.js  (4 tests) 22ms
+ ✓ src/services/notification/email.test.js  (2 tests) 18ms
+ ✓ src/lib/fulfillment-exceptions.test.js  (2 tests) 25ms
+ ✓ src/lib/order-quantity-rules.test.js  (6 tests) 12ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/staff-portal-auth.test.js  (4 tests) 12ms
+ ✓ src/services/product-import-worker.test.js  (1 test) 33ms
+ ✓ src/services/image-import-worker.test.js  (1 test) 36ms
+ ✓ src/lib/delivery-zone-input.test.js  (5 tests) 16ms
+[2026-11-14 17:34:58.658 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/whatsapp/webhook.service.test.js  (1 test) 11ms
+ ✓ src/lib/identity-normalize.test.js  (5 tests) 30ms
+ ✓ src/services/supplier-weekly-intelligence-summary.service.test.js  (1 test) 17ms
+ ✓ src/lib/staff-list-cache.test.js  (2 tests) 2965ms
+ ✓ src/services/reviews.service.test.js  (4 tests) 22ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/lib/tenant-resolve.test.js  (4 tests) 12ms
+[2026-11-14 17:34:59.424 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/reservation-policy.test.js  (5 tests) 13ms
+ ✓ src/lib/orders-calendar-cache.test.js  (2 tests) 10ms
+ ✓ src/lib/assign-owner-role.test.js  (1 test) 360ms
+ ✓ src/lib/branch-scope.test.js  (3 tests) 288ms
+ ✓ src/routes/recipes.routes.test.js  (2 tests) 231ms
+ ✓ src/lib/consumer-checkout-idempotency.test.js  (2 tests) 20ms
+ ✓ src/lib/supplier-stock-status.test.js  (5 tests) 12ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/subscription/free-trial-plan-features.test.js  (2 tests) 77ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/suppliers/admin.routes.test.js  (1 test) 126ms
+ ✓ src/services/reports-fulfillment.test.js  (2 tests) 3866ms
+ ✓ src/lib/dispatch-cache.test.js  (2 tests) 24ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/concurrency.test.js  (4 tests) 44ms
+ ✓ src/lib/socket-auth.test.js  (3 tests) 11ms
+ ✓ src/lib/billing/providers/manual.test.js  (3 tests) 10ms
+ ✓ src/services/consumer-order.service.test.js  (6 tests) 44ms
+ ✓ src/lib/warehouse-helpers.test.js  (2 tests) 339ms
+ ✓ src/lib/db.keepalive.test.js  (1 test) 313ms
+ ✓ src/lib/app-url.test.js  (4 tests) 55ms
+[2026-11-14 17:35:03.358 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/config/resolve-redis-url.test.js  (4 tests) 13ms
+[2026-11-14 17:35:03.920 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/start-crons-after-migrations.test.js  (2 tests) 66ms
+ ✓ src/lib/socket-redis-adapter.test.js  (4 tests) 18ms
+ ✓ src/lib/driver-location-validation.test.js  (3 tests) 7ms
+(node:35876) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+ ✓ src/lib/delivery-rollover-time.test.js  (3 tests) 9ms
+ ✓ src/lib/admin-tenant-usage-metrics.test.js  (2 tests) 11ms
+ ✓ src/lib/postal-code-match.test.js  (3 tests) 8ms
+ ✓ src/lib/delivery-route-order-statuses.test.js  (3 tests) 8ms
+[2026-11-14 17:35:04.824 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/billing/stripe-webhook.test.js  (2 tests) 8ms
+ ✓ src/lib/pinned-fetch.test.js  (3 tests) 16ms
+ ✓ src/services/route-optimization.service.test.js  (2 tests) 13ms
+ ✓ src/lib/delivery-zone-join.test.js  (2 tests) 6ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/routes/orders.calendar.routes.feature.test.js  (1 test) 72ms
+ ✓ src/services/invitationTokens.test.js  (4 tests) 12ms
+ ✓ src/lib/rbac.impersonation.test.js  (2 tests) 13ms
+ ✓ src/lib/reservation-board-date.test.js  (3 tests) 11ms
+ ✓ src/routes/e2e.routes.test.js  (3 tests) 193ms
+ ✓ src/lib/tenant-timezone.test.js  (2 tests) 37ms
+ ✓ src/lib/singleflight.test.js  (2 tests) 37ms
+ ✓ src/lib/active-gps-deliveries.test.js  (1 test) 47ms
+ ✓ src/jobs/driver-location-retention.job.test.js  (1 test) 8ms
+ ✓ src/lib/log-helpers.test.js  (2 tests) 9ms
+ ✓ src/services/recipe-unit-conversion.service.test.js  (4 tests) 15ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/email/template-resolver.test.js  (3 tests) 7ms
+ ✓ src/services/notification/channels.test.js  (6 tests) 18ms
+ ✓ src/lib/file-security-migration.test.js  (1 test) 6ms
+ ✓ src/lib/email-verification-gate.test.js  (3 tests) 11ms
+ ✓ src/lib/legal-pack-version-sync.test.js  (2 tests) 8ms
+ ✓ src/lib/whatsapp.test.js  (4 tests) 8ms
+ ✓ src/lib/safe-compare.test.js  (3 tests) 9ms
+ ✓ src/routes/quick-lists-ordering.test.js  (1 test) 85ms
+ ✓ src/lib/quantity-unit.test.js  (3 tests) 11ms
+ ✓ src/lib/quick-list-schedule.test.js  (3 tests) 11ms
+ ✓ src/lib/order-statuses.test.js  (2 tests) 11ms
+[2026-11-14 17:35:09.292 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/consumer-menu-import.service.test.js  (3 tests) 18ms
+ ✓ src/lib/branding-tier.test.js  (3 tests) 15ms
+ ✓ src/lib/workspace-tenant.test.js  (2 tests) 22ms
+ ✓ src/lib/sql-migrator.split.test.js  (1 test) 12ms
+ ✓ src/i18n/index.test.js  (5 tests) 11ms
+ ✓ src/lib/platform-settings.test.js  (4 tests) 10ms
+ ✓ src/lib/memory-monitor.test.js  (2 tests) 6ms
+ ✓ src/services/reservation-guest-reviews.service.test.js  (1 test) 8ms
+ ✓ src/services/supplier-growth-program.test.js  (1 test) 8ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/restaurant-invitations.test.js  (1 test) 8ms
+[2026-11-14 17:35:11.185 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/services/consumer-menu.service.test.js  (2 tests) 7ms
+[2026-11-14 17:35:11.312 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/keycloak-admin.test.js  (1 test) 11ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2026-11-14 17:35:12.632 +0200] [32mINFO[39m: [36mRedis cache connection established (shared cross-request cache enabled)[39m
+ ✓ src/lib/storage-upload.test.js  (7 tests) 8ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/lib/socket.test.js  (3 tests) 17ms
+(node:35876) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ src/services/notification/templates.order-short-id.test.js  (1 test) 4ms
+
+ Test Files  394 passed (394)
+      Tests  2596 passed (2596)
+   Start at  17:32:11
+   Duration  183.05s (transform 33.72s, setup 9.99s, collect 2245.40s, tests 504.29s, environment 239ms, prepare 564.85s)
+

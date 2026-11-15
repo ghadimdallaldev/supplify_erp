@@ -1,0 +1,66 @@
+[
+  {
+    "role": "GUEST",
+    "width": 390,
+    "locale": "en",
+    "errors": [],
+    "writes": [],
+    "unmapped": [],
+    "screens": [
+      {
+        "screen": "home",
+        "url": "http://localhost:8084/Login",
+        "overflow": false,
+        "text": "Supplify\nYour operation. In sync.\nThe everyday workspace for restaurants, suppliers, and the people who keep them moving.\n\nOrders and purchasing\n\nDeliveries and receiving\n\nStock and fulfillment\nWelcome back\nSign in to your workspace to continue.\n\nSign in\n\nSecure sign-in\nPrivacy Policy\nTerms\nMobile App Terms\nDelete account (web)"
+      }
+    ]
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 390,
+    "locale": "en",
+    "errors": [],
+    "writes": [],
+    "unmapped": [],
+    "screens": [
+      {
+        "screen": "home",
+        "url": "http://localhost:8084/Tabs/Home",
+        "overflow": false,
+        "text": "SUPPLIFY\nCedar Kitchen\n\nOwner\n\n\n1 item need attention\n2\nRecent open orders\n0\nReceiving queue\n$158.50 + LBP 12,500,000\nRecent open value\nOrder figures cover your 10 latest orders.\nNeeds attention\n\n2 open orders\nAmong your 10 latest orders\n\nUp next\n\nFresh Supply\nPLACED · $158.50\n\nQuick actions\n\nNew order\n\nQuick lists\n\nInvoices\n\nMessages\n\nReports\n\nReservations\n\nInventory\nFollowing\nSee all\nF\nFresh Supply\nRecent\nSee all\nF\nFresh Supply\nToday\n#A1111111\n$158.50\nPlaced\nL\nLebanon Produce\nToday\n#B1111111\nLBP 12,500,000\nAcknowledged\n\n\nHome\n\n\nSuppliers\n\n\nOrders\n\n\nMessages\n\n\nMore"
+      }
+    ]
+  },
+  {
+    "role": "SUPPLIER",
+    "width": 390,
+    "locale": "en",
+    "errors": [],
+    "writes": [],
+    "unmapped": [],
+    "screens": [
+      {
+        "screen": "home",
+        "url": "http://localhost:8084/Tabs/Dashboard",
+        "overflow": false,
+        "text": "SUPPLIFY\nFresh Supply\n\nOwner\n\n\n2\nRecent open orders\n0\nOut for delivery\n$158.50 + LBP 12,500,000\nRecent open value\nOrder figures cover your 50 latest orders.\nOrder pipeline\n1\nNew\n1\nConfirmed\n0\nPreparing\n0\nIn transit\nNeeds attention\n\n1 new order\nAcknowledge and confirm\n\n\n1 in fulfillment\nAdvance status or dispatch\n\nToday\n\nDispatch board\n0 active · 0 unassigned\n\n\nPick lists\n1 order in the pick queue\n\n\nRun sheet\nOperations summary for today\n\nUp next\nC\nCedar Kitchen\nToday\n#A1111111\n$158.50\nPlaced\nRecent\nSee all\nC\nCedar Kitchen\nToday\n#A1111111\n$158.50\nPlaced\nC\nCedar Kitchen\nToday\n#B1111111\nLBP 12,500,000\nAcknowledged\n\n\nHome\n\n\nOrders\n\n\nDispatch\n\n\nMessages\n\n\nMore"
+      }
+    ]
+  },
+  {
+    "role": "RESTAURANT",
+    "width": 1024,
+    "locale": "en",
+    "errors": [],
+    "writes": [],
+    "unmapped": [],
+    "screens": [
+      {
+        "screen": "home",
+        "url": "http://localhost:8084/Tabs/Home",
+        "overflow": false,
+        "text": "\n\nHome\n\n\nSuppliers\n\n\nOrders\n\n\nMessages\n\n\nMore\nSUPPLIFY\nCedar Kitchen\n\nOwner\n\n\n1 item need attention\n2\nRecent open orders\n0\nReceiving queue\n$158.50 + LBP 12,500,000\nRecent open value\nOrder figures cover your 10 latest orders.\nNeeds attention\n\n2 open orders\nAmong your 10 latest orders\n\nUp next\n\nFresh Supply\nPLACED · $158.50\n\nQuick actions\n\nNew order\n\nQuick lists\n\nInvoices\n\nMessages\n\nReports\n\nReservations\n\nInventory\nFollowing\nSee all\nF\nFresh Supply\nRecent\nSee all\nF\nFresh Supply\nToday\n#A1111111\n$158.50\nPlaced\nL\nLebanon Produce\nToday\n#B1111111\nLBP 12,500,000\nAcknowledged"
+      }
+    ]
+  }
+]

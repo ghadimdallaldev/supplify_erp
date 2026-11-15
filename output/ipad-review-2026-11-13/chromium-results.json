@@ -1,0 +1,775 @@
+[
+  {
+    "engine": "chromium",
+    "name": "invoices",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "date",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "date",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "invoices",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "date",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "date",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nInvoices\n\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nInvoice dashboard\n\nBilling, payments, and spend\n\nExport CSV\nNo open payables — you're caught up with supplier invoices.\nSupplier statement\n\nDate range & supplier\n\nLast 7 days\nLast 30 days\nLast 90 days\nSupplier\nSelect supplier\nCedar Foods\nBekaa Produce\nFrom\nTo\nSelect a supplier and date range to view the account statement.\nInvoice checks\n\nRecorded invoice, order, contract, and prior-price differences that need review.\n\nNo supported invoice anomalies in this period.\n\nTOTAL INVOICES\n\n1\n\n0 issued · 0 partial\n\nOUTSTANDING\n\n$120.00\n\n1 unpaid\n\nOVERDUE\n\n0\n\nAll current\n\nTOTAL PAID\n\n—\n\nNo paid invoices yet\n\nAVG DAYS TO PAY\n\nN/A\n\nPAID (30D)\n\n—\n\nOUTSTANDING (30D)\n\n—\n\nInvoice List\nStatus\nAll Status\nIssued\nPartially Paid\nPaid\nOverdue\nVoid\nSupplier\nAll Suppliers\nCedar Foods\nINVOICE\tSUPPLIER\tSTATUS\tBALANCE\tTOTAL\tACTIONS\nINV-QA-2026\tCedar Foods\t\nIssued\t$120.00\t$120.00\t"
+  },
+  {
+    "engine": "chromium",
+    "name": "invoices",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "statement-supplier",
+        "type": "select-one",
+        "width": 298.65625,
+        "height": 40
+      },
+      {
+        "id": "statement-from",
+        "type": "date",
+        "width": 298.671875,
+        "height": 40
+      },
+      {
+        "id": "statement-to",
+        "type": "date",
+        "width": 298.65625,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 180,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 200,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "pdf-download",
+    "filename": "invoice-INV-QA-2026.pdf"
+  },
+  {
+    "engine": "chromium",
+    "name": "products",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "product-supplier-filter",
+        "type": "select-one",
+        "width": 349,
+        "height": 40
+      },
+      {
+        "id": "product-category-filter",
+        "type": "select-one",
+        "width": 349,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "products",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "product-supplier-filter",
+        "type": "select-one",
+        "width": 369,
+        "height": 40
+      },
+      {
+        "id": "product-category-filter",
+        "type": "select-one",
+        "width": 369,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nProducts\n\nCart\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nProducts\n\nBrowse and search products from suppliers\n\nRequest best price\nView Cart\n2 active deals\nView all deals\nFavorites\nSupplier\nAll Suppliers\nBekaa Produce\nCedar Foods\nCategory\nAll Categories\nPantry\nPrice range\n–\nFilter by tags\nOrganic\nLebanese\n\nLebanese olive oil\n\nOL-1\n\nN/A\nCedar Foods\n\n$12.00\n\nper bottle\n\n100 bottle\nAdd to Cart\nAdd to ordering list\nView\n\nShowing 1–1 of 1\n\nPrevious\nNext"
+  },
+  {
+    "engine": "chromium",
+    "name": "products",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "product-supplier-filter",
+        "type": "select-one",
+        "width": 454,
+        "height": 40
+      },
+      {
+        "id": "product-category-filter",
+        "type": "select-one",
+        "width": 454,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "product",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": []
+  },
+  {
+    "engine": "chromium",
+    "name": "product",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nProducts\n\nCart\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nBack to Products\nLebanese olive oil\nProduct Details\n\nSKU\n\nOL-1\n\nSupplier\n\nCedar Foods\n\nUnit\n\nbottle\n\nStock\n\n100 bottle\n\nPricing\n\n$12.00\n\nUSD per bottle\n\nQuantity\nAdd to Cart\nView Cart"
+  },
+  {
+    "engine": "chromium",
+    "name": "product",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": []
+  },
+  {
+    "engine": "chromium",
+    "name": "deals",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "deals-sort",
+        "type": "select-one",
+        "width": 343,
+        "height": 40
+      },
+      {
+        "id": "deals-supplier",
+        "type": "select-one",
+        "width": 343,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "deals",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "deals-sort",
+        "type": "select-one",
+        "width": 367,
+        "height": 40
+      },
+      {
+        "id": "deals-supplier",
+        "type": "select-one",
+        "width": 367,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nDeals\n\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nAvailable deals\n\nSupplier deals from suppliers you follow, plus sponsored placement from new suppliers\n\nSort\nNewest\nBiggest discount\nExpiring soon\nSponsored first\nSupplier\nAll suppliers\nBekaa Produce\nCedar Foods\nExpiring within 7 days\nOlive oil offer\n\nCedar Foods\n\n10% off\n\nQA offer\n\nValid until Nov 18, 2026\n\nOrder with deal\nFresh produce offer\n\nBekaa Produce\n\n10% off\n\nQA offer\n\nValid until Nov 18, 2026\n\nOrder with deal"
+  },
+  {
+    "engine": "chromium",
+    "name": "deals",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "deals-sort",
+        "type": "select-one",
+        "width": 452,
+        "height": 40
+      },
+      {
+        "id": "deals-supplier",
+        "type": "select-one",
+        "width": 452,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "expired-deals-focus-refresh",
+    "passed": true
+  },
+  {
+    "engine": "chromium",
+    "name": "reports",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "date",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "date",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "reports",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "date",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "date",
+        "width": 242,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 242,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nReports\n\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nPurchasing reports\n\nTrack order volume, supplier spend, and top products across your locations.\n\nDate range & filters\n\nLast 7 days\nLast 30 days\nLast 90 days\nFrom\nTo\nGranularity\nDay\nWeek\nMonth\nOrder volume\nSpend by supplier\nTop products\nSpend by category\nCost of goods\nReceiving quality\nInvoice aging\nOrder volume\nExport CSV\n\nNo data for this period\n\nTry widening the date range, changing granularity, or placing orders in this window."
+  },
+  {
+    "engine": "chromium",
+    "name": "reports",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "report-from",
+        "type": "date",
+        "width": 298.65625,
+        "height": 40
+      },
+      {
+        "id": "report-to",
+        "type": "date",
+        "width": 298.671875,
+        "height": 40
+      },
+      {
+        "id": "report-granularity",
+        "type": "select-one",
+        "width": 298.65625,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "reservations",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "date",
+        "width": 121,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 234,
+        "height": 40
+      },
+      {
+        "id": "deposit-mode",
+        "type": "select-one",
+        "width": 676,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "date",
+        "width": 299.859375,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "reservations",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "date",
+        "width": 121,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 258,
+        "height": 40
+      },
+      {
+        "id": "deposit-mode",
+        "type": "select-one",
+        "width": 724,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "date",
+        "width": 323.859375,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nReservations\n\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nReservations\n\nBookings, waitlist, and guest flow\n\nToday\n+ New reservation\nBooking link for guests\n\nShare this link so clients can book a table online. They'll see availability and get a confirmation by email or WhatsApp when contact details are provided.\n\nhttp://127.0.0.1:5176/reserve/qa-bistro\nCopy link\n\nCOVERS TODAY\n\n4\n\nCONFIRMED\n\n1\n\nWAITLIST\n\n0\n\nCURRENTLY SEATED\n\n0\n\nWaitlist queue\n\nOffer status and manual promotion for guests waiting for a table\n\nAuto-promotion is on: when a reservation is cancelled, the next waitlisted guest may receive a timed table offer.\n\nWaitlist is empty\n\nGuests waiting for a table will appear here.\n\nToday's table map\n\n1 assigned · 0 unassigned on 2026-11-13. Matches what should appear on the floor below.\n\nA very long guest name to test card wrappingFri, Nov 13, 08:00 PM\nTerrace window\nCONFIRMED\nReservations Board\n\nAssign a table on each card, then use Seat / Complete — or drag by the grip handle.\n\nTotal seats: 4\nCovers booked: 4\nPENDING\n0\n\nDrop reservations here\n\nCONFIRMED\n1\n\nA very long guest name to test card wrappi"
+  },
+  {
+    "engine": "chromium",
+    "name": "reservations",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "date",
+        "width": 121,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 343,
+        "height": 40
+      },
+      {
+        "id": "deposit-mode",
+        "type": "select-one",
+        "width": 894,
+        "height": 40
+      },
+      {
+        "id": "",
+        "type": "date",
+        "width": 408.859375,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "booking",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "resDate",
+        "type": "date",
+        "width": 333,
+        "height": 44
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "booking",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "resDate",
+        "type": "date",
+        "width": 357,
+        "height": 44
+      }
+    ],
+    "text": "Q\nBook at QA Bistro\n\nChoose your date and party size, pick a time, then confirm in under a minute.\n\nWhen are you coming?\n\nSet your party size and date, then check which times are open.\n\nParty size\nDate\nCheck availability\nAvailable times\n\nPick a date and tap \"Check availability\" to see open times.\n\nYour details\n\nContact info to confirm your table at QA Bistro.\n\nSelect a time above after checking availability.\nName\nEmail *\nPhone *\nSelected time\nNo time selected yet\nNotes\nOccasion\nAllergies\nConfirm reservation\n\nSelect an available time after checking availability.\n\nBy booking you agree to receive reservation updates for this visit. Modify or cancel using the confirmation link sent after booking."
+  },
+  {
+    "engine": "chromium",
+    "name": "booking",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "resDate",
+        "type": "date",
+        "width": 357,
+        "height": 44
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "menu",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "menu-branch",
+        "type": "select-one",
+        "width": 384,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "menu",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "menu-branch",
+        "type": "select-one",
+        "width": 384,
+        "height": 40
+      }
+    ],
+    "text": "QA Bistro\nTaking orders\nBeirut\nByblos\nBranch\nBeirut\nByblos\n\n1 item\n\nDIETARY FILTERS\n\nVegetarian\nVegan\nHalal\nGluten-free\nDairy-free\nNut-free\nSpicy\nNo Gluten\nNo Dairy\nNo Eggs\nNo Fish\nNo Shellfish\nNo Tree nuts\nNo Peanuts\nNo Soy\nNo Sesame\nGarden kitchen\nChef picks\nG\n\nGrilled halloumi with herbs\n\n12.00\n\nFresh Lebanese halloumi, garden greens and seasonal vegetables.\n\nVegetarian\nmilk\n\nCustomize\n\nGarden kitchen\n1\nG\n\nGrilled halloumi with herbs\n\n12.00\n\nFresh Lebanese halloumi, garden greens and seasonal vegetables.\n\nVegetarian\nmilk\n\nCustomize\n\nHome\nMenu\nTrack\nAccount"
+  },
+  {
+    "engine": "chromium",
+    "name": "menu",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "menu-branch",
+        "type": "select-one",
+        "width": 384,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "rewards",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": []
+  },
+  {
+    "engine": "chromium",
+    "name": "rewards",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [],
+    "text": "QA Bistro\nTaking orders\nBack\nSign out\nMy rewards\n\n250 pts\n\nHi, QA Guest\n\nReady to use your points at checkout\n\nUse points at checkout for up to 50% of the food subtotal.\n\nYour orders\n\nNo orders yet.\n\nRecent activity\n\nEarned\n\n11/13/2026, 10:53:02 PM\n\n+50 pts\n\nBalance 250\n\nOrder now\nHome\nMenu\nTrack\nAccount"
+  },
+  {
+    "engine": "chromium",
+    "name": "rewards",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": []
+  },
+  {
+    "engine": "chromium",
+    "name": "inventory",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "inventory-category-filter",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "inventory-supplier-filter",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "inventory-status-filter",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      },
+      {
+        "id": "inventory-sort",
+        "type": "select-one",
+        "width": 345,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "inventory",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "inventory-category-filter",
+        "type": "select-one",
+        "width": 99,
+        "height": 40
+      },
+      {
+        "id": "inventory-supplier-filter",
+        "type": "select-one",
+        "width": 99,
+        "height": 40
+      },
+      {
+        "id": "inventory-status-filter",
+        "type": "select-one",
+        "width": 99,
+        "height": 40
+      },
+      {
+        "id": "inventory-sort",
+        "type": "select-one",
+        "width": 99,
+        "height": 40
+      }
+    ],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nReports\nDeals\nInvoices\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nQO\nQA Owner\nRestaurant\nSCALE\n\nInventory\n\nProducts\nPlans\nSearch products…\n⌘K\nQO\n\n2 new deals\n\nCedar Foods, Bekaa Produce — tap to browse deals.\n\nView deals\nInventory\n\nTrack stock levels, waste, expiry, and movement across your kitchen.\n\nBulk Upload\nAdd Product\nReorder assistance\n\nSuggestions based on stock levels, expiry, order patterns, and forecasts\n\nLebanese olive oil\nHIGH\nForecast Reorder Recommendation\nLow stock\nCedar Foods\nSuggest: 12 bottle\nView\nList\nCart\nStock\nHistory\nExpiry\nTotals\nStock Trend Analysis\n\nVisual overview of your inventory movements\n\nShow details\n\nTotal Products\n\n0\n\nSKUs tracked\n\nIn Stock\n\n0% of total\n\nLow Stock\n\n0% of total\n\nOut of Stock\n\n0% of total\n\nStock needs attention\n\nitems are below minimum — review and reorder soon.\n\nFilter at-risk\nSmart reorder\nJump to list\nSEARCH\nCATEGORY\nAll Categories\nSUPPLIER\nAll Suppliers\nSTATUS\nAll Status\nIn stock\nLow stock\nOut of stock\nSORT BY\nRecently updated\nName (A-Z)\nName (Z-A)\nQuantity (low first)\nQuantity (high first)\nStock status\nClear filters\nShowing 0 of 0of 0 items\nInventory Items\n\nView and manage your stock levels\n\nExport CSV\nImport CSV\n\nNo inventory yet\n\nPlace an order and receive goods to see inventory here.\n\nCreate first o"
+  },
+  {
+    "engine": "chromium",
+    "name": "inventory",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "inventory-category-filter",
+        "type": "select-one",
+        "width": 127.34375,
+        "height": 40
+      },
+      {
+        "id": "inventory-supplier-filter",
+        "type": "select-one",
+        "width": 127.328125,
+        "height": 40
+      },
+      {
+        "id": "inventory-status-filter",
+        "type": "select-one",
+        "width": 127.328125,
+        "height": 40
+      },
+      {
+        "id": "inventory-sort",
+        "type": "select-one",
+        "width": 127.34375,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "reorder-handoff",
+    "quantity": 12
+  },
+  {
+    "engine": "chromium",
+    "name": "checkout",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 702,
+        "height": 39
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "checkout",
+    "width": 1024,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 702,
+        "height": 39
+      }
+    ],
+    "text": "QA Bistro\nTaking orders\nBeirut\nByblos\nBack to menu\nCheckout\n\nQA Bistro\n\nEst. prep time ~20 min\n\nYour order\n1× Grilled halloumi with herbs\n12.00\n\nCustomizations selected\n\nSubtotal\n12.00\nTotal · Cash on pickup\n12.00\nBranch\nBeirut\nByblos\nFulfillment\nDelivery\nTakeaway\nDine-in\nWhen\n\nOrder now or schedule for later.\n\nASAP (~20 min)\nSchedule\nContact\nName *\nEmail\nPhone\nOrder notes\n\nBy placing this order, you agree that QA Bistro may use your contact and order details to prepare and fulfill your order. Supplify provides the ordering software. Read Supplify’s Privacy Policy and Terms.\n\nPlace order · 12.00"
+  },
+  {
+    "engine": "chromium",
+    "name": "checkout",
+    "width": 1194,
+    "errors": [],
+    "overflow": 0,
+    "controls": [
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 140,
+        "height": 36
+      },
+      {
+        "id": "",
+        "type": "select-one",
+        "width": 702,
+        "height": 39
+      }
+    ]
+  },
+  {
+    "engine": "chromium",
+    "name": "checkout-retry",
+    "requests": 2,
+    "sameKey": true
+  }
+]

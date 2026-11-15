@@ -1,0 +1,18 @@
+{
+  "id": "9d4474bc-6a54-4c28-b87e-60f095ac94bc",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "appVersion": "1.1.0",
+  "appBuildVersion": "24",
+  "createdAt": "2026-11-13T17:06:53.777Z",
+  "completedAt": "2026-11-13T17:19:52.437Z",
+  "artifacts": {
+    "buildUrl": "https://expo.dev/artifacts/eas/50LTd4MzzecDd2edx7SAtfVNOFH1340Amk0zfngS1PQ.apk",
+    "applicationArchiveUrl": "https://expo.dev/artifacts/eas/50LTd4MzzecDd2edx7SAtfVNOFH1340Amk0zfngS1PQ.apk"
+  },
+  "metrics": {
+    "buildWaitTime": 692,
+    "buildQueueTime": 6164,
+    "buildDuration": 771804
+  }
+}

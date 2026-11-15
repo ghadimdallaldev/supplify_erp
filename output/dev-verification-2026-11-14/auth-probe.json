@@ -1,0 +1,10 @@
+{
+  "environment": "Development",
+  "restaurant": "Hamra Bistro",
+  "grantStatus": 200,
+  "authenticated": true,
+  "meStatus": 200,
+  "role": "RESTAURANT",
+  "workspace": "ae465fb9-d2b6-5d47-af40-25b5c44968ab",
+  "userId": "0bac6409-86ed-5a4c-a103-51b9cfcba48b"
+}

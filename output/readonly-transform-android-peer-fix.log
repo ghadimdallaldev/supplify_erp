@@ -1,0 +1,23 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 244, reused 242, downloaded 1, added 0
+Progress: resolved 787, reused 773, downloaded 2, added 0
+Progress: resolved 787, reused 773, downloaded 3, added 0
+Progress: resolved 788, reused 774, downloaded 3, added 0
+Progress: resolved 789, reused 774, downloaded 3, added 0
+Progress: resolved 790, reused 776, downloaded 3, added 0
+Progress: resolved 791, reused 776, downloaded 3, added 0
+Progress: resolved 791, reused 777, downloaded 3, added 0
+ WARN  GET https://registry.npmjs.org/@babel%2Fplugin-syntax-export-default-from error (ECONNRESET). Will retry in 10 seconds. 2 retries left.
+Progress: resolved 792, reused 777, downloaded 3, added 0
+ WARN  5 deprecated subdependencies found: abab@2.0.6, domexception@4.0.0, glob@7.2.3, inflight@1.0.6, whatwg-encoding@2.0.0
+Packages: +7 -31
++++++++-------------------------------
+Progress: resolved 793, reused 779, downloaded 3, added 6
+Progress: resolved 793, reused 779, downloaded 3, added 7
+Progress: resolved 793, reused 779, downloaded 3, added 7, done
+
+devDependencies:
++ @react-native/metro-config 0.85.3 (0.88.1 is available)
++ react-test-renderer 19.2.3 (19.3.1 is available)
+
+Done in 12m 35.5s

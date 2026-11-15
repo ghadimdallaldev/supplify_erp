@@ -1,0 +1,44 @@
+
+Pruning release tree (tier=preprod)...
+
+removed docs
+removed .cursor
+removed scripts
+removed AGENTS.md
+removed CLAUDE.md
+removed .env.example
+removed src\config\env.test.ts
+removed src\features\auth\session.test.ts
+removed src\features\auth\sessionIsolation.test.ts
+removed src\features\auth\tokenStorage.test.ts
+removed src\features\publicShop\store.test.ts
+removed src\hooks\useEntitlements.test.ts
+removed src\hooks\useNetworkStatus.test.ts
+removed src\hooks\usePermissions.test.ts
+removed src\lib\cartCurrency.test.ts
+removed src\lib\dealDisplay.test.ts
+removed src\lib\orderQuantityRules.test.ts
+removed src\navigation\notificationNavigation.test.ts
+removed src\services\api\client.test.ts
+removed src\services\api\consumerCheckout.test.ts
+removed src\services\api\queries\auth.test.ts
+removed src\services\api\queries\keys.test.ts
+removed src\services\api\queries\orders.test.ts
+removed src\services\chatSocket.test.ts
+removed src\services\push.test.ts
+removed src\services\pushRegistration.test.ts
+removed src\store\cartStore.test.ts
+removed src\types\supplify.test.ts
+removed src\utils\deliveryEtaDisplay.test.ts
+removed src\utils\driverDeliveryUi.test.ts
+removed src\utils\driverSchedule.test.ts
+removed src\utils\format.test.ts
+removed src\utils\orderDisputeEligibility.test.ts
+removed src\utils\podConfirmation.test.ts
+removed src\utils\podValidation.test.ts
+removed src\utils\runSheetDate.test.ts
+wrote package.json
+wrote README.md
+
+Done. Review with `git status`, then commit.
+

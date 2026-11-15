@@ -1,0 +1,504 @@
+[
+  {
+    "surface": "web-orders-fixture",
+    "width": 390,
+    "errors": [],
+    "overflow": 0
+  },
+  {
+    "surface": "web-orders-fixture",
+    "width": 1440,
+    "errors": [],
+    "overflow": 0
+  },
+  {
+    "surface": "web",
+    "errors": [],
+    "text": "Supplify\nEnterprise ERP\nOVERVIEW\nRestaurant dashboard\nOPERATIONS\nOrders\nProducts\nMy Prices\nOrdering Lists\nCart\nQuote requests\nReceiving\nINTELLIGENCE\nSuppliers\nDeals\nChat\nACCOUNT\nInventory\nSettings\nHOSPITALITY ADD-ONS\nReservations\nStaff\nGuest menu\nGuest orders\nGuest rewards\nPU\nPilot UI fixture\nRestaurant\nINTELLIGENCE\nOrders\nPU\nOrders inbox\n\nAll team orders and delivery status\n\nCreate New Order\nAll Statuses\nPlaced\nAcknowledged\nProcessing\nShipped\nDelivered\nReceived (Partial)\nReceived (Full)\nInvoiced\nCompleted\nCancelled\nMore Filters\nAll Orders\nNew (Needs Action)\nProcessing\nShipped\nCompleted\n\nNo orders yet\n\nCreate your first order to get started.\n\nCreate first order\nHome\nOrders\nCart\nProducts\nChat",
+    "buttons": [
+      "OVERVIEW",
+      "OPERATIONS",
+      "INTELLIGENCE",
+      "ACCOUNT",
+      "HOSPITALITY ADD-ONS",
+      "Plans",
+      "Search products…⌘K",
+      "",
+      "PU",
+      "More Filters"
+    ],
+    "tabs": [
+      "All Orders",
+      "New (Needs Action)",
+      "Processing",
+      "Shipped",
+      "Completed"
+    ]
+  },
+  {
+    "surface": "native-cart-fixture",
+    "width": 320,
+    "errors": [],
+    "overflow": 0,
+    "buttons": [
+      {
+        "name": "Switch branch",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Notifications",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Resume cart2 lines · 2 supplier(s)",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "New order",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Quick lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "CCedar Foods1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Cedar Foods",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "BBekaa Produce1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Bekaa Produce",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Cart, 2 items",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "All",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "My lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Deals",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Today",
+        "width": 59.5625,
+        "height": 48
+      },
+      {
+        "name": "Tomorrow",
+        "width": 83.75,
+        "height": 48
+      },
+      {
+        "name": "+2 days",
+        "width": 70.859375,
+        "height": 48
+      },
+      {
+        "name": "Request supplier quotes",
+        "width": 288,
+        "height": 50
+      },
+      {
+        "name": "Place order",
+        "width": 288,
+        "height": 52
+      }
+    ],
+    "text": "Cart\nCart\n2 items · 2 suppliers\nE\nExtra virgin olive oil, restaurant pack\nCedar Foods\n$12.50 each\n\n1\n\nRemove\nF\nFresh seasonal Lebanese tomatoes\nBekaa Produce\nLBP 100,000 each\n\n1\n\nRemove\nSupplier subtotals\nCedar Foods\n$12.50\nBekaa Produce\nLBP 100,000\nFinal prices and availability are checked when you place the order. Different currencies are shown separately.\nCheckout creates one order per supplier automatically.\nPreferred delivery date\nToday\nTomorrow\n+2 days\nSuppliers may enforce a last-order cutoff. If you order past their cutoff, delivery rolls to the next eligible day.\n\nRequest supplier quotes\nEstimated totals by currency\n$12.50\nLBP 100,000\nPlace order"
+  },
+  {
+    "surface": "native-cart-fixture",
+    "width": 390,
+    "errors": [],
+    "overflow": 0,
+    "buttons": [
+      {
+        "name": "Switch branch",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Notifications",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Resume cart2 lines · 2 supplier(s)",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "New order",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Quick lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "CCedar Foods1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Cedar Foods",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "BBekaa Produce1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Bekaa Produce",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Cart, 2 items",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "All",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "My lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Deals",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Today",
+        "width": 59.5625,
+        "height": 48
+      },
+      {
+        "name": "Tomorrow",
+        "width": 83.75,
+        "height": 48
+      },
+      {
+        "name": "+2 days",
+        "width": 70.859375,
+        "height": 48
+      },
+      {
+        "name": "Request supplier quotes",
+        "width": 358,
+        "height": 50
+      },
+      {
+        "name": "Place order",
+        "width": 358,
+        "height": 52
+      }
+    ],
+    "text": "Cart\nCart\n2 items · 2 suppliers\nE\nExtra virgin olive oil, restaurant pack\nCedar Foods\n$12.50 each\n\n1\n\nRemove\nF\nFresh seasonal Lebanese tomatoes\nBekaa Produce\nLBP 100,000 each\n\n1\n\nRemove\nSupplier subtotals\nCedar Foods\n$12.50\nBekaa Produce\nLBP 100,000\nFinal prices and availability are checked when you place the order. Different currencies are shown separately.\nCheckout creates one order per supplier automatically.\nPreferred delivery date\nToday\nTomorrow\n+2 days\nSuppliers may enforce a last-order cutoff. If you order past their cutoff, delivery rolls to the next eligible day.\n\nRequest supplier quotes\nEstimated totals by currency\n$12.50\nLBP 100,000\nPlace order"
+  },
+  {
+    "surface": "native-cart-fixture",
+    "width": 768,
+    "errors": [],
+    "overflow": 0,
+    "buttons": [
+      {
+        "name": "Switch branch",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Notifications",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Resume cart2 lines · 2 supplier(s)",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "New order",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Quick lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "CCedar Foods1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Cedar Foods",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "BBekaa Produce1 product",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Follow Bekaa Produce",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Go back",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Cart, 2 items",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "All",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "My lists",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Deals",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "In cart 1, add another",
+        "width": 0,
+        "height": 0
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Decrease quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Increase quantity",
+        "width": 48,
+        "height": 48
+      },
+      {
+        "name": "Remove line",
+        "width": 56,
+        "height": 48
+      },
+      {
+        "name": "Today",
+        "width": 59.5625,
+        "height": 48
+      },
+      {
+        "name": "Tomorrow",
+        "width": 83.75,
+        "height": 48
+      },
+      {
+        "name": "+2 days",
+        "width": 70.859375,
+        "height": 48
+      },
+      {
+        "name": "Request supplier quotes",
+        "width": 736,
+        "height": 50
+      },
+      {
+        "name": "Place order",
+        "width": 736,
+        "height": 52
+      }
+    ],
+    "text": "Cart\nCart\n2 items · 2 suppliers\nE\nExtra virgin olive oil, restaurant pack\nCedar Foods\n$12.50 each\n\n1\n\nRemove\nF\nFresh seasonal Lebanese tomatoes\nBekaa Produce\nLBP 100,000 each\n\n1\n\nRemove\nSupplier subtotals\nCedar Foods\n$12.50\nBekaa Produce\nLBP 100,000\nFinal prices and availability are checked when you place the order. Different currencies are shown separately.\nCheckout creates one order per supplier automatically.\nPreferred delivery date\nToday\nTomorrow\n+2 days\nSuppliers may enforce a last-order cutoff. If you order past their cutoff, delivery rolls to the next eligible day.\n\nRequest supplier quotes\nEstimated totals by currency\n$12.50\nLBP 100,000\nPlace order"
+  },
+  {
+    "surface": "native-web-preview",
+    "errors": [],
+    "text": "Pilot UI fixture\n\nOwner\nSwitch branch\n\n0\nRecent open orders\n0\nReceiving queue\nOrder figures cover your 10 latest orders.\nUp next\n\nBrowse suppliers\nFind products and place an order\n\nQuick actions\n\nNew order\n\nQuick lists\nRECENT\n\nNo open orders\nOrders you place will appear here.\n\n\nHome\n\n\nOrders\n\n\nSuppliers\n\n\nMessages\n\n\nMore",
+    "buttons": [
+      "",
+      "",
+      "Remove",
+      "",
+      "",
+      "Remove",
+      "Today",
+      "Tomorrow",
+      "+2 days",
+      "Request supplier quotes",
+      "Place order"
+    ],
+    "tabs": []
+  }
+]

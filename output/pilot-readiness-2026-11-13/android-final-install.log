@@ -1,0 +1,13 @@
+(node:45404) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+- Downloading app (0 / 88.7 MB)
+√ Successfully downloaded app 6m 1s
+
+Using open emulator: Supplify_API_35
+
+Installing your app...
+√ Successfully installed your app!
+
+Starting your app...
+√ Successfully started your app!

@@ -1,0 +1,12 @@
+[
+  "/api/fulfillment/drivers",
+  "/api/restaurants",
+  "/api/notifications/preferences",
+  "/api/supplier/public-sales",
+  "/api/supplier/run-sheet",
+  "/api/supplier/invoices/receivables",
+  "/api/restaurant-pricing",
+  "/api/loyalty/supplier/program",
+  "/api/loyalty/supplier/balances",
+  "/api/reports/supplier/revenue-trend"
+]

@@ -1,0 +1,30 @@
+{
+  "buildId": "b5bcb76b-d869-4c7c-9844-046348170400",
+  "installation": "update install succeeded without data clearing",
+  "coldLaunch": "Status ok; 1886 ms measurement is a single launch only",
+  "identity": "Development Keycloak form loaded; no credentials entered",
+  "captures": [
+    {
+      "label": "launch",
+      "issues": []
+    },
+    {
+      "label": "signin-handoff",
+      "issues": []
+    },
+    {
+      "label": "signin-loaded",
+      "issues": []
+    },
+    {
+      "label": "native-landscape",
+      "issues": []
+    },
+    {
+      "label": "native-large-text",
+      "issues": []
+    }
+  ],
+  "scope": "Signed-out shell and identity handoff only; operational workflows and physical device UAT pending",
+  "displaySettingsRestored": true
+}
