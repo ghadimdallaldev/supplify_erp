@@ -76,7 +76,7 @@ The inventory / reorder-assistance Ask box routes to this assistant (`POST /api/
 
 - `POST /api/assistant/messages` accepts optional `attachments` alongside `conversationId` and `message`.
 - Web, Android, and iOS assistant composers accept up to five JPEG, PNG, WebP, or PDF files, with a 10 MB limit per file. Files use the authenticated presign/upload gateway and are persisted on the user message.
-- Image attachments are supplied to the multimodal model. PDF attachments remain available on the message and are identified to the assistant by filename and type; this release does not extract arbitrary PDF text.
+- Image attachments are supplied to the multimodal model. PDF bytes are supplied as inline model input after ownership, MIME, size, and clean-read checks. Unreadable/unsupported files produce an explicit error. Document values remain separate from verified catalog prices and stock.
 - Follow questions use `get_followed_suppliers`, which reads the exact active restaurant/organization follow scope instead of inferring follows from catalog results.
 - Common-product price questions use `compare_supplier_prices`. Comparison is deliberately conservative: normalized product name, unit, brand, and currency must match, and at least two followed supplier organizations must have a current offer.
 - Human B2B chat remains separate from the assistant, but its normal message composer also supports the same image/PDF file rules on web, Android, and iOS.
@@ -105,3 +105,36 @@ Reuses existing AI vars: `AI_ENABLED`, `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_MODE
 
 - [ai-smart-reorder.md](./ai-smart-reorder.md) — reorder LLM (not this chatbot)
 - Feature flag `ai_assistant` for this chatbot; `ai_platform` remains the separate Smart Reorder LLM flag.
+
+## 2026-11-14 read-only improvements
+
+The Assistant stays read-only against business records. The action-taking design
+is preserved in [the deferred roadmap](./ai-assistant-action-roadmap.md). Plan,
+permission, provider, and per-user quota rules remain unchanged.
+
+- Restaurant spend is grouped by currency, excludes cancelled/draft purchases,
+  and counts currently open orders separately from recent activity.
+- Supplier overview adds preparation/transit workload and recent sales by currency
+  with ORDERS_VIEW. Other domains retain their own permission/feature gates.
+- Catalog search requires CATALOG_VIEW. Restaurant matches come from followed,
+  non-blocked supplier organizations; supplier matches stay in its own catalog.
+  Identity lookup/catalog comparison is not a checkout price guarantee.
+- Reservation summaries require RESERVATIONS_VIEW, validate branch ownership, and
+  return full local-day status/cover counts separately from a limited guest list.
+  Availability uses the shared restaurant-wide engine; it never creates a booking.
+- Results add evidence with retrieval time, scope, status, completeness, and an
+  allowlisted source destination. It persists in sources[].evidence. A capped list
+  is not a total; a failed lookup is not zero or verified live data.
+- The latest 16 messages carry bounded historical record references. Changing facts
+  are queried again on follow-up; recent attachments are re-read with ownership checks.
+- History defaults to the latest 50 messages, chronologically. Optional limit
+  (1–50) and before (message UUID) load earlier pages. Responses add hasMore and
+  nextBefore; cursors remain scoped to conversation owner/workspace.
+- Web/Android/iOS add conversation selection, readable sources/times, role-specific
+  starters, and Arabic controls. Web supports copying; native supports selectable
+  text and the system share/copy sheet. Context clears across account/workspace changes.
+- Reorder answers consume the same enriched snapshot as inventory guidance. No
+  assistant tool submits purchases or other operational writes.
+
+Real document compatibility and answer quality require a deployed provider pilot.
+Repository checks do not prove live model quality or physical-device behavior.

@@ -519,7 +519,9 @@
     "title": "Customer follow-up",
     "description": "Restaurants that missed expected orders or may need a reorder nudge",
     "empty": "No follow-up suggestions right now",
-    "churnRisk": "Churn risk",
+    "churnRisk": "Longer ordering gap",
+    "evidence": "{{count}} orders · usually every {{interval}} days · {{elapsed}} days since last order",
+    "limitedHistory": "Limited history. Review the customer's needs before following up.",
     "urgency": {
       "HIGH": "High",
       "MEDIUM": "Medium",

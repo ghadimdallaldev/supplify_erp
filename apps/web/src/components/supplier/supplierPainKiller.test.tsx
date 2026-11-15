@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { SupplierReceivablesPanel } from './SupplierReceivablesPanel'
+import { SupplierFollowUpPanel } from './SupplierFollowUpPanel'
 import { SupplierCommandCenterPage } from '../../pages/SupplierCommandCenterPage'
 import { SupplierRunSheetPage } from '../../pages/SupplierRunSheetPage'
 import { renderWithProviders } from '../../test/utils'
@@ -11,6 +12,7 @@ const mockCommandCenter = vi.fn()
 const mockAtRisk = vi.fn()
 const mockEntitlements = vi.fn()
 const mockCreateDraft = vi.fn()
+const mockFollowUps = vi.fn()
 const mockSlowMoving = vi.fn()
 const mockDemandForecast = vi.fn()
 const mockStockoutRisks = vi.fn()
@@ -53,6 +55,8 @@ vi.mock('../../services/api', async (importOriginal) => {
     useGetSupplierWeeklyIntelligenceSummaryQuery: (...args: unknown[]) =>
       mockWeeklySummary(...args),
     useCreateReorderReminderDraftMutation: () => [mockCreateDraft, { isLoading: false }],
+    useGetSupplierReorderAssistanceQuery: (...args: unknown[]) => mockFollowUps(...args),
+    useSendReorderReminderDraftMutation: () => [vi.fn(), { isLoading: false }],
     useSendInvoiceReminderMutation: () => [vi.fn(), { isLoading: false }],
     useRemindOverdueInvoicesMutation: () => [vi.fn(), { isLoading: false }],
   }
@@ -71,6 +75,7 @@ describe('supplier pain-killer UI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDrivers.mockReturnValue({ data: { drivers: [] } })
+    mockFollowUps.mockReturnValue({ data: { suggestions: [] } })
     mockEntitlements.mockReturnValue({ data: { entitlements: { features: {} } } })
     mockAtRisk.mockReturnValue({ data: { orders: [] } })
     mockSlowMoving.mockReturnValue({
@@ -121,6 +126,37 @@ describe('supplier pain-killer UI', () => {
       isFetching: false,
       refetch: vi.fn(),
     })
+  })
+
+  it('shows supplier timing evidence without drafting or sending automatically', () => {
+    mockEntitlements.mockReturnValue({
+      data: { entitlements: { features: { smart_reorder: true } } },
+    })
+    mockFollowUps.mockReturnValue({
+      data: {
+        suggestions: [
+          {
+            id: 'follow-1',
+            restaurantId: 'r1',
+            restaurantName: 'Bistro',
+            reasonCode: 'churn_risk',
+            reasonLabel: 'Longer than usual since the last order',
+            urgency: 'HIGH',
+            orderCount: 2,
+            avgDaysBetween: 10,
+            daysSinceLastOrder: 30,
+            dataQuality: 'poor',
+          },
+        ],
+      },
+    })
+    renderWithProviders(<SupplierFollowUpPanel />)
+    expect(screen.getByText('Longer ordering gap')).toBeInTheDocument()
+    expect(
+      screen.getByText('2 orders · usually every 10 days · 30 days since last order')
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Limited history/)).toBeInTheDocument()
+    expect(mockCreateDraft).not.toHaveBeenCalled()
   })
 
   it('SupplierReceivablesPanel shows empty state when no unpaid invoices', () => {

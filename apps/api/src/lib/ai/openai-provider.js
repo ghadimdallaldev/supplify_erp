@@ -115,22 +115,30 @@ export function createOpenAiProvider() {
           toolCalls.map(async (call) => {
             const name = call.function?.name || 'unknown'
             let args = {}
+            let invalidArguments = false
             try {
               args = JSON.parse(call.function?.arguments || '{}')
             } catch {
-              args = {}
+              invalidArguments = true
             }
 
             let result
             let ok = true
             try {
+              if (invalidArguments) throw new Error('Invalid tool arguments')
               result = await executeTool(name, args)
+              ok = !result?.error && result?.evidence?.status !== 'unavailable'
             } catch (err) {
               ok = false
               result = { error: err?.message || 'Tool failed' }
             }
             return {
-              source: { tool: name, args, ok },
+              source: {
+                tool: name,
+                args,
+                ok,
+                ...(result?.evidence ? { evidence: result.evidence } : {}),
+              },
               message: {
                 role: 'tool',
                 tool_call_id: call.id,

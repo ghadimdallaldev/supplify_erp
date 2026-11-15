@@ -1,5 +1,30 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-15 - All-role mobile design transformation
+
+Android and iOS share the new violet/light presentation, reactive English/Arabic
+copy, adaptive navigation, tablet layouts, controls, sheets, motion, and role
+screens. Restaurant navigation prioritizes Home, Suppliers, Orders, Messages,
+and More; reservations remain directly reachable. The existing read-only
+Assistant/reorder work is preserved. No backend endpoint, auth/session contract,
+permission key, feature key, notification payload, or required environment
+variable changed. Local client query-enablement options remain wire-compatible.
+
+Both native repositories were updated. The user requested an Android **dev APK
+only**; iOS source/type/test parity is required while native iOS builds and device
+checks are deferred. The obsolete npm locks were removed; pnpm is pinned in EAS
+and the promotion/pruning scripts now use the pnpm lockfile.
+
+The signed Android dev APK was built and installed on an emulator. Its embedded
+URLs and real sign-in handoff target Development. Native checks cover the
+signed-out shell; live operational/device UAT remains separate. Motion uses
+React Native's built-in native driver and Gesture Handler, avoiding the new
+Reanimated/Worklets imports affected by SDK 56's upstream Hermes regression.
+
+See [implementation and verification record](MOBILE_UI_TRANSFORMATION_2026-11-15.md)
+and [screen inventory](MOBILE_UI_SCREEN_INVENTORY_2026-11-15.md). Exact build and
+final validation evidence is recorded there before handoff.
+
 Web = full cockpit. Mobile v1 = operational app. Driver mobile = complete and simple.
 
 ## 2026-11-14 - Development verification and unconfigured public booking
@@ -2127,3 +2152,29 @@ Stripe-like shared email layout, OTP code hero, optional detail strips, and EN/A
 - **Native verification:** both `C:/myProjects/supplify-mobile` and `C:/myProjects/supplify-mobile-ios` already read local bytes before POD presign and send `prepared.bytes`; their generic attachment upload services send `file.size`. No request/response shape, API path, auth flow, permission key, feature key, notification payload, or required environment variable changed.
 - **Parity decision:** no native source edit is required. The server-side fallback only hardens malformed or omitted sizes; compliant native calls retain the same contract and behavior.
 - **Web-only cleanup:** removed an unused order-tracking subscription from the web order-detail page and an unused translation hook from the supplier placement panel. Native screens and API contracts are unaffected.
+
+## 2026-11-14 - Read-only Assistant and reorder guidance
+
+Both sibling repositories receive matching Assistant/source/message types, scoped
+history queries, selection/pagination, PDF input, role-specific starters, evidence
+status/times, selectable answers, and system share/copy controls. New English/Arabic
+strings match. Conversation scope is keyed by user/workspace; stale async results
+are ignored.
+
+Both native Inventory screens consume the existing reorder-assistance endpoint and
+shared types. Stock, incoming, usage, and net need are displayed. Wait/review results
+cannot add purchases. Manual additions recheck price/stock and pending checkout,
+preserve quantity, and require list selection. No assistant write endpoint, auth
+change, permission/feature key, or env var is introduced. Plan access is unchanged;
+driver conversational access remains off.
+
+Supplier follow-up evidence contracts and a scoped read query are mirrored in both
+native clients. The dedicated supplier follow-up panel remains an existing web
+surface; this change adds no native sending controls. Supplier cadence corrections
+are server-side and apply to all consumers. No migration or new dependency is required.
+
+Local verification covers source changes; hosted environments and installed native
+binaries require a separate release. See [Assistant](../features/ai-assistant.md),
+[reorder](../features/ai-smart-reorder.md), and [roadmap](../features/ai-assistant-action-roadmap.md).
+Verification evidence and remaining device/provider checks are recorded in the
+[2026-11-14 verification report](../operations/READ_ONLY_ASSISTANCE_VERIFICATION_2026-11-14.md).

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { AssistantFab } from './AssistantFab'
@@ -24,6 +26,8 @@ vi.mock('../../hooks/useImpersonation', () => ({
  * endpoint: `{ entitlements: { features } }`.
  */
 let entitlementsPayload: unknown = { entitlements: { features: { ai_assistant: true } } }
+let savedMessages: unknown[] = []
+const sendMessage = vi.fn()
 
 vi.mock('../../services/api', () => ({
   useGetEntitlementsQuery: () => ({ data: entitlementsPayload }),
@@ -31,8 +35,12 @@ vi.mock('../../services/api', () => ({
     data: { enabled: true, tools: ['get_inventory'], quotaRemaining: 5 },
     isFetching: false,
   }),
-  useGetAssistantMessagesQuery: () => ({ data: { messages: [] } }),
-  useSendAssistantMessageMutation: () => [vi.fn(), { isLoading: false }],
+  useGetAssistantMessagesQuery: () => ({ currentData: { messages: savedMessages } }),
+  useGetAssistantConversationsQuery: () => ({
+    data: { conversations: [{ id: 'conv1', title: 'Earlier conversation' }] },
+  }),
+  useGetPresignedUrlMutation: () => [vi.fn()],
+  useSendAssistantMessageMutation: () => [sendMessage, { isLoading: false }],
 }))
 
 // planLimits is deliberately NOT mocked. Stubbing featureEnabled to always
@@ -46,7 +54,9 @@ function renderWithAuth(role = 'RESTAURANT') {
   })
   return render(
     <Provider store={store}>
-      <AssistantFab />
+      <MemoryRouter>
+        <AssistantFab />
+      </MemoryRouter>
     </Provider>
   )
 }
@@ -54,6 +64,9 @@ function renderWithAuth(role = 'RESTAURANT') {
 describe('AssistantFab', () => {
   beforeEach(() => {
     cleanup()
+    savedMessages = []
+    sendMessage.mockReset()
+    Element.prototype.scrollIntoView = vi.fn()
     entitlementsPayload = { entitlements: { features: { ai_assistant: true } } }
   })
 
@@ -101,5 +114,50 @@ describe('AssistantFab', () => {
     entitlementsPayload = undefined
     renderWithAuth('ADMIN')
     expect(screen.getByTestId('assistant-fab')).toBeInTheDocument()
+  })
+
+  it('restores a saved conversation and clearly labels failed and limited sources', async () => {
+    savedMessages = [
+      {
+        id: 'm1',
+        role: 'assistant',
+        content: 'A limited result',
+        toolPayload: {
+          sources: [
+            {
+              tool: 'get_inventory',
+              ok: true,
+              evidence: {
+                href: '/app/restaurant-inventory',
+                fetchedAt: '2026-11-14T12:00:00Z',
+                limited: true,
+              },
+            },
+            { tool: 'get_invoices', ok: false },
+          ],
+        },
+      },
+    ]
+    renderWithAuth()
+    await userEvent.click(screen.getByTestId('assistant-fab'))
+    await userEvent.click(screen.getByRole('button', { name: 'history' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Earlier conversation' }))
+    expect(screen.getByText('A limited result')).toBeInTheDocument()
+    expect(screen.getByText('limitedResults')).toBeInTheDocument()
+    expect(screen.getByText(/sourceUnavailable/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'sources.get_inventory' })).toHaveAttribute(
+      'href',
+      '/app/restaurant-inventory'
+    )
+  })
+
+  it('keeps the draft available when a send fails', async () => {
+    sendMessage.mockReturnValue({ unwrap: () => Promise.reject(new Error('network')) })
+    renderWithAuth()
+    await userEvent.click(screen.getByTestId('assistant-fab'))
+    await userEvent.type(screen.getByTestId('assistant-input'), 'What needs attention?')
+    await userEvent.click(screen.getByTestId('assistant-send'))
+    expect(await screen.findByText('error')).toBeInTheDocument()
+    expect(screen.getByTestId('assistant-input')).toHaveValue('What needs attention?')
   })
 })

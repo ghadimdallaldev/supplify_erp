@@ -52,6 +52,18 @@ export interface ReorderAssistanceItem {
   urgency: string
   suggestedQty?: number | null
   currentQty?: number
+  action?: 'order' | 'wait' | 'manual_review'
+  incomingQty?: number | null
+  uncertainIncomingQty?: number
+  overdueIncomingQty?: number
+  expectedUsage?: number | null
+  netNeed?: number | null
+  coverageDays?: number
+  dataQuality?: 'good' | 'fair' | 'poor'
+  stockScope?: 'restaurant' | 'branch'
+  asOf?: string
+  orderBy?: string | null
+  warnings?: string[]
   expiryDate?: string
   scopeType: 'product' | 'cadence' | 'supplier_product'
   scopeId: string
@@ -160,6 +172,11 @@ export interface ReorderAiAskResult {
 export interface ReorderAssistanceResponse {
   suggestions: ReorderAssistanceItem[]
   total: number
+  hasMore?: boolean
+  asOf?: string
+  timeZone?: string
+  incomingKnown?: boolean
+  fetchedAt?: string
   smartReorder?: {
     tier: string
     capabilities: Record<string, boolean>
@@ -171,4 +188,40 @@ export interface ReorderAssistanceResponse {
     canAskLlm: boolean
   }
   forecasts?: ReorderForecast[]
+}
+
+export interface SupplierReorderEvidence {
+  source: 'intelligence' | 'cadence'
+  orderCount?: number
+  lookbackDays?: number
+  avgDaysBetween?: number
+  daysSinceLastOrder?: number
+  lastOrderAt?: string
+  cadenceId?: string
+  label?: string
+  dayName?: string
+}
+
+export interface SupplierReorderAssistanceItem {
+  id: string
+  restaurantId: string
+  restaurantName: string
+  reasonCode: string
+  reasonLabel: string
+  detail?: string
+  urgency: string
+  sources: string[]
+  orderCount?: number
+  avgDaysBetween?: number
+  daysSinceLastOrder?: number
+  lastOrderAt?: string
+  dataQuality?: 'fair' | 'poor'
+  evidence?: SupplierReorderEvidence[]
+}
+
+export interface SupplierReorderAssistanceResponse {
+  suggestions: SupplierReorderAssistanceItem[]
+  total: number
+  graceDays: number
+  fetchedAt?: string
 }

@@ -1,4 +1,4 @@
-# HORECA Launch Experience: Progress Log
+﻿# HORECA Launch Experience: Progress Log
 
 Plan: `C:\Users\ghadi.mdallal\.claude\plans\vectorized-greeting-mccarthy.md`
 Video project: `C:\myProjects\video-studio` (Remotion, HyperFrames, GSAP, agent skills)
@@ -138,3 +138,10 @@ Project: `C:\myProjects\video-studio` (Remotion 4.0.542). README there has the f
 - Truth: all UI is coded after product tokens (no screenshots, labelled as coded in the README), verified lifecycle only, no billing/WhatsApp/turn-by-turn/prices/stats/testimonials/partnerships; "HORECA Beirut 2026" is an event label only. The Settings (accent colour + logo) beat was dropped for pacing.
 - Audio: Kokoro `af_heart` (not judged by ear), WhisperX forced alignment drives captions and animation cues, synthesised 120 BPM music and about 190 SFX; measured -16.0 LUFS, peak about -2.2 dBFS, VAD: 116/116 word onsets in speech.
 - Not done: listening check, real-phone playback. Known nits are listed in `README-v3.md`.
+
+## Film v3_polished (2026-11-11): polish pass, separate video
+
+- V3 files and compositions untouched. Polished project: `C:\myProjects\video-studio` `src/v3_polished/` (compositions `V3PPortrait`, `V3PLandscape`), scripts `scripts/v3p/`, outputs `video-studio/out/v3_polished/` (`supplify-v3_polished-portrait-1080x1920.mp4`, `-landscape-1920x1080.mp4`, `-web.mp4` + poster, `-hero-loop.mp4`, EN srt/vtt/transcript, thumbnails, contact sheets, char/prop sheets, V3-vs-polished before/after for both orientations, audio). Details and reproduce steps: `video-studio/README-v3-polished.md`. Not copied into `apps/horeca-experience/public/media`.
+- Fixes: empty frames filled with story content (status-update wipe, portrait BUILD cart, portrait warehouse boards, end card with the four roles); UI text rewritten at 18 px+ logical (about 24 to 26 px final on the key screens); landscape steps split layout with the caption in the right half and characters raised above caption zones; chaos before the logo extended from about 1 s to 2.7 s (cuts rebalanced, 60.000 s kept); added anticipation/reaction gags for all characters.
+- Audio re-synced to the retimed scenes (same voice and aligned words; music sections and 249 SFX regenerated). Measured -16.0 LUFS (MP4 AAC), peak -1.8 dBFS, Earshot: 116/116 word onsets in speech, no uncovered speech.
+- Checked: preview contact sheets on both orientations, 5 frames through each of the 11 transitions (portrait final; landscape render just before two small last tweaks), close-ups of end cards/door scene. Not done: listening check, real-phone playback. Remaining nits are listed in the README.

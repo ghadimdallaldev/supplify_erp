@@ -44,12 +44,24 @@ describe('supplier-reorder-assistance.service', () => {
     expect(result.suggestions.find((s) => s.restaurantId === 'r1')?.reasonCode).toBe(
       'missed_pattern'
     )
+    expect(result.suggestions.find((s) => s.restaurantId === 'r1')).toMatchObject({
+      orderCount: 5,
+      dataQuality: 'fair',
+      evidence: [
+        expect.objectContaining({
+          source: 'intelligence',
+          orderCount: 5,
+          avgDaysBetween: 10,
+          lookbackDays: 180,
+        }),
+      ],
+    })
     expect(result.suggestions.find((s) => s.restaurantId === 'r2')?.reasonCode).toBe(
       'cadence_missed'
     )
   })
 
-  it('flags churn risk when gap exceeds 1.5x average interval', async () => {
+  it('retains the compatibility reason code without claiming predicted churn', async () => {
     vi.doMock('./supplier-reorder-intelligence.service.js', () => ({
       getReorderIntelligence: vi.fn(async () => ({
         graceDays: 7,
@@ -75,5 +87,45 @@ describe('supplier-reorder-assistance.service', () => {
     )
     const result = await getSupplierReorderAssistance('s1')
     expect(result.suggestions[0].reasonCode).toBe('churn_risk')
+    expect(result.suggestions[0].reasonLabel).toBe('Longer than usual since the last order')
+    expect(result.suggestions[0].dataQuality).toBe('poor')
+  })
+
+  it('deduplicates customers and source labels while preserving distinct cadence evidence', async () => {
+    vi.doMock('./supplier-reorder-intelligence.service.js', () => ({
+      getReorderIntelligence: vi.fn(async () => ({ graceDays: 7, customersAtRisk: [] })),
+    }))
+    vi.doMock('./reorder-cadence.service.js', () => ({
+      listSupplierAtRisk: vi.fn(async () => [
+        {
+          restaurantId: 'r1',
+          restaurantName: 'Bistro',
+          cadenceId: 'c1',
+          label: 'Milk',
+          dayName: 'Monday',
+        },
+        {
+          restaurantId: 'r1',
+          restaurantName: 'Bistro',
+          cadenceId: 'c1',
+          label: 'Milk',
+          dayName: 'Monday',
+        },
+        {
+          restaurantId: 'r1',
+          restaurantName: 'Bistro',
+          cadenceId: 'c2',
+          label: 'Eggs',
+          dayName: 'Monday',
+        },
+      ]),
+    }))
+    const { getSupplierReorderAssistance } = await import(
+      './supplier-reorder-assistance.service.js'
+    )
+    const result = await getSupplierReorderAssistance('s1')
+    expect(result.suggestions).toHaveLength(1)
+    expect(result.suggestions[0].sources).toEqual(['cadence'])
+    expect(result.suggestions[0].evidence).toHaveLength(2)
   })
 })

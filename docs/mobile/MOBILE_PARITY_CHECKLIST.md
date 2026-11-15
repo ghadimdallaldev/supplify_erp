@@ -1,5 +1,20 @@
 # Mobile Parity Checklist
 
+## 2026-11-15 - All-role mobile design transformation
+
+- [x] Shared design system, controls, role navigation, and screen migration mirrored.
+- [x] English/Arabic copy and locale-aware presentation mirrored.
+- [x] Reservation date/time, details, table assignment, and existing status contracts preserved.
+- [x] Existing read-only Assistant and reorder protections retained.
+- [x] No new backend/auth/RBAC/feature/notification contract or environment variable.
+- [x] Native source/dependency parity and dated implementation documentation.
+- [x] Android and iOS regression suites pass (34 suites / 125 tests each).
+- [x] Android and iOS typechecks, ERP root typecheck, and Expo compatibility checks pass.
+- [x] Rendered route review passes 137 cases using isolated fixtures.
+- [x] Forty additional responsive cases pass; calendar/time selection, search, and Arabic draft retention verified on phone/tablet layouts.
+- [x] Android dev APK downloaded, checksummed, installed, and cold-launched; development identity handoff and native sign-in responsive layouts checked. See transformation record for scope and artifact.
+- [ ] Native iOS/device validation deferred at the user's request.
+
 Use on every web/API PR that touches orders, auth, fulfillment, tracking, or RBAC.
 
 ## 2026-11-13 - iPad and guest-flow repair
@@ -145,3 +160,12 @@ Mobile repos: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/suppl
 - [x] API focused routing, location, stock, catalog, and idempotency tests pass.
 - [x] Mobile typechecks run for Android and iOS.
 - [x] 2026-09-21 — Supplier product category contract (category `supplier_id` plus list/create/delete clients) synchronized in Android and iOS; full catalog management remains web-linked in the current mobile product screen.
+
+## 2026-11-14 read-only assistance
+
+- [x] Additive Assistant evidence and history contracts mirrored in Android/iOS.
+- [x] Conversation restoration/pagination, PDF input, role-specific starters, Arabic,
+      source status, and share/copy controls mirrored.
+- [x] Shared reorder snapshot and Inventory guidance mirrored; wait/review purchases disabled.
+- [x] Existing ai_assistant and domain permission/feature gates retained; no driver Assistant.
+- [x] Dated parity entry and Assistant/reorder/roadmap documentation updated.

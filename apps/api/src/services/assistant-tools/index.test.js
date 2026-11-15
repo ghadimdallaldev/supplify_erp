@@ -698,6 +698,6 @@ describe('supplier weekly-summary Assistant tool', () => {
       { days: 999 }
     )
     expect(getSupplierWeeklyIntelligenceSummary).toHaveBeenCalledWith('supplier-1', { days: 31 })
-    expect(result).toEqual({ summary: {} })
+    expect(result).toMatchObject({ summary: {}, evidence: { status: 'ok', scope: 'SUPPLIER' } })
   })
 })

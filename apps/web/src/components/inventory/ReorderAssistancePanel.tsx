@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -34,10 +34,12 @@ import {
   HelpCircle,
   MessageSquare,
   Flag,
+  RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
 import { getUsageMeterDisplay } from '../../lib/usageDisplay'
+import { usePermissions } from '../../hooks/usePermissions'
 import type {
   ReorderAiAskResult,
   ReorderAiExplainResult,
@@ -77,14 +79,14 @@ function resolveItemForecast(
 function formatForecastConfidence(confidence?: number | null): string | null {
   if (confidence == null || !Number.isFinite(confidence)) return null
   const pct = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence)
-  return `${pct}% confidence`
+  return pct >= 75 ? 'Strong data' : pct >= 35 ? 'Limited data' : 'Review data'
 }
 
 function formatReorderByDate(date?: string | null): string | null {
   if (!date) return null
-  const parsed = new Date(date)
+  const parsed = new Date(date.length === 10 ? `${date}T12:00:00Z` : date)
   if (Number.isNaN(parsed.getTime())) return null
-  return `Reorder by ${parsed.toLocaleDateString()}`
+  return parsed.toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 
 function recommendationLabel(source?: string): string {
@@ -92,8 +94,15 @@ function recommendationLabel(source?: string): string {
 }
 
 function resolveQty(item: ReorderAssistanceItem, recommendation?: ReorderAiRecommendation): number {
-  const quantity = Number(recommendation?.recommendedQuantity ?? item.suggestedQty ?? 1)
-  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1
+  if (
+    item.action === 'wait' ||
+    item.action === 'manual_review' ||
+    recommendation?.action === 'wait' ||
+    recommendation?.action === 'manual_review'
+  )
+    return 0
+  const quantity = Number(recommendation?.recommendedQuantity ?? item.suggestedQty ?? 0)
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 0
 }
 
 const REASON_STYLES: Record<string, string> = {
@@ -118,8 +127,11 @@ export function ReorderAssistancePanel({
   maxItems,
   className,
 }: ReorderAssistancePanelProps) {
-  const { t } = useTranslation('inventory')
-  const { data, isLoading, isError, refetch } = useGetReorderAssistanceQuery()
+  const { t, i18n } = useTranslation('inventory')
+  const { can } = usePermissions()
+  const canOrder = can('ORDERS_CREATE')
+  const canManage = can('INVENTORY_MANAGE')
+  const { data, isLoading, isFetching, isError, refetch } = useGetReorderAssistanceQuery()
   const { data: entitlementsData } = useGetEntitlementsQuery()
   const { data: quickListsData } = useGetQuickListsQuery()
   const [suppressSuggestion, { isLoading: isSuppressing }] = useSuppressReorderSuggestionMutation()
@@ -146,11 +158,33 @@ export function ReorderAssistancePanel({
   const [recommendationsByProduct, setRecommendationsByProduct] = useState<
     Record<string, ReorderAiRecommendation>
   >({})
-  const recommendAttemptKey = useRef<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [supplierFilter, setSupplierFilter] = useState('all')
 
   const suggestions = useMemo(() => data?.suggestions ?? [], [data])
   const forecasts = data?.forecasts ?? []
-  const visible = maxItems ? suggestions.slice(0, maxItems) : suggestions
+  const getAction = (item: ReorderAssistanceItem) =>
+    item.action === 'manual_review' || item.action === 'wait'
+      ? item.action
+      : (item.productId ? recommendationsByProduct[item.productId]?.action : undefined) ||
+        item.action
+  const filtered = suggestions
+    .filter(
+      (item) =>
+        (!search ||
+          `${item.productName} ${item.supplierName || ''}`
+            .toLocaleLowerCase()
+            .includes(search.toLocaleLowerCase())) &&
+        (actionFilter === 'all' || getAction(item) === actionFilter) &&
+        (supplierFilter === 'all' || item.supplierId === supplierFilter)
+    )
+    .sort(
+      (a, b) =>
+        (a.supplierName || '').localeCompare(b.supplierName || '') ||
+        a.productName.localeCompare(b.productName)
+    )
+  const visible = maxItems ? filtered.slice(0, maxItems) : filtered
   const canExplain = data?.smartReorder?.capabilities?.forecast === true
   const canAsk = data?.smartReorder?.capabilities?.seasonality === true
   const canExplainLlm = data?.ai?.canExplainLlm === true
@@ -185,43 +219,20 @@ export function ReorderAssistancePanel({
     [suggestions]
   )
 
-  useEffect(() => {
-    if (!canExplainLlm || !productIdsKey) {
-      setRecommendationsByProduct({})
-      recommendAttemptKey.current = null
-      return
+  const handleAiReview = async () => {
+    if (!canExplainLlm || !productIdsKey || isAiRecommending) return
+    try {
+      const result = await aiRecommend({ productIds: productIdsKey.split(','), limit: 8 }).unwrap()
+      setRecommendationsByProduct(
+        Object.fromEntries(
+          (result.recommendations || []).map((rec) => [String(rec.productId), rec])
+        )
+      )
+      if (result.usageLimited) toast.message(t('toast.aiDailyLimitReached'))
+    } catch {
+      toast.error(t('guidance.aiFailed'))
     }
-    if (recommendAttemptKey.current === productIdsKey) return
-    recommendAttemptKey.current = productIdsKey
-
-    const productIds = productIdsKey.split(',').filter(Boolean)
-    let cancelled = false
-    ;(async () => {
-      try {
-        const result = await aiRecommend({
-          productIds,
-          limit: Math.min(8, productIds.length),
-        }).unwrap()
-        if (cancelled) return
-        if (result.usageLimited) {
-          toast.message(t('toast.aiDailyLimitReached'))
-        }
-        const map: Record<string, ReorderAiRecommendation> = {}
-        for (const rec of result.recommendations || []) {
-          if (rec.productId) map[String(rec.productId)] = rec
-        }
-        setRecommendationsByProduct(map)
-      } catch {
-        if (!cancelled) {
-          setRecommendationsByProduct({})
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [canExplainLlm, productIdsKey, aiRecommend, t])
+  }
 
   const handleSnooze = async (item: (typeof suggestions)[0]) => {
     try {
@@ -297,6 +308,10 @@ export function ReorderAssistancePanel({
     try {
       const rec = recommendationsByProduct[String(item.productId)]
       const qty = resolveQty(item, rec)
+      if (qty <= 0) {
+        toast.message(t('guidance.reviewBeforeOrdering'))
+        return
+      }
       await addItemToQuickList({
         quickListId: selectedList.id,
         body: {
@@ -432,12 +447,12 @@ export function ReorderAssistancePanel({
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Sparkles className="h-4 w-4 text-[var(--brand-mid)]" />
-                Reorder assistance
+                {t('guidance.title')}
               </CardTitle>
               {!compact && (
                 <CardDescription>
-                  Suggestions based on stock levels, expiry, order patterns, and forecasts
-                  {isAiRecommending ? ' · Loading AI recommendations…' : ''}
+                  {t('guidance.description')}
+                  {isAiRecommending ? ` · ${t('guidance.aiLoading')}` : ''}
                 </CardDescription>
               )}
             </div>
@@ -451,9 +466,90 @@ export function ReorderAssistancePanel({
                     ?.scrollIntoView({ behavior: 'smooth' })
                 }
               >
-                View all
+                {t('guidance.viewAll')}
               </Button>
             )}
+          </div>
+          {!compact && (
+            <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <Label htmlFor="reorder-search">{t('guidance.search')}</Label>
+                <Input
+                  id="reorder-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="reorder-status">{t('guidance.status')}</Label>
+                <Select value={actionFilter} onValueChange={setActionFilter}>
+                  <SelectTrigger id="reorder-status">
+                    <option value="all">{t('guidance.all')}</option>
+                    {['order', 'wait', 'manual_review'].map((action) => (
+                      <option key={action} value={action}>
+                        {t(`guidance.actions.${action}`)}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="reorder-supplier">{t('guidance.supplier')}</Label>
+                <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+                  <SelectTrigger id="reorder-supplier">
+                    <option value="all">{t('guidance.allSuppliers')}</option>
+                    {Array.from(
+                      new Map<string, string>(
+                        suggestions
+                          .filter((item) => item.supplierId)
+                          .map(
+                            (item) =>
+                              [item.supplierId!, item.supplierName || item.supplierId!] as [
+                                string,
+                                string,
+                              ]
+                          )
+                      ).entries()
+                    ).map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </SelectTrigger>
+                </Select>
+              </div>
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isFetching}
+              onClick={() => {
+                setRecommendationsByProduct({})
+                void refetch()
+              }}
+            >
+              <RefreshCw className="me-1 h-3.5 w-3.5" />
+              {t('guidance.refresh')}
+            </Button>
+            {canExplainLlm && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isAiRecommending || !productIdsKey || aiUsageAtCap}
+                onClick={() => void handleAiReview()}
+              >
+                <Sparkles className="me-1 h-3.5 w-3.5" />
+                {t('guidance.aiReview')}
+              </Button>
+            )}
+            <span className="text-xs text-[var(--text-muted)]">
+              {t('guidance.showing', {
+                count: visible.length,
+                total: data?.total || suggestions.length,
+              })}
+            </span>
           </div>
           {lists.length > 1 && (
             <div className="mt-3 max-w-sm min-w-0 space-y-1.5">
@@ -491,7 +587,7 @@ export function ReorderAssistancePanel({
                   ) : (
                     <HelpCircle className="h-3.5 w-3.5 mr-1" />
                   )}
-                  Why these suggestions?
+                  {t('guidance.why')}
                 </Button>
               )}
               {(assistantAvailable || canAsk) && (
@@ -500,8 +596,8 @@ export function ReorderAssistancePanel({
                     <Input
                       placeholder={
                         assistantAvailable
-                          ? 'Ask anything about this restaurant — stock, orders, invoices, waste'
-                          : 'Ask: "order more tomatoes for the weekend"'
+                          ? t('guidance.askPlaceholder')
+                          : t('guidance.keywordPlaceholder')
                       }
                       value={askQuery}
                       onChange={(e) => setAskQuery(e.target.value)}
@@ -523,6 +619,7 @@ export function ReorderAssistancePanel({
                         isAsking || isAssistantAnswering || !askQuery.trim() || aiUsageAtCap
                       }
                       onClick={handleAsk}
+                      aria-label={t('guidance.ask')}
                       title={aiUsageAtCap ? aiUsageLimitTitle : undefined}
                     >
                       {isAsking || isAssistantAnswering ? (
@@ -560,7 +657,11 @@ export function ReorderAssistancePanel({
         <CardContent>
           {visible.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)] text-center py-4">
-              No reorder suggestions right now
+              {t(
+                search || actionFilter !== 'all' || supplierFilter !== 'all'
+                  ? 'guidance.noMatches'
+                  : 'guidance.empty'
+              )}
             </p>
           ) : (
             <ul className="divide-y divide-[var(--app-border)]">
@@ -572,12 +673,18 @@ export function ReorderAssistancePanel({
                 const qty = resolveQty(item, rec)
                 const showForecastBadges =
                   !rec && (item.reasonCode === 'forecast' || forecast?.confidence != null)
-                const confidenceLabel = formatForecastConfidence(
-                  rec?.confidence ?? forecast?.confidence
-                )
+                const confidenceLabel = item.dataQuality
+                  ? t(`guidance.quality.${item.dataQuality}`)
+                  : formatForecastConfidence(rec?.confidence ?? forecast?.confidence)
                 const reorderByLabel = formatReorderByDate(
-                  rec?.deliveryDate ?? forecast?.reorderByDate
+                  item.action
+                    ? item.action === 'order'
+                      ? item.orderBy
+                      : null
+                    : forecast?.reorderByDate
                 )
+                const actionable =
+                  canOrder && qty > 0 && item.action !== 'manual_review' && item.action !== 'wait'
                 const sourceLabel = rec
                   ? recommendationLabel(rec.source)
                   : canExplainLlm && item.productId
@@ -634,7 +741,7 @@ export function ReorderAssistancePanel({
                               variant="outline"
                               className="text-xs bg-violet-50 text-violet-700 border-violet-100"
                             >
-                              {reorderByLabel}
+                              {t('guidance.orderBy')}: {reorderByLabel}
                             </Badge>
                           )}
                         </div>
@@ -653,11 +760,49 @@ export function ReorderAssistancePanel({
                             </span>
                           )}
                           <span className="text-xs text-[var(--text-muted)]">
-                            Suggest: {qty}
+                            {t('guidance.suggested')}: {item.action === 'manual_review' ? '—' : qty}
                             {item.productUnit ? ` ${item.productUnit}` : ''}
-                            {rec?.action ? ` · ${rec.action}` : ''}
+                            {getAction(item)
+                              ? ` · ${t(`guidance.actions.${getAction(item)}`)}`
+                              : ''}
                           </span>
                         </div>
+                        {item.currentQty != null && (
+                          <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-[var(--bg)] p-3 text-xs sm:grid-cols-4">
+                            {(
+                              [
+                                ['onHand', item.currentQty],
+                                ['incoming', item.incomingQty],
+                                ['expectedUsage', item.expectedUsage],
+                                ['netNeed', item.netNeed],
+                              ] as const
+                            ).map(([label, value]) => (
+                              <div key={label}>
+                                <dt className="text-[var(--text-muted)]">
+                                  {t(`guidance.${label}`)}
+                                </dt>
+                                <dd className="mt-1 font-medium">
+                                  {value == null
+                                    ? t('guidance.unknown')
+                                    : new Intl.NumberFormat(i18n.language, {
+                                        maximumFractionDigits: 3,
+                                      }).format(value)}
+                                  {value != null ? ` ${item.productUnit || ''}` : ''}
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                        {item.stockScope && (
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            {t(`guidance.scope.${item.stockScope}`)}
+                          </p>
+                        )}
+                        {item.warnings?.map((warning) => (
+                          <p key={warning} className="mt-1 text-xs text-amber-800">
+                            {t(`guidance.warnings.${warning}`, { defaultValue: warning })}
+                          </p>
+                        ))}
                         {rec?.summary && (
                           <p className="mt-1.5 text-xs text-[var(--text)]">{rec.summary}</p>
                         )}
@@ -690,11 +835,6 @@ export function ReorderAssistancePanel({
                               .join('; ')}
                           </p>
                         )}
-                        {rec?.estimatedCost != null && (
-                          <p className="mt-1 text-xs text-[var(--text-muted)]">
-                            Est. cost: {rec.estimatedCost}
-                          </p>
-                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 shrink-0">
                         {item.productId && (
@@ -702,13 +842,13 @@ export function ReorderAssistancePanel({
                             <Button variant="outline" size="sm" asChild>
                               <Link to={`/app/products/${item.productId}`}>
                                 <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                                View
+                                {t('guidance.view')}
                               </Link>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={busyId === item.id}
+                              disabled={busyId === item.id || !actionable}
                               onClick={() => handleAddToQuickList(item)}
                             >
                               {busyId === item.id ? (
@@ -716,36 +856,46 @@ export function ReorderAssistancePanel({
                               ) : (
                                 <>
                                   <ListPlus className="h-3.5 w-3.5 mr-1" />
-                                  List
+                                  {t('guidance.list')}
                                 </>
                               )}
                             </Button>
-                            <Button variant="default" size="sm" asChild>
-                              <Link
-                                to={`/app/products/${item.productId}`}
-                                state={{ addToCartQty: qty }}
-                              >
-                                <ShoppingCart className="h-3.5 w-3.5 mr-1" />
-                                Cart
-                              </Link>
-                            </Button>
+                            {actionable ? (
+                              <Button variant="default" size="sm" asChild>
+                                <Link
+                                  to={`/app/products/${item.productId}`}
+                                  state={{ addToCartQty: qty }}
+                                >
+                                  <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                                  {t('guidance.cart')}
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button size="sm" disabled>
+                                {t(
+                                  `guidance.actions.${item.action || rec?.action || 'manual_review'}`
+                                )}
+                              </Button>
+                            )}
                           </>
                         )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={isSuppressing}
+                          disabled={isSuppressing || !canManage}
                           onClick={() => handleSnooze(item)}
-                          title="Snooze 7 days"
+                          title={t('guidance.snooze')}
+                          aria-label={t('guidance.snooze')}
                         >
                           <Clock className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={isSuppressing}
+                          disabled={isSuppressing || !canManage}
                           onClick={() => handleNotNeeded(item)}
-                          title="Not needed"
+                          title={t('guidance.notNeeded')}
+                          aria-label={t('guidance.notNeeded')}
                         >
                           <Ban className="h-3.5 w-3.5" />
                         </Button>
@@ -754,7 +904,8 @@ export function ReorderAssistancePanel({
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRecommendationIncorrect(item)}
-                            title="Recommendation incorrect"
+                            title={t('guidance.incorrect')}
+                            aria-label={t('guidance.incorrect')}
                           >
                             <Flag className="h-3.5 w-3.5" />
                           </Button>

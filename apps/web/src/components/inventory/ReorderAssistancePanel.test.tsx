@@ -16,6 +16,11 @@ let mockEntitlements: any = {
   usage: { ai_requests_per_day: 1 },
 }
 let mockLists = [{ id: 'ql1', name: 'Weekly' }]
+let mockExtra: Record<string, unknown> = {}
+let mockCanOrder = true
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({ can: (key: string) => key !== 'ORDERS_CREATE' || mockCanOrder }),
+}))
 
 vi.mock('../../services/api', () => ({
   useGetReorderAssistanceQuery: () => ({
@@ -34,6 +39,7 @@ vi.mock('../../services/api', () => ({
           suggestedQty: 10,
           scopeType: 'product',
           scopeId: 'p1',
+          ...mockExtra,
         },
       ],
       total: 1,
@@ -77,6 +83,8 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     mockLists = [{ id: 'ql1', name: 'Weekly' }]
+    mockExtra = {}
+    mockCanOrder = true
     await resetTestI18n()
     mockEntitlements = { limits: { ai_requests_per_day: 20 }, usage: { ai_requests_per_day: 1 } }
     mockAiRecommend.mockReturnValue({
@@ -144,6 +152,7 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
 
   it('shows AI Reorder Recommendation label, summary, reasoning, and warnings', async () => {
     renderPanel()
+    await userEvent.click(screen.getByRole('button', { name: 'Ask AI to review' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('recommendation-source-label')).toHaveTextContent(
@@ -159,6 +168,7 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
   it('uses validated AI qty for List add', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await userEvent.click(screen.getByRole('button', { name: 'Ask AI to review' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('recommendation-source-label')).toBeInTheDocument()
@@ -181,6 +191,7 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
       { id: 'ql2', name: 'Weekend' },
     ]
     renderPanel()
+    await userEvent.click(screen.getByRole('button', { name: 'Ask AI to review' }))
     await userEvent.selectOptions(screen.getByLabelText('Ordering list'), 'ql2')
     await waitFor(() =>
       expect(screen.getByTestId('recommendation-source-label')).toBeInTheDocument()
@@ -217,6 +228,7 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
     })
 
     renderPanel()
+    await userEvent.click(screen.getByRole('button', { name: 'Ask AI to review' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('recommendation-source-label')).toHaveTextContent(
@@ -248,9 +260,54 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
 
   it('hides estimated cost when backend omits it', async () => {
     renderPanel()
+    await userEvent.click(screen.getByRole('button', { name: 'Ask AI to review' }))
     await waitFor(() => {
       expect(screen.getByTestId('recommendation-source-label')).toBeInTheDocument()
     })
     expect(screen.queryByText(/Est\. cost/i)).not.toBeInTheDocument()
+  })
+
+  it('does not spend an AI request when the panel opens', () => {
+    renderPanel()
+    expect(mockAiRecommend).not.toHaveBeenCalled()
+  })
+
+  it('preserves zero need and disables buying when supply covers demand', () => {
+    mockExtra = {
+      action: 'wait',
+      suggestedQty: 0,
+      currentQty: 10,
+      incomingQty: 20,
+      expectedUsage: 20,
+      netNeed: 0,
+      dataQuality: 'good',
+    }
+    renderPanel()
+    expect(screen.getByRole('button', { name: 'List' })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: 'Cart' })).not.toBeInTheDocument()
+    expect(screen.getByText('Net requirement')).toBeInTheDocument()
+    expect(screen.getByText(/Suggested quantity: 0/)).toBeInTheDocument()
+  })
+
+  it('keeps unknown supply as a review and does not invent a one-unit purchase', () => {
+    mockExtra = {
+      action: 'manual_review',
+      suggestedQty: null,
+      currentQty: 1,
+      incomingQty: null,
+      warnings: ['incoming_unknown'],
+      dataQuality: 'poor',
+    }
+    renderPanel()
+    expect(screen.getByRole('button', { name: 'List' })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: 'Cart' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Incoming supply could not be checked/)).toBeInTheDocument()
+  })
+
+  it('does not invite a read-only user to purchase', () => {
+    mockCanOrder = false
+    renderPanel()
+    expect(screen.getByRole('button', { name: 'List' })).toBeDisabled()
+    expect(screen.queryByRole('link', { name: 'Cart' })).not.toBeInTheDocument()
   })
 })

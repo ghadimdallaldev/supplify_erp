@@ -86,8 +86,8 @@ AI request logs and feedback use the later reorder AI migrations noted in the im
 
 ## Confidence And Fallback
 
-- **Low history** (< 3 days with usage): `insufficientHistory: true`, null forecast qty, explanation directs user to existing heuristics
-- **Unit mismatch** on receiving lines: quantity kept, confidence penalized
+- **Low history** (fewer than 7 complete observed days of measured consumption): `insufficientHistory: true`, null forecast qty, manual review
+- **Unit mismatch** on receiving lines: incoming supply is unknown for the affected product; manual review is required
 - **Missing tables** (pre-migration): assistance API unchanged
 - **AI quota exhausted:** return a structured quota response or a clearly labeled forecast/rule-based fallback with next reset; do not label fallback output as AI
 
@@ -140,3 +140,39 @@ See [../operations/environment-variables.md](../operations/environment-variables
 ```bash
 cd apps/api && pnpm test -- smart-reorder-tier reorder-forecast reorder-ai reorder-ai-normalize ai-platform restaurant-reorder-assistance restaurant-reorder-ai-recommend
 ```
+
+## 2026-11-14 corrected guidance (model v2)
+
+- Receipts are supply evidence, not consumption. Purchase-history fallback never
+  adds to measured movements and is not presented as a measured forecast.
+- Complete restaurant-local calendar days, observed zero days, proper holdout
+  cutoffs, and all future weekdays drive the forecast. Measured history requires
+  seven observed days. The existing lead-time-plus-14-day buffer remains.
+- Restaurant-wide history aggregates branches once. Branch quantities need a branch
+  balance; shared stock is explicit. Branch-unknown cadence/expiry hints are omitted
+  from branch-scoped results instead of being silently attributed to that branch.
+- Outstanding inbound quantities deduct physical receipts per order line. Overdue,
+  unconfirmed/undated, and incompatible-unit supply is not counted as dependable.
+  Failed lookups mean unknown, not zero. Late deliveries expose bridging needs.
+- Net need precedes MOQ/pack rounding. Reliable zero forecasts replace positive
+  heuristics. Wait results never become a one-unit purchase. Expiry/cadence-only
+  reminders require review rather than inventing a purchase quantity.
+- Suggestions add action (order/wait/manual_review), incomingQty,
+  uncertainIncomingQty, overdueIncomingQty, expectedUsage, netNeed, coverageDays,
+  dataQuality, stockScope, orderBy, asOf, and warnings. Responses add hasMore,
+  fetchedAt, timeZone, and incomingKnown. Contracts are additive across all clients.
+- Web adds search, next-step/supplier filters, supply/usage/need metrics, and refresh.
+  AI review is requested explicitly, not run on mount. Android/iOS show the same
+  guidance in Inventory with manual cart/list handoffs. Wait/review cards cannot
+  submit quantities. Checkout still validates current price, stock, quote locks,
+  currencies, minimums, and packs.
+- AI cache keys include the current suggestion/supply snapshot. The model cannot
+  override deterministic wait/review decisions. Old model versions refresh on access.
+- Supplier follow-up cadence uses distinct orders, so additional product lines do
+  not distort timing. Suggestions include order counts, lookback, timing, cadence
+  evidence, retrieval time, and data strength. Repeated cadence rows consolidate by
+  customer. A longer ordering gap is a follow-up cue, not a churn prediction.
+  Existing reminder drafts and sending controls remain manual.
+
+Data strength describes evidence coverage, not a calibrated probability. Physical
+device checks, live provider checks, and production-size latency remain release gates.
