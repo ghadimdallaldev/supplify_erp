@@ -134,6 +134,9 @@ backups-preprod/
 *.jks
 *.keystore
 
+# Generated Android install packages belong in build artifact storage
+*.apk
+
 # Playwright MCP scratch output (console/page dumps from browser tooling)
 .playwright-mcp/
 

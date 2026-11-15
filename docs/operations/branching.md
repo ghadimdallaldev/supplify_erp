@@ -45,4 +45,8 @@ Railway deploys automatically from the pushed branch. See [railway-environments.
 
 ## Deployment
 
+Generated Android APKs are build artifacts and must not be committed to `dev` or
+promoted to release branches. Share them through EAS artifact links or dedicated
+artifact storage. The repository ignores `*.apk` files.
+
 Railway config and env templates: `deploy/railway/`. Guide: [railway.md](./railway.md).

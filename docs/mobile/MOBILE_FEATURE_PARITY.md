@@ -1,5 +1,13 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-16 - Exclude generated Android APKs from source control
+
+Removed the two generated Android APKs from the ERP tree and local workspace at
+the owner's request. Future `*.apk` files are ignored; share builds through EAS
+or dedicated artifact storage. This is repository housekeeping only, with no API,
+auth, RBAC, type, notification, feature, or environment-variable change. Android
+and iOS source updates are skipped because no client contract changed.
+
 ## 2026-11-15 - All-role mobile design transformation
 
 Android and iOS share the new violet/light presentation, reactive English/Arabic
