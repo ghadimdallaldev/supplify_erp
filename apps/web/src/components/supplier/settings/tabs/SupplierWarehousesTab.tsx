@@ -69,6 +69,8 @@ export function SupplierWarehousesTab() {
   const canAddWarehouse = warehouseGate.canAdd
 
   const [showAddWarehouse, setShowAddWarehouse] = useState(false)
+  const [deactivatingWarehouseId, setDeactivatingWarehouseId] = useState<string | null>(null)
+  const [transferDestination, setTransferDestination] = useState('')
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null)
   const [zonesWarehouse, setZonesWarehouse] = useState<{ id: string; name: string } | null>(null)
   const [warehouseForm, setWarehouseForm] = useState({
@@ -175,9 +177,16 @@ export function SupplierWarehousesTab() {
       return
     }
     try {
-      await updateWarehouse({ id: warehouseId, is_active: false }).unwrap()
+      await updateWarehouse({
+        id: warehouseId,
+        is_active: false,
+        destination_warehouse_id: transferDestination || undefined,
+        confirm_transfer: true,
+      }).unwrap()
       toast.success(t('warehouses.toast.deactivated'))
       await refetchWarehouses()
+      setDeactivatingWarehouseId(null)
+      setTransferDestination('')
     } catch (err: any) {
       toast.error(err?.data?.error?.message || t('warehouses.toast.deactivateFailed'))
     }
@@ -222,6 +231,57 @@ export function SupplierWarehousesTab() {
 
   return (
     <div className="space-y-4">
+      <Dialog
+        open={Boolean(deactivatingWarehouseId)}
+        onOpenChange={(open) => {
+          if (!open && !isUpdatingWarehouse) setDeactivatingWarehouseId(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('warehouses.exitTitle')}</DialogTitle>
+            <DialogDescription>{t('warehouses.exitDescription')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="warehouse-transfer-destination">
+              {t('warehouses.transferDestination')}
+            </Label>
+            <select
+              id="warehouse-transfer-destination"
+              className="h-11 w-full min-w-0 rounded-md border bg-background px-3"
+              value={transferDestination}
+              disabled={isUpdatingWarehouse}
+              onChange={(event) => setTransferDestination(event.target.value)}
+            >
+              <option value="">{t('warehouses.selectDestination')}</option>
+              {(warehousesData?.warehouses ?? [])
+                .filter((wh) => wh.id !== deactivatingWarehouseId && wh.is_active !== false)
+                .map((wh) => (
+                  <option key={wh.id} value={wh.id}>
+                    {wh.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={isUpdatingWarehouse}
+              onClick={() => setDeactivatingWarehouseId(null)}
+            >
+              {t('warehouses.cancelExit')}
+            </Button>
+            <Button
+              disabled={isUpdatingWarehouse}
+              onClick={() =>
+                deactivatingWarehouseId && void handleDeactivateWarehouse(deactivatingWarehouseId)
+              }
+            >
+              {t('warehouses.confirmExit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {multiWarehousePlan && <WarehouseFulfillmentSettings enabled={multiWarehousePlan} />}
       <Card>
         <CardHeader>
@@ -319,7 +379,10 @@ export function SupplierWarehousesTab() {
                           variant="outline"
                           size="sm"
                           disabled={isUpdatingWarehouse}
-                          onClick={() => handleDeactivateWarehouse(wh.id)}
+                          onClick={() => {
+                            setTransferDestination('')
+                            setDeactivatingWarehouseId(wh.id)
+                          }}
                         >
                           {t('warehouses.deactivateWarehouse')}
                         </Button>

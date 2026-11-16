@@ -6,6 +6,7 @@ import { logger } from '../../lib/logger.js'
 import { getEntitlements, isFeatureEnabled } from '../../lib/subscription.js'
 import { sendWhatsAppMessage as sendWhatsAppMessageService } from '../whatsapp.service.js'
 import { emitNotificationNew } from '../../lib/socket.js'
+import { canReceiveTenantEvent } from '../../lib/tenant-event-access.js'
 import { emailService } from './email.js'
 import { dispatchPushNotification } from './push.js'
 import { dispatchNotificationWebhook } from './webhook.js'
@@ -336,6 +337,20 @@ export async function sendNotification({
       logger.warn('Failed to resolve notification tier, defaulting to in_app', { err: err.message })
     }
 
+    if (
+      ['SUPPLIER', 'RESTAURANT'].includes(userType) &&
+      !(await canReceiveTenantEvent({
+        userId,
+        tenantId,
+        tenantType: userType,
+        orderId: referenceType === 'ORDER' ? referenceId : null,
+        warehouseId: metadata?.warehouseId ?? metadata?.warehouse_id ?? null,
+        referenceType,
+        referenceId,
+      }))
+    )
+      return null
+
     const metadataPayload = metadata && typeof metadata === 'object' ? { ...metadata } : {}
 
     const channels = {
@@ -384,8 +399,8 @@ export async function sendNotification({
       INSERT INTO notification_log (
         user_id, user_type, notification_type, notification_category,
         title, message, reference_id, reference_type, metadata,
-        email_sent, sms_sent, push_sent, in_app_sent, whatsapp_sent
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        email_sent, sms_sent, push_sent, in_app_sent, whatsapp_sent, tenant_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `,
       [
@@ -403,6 +418,7 @@ export async function sendNotification({
         false, // Mark true only after web delivery or an Expo FCM/APNs receipt succeeds.
         !!channels.inApp, // Convert to boolean
         !!channels.whatsapp, // Convert to boolean
+        tenantId,
       ]
     )
 

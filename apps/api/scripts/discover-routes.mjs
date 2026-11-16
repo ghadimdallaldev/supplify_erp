@@ -12,8 +12,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const ROUTES_DIR = path.join(ROOT, 'src/routes')
 const SERVER_JS = path.join(ROOT, 'src/server.js')
-const OUT_JSON = path.join(ROOT, '../../docs/audits/route-inventory.json')
-const OUT_MD = path.join(ROOT, '../../docs/audits/DEV_API_ROUTE_TEST_MATRIX.md')
+const outputArg = process.argv.indexOf('--output-dir')
+const outputDir = outputArg >= 0 ? path.resolve(process.argv[outputArg + 1]) : path.join(ROOT, '../../docs/audits')
+fs.mkdirSync(outputDir, { recursive: true })
+const OUT_JSON = path.join(outputDir, 'route-inventory.json')
+const OUT_MD = path.join(outputDir, 'DEV_API_ROUTE_TEST_MATRIX.md')
 
 const UNSAFE_PATTERNS = [
   /\/billing\/(checkout|pay-now)/,

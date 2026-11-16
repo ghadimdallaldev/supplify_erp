@@ -34,19 +34,13 @@ describe('tenant context cache', () => {
     resetSingleflightForTests()
   })
 
-  it('caches roles and permissions bundle on miss', async () => {
-    const { getTenantContextBundle, tenantContextCacheKey } = await import(
-      './tenant-context-cache.js'
-    )
+  it('resolves current roles without publishing an authorization cache', async () => {
+    const { getTenantContextBundle } = await import('./tenant-context-cache.js')
 
     const bundle = await getTenantContextBundle('u1', 't1', 'RESTAURANT')
     expect(bundle.roles).toEqual(['Owner'])
     expect(bundle.permissions).toEqual(['STAFF_VIEW'])
-    expect(setCacheMock).toHaveBeenCalledWith(
-      tenantContextCacheKey('u1', 't1', 'RESTAURANT'),
-      bundle,
-      120
-    )
+    expect(setCacheMock).not.toHaveBeenCalled()
   })
 
   it('returns cached bundle without recomputing', async () => {
@@ -56,8 +50,8 @@ describe('tenant context cache', () => {
     const { getRolesForUser } = await import('./permissions.js')
 
     const bundle = await getTenantContextBundle('u1', 't1', 'RESTAURANT')
-    expect(bundle).toEqual(cached)
-    expect(getRolesForUser).not.toHaveBeenCalled()
+    expect(bundle).toEqual({ roles: ['Owner'], permissions: ['STAFF_VIEW'] })
+    expect(getRolesForUser).toHaveBeenCalled()
   })
 
   it('canUseCrossRequestTenantCaches returns false when impersonating', async () => {

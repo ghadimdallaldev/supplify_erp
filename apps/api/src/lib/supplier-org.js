@@ -2,6 +2,7 @@
  * Supplier organization layer: org roles, branch access, and branch lifecycle.
  */
 import { query, withTransaction } from './db.js'
+import { lockOrgBranchCapacity } from './org-branch-capacity.js'
 import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
 import {
@@ -213,7 +214,7 @@ export async function getUserOrgMembership(userId) {
     SELECT our.*, orgr.name AS role_name, orgr.is_system,
            so.id AS organization_id, so.name AS organization_name, so.slug AS organization_slug
     FROM org_user_roles our
-    JOIN org_roles orgr ON orgr.id = our.role_id
+    JOIN org_roles orgr ON orgr.id = our.role_id AND orgr.organization_id = our.organization_id
     JOIN supplier_organizations so ON so.id = our.organization_id
     WHERE our.user_id = $1
     LIMIT 1
@@ -228,35 +229,34 @@ export async function getOrgRolePermissions(userId, organizationId, supplierId) 
     `
     SELECT orp.permission, orp.branch_scope, orgr.name AS role_name
     FROM org_user_roles our
-    JOIN org_roles orgr ON orgr.id = our.role_id
+    JOIN org_roles orgr ON orgr.id = our.role_id AND orgr.organization_id = our.organization_id
     JOIN org_role_permissions orp ON orp.role_id = orgr.id
     WHERE our.user_id = $1 AND our.organization_id = $2
+      AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM supplier t WHERE t.id = $3 AND t.organization_id = $2))
   `,
-    [userId, organizationId]
+    [userId, organizationId, supplierId ?? null]
   )
   if (!rows.length) return []
 
-  const roleName = rows[0].role_name
-  const branchScope = rows[0].branch_scope
-  const permissions = [...new Set(rows.map((r) => r.permission))]
-
-  if (branchScope === 'assigned') {
-    // L8: always deny when scope is 'assigned' and we cannot confirm branch access —
-    // previously the guard was `branchScope === 'assigned' && supplierId`, so a
-    // missing supplierId silently fell through and returned full permissions.
-    if (!supplierId) return []
+  let assigned = false
+  if (supplierId && rows.some((row) => row.branch_scope === 'assigned')) {
     const { rows: access } = await query(
-      `SELECT 1 FROM org_user_branch_access
-       WHERE user_id = $1 AND supplier_id = $2 AND organization_id = $3`,
+      `SELECT 1 FROM org_user_branch_access a
+      JOIN supplier t ON t.id = a.supplier_id AND t.organization_id = a.organization_id
+      WHERE a.user_id = $1 AND a.supplier_id = $2 AND a.organization_id = $3`,
       [userId, supplierId, organizationId]
     )
-    // Any assigned-scope role without branch access must not inherit org perms.
-    if (!access.length) {
-      return []
-    }
+    assigned = access.length > 0
   }
-
-  return permissions
+  return [
+    ...new Set(
+      rows
+        .filter(
+          (row) => row.branch_scope === 'all' || (row.branch_scope === 'assigned' && assigned)
+        )
+        .map((row) => row.permission)
+    ),
+  ]
 }
 
 export async function userHasOrgBranchAccess(userId, supplierId, organizationId) {
@@ -273,21 +273,15 @@ export async function userHasOrgBranchAccess(userId, supplierId, organizationId)
     `
     SELECT orp.branch_scope, orgr.name
     FROM org_user_roles our
-    JOIN org_roles orgr ON orgr.id = our.role_id
+    JOIN org_roles orgr ON orgr.id = our.role_id AND orgr.organization_id = our.organization_id
     JOIN org_role_permissions orp ON orp.role_id = orgr.id
     WHERE our.user_id = $1 AND our.organization_id = $2
-    LIMIT 1
   `,
     [userId, organizationId]
   )
   if (!roleRows.length) return false
 
-  if (
-    roleRows[0].branch_scope === 'all' ||
-    roleRows[0].name === 'Org Owner' ||
-    roleRows[0].name === 'Org Manager' ||
-    roleRows[0].name === 'Org Viewer'
-  ) {
+  if (roleRows.some((row) => row.branch_scope === 'all')) {
     return true
   }
 
@@ -321,9 +315,16 @@ export async function listOrgBranchesForUser(userId, organizationId) {
   const membership = await getUserOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return []
 
-  const roleName = membership.role_name
-  const isAllScope =
-    roleName === 'Org Owner' || roleName === 'Org Manager' || roleName === 'Org Viewer'
+  const { rows: scopes } = await query(
+    `SELECT orp.branch_scope
+    FROM org_user_roles our
+    JOIN org_roles orgr ON orgr.id = our.role_id AND orgr.organization_id = our.organization_id
+    JOIN org_role_permissions orp ON orp.role_id = orgr.id
+    WHERE our.user_id = $1 AND our.organization_id = $2`,
+    [userId, organizationId]
+  )
+  if (!scopes.length) return []
+  const isAllScope = scopes.some((row) => row.branch_scope === 'all')
 
   if (isAllScope) {
     const { rows } = await query(
@@ -350,7 +351,7 @@ export async function listOrgBranchesForUser(userId, organizationId) {
            (SELECT COUNT(*)::int FROM tenant_user_roles tur WHERE tur.tenant_id = s.id AND tur.tenant_type = 'SUPPLIER') AS staff_count,
            ${BRANCH_ORDER_STATS_SELECT}
     FROM supplier s
-    JOIN org_user_branch_access ouba ON ouba.supplier_id = s.id AND ouba.user_id = $1
+    JOIN org_user_branch_access ouba ON ouba.supplier_id = s.id AND ouba.organization_id = s.organization_id AND ouba.user_id = $1
     WHERE s.organization_id = $2 AND s.is_branch_active = true
     ORDER BY s.name ASC
   `,
@@ -409,7 +410,7 @@ export async function ensureOrgAccessForBranchStaff(userId, supplierId) {
     `
     SELECT tr.name AS role_name
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = 'SUPPLIER'
     LIMIT 1
     `,
@@ -518,13 +519,7 @@ export async function createOrgBranch({
   const name = branchName.trim()
 
   return withTransaction(async (client) => {
-    // Serialize Branch Account creates for this org (limit race guard)
-    await client.query(
-      `SELECT id FROM supplier
-       WHERE organization_id = $1 AND is_main_branch = true
-       FOR UPDATE`,
-      [organizationId]
-    )
+    await lockOrgBranchCapacity(client, organizationId, 'SUPPLIER')
 
     const slug = await uniqueSupplierSlug(client, slugifyName(name))
     const addressJson = address ? JSON.stringify(address) : '{}'
@@ -558,23 +553,36 @@ export async function createOrgBranch({
   })
 }
 
-export async function branchHasPendingOrders(supplierId) {
-  const { rows } = await query(
+export async function branchHasPendingOrders(supplierId, db = query) {
+  const { rows } = await db(
     `
     SELECT COUNT(DISTINCT co.id)::int AS count
     FROM customer_order co
     INNER JOIN order_item oi ON oi.order_id = co.id
     WHERE oi.supplier_id = $1
-      AND co.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED', 'COMPLETED')
+      AND co.status::text NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED', 'COMPLETED')
   `,
     [supplierId]
   )
   return Number(rows[0]?.count || 0) > 0
 }
 
-export async function deactivateOrgBranch(supplierId, organizationId = null) {
-  const { rows } = await query(
-    `SELECT is_main_branch, organization_id FROM supplier WHERE id = $1`,
+export async function deactivateOrgBranch(supplierId, organizationId = null, client = null) {
+  if (!client) {
+    const result = await withTransaction((tx) =>
+      deactivateOrgBranch(supplierId, organizationId, tx)
+    )
+    if (result.ok) {
+      const { invalidateCachesForSupplierBranchLifecycle } = await import(
+        './branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForSupplierBranchLifecycle(supplierId, result.organizationId)
+    }
+    return result
+  }
+  const db = (sql, params) => client.query(sql, params)
+  const { rows } = await db(
+    `SELECT is_main_branch, organization_id FROM supplier WHERE id = $1 FOR UPDATE`,
     [supplierId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
@@ -583,48 +591,58 @@ export async function deactivateOrgBranch(supplierId, organizationId = null) {
   }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
 
-  const { getSupplierDeactivationBlockers, invalidateCachesForSupplierBranchLifecycle } =
-    await import('./branch-lifecycle-guards.js')
+  const { getSupplierDeactivationBlockers } = await import('./branch-lifecycle-guards.js')
 
   const blockers = await getSupplierDeactivationBlockers(supplierId, {
-    hasPendingOrders: await branchHasPendingOrders(supplierId),
+    hasPendingOrders: await branchHasPendingOrders(supplierId, db),
+    db,
   })
   if (blockers.length) {
     return { ok: false, reason: blockers[0].code, blockers }
   }
 
-  await query(
+  await db(
     `UPDATE supplier
      SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
      WHERE id = $1`,
     [supplierId]
   )
 
-  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
-export async function reactivateOrgBranch(supplierId, organizationId = null) {
-  const { rows } = await query(
-    `SELECT is_main_branch, organization_id, is_branch_active FROM supplier WHERE id = $1`,
-    [supplierId]
-  )
-  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
-  if (organizationId && rows[0].organization_id !== organizationId) {
-    return { ok: false, reason: 'NOT_FOUND' }
+export async function reactivateOrgBranch(supplierId, organizationId = null, client = null) {
+  if (!client) {
+    const result = await withTransaction((tx) =>
+      reactivateOrgBranch(supplierId, organizationId, tx)
+    )
+    if (result.ok) {
+      const { invalidateCachesForSupplierBranchLifecycle } = await import(
+        './branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForSupplierBranchLifecycle(supplierId, result.organizationId)
+    }
+    return result
   }
-  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
-  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
-  await query(
-    `UPDATE supplier
-     SET is_branch_active = true, deactivated_at = NULL, updated_at = NOW()
-     WHERE id = $1`,
+  const db = (sql, params) => client.query(sql, params)
+  const { rows: initial } = await db('SELECT organization_id FROM supplier WHERE id = $1', [
+    supplierId,
+  ])
+  if (!initial.length || (organizationId && initial[0].organization_id !== organizationId))
+    return { ok: false, reason: 'NOT_FOUND' }
+  if (!initial[0].organization_id) return { ok: false, reason: 'DETACHED' }
+  await lockOrgBranchCapacity(client, initial[0].organization_id, 'SUPPLIER')
+  const { rows } = await db(
+    'SELECT organization_id, is_branch_active FROM supplier WHERE id = $1 FOR UPDATE',
     [supplierId]
   )
-  const { invalidateCachesForSupplierBranchLifecycle } = await import(
-    './branch-lifecycle-guards.js'
+  if (rows[0]?.organization_id !== initial[0].organization_id)
+    return { ok: false, reason: 'NOT_FOUND' }
+  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
+  await db(
+    'UPDATE supplier SET is_branch_active = TRUE, deactivated_at = NULL, updated_at = now() WHERE id = $1',
+    [supplierId]
   )
-  await invalidateCachesForSupplierBranchLifecycle(supplierId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
@@ -667,7 +685,12 @@ export async function linkSupplierToOrganization(
   organizationId,
   { isMain = false, client = null } = {}
 ) {
-  const db = client ? (sql, params) => client.query(sql, params) : query
+  if (!client)
+    return withTransaction((tx) =>
+      linkSupplierToOrganization(supplierId, organizationId, { isMain, client: tx })
+    )
+  await lockOrgBranchCapacity(client, organizationId, 'SUPPLIER', { initializingMain: isMain })
+  const db = (sql, params) => client.query(sql, params)
   const { rowCount } = await db(
     `
     UPDATE supplier

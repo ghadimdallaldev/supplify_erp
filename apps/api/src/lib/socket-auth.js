@@ -116,5 +116,5 @@ export async function resolveSocketUserFromCookieHeader(cookieHeader) {
     }
   }
 
-  return { user, tenantId, tenantType, newTokens }
+  return { user, tenantId, tenantType, newTokens, expiresAt: payload.exp * 1000 }
 }

@@ -18,7 +18,7 @@ function oneRow(hit) {
 
 function fakeQuery(sql, params = []) {
   const text = String(sql).replace(/\s+/g, ' ')
-  if (text.includes('SELECT is_branch_active')) {
+  if (text.includes('SELECT t.is_branch_active')) {
     return { rows: [{ is_branch_active: true }] }
   }
   if (text.includes('FROM user_role WHERE user_id')) {

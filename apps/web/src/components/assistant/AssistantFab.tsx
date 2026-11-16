@@ -19,6 +19,7 @@ import {
 } from '../../services/api'
 import type { AssistantAttachment, AssistantMessage, AssistantSource } from '../../types/assistant'
 import { uploadFileThroughGateway } from '../../utils/fileUpload'
+import { businessSessionKey } from '../../lib/businessSession'
 
 type LocalMsg = {
   id: string
@@ -74,18 +75,20 @@ export function AssistantFab() {
   const [draft, setDraft] = useState('')
   const [conversationScope, setConversationScope] = useState('')
   const { user } = useAppSelector((s) => s.auth)
-  const userId = user?.id ?? null
   const { isImpersonating, tenantId, tenantName, effectiveRole } = useImpersonation()
-  const scopeKey = `${userId}:${tenantId || 'admin'}`
+  const scopeKey = `${businessSessionKey(user)}:${tenantId || 'admin'}`
+  const scopeAllowsAssistant =
+    user?.role !== 'SUPPLIER' || user.warehouseAccess?.mode !== 'assigned'
   const activeScope = useRef(scopeKey)
   activeScope.current = scopeKey
   useEffect(() => {
-    // A different signed-in user must never see the previous user's conversation.
+    // Access changes must also clear conversation state and attachment drafts.
+    setOpen(false)
     setConversationId(null)
     setLocalMessages([])
     setDraft('')
-    setConversationScope(`${userId}:${tenantId || 'admin'}`)
-  }, [userId, tenantId])
+    setConversationScope(scopeKey)
+  }, [scopeKey])
   const { data: entitlements } = useGetEntitlementsQuery(undefined, {
     skip: !user || (user.role === 'ADMIN' && !isImpersonating),
   })
@@ -102,12 +105,12 @@ export function AssistantFab() {
   }, [i18n.language])
 
   const { data: caps, isFetching: capsLoading } = useGetAssistantCapabilitiesQuery(undefined, {
-    skip: !user || !open,
+    skip: !user || !open || !scopeAllowsAssistant,
   })
 
   // The conversational assistant is a Scale entitlement. The API keeps its own
   // authoritative gate; the UI only avoids rendering an unavailable entry point.
-  if (!user || !planHasAi) return null
+  if (!user || !planHasAi || !scopeAllowsAssistant) return null
 
   return (
     <>
@@ -145,7 +148,7 @@ export function AssistantFab() {
           </SheetHeader>
 
           <AssistantChatBody
-            key={`${userId}:${tenantId || 'admin'}`}
+            key={scopeKey}
             isCurrentScope={() => activeScope.current === scopeKey}
             enabled={Boolean(caps?.enabled)}
             reason={caps?.reason}

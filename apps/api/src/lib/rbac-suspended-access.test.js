@@ -53,6 +53,7 @@ vi.mock('./tenant-context-cache.js', () => ({
   setTenantContextBundle: vi.fn(),
 }))
 vi.mock('./tenant-roles.js', () => ({
+  rolesIncludeOwner: (roles) => roles?.includes('Owner') === true,
   ensureTenantSystemRoles: vi.fn().mockResolvedValue(undefined),
   assignOwnerRoleForUser: vi.fn(),
   userHasOwnerRole: vi.fn(),

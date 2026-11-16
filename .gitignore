@@ -144,3 +144,12 @@ backups-preprod/
 .release-checkouts/
 docs/onboarding/output/*.html
 docs/guides/qa/output/*.html
+
+# Local synthetic audit databases, credentials, edit helpers and check logs
+output/rbac-audit-*/
+output/rbac-*.mjs
+output/readonly-audit-*.log
+
+# Local mobile design-review output (emulator screenshots, capture scripts, review notes)
+design-audit/
+skills-lock.json

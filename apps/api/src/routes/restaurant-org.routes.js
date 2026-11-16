@@ -423,6 +423,13 @@ router.post('/branches', requireRestaurantOrgOwner, multiBranchFeature, async (r
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error.code === 'LIMIT_EXCEEDED')
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+        requestId: req.requestId,
+      })
     logger.error('POST /api/restaurant-org/branches error:', error)
     res.status(500).json({
       ok: false,
@@ -764,6 +771,13 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === 'LIMIT_EXCEEDED')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
       logger.error('POST restaurant-org reactivate error:', error)
       res.status(500).json({
         ok: false,

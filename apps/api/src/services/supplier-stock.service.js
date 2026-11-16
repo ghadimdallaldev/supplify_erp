@@ -284,7 +284,7 @@ export async function transferWarehouseInventory(client, fromWarehouseId, toWare
   const { rows } = await db(
     `SELECT product_id, quantity_available, quantity_reserved, quantity_on_hand,
             reorder_point, reorder_quantity
-     FROM warehouse_inventory WHERE warehouse_id = $1`,
+     FROM warehouse_inventory WHERE warehouse_id = $1 ORDER BY product_id FOR UPDATE`,
     [fromWarehouseId]
   )
 

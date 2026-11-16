@@ -6,6 +6,13 @@ const getUserNotifications = vi.fn()
 const getUnreadNotificationCount = vi.fn()
 const getUserPreferences = vi.fn()
 const query = vi.fn()
+vi.mock('../services/notification/scoped-notifications.js', () => ({
+  getScopedUserNotifications: (userId, userType, _context, options) =>
+    options.limit === 0
+      ? getUnreadNotificationCount(userId, userType)
+      : getUserNotifications(userId, userType, options),
+  notificationAccessScope: () => ({ clause: 'user_id = $1', params: ['user-1'] }),
+}))
 
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },

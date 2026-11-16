@@ -24,6 +24,7 @@ import { splitRowClass } from './ui/card-layout'
 import { EmptyState } from './ui/empty-state'
 import { labelForPermission } from '../lib/permissionLabels'
 import { cn } from '../lib/utils'
+import { WarehouseStaffAccess } from './WarehouseStaffAccess'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import {
   useGetEntitlementsQuery,
@@ -203,6 +204,7 @@ export function TeamRolesPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isSupplier && advancedRolesEnabled && <WarehouseStaffAccess />}
         {teamMembersLoading ? (
           <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
             <Loader2 className="h-5 w-5 animate-spin mr-2" />

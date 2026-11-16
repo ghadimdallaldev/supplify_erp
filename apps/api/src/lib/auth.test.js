@@ -29,6 +29,7 @@ vi.mock('../config/env.js', () => ({
 vi.mock('jose', () => ({
   jwtVerify: vi.fn().mockResolvedValue({
     payload: {
+      iss: 'http://keycloak.example.com/realms/Supplify',
       sub: 'user-sub-123',
       email: 'test@example.com',
       exp: Math.floor(Date.now() / 1000) + 3600,

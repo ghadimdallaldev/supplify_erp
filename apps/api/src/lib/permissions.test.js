@@ -62,7 +62,7 @@ describe('permissions resolution', () => {
     const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
     expect(perms).toContain('ORDERS_VIEW')
     expect(perms).toContain('ORDERS_CREATE')
-    expect(setCache).toHaveBeenCalled()
+    expect(setCache).not.toHaveBeenCalled()
   })
 
   it('merges legacy permissions when no tenant_user_roles assignment', async () => {
@@ -147,11 +147,12 @@ describe('permissions resolution', () => {
     expect(rolesIncludeOwner(roles)).toBe(true)
   })
 
-  it('uses cache when present', async () => {
+  it('ignores stale cross-request allow decisions', async () => {
     vi.mocked(getCache).mockResolvedValue(['INVOICES_VIEW'])
+    queryMock.mockResolvedValue({ rows: [] })
     const perms = await getPermissionsForUser('u1', 't1', 'RESTAURANT')
-    expect(perms).toEqual(['INVOICES_VIEW'])
-    expect(queryMock).not.toHaveBeenCalled()
+    expect(perms).toEqual([])
+    expect(queryMock).toHaveBeenCalled()
   })
 
   it('invalidates permission cache key', async () => {

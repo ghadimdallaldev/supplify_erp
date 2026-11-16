@@ -423,7 +423,13 @@
       "updateFailed": "Failed to update warehouse",
       "deactivateFailed": "Failed to deactivate warehouse",
       "noPermission": "You do not have permission to manage warehouses"
-    }
+    },
+    "exitTitle": "Deactivate warehouse",
+    "exitDescription": "Choose where remaining stock should move. Active fulfillment or reservations must be resolved first. Historical records stay with this warehouse.",
+    "transferDestination": "Stock destination and replacement default",
+    "selectDestination": "Select a destination (required when stock remains)",
+    "cancelExit": "Cancel",
+    "confirmExit": "Confirm transfer and deactivate"
   },
   "zones": {
     "noPermission": "You do not have permission to manage delivery zones",
@@ -596,5 +602,15 @@
   },
   "toastMessages": {
     "publicSalesUpdated": "Public sales settings updated"
+  },
+  "warehouseAccess": {
+    "title": "Warehouse access",
+    "description": "Existing permissions still apply. Assigned access limits operations to the selected warehouses; an empty selection grants no warehouse access.",
+    "member": "Team member",
+    "chooseMember": "Choose a team member",
+    "all": "All warehouses, including future locations",
+    "save": "Save warehouse access",
+    "saved": "Warehouse access saved",
+    "failed": "Could not update warehouse access"
   }
 }

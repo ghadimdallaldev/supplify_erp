@@ -6,8 +6,76 @@ import { userCanAccessConversation } from './chat-access.js'
 import { resolveSocketUserFromCookieHeader } from './socket-auth.js'
 import { attachSocketRedisAdapter } from './socket-redis-adapter.js'
 import { query } from './db.js'
+import { canReceiveTenantEvent } from './tenant-event-access.js'
 
 let io = null
+
+export async function emitAuthorizedRoom(
+  room,
+  event,
+  payload,
+  exceptSocketId = null,
+  context = null
+) {
+  if (!io) return
+  try {
+    const sockets = await io.in(room).fetchSockets()
+    const decisions = new Map()
+    for (const socket of sockets) {
+      if (socket.id === exceptSocketId) continue
+      const data = socket.data
+      if (!Number.isFinite(data.expiresAt) || data.expiresAt <= Date.now()) continue
+      if (
+        context &&
+        (context.tenantId !== data.tenantId ||
+          context.tenantType !== (data.tenantType ?? data.role))
+      )
+        continue
+      const key = `${data.userId}:${data.tenantId}:${data.tenantType}`
+      if (!decisions.has(key))
+        decisions.set(
+          key,
+          (async () => {
+            if (room === userRoom(data.userId) && ['ADMIN', 'CONSUMER'].includes(data.role)) {
+              const { rows } = await query(
+                'SELECT id FROM app_user WHERE id = $1 AND role = $2 AND is_active = TRUE',
+                [data.userId, data.role]
+              )
+              return rows.length > 0
+            }
+            if (room.startsWith('conversation_')) {
+              return userCanAccessConversation(data.userId, room.slice('conversation_'.length), {
+                tenantId: data.tenantId,
+                role: data.role,
+                requiredPermission: 'CHAT_VIEW',
+              })
+            }
+            return canReceiveTenantEvent({
+              userId: data.userId,
+              tenantId: data.tenantId,
+              tenantType: data.tenantType,
+              orderId:
+                event === 'consumer_order_new'
+                  ? null
+                  : (payload?.orderId ??
+                    (payload?.reference_type === 'ORDER' ? payload.reference_id : null)),
+              warehouseId: payload?.warehouseId ?? null,
+              driverId: payload?.driverId ?? null,
+              referenceType:
+                event === 'consumer_order_new' ? 'ORDER' : (payload?.reference_type ?? null),
+              gps: event === 'driver_location_updated' || event === 'driver_tracking_status',
+            })
+          })()
+        )
+      if (await decisions.get(key)) socket.emit(event, payload)
+    }
+  } catch (error) {
+    logger.warn('Socket delivery denied because access could not be verified', {
+      event,
+      error: error.message,
+    })
+  }
+}
 
 function userRoom(userId) {
   return `user_${userId}`
@@ -27,12 +95,12 @@ function supplierRoom(supplierId) {
  */
 export function emitToRestaurant(restaurantId, event, payload) {
   if (!io || !restaurantId) return
-  io.to(restaurantRoom(restaurantId)).emit(event, payload)
+  void emitAuthorizedRoom(restaurantRoom(restaurantId), event, payload)
 }
 /** Broadcast only after durable acceptance; PostgreSQL remains the source of truth. */
 export async function emitDriverLocationUpdated({ supplierId, orderId = null, payload }) {
   if (!io || !supplierId || config.GPS_LIVE_EVENTS_ENABLED !== true) return
-  io.to(supplierRoom(supplierId)).emit('driver_location_updated', payload)
+  await emitAuthorizedRoom(supplierRoom(supplierId), 'driver_location_updated', payload)
   if (!orderId) return
   const { rows } = await query(
     `SELECT o.restaurant_id
@@ -43,7 +111,7 @@ export async function emitDriverLocationUpdated({ supplierId, orderId = null, pa
   )
   const restaurantId = rows[0]?.restaurant_id
   if (restaurantId) {
-    io.to(restaurantRoom(restaurantId)).emit('driver_location_updated', {
+    await emitAuthorizedRoom(restaurantRoom(restaurantId), 'driver_location_updated', {
       sessionId: payload.sessionId,
       driverId: payload.driverId,
       orderId,
@@ -60,7 +128,7 @@ export function emitDriverTrackingStatus({
   reason = null,
 }) {
   if (!io || !supplierId || config.GPS_LIVE_EVENTS_ENABLED !== true) return
-  io.to(supplierRoom(supplierId)).emit('driver_tracking_status', {
+  void emitAuthorizedRoom(supplierRoom(supplierId), 'driver_tracking_status', {
     supplierId,
     routeId,
     driverId,
@@ -121,7 +189,7 @@ export function serializeNotificationPayload(notification) {
  */
 export function emitToUser(userId, event, payload) {
   if (!io || !userId) return
-  io.to(userRoom(userId)).emit(event, payload)
+  void emitAuthorizedRoom(userRoom(userId), event, payload)
 }
 
 /**
@@ -138,7 +206,10 @@ export function emitNotificationNew(notification) {
     return
   }
   const payload = serializeNotificationPayload(notification)
-  emitToUser(userId, 'notification_new', payload)
+  void emitAuthorizedRoom(userRoom(userId), 'notification_new', payload, null, {
+    tenantId: notification.tenant_id ?? null,
+    tenantType: notification.user_type,
+  })
 }
 
 export async function initializeSocket(server) {
@@ -155,13 +226,14 @@ export async function initializeSocket(server) {
 
   io.use(async (socket, next) => {
     try {
-      const { user, tenantId, tenantType } = await resolveSocketUserFromCookieHeader(
+      const { user, tenantId, tenantType, expiresAt } = await resolveSocketUserFromCookieHeader(
         socket.handshake.headers.cookie || ''
       )
       socket.data.userId = user.id
       socket.data.role = user.role
       socket.data.tenantId = tenantId
       socket.data.tenantType = tenantType
+      socket.data.expiresAt = expiresAt
       next()
     } catch (error) {
       const message =
@@ -172,6 +244,28 @@ export async function initializeSocket(server) {
   })
 
   io.on('connection', (socket) => {
+    // Reconnection repeats the normal cookie/refresh handshake. Expired connections
+    // cannot keep private subscriptions or send packets indefinitely.
+    const expiryTimer = setTimeout(
+      () => socket.disconnect(true),
+      Math.max(0, Math.min(2_147_483_647, socket.data.expiresAt - Date.now()))
+    )
+    expiryTimer.unref?.()
+    socket.use(async (_packet, next) => {
+      try {
+        if (!Number.isFinite(socket.data.expiresAt) || socket.data.expiresAt <= Date.now())
+          throw new Error('Session expired')
+        const { rows } = await query(
+          'SELECT id FROM app_user WHERE id = $1 AND role = $2 AND is_active = TRUE',
+          [socket.data.userId, socket.data.role]
+        )
+        if (!rows.length) throw new Error('Session revoked')
+        next()
+      } catch {
+        next(new Error('Unauthorized'))
+        socket.disconnect(true)
+      }
+    })
     const userId = socket.data.userId
     if (userId) {
       socket.join(userRoom(userId))
@@ -266,7 +360,7 @@ export async function initializeSocket(server) {
             logger.warn('Socket message notification failed', { error: err.message })
           )
         }
-        io.to(`conversation_${conversationId}`).emit('new_message', {
+        await emitAuthorizedRoom(`conversation_${conversationId}`, 'new_message', {
           conversationId,
           content,
           senderId,
@@ -290,7 +384,7 @@ export async function initializeSocket(server) {
         })
         if (!allowed) return
 
-        io.to(`conversation_${conversationId}`).emit('message_read_update', {
+        await emitAuthorizedRoom(`conversation_${conversationId}`, 'message_read_update', {
           conversationId,
           messageId,
           timestamp: new Date().toISOString(),
@@ -311,18 +405,24 @@ export async function initializeSocket(server) {
         })
         if (!allowed) return
 
-        socket.to(`conversation_${conversationId}`).emit('user_typing', {
-          conversationId,
-          userId: socket.data.userId,
-          isTyping,
-          timestamp: new Date().toISOString(),
-        })
+        await emitAuthorizedRoom(
+          `conversation_${conversationId}`,
+          'user_typing',
+          {
+            conversationId,
+            userId: socket.data.userId,
+            isTyping,
+            timestamp: new Date().toISOString(),
+          },
+          socket.id
+        )
       } catch (err) {
         logger.error('typing handler error', { socketId: socket.id, err })
       }
     })
 
     socket.on('disconnect', () => {
+      clearTimeout(expiryTimer)
       logger.info({
         msg: 'WebSocket client disconnected',
         socketId: socket.id,

@@ -1,6 +1,8 @@
 import { query } from './db.js'
 import { getPermissionsForUser, hasPermission } from './permissions.js'
 import { isFeatureEnabled } from './subscription.js'
+import { userCanAccessTenant } from './tenant-switch.js'
+import { getWarehouseAccess } from './warehouse-access.js'
 
 export async function adminHasSupportChatAccess(appUserId) {
   if (!appUserId) return false
@@ -26,6 +28,11 @@ export async function userCanAccessConversation(
   const conversation = convRows[0]
 
   if (role === 'ADMIN') {
+    const { rows: active } = await query(
+      "SELECT id FROM app_user WHERE id = $1 AND role = 'ADMIN' AND is_active = TRUE",
+      [appUserId]
+    )
+    if (!active.length) return false
     if (conversation.is_admin_conversation) {
       return adminHasSupportChatAccess(appUserId)
     }
@@ -33,7 +40,7 @@ export async function userCanAccessConversation(
       tenantId &&
       (conversation.supplier_id === tenantId || conversation.restaurant_id === tenantId)
     ) {
-      return true
+      return requiredPermission === 'CHAT_VIEW'
     }
     return false
   }
@@ -44,6 +51,9 @@ export async function userCanAccessConversation(
       ? conversation.supplier_id === tenantId
       : conversation.restaurant_id === tenantId
   if (!isParticipant) return false
+  if (!(await userCanAccessTenant(appUserId, '', tenantId, role))) return false
+  if (role === 'SUPPLIER' && (await getWarehouseAccess(appUserId, tenantId)).mode !== 'all')
+    return false
 
   const [permissions, chatEnabled] = await Promise.all([
     getPermissionsForUser(appUserId, tenantId, role),

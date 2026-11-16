@@ -382,7 +382,7 @@ describe('RBAC Utilities', () => {
       expect(query.mock.calls[0][0]).toContain('SELECT * FROM app_user WHERE keycloak_sub = $1')
       expect(query.mock.calls[0][0]).toContain('COALESCE(is_active, TRUE) = TRUE')
       expect(query.mock.calls[0][1]).toEqual(['sub-123'])
-      expect(setCache).toHaveBeenCalled()
+      expect(setCache).not.toHaveBeenCalled()
     })
 
     it('should return null for non-existent user', async () => {
@@ -399,7 +399,7 @@ describe('RBAC Utilities', () => {
       expect(query).toHaveBeenCalledTimes(1)
     })
 
-    it('uses cache without querying database', async () => {
+    it('ignores cached identity after deactivation', async () => {
       const { query } = await import('./db.js')
       const { getCache } = await import('./cache.js')
       vi.mocked(getCache).mockResolvedValueOnce({
@@ -408,9 +408,10 @@ describe('RBAC Utilities', () => {
         email: 'cached@example.com',
       })
 
+      query.mockResolvedValueOnce({ rows: [] })
       const user = await getUserBySub('sub-cached')
-      expect(user.email).toBe('cached@example.com')
-      expect(query).not.toHaveBeenCalled()
+      expect(user).toBeNull()
+      expect(query).toHaveBeenCalledTimes(1)
     })
   })
 

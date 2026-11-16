@@ -4,8 +4,7 @@
  */
 import { query } from './db.js'
 import { logger } from './logger.js'
-import { getCache, setCache, deleteCache } from './cache.js'
-import { singleflight } from './singleflight.js'
+import { deleteCache } from './cache.js'
 import { invalidateTenantContextCache } from './tenant-context-cache.js'
 import { PERMISSION_KEYS } from './permission-keys.js'
 import { getOrgRolePermissions } from './supplier-org.js'
@@ -18,9 +17,6 @@ import {
 } from './tenant-roles.js'
 
 export { PERMISSION_KEYS }
-
-const PERMISSION_CACHE_TTL_SECONDS = 120
-const ROLES_CACHE_TTL_SECONDS = 180
 
 export function permissionCacheKey(userId, tenantId, tenantType) {
   return `perms:${userId}:${tenantId}:${tenantType}`
@@ -48,7 +44,7 @@ async function getLegacyRolesForUser(userId, tenantId, tenantType) {
     `
     SELECT r.code
     FROM user_role ur
-    JOIN role r ON r.id = ur.role_id
+    JOIN role r ON r.id = ur.role_id AND r.tenant_type = ur.tenant_type
     WHERE ur.user_id = $1 AND ur.tenant_type = $2
       AND ((ur.tenant_id IS NULL AND $3::uuid IS NULL) OR ur.tenant_id = $3)
   `,
@@ -62,7 +58,7 @@ async function getLegacyPermissionsForUser(userId, tenantId, tenantType) {
     `
     SELECT DISTINCT p.code
     FROM user_role ur
-    JOIN role r ON r.id = ur.role_id
+    JOIN role r ON r.id = ur.role_id AND r.tenant_type = ur.tenant_type
     JOIN role_permission rp ON rp.role_id = r.id
     JOIN permission p ON p.id = rp.permission_id
     WHERE ur.user_id = $1 AND ur.tenant_type = $2
@@ -78,7 +74,7 @@ async function getTenantNamedRoleCodes(userId, tenantId, tenantType) {
     `
     SELECT tr.name, tr.is_system
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
   `,
     [userId, tenantId, tenantType]
@@ -96,6 +92,7 @@ async function getTenantNamedPermissionsForUser(userId, tenantId, tenantType) {
     `
     SELECT DISTINCT trp.permission
     FROM tenant_user_roles tur
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
     JOIN tenant_role_permissions trp ON trp.role_id = tur.role_id
     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
   `,
@@ -118,20 +115,7 @@ export async function getRolesForUser(userId, tenantId, tenantType, req = null) 
     return req._rolesMemo
   }
   try {
-    const cacheKey = rolesCacheKey(userId, tenantId, tenantType)
-    const cached = await getCache(cacheKey)
-    if (Array.isArray(cached)) {
-      if (req) {
-        req._rolesMemoKey = memoKey
-        req._rolesMemo = cached
-      }
-      return cached
-    }
-
-    const roles = await singleflight(cacheKey, async () => {
-      const again = await getCache(cacheKey)
-      if (Array.isArray(again)) return again
-
+    const roles = await (async () => {
       let resolved
       if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
         const named = await getTenantNamedRoleCodes(userId, tenantId, tenantType)
@@ -141,9 +125,8 @@ export async function getRolesForUser(userId, tenantId, tenantType, req = null) 
         resolved = await getLegacyRolesForUser(userId, tenantId, tenantType)
       }
 
-      await setCache(cacheKey, resolved, ROLES_CACHE_TTL_SECONDS).catch(() => {})
       return resolved
-    })
+    })()
 
     if (req) {
       req._rolesMemoKey = memoKey
@@ -163,20 +146,13 @@ export async function getRolesForUser(userId, tenantId, tenantType, req = null) 
  */
 export async function getPermissionsForUser(userId, tenantId, tenantType) {
   try {
-    const cacheKey = permissionCacheKey(userId, tenantId, tenantType)
-    const cached = await getCache(cacheKey)
-    if (Array.isArray(cached)) return cached
-
-    return singleflight(cacheKey, async () => {
-      const again = await getCache(cacheKey)
-      if (Array.isArray(again)) return again
-
+    return await (async () => {
       if (tenantType === 'RESTAURANT' || tenantType === 'SUPPLIER') {
         if (await userHasOwnerRole(userId, tenantId, tenantType)) {
           // Owner role is ALL — return the canonical list even if DB role rows lag behind new keys.
           ensureTenantSystemRoles(tenantId, tenantType).catch(() => {})
           const permissions = getAllPermissionsForTenantType(tenantType)
-          await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+
           return permissions
         }
       }
@@ -271,19 +247,18 @@ export async function getPermissionsForUser(userId, tenantId, tenantType) {
         const permissions = hasNamedAssignment
           ? named
           : mergeUniquePermissions(orgPerms, branchPerms)
-        await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+
         return permissions
       }
 
       if (tenantType === 'SUPPLIER' && !hasOrgRole && branchPerms.length === 0) {
-        await setCache(cacheKey, [], PERMISSION_CACHE_TTL_SECONDS)
         return []
       }
 
       const permissions = branchPerms
-      await setCache(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS)
+
       return permissions
-    })
+    })()
   } catch (err) {
     if (err.code === '42P01') return []
     logger.error('getPermissionsForUser error', { error: err.message })

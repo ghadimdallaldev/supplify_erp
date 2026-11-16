@@ -8,7 +8,8 @@ import {
   requireAnyPermission,
 } from '../lib/rbac.js'
 import { assertTenantUserSeatAvailable, requireFeature } from '../lib/subscription.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
+import { getWarehouseAccess, replaceWarehouseAccess } from '../lib/warehouse-access.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
@@ -76,11 +77,55 @@ const updateRoleSchema = z.object({
   permissions: z.array(z.string()).optional(),
 })
 
+const warehouseAccessSchema = z.object({
+  mode: z.enum(['all', 'assigned']),
+  warehouseIds: z.array(z.string().uuid()).max(500).default([]),
+})
+
 const assignRoleSchema = z.object({
   role_id: z.string().uuid(),
   driver_id: z.string().uuid().optional().nullable(),
   create_driver_profile: z.boolean().optional(),
+  warehouseAccess: warehouseAccessSchema.optional(),
 })
+
+router.put(
+  '/users/:userId/warehouse-access',
+  requirePermission('STAFF_MANAGE'),
+  async (req, res, next) => {
+    try {
+      const { tenantId, tenantType } = assertTenantAccess(req)
+      if (tenantType !== 'SUPPLIER')
+        throw new ValidationError('Warehouse access applies to supplier workspaces')
+      const userId = z.string().uuid().parse(req.params.userId)
+      const access = warehouseAccessSchema.parse(req.body)
+      const warehouseAccess = await withTransaction(async (client) => {
+        const { rows } = await client.query(
+          `SELECT user_id FROM tenant_user_roles
+        WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = 'SUPPLIER'`,
+          [userId, tenantId]
+        )
+        if (!rows.length) throw new NotFoundError('Workspace team member not found')
+        return replaceWarehouseAccess(client, {
+          actorId: req.userData.id,
+          userId,
+          supplierId: tenantId,
+          access,
+          requestId: req.requestId,
+        })
+      })
+      await invalidateUserAuthCaches({ userId, tenantId, tenantType })
+      res.json({
+        ok: true,
+        data: { userId, warehouseAccess },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
 
 /** GET /api/roles */
 router.get('/', requirePermission('SETTINGS_VIEW'), async (req, res) => {
@@ -393,7 +438,16 @@ router.get('/users', requirePermission('SETTINGS_VIEW'), async (req, res) => {
     `,
       [tenantId, tenantType]
     )
-    res.json({ ok: true, data: { users: rows }, error: null, requestId: req.requestId })
+    const users =
+      tenantType === 'SUPPLIER'
+        ? await Promise.all(
+            rows.map(async (user) => ({
+              ...user,
+              warehouseAccess: await getWarehouseAccess(user.id, tenantId),
+            }))
+          )
+        : rows
+    res.json({ ok: true, data: { users }, error: null, requestId: req.requestId })
   } catch (error) {
     logger.error('List tenant role users error', { error: error.message })
     res.status(500).json({
@@ -420,28 +474,55 @@ router.post(
       } = body
       const targetUserId = req.params.userId
 
-      const scope = await resolveWorkspaceScope(tenantId, tenantType)
-      const role = await assertCanAssignRole({
-        requesterId: req.userData.id,
-        requesterIsPlatformAdmin: req.userData.role === 'ADMIN',
-        requesterPermissions: req.tenantContext?.permissions || [],
-        targetUserId,
-        roleId,
-        tenantId,
-        tenantType,
-        organizationId: scope.organizationId,
-      })
+      const role = await withTransaction(async (client) => {
+        const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
+        const scope = await resolveWorkspaceScope(tenantId, tenantType, client)
+        if (scope.organizationId) {
+          const orgTable =
+            tenantType === 'SUPPLIER' ? 'supplier_organizations' : 'restaurant_organizations'
+          await client.query(`SELECT id FROM ${orgTable} WHERE id = $1 FOR UPDATE`, [
+            scope.organizationId,
+          ])
+        }
+        await client.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [tenantId])
+        const role = await assertCanAssignRole({
+          requesterId: req.userData.id,
+          requesterIsPlatformAdmin: req.userData.role === 'ADMIN',
+          requesterPermissions: req.tenantContext?.permissions || [],
+          targetUserId,
+          roleId,
+          tenantId,
+          tenantType,
+          organizationId: scope.organizationId,
+          client,
+        })
 
-      await assertTenantUserSeatAvailable(tenantId, tenantType, {
-        joiningUserId: targetUserId,
-      })
+        await assertTenantUserSeatAvailable(tenantId, tenantType, {
+          joiningUserId: targetUserId,
+        })
 
-      await assignTenantUserRole({
-        userId: targetUserId,
-        roleId,
-        tenantId,
-        tenantType,
-        assignedBy: req.userData.id,
+        await assignTenantUserRole(
+          {
+            userId: targetUserId,
+            roleId,
+            tenantId,
+            tenantType,
+            assignedBy: req.userData.id,
+          },
+          client
+        )
+        if (body.warehouseAccess) {
+          if (tenantType !== 'SUPPLIER')
+            throw new ValidationError('Warehouse access applies to supplier workspaces')
+          await replaceWarehouseAccess(client, {
+            actorId: req.userData.id,
+            userId: targetUserId,
+            supplierId: tenantId,
+            access: body.warehouseAccess,
+            requestId: req.requestId,
+          })
+        }
+        return role
       })
       await invalidateUserAuthCaches({
         userId: targetUserId,

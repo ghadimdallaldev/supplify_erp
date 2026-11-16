@@ -1,5 +1,69 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-16 - Design round 1.1: Home finishing pass (presentation only)
+
+Corrections to Round 1 in both mobile worktrees (`design/round-01-home`,
+uncommitted, file-for-file parity): compact restaurant priority panel (count as
+focal point, integrated footer action, no decorative stripe), supplier Home
+rebuilt around a neutral order command center joined to the pipeline, metric and
+fulfillment labels that state their scope without changing calculations, capped
+violet unread badges (9+), "Chat" tab label with "Messages" as the accessible
+name, Login headline sizing, and an Arabic-only LTR isolate around the currency
+code in `formatMoney` (`US$` no longer renders as `$US`). New shared pieces:
+`OrderCommandCenter`, `compactCount`, `PressFeedback.contentStyle`; ~41 new
+`ar.json` entries (97 across Rounds 1 + 1.1, all awaiting native review:
+`design-audit/mobile/round-01-1/ARABIC_REVIEW.md`). No API, auth, RBAC, feature
+key, order-state, notification or env change. Android: `tsc` clean, 37 suites /
+140 tests pass, debug build verified on an emulator
+(`design-audit/mobile/round-01-1/`). iOS: same `tsc` and 140 tests pass; not
+visually verified. Round 2 finding recorded there: the orders list API has no
+supplier name for restaurant rows (suppliers live on `order_item`). Merge note:
+uncommitted work in the real mobile repos adds a warehouse-assigned assistant
+gate to `SupplierDashboardScreen.tsx`, which must be carried into the
+redesigned header.
+
+## 2026-11-16 - Claude Code design skill stack (tooling only, no app change)
+
+Installed and documented the UI/UX and motion-design skills Claude Code uses for
+mobile screen work: `docs/mobile/SUPPLIFY_DESIGN_SKILLS.md` and the project skill
+`.claude/skills/supplify-mobile-design`. User-scope: Emil Kowalski's animation
+set (`animate-expo`, `gestures`, `apple-design`, `review-animations`,
+`choreograph`, `break-ui`, `find-animation-opportunities`,
+`animation-vocabulary`, `emil-design-eng`) and `impeccable` 4.9.2 (skill only,
+no edit hooks, no engine binary). Project-scope (`supplify_erp/.claude/skills`,
+gitignored, recorded in `skills-lock.json`): `expo-native-ui`,
+`expo-design-system`, `react-native-best-practices`. No dependency, source file,
+API, auth, RBAC, feature key, or env var changed in either mobile repo; nothing
+to port. Mobile: not applicable.
+
+## 2026-11-16 - Design round 01: Restaurant Home + Supplier Home (presentation only)
+
+Redesigned the two flagship Home screens and the shared foundation they need in
+both native repos (worktrees `C:/myProjects/wt/sm-android` and
+`C:/myProjects/wt/sm-ios`, branch `design/round-01-home`, **uncommitted**, based on
+the committed HEADs `b0d50e1` / `6f16ac1` without the unrelated uncommitted
+auth/warehouse work): new tokens (palette, Plus Jakarta Sans / IBM Plex Sans
+Arabic bundled via `expo-font`), `src/components/ui/home.tsx` primitives,
+status-bar contrast fix (`expo-status-bar` + scrim), no back arrow on tab-root
+headers, tab-bar refinement, and count-aware localization (`copyCount`,
+`formatCount`; ~55 new `ar.json` keys that still need native-speaker review).
+
+No API endpoint, auth/session, RBAC permission, plan feature key, order lifecycle,
+GPS, notification payload or env var changed; existing navigation targets and
+permission/entitlement gates are reused as-is. Android: `tsc` clean, 37 suites /
+135 tests pass, debug build verified on an emulator with screenshots in
+`design-audit/mobile/round-01/`. iOS: source mirrored file-for-file, `tsc` clean,
+same 37 suites / 135 tests pass; **no iOS visual verification** (cannot render
+locally). Known unrelated defect recorded for the auth owner: Keycloak logout
+lands on "Invalid parameter: redirect_uri" (evidence screenshot in the round-01
+folder). Web/API/admin docs: not affected.
+
+## 2026-11-16 - Mobile design discovery audit (documentation only)
+
+Added `design-audit/mobile/` (audit report, 34 emulator screenshots, capture
+helper) as input for a design-director-led redesign. No mobile or API source was
+changed; Android and iOS updates are skipped because no client contract changed.
+
 ## 2026-11-16 - Exclude generated Android APKs from source control
 
 Removed the two generated Android APKs from the ERP tree and local workspace at

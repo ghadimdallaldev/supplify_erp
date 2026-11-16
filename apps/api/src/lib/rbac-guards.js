@@ -56,7 +56,7 @@ export async function countOwnersInOrganization(organizationId, workspaceType, c
     `
     SELECT COUNT(DISTINCT tur.user_id)::int AS count
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.name = $3
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type AND tr.name = $3 AND tr.is_system = TRUE
     JOIN ${tenantTable} t ON t.id = tur.tenant_id AND tur.tenant_type = $2
     WHERE t.organization_id = $1
     `,
@@ -78,7 +78,7 @@ export async function userIsOwnerInOrganization(
     `
     SELECT 1
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.name = $3
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type AND tr.name = $3 AND tr.is_system = TRUE
     JOIN ${tenantTable} t ON t.id = tur.tenant_id AND tur.tenant_type = $2
     WHERE t.organization_id = $1 AND tur.user_id = $4
     LIMIT 1
@@ -94,20 +94,18 @@ export async function assertNotLastOwnerRemoval({
   organizationId,
   workspaceType,
   tenantId,
+  client = null,
 }) {
-  if (!organizationId) return
+  const db = client ? (sql, params) => client.query(sql, params) : query
 
-  const newPerms = await getRolePermissionSet(newRoleId)
-  const { rows: newRoleRows } = await query(`SELECT name FROM tenant_roles WHERE id = $1`, [
-    newRoleId,
-  ])
+  const { rows: newRoleRows } = await db(`SELECT name FROM tenant_roles WHERE id = $1`, [newRoleId])
   const newRoleName = newRoleRows[0]?.name
 
-  const { rows: currentRows } = await query(
+  const { rows: currentRows } = await db(
     `
     SELECT tr.name
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
     WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
     `,
     [targetUserId, tenantId, workspaceType]
@@ -117,7 +115,18 @@ export async function assertNotLastOwnerRemoval({
 
   if (!wasOwner || willBeOwner) return
 
-  const ownerCount = await countOwnersInOrganization(organizationId, workspaceType)
+  const ownerCount = organizationId
+    ? await countOwnersInOrganization(organizationId, workspaceType, client)
+    : Number(
+        (
+          await db(
+            `SELECT COUNT(DISTINCT ur.user_id)::int AS count FROM tenant_user_roles ur
+        JOIN tenant_roles r ON r.id = ur.role_id AND r.name = 'Owner' AND r.is_system = TRUE
+        WHERE ur.tenant_id = $1 AND ur.tenant_type = $2`,
+            [tenantId, workspaceType]
+          )
+        ).rows[0]?.count ?? 0
+      )
   if (ownerCount <= 1) {
     throw new ValidationError(
       'Cannot remove or downgrade the last Owner. Assign another Owner first.'
@@ -134,8 +143,10 @@ export async function assertCanAssignRole({
   tenantId,
   tenantType,
   organizationId,
+  client = null,
 }) {
-  const { rows: roleRows } = await query(
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows: roleRows } = await db(
     `SELECT id, name, tenant_id, tenant_type, is_system FROM tenant_roles WHERE id = $1`,
     [roleId]
   )
@@ -148,9 +159,14 @@ export async function assertCanAssignRole({
 
   if (isOwnerRoleName(role.name)) {
     if (!requesterIsPlatformAdmin) {
-      const requesterIsTenantOwner = await userHasOwnerRole(requesterId, tenantId, tenantType)
+      const requesterIsTenantOwner = await userHasOwnerRole(
+        requesterId,
+        tenantId,
+        tenantType,
+        client
+      )
       const requesterIsOrgOwner = organizationId
-        ? await userIsOwnerInOrganization(requesterId, organizationId, tenantType)
+        ? await userIsOwnerInOrganization(requesterId, organizationId, tenantType, client)
         : false
       if (!requesterIsTenantOwner && !requesterIsOrgOwner) {
         throw new ForbiddenError('Only an Owner can assign the Owner role')
@@ -160,18 +176,18 @@ export async function assertCanAssignRole({
   }
 
   if (!requesterIsPlatformAdmin) {
-    const rolePerms = await getRolePermissionSet(roleId)
+    const rolePerms = await getRolePermissionSet(roleId, client)
     if (!isPermissionSubset(requesterPermissions, rolePerms)) {
       throw new ForbiddenError('You cannot assign a role with permissions you do not have')
     }
   }
 
   if (targetUserId === requesterId && !requesterIsPlatformAdmin) {
-    const { rows: current } = await query(
+    const { rows: current } = await db(
       `
       SELECT tr.name, tur.role_id
       FROM tenant_user_roles tur
-      JOIN tenant_roles tr ON tr.id = tur.role_id
+      JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
       WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
       `,
       [targetUserId, tenantId, tenantType]
@@ -184,8 +200,8 @@ export async function assertCanAssignRole({
       throw new ForbiddenError('You cannot assign yourself the Owner role')
     }
     if (current[0]?.role_id) {
-      const currentPerms = await getRolePermissionSet(current[0].role_id)
-      const newPerms = await getRolePermissionSet(roleId)
+      const currentPerms = await getRolePermissionSet(current[0].role_id, client)
+      const newPerms = await getRolePermissionSet(roleId, client)
       if (!isPermissionSubset([...currentPerms], newPerms)) {
         throw new ForbiddenError('You cannot change your own role to gain more access')
       }
@@ -198,6 +214,7 @@ export async function assertCanAssignRole({
     organizationId,
     workspaceType: tenantType,
     tenantId,
+    client,
   })
 
   return role

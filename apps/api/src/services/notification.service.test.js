@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+vi.mock('../lib/tenant-event-access.js', () => ({
+  canReceiveTenantEvent: vi.fn().mockResolvedValue(true),
+}))
 import {
   sendNotification,
   notifyGuestReservationConfirmation,

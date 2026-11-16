@@ -280,13 +280,13 @@ describe('warehouseRouting', () => {
       expect(preview[0].reason).toBeDefined()
     })
 
-    it('buildSimulationFromPayload matches simulateWarehouseRouting', () => {
+    it('buildSimulationFromPayload chooses the canonical whole-order warehouse', () => {
       const items = [{ product_id: 'p1', quantity: 1, category_id: 'c1' }]
       const built = buildSimulationFromPayload({
         items,
         rules: [],
         warehouses,
-        warehouseStock: [],
+        warehouseStock: [{ warehouse_id: 'wh-default', product_id: 'p1', quantity_available: 5 }],
         zones: [],
         restaurantPostalCode: null,
       })
@@ -296,6 +296,39 @@ describe('warehouseRouting', () => {
   })
 
   describe('resolveSingleWarehouseForOrder', () => {
+    it('sums repeated SKU lines before selecting a warehouse', () => {
+      const result = resolveSingleWarehouseForOrder(
+        [
+          { product_id: 'p1', quantity: 4 },
+          { product_id: 'p1', quantity: 4 },
+        ],
+        {
+          warehouses: [{ id: 'a', is_default: true }, { id: 'b' }],
+          warehouseStock: new Map([
+            ['a:p1', { quantity_available: 5 }],
+            ['b:p1', { quantity_available: 8 }],
+          ]),
+        }
+      )
+      expect(result.warehouseId).toBe('b')
+    })
+    it('rejects a preview that would require split fulfillment', () => {
+      expect(() =>
+        buildSimulationFromPayload({
+          items: [
+            { product_id: 'p1', quantity: 1 },
+            { product_id: 'p2', quantity: 1 },
+          ],
+          warehouses: [{ id: 'a' }, { id: 'b' }],
+          rules: [],
+          zones: [],
+          warehouseStock: [
+            { warehouse_id: 'a', product_id: 'p1', quantity_available: 2 },
+            { warehouse_id: 'b', product_id: 'p2', quantity_available: 2 },
+          ],
+        })
+      ).toThrowError(expect.objectContaining({ code: 'NO_SINGLE_FULFILLMENT_LOCATION' }))
+    })
     it('selects one warehouse that can fulfill every line', () => {
       const result = resolveSingleWarehouseForOrder(
         [

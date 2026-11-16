@@ -255,6 +255,11 @@ describe('Warehouses Routes', () => {
         if (text.includes('SELECT id FROM product')) {
           return { rows: [{ id: 'prod-1' }] }
         }
+        if (text.includes('SELECT id FROM warehouse')) return { rows: [{ id: 'wh-1' }] }
+        if (text.includes('SELECT * FROM warehouse_inventory'))
+          return {
+            rows: [{ quantity_available: '6', quantity_reserved: '2', quantity_on_hand: '8' }],
+          }
         if (text.includes('INSERT INTO warehouse_inventory')) {
           return { rows: [{ warehouse_id: 'wh-1', product_id: 'prod-1', reorder_point: 4 }] }
         }
@@ -269,7 +274,7 @@ describe('Warehouses Routes', () => {
       const insertCall = db.query.mock.calls.find(([sql]) =>
         String(sql).includes('INSERT INTO warehouse_inventory')
       )
-      expect(insertCall?.[1].slice(2, 5)).toEqual([null, null, null])
+      expect(insertCall?.[1].slice(2, 5)).toEqual([6, 2, 8])
     })
 
     it('rejects inventory updates for another supplier product', async () => {
@@ -313,27 +318,35 @@ describe('Warehouses Routes', () => {
           return { rows: [] }
         }
         if (text.includes('FROM warehouse_inventory')) {
-          return { rows: [{ warehouse_id: 'wh-1', product_id: 'prod-1', quantity_available: 5 }] }
+          return {
+            rows: [
+              {
+                warehouse_id: 'wh-1',
+                product_id: '13318f5f-0d66-4728-a043-f601036e31ac',
+                quantity_available: 5,
+              },
+            ],
+          }
         }
         if (text.includes('FROM delivery_zone')) {
           return { rows: [] }
         }
         if (text.includes('FROM product')) {
-          return { rows: [{ id: 'prod-1', category_id: null }] }
+          return { rows: [{ id: '13318f5f-0d66-4728-a043-f601036e31ac', category_id: null }] }
         }
         return { rows: [] }
       })
 
       await request(app)
         .post('/api/warehouses/routing/simulate')
-        .send({ items: [{ product_id: 'prod-1', quantity: 1 }] })
+        .send({ items: [{ product_id: '13318f5f-0d66-4728-a043-f601036e31ac', quantity: 1 }] })
         .expect(200)
 
       const stockCall = db.query.mock.calls.find(([sql]) =>
         String(sql).includes('FROM warehouse_inventory')
       )
       expect(stockCall?.[0]).toMatch(/warehouse w/)
-      expect(stockCall?.[1]?.[0]).toEqual(['prod-1'])
+      expect(stockCall?.[1]?.[0]).toEqual(['13318f5f-0d66-4728-a043-f601036e31ac'])
       expect(stockCall?.[1]?.[1]).toBe('supplier-1')
 
       const productCall = db.query.mock.calls.find(

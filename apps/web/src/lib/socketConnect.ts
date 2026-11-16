@@ -2,7 +2,8 @@ import type { Socket } from 'socket.io-client'
 
 /** Refresh session cookies via REST (triggers token refresh when access token expired). */
 async function refreshSessionCookies(): Promise<void> {
-  await fetch('/auth/me', { credentials: 'include' })
+  const response = await fetch('/auth/me', { credentials: 'include' })
+  if (!response.ok) throw new Error('Session refresh rejected')
 }
 
 /**
@@ -11,6 +12,17 @@ async function refreshSessionCookies(): Promise<void> {
  */
 export function connectAuthenticatedSocket(socket: Socket, logPrefix: string): void {
   let authRetryDone = false
+  socket.on('connect', () => {
+    authRetryDone = false
+  })
+  socket.on('disconnect', (reason) => {
+    if (reason !== 'io server disconnect') return
+    void refreshSessionCookies()
+      .then(() => {
+        if (!socket.connected) socket.connect()
+      })
+      .catch(() => {})
+  })
 
   socket.on('connect_error', (err) => {
     const msg = err.message || ''

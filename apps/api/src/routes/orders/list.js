@@ -110,6 +110,20 @@ router.get('/', async (req, res) => {
       })
     }
 
+    if (
+      tenant?.tenantType === 'SUPPLIER' &&
+      req.tenantContext?.warehouseAccess?.mode === 'assigned'
+    ) {
+      whereConditions.push(`EXISTS (SELECT 1 FROM order_warehouse_assignment wa
+        WHERE wa.order_id = o.id AND wa.status <> 'superseded'
+          AND wa.warehouse_id = ANY($${paramIndex}::uuid[]))
+        AND NOT EXISTS (SELECT 1 FROM order_warehouse_assignment wa
+          WHERE wa.order_id = o.id AND wa.status <> 'superseded'
+            AND NOT (wa.warehouse_id = ANY($${paramIndex}::uuid[])))`)
+      queryParams.push(req.tenantContext.warehouseAccess.warehouseIds)
+      paramIndex++
+    }
+
     // Status filter
     if (params.status) {
       whereConditions.push(`o.status = $${paramIndex}`)

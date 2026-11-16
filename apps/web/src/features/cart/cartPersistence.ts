@@ -1,6 +1,11 @@
 import type { CartItem } from '../../types'
 
 const CART_KEY_PREFIX = 'supplify_cart_v1'
+let activeBusinessScope: string | null = null
+
+export function setCartBusinessScope(scope: string | null): void {
+  activeBusinessScope = scope
+}
 
 export type PersistedCart = {
   items: CartItem[]
@@ -13,6 +18,8 @@ export type PersistedCart = {
 }
 
 export function getCartStorageKey(email?: string | null): string {
+  if (activeBusinessScope)
+    return `${CART_KEY_PREFIX}_scope_${encodeURIComponent(activeBusinessScope)}`
   if (!email) return `${CART_KEY_PREFIX}_guest`
   const safe = email
     .trim()

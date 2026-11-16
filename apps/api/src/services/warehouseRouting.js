@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js'
 /**
  * Pure routing logic + transactional assignment helpers for warehouse fulfillment.
  */
@@ -422,6 +423,35 @@ async function insertAssignment(
 /**
  * Build simulation context from caller-supplied data (for API simulate endpoint).
  */
+function warehouseZoneContext(warehouses, zones, destinationAddress) {
+  const zoneEligibleByWarehouse = new Map()
+  const restaurantZoneIds = new Set()
+  for (const zone of zones) {
+    if (restaurantMatchesZone(zone, destinationAddress)) restaurantZoneIds.add(zone.id)
+  }
+  // True when at least one warehouse in this tenant has an active delivery zone.
+  // Used to fail-close unzoned warehouses so they don't win by default when
+  // sibling warehouses have proper zone coverage configured.
+  const anyWarehouseHasZones = zones.length > 0
+  const destinationSignalled = destinationHasRoutingSignal(destinationAddress)
+  for (const warehouse of warehouses) {
+    const warehouseZones = zones.filter((zone) => zone.warehouse_id === warehouse.id)
+    if (warehouseZones.length === 0) {
+      // Unzoned warehouse: only eligible when no other warehouse in the tenant
+      // has zones, OR when the destination carries no routing signals (so zone
+      // matching is impossible for everyone).
+      zoneEligibleByWarehouse.set(warehouse.id, !anyWarehouseHasZones || !destinationSignalled)
+    } else {
+      zoneEligibleByWarehouse.set(
+        warehouse.id,
+        warehouseZones.some((zone) => restaurantMatchesZone(zone, destinationAddress))
+      )
+    }
+  }
+
+  return { zoneEligibleByWarehouse, restaurantZoneIds }
+}
+
 export function buildSimulationFromPayload({
   items,
   rules,
@@ -429,33 +459,30 @@ export function buildSimulationFromPayload({
   warehouseStock,
   zones,
   restaurantPostalCode,
+  destination = null,
 }) {
-  const warehouseStockMap = new Map(
-    (warehouseStock || []).map((r) => [`${r.warehouse_id}:${r.product_id}`, r])
-  )
-  const restaurantInZoneByWarehouse = new Map()
-  const restaurantZoneIds = new Set()
-  const address = { postalCode: restaurantPostalCode, zip: restaurantPostalCode }
-  for (const zone of zones || []) {
-    if (restaurantMatchesZone(zone, address)) restaurantZoneIds.add(zone.id)
+  const destinationAddress = destination || {
+    postalCode: restaurantPostalCode,
+    zip: restaurantPostalCode,
   }
-  for (const wh of warehouses || []) {
-    const whZones = (zones || []).filter((z) => z.warehouse_id === wh.id)
-    const inZone = whZones.some((z) => restaurantMatchesZone(z, address))
-    restaurantInZoneByWarehouse.set(wh.id, inZone)
+  const context = {
+    warehouses: warehouses || [],
+    rules: rules || [],
+    destinationAddress,
+    warehouseStock: new Map(
+      (warehouseStock || []).map((row) => [`${row.warehouse_id}:${row.product_id}`, row])
+    ),
+    ...warehouseZoneContext(warehouses || [], zones || [], destinationAddress),
   }
-
-  const defaultWarehouseId =
-    warehouses?.find((w) => w.is_default || w.is_main)?.id ?? warehouses?.[0]?.id ?? null
-
-  return simulateWarehouseRouting(items, {
-    rules,
-    warehouses,
-    warehouseStock: warehouseStockMap,
-    restaurantInZoneByWarehouse,
-    restaurantZoneIds,
-    defaultWarehouseId,
-  })
+  const resolution = resolveSingleWarehouseForOrder(items, context)
+  return items.map((item) => ({
+    productId: item.product_id ?? item.productId,
+    quantity: item.quantity,
+    warehouseId: resolution.warehouseId,
+    warehouseName: resolution.warehouse.name,
+    reason: resolution.ruleType,
+    ruleId: null,
+  }))
 }
 function ruleMatchesCandidate(item, warehouseId, rules) {
   const productRules = rules.filter(
@@ -522,6 +549,14 @@ function candidateRuleRank(items, warehouseId, rules, zoneEligible, matchedZoneI
  * sibling tenant's warehouse to fulfill another tenant's product.
  */
 export function resolveSingleWarehouseForOrder(items, context) {
+  const required = new Map()
+  for (const item of items) {
+    const id = item.product_id ?? item.productId
+    const qty = new Decimal(item.quantity)
+    if (!qty.isFinite() || !qty.gt(0))
+      throw new Error('Order quantities must be positive finite numbers')
+    required.set(id, (required.get(id) || new Decimal(0)).plus(qty))
+  }
   const warehouses = (context.warehouses || []).filter((warehouse) => warehouse.is_active !== false)
   const activeWarehouseIds = new Set(warehouses.map((warehouse) => warehouse.id))
   const rules = (context.rules || []).filter((rule) => {
@@ -544,7 +579,7 @@ export function resolveSingleWarehouseForOrder(items, context) {
         continue
       }
       const stock = context.warehouseStock?.get(`${warehouse.id}:${productId}`)
-      if (!stock || Number(stock.quantity_available) < Number(item.quantity)) {
+      if (!stock || new Decimal(stock.quantity_available).lt(required.get(productId))) {
         warehouseFailures.push({ productId, code: 'INSUFFICIENT_STOCK' })
       }
     }
@@ -616,7 +651,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
   const { rows: warehouses } = await client.query(
     `SELECT * FROM warehouse
      WHERE ${supplierCol} = $1 AND is_active = TRUE
-     ORDER BY created_at ASC, id ASC`,
+     ORDER BY id ASC FOR SHARE`,
     [supplierId]
   )
   const { rows: rules } = await client.query(
@@ -670,30 +705,11 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
      WHERE w.${supplierCol} = $1 AND dz.is_active = TRUE AND dz.warehouse_id IS NOT NULL`,
     [supplierId]
   )
-  const zoneEligibleByWarehouse = new Map()
-  const restaurantZoneIds = new Set()
-  for (const zone of zones) {
-    if (restaurantMatchesZone(zone, destinationAddress)) restaurantZoneIds.add(zone.id)
-  }
-  // True when at least one warehouse in this tenant has an active delivery zone.
-  // Used to fail-close unzoned warehouses so they don't win by default when
-  // sibling warehouses have proper zone coverage configured.
-  const anyWarehouseHasZones = zones.length > 0
-  const destinationSignalled = destinationHasRoutingSignal(destinationAddress)
-  for (const warehouse of warehouses) {
-    const warehouseZones = zones.filter((zone) => zone.warehouse_id === warehouse.id)
-    if (warehouseZones.length === 0) {
-      // Unzoned warehouse: only eligible when no other warehouse in the tenant
-      // has zones, OR when the destination carries no routing signals (so zone
-      // matching is impossible for everyone).
-      zoneEligibleByWarehouse.set(warehouse.id, !anyWarehouseHasZones || !destinationSignalled)
-    } else {
-      zoneEligibleByWarehouse.set(
-        warehouse.id,
-        warehouseZones.some((zone) => restaurantMatchesZone(zone, destinationAddress))
-      )
-    }
-  }
+  const { zoneEligibleByWarehouse, restaurantZoneIds } = warehouseZoneContext(
+    warehouses,
+    zones,
+    destinationAddress
+  )
   const enrichedItems = orderItems.map((item) => ({
     ...item,
     category_id: productMap.get(item.product_id)?.category_id ?? null,

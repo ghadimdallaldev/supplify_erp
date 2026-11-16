@@ -2,6 +2,7 @@
  * Restaurant organization layer: org roles, branch access, and branch lifecycle.
  */
 import { query, withTransaction } from './db.js'
+import { lockOrgBranchCapacity } from './org-branch-capacity.js'
 import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
 import {
@@ -138,30 +139,34 @@ export async function getRestaurantOrgRolePermissions(userId, organizationId, re
     `
     SELECT rorp.permission, rorp.branch_scope, ror.name AS role_name
     FROM restaurant_org_user_roles rour
-    JOIN restaurant_org_roles ror ON ror.id = rour.role_id
+    JOIN restaurant_org_roles ror ON ror.id = rour.role_id AND ror.organization_id = rour.organization_id
     JOIN restaurant_org_role_permissions rorp ON rorp.role_id = ror.id
     WHERE rour.user_id = $1 AND rour.organization_id = $2
+      AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM restaurant t WHERE t.id = $3 AND t.organization_id = $2))
   `,
-    [userId, organizationId]
+    [userId, organizationId, restaurantId ?? null]
   )
   if (!rows.length) return []
 
-  const roleName = rows[0].role_name
-  const branchScope = rows[0].branch_scope
-  const permissions = [...new Set(rows.map((r) => r.permission))]
-
-  if (branchScope === 'assigned' && restaurantId) {
+  let assigned = false
+  if (restaurantId && rows.some((row) => row.branch_scope === 'assigned')) {
     const { rows: access } = await query(
-      `SELECT 1 FROM restaurant_org_user_branch_access
-       WHERE user_id = $1 AND restaurant_id = $2 AND organization_id = $3`,
+      `SELECT 1 FROM restaurant_org_user_branch_access a
+      JOIN restaurant t ON t.id = a.restaurant_id AND t.organization_id = a.organization_id
+      WHERE a.user_id = $1 AND a.restaurant_id = $2 AND a.organization_id = $3`,
       [userId, restaurantId, organizationId]
     )
-    if (!access.length && roleName === 'Regional Manager') {
-      return []
-    }
+    assigned = access.length > 0
   }
-
-  return permissions
+  return [
+    ...new Set(
+      rows
+        .filter(
+          (row) => row.branch_scope === 'all' || (row.branch_scope === 'assigned' && assigned)
+        )
+        .map((row) => row.permission)
+    ),
+  ]
 }
 
 export async function getRestaurantOrgRoleIdByName(organizationId, roleName, client = null) {
@@ -208,7 +213,7 @@ export async function getUserRestaurantOrgMembership(userId) {
     SELECT rour.*, ror.name AS role_name, ror.is_system,
            ro.id AS organization_id, ro.name AS organization_name, ro.slug AS organization_slug
     FROM restaurant_org_user_roles rour
-    JOIN restaurant_org_roles ror ON ror.id = rour.role_id
+    JOIN restaurant_org_roles ror ON ror.id = rour.role_id AND ror.organization_id = rour.organization_id
     JOIN restaurant_organizations ro ON ro.id = rour.organization_id
     WHERE rour.user_id = $1
     LIMIT 1
@@ -232,21 +237,15 @@ export async function userHasRestaurantOrgBranchAccess(userId, restaurantId, org
     `
     SELECT rorp.branch_scope, ror.name
     FROM restaurant_org_user_roles rour
-    JOIN restaurant_org_roles ror ON ror.id = rour.role_id
+    JOIN restaurant_org_roles ror ON ror.id = rour.role_id AND ror.organization_id = rour.organization_id
     JOIN restaurant_org_role_permissions rorp ON rorp.role_id = ror.id
     WHERE rour.user_id = $1 AND rour.organization_id = $2
-    LIMIT 1
   `,
     [userId, organizationId]
   )
   if (!roleRows.length) return false
 
-  if (
-    roleRows[0].branch_scope === 'all' ||
-    roleRows[0].name === 'Org Owner' ||
-    roleRows[0].name === 'Org Manager' ||
-    roleRows[0].name === 'Org Viewer'
-  ) {
+  if (roleRows.some((row) => row.branch_scope === 'all')) {
     return true
   }
 
@@ -277,9 +276,16 @@ export async function listRestaurantOrgBranchesForUser(userId, organizationId) {
   const membership = await getUserRestaurantOrgMembership(userId)
   if (!membership || membership.organization_id !== organizationId) return []
 
-  const roleName = membership.role_name
-  const isAllScope =
-    roleName === 'Org Owner' || roleName === 'Org Manager' || roleName === 'Org Viewer'
+  const { rows: scopes } = await query(
+    `SELECT rorp.branch_scope
+    FROM restaurant_org_user_roles rour
+    JOIN restaurant_org_roles ror ON ror.id = rour.role_id AND ror.organization_id = rour.organization_id
+    JOIN restaurant_org_role_permissions rorp ON rorp.role_id = ror.id
+    WHERE rour.user_id = $1 AND rour.organization_id = $2`,
+    [userId, organizationId]
+  )
+  if (!scopes.length) return []
+  const isAllScope = scopes.some((row) => row.branch_scope === 'all')
 
   if (isAllScope) {
     const { rows } = await query(
@@ -302,7 +308,7 @@ export async function listRestaurantOrgBranchesForUser(userId, organizationId) {
            r.phone, r.address_json, r.contact_email,
            ${BRANCH_ORDER_STATS_SELECT}
     FROM restaurant r
-    JOIN restaurant_org_user_branch_access rouba ON rouba.restaurant_id = r.id AND rouba.user_id = $1
+    JOIN restaurant_org_user_branch_access rouba ON rouba.restaurant_id = r.id AND rouba.organization_id = r.organization_id AND rouba.user_id = $1
     WHERE r.organization_id = $2 AND r.is_branch_active = true
     ORDER BY r.name ASC
   `,
@@ -422,13 +428,7 @@ export async function createRestaurantOrgBranch({
   const normalizedEmail = (ownerEmail || '').trim().toLowerCase()
 
   return withTransaction(async (client) => {
-    // Serialize Branch Account creates for this org (limit race guard)
-    await client.query(
-      `SELECT id FROM restaurant
-       WHERE organization_id = $1 AND is_main_branch = true
-       FOR UPDATE`,
-      [organizationId]
-    )
+    await lockOrgBranchCapacity(client, organizationId, 'RESTAURANT')
 
     const slug = await uniqueRestaurantSlug(client, slugifyName(name))
     const addressJson = address ? JSON.stringify(address) : '{}'
@@ -457,22 +457,39 @@ export async function createRestaurantOrgBranch({
   })
 }
 
-export async function restaurantBranchHasPendingOrders(restaurantId) {
-  const { rows } = await query(
+export async function restaurantBranchHasPendingOrders(restaurantId, db = query) {
+  const { rows } = await db(
     `
     SELECT COUNT(*)::int AS count
     FROM customer_order co
     WHERE co.restaurant_id = $1
-      AND co.status NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED', 'COMPLETED')
+      AND co.status::text NOT IN ('DELIVERED', 'CANCELLED', 'REJECTED', 'COMPLETED')
   `,
     [restaurantId]
   )
   return Number(rows[0]?.count || 0) > 0
 }
 
-export async function deactivateRestaurantOrgBranch(restaurantId, organizationId = null) {
-  const { rows } = await query(
-    `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1`,
+export async function deactivateRestaurantOrgBranch(
+  restaurantId,
+  organizationId = null,
+  client = null
+) {
+  if (!client) {
+    const result = await withTransaction((tx) =>
+      deactivateRestaurantOrgBranch(restaurantId, organizationId, tx)
+    )
+    if (result.ok) {
+      const { invalidateCachesForRestaurantBranchLifecycle } = await import(
+        './branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForRestaurantBranchLifecycle(restaurantId, result.organizationId)
+    }
+    return result
+  }
+  const db = (sql, params) => client.query(sql, params)
+  const { rows } = await db(
+    `SELECT is_main_branch, organization_id FROM restaurant WHERE id = $1 FOR UPDATE`,
     [restaurantId]
   )
   if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
@@ -481,48 +498,62 @@ export async function deactivateRestaurantOrgBranch(restaurantId, organizationId
   }
   if (rows[0].is_main_branch) return { ok: false, reason: 'MAIN_BRANCH' }
 
-  const { getRestaurantDeactivationBlockers, invalidateCachesForRestaurantBranchLifecycle } =
-    await import('./branch-lifecycle-guards.js')
+  const { getRestaurantDeactivationBlockers } = await import('./branch-lifecycle-guards.js')
 
   const blockers = await getRestaurantDeactivationBlockers(restaurantId, {
-    hasPendingOrders: await restaurantBranchHasPendingOrders(restaurantId),
+    hasPendingOrders: await restaurantBranchHasPendingOrders(restaurantId, db),
+    db,
   })
   if (blockers.length) {
     return { ok: false, reason: blockers[0].code, blockers }
   }
 
-  await query(
+  await db(
     `UPDATE restaurant
      SET is_branch_active = false, deactivated_at = NOW(), updated_at = NOW()
      WHERE id = $1`,
     [restaurantId]
   )
 
-  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
-export async function reactivateRestaurantOrgBranch(restaurantId, organizationId = null) {
-  const { rows } = await query(
-    `SELECT is_main_branch, organization_id, is_branch_active FROM restaurant WHERE id = $1`,
-    [restaurantId]
-  )
-  if (!rows.length) return { ok: false, reason: 'NOT_FOUND' }
-  if (organizationId && rows[0].organization_id !== organizationId) {
-    return { ok: false, reason: 'NOT_FOUND' }
+export async function reactivateRestaurantOrgBranch(
+  restaurantId,
+  organizationId = null,
+  client = null
+) {
+  if (!client) {
+    const result = await withTransaction((tx) =>
+      reactivateRestaurantOrgBranch(restaurantId, organizationId, tx)
+    )
+    if (result.ok) {
+      const { invalidateCachesForRestaurantBranchLifecycle } = await import(
+        './branch-lifecycle-guards.js'
+      )
+      await invalidateCachesForRestaurantBranchLifecycle(restaurantId, result.organizationId)
+    }
+    return result
   }
-  if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
-  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
-  await query(
-    `UPDATE restaurant
-     SET is_branch_active = true, deactivated_at = NULL, updated_at = NOW()
-     WHERE id = $1`,
+  const db = (sql, params) => client.query(sql, params)
+  const { rows: initial } = await db('SELECT organization_id FROM restaurant WHERE id = $1', [
+    restaurantId,
+  ])
+  if (!initial.length || (organizationId && initial[0].organization_id !== organizationId))
+    return { ok: false, reason: 'NOT_FOUND' }
+  if (!initial[0].organization_id) return { ok: false, reason: 'DETACHED' }
+  await lockOrgBranchCapacity(client, initial[0].organization_id, 'RESTAURANT')
+  const { rows } = await db(
+    'SELECT organization_id, is_branch_active FROM restaurant WHERE id = $1 FOR UPDATE',
     [restaurantId]
   )
-  const { invalidateCachesForRestaurantBranchLifecycle } = await import(
-    './branch-lifecycle-guards.js'
+  if (rows[0]?.organization_id !== initial[0].organization_id)
+    return { ok: false, reason: 'NOT_FOUND' }
+  if (rows[0].is_branch_active !== false) return { ok: false, reason: 'ALREADY_ACTIVE' }
+  await db(
+    'UPDATE restaurant SET is_branch_active = TRUE, deactivated_at = NULL, updated_at = now() WHERE id = $1',
+    [restaurantId]
   )
-  await invalidateCachesForRestaurantBranchLifecycle(restaurantId, rows[0].organization_id)
   return { ok: true, organizationId: rows[0].organization_id }
 }
 
@@ -569,7 +600,12 @@ export async function linkRestaurantToOrganization(
   organizationId,
   { isMain = false, client = null } = {}
 ) {
-  const db = client ? (sql, params) => client.query(sql, params) : query
+  if (!client)
+    return withTransaction((tx) =>
+      linkRestaurantToOrganization(restaurantId, organizationId, { isMain, client: tx })
+    )
+  await lockOrgBranchCapacity(client, organizationId, 'RESTAURANT', { initializingMain: isMain })
+  const db = (sql, params) => client.query(sql, params)
   const { rowCount } = await db(
     `
     UPDATE restaurant

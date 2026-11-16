@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const queryMock = vi.fn()
 const getPermissionsForUserMock = vi.fn()
 const isFeatureEnabledMock = vi.fn()
+const membershipMock = vi.fn().mockResolvedValue(true)
+const warehouseAccessMock = vi.fn().mockResolvedValue({ mode: 'all', warehouseIds: [] })
+vi.mock('./tenant-switch.js', () => ({ userCanAccessTenant: (...args) => membershipMock(...args) }))
+vi.mock('./warehouse-access.js', () => ({
+  getWarehouseAccess: (...args) => warehouseAccessMock(...args),
+}))
 
 vi.mock('./db.js', () => ({ query: (...args) => queryMock(...args) }))
 vi.mock('./permissions.js', async (importOriginal) => {
@@ -21,6 +27,8 @@ import { userCanAccessConversation } from './chat-access.js'
 describe('socket chat access', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    membershipMock.mockResolvedValue(true)
+    warehouseAccessMock.mockResolvedValue({ mode: 'all', warehouseIds: [] })
     queryMock.mockResolvedValue({
       rows: [
         {
@@ -44,6 +52,27 @@ describe('socket chat access', () => {
     ).resolves.toBe(true)
 
     expect(getPermissionsForUserMock).toHaveBeenCalledWith('staff-user', 'supplier-1', 'SUPPLIER')
+  })
+
+  it('rejects a revoked member even with stale chat permissions and an existing socket room', async () => {
+    membershipMock.mockResolvedValueOnce(false)
+    await expect(
+      userCanAccessConversation('staff-user', 'conv-1', {
+        tenantId: 'supplier-1',
+        role: 'SUPPLIER',
+      })
+    ).resolves.toBe(false)
+    expect(getPermissionsForUserMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects tenant-wide chat for staff restricted to assigned warehouses', async () => {
+    warehouseAccessMock.mockResolvedValueOnce({ mode: 'assigned', warehouseIds: ['wh-a'] })
+    await expect(
+      userCanAccessConversation('staff-user', 'conv-1', {
+        tenantId: 'supplier-1',
+        role: 'SUPPLIER',
+      })
+    ).resolves.toBe(false)
   })
 
   it('denies a user from another tenant before checking permissions', async () => {
@@ -107,6 +136,22 @@ describe('socket chat access', () => {
       userCanAccessConversation('admin-user', 'conv-1', { role: 'ADMIN' })
     ).resolves.toBe(true)
     expect(getPermissionsForUserMock).toHaveBeenCalledWith('admin-user', null, 'ADMIN')
+  })
+
+  it('denies a deactivated admin and operational sends during impersonation', async () => {
+    await expect(
+      userCanAccessConversation('admin-user', 'conv-1', {
+        role: 'ADMIN',
+        tenantId: 'supplier-1',
+        requiredPermission: 'CHAT_SEND',
+      })
+    ).resolves.toBe(false)
+    queryMock
+      .mockResolvedValueOnce({ rows: [{ id: 'conv-1', is_admin_conversation: true }] })
+      .mockResolvedValueOnce({ rows: [] })
+    await expect(
+      userCanAccessConversation('admin-user', 'conv-1', { role: 'ADMIN' })
+    ).resolves.toBe(false)
   })
 
   it('denies admins without ADMIN_SUPPORT on support threads', async () => {
