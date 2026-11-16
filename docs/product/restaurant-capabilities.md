@@ -42,4 +42,9 @@ Tenant roles, branch context, subscription feature gates, and RBAC permissions â
 
 ## QA
 
+The [2026-11-16 restaurant feature audit](../audits/RESTAURANT_FEATURE_AUDIT_2026-11-16.md)
+tracks per-feature checks, confirmed defects, and verification limits.
+Checkout guarantees and order-list counterparty/currency behavior are documented
+in [ordering reliability](../features/ordering-reliability.md).
+
 Manual regression: [regression-checklist.md](../guides/qa/regression-checklist.md). Route smoke map: [features.md](./features.md).

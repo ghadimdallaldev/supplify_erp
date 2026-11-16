@@ -193,7 +193,7 @@ describe('restaurant-reorder-assistance.service', () => {
           {
             id: 'lot-1',
             productId: 'p-visible',
-            productName: 'Yoghurt',
+            itemName: 'Yoghurt',
             status: 'expiring_soon',
             quantity: 4,
             expiryDate: '2026-10-01',
@@ -201,7 +201,7 @@ describe('restaurant-reorder-assistance.service', () => {
           {
             id: 'lot-2',
             productId: 'p-suppressed',
-            productName: 'Cream',
+            itemName: 'Cream',
             status: 'expired',
             quantity: 2,
             expiryDate: '2026-09-01',
@@ -217,7 +217,9 @@ describe('restaurant-reorder-assistance.service', () => {
     const { getReorderAssistance } = await import('./restaurant-reorder-assistance.service.js')
     const result = await getReorderAssistance('r1')
 
-    expect(result.suggestions.find((s) => s.productId === 'p-visible')).toBeDefined()
+    expect(result.suggestions.find((s) => s.productId === 'p-visible')).toMatchObject({
+      productName: 'Yoghurt',
+    })
     expect(result.suggestions.find((s) => s.productId === 'p-suppressed')).toBeUndefined()
     // No parallel un-suppressed channel for the same data.
     expect(result.expiryAlerts).toBeUndefined()

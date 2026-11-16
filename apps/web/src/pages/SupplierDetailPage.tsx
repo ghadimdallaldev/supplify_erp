@@ -5,7 +5,6 @@ import {
   useGetSupplierQuery,
   useGetProductsQuery,
   useCreateConversationMutation,
-  useGetRestaurantsQuery,
   useFollowSupplierMutation,
   useUnfollowSupplierMutation,
   useBlockSupplierMutation,
@@ -82,7 +81,6 @@ export function SupplierDetailPage() {
   }, [])
 
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
-  useGetRestaurantsQuery()
   const [createConversation, { isLoading: isCreatingConversation }] =
     useCreateConversationMutation()
   const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()

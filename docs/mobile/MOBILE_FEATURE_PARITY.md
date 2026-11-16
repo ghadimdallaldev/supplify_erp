@@ -1,5 +1,27 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-16 - Restaurant functional audit: checkout and inventory reliability
+
+Fixed concurrent order-key claims against schemas retaining both restaurant/key
+and actor/key uniqueness, expiry lot name mapping in reorder suggestions, and a
+reserved SQL alias in waste/weekly intelligence. Existing checkout/replay shapes,
+inventory response fields, permissions, plan gates, and notifications are retained.
+Restaurant order lists also expose the purchased `supplier_name` projection; web
+lists show the supplier counterparty and the stored currency.
+
+Both Android (`C:/myProjects/supplify-mobile`) and iOS
+(`C:/myProjects/supplify-mobile-ios`) mirror nullable `Order.supplier_name` and
+`src/store/cartStore.concurrent.test.ts`. Their existing lists already display
+that field and format the order currency. The native checkout stores retain the
+same key/payload for concurrent or uncertain submissions and ignore late duplicate
+successes, verified by 11 focused tests per platform. The web-only defensive
+inventory sort and order table/card presentation require no native layout change.
+No auth, RBAC, feature key, notification payload, or environment variable changed.
+Migration `0235` also permits the adjustment types already declared in both native
+`src/types/inventory.ts` files; the requests and response contract are unchanged.
+See the [audit record](../audits/RESTAURANT_FEATURE_AUDIT_2026-11-16.md) for final
+typecheck and regression results; device validation is recorded separately.
+
 ## 2026-11-16 - Revert web restaurant dashboard polish (mobile skip)
 
 Reverted `67c7c78c` at the user's request, restoring the previous web dashboard

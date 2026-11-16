@@ -91,7 +91,7 @@ describe('upload security sessions', () => {
       /^https:\/\/api\.example\.test\/api\/files\/upload\/[A-Za-z0-9_-]+$/
     )
     expect(result.url).toBe(result.presignedUrl)
-    expect(result.presignedUrl).not.toContain('s3')
+    expect(new URL(result.presignedUrl).hostname).toBe('api.example.test')
     expect(result.maxBytes).toBe(10 * 1024 * 1024)
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO file_upload_session'),

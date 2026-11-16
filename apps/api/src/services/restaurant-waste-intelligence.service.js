@@ -57,7 +57,7 @@ export async function getWasteIntelligence(restaurantId, opts = {}, dbQuery = qu
         CASE
           WHEN ia.created_at >= now() - ($2::int * INTERVAL '1 day') THEN 'current'
           ELSE 'previous'
-        END AS window
+        END AS period_window
       FROM inventory_adjustment ia
       JOIN product p ON p.id = ia.product_id
       LEFT JOIN supplier s ON s.id = p.supplier_id
@@ -67,14 +67,14 @@ export async function getWasteIntelligence(restaurantId, opts = {}, dbQuery = qu
     ),
     summary AS (
       SELECT
-        window,
+        period_window,
         COUNT(*)::int AS incidents,
         COUNT(*) FILTER (WHERE waste_cost IS NOT NULL)::int AS costed_incidents,
         COUNT(*) FILTER (WHERE waste_cost IS NULL)::int AS uncosted_incidents,
         COUNT(DISTINCT product_id)::int AS affected_products,
         SUM(waste_cost) AS waste_cost
       FROM movement
-      GROUP BY window
+      GROUP BY period_window
     ),
     product_windows AS (
       SELECT
@@ -82,13 +82,13 @@ export async function getWasteIntelligence(restaurantId, opts = {}, dbQuery = qu
         MAX(product_name) AS product_name,
         MAX(product_unit) AS product_unit,
         MAX(supplier_name) AS supplier_name,
-        COUNT(*) FILTER (WHERE window = 'current')::int AS current_incidents,
-        COUNT(*) FILTER (WHERE window = 'previous')::int AS previous_incidents,
-        COUNT(*) FILTER (WHERE window = 'current' AND waste_cost IS NOT NULL)::int AS costed_incidents,
-        COUNT(*) FILTER (WHERE window = 'current' AND waste_cost IS NULL)::int AS uncosted_incidents,
-        SUM(waste_cost) FILTER (WHERE window = 'current') AS current_waste_cost,
-        SUM(waste_cost) FILTER (WHERE window = 'previous') AS previous_waste_cost,
-        SUM(quantity) FILTER (WHERE window = 'current') AS current_waste_qty
+        COUNT(*) FILTER (WHERE period_window = 'current')::int AS current_incidents,
+        COUNT(*) FILTER (WHERE period_window = 'previous')::int AS previous_incidents,
+        COUNT(*) FILTER (WHERE period_window = 'current' AND waste_cost IS NOT NULL)::int AS costed_incidents,
+        COUNT(*) FILTER (WHERE period_window = 'current' AND waste_cost IS NULL)::int AS uncosted_incidents,
+        SUM(waste_cost) FILTER (WHERE period_window = 'current') AS current_waste_cost,
+        SUM(waste_cost) FILTER (WHERE period_window = 'previous') AS previous_waste_cost,
+        SUM(quantity) FILTER (WHERE period_window = 'current') AS current_waste_qty
       FROM movement
       GROUP BY product_id
     ),
@@ -106,9 +106,9 @@ export async function getWasteIntelligence(restaurantId, opts = {}, dbQuery = qu
       LIMIT $3
     )
     SELECT
-      (SELECT row_to_json(current_summary) FROM summary current_summary WHERE window = 'current')
+      (SELECT row_to_json(current_summary) FROM summary current_summary WHERE period_window = 'current')
         AS current_summary,
-      (SELECT row_to_json(previous_summary) FROM summary previous_summary WHERE window = 'previous')
+      (SELECT row_to_json(previous_summary) FROM summary previous_summary WHERE period_window = 'previous')
         AS previous_summary,
       COALESCE((SELECT json_agg(hotspots) FROM hotspots), '[]'::json) AS hotspots
     `,

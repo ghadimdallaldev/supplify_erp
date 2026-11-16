@@ -1,5 +1,14 @@
 # Mobile Parity Checklist
 
+## 2026-11-16 - Restaurant checkout audit
+
+- [x] Nullable restaurant-order supplier display projection mirrored in Android and iOS.
+- [x] Concurrent checkout keys/payloads and late replay responses covered identically in both native stores.
+- [x] Existing native supplier labels and order-currency formatting retained.
+- [x] Server-only waste/expiry corrections preserve existing fields and action semantics.
+- [x] Dated parity entry and ordering/inventory domain documentation updated.
+- [x] Both native typechecks pass; checkout regressions pass 11 tests per platform.
+
 ## 2026-11-15 - All-role mobile design transformation
 
 - [x] Shared design system, controls, role navigation, and screen migration mirrored.

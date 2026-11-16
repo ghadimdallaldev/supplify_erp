@@ -17,6 +17,7 @@ let mockEntitlements: any = {
 }
 let mockLists = [{ id: 'ql1', name: 'Weekly' }]
 let mockExtra: Record<string, unknown> = {}
+let mockOtherSuggestions: any[] = []
 let mockCanOrder = true
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({ can: (key: string) => key !== 'ORDERS_CREATE' || mockCanOrder }),
@@ -41,6 +42,7 @@ vi.mock('../../services/api', () => ({
           scopeId: 'p1',
           ...mockExtra,
         },
+        ...mockOtherSuggestions,
       ],
       total: 1,
       smartReorder: { tier: 'gold', capabilities: { forecast: true } },
@@ -84,6 +86,7 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
     vi.clearAllMocks()
     mockLists = [{ id: 'ql1', name: 'Weekly' }]
     mockExtra = {}
+    mockOtherSuggestions = []
     mockCanOrder = true
     await resetTestI18n()
     mockEntitlements = { limits: { ai_requests_per_day: 20 }, usage: { ai_requests_per_day: 1 } }
@@ -117,6 +120,28 @@ describe('ReorderAssistancePanel AI vs forecast labels', () => {
 
   afterEach(() => {
     cleanup()
+  })
+
+  it('keeps the inventory panel usable when older expiry suggestions have no product name', () => {
+    mockExtra = { productName: undefined }
+    mockOtherSuggestions = [
+      {
+        id: 'expiry-lot-2',
+        productId: 'p2',
+        supplierId: 's1',
+        supplierName: 'Fresh Co',
+        reasonCode: 'near_expiry',
+        reasonLabel: 'Expiring soon',
+        urgency: 'HIGH',
+        suggestedQty: null,
+        action: 'manual_review',
+        scopeType: 'product',
+        scopeId: 'p2',
+      },
+    ]
+    renderPanel()
+    expect(screen.getByText('p1')).toBeInTheDocument()
+    expect(screen.getByText('p2')).toBeInTheDocument()
   })
 
   it('answers account-wide questions through the assistant instead of matching product names', async () => {

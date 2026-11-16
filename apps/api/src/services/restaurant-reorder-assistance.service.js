@@ -253,7 +253,7 @@ async function fetchExpirySuggestions(restaurantId) {
     .map((lot) => ({
       id: `expiry-${lot.id}`,
       productId: lot.productId,
-      productName: lot.productName || lot.label,
+      productName: lot.itemName || lot.productName || lot.label,
       supplierId: lot.supplierId,
       supplierName: lot.supplierName,
       reasonCode: lot.status === 'expired' ? 'expired' : 'near_expiry',

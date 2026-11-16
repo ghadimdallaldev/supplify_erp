@@ -173,7 +173,7 @@ export function ReorderAssistancePanel({
     .filter(
       (item) =>
         (!search ||
-          `${item.productName} ${item.supplierName || ''}`
+          `${item.productName || item.productId || item.id} ${item.supplierName || ''}`
             .toLocaleLowerCase()
             .includes(search.toLocaleLowerCase())) &&
         (actionFilter === 'all' || getAction(item) === actionFilter) &&
@@ -182,7 +182,7 @@ export function ReorderAssistancePanel({
     .sort(
       (a, b) =>
         (a.supplierName || '').localeCompare(b.supplierName || '') ||
-        a.productName.localeCompare(b.productName)
+        (a.productName || a.productId || a.id).localeCompare(b.productName || b.productId || b.id)
     )
   const visible = maxItems ? filtered.slice(0, maxItems) : filtered
   const canExplain = data?.smartReorder?.capabilities?.forecast === true
@@ -703,7 +703,7 @@ export function ReorderAssistancePanel({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-sm text-[var(--text)] truncate">
-                            {item.productName}
+                            {item.productName || item.productId || item.id}
                           </span>
                           <Badge
                             variant="outline"

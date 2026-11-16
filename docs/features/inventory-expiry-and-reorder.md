@@ -4,6 +4,24 @@
 
 Operational features for restaurant inventory expiry, supplier shortage/substitution chat, ordering lists, and smart reorder reminders.
 
+## 2026-11-16 reliability corrections
+
+Expiry-derived reorder suggestions use the lot's `itemName` as `productName`.
+This preserves the existing response contract and prevents unnamed expiry rows
+from crashing the inventory panel's sort. The web panel also falls back to the
+product/suggestion identifier when older responses lack a name; expiry signals
+remain manual-review actions and never become automatic purchase suggestions.
+
+Waste intelligence uses the SQL alias `period_window`, avoiding PostgreSQL's
+reserved `WINDOW` keyword. Both the waste query and the aggregate weekly summary
+are exercised against real PostgreSQL, including empty histories. No metric
+formula, permission, feature gate, or notification payload changes.
+Migration `0235_restaurant_inventory_adjustment_types.sql` separately expands the
+legacy adjustment constraint to accept the restaurant API's existing `WASTAGE`,
+`SPOILAGE`, `COUNT_CORRECTION`, and `OTHER` values, while retaining supplier `IN`
+and `OUT`. Unknown values are still rejected. Apply this migration before
+validating waste-entry writes on an upgraded deployment.
+
 ## Feature 1: Restaurant item expiry tracking
 
 ### Behavior

@@ -192,6 +192,13 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
+    const supplierProjection =
+      tenant?.tenantType === 'RESTAURANT'
+        ? `, (SELECT string_agg(DISTINCT s_order.name, ', ' ORDER BY s_order.name)
+            FROM order_item oi_order
+            JOIN supplier s_order ON s_order.id = oi_order.supplier_id
+            WHERE oi_order.order_id = o.id) AS supplier_name`
+        : ''
 
     // Supplier/search filters use EXISTS (no DISTINCT + item joins).
     const sql = `
@@ -200,10 +207,11 @@ router.get('/', async (req, res) => {
         r.name as restaurant_name,
         r.slug as restaurant_slug,
         COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name
+        ${supplierProjection}
       FROM customer_order o
       LEFT JOIN restaurant r ON r.id = o.restaurant_id
       ${whereClause}
-      ORDER BY o.created_at DESC
+      ORDER BY o.created_at DESC, o.id DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 

@@ -66,6 +66,7 @@ export interface Order {
   created_at: string
   updated_at: string
   restaurant_name?: string
+  supplier_name?: string | null
   restaurant_slug?: string
   cancel_reason?: string | null
   cancelled_by?: 'RESTAURANT' | 'SUPPLIER' | null

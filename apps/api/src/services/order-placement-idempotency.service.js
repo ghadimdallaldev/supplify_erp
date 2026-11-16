@@ -116,7 +116,9 @@ export async function claimOrderPlacementKey(
     `INSERT INTO order_placement_idempotency
        (restaurant_id, actor_scope, idempotency_key, request_hash, status)
      VALUES ($1, $2, $3, $4, 'IN_PROGRESS')
-     ON CONFLICT (actor_scope, idempotency_key) DO NOTHING
+     -- Older schemas also retain UNIQUE (restaurant_id, idempotency_key).
+     -- Let either uniqueness check serialize a retry before reading its result.
+     ON CONFLICT DO NOTHING
      RETURNING id, status`,
     [restaurantId, scope, normalizedKey, requestHash]
   )
