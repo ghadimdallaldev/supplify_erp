@@ -19,23 +19,6 @@ Concise map of restaurant-side features. Detailed specs live under [features/](.
 | Branches & team                | Settings                   | [restaurant-branches.md](../features/restaurant-branches.md), [tenant-roles.md](../features/tenant-roles.md)                       |
 | Settings & billing             | `/app/settings`            | [tenant-registration.md](../features/tenant-registration.md), [free-trial-expiry.md](../features/free-trial-expiry.md)             |
 
-## Restaurant dashboard presentation
-
-The web restaurant dashboard keeps the existing role-specific metrics, section
-order, navigation targets, and permission/plan gates. Its purchasing summary uses
-quiet metric panels and aligned order references, suppliers, amounts, and statuses;
-phone layouts keep each order together in a compact row. The spend chart shows the
-existing daily values with currency and date axes and the existing period controls.
-Reorder suggestions retain their original quantities and ordering actions; row
-position does not imply urgency.
-
-English and Arabic restaurant role headings and metric captions are localized.
-Arabic uses a bundled IBM Plex Sans Arabic font, logical alignment, and isolated
-order references and amounts. Dashboard surfaces and controls support light and
-dark themes. This is a web presentation change; API contracts and the native
-restaurant Home screens are unchanged. See the
-[2026-11-16 design review](../../output/unslop-restaurant-dashboard/README.md).
-
 ## Core flows
 
 | Flow                        | Summary                                               | Spec                                                                                                                             |

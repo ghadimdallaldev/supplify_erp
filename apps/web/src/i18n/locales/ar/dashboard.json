@@ -13,40 +13,16 @@
   "kpi": {
     "zeroCurrency": "٠ $",
     "supplier": {
-      "revenue": {
-        "label": "الإيرادات",
-        "meta": "طوال الوقت"
-      },
-      "orders": {
-        "label": "الطلبات",
-        "meta": "جميع الطلبات"
-      },
-      "pending": {
-        "label": "قيد الانتظار",
-        "meta": "في انتظار التنفيذ"
-      },
-      "counterpart": {
-        "label": "المطاعم",
-        "meta": "العملاء النشطون"
-      }
+      "revenue": { "label": "الإيرادات", "meta": "طوال الوقت" },
+      "orders": { "label": "الطلبات", "meta": "جميع الطلبات" },
+      "pending": { "label": "قيد الانتظار", "meta": "في انتظار التنفيذ" },
+      "counterpart": { "label": "المطاعم", "meta": "العملاء النشطون" }
     },
     "restaurant": {
-      "revenue": {
-        "label": "إجمالي الإنفاق",
-        "meta": "طوال الوقت"
-      },
-      "orders": {
-        "label": "طلباتي",
-        "meta": "جميع الطلبات"
-      },
-      "pending": {
-        "label": "قيد الانتظار",
-        "meta": "قيد التنفيذ"
-      },
-      "counterpart": {
-        "label": "الموردون",
-        "meta": "البائعون النشطون"
-      }
+      "revenue": { "label": "إجمالي الإنفاق", "meta": "طوال الوقت" },
+      "orders": { "label": "طلباتي", "meta": "جميع الطلبات" },
+      "pending": { "label": "قيد الانتظار", "meta": "قيد التنفيذ" },
+      "counterpart": { "label": "الموردون", "meta": "البائعون النشطون" }
     }
   },
   "onboarding": {
@@ -87,10 +63,7 @@
       "footerLastDays": "آخر {{days}} يومًا",
       "footerLastDaysOrders": "آخر {{days}} يومًا (طلبات)",
       "footerAllTimeOrders": "طوال الوقت (طلبات)",
-      "tooltipLabel": "الإنفاق",
-      "chartDescription_one": "الإنفاق اليومي على المشتريات",
-      "chartDescription_other": "الإنفاق اليومي على المشتريات",
-      "chartDescription": "الإنفاق اليومي على المشتريات"
+      "tooltipLabel": "الإنفاق"
     },
     "stockAlerts": {
       "lowStockTitle": "مخزون منخفض",
@@ -102,10 +75,7 @@
       "availableWithThreshold": "المتاح: {{qty}} · الحد: {{threshold}}",
       "noSuggestions": "لا توجد اقتراحات لإعادة الطلب",
       "currentSuggest": "الحالي: {{current}} · المقترح: {{suggest}}",
-      "addButton": "+ إضافة",
-      "aiRecommendation": "توصية إعادة طلب بالذكاء الاصطناعي",
-      "forecastRecommendation": "توصية إعادة طلب حسب التوقعات",
-      "adding": "جارٍ الإضافة إلى قائمة الطلب"
+      "addButton": "+ إضافة"
     },
     "expiry": {
       "title": "انتهاء صلاحية المخزون",
@@ -136,119 +106,5 @@
     "createQuickListFirst": "أنشئ قائمة سريعة أولًا",
     "addedToQuickList": "تمت إضافة {{productName}} ({{qty}}) إلى {{listName}}",
     "addToQuickListFailed": "فشلت الإضافة إلى القائمة السريعة"
-  },
-  "restaurantTitle": "لوحة تحكم المطعم",
-  "restaurantLabels": {
-    "recentOrders": "الطلبات الأخيرة",
-    "viewAll": "عرض الكل"
-  },
-  "restaurantWorkspace": {
-    "restaurant_owner": {
-      "title": "لوحة تحكم المطعم",
-      "description": "الإنفاق والطلبات والعلاقات مع الموردين",
-      "role": "المالك",
-      "kpis": {
-        "revenue": {
-          "label": "إجمالي الإنفاق",
-          "meta": "طوال الوقت"
-        },
-        "orders": {
-          "label": "طلباتي",
-          "meta": "جميع الطلبات"
-        },
-        "pending": {
-          "label": "قيد التنفيذ",
-          "meta": "بانتظار التسليم"
-        },
-        "counterpart": {
-          "label": "الموردون",
-          "meta": "الموردون النشطون"
-        }
-      }
-    },
-    "restaurant_manager": {
-      "title": "لوحة العمليات",
-      "description": "الطلبات والاستلام ونشاط المشتريات اليومي",
-      "role": "مدير المطعم",
-      "kpis": {
-        "revenue": {
-          "label": "الإنفاق خلال 30 يومًا",
-          "meta": "المشتريات الأخيرة"
-        },
-        "orders": {
-          "label": "الطلبات",
-          "meta": "طلبات فريقك"
-        },
-        "pending": {
-          "label": "الطلبات المفتوحة",
-          "meta": "قيد التنفيذ"
-        },
-        "counterpart": {
-          "label": "الموردون",
-          "meta": "موردو مشترياتك"
-        }
-      }
-    },
-    "restaurant_purchaser": {
-      "title": "لوحة المشتريات",
-      "description": "سلالك وطلباتك وكتالوجات الموردين",
-      "role": "مسؤول المشتريات",
-      "kpis": {
-        "orders": {
-          "label": "الطلبات",
-          "meta": "طلبات فريقك"
-        },
-        "pending": {
-          "label": "بانتظار التسليم",
-          "meta": "تتبع الحالة"
-        },
-        "counterpart": {
-          "label": "الموردون",
-          "meta": "الموردون الذين طلبت منهم"
-        }
-      }
-    },
-    "restaurant_accountant": {
-      "title": "لوحة الشؤون المالية",
-      "description": "إنفاق الفواتير والمدفوعات وفواتير الموردين",
-      "role": "المحاسب",
-      "kpis": {
-        "revenue": {
-          "label": "إنفاق الفواتير",
-          "meta": "آخر 30 يومًا"
-        },
-        "orders": {
-          "label": "الطلبات المفوترة",
-          "meta": "طلبات لها فواتير"
-        },
-        "counterpart": {
-          "label": "الموردون",
-          "meta": "موردو الفواتير"
-        }
-      }
-    },
-    "restaurant_viewer": {
-      "title": "نظرة عامة على مساحة العمل",
-      "description": "نشاط المطعم في مساحة عمل للقراءة فقط",
-      "role": "مشاهد",
-      "kpis": {
-        "revenue": {
-          "label": "إجمالي الإنفاق",
-          "meta": "طوال الوقت"
-        },
-        "orders": {
-          "label": "الطلبات",
-          "meta": "جميع الطلبات"
-        },
-        "pending": {
-          "label": "قيد التنفيذ",
-          "meta": "الطلبات المفتوحة"
-        },
-        "counterpart": {
-          "label": "الموردون",
-          "meta": "الموردون"
-        }
-      }
-    }
   }
 }

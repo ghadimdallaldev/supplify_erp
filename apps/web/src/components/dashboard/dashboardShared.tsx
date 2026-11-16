@@ -94,22 +94,14 @@ export function DashboardWidgetPanel({
   children,
   action,
   testId,
-  className,
 }: {
   title: string
   children: ReactNode
   action?: ReactNode
   testId?: string
-  className?: string
 }) {
   return (
-    <AppPanel
-      title={title}
-      titleClassName="section-label"
-      action={action}
-      testId={testId}
-      className={`dashboard-widget-panel ${className ?? ''}`}
-    >
+    <AppPanel title={title} titleClassName="section-label" action={action} testId={testId}>
       {children}
     </AppPanel>
   )
