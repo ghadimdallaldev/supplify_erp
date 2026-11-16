@@ -1,6 +1,6 @@
 # Restaurant feature audit — 2026-11-16
 
-Status: source verification passed; Development release/recheck in progress.
+Status: source verification and the documented Development walkthrough passed.
 Target is Development, as selected by the user.
 Account: the user-provided seeded Riviera restaurant owner. An initial Hamra
 account required updated legal consent; that gate was retained, and no agreement
@@ -39,7 +39,7 @@ of a completed business transaction.
 | My prices            | Supplier tabs and filters                                                                     | Contract pricing / price resolution API suites                                                                                                               |
 | Ordering lists       | List/detail and transfer to local cart                                                        | Quick-list cart, branch validation, schedule and ordering API suites                                                                                         |
 | Cart                 | Quantity increment/decrement, removal, empty state, list transfer                             | Currency grouping, quote locks, quantity validation, supplier stock and retry transactions                                                                   |
-| Quote requests       | List/empty state; no live comparison record                                                   | Quote request create/response/decline/access API suites                                                                                                      |
+| Quote requests       | List/empty state and new request form; no live comparison record                              | Quote request create/response/decline/access API suites                                                                                                      |
 | Receiving            | Pending/history, delivery form, order link                                                    | Receiving validation, duplicate receipt/invoice protection, warehouse integrity suites                                                                       |
 | Suppliers            | List/detail, catalog links, relationship controls visible                                     | Tenant/organization supplier access, reviews and blocklist API suites                                                                                        |
 | Reports              | Eight report tabs and actual CSV download/header                                              | Report-response, aggregation, waste and finance API suites                                                                                                   |
@@ -47,17 +47,17 @@ of a completed business transaction.
 | Deals                | Eligible deals and supplier controls                                                          | Discovery, redemption limits, pricing, quote-lock and promotion rollback suites                                                                              |
 | Price intelligence   | Page and evidence/empty states                                                                | Deterministic price-change and restaurant intelligence suites                                                                                                |
 | Invoices             | Dashboard/list, supplier/date filtering, detail, valid PDF bytes                              | Balances, payment/status rules, receiving-linked invoicing and payables suites                                                                               |
-| Chat                 | Inbox and conversation selection view; no message sent                                        | Chat access, realtime authorization and notification suites                                                                                                  |
+| Chat                 | Inbox, existing conversation, enabled composer; no message sent                               | Chat access, realtime authorization and notification suites                                                                                                  |
 | Recipe costing       | Dashboard and empty states                                                                    | Real recipe cost creation/recalculation plus unit/conversion and price-impact suites                                                                         |
-| Recipes              | List/empty state; no live recipe detail record                                                | Recipe CRUD/cost engine and tenant isolation                                                                                                                 |
-| Inventory            | Initial crash reproduced; corrected route requires post-release recheck                       | Real waste, weekly-summary and expiry/reorder SQL, stock and inventory import suites                                                                         |
+| Recipes              | List/empty state and builder form; no live recipe detail record                               | Recipe CRUD/cost engine and tenant isolation                                                                                                                 |
+| Inventory            | Stock/waste/history/expiry/totals tabs; weekly summary 200; 29 named reorder suggestions      | Real waste, weekly-summary and expiry/reorder SQL, stock and inventory import suites                                                                         |
 | Settings / profile   | Profile, team, branches, activity, reviews                                                    | Auth, branch scope, role and entitlement suites                                                                                                              |
 | Reservations         | Calendar day/week/month and waitlist                                                          | Policy, capacity, availability, branch ownership and reservation route suites                                                                                |
 | Staff                | Calendar/team directory and attendance entry views                                            | Staff routes, shift windows, portal access and payroll/labour suites                                                                                         |
 | Guest menu           | Menu and fulfillment views                                                                    | Consumer menu, availability and ordering-hours suites                                                                                                        |
 | Guest orders         | All/received/preparing/ready views                                                            | Consumer checkout, status, idempotency and currency suites                                                                                                   |
 | Guest rewards        | Program and earn/redeem controls                                                              | Loyalty ledger, redemption and consumer reward suites                                                                                                        |
-| Dashboard / calendar | Metrics, recent order links, chart and calendar controls                                      | Dashboard role metrics, period controls and calendar API suites                                                                                              |
+| Dashboard / calendar | Metrics, 7/30/90-day spend periods; month/week/day/agenda calendar views                      | Dashboard role metrics, period controls and calendar API suites                                                                                              |
 
 ## Evidence and gates
 
@@ -74,9 +74,30 @@ of a completed business transaction.
 - Root and both native typechecks pass. Web lint has no errors or warnings; API
   lint has no errors and retains 41 existing unused-import/variable warnings in
   the changed legacy files. Web production build passes.
-- Development post-release browser/API checks are pending at this draft stage.
+- Development post-release page sweep: **24 areas at 1440px and 390px** (48 visits).
+  No console/page errors, caught route crashes, failed hosted requests, or document
+  overflow were recorded.
+- **38 deeper checks passed**, covering nested tabs, pagination, search, details,
+  local cart operations, entry forms, chat composer, chart/calendar controls,
+  filters, and PDF/CSV downloads. No live purchase, receipt, recipe, quote,
+  payment, booking, or message was submitted.
+- The corrected weekly-summary and reorder-assistance endpoints return 200;
+  all 29 returned reorder suggestions have names. Supplier detail no longer
+  triggers the unused forbidden restaurant query.
 
-Evidence lives in `output/restaurant-audit-2026-11-16/`. Scripts retain sessions in
+## Development release
+
+- ERP source: `206c4622286520ad1cbb959c552a2f4d6aa10283` on `dev`.
+- Android parity: `d55333ee69be225c7b6ae9db3fe6de7f8d7cdc9c` on `dev`.
+- iOS parity: `075ea9bfcfe43c70a5e3104f108d150bb8160f1c` on `dev`.
+- API deployment: `a375ae1a-fc42-462a-9c01-9663cbc3ac25` (SUCCESS).
+- Web deployment: `fd4c1ca8-1c0d-4be8-aa51-84275af25e8d` (SUCCESS).
+- API startup logs confirm migration `0235` and migration completion. Both API
+  and web have one healthy replica and no pending work or active service issues.
+
+Evidence lives in `output/restaurant-audit-2026-11-16/`; the committed
+`verification-summary.json` contains the aggregate results. Detailed captures and
+logs remain local. Scripts retain sessions in
 memory, never write tokens, and use the existing seeded login password through
 the seed-data module. `scripts/qa/restaurant-audit-db.mjs` creates an owned,
 disposable localhost-only PostgreSQL container. No business records are copied

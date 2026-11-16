@@ -1,0 +1,301 @@
+{
+  "verifiedAt": "2026-11-16T14:20:10.577Z",
+  "environment": "Development",
+  "web": "https://app-dev.supplifyerp.com",
+  "sourceCommit": "206c4622286520ad1cbb959c552a2f4d6aa10283",
+  "confirmedProductDefectsFixed": 8,
+  "automated": {
+    "api": {
+      "files": 396,
+      "tests": 2610,
+      "status": "passed"
+    },
+    "web": {
+      "files": 163,
+      "tests": 625,
+      "status": "passed"
+    },
+    "postgres": {
+      "files": 2,
+      "tests": 43,
+      "status": "passed"
+    },
+    "migrations": {
+      "freshCount": 236,
+      "upgradeAppliedCount": 1,
+      "status": "passed"
+    },
+    "typechecks": {
+      "erp": "passed",
+      "android": "passed",
+      "ios": "passed"
+    },
+    "webBuild": "passed",
+    "targetedLint": {
+      "webErrors": 0,
+      "webWarnings": 0,
+      "apiErrors": 0,
+      "existingApiWarnings": 41
+    }
+  },
+  "mobile": {
+    "android": {
+      "commit": "d55333ee69be225c7b6ae9db3fe6de7f8d7cdc9c",
+      "suites": 2,
+      "tests": 11,
+      "status": "passed"
+    },
+    "ios": {
+      "commit": "075ea9bfcfe43c70a5e3104f108d150bb8160f1c",
+      "suites": 2,
+      "tests": 11,
+      "status": "passed"
+    }
+  },
+  "deploymentAtWalkthrough": {
+    "api": {
+      "id": "a375ae1a-fc42-462a-9c01-9663cbc3ac25",
+      "status": "SUCCESS"
+    },
+    "web": {
+      "id": "fd4c1ca8-1c0d-4be8-aa51-84275af25e8d",
+      "status": "SUCCESS"
+    },
+    "migration0235": "Applied; SQL migrations completed in API startup logs"
+  },
+  "live": {
+    "pages": [
+      {
+        "width": 1440,
+        "visits": 24,
+        "status": "passed",
+        "routes": [
+          "/app/orders",
+          "/app/products",
+          "/app/my-prices",
+          "/app/quick-lists",
+          "/app/cart",
+          "/app/quote-requests",
+          "/app/receiving",
+          "/app/suppliers",
+          "/app/reports",
+          "/app/disputes",
+          "/app/deals",
+          "/app/price-intelligence",
+          "/app/invoices",
+          "/app/chat",
+          "/app/recipe-costing",
+          "/app/recipes",
+          "/app/restaurant-inventory",
+          "/app/settings",
+          "/app/reservations",
+          "/app/staff",
+          "/app/consumer-menu",
+          "/app/consumer-orders",
+          "/app/consumer-loyalty",
+          "/app/dashboard"
+        ]
+      },
+      {
+        "width": 390,
+        "visits": 24,
+        "status": "passed",
+        "routes": [
+          "/app/orders",
+          "/app/products",
+          "/app/my-prices",
+          "/app/quick-lists",
+          "/app/cart",
+          "/app/quote-requests",
+          "/app/receiving",
+          "/app/suppliers",
+          "/app/reports",
+          "/app/disputes",
+          "/app/deals",
+          "/app/price-intelligence",
+          "/app/invoices",
+          "/app/chat",
+          "/app/recipe-costing",
+          "/app/recipes",
+          "/app/restaurant-inventory",
+          "/app/settings",
+          "/app/reservations",
+          "/app/staff",
+          "/app/consumer-menu",
+          "/app/consumer-orders",
+          "/app/consumer-loyalty",
+          "/app/dashboard"
+        ]
+      }
+    ],
+    "deeperChecks": [
+      {
+        "name": "Corrections: supplier projection and inventory API responses",
+        "status": "passed"
+      },
+      {
+        "name": "Orders: list pagination changes the visible page",
+        "status": "passed"
+      },
+      {
+        "name": "Orders: search and detail tabs",
+        "status": "passed"
+      },
+      {
+        "name": "Products: search, detail, add to cart, quantity and removal",
+        "status": "passed"
+      },
+      {
+        "name": "/app/my-prices: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/quick-lists: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/quote-requests: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/receiving: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/suppliers: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/reports: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/disputes: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/deals: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/price-intelligence: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/invoices: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/chat: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/recipe-costing: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/recipes: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/restaurant-inventory: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/settings: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/reservations: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/staff: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/consumer-menu: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/consumer-orders: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/consumer-loyalty: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "/app/dashboard: nested tabs and views",
+        "status": "passed"
+      },
+      {
+        "name": "Invoices: detail and real PDF response",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: ordering list contents and transfer to cart",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: receiving delivery form",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: quote comparison",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: supplier detail",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: dispute detail",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: recipe detail",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: purchasing filters",
+        "status": "passed"
+      },
+      {
+        "name": "Actions: report CSV export",
+        "status": "passed"
+      },
+      {
+        "name": "Entries: /app/quote-requests/new form",
+        "status": "passed"
+      },
+      {
+        "name": "Entries: /app/recipes/new form",
+        "status": "passed"
+      },
+      {
+        "name": "Entries: chat conversation and composer",
+        "status": "passed"
+      },
+      {
+        "name": "Entries: dashboard spend periods and calendar views",
+        "status": "passed"
+      }
+    ],
+    "weeklySummaryStatus": 200,
+    "reorderAssistanceStatus": 200,
+    "namedReorderSuggestions": 29,
+    "browserErrors": 0,
+    "caughtRouteErrors": 0,
+    "failedHostedRequests": 0,
+    "documentOverflow": 0,
+    "businessTransactionsSubmitted": 0,
+    "messagesSent": 0
+  },
+  "limits": [
+    "Selected seeded restaurant owner in Development; no absolute bug-free guarantee.",
+    "Business mutations verified in isolated tests; no hosted purchases, receipts, payments or bookings submitted.",
+    "Live quote comparison and recipe detail fixtures absent for the selected account; isolated coverage recorded in audit.",
+    "Physical devices, every plan/role/branch, offline sessions and external delivery providers are not certified."
+  ]
+}

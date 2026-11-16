@@ -208,6 +208,34 @@ try {
       )
       console.log(JSON.stringify(result))
     }
+    await check('Corrections: supplier projection and inventory API responses', async () => {
+      const requestData = async (path) => {
+        const response = await context.request.get(`${web}${path}`)
+        assert.equal(response.status(), 200, `${path} should succeed`)
+        const body = await response.json()
+        assert.equal(body.ok, true)
+        return body.data
+      }
+      const orders = await requestData('/api/orders?limit=3')
+      assert.ok(orders.orders.length > 0, 'Live order fixture is required')
+      for (const order of orders.orders) {
+        assert.ok(Object.hasOwn(order, 'supplier_name'))
+        assert.ok(order.supplier_name === null || typeof order.supplier_name === 'string')
+      }
+      await requestData('/api/restaurant-intelligence/weekly-summary')
+      const reorder = await requestData('/api/restaurant-inventory/reorder-assistance')
+      for (const suggestion of reorder.suggestions) {
+        assert.ok(typeof suggestion.productName === 'string' && suggestion.productName.length > 0)
+      }
+      await visit('/app/orders')
+      await page.getByRole('columnheader', { name: 'Supplier', exact: true }).waitFor()
+      return {
+        restaurantSupplierProjection: true,
+        weeklySummaryStatus: 200,
+        reorderStatus: 200,
+        namedSuggestions: reorder.suggestions.length,
+      }
+    })
     await check('Orders: list pagination changes the visible page', async () => {
       await visit('/app/orders')
       const links = () => page.getByRole('link', { name: 'View Details', exact: true })
@@ -294,6 +322,56 @@ try {
         return { tabs: visited, headings: await page.locator('main h1,main h2').allTextContents() }
       })
     }
+    for (const path of ['/app/quote-requests/new', '/app/recipes/new']) {
+      await check(`Entries: ${path} form`, async () => {
+        await visit(path)
+        assert.equal(new URL(page.url()).pathname, path)
+        assert.equal(
+          await page.getByRole('heading', { name: 'Something went wrong', exact: true }).count(),
+          0
+        )
+        await page.locator('main input').first().waitFor()
+        return { formOpened: true, submitted: false }
+      })
+    }
+    await check('Entries: chat conversation and composer', async () => {
+      await visit('/app/chat')
+      await page.locator('button.chat-list-item').first().click()
+      await settle()
+      const composer = page.locator('main textarea').first()
+      await composer.waitFor()
+      assert.equal(await composer.isEnabled(), true)
+      return { conversationOpened: true, composerEnabled: true, messagesSent: 0 }
+    })
+    await check('Entries: dashboard spend periods and calendar views', async () => {
+      await visit('/app/dashboard')
+      const periods = page.locator('button[data-testid^="spend-trend-period-"]')
+      const periodIds = await periods.evaluateAll((nodes) =>
+        nodes.map((node) => node.dataset.testid)
+      )
+      assert.ok(periodIds.length >= 2)
+      const originalPeriod = await page
+        .locator('button[data-testid^="spend-trend-period-"][aria-pressed="true"]')
+        .getAttribute('data-testid')
+      for (const id of periodIds) {
+        await page.getByTestId(id).click()
+        await settle()
+        assert.equal(await page.getByTestId(id).getAttribute('aria-pressed'), 'true')
+      }
+      await page.getByTestId(originalPeriod).click()
+      const views = [
+        ['Week', 'timeGridWeek'],
+        ['Day', 'timeGridDay'],
+        ['Agenda', 'listWeek'],
+        ['Month', 'dayGridMonth'],
+      ]
+      for (const [name, view] of views) {
+        await page.getByRole('button', { name, exact: true }).click()
+        await settle()
+        await page.locator(`.fc-${view}-view`).waitFor()
+      }
+      return { periods: periodIds, calendarViews: views.map(([name]) => name) }
+    })
     await check('Invoices: detail and real PDF response', async () => {
       await visit('/app/invoices')
       await page
