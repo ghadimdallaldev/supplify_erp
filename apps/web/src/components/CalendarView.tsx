@@ -399,7 +399,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder={t('filters.allStatuses')}>
+          <SelectTrigger
+            aria-label={t('filters.allStatuses')}
+            placeholder={t('filters.allStatuses')}
+          >
             <option value="">{t('filters.allStatuses')}</option>
             {data?.filters?.statuses?.map((status) => (
               <SelectItem key={status} value={status}>
@@ -416,7 +419,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder={supplierFilterLabel}>
+          <SelectTrigger aria-label={supplierFilterLabel} placeholder={supplierFilterLabel}>
             <option value="">{supplierFilterLabel}</option>
             {data?.filters?.suppliers?.map((supplier) => (
               <SelectItem key={supplier.id} value={supplier.id}>
@@ -433,7 +436,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder={t('filters.allBranches')}>
+          <SelectTrigger
+            aria-label={t('filters.allBranches')}
+            placeholder={t('filters.allBranches')}
+          >
             <option value="">{t('filters.allBranches')}</option>
             {data?.filters?.branches?.map((branch) => (
               <SelectItem key={branch.id} value={branch.id}>
@@ -450,7 +456,10 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
             setPage(1)
           }}
         >
-          <SelectTrigger placeholder={t('filters.allCategories')}>
+          <SelectTrigger
+            aria-label={t('filters.allCategories')}
+            placeholder={t('filters.allCategories')}
+          >
             <option value="">{t('filters.allCategories')}</option>
             {data?.filters?.categories?.map((category) => (
               <SelectItem key={category} value={category}>
@@ -464,7 +473,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-[var(--text-muted)]">
         <Badge
           variant="outline"
-          className="flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]"
+          className="calendar-filter-hint flex items-center gap-1 border-dashed border-[var(--brand)] text-[var(--brand-mid)]"
         >
           <Filter className="h-3.5 w-3.5" />
           {t('filters.liveHint')}

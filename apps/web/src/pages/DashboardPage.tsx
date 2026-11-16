@@ -47,13 +47,14 @@ import {
 import { DashboardLoading } from '../components/dashboard/DashboardLoading'
 import { DashboardPostOnboardingBanners } from '../components/dashboard/DashboardPostOnboardingBanners'
 import { LazyDashboardWidgetGrid } from '../components/dashboard/lazyDashboardWidgets'
+import '../components/dashboard/restaurant-dashboard.css'
 
 const CalendarView = lazy(() =>
   import('../components/CalendarView').then((m) => ({ default: m.CalendarView }))
 )
 
 export function DashboardPage() {
-  const { t } = useTranslation('dashboard')
+  const { t, i18n } = useTranslation('dashboard')
 
   useEffect(() => {
     void ensureNamespace('dashboard')
@@ -310,6 +311,10 @@ export function DashboardPage() {
 
   const baseKpis = isSupplier ? supplierKpis : restaurantKpis
   const dashboardConfig = persona.dashboard
+  const restaurantCopyKey = `restaurantWorkspace.${persona.id}`
+  const roleLabel = isRestaurant
+    ? t(`${restaurantCopyKey}.role`, { defaultValue: persona.roleLabel })
+    : persona.roleLabel
   const kpis = dashboardConfig
     ? baseKpis
         .filter((kpi) => dashboardConfig.kpiKeys.includes(kpi.kpiKey))
@@ -322,9 +327,16 @@ export function DashboardPage() {
             formatCurrency,
             t('kpi.zeroCurrency')
           )
+          const label = override?.label ?? kpi.label
+          const meta = override?.meta ?? kpi.meta
           return {
             ...kpi,
-            ...(override ? { label: override.label, meta: override.meta } : {}),
+            label: isRestaurant
+              ? t(`${restaurantCopyKey}.kpis.${kpi.kpiKey}.label`, { defaultValue: label })
+              : label,
+            meta: isRestaurant
+              ? t(`${restaurantCopyKey}.kpis.${kpi.kpiKey}.meta`, { defaultValue: meta ?? '' })
+              : meta,
             ...(personaValue !== undefined ? { value: personaValue } : {}),
           }
         })
@@ -332,13 +344,17 @@ export function DashboardPage() {
 
   return (
     <ContentReveal>
-      <PageShell data-testid="dashboard-page" maxWidth="wide">
+      <PageShell
+        data-testid="dashboard-page"
+        maxWidth="wide"
+        className={isRestaurant ? 'restaurant-dashboard' : undefined}
+      >
         {persona.readOnly && (
           <p
             className="m-0 rounded-lg border border-[var(--app-border)] bg-[var(--brand-ultra)] px-3 py-2.5 text-xs text-[var(--text-muted)]"
             role="status"
           >
-            {t('readOnlyWorkspace', { roleLabel: persona.roleLabel })}
+            {t('readOnlyWorkspace', { roleLabel })}
           </p>
         )}
 
@@ -351,28 +367,69 @@ export function DashboardPage() {
         />
 
         <PageHeader
-          title={dashboardConfig?.title ?? `${greeting}, ${firstName}`}
-          description={dashboardConfig?.description ?? formattedDate}
+          className={isRestaurant ? 'restaurant-dashboard-header' : undefined}
+          title={
+            isRestaurant
+              ? t(`${restaurantCopyKey}.title`, {
+                  defaultValue: dashboardConfig?.title ?? t('restaurantTitle'),
+                })
+              : (dashboardConfig?.title ?? `${greeting}, ${firstName}`)
+          }
+          description={
+            isRestaurant
+              ? t(`${restaurantCopyKey}.description`, {
+                  defaultValue: dashboardConfig?.description ?? formattedDate,
+                })
+              : (dashboardConfig?.description ?? formattedDate)
+          }
           actions={
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline">{persona.roleLabel}</Badge>
-              <Badge variant="default">{planName}</Badge>
-            </div>
+            isRestaurant ? (
+              <div className="restaurant-workspace-meta">
+                <span>{roleLabel}</span>
+                <span aria-hidden="true">/</span>
+                <span>{planName}</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge variant="outline">{persona.roleLabel}</Badge>
+                <Badge variant="default">{planName}</Badge>
+              </div>
+            )
           }
         />
 
         <div className="dashboard-kpi-grid" data-testid="dashboard-kpi-grid">
-          {kpis.map((kpi) => (
-            <KpiCard
-              key={kpi.kpiKey}
-              label={kpi.label}
-              value={kpi.value}
-              icon={kpi.Icon}
-              tone={dashboardKpiTone(kpi.kpiKey)}
-              description={kpi.meta}
-              testId={`dashboard-kpi-${kpi.kpiKey}`}
-            />
-          ))}
+          {kpis.map((kpi) =>
+            isRestaurant ? (
+              <div
+                key={kpi.kpiKey}
+                className="restaurant-kpi"
+                data-testid={`dashboard-kpi-${kpi.kpiKey}`}
+              >
+                <p className="restaurant-kpi-label">{kpi.label}</p>
+                <p className="restaurant-kpi-value">
+                  <bdi dir="ltr">
+                    {typeof kpi.value === 'number'
+                      ? new Intl.NumberFormat(i18n.language, { numberingSystem: 'latn' }).format(
+                          kpi.value
+                        )
+                      : kpi.value}
+                  </bdi>
+                </p>
+                <p className="restaurant-kpi-meta">{kpi.meta}</p>
+              </div>
+            ) : (
+              <KpiCard
+                key={kpi.kpiKey}
+                label={kpi.label}
+                value={kpi.value}
+                icon={kpi.Icon}
+                tone={dashboardKpiTone(kpi.kpiKey)}
+                description={kpi.meta}
+                testId={`dashboard-kpi-${kpi.kpiKey}`}
+              />
+            )
+          )}
         </div>
 
         <Suspense
@@ -413,7 +470,10 @@ export function DashboardPage() {
         </Suspense>
 
         {showDashboardCalendar && calendarReady && (
-          <div className="min-w-0" style={{ marginTop: DASHBOARD_CALENDAR_EXTRA_GAP }}>
+          <div
+            className={isRestaurant ? 'restaurant-dashboard-calendar min-w-0' : 'min-w-0'}
+            style={{ marginTop: isRestaurant ? 0 : DASHBOARD_CALENDAR_EXTRA_GAP }}
+          >
             <Suspense
               fallback={
                 <div className="p-6">

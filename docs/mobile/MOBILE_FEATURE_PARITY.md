@@ -1,5 +1,20 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-16 - Web restaurant dashboard polish (mobile skip)
+
+Refined the web restaurant dashboard's spacing, metric hierarchy, spend chart,
+compact order rows, stock/expiry presentation, and English/Arabic restaurant copy.
+Purple Supplify branding, section order, data sources, metric calculations,
+navigation, permission/plan gates, and ordering actions are retained.
+
+Both `C:/myProjects/supplify-mobile` (Android) and
+`C:/myProjects/supplify-mobile-ios` (iOS) are intentionally skipped under the
+web-only UI/layout exception. No API behavior, auth/session, RBAC permission,
+shared client contract/type, feature key, order state, notification payload, or
+environment variable changed. Bundled Arabic fonts are web assets only.
+Validation and preview evidence are recorded in the
+[dashboard design review](../../output/unslop-restaurant-dashboard/README.md).
+
 ## 2026-11-16 - Design round 1.1: Home finishing pass (presentation only)
 
 Corrections to Round 1 in both mobile worktrees (`design/round-01-home`,

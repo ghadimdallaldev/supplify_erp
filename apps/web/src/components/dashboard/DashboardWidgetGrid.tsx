@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { Skeleton } from '../ui/skeleton'
 import { StatusBadge } from '../ui/status-badge'
 import { formatCurrency } from '../../utils/format'
+import { formatDate } from '../../i18n/formatters'
 import type { ReorderAiRecommendation } from '../../types/reorder'
 import {
   DashboardWidgetPanel,
@@ -121,13 +122,14 @@ export function DashboardWidgetGrid(props: any) {
         {/* Col 1 — Recent Orders */}
         {showRestaurantSection('showRecentOrders') && (
           <DashboardWidgetPanel
-            title={t('widgets.recentOrders.title')}
+            className={isRestaurant ? 'restaurant-recent-panel' : undefined}
+            title={t(isRestaurant ? 'restaurantLabels.recentOrders' : 'widgets.recentOrders.title')}
             action={
               <Link
                 to="/app/orders"
                 className="text-[11px] font-semibold text-[var(--brand)] no-underline hover:underline"
               >
-                {t('widgets.recentOrders.viewAll')}
+                {t(isRestaurant ? 'restaurantLabels.viewAll' : 'widgets.recentOrders.viewAll')}
               </Link>
             }
           >
@@ -149,61 +151,90 @@ export function DashboardWidgetGrid(props: any) {
                   <Link
                     key={o.id}
                     to={`/app/orders/${o.id}`}
-                    className="dashboard-split-row"
-                    style={{
-                      padding: '8px 4px',
-                      borderBottom: '1px solid var(--app-border)',
-                      textDecoration: 'none',
-                    }}
+                    className={isRestaurant ? 'restaurant-order-row' : 'dashboard-split-row'}
+                    style={
+                      isRestaurant
+                        ? undefined
+                        : {
+                            padding: '8px 4px',
+                            borderBottom: '1px solid var(--app-border)',
+                            textDecoration: 'none',
+                          }
+                    }
                   >
                     <div style={{ minWidth: 0 }}>
                       <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: 'var(--text)',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          whiteSpace: 'nowrap',
-                        }}
+                        className={isRestaurant ? 'restaurant-order-reference' : undefined}
+                        style={
+                          isRestaurant
+                            ? undefined
+                            : {
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: 'var(--text)',
+                                fontFamily: "'JetBrains Mono', monospace",
+                                whiteSpace: 'nowrap',
+                              }
+                        }
                       >
-                        #{o.id.slice(0, 8).toUpperCase()}
+                        <bdi dir="ltr">#{o.id.slice(0, 8).toUpperCase()}</bdi>
                       </div>
                       <div
-                        style={{
-                          fontSize: 11,
-                          color: 'var(--text-muted)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginTop: 1,
-                        }}
+                        className={isRestaurant ? 'restaurant-order-supplier' : undefined}
+                        style={
+                          isRestaurant
+                            ? undefined
+                            : {
+                                fontSize: 11,
+                                color: 'var(--text-muted)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                marginTop: 1,
+                              }
+                        }
                       >
-                        {isSupplier
-                          ? o.customer_display_name ||
-                            o.restaurant_name ||
-                            o.restaurantName ||
-                            t('widgets.recentOrders.customerFallback')
-                          : t('widgets.recentOrders.fromSupplier', {
-                              name:
-                                o.supplier_name ||
-                                o.supplierName ||
-                                t('widgets.recentOrders.supplierFallback'),
-                            })}
+                        {isSupplier ? (
+                          o.customer_display_name ||
+                          o.restaurant_name ||
+                          o.restaurantName ||
+                          t('widgets.recentOrders.customerFallback')
+                        ) : (
+                          <bdi>
+                            {o.supplier_name ||
+                              o.supplierName ||
+                              t('widgets.recentOrders.supplierFallback')}
+                          </bdi>
+                        )}
                       </div>
                     </div>
                     <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-end',
-                        gap: 3,
-                        flexShrink: 0,
-                      }}
+                      className={isRestaurant ? 'restaurant-order-amount' : undefined}
+                      style={
+                        isRestaurant
+                          ? undefined
+                          : {
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'flex-end',
+                              gap: 3,
+                              flexShrink: 0,
+                            }
+                      }
                     >
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>
-                        {formatCurrency(o.total_amount)}
+                      <span
+                        style={
+                          isRestaurant
+                            ? undefined
+                            : { fontSize: 12, fontWeight: 700, color: 'var(--text)' }
+                        }
+                      >
+                        <bdi dir="ltr">{formatCurrency(o.total_amount)}</bdi>
                       </span>
-                      <StatusBadge status={o.status} />
+                      <StatusBadge
+                        status={o.status}
+                        className={isRestaurant ? 'restaurant-order-status' : undefined}
+                      />
                     </div>
                   </Link>
                 ))
@@ -302,11 +333,12 @@ export function DashboardWidgetGrid(props: any) {
           </DashboardWidgetPanel>
         ) : showRestaurantSection('showSpendTrend') ? (
           <DashboardWidgetPanel
+            className="restaurant-spend-panel"
             title={t('widgets.spendTrend.title')}
             action={
               financeInvoicesEnabled && onPeriodDaysChange ? (
                 <div
-                  className="flex items-center gap-0.5"
+                  className="restaurant-period-control"
                   role="group"
                   aria-label={t('widgets.spendTrend.periodAriaLabel')}
                   data-testid="spend-trend-period-toggle"
@@ -318,12 +350,6 @@ export function DashboardWidgetGrid(props: any) {
                       data-testid={`spend-trend-period-${days}d`}
                       aria-pressed={periodDays === days}
                       onClick={() => onPeriodDaysChange(days as SpendTrendPeriodDays)}
-                      className="cursor-pointer rounded-[5px] border px-1.5 py-0.5 text-[10px] font-bold font-[inherit]"
-                      style={{
-                        borderColor: periodDays === days ? 'var(--brand-mid)' : 'var(--app-border)',
-                        background: periodDays === days ? 'var(--brand-pale)' : 'var(--surface)',
-                        color: periodDays === days ? 'var(--brand)' : 'var(--text-muted)',
-                      }}
                     >
                       {t('widgets.spendTrend.periodDays', { days })}
                     </button>
@@ -336,7 +362,7 @@ export function DashboardWidgetGrid(props: any) {
               <Suspense
                 fallback={
                   <Skeleton
-                    className="h-[120px] w-full rounded-md"
+                    className="h-[240px] w-full rounded-md"
                     aria-label={t('widgets.spendTrend.loadingAriaLabel')}
                   />
                 }
@@ -344,38 +370,21 @@ export function DashboardWidgetGrid(props: any) {
                 <SpendTrendChart data={spendTrend} />
               </Suspense>
             ) : (
-              <p
-                style={{
-                  fontSize: 12,
-                  color: 'var(--text-muted)',
-                  textAlign: 'center',
-                  padding: '32px 0',
-                }}
-              >
+              <p className="restaurant-spend-empty">
                 {typeof stats?.totalSpent === 'number' && stats.totalSpent > 0
                   ? t('widgets.spendTrend.emptyNoRecent', { days: periodDays })
                   : t('widgets.spendTrend.emptyNoData')}
               </p>
             )}
-            <div
-              style={{
-                marginTop: 8,
-                paddingTop: 10,
-                borderTop: '1px solid var(--app-border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            <div className="restaurant-spend-total">
+              <span>
                 {spendTrend.length > 0
                   ? spendTrendSource === 'orders'
                     ? t('widgets.spendTrend.footerLastDaysOrders', { days: periodDays })
                     : t('widgets.spendTrend.footerLastDays', { days: periodDays })
                   : t('widgets.spendTrend.footerAllTimeOrders')}
               </span>
-              <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--text)' }}>
+              <bdi dir="ltr">
                 {formatCurrency(
                   spendTrend.length > 0
                     ? spendTrendPeriodTotal
@@ -383,7 +392,7 @@ export function DashboardWidgetGrid(props: any) {
                       ? stats.totalSpent
                       : 0
                 )}
-              </span>
+              </bdi>
             </div>
           </DashboardWidgetPanel>
         ) : null}
@@ -391,6 +400,7 @@ export function DashboardWidgetGrid(props: any) {
         {/* Col 3 — Restaurant: reorder | Supplier: low stock */}
         {(isSupplier || showRestaurantSection('showReorderAlerts')) && (
           <DashboardWidgetPanel
+            className={isRestaurant ? 'restaurant-reorder-panel' : undefined}
             title={
               isSupplier
                 ? t('widgets.stockAlerts.lowStockTitle')
@@ -407,19 +417,11 @@ export function DashboardWidgetGrid(props: any) {
                     fontWeight: 600,
                   }}
                 >
-                  {t('widgets.recentOrders.viewAll')}
+                  {t(isRestaurant ? 'restaurantLabels.viewAll' : 'widgets.recentOrders.viewAll')}
                 </Link>
               ) : isRestaurant && smartReorderEnabled ? (
-                <Link
-                  to="/app/restaurant-inventory#reorder-assistance"
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--brand)',
-                    textDecoration: 'none',
-                    fontWeight: 600,
-                  }}
-                >
-                  {t('widgets.recentOrders.viewAll')}
+                <Link to="/app/restaurant-inventory#reorder-assistance">
+                  {t(isRestaurant ? 'restaurantLabels.viewAll' : 'widgets.recentOrders.viewAll')}
                 </Link>
               ) : undefined
             }
@@ -484,20 +486,11 @@ export function DashboardWidgetGrid(props: any) {
                 )}
               </div>
             ) : isRestaurant ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div className="restaurant-reorder-list">
                 {(reorderSuggestions?.suggestions?.length ?? 0) === 0 ? (
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                      textAlign: 'center',
-                      padding: '16px 0',
-                    }}
-                  >
-                    {t('widgets.stockAlerts.noSuggestions')}
-                  </p>
+                  <p className="restaurant-list-empty">{t('widgets.stockAlerts.noSuggestions')}</p>
                 ) : (
-                  reorderSuggestions!.suggestions.slice(0, 3).map((s: any, idx: number) => {
+                  reorderSuggestions!.suggestions.slice(0, 3).map((s: any) => {
                     const coverageDays = (Number(s.lead_time_days) || 7) + 14
                     const productId = String(s.product_id || s.productId || '')
                     const aiRec = productId ? aiRecByProduct[productId] : undefined
@@ -516,14 +509,13 @@ export function DashboardWidgetGrid(props: any) {
                         ? aiRec.recommendedQuantity
                         : heuristicQty
                     // Only label after ai-recommend responds; never claim heuristic-only as AI
-                    const sourceLabel =
-                      aiRec?.source === 'ai'
-                        ? 'AI Reorder Recommendation'
-                        : aiRec
-                          ? 'Forecast Reorder Recommendation'
-                          : null
-                    const urgencyColor =
-                      idx === 0 ? 'var(--red)' : idx === 1 ? 'var(--amber)' : 'var(--mint-mid)'
+                    const sourceLabel = aiRec
+                      ? t(
+                          aiRec.source === 'ai'
+                            ? 'widgets.stockAlerts.aiRecommendation'
+                            : 'widgets.stockAlerts.forecastRecommendation'
+                        )
+                      : null
                     const isAdding = addingSuggestionId === s.id
 
                     const handleAdd = async () => {
@@ -557,39 +549,12 @@ export function DashboardWidgetGrid(props: any) {
                     }
 
                     return (
-                      <div
-                        key={s.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          padding: '8px 0',
-                          borderBottom: '1px solid var(--app-border)',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 4,
-                            height: 36,
-                            borderRadius: '0 2px 2px 0',
-                            background: urgencyColor,
-                            flexShrink: 0,
-                          }}
-                        />
+                      <div key={s.id} className="restaurant-reorder-row">
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: 'var(--text)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {s.product_name}
+                          <div className="restaurant-reorder-product">
+                            <bdi>{s.product_name}</bdi>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                          <div className="restaurant-reorder-meta">
                             {t('widgets.stockAlerts.currentSuggest', {
                               current: s.current_qty,
                               suggest: qty,
@@ -597,13 +562,7 @@ export function DashboardWidgetGrid(props: any) {
                           </div>
                           {sourceLabel && (
                             <div
-                              style={{
-                                fontSize: 10,
-                                marginTop: 2,
-                                color:
-                                  aiRec?.source === 'ai' ? 'var(--mint-mid)' : 'var(--text-muted)',
-                                fontWeight: 600,
-                              }}
+                              className="restaurant-reorder-meta"
                               data-testid="dashboard-reorder-source-label"
                             >
                               {sourceLabel}
@@ -611,6 +570,8 @@ export function DashboardWidgetGrid(props: any) {
                           )}
                         </div>
                         <button
+                          type="button"
+                          className="restaurant-add-button"
                           disabled={
                             isAdding ||
                             Boolean(
@@ -620,24 +581,14 @@ export function DashboardWidgetGrid(props: any) {
                             )
                           }
                           onClick={handleAdd}
-                          style={{
-                            background: 'var(--brand-pale)',
-                            color: 'var(--brand)',
-                            border: 'none',
-                            borderRadius: 6,
-                            padding: '4px 8px',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            cursor: isAdding ? 'not-allowed' : 'pointer',
-                            fontFamily: 'inherit',
-                            flexShrink: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
                         >
                           {isAdding ? (
-                            <Loader2 size={11} className="animate-spin" />
+                            <Loader2
+                              size={16}
+                              strokeWidth={1.5}
+                              className="animate-spin"
+                              aria-label={t('widgets.stockAlerts.adding')}
+                            />
                           ) : (
                             t('widgets.stockAlerts.addButton')
                           )}
@@ -662,12 +613,17 @@ export function DashboardWidgetGrid(props: any) {
         (reorderRemindersData?.reminders?.length ?? 0) > 0) ||
       (isSupplier && (atRiskData?.atRisk?.length ?? 0) > 0) ? (
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: DASHBOARD_GRID_GAP,
-            marginTop: DASHBOARD_STACK_GAP,
-          }}
+          className={isRestaurant ? 'restaurant-secondary-grid' : undefined}
+          style={
+            isRestaurant
+              ? undefined
+              : {
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: DASHBOARD_GRID_GAP,
+                  marginTop: DASHBOARD_STACK_GAP,
+                }
+          }
         >
           {isRestaurant && inventoryMgmtEnabled && expirySummaryData?.summary ? (
             <DashboardWidgetPanel
@@ -675,40 +631,50 @@ export function DashboardWidgetGrid(props: any) {
               action={
                 <Link
                   to="/app/restaurant-inventory?tab=expiry"
-                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                  style={
+                    isRestaurant
+                      ? undefined
+                      : { fontSize: 11, color: 'var(--brand)', fontWeight: 600 }
+                  }
                 >
-                  {t('widgets.recentOrders.viewAll')}
+                  {t(isRestaurant ? 'restaurantLabels.viewAll' : 'widgets.recentOrders.viewAll')}
                 </Link>
               }
             >
-              <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
+              <div className="restaurant-expiry-stats">
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                    {t('widgets.expiry.expiringSoon')}
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 20 }}>
+                  <div className="restaurant-kpi-label">{t('widgets.expiry.expiringSoon')}</div>
+                  <div className="restaurant-expiry-count">
                     {expirySummaryData.summary.expiringSoonCount ?? 0}
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                    {t('widgets.expiry.expired')}
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--danger, #b91c1c)' }}>
+                  <div className="restaurant-kpi-label">{t('widgets.expiry.expired')}</div>
+                  <div
+                    className="restaurant-expiry-count"
+                    style={{
+                      color: expirySummaryData.summary.expiredCount > 0 ? 'var(--red)' : undefined,
+                    }}
+                  >
                     {expirySummaryData.summary.expiredCount ?? 0}
                   </div>
                 </div>
               </div>
               {(expirySummaryData.summary.topNearestExpiry?.length ?? 0) > 0 && (
-                <ul style={{ marginTop: 12, padding: 0, listStyle: 'none', fontSize: 12 }}>
+                <ul className="restaurant-expiry-list">
                   {expirySummaryData.summary.topNearestExpiry
                     .slice(0, 5)
                     .map((lot: { id: string; itemName: string; expiryDate: string }) => (
-                      <li
-                        key={lot.id}
-                        style={{ padding: '4px 0', borderTop: '1px solid var(--app-border)' }}
-                      >
-                        {lot.itemName} — {new Date(lot.expiryDate).toLocaleDateString()}
+                      <li key={lot.id}>
+                        <bdi>{lot.itemName}</bdi>
+                        <bdi>
+                          {formatDate(lot.expiryDate, {
+                            month: 'short',
+                            day: 'numeric',
+                            numberingSystem: 'latn',
+                            timeZone: 'UTC',
+                          })}
+                        </bdi>
                       </li>
                     ))}
                 </ul>
@@ -724,21 +690,22 @@ export function DashboardWidgetGrid(props: any) {
               action={
                 <Link
                   to="/app/quick-lists"
-                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                  style={
+                    isRestaurant
+                      ? undefined
+                      : { fontSize: 11, color: 'var(--brand)', fontWeight: 600 }
+                  }
                 >
                   {t('widgets.reorderReminders.orderingLists')}
                 </Link>
               }
             >
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 12 }}>
+              <ul className="restaurant-reminder-list">
                 {reorderRemindersData.reminders
                   .slice(0, 5)
                   .map(
                     (r: { id: string; label: string; supplierName: string; dayName: string }) => (
-                      <li
-                        key={r.id}
-                        style={{ padding: '6px 0', borderBottom: '1px solid var(--app-border)' }}
-                      >
+                      <li key={r.id}>
                         {t('widgets.reorderReminders.pattern', {
                           label: r.label,
                           dayName: r.dayName,
@@ -756,7 +723,11 @@ export function DashboardWidgetGrid(props: any) {
               action={
                 <Link
                   to="/app/command-center"
-                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                  style={
+                    isRestaurant
+                      ? undefined
+                      : { fontSize: 11, color: 'var(--brand)', fontWeight: 600 }
+                  }
                 >
                   {t('widgets.atRisk.commandCenter')}
                 </Link>
@@ -794,7 +765,11 @@ export function DashboardWidgetGrid(props: any) {
               action={
                 <Link
                   to="/app/customer-growth"
-                  style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}
+                  style={
+                    isRestaurant
+                      ? undefined
+                      : { fontSize: 11, color: 'var(--brand)', fontWeight: 600 }
+                  }
                 >
                   {t('widgets.customerGrowth.manage')}
                 </Link>

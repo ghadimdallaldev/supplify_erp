@@ -13,16 +13,40 @@
   "kpi": {
     "zeroCurrency": "$0",
     "supplier": {
-      "revenue": { "label": "Revenue", "meta": "All-time" },
-      "orders": { "label": "Orders", "meta": "All orders" },
-      "pending": { "label": "Pending", "meta": "Awaiting fulfillment" },
-      "counterpart": { "label": "Restaurants", "meta": "Active customers" }
+      "revenue": {
+        "label": "Revenue",
+        "meta": "All-time"
+      },
+      "orders": {
+        "label": "Orders",
+        "meta": "All orders"
+      },
+      "pending": {
+        "label": "Pending",
+        "meta": "Awaiting fulfillment"
+      },
+      "counterpart": {
+        "label": "Restaurants",
+        "meta": "Active customers"
+      }
     },
     "restaurant": {
-      "revenue": { "label": "Total Spent", "meta": "All-time" },
-      "orders": { "label": "My Orders", "meta": "All orders" },
-      "pending": { "label": "Pending", "meta": "In progress" },
-      "counterpart": { "label": "Suppliers", "meta": "Active vendors" }
+      "revenue": {
+        "label": "Total Spent",
+        "meta": "All-time"
+      },
+      "orders": {
+        "label": "My Orders",
+        "meta": "All orders"
+      },
+      "pending": {
+        "label": "Pending",
+        "meta": "In progress"
+      },
+      "counterpart": {
+        "label": "Suppliers",
+        "meta": "Active vendors"
+      }
     }
   },
   "onboarding": {
@@ -54,7 +78,7 @@
       "totalAllTime": "Total orders (all time)"
     },
     "spendTrend": {
-      "title": "Spend Trend",
+      "title": "Spend trend",
       "periodAriaLabel": "Spend trend period",
       "periodDays": "{{days}}d",
       "loadingAriaLabel": "Loading spend trend",
@@ -63,11 +87,13 @@
       "footerLastDays": "Last {{days}} days",
       "footerLastDaysOrders": "Last {{days}} days (orders)",
       "footerAllTimeOrders": "All-time (orders)",
-      "tooltipLabel": "Spend"
+      "tooltipLabel": "Spend",
+      "chartDescription_one": "Daily purchasing spend, {{count}} data point",
+      "chartDescription_other": "Daily purchasing spend, {{count}} data points"
     },
     "stockAlerts": {
       "lowStockTitle": "Low Stock",
-      "reorderTitle": "Reorder Alerts",
+      "reorderTitle": "Reorder alerts",
       "allAboveThreshold": "All products are above their stock thresholds",
       "productFallback": "Product",
       "available": "Available: {{qty}}",
@@ -75,7 +101,10 @@
       "availableWithThreshold": "Available: {{qty}} · Threshold: {{threshold}}",
       "noSuggestions": "No reorder suggestions",
       "currentSuggest": "Current: {{current}} · Suggest: {{suggest}}",
-      "addButton": "+ Add"
+      "addButton": "+ Add",
+      "aiRecommendation": "AI reorder recommendation",
+      "forecastRecommendation": "Forecast reorder recommendation",
+      "adding": "Adding to ordering list"
     },
     "expiry": {
       "title": "Inventory expiry",
@@ -106,5 +135,119 @@
     "createQuickListFirst": "Create a quick list first",
     "addedToQuickList": "Added {{productName}} ({{qty}}) to {{listName}}",
     "addToQuickListFailed": "Failed to add to quick list"
+  },
+  "restaurantTitle": "Restaurant dashboard",
+  "restaurantLabels": {
+    "recentOrders": "Recent orders",
+    "viewAll": "View all"
+  },
+  "restaurantWorkspace": {
+    "restaurant_owner": {
+      "title": "Restaurant dashboard",
+      "description": "Spending, orders, and supplier relationships",
+      "role": "Owner",
+      "kpis": {
+        "revenue": {
+          "label": "Total spent",
+          "meta": "All time"
+        },
+        "orders": {
+          "label": "My orders",
+          "meta": "All orders"
+        },
+        "pending": {
+          "label": "In progress",
+          "meta": "Awaiting delivery"
+        },
+        "counterpart": {
+          "label": "Suppliers",
+          "meta": "Active vendors"
+        }
+      }
+    },
+    "restaurant_manager": {
+      "title": "Operations dashboard",
+      "description": "Orders, receiving, and daily purchasing activity",
+      "role": "Restaurant manager",
+      "kpis": {
+        "revenue": {
+          "label": "Spend (30 days)",
+          "meta": "Recent purchasing"
+        },
+        "orders": {
+          "label": "Orders",
+          "meta": "Placed by your team"
+        },
+        "pending": {
+          "label": "Open orders",
+          "meta": "In progress"
+        },
+        "counterpart": {
+          "label": "Suppliers",
+          "meta": "You order from"
+        }
+      }
+    },
+    "restaurant_purchaser": {
+      "title": "Ordering dashboard",
+      "description": "Your carts, orders, and supplier catalogs",
+      "role": "Purchaser",
+      "kpis": {
+        "orders": {
+          "label": "Orders",
+          "meta": "Placed by your team"
+        },
+        "pending": {
+          "label": "Awaiting delivery",
+          "meta": "Track status"
+        },
+        "counterpart": {
+          "label": "Suppliers",
+          "meta": "You have ordered from"
+        }
+      }
+    },
+    "restaurant_accountant": {
+      "title": "Finance dashboard",
+      "description": "Invoice spend, payments, and supplier billing",
+      "role": "Accountant",
+      "kpis": {
+        "revenue": {
+          "label": "Invoice spend",
+          "meta": "Last 30 days"
+        },
+        "orders": {
+          "label": "Billed orders",
+          "meta": "With invoices"
+        },
+        "counterpart": {
+          "label": "Suppliers",
+          "meta": "Billing relationships"
+        }
+      }
+    },
+    "restaurant_viewer": {
+      "title": "Workspace overview",
+      "description": "Restaurant activity in a read-only workspace",
+      "role": "Viewer",
+      "kpis": {
+        "revenue": {
+          "label": "Total spent",
+          "meta": "All time"
+        },
+        "orders": {
+          "label": "Orders",
+          "meta": "All orders"
+        },
+        "pending": {
+          "label": "In progress",
+          "meta": "Open orders"
+        },
+        "counterpart": {
+          "label": "Suppliers",
+          "meta": "Vendors"
+        }
+      }
+    }
   }
 }
