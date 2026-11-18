@@ -4,6 +4,19 @@ Tenant-scoped RBAC provides a clean foundation for mapping subscription features
 
 ## Tenant types
 
+Quote response ownership (2026-11-18): `ORDERS_MANAGE` admits supplier response and
+decline actions, but each write is also scoped to that supplier's invitation,
+request and product lines. Substitute products must share that supplier. Detail,
+comparison, cart and quote-price reads reject historical cross-request/supplier
+links. Restaurant cart/pricing reads remain scoped to the requesting restaurant.
+No permission key or role grant changed.
+
+Manual-order replay (2026-11-18): idempotency scope includes the authenticated
+supplier and destination restaurant. Historical successful responses require that
+same restaurant and supplier ownership on every stored line before replay. Knowing
+another supplier's request key/payload cannot expose its order response. Existing
+`ORDERS_CREATE`/manage admission remains unchanged.
+
 - **RESTAURANT** – Restaurant tenant (branches, reservations, staff, orders, etc.).
 - **SUPPLIER** – Supplier tenant (catalog, warehouses, orders, invoices, etc.).
 - **ADMIN** – Global admin (no tenant_id; platform-wide access).
@@ -53,6 +66,14 @@ Role identifiers are name strings (not uppercase codes) as defined in `role-matr
 | GROWTH_ADMIN  | Growth Admin  | Analytics and growth      |
 
 ## Permission keys (by domain)
+
+Supplier operational summaries enforce invoice visibility separately from route
+admission. `/api/supplier/command-center` and `/api/supplier/run-sheet` redact
+receivables, balances and financial priorities without `INVOICES_VIEW` or its
+existing manage/Owner equivalent. The tenant-wide run sheet admits operations or
+invoice permission, not a driver-only grant. Driver delivery endpoints retain
+their assignment-based restrictions. This changes no permission key or default
+role definition. See [supplier operations](../features/supplier-ops.md).
 
 Permission codes are string enums used in code and DB. `*_MANAGE` implies all actions in that domain (e.g. `ORDERS_MANAGE` implies view/create/edit).
 
@@ -280,3 +301,24 @@ Supplier `/api/inventory` mutations require `INVENTORY_EDIT` or `INVENTORY_MANAG
 ## Public demo campaign administration (2026-11-11)
 
 The `/api/admin-dashboard/demo/*` lead, summary, update and CSV routes inherit existing ADMIN authentication/context and require `ADMIN_GROWTH`. Anonymous visitors may only submit consented requests or allowed funnel events through `/api/public/demo/*`; those calls have no tenant/account privileges. No new permission key is introduced. See `../features/demo-experience.md`.
+
+## Driver proof assignment scope (2026-11-17)
+
+Standalone `POST /api/orders/:id/proof-of-delivery` retains its existing
+`FULFILLMENT_MANAGE` / `DRIVER_DELIVERIES_MANAGE` gate. Driver-only access checks
+both the order and any submitted `driver_assignment_id`; order-level assignment
+alone cannot authorize writing another driver's proof. If an older client omits
+the selector, the endpoint uses the assignment returned by that access check.
+Driver detail's SQL independently requires a matching non-reassigned leg when
+given a driver ID. No permission key or role matrix changed.
+
+## Driver route operations (2026-11-17)
+
+The shared fulfillment gate admits scoped route list/detail/today/active reads with
+`DRIVER_DELIVERIES_VIEW`, and driver building/reorder/next-stop/optimization/stop
+writes with `DRIVER_DELIVERIES_MANAGE`. Supplier board access and route metadata
+mutations retain `FULFILLMENT_*` checks. Existing handler/service ownership checks
+still restrict a driver to their linked profile and own route. Stop mutation passes
+that scope into the transaction and rechecks it against the locked route, including
+after concurrent driver changes. Trusted Owner stop access uses the common role
+bypass. No new permission or role is introduced.

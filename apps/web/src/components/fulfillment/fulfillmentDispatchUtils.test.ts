@@ -6,6 +6,8 @@ import {
   formatOrderRef,
   hasActiveDispatchFilters,
   DISPATCH_FILTER_ALL,
+  enrichOrderFromBoard,
+  formatScheduledAt,
 } from './fulfillmentDispatchUtils'
 import type { DispatchOrderCard } from '../../types'
 
@@ -19,6 +21,27 @@ const sampleOrder = (id: string): DispatchOrderCard => ({
 })
 
 describe('fulfillmentDispatchUtils', () => {
+  it('retains the supplier calendar day ahead of a legacy timestamp on the previous UTC day', () => {
+    const order = enrichOrderFromBoard(
+      sampleOrder('a'),
+      new Map([
+        [
+          'a',
+          {
+            orderId: 'a',
+            restaurantName: 'Cafe',
+            deliveryStatus: 'assigned',
+            scheduledAt: '2026-11-17T22:00:00.000Z',
+            scheduledDeliveryDate: '2026-11-18',
+          },
+        ],
+      ])
+    )
+    expect(order.scheduledDeliveryDate).toBe('2026-11-18')
+    expect(formatScheduledAt(order.scheduledDeliveryDate)).toBe(
+      new Date(2026, 10, 18, 12).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    )
+  })
   it('hasActiveDispatchFilters detects active filters', () => {
     expect(
       hasActiveDispatchFilters({

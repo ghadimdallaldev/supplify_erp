@@ -28,13 +28,21 @@ DELIVERY_ROLLOVER_TIMEZONE=Asia/Beirut
 
 An assignment is rolled when:
 
-- Status is `assigned`, `picked_up`, `out_for_delivery`, or `rescheduled`
+- Status is `assigned` or `rescheduled`; picked-up and out-for-delivery work stays on its live route
 - Effective delivery date is **before** local today, **or** equal to local today and local time is **≥ cutoff hour**
 - Order is not terminal: `DELIVERED`, `RECEIVED_*`, `CANCELLED`, `INVOICED`, `COMPLETED`
 - Assignment is not `delivered`, `failed`, or `reassigned`
-- Not already rolled earlier **the same local calendar day** (idempotent)
+- Automatic processing skips assignments already rolled earlier **the same local calendar day**
 
-Effective delivery date = `scheduled_delivery_date` → active route `scheduled_date` → `assigned_at` date.
+Effective delivery date = `scheduled_delivery_date` → active route `scheduled_date`
+→ order requested date → `assigned_at` date → assignment creation date → order
+creation date. PostgreSQL returns this DATE expression as `YYYY-MM-DD` text for
+calendar comparisons and next-day arithmetic; it is not converted through UTC.
+
+Before writing, rollover locks the parent order, its live routes and the assignment
+in that order. It rechecks current order/assignment eligibility, delivery day and
+the automatic same-day marker under those locks. A newly cancelled order, future
+reschedule, picked-up leg or already processed automatic attempt is preserved.
 
 `scheduled_delivery_date` is stamped from the **route's** `scheduled_date` when the
 assignment is created by route planning, and is carried forward on reassignment. Both
@@ -49,13 +57,17 @@ For each eligible assignment:
 1. `driver_assignments.status` → `rescheduled`
 2. `scheduled_delivery_date` → next calendar day
 3. `rolled_over_at` set; `rollover_count` incremented
-4. Incomplete stops removed from `PLANNED` / `IN_PROGRESS` routes dated before the new delivery day. A route already planned for that new day keeps its stop.
+4. Incomplete stops removed from `PLANNED` routes dated before the new delivery day. Stops on an in-progress route are retained. A route already planned for the new day keeps its stop.
 5. If `DELIVERY_ROLLOVER_KEEP_DRIVER=true`, order appended to a planned route `Rollover {date}` for that driver
 6. Audit log: `delivery.rollover` — _Delivery rolled over to next day because it was not delivered before cutoff._
 7. **Order status unchanged** (stays `PROCESSING` / `SHIPPED`, etc.)
 8. The supplier's dispatch cache is invalidated (per supplier, after the batch for the
    cron job; immediately for the manual action) so the board reflects the new day
    rather than serving up to 45s of stale buckets.
+
+Route creation shares normal planning's supplier transaction lock and UTC daily
+number sequence. It uses the maximum allocated suffix rather than the number of
+remaining routes, so a removed route number cannot cause a duplicate-key failure.
 
 ## GPS / ETA / tracking
 
@@ -65,9 +77,15 @@ For each eligible assignment:
 
 ## Manual action
 
-**Fulfillment → Driver Dispatch** → **Move to tomorrow** on assigned or out-for-delivery cards.
+**Fulfillment → Driver Dispatch** → **Move to tomorrow** on assigned or rescheduled work.
 
 API: `POST /api/fulfillment/assignments/:assignmentId/rollover-to-tomorrow` (requires `FULFILLMENT_MANAGE`). Uses the same service with `force: true` (ignores cutoff).
+
+The existing manual `force` mode also bypasses the automatic same-day marker;
+repeated forced calls and advancement of long-overdue dates remain audit leads.
+It still rechecks terminal orders and assignment eligibility under lock. Android
+and iOS invalidate dispatch, order, driver, supplier delivery and run-sheet caches
+after success. A rejected request retains cached work and surfaces the API error.
 
 Reactivate for the new day: **Ready to dispatch** (`rescheduled` → `assigned`) on the dispatch board.
 

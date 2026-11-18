@@ -4,6 +4,7 @@ import { insertOrderItemsBatch } from './order-create.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 import { resolveSupplierDeliveryDate } from '../lib/supplier-last-order.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { lockCheckoutQuoteRows, assertCheckoutQuotePrices } from './quote-checkout.service.js'
 
 function elapsedMsSince(start) {
   return Math.round(performance.now() - start)
@@ -40,6 +41,22 @@ export async function createRestaurantOrdersInTransaction({
     transactionQueryCount += 1
     return client.query(...args)
   }
+  const quoteLines = [...supplierGroups.entries()].flatMap(([supplierId, items]) =>
+    items.map((item) => ({ ...item, supplierId }))
+  )
+  const quoteRows = await lockCheckoutQuoteRows(
+    { query: q },
+    {
+      restaurantId,
+      productIds: quoteLines.map((line) => line.productId),
+      quoteLocks: orderData?.quoteLocks,
+    }
+  )
+  assertCheckoutQuotePrices({
+    rows: quoteRows,
+    lines: quoteLines,
+    quoteLocks: orderData?.quoteLocks,
+  })
 
   if (orderStatus === 'PLACED') {
     const usageStart = performance.now()

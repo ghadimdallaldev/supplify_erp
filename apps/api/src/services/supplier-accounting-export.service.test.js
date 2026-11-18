@@ -1,18 +1,52 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+vi.mock('../lib/tenant-timezone.js', () => ({ getSupplierTimezone: vi.fn(async () => 'UTC') }))
 
 describe('supplier-accounting-export.service', () => {
   beforeEach(() => {
     vi.resetModules()
   })
 
-  it('parseExportDateRange defaults to last 30 days', async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.useRealTimers()
+  })
+
+  it.each(['Asia/Beirut', 'America/Los_Angeles', 'Pacific/Kiritimati'])(
+    'preserves inclusive export calendar dates in %s',
+    async (timeZone) => {
+      vi.stubEnv('TZ', timeZone)
+      const { parseExportDateRange } = await import('./supplier-accounting-export.service.js')
+      expect(parseExportDateRange({ from: '2026-06-01', to: '2026-06-30' })).toEqual({
+        from: '2026-06-01',
+        to: '2026-06-30',
+      })
+    }
+  )
+
+  it.each(['2026-02-30', '2026-13-01', 'not-a-date', ['2026-06-01']])(
+    'rejects an invalid export calendar date: %s',
+    async (from) => {
+      const { parseExportDateRange } = await import('./supplier-accounting-export.service.js')
+      expect(() => parseExportDateRange({ from, to: '2026-06-30' })).toThrow(
+        /Invalid from or to date/
+      )
+    }
+  )
+
+  it('allows 366 inclusive calendar days and rejects 367', async () => {
     const { parseExportDateRange } = await import('./supplier-accounting-export.service.js')
-    const range = parseExportDateRange({})
-    expect(range.from).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    expect(range.to).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    const fromMs = new Date(range.from).getTime()
-    const toMs = new Date(range.to).getTime()
-    expect(toMs >= fromMs).toBe(true)
+    expect(parseExportDateRange({ from: '2024-01-01', to: '2024-12-31' })).toEqual({
+      from: '2024-01-01',
+      to: '2024-12-31',
+    })
+    expect(() => parseExportDateRange({ from: '2024-01-01', to: '2025-01-01' })).toThrow(/366 days/)
+  })
+
+  it('parseExportDateRange defaults to last 30 days', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 0, 15, 12))
+    const { parseExportDateRange } = await import('./supplier-accounting-export.service.js')
+    expect(parseExportDateRange({})).toEqual({ from: '2025-12-16', to: '2026-01-15' })
   })
 
   it('parseExportDateRange rejects inverted range', async () => {

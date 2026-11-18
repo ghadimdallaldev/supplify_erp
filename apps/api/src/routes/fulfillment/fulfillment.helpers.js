@@ -81,12 +81,17 @@ function requireFulfillmentAccess(req, res, next) {
   const perms = req.tenantContext?.permissions ?? []
   const path = req.path
 
-  if (req.method === 'GET' && path === '/routes/active') {
+  if (req.method === 'GET' && /^\/routes(?:\/[^/]+)?$/.test(path)) {
     if (hasPermission(perms, P.DRIVER_DELIVERIES_VIEW)) return next()
     return requirePermission('FULFILLMENT_VIEW')(req, res, next)
   }
 
-  if (req.method === 'PATCH' && /^\/routes\/[^/]+\/stops\/[^/]+$/.test(path)) {
+  const driverRouteWrite =
+    (req.method === 'POST' &&
+      (path === '/routes/build-from-assignments' ||
+        /^\/routes\/[^/]+\/(?:optimize|stops\/reorder)$/.test(path))) ||
+    (req.method === 'PATCH' && /^\/routes\/[^/]+\/(?:next-stop|stops\/[^/]+)$/.test(path))
+  if (driverRouteWrite) {
     if (
       hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE) ||
       hasPermission(perms, P.FULFILLMENT_MANAGE)
@@ -94,10 +99,6 @@ function requireFulfillmentAccess(req, res, next) {
       return next()
     }
     return requirePermission('FULFILLMENT_VIEW')(req, res, next)
-  }
-
-  if (req.method === 'POST' && /^\/routes\/[^/]+\/optimize$/.test(path)) {
-    if (hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)) return next()
   }
 
   return requirePermission('FULFILLMENT_VIEW')(req, res, next)

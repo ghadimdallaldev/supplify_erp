@@ -97,6 +97,18 @@ describe('supplier-deliveries.service', () => {
   })
 
   describe('mapBoardRow', () => {
+    it('normalizes a PostgreSQL calendar Date object and prefers an explicit calendar day', () => {
+      const row = {
+        order_id: 'o-date',
+        restaurant_name: 'Cafe',
+        scheduled_at: new Date(2026, 10, 18),
+      }
+      expect(mapBoardRow(row, new Map()).scheduledDeliveryDate).toBe('2026-11-18')
+      expect(
+        mapBoardRow({ ...row, scheduled_delivery_date: '2026-11-19' }, new Map())
+          .scheduledDeliveryDate
+      ).toBe('2026-11-19')
+    })
     it('maps assignment and warehouse leg fields for mobile-compatible rows', () => {
       const row = mapBoardRow(
         {

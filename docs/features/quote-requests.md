@@ -12,7 +12,7 @@ Restaurants send **multi-supplier quote requests** (RFQ) for catalog products. S
 4. Supplier submits structured response per line item (price, availability, delivery date, substitute).
 5. Restaurant compares responses (`GET .../compare`) and optionally loads cart payload from a chosen response.
 6. Restaurant completes checkout via normal `POST /api/orders` with `quoteLocks` — **quoted unit prices are locked at checkout** (`pricing_source = QUOTE_PRICE` on `order_item`). Clients must send `quoteLocks` for every quoted cart line (web CartPage and mobile CartScreen do this). **Server enforcement:** if an open RFQ has a responded, available quote line for a product in the order, checkout returns `400` unless that product is included in `quoteLocks` — raw API clients cannot silently use catalog/contract pricing instead. **Supplier `POST /api/orders/manual`** auto-applies open quote locks for that supplier’s products (optional client `quoteLocks` still accepted) so phone/chat orders cannot silently bypass quoted prices. Checkout does **not** auto-close the RFQ — other invited suppliers may still respond until the restaurant closes it.
-7. Restaurant may **close or cancel** an open RFQ (`PATCH /api/quote-requests/:id/status`); suppliers can no longer respond or load cart payloads once status leaves `open`. Supplier respond re-checks `quote_requests.status = 'open'` under row lock inside the write transaction (closes concurrent TOCTOU races).
+7. Restaurant may **close or cancel** an open RFQ (`PATCH /api/quote-requests/:id`); suppliers can no longer respond or load cart payloads once status leaves `open`. Response and decline writers lock the request, then its supplier invitation, and recheck both statuses inside the transaction.
 
 ## API — Restaurant (`/api/quote-requests`)
 
@@ -23,7 +23,7 @@ Restaurants send **multi-supplier quote requests** (RFQ) for catalog products. S
 | GET    | `/:id`                                  | `CATALOG_VIEW` / `ORDERS_*` | Request detail with supplier statuses                                       |
 | GET    | `/:id/compare`                          | `CATALOG_VIEW` / `ORDERS_*` | Side-by-side comparison payload                                             |
 | POST   | `/:id/suppliers/:supplierRowId/to-cart` | `ORDERS_CREATE`             | Cart line payload from accepted response (uses substitute SKU when offered) |
-| PATCH  | `/:id/status`                           | `ORDERS_CREATE`             | Close or cancel an open request                                             |
+| PATCH  | `/:id`                                  | `ORDERS_CREATE`             | Close or cancel an open request                                             |
 
 ## API — Supplier (`/api/quote-requests`)
 
@@ -49,7 +49,7 @@ The response carries `inbox[]`, `pagination`, and a whole-inbox `counts` object
 scoped to the current page or filter — it drives the tab badges and the unread dot.
 `urgent` counts pending entries on an open request needed within 2 days.
 
-Response items support: `isAvailable`, `unitPrice`, `quantity`, `deliveryDate`, `note`, `substituteProductId`.
+Response items support: `isAvailable`, `unitPrice`, `currency`, `quantity`, `deliveryDate`, `note`, `substituteProductId`.
 
 ### Response and decline rules
 
@@ -61,6 +61,37 @@ Response items support: `isAvailable`, `unitPrice`, `quantity`, `deliveryDate`, 
   non-`open` request.
 - Opening the detail endpoint stamps `viewed_at` once; that is what makes an entry
   stop counting as unread.
+
+### Ownership, values and edit preservation (2026-11-18)
+
+- A supplier can price only its own product lines within that request. An offered
+  substitute must also belong to that supplier. The write rechecks request/item/
+  product ownership inside the transaction. Historical invalid lines are excluded
+  from supplier detail, restaurant comparison, cart conversion and quote-price reads.
+- Available lines require a finite nonnegative unit price; zero is allowed.
+  Unavailable lines may omit price. An optional quantity must be finite and positive;
+  request item IDs cannot repeat. Currency is a three-letter code, normalized to
+  uppercase. Impossible or non-calendar delivery/needed-by dates return validation
+  errors. Needed-by and delivery fields return literal `YYYY-MM-DD` strings.
+- A substitute quote prices the offered substitute SKU. It cannot price the
+  original SKU too. Quote discovery and automatic manual-order lock selection use
+  that same effective product identity; a separate original-product quote may coexist.
+- Open responses can be edited on web, Android and iOS. Editing retains each line's
+  currency, substitute ID and delivery day. Native drafts reset when a different
+  request is opened; refreshing the same request retains the current draft. Closed
+  or declined requests remain read-only. All clients validate available prices and
+  quantities locally, while server validation remains authoritative.
+- Response/decline decisions serialize on the same parent/invitation locks. A newer
+  decline, response or request closure is preserved. Notifications run after commit;
+  an application error before commit rolls response replacement back atomically.
+
+The local audit verifies SQL price resolution/cart construction and actual
+restaurant/manual checkout HTTP transactions. Checkout rechecks current quote state
+under shared parent/line locks and preserves quoted price, currency, quantity limit
+and line references through commit. Response/closure writers wait; newer committed
+state rejects outdated checkout. See [ordering-reliability.md](./ordering-reliability.md).
+Price/quantity precision bounds, non-quote pricing changes, new-request phantoms,
+historical schema variants and hosted/device workflows remain separate audit gates.
 
 ## Notifications
 
@@ -100,7 +131,7 @@ Entry points: Products page, Supplier detail, Supplier settings catalog card.
 
 Migrations:
 
-- `0153_quote_requests_and_public_catalog.sql` — quote tables + `supplier.public_catalog_enabled`
+- `0154_quote_requests_and_public_catalog.sql` — quote tables + `supplier.public_catalog_enabled`
 - `0155_ensure_quote_request_schema.sql` — idempotent schema repair
 - `0202_quote_request_supplier_decline.sql` — `quote_request_suppliers.decline_reason`,
   `.viewed_at`, and a partial index for the unread-pending count
@@ -109,12 +140,15 @@ Tables: `quote_requests`, `quote_request_items`, `quote_request_suppliers`, `quo
 
 ## Tests
 
-| File                                                          | Covers                                        |
-| ------------------------------------------------------------- | --------------------------------------------- |
-| `apps/api/src/services/quote-requests.service.test.js`        | Create, notify, list, compare                 |
-| `apps/api/src/routes/quote-requests.routes.test.js`           | Route auth and validation                     |
-| `apps/api/src/services/resolve-product-price.service.test.js` | Open-quote product detection for checkout     |
-| `apps/api/src/routes/orders.routes.test.js`                   | Mandatory `quoteLocks` when open quotes exist |
+| File                                                                  | Covers                                                                       |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `apps/api/src/services/quote-requests.service.test.js`                | Create, notify, list, compare                                                |
+| `apps/api/src/routes/quote-requests.routes.test.js`                   | Route auth and validation                                                    |
+| `apps/api/src/services/resolve-product-price.service.test.js`         | Open-quote product detection for checkout                                    |
+| `apps/api/src/routes/orders.routes.test.js`                           | Mandatory `quoteLocks` when open quotes exist                                |
+| `tests/integrity/supplier-quotes.pg.test.js`                          | Real SQL ownership/calendar/cart/pricing, response/decline race and rollback |
+| `apps/web/src/pages/SupplierQuoteResponsePage.test.tsx`               | Edit metadata and local quantity validation                                  |
+| Both native `QuoteResponseScreen.test.tsx` / `queries/quotes.test.ts` | Editing, request isolation, metadata, API errors/retry/cache                 |
 
 ## See also
 

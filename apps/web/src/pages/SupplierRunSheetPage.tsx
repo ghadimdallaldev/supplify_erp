@@ -10,12 +10,13 @@ import {
 import { PageShell } from '../components/ui/page-shell'
 import { PageHeader } from '../components/ui/page-header'
 import { RequirePermission } from '../components/RequirePermission'
+import { usePermissions } from '../hooks/usePermissions'
 import { EmptyState } from '../components/ui/empty-state'
 import { Skeleton } from '../components/ui/skeleton'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { StatusBadge } from '../components/ui/status-badge'
-import { formatCurrency } from '../utils/format'
+import { formatRunSheetAmount, formatRunSheetTotal } from '../lib/runSheetMoney'
 import { cn } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -58,6 +59,8 @@ function formatShortTime(iso: string | undefined) {
 }
 
 export function SupplierRunSheetPage() {
+  const { can } = usePermissions()
+  const canViewFinance = can('INVOICES_VIEW')
   const { t } = useTranslation('supplierOps')
 
   useEffect(() => {
@@ -75,6 +78,9 @@ export function SupplierRunSheetPage() {
   } = useGetSupplierRunSheetQuery(queryDate ? { date: queryDate } : undefined)
   const [sendReminder, { isLoading: sendingOne }] = useSendInvoiceReminderMutation()
   const [remindOverdue, { isLoading: sendingBulk }] = useRemindOverdueInvoicesMutation()
+  const priorities = (sheet?.summary.todaysPriorities ?? []).filter(
+    (item) => canViewFinance || (item.type !== 'finance' && item.id !== 'overdue-invoices')
+  )
 
   const handleBulkRemind = async () => {
     try {
@@ -183,14 +189,14 @@ export function SupplierRunSheetPage() {
           </div>
         ) : (
           <div className="space-y-6 print:space-y-4">
-            {(sheet.summary.todaysPriorities?.length ?? 0) > 0 && (
+            {priorities.length > 0 && (
               <section
                 className="rounded-xl border border-[var(--app-border)] bg-[var(--surface)] p-3.5 print:break-inside-avoid"
                 data-testid="run-sheet-priorities"
               >
                 <SectionHeading icon={ClipboardList} title={t('runSheet.priorities')} />
                 <ul className="list-none p-0 m-0 flex flex-col gap-2">
-                  {sheet.summary.todaysPriorities.map((item) => (
+                  {priorities.map((item) => (
                     <li key={item.id}>
                       {item.href ? (
                         <Link
@@ -231,14 +237,27 @@ export function SupplierRunSheetPage() {
                 href="/app/fulfillment"
                 testId="run-sheet-kpi-deliveries"
               />
-              <KpiTile
-                icon={DollarSign}
-                label={t('runSheet.kpis.overdueAr')}
-                value={formatCurrency(sheet.summary.kpis.overdueBalance)}
-                href="/app/invoices"
-                testId="run-sheet-kpi-ar"
-                highlight={sheet.summary.kpis.overdueBalance > 0}
-              />
+              {canViewFinance && (
+                <KpiTile
+                  icon={DollarSign}
+                  label={t('runSheet.kpis.overdueAr')}
+                  value={formatRunSheetTotal(
+                    sheet.summary.kpis.overdueBalance,
+                    sheet.summary.receivablesByCurrency?.map((row) => ({
+                      currency: row.currency,
+                      totalBalanceDue: row.overdueTotal,
+                    }))
+                  )}
+                  href="/app/invoices"
+                  testId="run-sheet-kpi-ar"
+                  highlight={
+                    (sheet.summary.kpis.overdueBalance ?? 0) > 0 ||
+                    Boolean(
+                      sheet.summary.receivablesByCurrency?.some((row) => row.overdueTotal > 0)
+                    )
+                  }
+                />
+              )}
               <KpiTile
                 icon={Users}
                 label={t('runSheet.kpis.reorderDue')}
@@ -345,90 +364,98 @@ export function SupplierRunSheetPage() {
               </RunSheetPanel>
             </section>
 
-            <RunSheetPanel testId="run-sheet-receivables" className="print:break-inside-avoid">
-              <PanelHeader
-                title={
-                  <>
-                    {t('runSheet.receivables.title', {
-                      count: sheet.receivablesDueToday.summary.count,
-                    })}
-                    <span className="font-normal text-[var(--text-muted)]">
-                      {' '}
-                      · {formatCurrency(sheet.receivablesDueToday.summary.totalBalanceDue)}
-                    </span>
-                  </>
-                }
-                icon={DollarSign}
-                action={
-                  <div className="flex gap-2 print:hidden">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={sendingBulk || sheet.receivablesDueToday.summary.overdueCount === 0}
-                      onClick={handleBulkRemind}
-                    >
-                      {t('runSheet.receivables.remindOverdue')}
-                    </Button>
-                    <Link to="/app/invoices">
-                      <Button size="sm" variant="outline">
-                        {t('runSheet.receivables.invoices')}
+            {canViewFinance && (
+              <RunSheetPanel testId="run-sheet-receivables" className="print:break-inside-avoid">
+                <PanelHeader
+                  title={
+                    <>
+                      {t('runSheet.receivables.title', {
+                        count: sheet.receivablesDueToday.summary.count,
+                      })}
+                      <span className="font-normal text-[var(--text-muted)]">
+                        {' '}
+                        ·{' '}
+                        {formatRunSheetTotal(
+                          sheet.receivablesDueToday.summary.totalBalanceDue,
+                          sheet.receivablesDueToday.summary.byCurrency
+                        )}
+                      </span>
+                    </>
+                  }
+                  icon={DollarSign}
+                  action={
+                    <div className="flex gap-2 print:hidden">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          sendingBulk || sheet.receivablesDueToday.summary.overdueCount === 0
+                        }
+                        onClick={handleBulkRemind}
+                      >
+                        {t('runSheet.receivables.remindOverdue')}
                       </Button>
-                    </Link>
-                  </div>
-                }
-              />
-              {sheet.receivablesDueToday.invoices.length === 0 ? (
-                <EmptyState
-                  title={t('runSheet.receivables.emptyTitle')}
-                  description={t('runSheet.receivables.emptyDescription')}
-                  icon={<DollarSign className="h-5 w-5" />}
-                  className="py-8"
+                      <Link to="/app/invoices">
+                        <Button size="sm" variant="outline">
+                          {t('runSheet.receivables.invoices')}
+                        </Button>
+                      </Link>
+                    </div>
+                  }
                 />
-              ) : (
-                <ul className="divide-y divide-[var(--app-border)]">
-                  {sheet.receivablesDueToday.invoices.slice(0, 10).map((inv) => (
-                    <li key={inv.id}>
-                      <RunSheetRow
-                        primary={
-                          <>
-                            {inv.restaurantName}
-                            <span className="font-normal text-[var(--text-muted)]">
-                              · {inv.invoiceNumber || inv.id.slice(0, 8)}
-                            </span>
-                          </>
-                        }
-                        secondary={
-                          <>
-                            <span className="font-semibold text-[var(--text)]">
-                              {formatCurrency(inv.balanceDue)}
-                            </span>
-                            {inv.isOverdue ? <StatusBadge status="OVERDUE" /> : null}
-                          </>
-                        }
-                        action={
-                          <div className="flex gap-1 print:hidden">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 px-2"
-                              disabled={sendingOne}
-                              onClick={() => handleRemindInvoice(inv.id)}
-                            >
-                              {t('runSheet.receivables.remind')}
-                            </Button>
-                            <Link to="/app/invoices">
-                              <Button size="sm" variant="ghost" className="h-8 px-2">
-                                {t('runSheet.receivables.view')}
+                {sheet.receivablesDueToday.invoices.length === 0 ? (
+                  <EmptyState
+                    title={t('runSheet.receivables.emptyTitle')}
+                    description={t('runSheet.receivables.emptyDescription')}
+                    icon={<DollarSign className="h-5 w-5" />}
+                    className="py-8"
+                  />
+                ) : (
+                  <ul className="divide-y divide-[var(--app-border)]">
+                    {sheet.receivablesDueToday.invoices.slice(0, 10).map((inv) => (
+                      <li key={inv.id}>
+                        <RunSheetRow
+                          primary={
+                            <>
+                              {inv.restaurantName}
+                              <span className="font-normal text-[var(--text-muted)]">
+                                · {inv.invoiceNumber || inv.id.slice(0, 8)}
+                              </span>
+                            </>
+                          }
+                          secondary={
+                            <>
+                              <span className="font-semibold text-[var(--text)]">
+                                {formatRunSheetAmount(inv.balanceDue, inv.currency)}
+                              </span>
+                              {inv.isOverdue ? <StatusBadge status="OVERDUE" /> : null}
+                            </>
+                          }
+                          action={
+                            <div className="flex gap-1 print:hidden">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 px-2"
+                                disabled={sendingOne}
+                                onClick={() => handleRemindInvoice(inv.id)}
+                              >
+                                {t('runSheet.receivables.remind')}
                               </Button>
-                            </Link>
-                          </div>
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </RunSheetPanel>
+                              <Link to="/app/invoices">
+                                <Button size="sm" variant="ghost" className="h-8 px-2">
+                                  {t('runSheet.receivables.view')}
+                                </Button>
+                              </Link>
+                            </div>
+                          }
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </RunSheetPanel>
+            )}
 
             {(sheet.shortages?.preview?.length ?? 0) > 0 && (
               <section

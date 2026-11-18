@@ -392,7 +392,7 @@ describe('resolve-product-price.service', () => {
     expect(enriched.contract_price_id).toBe(CONTRACT_ID)
   })
 
-  it('findOpenQuotedProductsForOrder maps original and substitute product ids', async () => {
+  it('maps a substitute quote to its offered SKU and retains a separate original-product quote', async () => {
     const { findOpenQuotedProductsForOrder } = await import('./resolve-product-price.service.js')
     const substituteProductId = '88888888-8888-4888-8888-888888888888'
 
@@ -418,7 +418,7 @@ describe('resolve-product-price.service', () => {
       productIds: [PRODUCT_ID, substituteProductId],
     })
 
-    expect(quoted.get(PRODUCT_ID)).toEqual({ sku: 'SKU-ORIG', productId: PRODUCT_ID })
+    expect(quoted.get(PRODUCT_ID)).toEqual({ sku: 'SKU-OLDER', productId: PRODUCT_ID })
     expect(quoted.get(substituteProductId)).toEqual({
       sku: 'SKU-ORIG',
       productId: substituteProductId,

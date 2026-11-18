@@ -529,16 +529,19 @@ router.post(
           requestId: req.requestId,
         })
       }
+      const body = podSchema.parse(req.body)
       const perms = req.tenantContext?.permissions ?? []
+      let driverAssignmentId = body.driver_assignment_id
       if (isDriverOnlyPermissions(perms)) {
-        await assertDriverAssignmentAccess({
+        const access = await assertDriverAssignmentAccess({
           userId: req.userData.id,
           supplierId,
           orderId: req.params.id,
+          assignmentId: body.driver_assignment_id ?? null,
           permissions: perms,
         })
+        driverAssignmentId = access.assignment.id
       }
-      const body = podSchema.parse(req.body)
       const tenant = await getRequestTenant(req)
       for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
         await assertCleanUploadOwnership(key, {
@@ -554,7 +557,7 @@ router.post(
         signatureFileKey: body.signature_file_key,
         notes: body.notes,
         recipientName: body.recipient_name,
-        driverAssignmentId: body.driver_assignment_id,
+        driverAssignmentId,
         userId: req.userData?.id,
         latitude: body.latitude,
         longitude: body.longitude,

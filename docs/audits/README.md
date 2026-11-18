@@ -15,6 +15,14 @@ Active audit reports, route inventories, and performance/cache analysis. Histori
 
 ## Feature & platform audits
 
+- [Full supplier code and feature audit - active](./SUPPLIER_FULL_AUDIT_2026-11-17.md)
+  tracks all supplier feature areas, reproduced summary/delivery/route/rollover/quote defects,
+  and outstanding source/runtime evidence.
+
+- [Supplier dynamic workflow audit - 2026-11-17](./SUPPLIER_WORKFLOW_AUDIT_2026-11-17.md)
+  records executable workflow checks, verified accounting/native corrections and
+  mobile parity.
+
 | File                                                                                                                       | Topic                               |
 | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | [FINAL_PRODUCTION_AUDIT_2026-10-22.md](./FINAL_PRODUCTION_AUDIT_2026-10-22.md)                                             | Final API/web production readiness  |

@@ -186,4 +186,67 @@ describe('quote-requests.routes', () => {
       reason: 'Out of stock this week',
     })
   })
+
+  it.each([
+    { unitPrice: null },
+    { unitPrice: -1 },
+    { unitPrice: 2, quantity: 0 },
+    { unitPrice: 2, deliveryDate: '2099-02-30' },
+    { unitPrice: 2, deliveryDate: 'tomorrow' },
+    { unitPrice: 2, currency: 'dollars' },
+  ])('rejects invalid quote values before calling the response service: %j', async (values) => {
+    const res = await request(app)
+      .post('/api/quote-requests/supplier/inbox/qrs-1/respond')
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_MANAGE')
+      .send({ items: [{ quoteRequestItemId: '11111111-1111-1111-1111-111111111111', ...values }] })
+    expect(res.status).toBe(400)
+    expect(quoteService.submitQuoteResponse).not.toHaveBeenCalled()
+  })
+
+  it('rejects duplicate response items before calling the service', async () => {
+    const item = { quoteRequestItemId: '11111111-1111-1111-1111-111111111111', unitPrice: 2 }
+    const res = await request(app)
+      .post('/api/quote-requests/supplier/inbox/qrs-1/respond')
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_MANAGE')
+      .send({ items: [item, item] })
+    expect(res.status).toBe(400)
+    expect(quoteService.submitQuoteResponse).not.toHaveBeenCalled()
+  })
+
+  it('rejects impossible needed-by dates before calling the request service', async () => {
+    const res = await request(app)
+      .post('/api/quote-requests')
+      .send({
+        items: [{ productId: '11111111-1111-1111-1111-111111111111', quantity: 2 }],
+        supplierIds: ['22222222-2222-2222-2222-222222222222'],
+        neededBy: '2099-02-30',
+      })
+    expect(res.status).toBe(400)
+    expect(quoteService.createQuoteRequest).not.toHaveBeenCalled()
+  })
+
+  it('accepts a zero-price available line and a price-free unavailable line', async () => {
+    const res = await request(app)
+      .post('/api/quote-requests/supplier/inbox/qrs-1/respond')
+      .set('x-test-role', 'SUPPLIER')
+      .set('x-test-permissions', 'ORDERS_MANAGE')
+      .send({
+        items: [
+          {
+            quoteRequestItemId: '11111111-1111-1111-1111-111111111111',
+            unitPrice: 0,
+            currency: 'USD',
+          },
+          {
+            quoteRequestItemId: '22222222-2222-2222-2222-222222222222',
+            isAvailable: false,
+            unitPrice: null,
+          },
+        ],
+      })
+    expect(res.status).toBe(200)
+    expect(quoteService.submitQuoteResponse).toHaveBeenCalledOnce()
+  })
 })

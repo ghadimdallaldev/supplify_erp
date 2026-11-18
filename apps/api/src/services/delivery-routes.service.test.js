@@ -3,17 +3,26 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 
 const queryMock = vi.fn()
 const clientQueryMock = vi.fn()
+vi.mock('../lib/delivery-route-state.js', () => ({ lockRouteOrders: vi.fn() }))
 let committedOps = []
 let pendingOps = []
 let txShouldFailAfterFn = false
+let loadedRoute = null
 
 vi.mock('../lib/db.js', () => ({
-  query: (...args) => queryMock(...args),
+  query: async (...args) => {
+    if (/SELECT COALESCE[\s\S]*last_order_timezone/.test(args[0])) return { rows: [{ tz: 'UTC' }] }
+    const result = await queryMock(...args)
+    if (/FROM delivery_route dr/.test(args[0]) && result?.rows?.[0]?.route_number)
+      loadedRoute = result.rows[0]
+    return result
+  },
   withTransaction: async (fn) => {
     pendingOps = []
     const client = {
       query: async (...args) => {
         pendingOps.push({ sql: String(args[0]), params: args[1] })
+        if (/SELECT dr\.\*[\s\S]*FOR UPDATE OF dr/.test(args[0])) return { rows: [loadedRoute] }
         return clientQueryMock(...args)
       },
     }
@@ -74,6 +83,7 @@ describe('delivery-routes.service', () => {
     committedOps = []
     pendingOps = []
     txShouldFailAfterFn = false
+    loadedRoute = null
     updateDeliveryStatusMock.mockResolvedValue({})
     listActiveDriverAssignmentsMock.mockResolvedValue([])
   })

@@ -110,8 +110,6 @@ describe('quote-requests.service', () => {
           },
         ],
       })
-      // the UPDATE
-      .mockResolvedValueOnce({ rows: [] })
       // getSupplierQuoteRequestDetail: header, items, responses
       .mockResolvedValueOnce({
         rows: [
@@ -131,13 +129,19 @@ describe('quote-requests.service', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
 
+    const clientQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: 'qr-1', status: 'open' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'qrs-1', status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
+    withTransactionMock.mockImplementationOnce((fn) => fn({ query: clientQuery }))
     const detail = await declineQuoteRequest({
       supplierId: 'supplier-1',
       quoteRequestSupplierId: 'qrs-1',
       reason: '  Out of stock  ',
     })
 
-    const updateCall = queryMock.mock.calls.find(([sql]) => sql.includes("status = 'declined'"))
+    const updateCall = clientQuery.mock.calls.find(([sql]) => sql.includes("status='declined'"))
     expect(updateCall?.[1]).toEqual(['qrs-1', 'Out of stock'])
     expect(detail.declineReason).toBe('Out of stock')
     expect(notifyQuoteRequestDeclinedMock).toHaveBeenCalledTimes(1)
@@ -513,6 +517,8 @@ describe('quote-requests.service', () => {
         query: vi
           .fn()
           .mockResolvedValueOnce({ rows: [{ id: 'qr-1', status: 'open' }] }) // FOR UPDATE lock
+          .mockResolvedValueOnce({ rows: [{ id: 'qrs-1', status: 'pending' }] })
+          .mockResolvedValueOnce({ rows: [{ id: 'item-1' }] })
           .mockResolvedValueOnce({ rows: [] }) // existing response
           .mockResolvedValueOnce({ rows: [{ id: 'resp-1' }] }) // insert response
           .mockResolvedValueOnce({ rows: [] }) // insert item

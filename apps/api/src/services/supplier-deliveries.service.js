@@ -5,6 +5,7 @@ import { getLatestLocationsForDrivers, isGpsTrackingEnabled } from './driver-loc
 import { buildTrackingPayload, buildDriverLastSeenAlias } from '../lib/delivery-tracking-payload.js'
 import { isEtaEligibleAssignmentStatus } from './delivery-eta.service.js'
 import { resolveDestinationFromOrderRow } from '../lib/delivery-coordinates.js'
+import { formatInvoiceCalendarDate } from './invoice.service.js'
 
 /**
  * Daily delivery board with filters and area grouping.
@@ -68,7 +69,9 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
       error: error.message,
       code: error.code,
     })
-    rows = await queryMinimalDeliveryBoardRows(conditions, params, sql.scheduledAtExpr)
+    rows = await queryMinimalDeliveryBoardRows(sql, conditions, params, {
+      includeZones: Boolean(area),
+    })
   }
 
   const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))]
@@ -83,7 +86,7 @@ export async function getSupplierDeliveryBoard(supplierId, filters = {}) {
 
   const orders = rows.map((r) => mapBoardRow(r, locationMap))
 
-  const byArea = {}
+  const byArea = Object.create(null)
   for (const order of orders) {
     const key = order.deliveryArea || 'Unassigned area'
     if (!byArea[key]) byArea[key] = []
@@ -141,12 +144,13 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
       COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
       ${sql.deliveryAreaExpr} AS delivery_area,
       da.id AS assignment_id,
-      da.warehouse_assignment_id AS warehouse_assignment_id,
+      ${sql.warehouseAssignmentIdExpr ?? 'da.warehouse_assignment_id'} AS warehouse_assignment_id,
       COALESCE(da.status, 'pending') AS delivery_status,
       da.driver_id AS driver_id,
       ${sql.driverNameExpr} AS driver_name,
       ${sql.hasPodExpr} AS has_pod,
       ${sql.scheduledAtExpr} AS scheduled_at,
+      (${sql.scheduledAtExpr})::text AS scheduled_delivery_date,
       ${sql.destinationLatitudeExpr} AS destination_latitude,
       ${sql.destinationLongitudeExpr} AS destination_longitude,
       ${sql.destinationLabelExpr} AS destination_label,
@@ -175,32 +179,39 @@ async function queryDeliveryBoardRows(sql, conditions, params) {
   return rows
 }
 
-/** Last-resort board SQL — only core tables/columns guaranteed on every Supplify DB. */
-async function queryMinimalDeliveryBoardRows(conditions, params, scheduledAtExpr) {
-  const safeConditions = conditions.filter((c) => !c.includes('da.') && !c.includes('dz.'))
+/** Omit optional display enrichment, while retaining assignment identity and every filter. */
+async function queryMinimalDeliveryBoardRows(sql, conditions, params, { includeZones }) {
+  const areaExpr = includeZones
+    ? sql.deliveryAreaExpr
+    : (sql.fallbackDeliveryAreaExpr ?? "'Unassigned area'")
   const { rows } = await query(
     `
-    SELECT DISTINCT ON (o.id)
+    SELECT DISTINCT ON (COALESCE(da.id, o.id))
       o.id AS order_id,
       o.status AS order_status,
       COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
-      'Unassigned area' AS delivery_area,
-      NULL::uuid AS assignment_id,
-      NULL::uuid AS warehouse_assignment_id,
-      'pending' AS delivery_status,
-      NULL::uuid AS driver_id,
+      ${areaExpr} AS delivery_area,
+      da.id AS assignment_id,
+      ${sql.warehouseAssignmentIdExpr ?? 'da.warehouse_assignment_id'} AS warehouse_assignment_id,
+      COALESCE(da.status, 'pending') AS delivery_status,
+      da.driver_id AS driver_id,
       NULL::text AS driver_name,
       FALSE AS has_pod,
-      ${scheduledAtExpr} AS scheduled_at,
+      ${sql.scheduledAtExpr} AS scheduled_at,
+      (${sql.scheduledAtExpr})::text AS scheduled_delivery_date,
       NULL::numeric AS destination_latitude,
       NULL::numeric AS destination_longitude,
       r.name AS destination_label,
-      o.delivery_location_snapshot
+      to_jsonb(o)->'delivery_location_snapshot' AS delivery_location_snapshot,
+      to_jsonb(r)->'address_json' AS restaurant_address
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id
     LEFT JOIN restaurant r ON r.id = o.restaurant_id
-    WHERE ${safeConditions.join(' AND ')}
-    ORDER BY o.id, scheduled_at DESC
+    ${sql.assignmentJoinSql ?? sql.driverAssignmentJoinSql ?? ''}
+    ${includeZones ? sql.branchJoinSql : ''}
+    ${includeZones ? sql.zoneJoinSql : ''}
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY COALESCE(da.id, o.id), scheduled_at DESC
     LIMIT 500
   `,
     params
@@ -269,7 +280,7 @@ export function mapBoardRow(r, locationMap) {
     destinationLongitude: destinationCoordinatesAvailable ? destLng : null,
     destinationLabel: destination?.label ?? r.destination_label ?? null,
     destinationAddress: destination?.address ?? null,
-    scheduledDeliveryDate: r.scheduled_at ? String(r.scheduled_at).slice(0, 10) : null,
+    scheduledDeliveryDate: r.scheduled_delivery_date ?? formatInvoiceCalendarDate(r.scheduled_at),
     etaAvailable,
   }
 }

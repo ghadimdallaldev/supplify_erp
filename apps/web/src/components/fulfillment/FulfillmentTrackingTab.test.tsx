@@ -14,7 +14,8 @@ vi.mock('../../services/api', () => ({
           restaurantName: 'Test Cafe',
           driverName: 'Alex',
           deliveryArea: 'Downtown',
-          scheduledAt: '2026-06-03T10:00:00Z',
+          scheduledAt: '2026-06-02T22:00:00Z',
+          scheduledDeliveryDate: '2026-06-03',
           deliveryStatus: 'out_for_delivery',
           destinationLatitude: 33.91,
           destinationLongitude: 35.52,
@@ -62,6 +63,15 @@ describe('FulfillmentTrackingTab', () => {
     expect(screen.getByTestId('tracking-gps-status')).toHaveTextContent(/Live/i)
     fireEvent.click(screen.getAllByTestId('tracking-view-order-abc-1234')[0])
     expect(screen.getByTestId('delivery-tracking-drawer')).toBeInTheDocument()
+  })
+
+  it('displays the canonical delivery day without deriving it from the legacy UTC timestamp', () => {
+    renderWithFulfillmentI18n(<FulfillmentTrackingTab />)
+    const day = new Date(2026, 5, 3, 12).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    })
+    expect(screen.getAllByText(day).length).toBeGreaterThan(0)
   })
 
   it('switches to map view and opens drawer from map selection', async () => {

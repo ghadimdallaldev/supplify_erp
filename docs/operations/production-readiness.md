@@ -2,6 +2,15 @@
 
 ## This document merges the **status report**, **API findings**, and **PR-sized fix plan** that previously lived in three separate files at the repo root.
 
+## 2026-11-18 supplier checkout migration gate
+
+Migration `0236_manual_order_idempotency_actor_scope.sql` is required for supplier
+manual checkout scopes. It retains the actor/key unique index and historical rows,
+and removes the old restaurant/key constraint. It was applied and tested only in
+the owned disposable local audit database. Target-environment migration, legacy
+replay and mixed-version rollout checks remain release gates. Follow the staged
+branching/release workflow; this audit did not deploy any environment.
+
 ## 2026-08-21 ship-hardening checkpoint
 
 - **RBAC:** Demo email role shortcuts are dev-only; production rejects ALLOW_AUTO_SUPER_ADMIN=true; restaurant settings, invoice access during admin impersonation, chat read receipts, and branch query overrides are tenant-scoped.

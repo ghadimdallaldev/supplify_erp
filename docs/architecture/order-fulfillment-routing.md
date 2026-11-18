@@ -1,6 +1,6 @@
 # Order fulfillment routing map
 
-Updated 2026-09-29.
+Updated 2026-11-18 (checkout quote locking and supplier manual replay).
 
 ## Repository model
 
@@ -40,12 +40,24 @@ Placed financial values are immutable snapshots on the order and lines: quantiti
 ## Placement idempotency
 
 `order_placement_idempotency` uses an actor scope such as `RESTAURANT:<id>`,
-`CONSUMER:<id>`, or `PUBLIC:<supplierId>` with the idempotency key. Existing restaurant
+`SUPPLIER:<supplierId>:RESTAURANT:<restaurantId>`, `CONSUMER:<id>`, or
+`PUBLIC:<supplierId>` with the idempotency key. Existing restaurant
 records are backfilled to their equivalent scope. The request hash is normalized over
 the placement payload and successful responses are replayed. Reusing a key with another
 payload returns a conflict. The claim is created in the same transaction as order
 creation, so a rolled-back transaction does not poison the key. Successful keys are
 retained for 180 days and cleaned opportunistically during placement.
+
+Migration 0236 removes the superseded restaurant/key constraint while retaining
+actor/key uniqueness and historical rows. Historical manual responses are accepted
+only for their actual supplier and restaurant. The client keeps its original key;
+it does not choose or transmit the server actor scope.
+
+Quote-locked checkout acquires shared request locks in ID order before reading and
+checking current quote lines. Response/closure writers use the same parents with
+write locks, so selected price/currency/quantity stays stable until commit. Manual
+price reads use that transaction's connection. Order, quote reference, stock and
+placement result commit together; incompatible changes fail before order writes.
 
 ## Public supplier orders
 

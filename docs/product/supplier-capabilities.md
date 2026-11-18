@@ -44,4 +44,12 @@ Tenant roles, warehouse scope, driver portal link — [security/rbac.md](../secu
 
 ## QA
 
+The [2026-11-17 workflow audit](../audits/SUPPLIER_WORKFLOW_AUDIT_2026-11-17.md)
+records export-calendar and debtor-reminder corrections, native receivables
+contract alignment and executable PostgreSQL/API/web checks.
+
+The [2026-11-16 functional audit](../audits/SUPPLIER_FEATURE_AUDIT_2026-11-16.md)
+records supplier feature checks, confirmed corrections, native parity and explicit
+Development/device/provider limits.
+
 Manual regression: [regression-checklist.md](../guides/qa/regression-checklist.md) (**SUP-15a–f**, **GRW-01–GRW-10**). Bulk image import: [bulk-product-image-import.md](../features/bulk-product-image-import.md). Supplier pain-killer / command center: [supplier-pain-killer-features-audit.md](../archive/audits/supplier-pain-killer-features-audit.md).

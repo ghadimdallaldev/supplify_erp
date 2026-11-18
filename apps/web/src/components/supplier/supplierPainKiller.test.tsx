@@ -21,10 +21,11 @@ const mockSuggestedDeals = vi.fn()
 const mockWarehousePerformance = vi.fn()
 const mockWarehouseForecast = vi.fn()
 const mockWeeklySummary = vi.fn()
+const mockFinancePermission = vi.hoisted(() => ({ allowed: true }))
 
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({
-    can: () => true,
+    can: (permission: string) => permission !== 'INVOICES_VIEW' || mockFinancePermission.allowed,
     canAny: () => true,
     isViewOnly: () => false,
     isWorkspaceViewer: false,
@@ -74,6 +75,7 @@ vi.mock('../../services/api/endpoints/finance', async (importOriginal) => {
 describe('supplier pain-killer UI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFinancePermission.allowed = true
     mockDrivers.mockReturnValue({ data: { drivers: [] } })
     mockFollowUps.mockReturnValue({ data: { suggestions: [] } })
     mockEntitlements.mockReturnValue({ data: { entitlements: { features: {} } } })
@@ -430,72 +432,91 @@ describe('supplier pain-killer UI', () => {
     expect(mockStockoutRisks).toHaveBeenCalledWith(undefined, { skip: false })
   })
 
-  it('SupplierRunSheetPage renders KPIs, priorities, and delivery areas from unwrapped API data', () => {
-    mockRunSheet.mockReturnValue({
-      data: {
-        date: '2026-06-17',
-        summary: {
-          kpis: {
-            ordersToPrepareToday: 4,
-            deliveriesPendingToday: 2,
-            ordersWaitingAction: 0,
-            unpaidBalance: 500,
-            overdueBalance: 120,
-            customersDueReorder: 3,
-            lowStockCount: 0,
-            openDisputes: 0,
-            fulfillmentAlerts: 0,
+  it.each([true, false])(
+    'SupplierRunSheetPage applies finance permission %s to cached data while retaining operations',
+    (financeAllowed) => {
+      mockFinancePermission.allowed = financeAllowed
+      mockRunSheet.mockReturnValue({
+        data: {
+          date: '2026-06-17',
+          summary: {
+            kpis: {
+              ordersToPrepareToday: 4,
+              deliveriesPendingToday: 2,
+              ordersWaitingAction: 0,
+              unpaidBalance: 500,
+              overdueBalance: 120,
+              customersDueReorder: 3,
+              lowStockCount: 0,
+              openDisputes: 0,
+              fulfillmentAlerts: 0,
+            },
+            todaysPriorities: [
+              {
+                id: 'overdue-invoices',
+                type: 'finance',
+                title: 'Confidential receivables',
+                href: '/app/invoices',
+              },
+              {
+                id: 'deliveries',
+                type: 'delivery',
+                title: '2 deliveries pending',
+                href: '/app/fulfillment',
+              },
+            ],
           },
-          todaysPriorities: [
-            {
-              id: 'deliveries',
-              type: 'delivery',
-              title: '2 deliveries pending',
-              href: '/app/fulfillment',
-            },
-          ],
+          ordersToPick: {
+            count: 1,
+            orders: [
+              {
+                orderId: 'o-1',
+                orderStatus: 'PROCESSING',
+                restaurantName: 'Bistro',
+                scheduledAt: '2026-06-17T08:00:00Z',
+                pickListId: 'pl-1',
+                pickListStatus: 'PENDING',
+              },
+            ],
+          },
+          deliveries: {
+            filters: { date: '2026-06-17' },
+            orders: [],
+            routeSummary: [{ area: 'Downtown', orderCount: 2, pending: 1 }],
+            stats: { total: 2 },
+          },
+          receivablesDueToday: {
+            summary: { count: 0, totalBalanceDue: 0, dueTodayCount: 0, overdueCount: 0 },
+            invoices: [],
+          },
+          reorderLeads: [],
+          shortages: { count: 0, preview: [] },
         },
-        ordersToPick: {
-          count: 1,
-          orders: [
-            {
-              orderId: 'o-1',
-              orderStatus: 'PROCESSING',
-              restaurantName: 'Bistro',
-              scheduledAt: '2026-06-17T08:00:00Z',
-              pickListId: 'pl-1',
-              pickListStatus: 'PENDING',
-            },
-          ],
-        },
-        deliveries: {
-          filters: { date: '2026-06-17' },
-          orders: [],
-          routeSummary: [{ area: 'Downtown', orderCount: 2, pending: 1 }],
-          stats: { total: 2 },
-        },
-        receivablesDueToday: {
-          summary: { count: 0, totalBalanceDue: 0, dueTodayCount: 0, overdueCount: 0 },
-          invoices: [],
-        },
-        reorderLeads: [],
-        shortages: { count: 0, preview: [] },
-      },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    })
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
 
-    renderWithProviders(<SupplierRunSheetPage />)
+      renderWithProviders(<SupplierRunSheetPage />)
 
-    expect(screen.getByTestId('supplier-run-sheet-page')).toBeInTheDocument()
-    expect(screen.getByTestId('run-sheet-kpi-orders')).toHaveTextContent('4')
-    expect(screen.getByTestId('run-sheet-priorities')).toBeInTheDocument()
-    expect(screen.getByTestId('run-sheet-priority-deliveries')).toHaveTextContent(
-      '2 deliveries pending'
-    )
-    expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('Downtown')
-    expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('2 stops')
-    expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('1 pending')
-  })
+      expect(screen.getByTestId('supplier-run-sheet-page')).toBeInTheDocument()
+      expect(screen.getByTestId('run-sheet-kpi-orders')).toHaveTextContent('4')
+      expect(screen.getByTestId('run-sheet-priorities')).toBeInTheDocument()
+      expect(screen.getByTestId('run-sheet-priority-deliveries')).toHaveTextContent(
+        '2 deliveries pending'
+      )
+      expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('Downtown')
+      expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('2 stops')
+      expect(screen.getByTestId('run-sheet-deliveries')).toHaveTextContent('1 pending')
+      if (financeAllowed) {
+        expect(screen.getByTestId('run-sheet-kpi-ar')).toBeInTheDocument()
+        expect(screen.getByTestId('run-sheet-receivables')).toBeInTheDocument()
+        expect(screen.getByText('Confidential receivables')).toBeInTheDocument()
+      } else {
+        expect(screen.queryByTestId('run-sheet-kpi-ar')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('run-sheet-receivables')).not.toBeInTheDocument()
+        expect(screen.queryByText('Confidential receivables')).not.toBeInTheDocument()
+      }
+    }
+  )
 })

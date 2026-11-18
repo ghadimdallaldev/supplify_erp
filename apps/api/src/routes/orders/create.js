@@ -45,8 +45,12 @@ import {
   resolveProductPricesBatch,
   getDefaultCatalogPricesBatch,
   findOpenQuotedProductsForOrder,
-  findOpenQuoteLocksForOrder,
 } from '../../services/resolve-product-price.service.js'
+import {
+  lockCheckoutQuoteRows,
+  autoCheckoutQuoteLocks,
+  assertCheckoutQuotePrices,
+} from '../../services/quote-checkout.service.js'
 import { createRestaurantOrdersInTransaction } from '../../services/restaurant-order-create.service.js'
 import { resolveSupplierDeliveryDate } from '../../lib/supplier-last-order.js'
 import { resolveOrderDeliveryLocation } from '../../services/restaurant-delivery-location.service.js'
@@ -55,6 +59,8 @@ import {
   completeOrderPlacementKey,
   hashOrderPlacementPayload,
   lookupOrderPlacementKey,
+  lookupSupplierOrderPlacementKey,
+  supplierOrderPlacementScope,
   IdempotencyConflictError,
 } from '../../services/order-placement-idempotency.service.js'
 import {
@@ -875,7 +881,8 @@ router.post(
       delete normalizedPlacementPayload.idempotencyKey
       delete normalizedPlacementPayload.idempotency_key
       const idempotencyHash = hashOrderPlacementPayload(normalizedPlacementPayload)
-      const existingPlacement = await lookupOrderPlacementKey(query, {
+      const existingPlacement = await lookupSupplierOrderPlacementKey(query, {
+        supplierId,
         restaurantId: orderData.restaurant_id,
         key: idempotencyKey,
         requestHash: idempotencyHash,
@@ -948,23 +955,12 @@ router.post(
 
       const productIds = orderData.items.map((item) => item.productId)
       const clientLocks = orderData.quoteLocks ?? []
-      const lockByProductId = new Map(clientLocks.map((lock) => [lock.productId, lock]))
-      const autoQuoteLocks = await findOpenQuoteLocksForOrder({
-        restaurantId: orderData.restaurant_id,
-        productIds,
-        supplierId,
-      })
-      for (const lock of autoQuoteLocks) {
-        if (!lockByProductId.has(lock.productId)) {
-          lockByProductId.set(lock.productId, lock)
-        }
-      }
-      const quoteLocks = [...lockByProductId.values()]
 
       // Create order with transaction
       let idempotencyReplay = null
       const result = await withTransaction(async (client) => {
         const idempotencyClaim = await claimOrderPlacementKey(client, {
+          actorScope: supplierOrderPlacementScope(supplierId, orderData.restaurant_id),
           restaurantId: orderData.restaurant_id,
           key: idempotencyKey,
           requestHash: idempotencyHash,
@@ -973,6 +969,15 @@ router.post(
           idempotencyReplay = idempotencyClaim.replay
           return null
         }
+        const quoteRows = await lockCheckoutQuoteRows(client, {
+          restaurantId: orderData.restaurant_id,
+          productIds,
+          quoteLocks: clientLocks,
+        })
+        const lockByProductId = new Map(clientLocks.map((lock) => [lock.productId, lock]))
+        for (const lock of autoCheckoutQuoteLocks(quoteRows, supplierId))
+          if (!lockByProductId.has(lock.productId)) lockByProductId.set(lock.productId, lock)
+        const quoteLocks = [...lockByProductId.values()]
 
         const manualDeliveryDate = resolveSupplierDeliveryDate(
           supplierProfile,
@@ -984,12 +989,20 @@ router.post(
           quantity: item.quantity,
           date: manualDeliveryDate,
         }))
-        const manualResolved = await resolveProductPricesBatch({
-          restaurantId: orderData.restaurant_id,
-          items: manualResolveItems,
-          quoteLocks: quoteLocks.length ? quoteLocks : undefined,
-        })
+        const manualResolved = await resolveProductPricesBatch(
+          {
+            restaurantId: orderData.restaurant_id,
+            items: manualResolveItems,
+            quoteLocks: quoteLocks.length ? quoteLocks : undefined,
+          },
+          (sql, params) => client.query(sql, params)
+        )
         const manualResolvedMap = new Map(manualResolved.map((r) => [r.productId, r]))
+        assertCheckoutQuotePrices({
+          rows: quoteRows,
+          quoteLocks,
+          lines: manualResolved.map((row) => ({ ...row, pricingSource: row.source })),
+        })
 
         if (quoteLocks.length) {
           const qriIds = quoteLocks.map((lock) => lock.quoteResponseItemId)
@@ -1062,7 +1075,7 @@ router.post(
             orderData.deliveryTime || null,
             orderCurrency,
             orderData.notes || null,
-            orderData.deliveryDate || null,
+            manualDeliveryDate,
           ]
         )
 
@@ -1105,8 +1118,8 @@ router.post(
             `
           INSERT INTO order_item (
             order_id, product_id, supplier_id, quantity, unit_price, line_total, notes,
-            pricing_source, contract_price_id, default_catalog_price
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            pricing_source, contract_price_id, default_catalog_price, quote_response_item_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
           RETURNING *
         `,
             [
@@ -1120,6 +1133,7 @@ router.post(
               resolved.source || 'DEFAULT_PRICE',
               resolved.contractPriceId || null,
               resolved.defaultPrice ?? null,
+              resolved.quoteResponseItemId ?? null,
             ]
           )
 

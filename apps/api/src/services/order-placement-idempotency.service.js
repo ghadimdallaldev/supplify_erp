@@ -47,6 +47,46 @@ function placementActorScope({ actorScope, restaurantId }) {
   throw new IdempotencyConflictError('Order placement actor scope is required')
 }
 
+export function supplierOrderPlacementScope(supplierId, restaurantId) {
+  return `SUPPLIER:${supplierId}:RESTAURANT:${restaurantId}`
+}
+
+/** Preserve owned historical manual replays without exposing another supplier's response. */
+export async function lookupSupplierOrderPlacementKey(
+  dbQuery,
+  { supplierId, restaurantId, key, requestHash }
+) {
+  if (!key) return null
+  const response = await lookupOrderPlacementKey(dbQuery, {
+    actorScope: supplierOrderPlacementScope(supplierId, restaurantId),
+    restaurantId,
+    key,
+    requestHash,
+  })
+  if (response) return response
+  const { rows } = await dbQuery(
+    `SELECT request_hash, status, response_json FROM order_placement_idempotency
+     WHERE actor_scope = $1 AND idempotency_key = $2`,
+    [`RESTAURANT:${restaurantId}`, String(key).trim()]
+  )
+  const legacy = rows[0],
+    order = legacy?.response_json?.order
+  if (
+    legacy?.status !== 'SUCCEEDED' ||
+    order?.restaurant_id !== restaurantId ||
+    !Array.isArray(order.items) ||
+    !order.items.length ||
+    order.items.some((item) => !item || item.supplier_id !== supplierId)
+  )
+    return null
+  if (legacy.request_hash !== requestHash)
+    throw new IdempotencyConflictError(
+      'This Idempotency-Key was already used for a different order request',
+      'IDEMPOTENCY_PAYLOAD_MISMATCH'
+    )
+  return legacy.response_json
+}
+
 export async function lookupOrderPlacementKey(
   dbQuery,
   { actorScope, restaurantId = null, key, requestHash }
@@ -84,7 +124,7 @@ export async function lookupOrderPlacementKey(
 }
 
 /**
- * Claim a restaurant-scoped placement key inside the order transaction.
+ * Claim an actor-scoped placement key inside the order transaction.
  * PostgreSQL's unique constraint serializes concurrent first attempts. A
  * rolled-back order also rolls back its IN_PROGRESS claim, so retries remain
  * possible after failed placement.

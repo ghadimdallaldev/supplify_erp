@@ -40,6 +40,10 @@ vi.mock('../lib/dispatch-cache.js', () => ({
 vi.mock('../lib/pod-requirement.js', () => ({
   assertPodPresentWhenRequired: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock('../lib/delivery-route-state.js', () => ({
+  lockDeliveryRoutesForOrder: vi.fn().mockResolvedValue([]),
+  syncDriverRouteState: vi.fn(),
+}))
 
 import { query, withTransaction } from '../lib/db.js'
 import {
@@ -63,6 +67,15 @@ import {
   reopenFailedWarehouseLegs,
 } from './warehouseInventory.js'
 
+function deliveryClient(clientQuery) {
+  return {
+    query: (sql, params) =>
+      /SELECT o\.id FROM customer_order o[\s\S]*FOR UPDATE OF o/.test(sql)
+        ? Promise.resolve({ rows: [{ id: params[0] }] })
+        : clientQuery(sql, params),
+  }
+}
+
 describe('driver-fulfillment.service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -81,7 +94,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] }) // unlocked peek
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] }) // locked resolve
@@ -133,7 +146,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -163,7 +176,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -193,13 +206,13 @@ describe('driver-fulfillment.service', () => {
     }
     const proof = { id: 'pod-1', order_id: 'order-1', file_key: 'uploads/pod.jpg' }
 
-    // The outer ownership check and the proof-save ownership check both pass.
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
+    // Proof-save ownership now uses the same transaction as the proof/status write.
+    query.mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
+      .mockResolvedValueOnce({ rows: [assignment] }) // exact target locked before proof capture
+      .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] }) // transaction-local ownership
       .mockResolvedValueOnce({ rows: [{ id: assignment.id }] }) // proof assignment scope
       .mockResolvedValueOnce({ rows: [proof] }) // POD upsert
       .mockResolvedValueOnce({ rows: [assignment] }) // locked assignment
@@ -256,7 +269,7 @@ describe('driver-fulfillment.service', () => {
 
     const clientQuery = vi.fn()
     withTransaction.mockImplementationOnce(async (fn) => {
-      await fn({ query: clientQuery })
+      await fn(deliveryClient(clientQuery))
       throw new Error('commit failed')
     })
 
@@ -301,7 +314,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] }) // locked resolve
@@ -353,7 +366,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
@@ -407,7 +420,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     reopenFailedWarehouseLegs.mockResolvedValueOnce([{ id: 'leg-new' }])
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
@@ -455,7 +468,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     reopenFailedWarehouseLegs.mockResolvedValueOnce([{ id: 'wh-new' }])
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
@@ -510,7 +523,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     reopenFailedWarehouseLegs.mockRejectedValueOnce(
       new Error('Insufficient stock at warehouse for product p1')
     )
@@ -543,7 +556,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -574,7 +587,7 @@ describe('driver-fulfillment.service', () => {
 
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -669,7 +682,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
@@ -713,7 +726,7 @@ describe('driver-fulfillment.service', () => {
     allWarehouseAssignmentsDelivered.mockResolvedValueOnce(false)
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
@@ -774,7 +787,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
@@ -817,7 +830,7 @@ describe('driver-fulfillment.service', () => {
     query.mockResolvedValueOnce({ rows: [assignment] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({ rows: [{ id: 'order-1' }] })
@@ -858,7 +871,7 @@ describe('driver-fulfillment.service', () => {
       .mockResolvedValueOnce({ rows: [{ full_name: 'Ali' }] })
 
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
 
     clientQuery
       .mockResolvedValueOnce({
@@ -929,7 +942,7 @@ describe('driver-fulfillment.service', () => {
     }
     query.mockResolvedValueOnce({ rows: [assignment] })
     const clientQuery = vi.fn()
-    withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
+    withTransaction.mockImplementationOnce(async (fn) => fn(deliveryClient(clientQuery)))
     clientQuery
       .mockResolvedValueOnce({ rows: [assignment] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })

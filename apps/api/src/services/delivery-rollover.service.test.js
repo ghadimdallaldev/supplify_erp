@@ -22,9 +22,15 @@ vi.mock('../config/env.js', () => ({
 vi.mock('../lib/audit.js', () => ({
   writeSystemAuditLog: vi.fn(),
 }))
+vi.mock('../lib/dispatch-cache.js', () => ({
+  invalidateDispatchCacheForSupplier: vi.fn(),
+}))
 
 vi.mock('./notification.service.js', () => ({
   notifyDeliveryRolloverBatch: vi.fn(),
+}))
+vi.mock('../lib/delivery-route-state.js', () => ({
+  lockDeliveryRoutesForOrder: vi.fn(async () => []),
 }))
 
 import { query, withTransaction } from '../lib/db.js'
@@ -140,6 +146,7 @@ describe('delivery-rollover.service', () => {
     const clientQuery = vi.fn()
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
     clientQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'ord-locked', status: 'SHIPPED' }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -190,6 +197,7 @@ describe('delivery-rollover.service', () => {
     withTransaction.mockImplementationOnce(async (fn) => fn({ query: clientQuery }))
 
     clientQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'ord-1', status: 'SHIPPED' }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -198,6 +206,7 @@ describe('delivery-rollover.service', () => {
             order_id: 'ord-1',
             supplier_id: 'sup-1',
             driver_id: 'drv-1',
+            effective_delivery_date: '2026-06-08',
             notes: null,
           },
         ],

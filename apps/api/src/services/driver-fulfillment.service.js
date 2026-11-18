@@ -15,9 +15,21 @@ import {
 import { notifyOrderStatusChange, notifyDriverDeliveryMilestone } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
 import { assertPodPresentWhenRequired } from '../lib/pod-requirement.js'
+import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
+import { lockDeliveryRoutesForOrder, syncDriverRouteState } from '../lib/delivery-route-state.js'
 
 function dbQuery(client) {
   return client ? (text, params) => client.query(text, params) : query
+}
+
+async function lockDeliveryOrder(client, orderId, supplierId) {
+  // All delivery writers lock the parent before its driver/warehouse legs.
+  const { rows } = await client.query(
+    `SELECT o.id FROM customer_order o WHERE o.id = $1 FOR UPDATE OF o`,
+    [orderId]
+  )
+  if (!rows.length) throw new NotFoundError('Order not found')
+  return lockDeliveryRoutesForOrder(client, { supplierId, orderId })
 }
 
 /** Run irreversible side effects after DB commit; failures must not undo committed state. */
@@ -46,8 +58,8 @@ const ACTIVE_ASSIGNMENT_STATUSES = ['assigned', 'picked_up', 'out_for_delivery']
 const OCCUPIED_ASSIGNMENT_STATUSES = [...ACTIVE_ASSIGNMENT_STATUSES, 'rescheduled']
 const NON_REASSIGNED_STATUSES = ['reassigned', 'superseded']
 
-export async function assertSupplierOwnsOrder(supplierId, orderId) {
-  const { rows } = await query(
+export async function assertSupplierOwnsOrder(supplierId, orderId, { client = null } = {}) {
+  const { rows } = await dbQuery(client)(
     `SELECT o.id, o.status, o.restaurant_id, o.requested_delivery_method
      FROM customer_order o
      JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
@@ -197,7 +209,10 @@ async function resolveDriverAssignmentForStatusUpdate({
     const assignment = await getActiveDriverAssignment(orderId, warehouseAssignmentId, {
       client,
       forUpdate,
-      statuses: OCCUPIED_ASSIGNMENT_STATUSES,
+      statuses:
+        status === 'delivered'
+          ? [...OCCUPIED_ASSIGNMENT_STATUSES, 'delivered']
+          : OCCUPIED_ASSIGNMENT_STATUSES,
     })
     if (!assignment) {
       throw new ValidationError('No active driver assignment for this warehouse leg')
@@ -209,7 +224,15 @@ async function resolveDriverAssignmentForStatusUpdate({
     return getLatestDriverAssignment(orderId, { client, forUpdate })
   }
 
-  const active = await listActiveDriverAssignments(orderId, { client, forUpdate })
+  let active = await listActiveDriverAssignments(orderId, { client, forUpdate })
+  if (!active.length && status === 'delivered') {
+    // A lost response may be retried without an explicit selector on a single-leg order.
+    active = await listActiveDriverAssignments(orderId, {
+      client,
+      forUpdate,
+      statuses: ['delivered'],
+    })
+  }
   if (active.length === 0) return null
   if (active.length === 1) return active[0]
   throw new ValidationError(
@@ -331,9 +354,21 @@ export async function assignDriverToOrder({
         `INSERT INTO driver_assignments (
            order_id, warehouse_assignment_id, driver_id, supplier_id, assigned_by, status,
            scheduled_delivery_date
-         ) VALUES ($1, $2, $3, $4, $5, 'assigned', CURRENT_DATE)
+         ) VALUES ($1, $2, $3, $4, $5, 'assigned', GREATEST(
+           (SELECT requested_delivery_date FROM customer_order WHERE id = $1),
+           (now() AT TIME ZONE COALESCE(
+             (SELECT NULLIF(TRIM(last_order_timezone), '') FROM supplier WHERE id = $4), $6
+           ))::date
+         ))
          RETURNING *`,
-        [orderId, whAssignmentId, driverId, supplierId, assignedByUserId ?? null]
+        [
+          orderId,
+          whAssignmentId,
+          driverId,
+          supplierId,
+          assignedByUserId ?? null,
+          getDefaultTenantTimezone(),
+        ]
       )
       results.push(assignments[0])
     }
@@ -500,6 +535,7 @@ async function applyDeliveryStatusUpdate({
   client,
   postCommitEffects,
 }) {
+  const routes = await lockDeliveryOrder(client, orderId, supplierId)
   const assignment = await resolveDriverAssignmentForStatusUpdate({
     orderId,
     status,
@@ -518,6 +554,12 @@ async function applyDeliveryStatusUpdate({
 
   if (assignment.status === status) {
     if (notes == null && !(status === 'failed' && failureReason)) {
+      await syncDriverRouteState(client, {
+        supplierId,
+        orderId,
+        driverId: assignment.driver_id,
+        routes,
+      })
       return assignment
     }
   } else {
@@ -767,6 +809,13 @@ async function applyDeliveryStatusUpdate({
     }
   }
 
+  await syncDriverRouteState(client, {
+    supplierId,
+    orderId,
+    driverId: assignment.driver_id,
+    routes,
+  })
+
   const { rows: updatedAssignment } = await client.query(
     `SELECT da.*, d.full_name AS driver_name
      FROM driver_assignments da
@@ -989,7 +1038,7 @@ export async function submitProofOfDelivery({
   longitude = null,
   client = null,
 }) {
-  await assertSupplierOwnsOrder(supplierId, orderId)
+  await assertSupplierOwnsOrder(supplierId, orderId, { client })
   const run = dbQuery(client)
   const assignment =
     driverAssignmentId != null
@@ -1008,6 +1057,10 @@ export async function submitProofOfDelivery({
             [orderId, supplierId]
           )
         ).rows[0]
+
+  if (driverAssignmentId != null && !assignment) {
+    throw new ValidationError('Driver assignment not found for this order')
+  }
 
   const gpsLat = latitude != null && Number.isFinite(Number(latitude)) ? Number(latitude) : null
   const gpsLng = longitude != null && Number.isFinite(Number(longitude)) ? Number(longitude) : null
@@ -1086,6 +1139,18 @@ export async function completeDeliveryWithProof({
   await assertSupplierOwnsOrder(supplierId, orderId)
   const effects = []
   const result = await withTransaction(async (client) => {
+    await lockDeliveryOrder(client, orderId, supplierId)
+    const target = await resolveDriverAssignmentForStatusUpdate({
+      orderId,
+      status: 'delivered',
+      driverAssignmentId,
+      warehouseAssignmentId,
+      client,
+      forUpdate: true,
+    })
+    if (!target || target.supplier_id !== supplierId) {
+      throw new ValidationError('No active driver assignment for this order')
+    }
     const proof = await submitProofOfDelivery({
       orderId,
       supplierId,
@@ -1093,7 +1158,7 @@ export async function completeDeliveryWithProof({
       signatureFileKey,
       notes,
       recipientName,
-      driverAssignmentId,
+      driverAssignmentId: target.id,
       userId,
       latitude,
       longitude,
@@ -1103,7 +1168,7 @@ export async function completeDeliveryWithProof({
       supplierId,
       orderId,
       status: 'delivered',
-      driverAssignmentId,
+      driverAssignmentId: target.id,
       warehouseAssignmentId,
       client,
       postCommitEffects: effects,

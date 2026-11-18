@@ -27,7 +27,8 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
       da.warehouse_assignment_id,
       da.status AS assignment_status,
       da.assigned_at,
-      da.scheduled_delivery_date,
+      COALESCE(da.scheduled_delivery_date, route.route_date, o.requested_delivery_date,
+               da.assigned_at::date, o.created_at::date)::text AS effective_delivery_date,
       da.picked_up_at,
       da.delivered_at,
       da.failed_at,
@@ -35,13 +36,24 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
       da.notes AS assignment_notes,
       route.route_id,
       route.route_number,
-      route.route_date,
+      route.route_date::text AS route_date,
       route.route_stop_id,
       route.sequence_number,
       EXISTS (
         SELECT 1 FROM proof_of_delivery pod
         WHERE pod.order_id = o.id
-          AND (da.id IS NULL OR pod.driver_assignment_id IS NULL OR pod.driver_assignment_id = da.id)
+          AND (
+            pod.driver_assignment_id = da.id
+            OR (
+              pod.driver_assignment_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM driver_assignments sibling
+                WHERE sibling.order_id = o.id
+                  AND sibling.id IS DISTINCT FROM da.id
+                  AND sibling.status NOT IN ('reassigned', 'superseded')
+              )
+            )
+          )
       ) AS pod_available
     FROM customer_order o
     LEFT JOIN restaurant r ON r.id = o.restaurant_id
@@ -75,10 +87,10 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
     ) route ON TRUE
     WHERE o.id = $1
       AND EXISTS (SELECT 1 FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = $2)
-      AND (da.id IS NOT NULL OR EXISTS (
+      AND (da.id IS NOT NULL OR ($3::uuid IS NULL AND EXISTS (
         SELECT 1 FROM driver_assignments any_da
         WHERE any_da.order_id = o.id AND any_da.supplier_id = $2
-      ))
+      )))
     LIMIT 1
     `,
     [orderId, supplierId, driverId]
@@ -138,18 +150,7 @@ export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = 
       sku: item.sku ?? null,
       quantity: Number(item.quantity),
     })),
-    scheduledDeliveryDate:
-      row.scheduled_delivery_date?.toISOString?.().slice(0, 10) ??
-      row.scheduled_delivery_date ??
-      row.route_date?.toISOString?.().slice(0, 10) ??
-      row.route_date ??
-      row.requested_delivery_date?.toISOString?.().slice(0, 10) ??
-      row.requested_delivery_date ??
-      row.assigned_at?.toISOString?.().slice(0, 10) ??
-      row.assigned_at ??
-      row.order_created_at?.toISOString?.().slice(0, 10) ??
-      row.order_created_at ??
-      null,
+    scheduledDeliveryDate: row.effective_delivery_date ?? null,
     assignment: row.assignment_id
       ? {
           id: row.assignment_id,

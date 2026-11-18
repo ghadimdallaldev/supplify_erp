@@ -19,7 +19,66 @@ Canonical reference for supplier dispatch, drivers, routes, live GPS, POD, and e
 
 ## Dispatch flow
 
+New driver assignments keep a future requested delivery date. Missing or overdue
+dates use the supplier's current calendar day (`last_order_timezone`, with the
+configured tenant-timezone fallback). Driver detail returns the effective day as
+`YYYY-MM-DD`, using assignment, route, requested date, assignment day and order
+creation day in that order. Route dates are also calendar strings.
+
+Delivery-board responses expose the scheduled calendar day as
+`scheduledDeliveryDate: YYYY-MM-DD`. Supplier dispatch/tracking and native driver
+schedule grouping prefer this field to the legacy `scheduledAt` timestamp so a
+UTC conversion cannot move a stop onto the previous day. Calendar-only values
+are displayed as dates without an invented time of day.
+
+When optional delivery-board enrichment fails, the fallback preserves assignment
+identity, actual delivery status and all caller filters, including a driver's
+assignment restriction. It can omit optional names/POD annotations; it does not
+turn assigned or delivered stops into unassigned pending orders. An unavailable
+filter dependency produces an error instead of broadening the result.
+
 Fulfillment → **Driver Dispatch**: Unassigned → assign driver → Picked Up → Out for delivery → Delivered or Failed. Status updates use `PATCH /api/orders/:id/delivery-status` (canonical). Driver delivery sets order status to **`DELIVERED`**; receiving accepts `DELIVERED` or `COMPLETED`. See [receiving.md](./receiving.md).
+
+Atomic completion resolves and locks the target assignment before capturing proof;
+the proof and delivered transition always use the same assignment ID. Supplier
+calls may omit selectors on a single-leg order. Multiple active or completed legs
+require an explicit `driver_assignment_id` or `warehouse_assignment_id`. Repeating
+completion for a delivered leg reuses its proof row. An invalid transition rolls
+proof capture back. Delivery status, reassignment and completion lock the order
+before the assignment to serialize concurrent changes.
+
+Direct driver dispatch and atomic proof completion now derive their live route
+stop in the same transaction. A stop aggregates the latest non-retired attempt
+for each warehouse leg owned by that route's driver: one delivered leg does not
+finish another outstanding leg. Other drivers' warehouse legs do not prevent this
+driver's route from finishing, and are never advanced by it. The last terminal
+stop completes the route; a mix containing failed legs leaves that stop failed.
+Starting direct work also starts its planned route. Clients refresh the route
+after atomic completion and do not send a second delivered request.
+
+Route-wide edits acquire affected order locks in sorted order before locking the
+route header. Direct status/POD writes then lock the route before their assignment
+and stop writes. This keeps route cancellation and direct completion in a common
+locking order. A route-stop status change with no matching live assignment is
+rejected.
+
+Changing `driver_id` on a planned or active route atomically hands over unfinished
+legs. The previous assignment is retained as `reassigned`; its replacement keeps
+the warehouse leg, delivery day, current operational status and pickup timestamp.
+Completed/failed stops and their history stay unchanged, as do stock quantities
+and legs held by other drivers. A replacement driver must still be active and
+belong to the supplier when the transaction executes.
+
+Web and native actions carry the selected assignment and its warehouse together.
+If an explicit assignment disappeared, the UI does not fall back to another leg.
+Navigation without a selector prefers an active leg over already delivered work.
+
+Standalone proof submission accepts `driver_assignment_id` and rejects an invalid
+explicit ID. Driver-only callers must own that exact assignment. When an older
+driver client omits the ID, the server binds proof to the assignment returned by
+its access check. Driver detail also requires a matching non-reassigned leg when
+a driver filter is supplied. An unbound legacy proof counts toward the detail
+POD indicator only when it cannot belong to a different current leg.
 
 ---
 
@@ -138,6 +197,22 @@ Mapping from ops language: CONFIRMED/ACCEPTED → `ACKNOWLEDGED`; PREPARING → 
 
 ### Edge cases
 
+- **Concurrent edits:** add/remove/reorder/next-stop, route updates, cancellation
+  and driver-route merging lock the route and recheck the status, driver and day
+  read by the request. A conflicting change asks the caller to refresh. Reorders
+  also lock/recheck stop identity and terminal status. Order eligibility is checked
+  again under its lock before route creation or insertion; a concurrently cancelled
+  or pickup-only order cannot be added from an old eligibility result.
+- **Route-stop writes:** driver ownership is checked again on the locked route.
+  The order is locked before the route, stop and driver assignments so reassignment can
+  finish without an order/assignment lock inversion. A deleted stop returns a
+  not-found/validation result instead of applying a stale update.
+- **Calendar contract:** route list/detail/create/build responses return
+  `scheduledDate` as `YYYY-MM-DD`. Active planned-route lookup and an omitted
+  driver-build date use the supplier timezone, with the configured fallback.
+- **Stop context:** assignment status follows the route supplier/driver, and the
+  order currency accompanies the stop total. Another driver's newer leg cannot
+  replace this driver's displayed assignment status.
 - **Cancelled order:** the same transaction removes incomplete stops and releases the live driver legs (`releaseOrderFromPlannedRoutes`). The dispatch cache refreshes after that commit.
 - **Non-ready stops on activate:** route still moves to `IN_PROGRESS`; waiting stops keep `assigned` until order reaches `PROCESSING`/`SHIPPED`
 - **Duplicate routing:** an order cannot be on two `PLANNED`/`IN_PROGRESS` routes
@@ -167,6 +242,29 @@ create / add stops / remove stop / update / activate / cancel / build-from-assig
 driver assign / status / reassign, POD submit, and both manual and cron rollover.
 Skipping it leaves the board showing an order as unassigned for up to 45 seconds after
 a driver has been routed.
+
+### Driver route API contracts
+
+Existing `DRIVER_DELIVERIES_VIEW` permits assignment-scoped route list/detail,
+`/routes/active` and `/routes/today` reads without `FULFILLMENT_VIEW`.
+`DRIVER_DELIVERIES_MANAGE` permits own-assignment route building and own-route
+optimization/reordering/next-stop/stop updates. Supplier route creation, metadata
+updates, cancellation and dispatch-board access retain their supplier permissions.
+Every path still applies the existing fulfillment feature gate.
+
+- `POST /api/fulfillment/routes/build-from-assignments` accepts optional `date`.
+  New-route detail is read on its creation transaction connection so the route is
+  visible before commit. Existing-route merges invalidate dispatch cache after commit.
+- `POST /api/fulfillment/routes/:id/stops/reorder` accepts `{ stop_ids: [...] }`.
+  The PATCH alternative accepts `{ stops: [{ orderId, stopSequence }, ...] }`.
+- `PATCH /api/fulfillment/routes/:id/next-stop` accepts `{ orderId }`.
+- Optimization responds with `{ preview, route }`; `preview.estimatedDistanceKm`
+  is the estimated route distance, not a distance saved.
+
+Android/iOS use the POST stop-ID contract and the canonical next-stop field.
+Active-route fetch failures remain query errors while retaining cached route data;
+driver home and run sheet show a retry control. A successful `{ route: null }`
+continues to mean no route.
 
 ### Supplier delivery board (multi-warehouse legs)
 

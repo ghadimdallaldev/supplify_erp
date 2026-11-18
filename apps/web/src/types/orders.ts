@@ -57,6 +57,7 @@ export interface Order {
   delivery_location_snapshot?: DeliveryLocationSnapshot | null
   requested_delivery_method?: string | null
   requested_delivery_time?: string | null
+  requested_delivery_date?: string | null
   warehouseFulfillment?: {
     warehouseId: string
     supplierTenantId?: string
@@ -92,6 +93,16 @@ export interface OrderItem {
   product_sku?: string
   supplier_name?: string
   supplier_slug?: string
+  pricing_source?:
+    | 'DEFAULT_PRICE'
+    | 'CONTRACT_PRICE'
+    | 'PROMOTION_PRICE'
+    | 'DISCOUNT_APPLIED'
+    | 'QUOTE_PRICE'
+    | null
+  quote_response_item_id?: string | null
+  contract_price_id?: string | null
+  default_catalog_price?: number | null
 }
 
 export interface CreateOrderRequest {
@@ -131,6 +142,7 @@ export interface CreateManualOrderRequest {
   deliveryTime?: string
   deliveryDate?: string
   idempotencyKey?: string
+  quoteLocks?: CreateOrderRequest['quoteLocks']
 }
 
 export interface UpdateOrderRequest {

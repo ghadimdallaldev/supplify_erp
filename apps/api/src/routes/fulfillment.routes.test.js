@@ -11,6 +11,12 @@ const getLinkedDriverIdMock = vi.fn()
 vi.mock('../lib/db.js', () => ({
   query: vi.fn().mockResolvedValue({ rows: [{ id: 'supplier-1' }] }),
 }))
+vi.mock('../lib/cache.js', () => ({
+  getCache: vi.fn(),
+  setCache: vi.fn(async () => {}),
+  deleteCache: vi.fn(),
+  deleteCacheByPrefix: vi.fn(async () => {}),
+}))
 
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => next(),
@@ -89,6 +95,151 @@ describe('Fulfillment routes — delivery route planning', () => {
     })
     app.use('/api/fulfillment', fulfillmentRoutes)
     app.use(errorHandler)
+  })
+
+  function driverApp(
+    permissions = ['DRIVER_DELIVERIES_VIEW', 'DRIVER_DELIVERIES_MANAGE'],
+    roles = []
+  ) {
+    const driver = express()
+    driver.use(express.json())
+    driver.use((req, _res, next) => {
+      req.requestId = 'driver-route-regression'
+      req.userData = { id: 'driver-user', role: 'SUPPLIER' }
+      req.tenantContext = { tenantId: 'supplier-1', tenantType: 'SUPPLIER', permissions, roles }
+      next()
+    })
+    driver.use('/api/fulfillment', fulfillmentRoutes)
+    driver.use(errorHandler)
+    return driver
+  }
+
+  it('lets drivers build from their own assignments without supplier board permission', async () => {
+    const { buildDriverRouteFromAssignments } = await import(
+      '../services/delivery-routes.service.js'
+    )
+    buildDriverRouteFromAssignments.mockResolvedValue({ id: 'route-1', stops: [] })
+    await request(driverApp())
+      .post('/api/fulfillment/routes/build-from-assignments')
+      .send({})
+      .expect(201)
+    expect(buildDriverRouteFromAssignments).toHaveBeenCalledWith(
+      'supplier-1',
+      'driver-a',
+      expect.anything()
+    )
+  })
+
+  it.each(['/routes/today', '/routes/active', '/routes/own-route', '/routes'])(
+    'lets a driver read their route at %s without supplier board permission',
+    async (path) => {
+      const { getDriverActiveRoute } = await import('../services/delivery-routes.service.js')
+      getDriverActiveRoute.mockResolvedValue({ id: 'route-1', stops: [] })
+      getDeliveryRouteMock.mockResolvedValue({ id: 'own-route', driverId: 'driver-a', stops: [] })
+      listDeliveryRoutesMock.mockResolvedValue([])
+      await request(driverApp(['DRIVER_DELIVERIES_VIEW']))
+        .get('/api/fulfillment' + path)
+        .expect(200)
+    }
+  )
+
+  it.each([
+    [
+      'post',
+      '/routes/route-1/stops/reorder',
+      { stop_ids: ['11111111-1111-4111-8111-111111111111'] },
+      'reorderRouteStops',
+    ],
+    [
+      'patch',
+      '/routes/route-1/stops/reorder',
+      { stops: [{ orderId: '11111111-1111-4111-8111-111111111111', stopSequence: 1 }] },
+      'reorderRouteStopsByOrder',
+    ],
+    [
+      'patch',
+      '/routes/route-1/next-stop',
+      { orderId: '11111111-1111-4111-8111-111111111111' },
+      'setNextRouteStop',
+    ],
+  ])('lets drivers use the scoped %s %s handler', async (method, path, body, serviceName) => {
+    const services = await import('../services/delivery-routes.service.js')
+    services[serviceName].mockResolvedValue({ id: 'route-1', stops: [] })
+    await request(driverApp())
+      [method]('/api/fulfillment' + path)
+      .send(body)
+      .expect(200)
+    expect(services[serviceName]).toHaveBeenCalledWith('supplier-1', 'route-1', expect.anything(), {
+      driverIdScope: 'driver-a',
+    })
+  })
+
+  it('keeps driver-only access out of supplier mutations and requires manage for route actions', async () => {
+    await request(driverApp()).post('/api/fulfillment/routes').send({}).expect(403)
+    await request(driverApp())
+      .patch('/api/fulfillment/routes/route-1')
+      .send({ route_label: 'Changed' })
+      .expect(403)
+    await request(driverApp()).get('/api/fulfillment/dispatch').expect(403)
+    await request(driverApp(['DRIVER_DELIVERIES_VIEW']))
+      .post('/api/fulfillment/routes/build-from-assignments')
+      .send({})
+      .expect(403)
+    await request(driverApp(['DRIVER_DELIVERIES_VIEW']))
+      .patch('/api/fulfillment/routes/route-1/next-stop')
+      .send({ orderId: '11111111-1111-4111-8111-111111111111' })
+      .expect(403)
+  })
+
+  it('passes the linked driver scope through a stop mutation and refuses an unlinked caller', async () => {
+    const { updateRouteStop } = await import('../services/delivery-routes.service.js')
+    getDeliveryRouteMock.mockResolvedValue({ id: 'route-1', driverId: 'driver-a', stops: [] })
+    updateRouteStop.mockResolvedValue({ id: 'route-1', stops: [] })
+    await request(driverApp())
+      .patch('/api/fulfillment/routes/route-1/stops/stop-1')
+      .send({ notes: 'At gate' })
+      .expect(200)
+    expect(updateRouteStop).toHaveBeenCalledWith(
+      'supplier-1',
+      'route-1',
+      'stop-1',
+      expect.objectContaining({ driverIdScope: 'driver-a' })
+    )
+    expect(getDeliveryRouteMock).toHaveBeenCalledWith('supplier-1', 'route-1', {
+      driverIdScope: 'driver-a',
+    })
+    getLinkedDriverIdMock.mockResolvedValue(null)
+    updateRouteStop.mockClear()
+    await request(driverApp())
+      .patch('/api/fulfillment/routes/route-1/stops/stop-1')
+      .send({ notes: 'At gate' })
+      .expect(403)
+    expect(updateRouteStop).not.toHaveBeenCalled()
+  })
+
+  it('retains trusted Owner stop management without requiring explicit permission rows', async () => {
+    const { updateRouteStop } = await import('../services/delivery-routes.service.js')
+    getDeliveryRouteMock.mockResolvedValue({ id: 'route-1', stops: [] })
+    updateRouteStop.mockResolvedValue({ id: 'route-1', stops: [] })
+    await request(driverApp([], ['Owner']))
+      .patch('/api/fulfillment/routes/route-1/stops/stop-1')
+      .send({ notes: 'Supplier note' })
+      .expect(200)
+    expect(updateRouteStop).toHaveBeenCalledWith(
+      'supplier-1',
+      'route-1',
+      'stop-1',
+      expect.objectContaining({ driverIdScope: null })
+    )
+  })
+
+  it('denies a stop write to a view-only driver', async () => {
+    const { updateRouteStop } = await import('../services/delivery-routes.service.js')
+    await request(driverApp(['DRIVER_DELIVERIES_VIEW']))
+      .patch('/api/fulfillment/routes/route-1/stops/stop-1')
+      .send({ notes: 'Unauthorized' })
+      .expect(403)
+    expect(updateRouteStop).not.toHaveBeenCalled()
   })
 
   it('POST /routes creates a route for supplier staff', async () => {

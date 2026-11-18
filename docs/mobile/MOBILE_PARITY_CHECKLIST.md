@@ -1,5 +1,103 @@
 # Mobile Parity Checklist
 
+## 2026-11-18 - Checkout quote/replay contracts
+
+- [x] Web mutation types match canonical single/split/manual success data.
+- [x] Android/iOS normalize counted restaurant results and reject malformed confirmations.
+- [x] Both native manual clients forward quote selectors and stable retry headers.
+- [x] Existing quote/order audit fields are typed across all three clients.
+- [x] Real HTTP/SQL covers quote snapshots, replay ownership, legacy compatibility, rollback and writer serialization.
+- [x] Migration 0236 applied only to the owned disposable audit database.
+- [ ] Final broad API/lint/typecheck and matching native evidence recorded in the audit.
+- [ ] Hosted migration/rollout, native manual-order UI, remaining warehouse/plan/device matrices stay open.
+
+## 2026-11-18 - Supplier quote response parity
+
+- [x] Web/Android/iOS preserve line currency, substitute ID and calendar day on edit.
+- [x] Both native clients allow open-response edits and reset drafts across requests.
+- [x] Price/quantity guards and English/Arabic quantity messages match all clients.
+- [x] Real SQL verifies supplier/request/restaurant isolation, effective SKU pricing and response/decline transactions.
+- [x] Both native hook suites cover metadata, errors/retries and cache invalidation.
+- [x] Final broad regression/lint/typecheck evidence is recorded in the active audit (41 mobile regressions per platform plus quote/Arabic runtime checks; all three typechecks).
+- [ ] Checkout-commit races, precision boundaries, hosted and physical-device workflows remain open.
+
+## 2026-11-18 - Rollover transaction and client refresh
+
+- [x] Android/iOS preserve the canonical manual-rollover request and response.
+- [x] Both clients refresh dispatch/order/driver/delivery/run-sheet caches on success.
+- [x] Matching regressions retain cached work on error and refresh after retry.
+- [x] Actual SQL covers calendar/status compatibility, job execution, stale writes and pickup serialization.
+- [x] Final typecheck/lint and broad API results recorded in the active audit (32 native tests per platform, all three typechecks).
+- [ ] Manual force replay, long-overdue days, route membership and physical devices remain open.
+
+## 2026-11-18 - Direct delivery, route state and warehouse assignment selection
+
+- [x] Android/iOS home and stop screens preserve exact assignment/warehouse selection.
+- [x] Explicit stale selectors do not fall back; selector-free navigation prefers active work.
+- [x] Both status mutation clients refresh order/detail/board/route caches.
+- [x] Web proof completion refreshes after the atomic endpoint without a second delivered write.
+- [x] Real SQL covers direct status/POD route synchronization, multi-leg aggregation and rollback.
+- [x] Route driver handover preserves completed history and physical stock quantities.
+- [x] Final test/typecheck/lint results are recorded in the active audit (28 native tests per platform, all three typechecks).
+- [ ] Physical devices, GPS-session transitions and retry/rollover route membership remain open.
+
+## 2026-11-17 - Driver route lifecycle and error parity
+
+- [x] Both native clients POST stop-ID reorders and PATCH the canonical next-stop field.
+- [x] Optimization response types and copy reflect estimated distance from `preview`.
+- [x] Both clients retain active-route query errors and cached routes on refresh failure.
+- [x] Driver home/run-sheet retry rendering and successful null-route controls pass in both clients.
+- [x] Route currency types and English/Arabic messages match across Android/iOS.
+- [x] Real SQL covers route creation, edits, dispatch/delivery, stale state and reassignment lock ordering.
+- [x] Final ERP/Android/iOS typechecks and API regression gate recorded in the active audit.
+- [ ] Physical-device route/GPS/offline behavior and hosted workflows remain open.
+
+## 2026-11-17 - Supplier proof assignment and completion parity
+
+- [x] Android/iOS standalone proof clients send an explicit assignment selector when provided.
+- [x] Proof response types include the nullable driver assignment ID on web and both native clients.
+- [x] Active native atomic proof screens retain their required assignment ID and uploaded-photo retry.
+- [x] Matching hook regressions verify explicit/omitted selectors and retry/cache behavior on both platforms.
+- [x] ERP, Android and iOS typechecks pass after the proof client/type changes.
+- [x] PostgreSQL verifies calendar dates, rollback, leg/tenant isolation, connection reuse and reassignment serialization.
+- [ ] Hosted and physical-device camera, offline/reconnect and delivery lifecycle verification remain open.
+
+## 2026-11-17 - Supplier delivery calendar parity
+
+- [x] Delivery calendar field contract documented identically in Android and iOS.
+- [x] Both native schedules retain the supplier day when the legacy timestamp is on the previous UTC date.
+- [x] Matching driver schedule and run-sheet regressions pass on both platforms.
+- [x] ERP, Android and iOS typechecks pass after the delivery calendar changes.
+- [x] Server fallback preserves existing response fields and driver/area/status restrictions.
+- [ ] Physical-device delivery, offline/reconnect and full lifecycle verification remain open.
+
+## 2026-11-17 - Supplier summary finance authorization
+
+- [x] Android/iOS run sheets require invoice visibility for financial tiles and details.
+- [x] Both native regression suites cover an unauthorized user with a cached finance payload.
+- [x] Existing driver navigation remains aligned with the tenant-wide run-sheet gate.
+- [x] ERP, Android and iOS typechecks pass after the permission guards.
+- [x] No new response field, permission/feature key or environment variable needs migration.
+- [ ] Full supplier source, feature, role/plan and physical-device audit remains open.
+
+## 2026-11-17 - Supplier receivables workflow audit
+
+- [x] Canonical supplier receivables response types mirrored in Android and iOS.
+- [x] Both native screens display API invoice fields, currency groups and supplier overdue flags.
+- [x] Full open-invoice count retained when the invoice preview is capped at 100 rows.
+- [x] Matching rendering/currency regressions and both native typechecks pass.
+- [x] Export endpoint usage inspected in both native clients; neither calls these accounting exports.
+- [x] Dated parity entry, supplier operations and regression documentation updated.
+
+## 2026-11-16 - Supplier run sheet and accounting audit
+
+- [x] Nullable run-sheet KPI/collection amounts and currency groups mirrored in Android and iOS.
+- [x] Both native run sheets show invoice and aggregate currencies without combining balances.
+- [x] Matching mixed/single/missing-currency and legacy-payload display regressions pass.
+- [x] Both native typechecks pass; root typecheck and web production build pass.
+- [x] Accounting CSV downloads retain their opaque-file handling; no new parser, dependency or env var.
+- [x] Dated parity entry and supplier operations/capability documentation updated.
+
 ## 2026-11-16 - Restaurant checkout audit
 
 - [x] Nullable restaurant-order supplier display projection mirrored in Android and iOS.

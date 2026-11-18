@@ -1,46 +1,38 @@
 import { query } from '../lib/db.js'
+import { formatInvoiceCalendarDate } from './invoice.service.js'
+import { getSupplierTimezone } from '../lib/tenant-timezone.js'
 import { escapeCsvField } from '../lib/sanitize-upload.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 
 const OPEN_STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE']
 const MAX_EXPORT_RANGE_DAYS = 366
 
-function startOfDay(d) {
-  const x = new Date(d)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
-function endOfDay(d) {
-  const x = new Date(d)
-  x.setHours(23, 59, 59, 999)
-  return x
-}
-
-function defaultFrom() {
-  const d = new Date()
-  d.setDate(d.getDate() - 30)
-  return d
+function parseExportCalendarDate(value, fallback) {
+  if (value == null || value === '') return fallback
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new ValidationError('Invalid from or to date')
+  }
+  const date = new Date(`${value}T00:00:00.000Z`)
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new ValidationError('Invalid from or to date')
+  }
+  return value
 }
 
 export function parseExportDateRange(query = {}) {
-  const from = query.from ? startOfDay(new Date(query.from)) : startOfDay(defaultFrom())
-  const to = query.to ? endOfDay(new Date(query.to)) : endOfDay(new Date())
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    throw new ValidationError('Invalid from or to date')
-  }
+  const today = formatInvoiceCalendarDate(new Date())
+  const thirtyDaysAgo = new Date(`${today}T00:00:00.000Z`)
+  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30)
+  const from = parseExportCalendarDate(query.from, thirtyDaysAgo.toISOString().slice(0, 10))
+  const to = parseExportCalendarDate(query.to, today)
   if (from > to) {
     throw new ValidationError('from must be before to')
   }
-  const spanMs = to.getTime() - from.getTime()
-  const maxSpanMs = MAX_EXPORT_RANGE_DAYS * 24 * 60 * 60 * 1000
-  if (spanMs > maxSpanMs) {
+  const inclusiveDays = (Date.parse(to) - Date.parse(from)) / 86400000 + 1
+  if (inclusiveDays > MAX_EXPORT_RANGE_DAYS) {
     throw new ValidationError(`Date range cannot exceed ${MAX_EXPORT_RANGE_DAYS} days`)
   }
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  }
+  return { from, to }
 }
 
 function buildCsv(header, rows) {
@@ -58,6 +50,7 @@ export async function exportInvoicesCsv(supplierId, { from, to, status }) {
       i.total_amount,
       i.paid_amount,
       i.balance_due,
+      i.currency,
       r.name AS restaurant_name
     FROM invoice i
     JOIN restaurant r ON r.id = i.restaurant_id
@@ -73,17 +66,19 @@ export async function exportInvoicesCsv(supplierId, { from, to, status }) {
   sql += ` ORDER BY i.invoice_date ASC, i.invoice_number ASC`
 
   const { rows } = await query(sql, params)
-  const header = 'Invoice Number,Invoice Date,Due Date,Status,Total,Paid,Balance,Restaurant\n'
+  const header =
+    'Invoice Number,Invoice Date,Due Date,Status,Total,Paid,Balance,Restaurant,Currency\n'
   const lines = rows.map((r) =>
     [
       escapeCsvField(r.invoice_number),
-      escapeCsvField(r.invoice_date),
-      escapeCsvField(r.due_date),
+      escapeCsvField(formatInvoiceCalendarDate(r.invoice_date) || ''),
+      escapeCsvField(formatInvoiceCalendarDate(r.due_date) || ''),
       escapeCsvField(r.status),
       escapeCsvField(r.total_amount),
       escapeCsvField(r.paid_amount),
       escapeCsvField(r.balance_due),
       escapeCsvField(r.restaurant_name),
+      escapeCsvField(r.currency),
     ].join(',')
   )
   return buildCsv(header, lines)
@@ -99,6 +94,7 @@ export async function exportInvoicesQuickBooksCsv(supplierId, { from, to }) {
       i.due_date,
       i.payment_terms,
       i.notes,
+      i.total_amount,
       ili.description,
       ili.quantity,
       ili.unit_price,
@@ -120,13 +116,13 @@ export async function exportInvoicesQuickBooksCsv(supplierId, { from, to }) {
   const lines = rows.map((r) => {
     const description = r.description || `Invoice ${r.invoice_number}`
     const quantity = r.quantity != null ? r.quantity : 1
-    const rate = r.unit_price != null ? r.unit_price : (r.line_total ?? 0)
+    const rate = r.unit_price != null ? r.unit_price : (r.line_total ?? r.total_amount ?? 0)
     const amount = r.line_total != null ? r.line_total : rate
     return [
       escapeCsvField(r.invoice_number),
       escapeCsvField(r.restaurant_name),
-      escapeCsvField(r.invoice_date),
-      escapeCsvField(r.due_date),
+      escapeCsvField(formatInvoiceCalendarDate(r.invoice_date) || ''),
+      escapeCsvField(formatInvoiceCalendarDate(r.due_date) || ''),
       escapeCsvField(r.payment_terms || ''),
       escapeCsvField(r.notes || ''),
       escapeCsvField('Services'),
@@ -152,6 +148,7 @@ export async function exportPaymentsCsv(supplierId, { from, to }) {
       p.bank_name,
       p.notes,
       i.invoice_number,
+      i.currency,
       r.name AS restaurant_name
     FROM payment p
     JOIN invoice i ON i.id = p.invoice_id
@@ -165,11 +162,11 @@ export async function exportPaymentsCsv(supplierId, { from, to }) {
   )
 
   const header =
-    'Payment Number,Payment Date,Amount,Method,Reference,Status,Bank,Notes,Invoice Number,Restaurant\n'
+    'Payment Number,Payment Date,Amount,Method,Reference,Status,Bank,Notes,Invoice Number,Restaurant,Currency\n'
   const lines = rows.map((r) =>
     [
       escapeCsvField(r.payment_number),
-      escapeCsvField(r.payment_date),
+      escapeCsvField(formatInvoiceCalendarDate(r.payment_date) || ''),
       escapeCsvField(r.payment_amount),
       escapeCsvField(r.payment_method),
       escapeCsvField(r.payment_reference),
@@ -178,50 +175,53 @@ export async function exportPaymentsCsv(supplierId, { from, to }) {
       escapeCsvField(r.notes),
       escapeCsvField(r.invoice_number),
       escapeCsvField(r.restaurant_name),
+      escapeCsvField(r.currency),
     ].join(',')
   )
   return buildCsv(header, lines)
 }
 
 export async function exportArSummaryCsv(supplierId) {
+  const timeZone = await getSupplierTimezone(supplierId)
   const { rows } = await query(
     `
     SELECT
       r.name AS restaurant_name,
+      i.currency,
       COUNT(*)::int AS invoice_count,
       COALESCE(SUM(i.balance_due), 0)::numeric AS total_balance,
       COALESCE(
-        SUM(i.balance_due) FILTER (WHERE i.due_date >= CURRENT_DATE),
+        SUM(i.balance_due) FILTER (WHERE i.due_date >= (now() AT TIME ZONE $3)::date),
         0
       )::numeric AS aging_current,
       COALESCE(
         SUM(i.balance_due) FILTER (
-          WHERE i.due_date < CURRENT_DATE
-            AND CURRENT_DATE - i.due_date BETWEEN 1 AND 7
+          WHERE i.due_date < (now() AT TIME ZONE $3)::date
+            AND (now() AT TIME ZONE $3)::date - i.due_date BETWEEN 1 AND 7
             AND i.status NOT IN ('PAID', 'VOID')
         ),
         0
       )::numeric AS aging_0_7,
       COALESCE(
         SUM(i.balance_due) FILTER (
-          WHERE i.due_date < CURRENT_DATE
-            AND CURRENT_DATE - i.due_date BETWEEN 8 AND 30
+          WHERE i.due_date < (now() AT TIME ZONE $3)::date
+            AND (now() AT TIME ZONE $3)::date - i.due_date BETWEEN 8 AND 30
             AND i.status NOT IN ('PAID', 'VOID')
         ),
         0
       )::numeric AS aging_8_30,
       COALESCE(
         SUM(i.balance_due) FILTER (
-          WHERE i.due_date < CURRENT_DATE
-            AND CURRENT_DATE - i.due_date BETWEEN 31 AND 60
+          WHERE i.due_date < (now() AT TIME ZONE $3)::date
+            AND (now() AT TIME ZONE $3)::date - i.due_date BETWEEN 31 AND 60
             AND i.status NOT IN ('PAID', 'VOID')
         ),
         0
       )::numeric AS aging_31_60,
       COALESCE(
         SUM(i.balance_due) FILTER (
-          WHERE i.due_date < CURRENT_DATE
-            AND CURRENT_DATE - i.due_date > 60
+          WHERE i.due_date < (now() AT TIME ZONE $3)::date
+            AND (now() AT TIME ZONE $3)::date - i.due_date > 60
             AND i.status NOT IN ('PAID', 'VOID')
         ),
         0
@@ -230,14 +230,14 @@ export async function exportArSummaryCsv(supplierId) {
     JOIN restaurant r ON r.id = i.restaurant_id
     WHERE i.supplier_id = $1
       AND i.status = ANY($2::text[])
-    GROUP BY i.restaurant_id, r.name
+    GROUP BY i.restaurant_id, r.name, i.currency
     ORDER BY total_balance DESC, restaurant_name ASC
     `,
-    [supplierId, OPEN_STATUSES]
+    [supplierId, OPEN_STATUSES, timeZone]
   )
 
   const header =
-    'Restaurant,Open Invoices,Total Balance,Current,1-7 Days,8-30 Days,31-60 Days,60+ Days\n'
+    'Restaurant,Open Invoices,Total Balance,Current,1-7 Days,8-30 Days,31-60 Days,60+ Days,Currency\n'
   const lines = rows.map((r) =>
     [
       escapeCsvField(r.restaurant_name),
@@ -248,6 +248,7 @@ export async function exportArSummaryCsv(supplierId) {
       escapeCsvField(r.aging_8_30),
       escapeCsvField(r.aging_31_60),
       escapeCsvField(r.aging_60_plus),
+      escapeCsvField(r.currency),
     ].join(',')
   )
   return buildCsv(header, lines)

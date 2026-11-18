@@ -25,6 +25,8 @@ type LineDraft = {
   unitPrice: string
   quantity: string
   deliveryDate: string
+  currency: string
+  substituteProductId: string | null
   note: string
 }
 
@@ -64,12 +66,14 @@ export function SupplierQuoteResponsePage() {
         unitPrice: existing?.unitPrice != null ? String(existing.unitPrice) : '',
         quantity: existing?.quantity != null ? String(existing.quantity) : String(item.quantity),
         deliveryDate: existing?.deliveryDate?.slice(0, 10) || '',
+        currency: existing?.currency || data.defaultCurrency || quoteCurrency,
+        substituteProductId: existing?.substituteProductId ?? null,
         note: existing?.note || '',
       }
     }
     setLines(initial)
     setNote(data.response?.note || '')
-  }, [data])
+  }, [data, quoteCurrency])
 
   const updateLine = (itemId: string, patch: Partial<LineDraft>) => {
     setLines((prev) => ({
@@ -100,21 +104,37 @@ export function SupplierQuoteResponsePage() {
     // A line marked available with no price is not a quote — catch it here rather
     // than sending an unusable response the restaurant cannot act on.
     const missingPrice = Object.values(lines).filter(
-      (line) => line.isAvailable && !(parseFloat(line.unitPrice) >= 0)
+      (line) =>
+        line.isAvailable &&
+        (!line.unitPrice.trim() ||
+          !Number.isFinite(Number(line.unitPrice)) ||
+          Number(line.unitPrice) < 0)
     )
     if (missingPrice.length) {
       toast.error(t('response.missingPrice', { count: missingPrice.length }))
+      return
+    }
+    if (
+      Object.values(lines).some(
+        (line) =>
+          line.isAvailable &&
+          line.quantity.trim() &&
+          (!Number.isFinite(Number(line.quantity)) || Number(line.quantity) <= 0)
+      )
+    ) {
+      toast.error(t('response.invalidQuantity'))
       return
     }
 
     const items = Object.values(lines).map((line) => ({
       quoteRequestItemId: line.quoteRequestItemId,
       isAvailable: line.isAvailable,
-      unitPrice: line.unitPrice ? parseFloat(line.unitPrice) : null,
-      quantity: line.quantity ? parseFloat(line.quantity) : null,
+      unitPrice: line.isAvailable ? Number(line.unitPrice) : null,
+      quantity: line.isAvailable && line.quantity.trim() ? Number(line.quantity) : null,
       deliveryDate: line.deliveryDate || null,
       note: line.note || null,
-      currency: quoteCurrency,
+      currency: line.currency,
+      substituteProductId: line.substituteProductId,
     }))
 
     try {

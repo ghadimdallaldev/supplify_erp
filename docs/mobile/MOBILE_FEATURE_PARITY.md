@@ -1,5 +1,226 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-18 - Checkout transactions, scoped replay and order result contracts
+
+Both native clients now normalize actual restaurant `{ order }` / `{ orders }`
+placement responses into the order array promised by their checkout hook. Invalid
+or empty confirmation data rejects the mutation so the existing uncertain-checkout
+path can retain the cart and retry key. They expose a typed manual-order hook that
+forwards existing quote selectors and the same `Idempotency-Key` header, returning
+the confirmed order. The server derives actor scope; no new client field is required.
+Web mutation types now reflect the same success wrappers. All three clients type
+the existing pricing-source/quote-reference/delivery-date fields; the web manual
+request also exposes existing optional quote locks.
+
+Server checkout rechecks quote state inside the order transaction, manual pricing
+uses its transaction connection, and quoted lines retain their response-item ID.
+Manual placement stores the resolved delivery day. Supplier replay is isolated by
+supplier/customer; owned historical responses remain retryable. Migration 0236
+removes the legacy restaurant/key uniqueness constraint, and has been applied only
+to the disposable audit database. No permission/feature key, required environment
+variable or notification payload changed.
+
+Matching native tests cover single/split confirmations, malformed data, quote/key
+preservation, manual calls, rejection caches and existing cart retention/concurrent
+retry behavior. The native manual endpoint is now typed; a supplier manual-order
+screen remains a broader feature-parity item. Hosted rollout, all warehouse/plan
+combinations, mixed-version retries, precision and physical-device behavior remain
+open in the active audit.
+
+## 2026-11-18 - Quote ownership, editable responses and line metadata
+
+Android and iOS now allow editing an open responded quote when `canRespond` permits
+it, matching web and the API. Drafts reset when opening another invitation. Edits
+retain each line's currency, offered substitute ID and delivery calendar date.
+Both native response types/clients now expose the existing optional substitute ID;
+web already typed it and now preserves it in its form. All three clients reject
+invalid available prices/quantities locally. New quantity messages have English
+and Arabic entries in web and both native repositories.
+
+The API rechecks supplier-owned request lines/substitutes and invitation status
+under parent/invitation locks. Response and decline decisions serialize; historical
+cross-supplier/request links are excluded from detail/cart/pricing reads. Substitute
+pricing applies only to its offered SKU. Calendar response fields are literal date
+strings, with invalid dates and duplicate lines rejected as validation errors.
+No new endpoint, permission/feature key, environment variable or notification payload
+was added. Matching screen and hook regressions exercise metadata, request switches,
+error/retry/cache behavior and read-only controls. Full checkout-commit, hosted and
+physical-device matrices remain open in the active supplier audit.
+
+## 2026-11-18 - Rollover calendar, write guards and cache refresh
+
+Both Android and iOS retain the existing assignment-ID/manual rollover endpoint
+and response. Success now invalidates dispatch, orders, all driver views, supplier
+deliveries and run sheets, so moved dates and route membership refresh together.
+Matching hook regressions cover successful refresh, rejection with cached work
+preserved, and a successful retry. The corrected fixture keeps inactive cached
+queries until explicit cleanup rather than letting a zero GC timer remove them.
+
+Server rollover fixes the actual PostgreSQL enum/text comparison and DATE parsing,
+then rechecks order/assignment status, schedule and the automatic daily marker
+under order-before-route-before-assignment locks. It shares route numbering with
+normal planning and preserves numbering gaps. No endpoint, payload field, permission,
+feature key, notification or environment variable changed. Existing web mutation
+invalidates the Order/Fulfillment tags; native caches now refresh corresponding views.
+
+Real SQL covers job execution, manual next-day route creation, stale cancellation,
+future scheduling, daily deduplication, numbering gaps and pickup concurrency.
+Forced manual replay, long-overdue advancement, retry/rollover route membership,
+multi-instance route grouping and physical-device/background behavior remain open
+in the [active audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md).
+
+## 2026-11-18 - Direct delivery/route consistency and exact warehouse selection
+
+Android and iOS now resolve the selected assignment before reading its status or
+opening proof/problem capture. The selected assignment and warehouse stay paired;
+an explicit missing assignment displays the existing not-found state rather than
+falling back to another leg. Route navigation without a selector prefers remaining
+active work over already delivered legs. Matching home/stop screen regressions
+reproduced four failures before correction. Status mutations also refresh the
+exact order and driver-detail caches along with the board and route.
+
+Web cards/sticky actions and proof submission preserve that same selected leg.
+Route proof confirmation now refreshes after the atomic completion endpoint and
+does not send an additional route-stop delivered request. No new request/response
+field is required: existing assignment/warehouse IDs and calendar types remain
+canonical across all three clients.
+
+The server now commits assignment, proof, order, stop and route state together for
+direct delivery changes. It aggregates current warehouse attempts for the route's
+driver, rejects a status change without a matching live assignment, and preserves
+other drivers' legs. Route driver handover now moves unfinished assignment ownership
+with its operational progress, retaining history, completed stops and stock. Order
+locks precede the route header in affected writers; concurrent cancellation/POD
+completion is exercised with controlled real PostgreSQL transactions.
+
+No permission/feature key, notification payload, environment variable or migration
+changed. Provider/GPS-session, retry/rollover membership and physical-device matrices
+remain open in the [active audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md).
+
+## 2026-11-17 - Supplier routes, driver requests and failed refreshes
+
+Both native clients now POST `stop_ids` for route reordering and PATCH `orderId`
+for next stop, matching the existing canonical endpoints. Optimization types use
+the actual `{ preview, route }` response; the home screen labels
+`preview.estimatedDistanceKm` as estimated distance rather than savings. English
+and Arabic copy accompanies the route error and optimization messages.
+
+Active-route requests now preserve network/API errors, with cached data retained
+by React Query on refresh failure. Driver home and run sheet display a route retry
+control alongside the available deliveries. A successful null-route response stays
+distinct from failure. Matching hook and rendered-screen tests verify both states,
+request payloads, retries and optimization copy in Android/iOS. The first Android
+edit duplicated the retry banner; the new screen tests caught it and the corrected
+screen sources now match iOS.
+
+Route stops expose the order currency in both native types (already present in the
+web type), and route dates are literal calendar strings. Active planned-route
+lookup and omitted driver-build dates use the supplier day. Server-side creation
+reads its own transaction; route/order writes recheck locked state, stop writes
+recheck driver scope, and route-stop dispatch locks order before stop/assignment.
+The shared gate now admits existing driver-scoped read/manage handlers without
+granting supplier board or metadata mutation access. Permission/feature keys,
+notification payloads, environment variables and schema are unchanged.
+
+See the [active supplier audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md) for
+isolated SQL evidence and remaining route/device/provider coverage. No physical
+device or hosted delivery was exercised by these fixtures.
+
+## 2026-11-17 - Supplier assignment, proof capture and delivery detail
+
+Android and iOS standalone `useSubmitPod` clients now accept and forward the
+optional `driver_assignment_id`. Their `ProofOfDelivery` type includes that
+nullable field, matching the web type. Standalone and atomic completion responses
+now expose typed proof data; atomic completion also types the returned assignment
+ID and delivered status. The web standalone mutation accepts the same selector.
+Both active native proof screens already require their assignment ID and send it
+to the atomic endpoint; that flow is retained.
+
+The API binds proof and completion to one locked leg, supports safe single-leg
+and warehouse-selector retries, rejects invalid explicit IDs, reuses the active
+transaction connection and locks order before assignment during status changes.
+Standalone driver proof authorization checks the submitted leg and binds omitted
+selectors to the authorized assignment. Driver detail enforces its driver filter,
+returns literal calendar dates and avoids attributing ambiguous legacy proof to
+every leg. Future assignment dates are retained; missing/past dates use the supplier
+day. Existing native detail/schedule types already consume these calendar strings.
+
+Matching React Query hook regressions cover explicit and omitted proof selectors,
+atomic retry with the same uploaded file/leg, and success-only cache invalidation.
+Real PostgreSQL regressions cover dates, proof/tenant isolation, rollback,
+single-connection operation and concurrent reassignment. No permission/feature
+key, notification payload, environment variable or schema change was introduced.
+Physical-device capture and hosted delivery transactions remain unverified; see
+the [active audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md).
+
+## 2026-11-17 - Supplier delivery calendar and fallback reliability
+
+The API now serializes delivery-board `scheduledDeliveryDate` as `YYYY-MM-DD`
+instead of slicing the human-readable string representation of a PostgreSQL Date.
+Android and iOS already prefer this field over the legacy timestamp when grouping
+driver work; both receive matching contract comments and regressions verifying
+that a previous-day UTC timestamp does not move a stop out of its scheduled day.
+The existing nullable string field and all endpoint/request types are unchanged.
+
+The board's degraded SQL path now retains assignments, actual statuses and all
+date/driver/status/area filters. Schema-aware joins preserve assignment scope
+without optional driver display data. Reserved-name area labels no longer crash
+server grouping. These server query/grouping corrections preserve the response
+shape; no native adapter, auth change, notification handler, permission/feature
+key or environment variable was introduced. Web dispatch/tracking now prefer the
+same calendar day. Source inventory also includes the native Driver navigator as
+part of the supplier workforce surface. Full feature/device verification remains
+open in the [active audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md).
+
+## 2026-11-17 - Full supplier audit in progress: summary finance authorization
+
+Supplier command-center and run-sheet HTTP responses now remove finance data
+unless the caller has the existing `INVOICES_VIEW` permission (or its existing
+manage/Owner equivalent). The run sheet is tenant-wide and no longer admits a
+driver-only grant, matching the current web/Android/iOS navigation policy.
+Both native run sheets now hide unpaid amounts and receivable details without
+invoice permission, including data retained in an old query cache. Matching
+authorized/unauthorized rendering regressions pass in both repositories.
+Authorized response fields, notification payloads, feature/permission keys and
+environment variables are unchanged. Source inventory tooling has no native
+runtime contract. See the [active full audit](../audits/SUPPLIER_FULL_AUDIT_2026-11-17.md)
+for remaining feature and device verification gaps.
+
+## 2026-11-17 - Supplier dynamic workflow audit: receivables and export dates
+
+Android and iOS now mirror the existing supplier receivables response instead of
+typing it as restaurant invoices. Both use camelCase invoice fields, supplier
+calendar overdue flags, the full `unpaidCount`, and per-currency unpaid/overdue
+amounts. Unknown-currency amounts stay unlabeled. Matching screen regressions
+exercise the canonical API payload, mixed currencies, the preview count boundary,
+unknown currency and empty accounts. Both native typechecks pass.
+
+The server now selects a debtor's reminder invoice within its restaurant/currency
+group, including invoices outside the 100-row preview, without changing the
+response shape. Accounting export date filters preserve literal calendar dates
+and validate the inclusive 366-day limit. Neither native app calls the supplier
+accounting export endpoints; no export client or parser needs migration. No auth,
+permission, feature, notification or environment contract changed. See the
+[2026-11-17 audit](../audits/SUPPLIER_WORKFLOW_AUDIT_2026-11-17.md) for reproduction,
+validation and scope limits.
+
+## 2026-11-16 - Supplier functional audit: run sheet and accounting reliability
+
+Corrected the server run-sheet pick-queue SQL and calendar aging. Run-sheet
+collections now include per-currency totals and return a null combined amount for
+mixed currencies. Web, Android and iOS mirror nullable KPI/collection amounts,
+invoice currency and the currency groups; all three show each currency instead
+of relabeling amounts as USD. Both native clients include matching formatting
+regressions and screen changes. API permissions, auth, notifications, feature keys
+and environment variables are unchanged.
+
+Accounting CSV exports preserve calendar dates, label currencies, group AR by
+currency and supplier day, and retain positive header-only invoice amounts in the
+QuickBooks fallback. Native accounting exports are opaque downloads, with no CSV
+column parser to migrate. No native dependency or binary release is introduced.
+Validation and remaining device/provider limits are recorded in the
+[supplier audit](../audits/SUPPLIER_FEATURE_AUDIT_2026-11-16.md).
+
 ## 2026-11-16 - Restaurant functional audit: checkout and inventory reliability
 
 Fixed concurrent order-key claims against schemas retaining both restaurant/key

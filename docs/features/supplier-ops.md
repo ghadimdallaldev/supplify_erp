@@ -4,6 +4,50 @@
 
 Supplier-facing operational APIs mounted at `/api/supplier/*` — command center KPIs, receivables aging, CSV product import, **bulk product image import**, delivery board, reorder intelligence, and fulfillment issue workflows.
 
+Driver fulfillment now keeps requested future delivery dates and uses the supplier
+calendar day for missing/overdue dates when assigning drivers. Detail dates remain
+literal calendar strings. Atomic proof/completion, standalone proof authorization,
+retry behavior and delivery lock ordering are documented in
+[drivers-and-gps-tracking.md](./drivers-and-gps-tracking.md#dispatch-flow).
+
+Route planning and driver-built routes now use transaction-visible reads and
+revalidate route/order state under locks before writing. Driver-scoped route
+operations work with existing driver permissions; mobile reorder/next-stop and
+optimization payloads match the API. See the
+[driver route contracts](./drivers-and-gps-tracking.md#driver-route-api-contracts).
+
+Direct delivery/POD transitions now update route stops and route completion in the
+same transaction. Route driver changes carry live assignment state and preserve
+history/stock. Web and both native clients target the selected warehouse leg;
+atomic proof completion requires only a refresh afterward.
+
+Delivery rollover now uses PostgreSQL-compatible status comparison and literal
+calendar dates, and rechecks cancellation/scheduling/automatic same-day eligibility
+under parent-order/route/assignment locks. Route numbering is shared with normal
+planning. Android/iOS refresh affected delivery caches after successful manual
+rollover. See [delivery-rollover.md](./delivery-rollover.md) for scope and open leads.
+
+Supplier manual checkout now scopes idempotent replay to the supplier and customer,
+preserves quote references, and stores the resolved delivery date. Quote lookup and
+validation share the order transaction and connection. Migration 0236 is required
+for independent supplier key reuse; see [ordering reliability](./ordering-reliability.md).
+
+### Delivery board calendar and fallback behavior
+
+`GET /api/supplier/deliveries/board` returns `scheduledDeliveryDate` as the literal
+`YYYY-MM-DD` calendar day selected by the assignment/route/requested-date
+precedence. `scheduledAt` remains available for legacy consumers; clients should
+prefer the calendar field when displaying or grouping a delivery day.
+
+If optional display enrichment fails, the fallback retains delivery assignment
+IDs, driver IDs, actual statuses, supplier ownership and every supplied date,
+driver, status and area filter. It omits optional driver-name/POD enrichment.
+An area filter retains its required zone/branch joins; if those joins cannot
+execute, the request fails instead of returning an unfiltered board. Area groups
+accept arbitrary stored labels, including names that match JavaScript prototype
+properties. Schema probes keep driver assignments independent of driver display
+metadata and preserve route dates when assignment tables are unavailable.
+
 **Base mount:** `apps/api/src/server.js` → `app.use('/api/supplier', supplierOpsRoutes)`
 
 ## Command center
@@ -23,6 +67,12 @@ Aggregated **today view** for suppliers: orders to prepare, deliveries pending, 
 **Web:** `/app/command-center` — `SupplierCommandCenterPage`
 
 Service: `supplier-command-center.service.js`
+
+Operational admission to the command center does not grant invoice visibility.
+The HTTP response includes receivable balances, debtor previews and financial
+priorities only with `INVOICES_VIEW` (including existing manage/Owner equivalents).
+Other callers receive null financial KPI amounts, no receivable preview and no
+financial priorities. This projection never mutates the shared tenant cache.
 
 ## Receivables
 
@@ -44,6 +94,15 @@ The overdue job marks a past-due invoice `OVERDUE` only while `balance_due > 0`,
 **Web:** `SupplierReceivablesPanel` on `/app/invoices` (supplier tenants with `finance_invoices`).
 
 Service: `supplier-receivables.service.js`
+
+The receivables API returns camelCase invoice fields (`invoiceNumber`, `dueDate`,
+`balanceDue`, `isOverdue`) and summary fields `unpaidCount`, `unpaidTotal`,
+`overdueTotal`, and `byCurrency`. Android and iOS use these fields directly.
+Their overdue tile displays the overdue amount per currency; this endpoint does
+not return an overdue invoice count. The invoice list is a 100-row preview, while
+summary counts and totals cover all open invoices. Each top-debtor row's
+`oldestInvoiceId` belongs to that restaurant and currency and is selected from all
+open invoices, independently of the preview limit.
 
 ### Collections reminders
 
@@ -76,19 +135,32 @@ CSV exports for supplier AR and bookkeeping integrations.
 
 Service: `supplier-accounting-export.service.js`
 
+Export `from` and `to` filters accept valid `YYYY-MM-DD` calendar dates, inclusive
+of both endpoints, with a maximum of 366 calendar days. They stay on the selected
+day regardless of the server timezone. Impossible dates and repeated query values
+are rejected. With no filters the range runs from 30 calendar days ago through
+today on the server's local calendar.
+
 ## Run sheet (daily ops brief)
 
 Single-page **morning brief** for suppliers: orders to pick, deliveries, receivables due today, reorder leads, and shortage preview.
 
-| Method | Path         | Gate                                                                              | Description                                              |
-| ------ | ------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| GET    | `/run-sheet` | `ORDERS_MANAGE`, `FULFILLMENT_VIEW`, `INVOICES_VIEW`, or `DRIVER_DELIVERIES_VIEW` | KPIs + pick queue + deliveries + receivables + shortages |
+| Method | Path         | Gate                                                           | Description                                                        |
+| ------ | ------------ | -------------------------------------------------------------- | ------------------------------------------------------------------ |
+| GET    | `/run-sheet` | Any of `ORDERS_MANAGE`, `FULFILLMENT_VIEW`, or `INVOICES_VIEW` | KPIs + pick queue + deliveries + permitted receivables + shortages |
 
 **Query:** `?date=YYYY-MM-DD`. When omitted, the date is today in the supplier `last_order_timezone` (platform default when unset). The web date picker uses the browser’s local calendar day.
 
 **Web:** `/app/run-sheet` — `SupplierRunSheetPage`; linked from command center and sidebar.
 
 Service: `supplier-run-sheet.service.js`
+
+The tenant-wide run sheet does not admit a driver-only permission. Drivers use
+their assignment-scoped delivery endpoints. Run-sheet financial KPIs, currency
+groups, invoice rows and financial priorities require `INVOICES_VIEW`. Without it
+the amounts are null, collection rows/groups are empty and financial priorities
+are removed. Web, Android and iOS hide the finance tiles/collection section under
+the same permission, including for an older cached payload.
 
 ## Product import (CSV / Excel)
 
@@ -192,6 +264,14 @@ Service: `supplier-reorder-intelligence.service.js` (`createReorderReminderDraft
 - Fulfillment board requires `fulfillment` feature.
 
 ## Tests
+
+The [2026-11-16 supplier audit](../audits/SUPPLIER_FEATURE_AUDIT_2026-11-16.md)
+records real PostgreSQL and Development verification. Run-sheet pick queries use
+the delivery-board schema's driver assignment join. Collection and overdue totals
+retain currencies; selected run dates determine overdue days. Accounting CSVs use
+calendar dates, and invoice/payment/AR exports append a Currency column. AR rows
+are grouped by customer and currency and aged on the supplier's local day.
+Header-only legacy invoices retain their total in the QuickBooks fallback row.
 
 | File                                                                  | Covers                                       |
 | --------------------------------------------------------------------- | -------------------------------------------- |

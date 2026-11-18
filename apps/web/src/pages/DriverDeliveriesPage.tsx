@@ -29,6 +29,7 @@ import {
   isDoneDriverDeliveryStatus,
   isTerminalDriverDeliveryStatus,
   routeStopIsComplete,
+  resolveDriverDeliveryLeg,
 } from '../lib/driverDeliveryUi'
 import {
   driverStatusNeedsProofOfDelivery,
@@ -59,6 +60,7 @@ export function DriverDeliveriesPage() {
   const [showCompleted, setShowCompleted] = useState(false)
   // Order awaiting proof-of-delivery capture before it is marked delivered.
   const [podOrderId, setPodOrderId] = useState<string | null>(null)
+  const [podAssignmentId, setPodAssignmentId] = useState<string | null>(null)
   const [podStop, setPodStop] = useState<{ stopId: string; orderId: string } | null>(null)
 
   const orders = useMemo(() => data?.orders ?? [], [data?.orders])
@@ -231,21 +233,40 @@ export function DriverDeliveriesPage() {
     await applyRouteStopStatus(stopId, orderId, status)
   }
 
-  const handleRouteStopPodSubmitted = async () => {
-    const target = podStop
+  const handleRouteStopPodSubmitted = () => {
     setPodStop(null)
-    if (!target) return
-    await applyRouteStopStatus(target.stopId, target.orderId, 'DELIVERED')
+    refetch()
+    refetchRoute()
   }
 
   const orderByIdRef = useMemo(() => {
     const map = new Map<string, (typeof orders)[number]>()
-    for (const order of orders) map.set(order.orderId, order)
+    for (const order of orders) {
+      const current = map.get(order.orderId)
+      if (
+        !current ||
+        (!isActiveDriverDeliveryStatus(current.deliveryStatus) &&
+          isActiveDriverDeliveryStatus(order.deliveryStatus))
+      )
+        map.set(order.orderId, order)
+    }
     return map
   }, [orders])
 
-  const applyStatus = async (orderId: string, status: DriverDeliveryStatus) => {
-    const order = orderByIdRef.get(orderId)
+  const selectedPodOrder = podOrderId
+    ? resolveDriverDeliveryLeg(orders, podOrderId, podAssignmentId)
+    : undefined
+
+  const applyStatus = async (
+    orderId: string,
+    status: DriverDeliveryStatus,
+    assignmentId?: string | null
+  ) => {
+    const order = resolveDriverDeliveryLeg(orders, orderId, assignmentId)
+    if (!order) {
+      toast.error(t('driverDeliveries.toast.updateStatusFailed'))
+      return
+    }
     try {
       await updateStatus({
         orderId,
@@ -271,20 +292,22 @@ export function DriverDeliveriesPage() {
     }
   }
 
-  const handleStatus = async (orderId: string, status: string) => {
+  const handleStatus = async (orderId: string, status: string, assignmentId?: string | null) => {
     // Delivering is irreversible, and suppliers with pod_required have the API reject
     // `delivered` until proof exists. Capture proof first — that also stops a stray
     // second tap from delivering the order the instant the previous action resolves.
     if (driverStatusNeedsProofOfDelivery(status)) {
       setPodOrderId(orderId)
+      setPodAssignmentId(assignmentId ?? null)
       return
     }
-    await applyStatus(orderId, status as DriverDeliveryStatus)
+    await applyStatus(orderId, status as DriverDeliveryStatus, assignmentId)
   }
 
   const handlePodSubmitted = () => {
     // complete-delivery already advanced the driver assignment atomically.
     setPodOrderId(null)
+    setPodAssignmentId(null)
     refetch()
     refetchRoute()
   }
@@ -328,9 +351,19 @@ export function DriverDeliveriesPage() {
         primaryLabel: primary.label,
         primarySuccess: primary.value === 'delivered',
         targetLabel: nextStandaloneOrder.restaurantName,
-        onPrimary: () => handleStatus(nextStandaloneOrder.orderId, primary.value),
+        onPrimary: () =>
+          handleStatus(
+            nextStandaloneOrder.orderId,
+            primary.value,
+            nextStandaloneOrder.assignmentId
+          ),
         onProblem: problem
-          ? () => handleStatus(nextStandaloneOrder.orderId, problem.value)
+          ? () =>
+              handleStatus(
+                nextStandaloneOrder.orderId,
+                problem.value,
+                nextStandaloneOrder.assignmentId
+              )
           : undefined,
       }
     }
@@ -469,11 +502,11 @@ export function DriverDeliveriesPage() {
             ) : null}
             {activeOrders.map((order) => (
               <DriverDeliveryCard
-                key={order.orderId}
+                key={order.assignmentId ?? order.orderId}
                 order={order}
                 notes={notes[order.orderId] ?? ''}
                 onNotesChange={(value) => setNotes((prev) => ({ ...prev, [order.orderId]: value }))}
-                onStatus={(status) => handleStatus(order.orderId, status)}
+                onStatus={(status) => handleStatus(order.orderId, status, order.assignmentId)}
                 disabled={updating}
                 isNext={!activeRoute && order.orderId === nextStandaloneOrderId}
               />
@@ -497,13 +530,13 @@ export function DriverDeliveriesPage() {
             {showCompleted
               ? completedOrders.map((order) => (
                   <DriverDeliveryCard
-                    key={order.orderId}
+                    key={order.assignmentId ?? order.orderId}
                     order={order}
                     notes={notes[order.orderId] ?? ''}
                     onNotesChange={(value) =>
                       setNotes((prev) => ({ ...prev, [order.orderId]: value }))
                     }
-                    onStatus={(status) => handleStatus(order.orderId, status)}
+                    onStatus={(status) => handleStatus(order.orderId, status, order.assignmentId)}
                     disabled={updating}
                   />
                 ))
@@ -530,10 +563,8 @@ export function DriverDeliveriesPage() {
             if (!open) setPodOrderId(null)
           }}
           completion={{
-            driverAssignmentId: podOrderId ? orderByIdRef.get(podOrderId)?.assignmentId : undefined,
-            warehouseAssignmentId: podOrderId
-              ? orderByIdRef.get(podOrderId)?.warehouseAssignmentId
-              : undefined,
+            driverAssignmentId: podAssignmentId ?? selectedPodOrder?.assignmentId ?? undefined,
+            warehouseAssignmentId: selectedPodOrder?.warehouseAssignmentId ?? undefined,
           }}
           onSubmitted={handlePodSubmitted}
         />
@@ -551,9 +582,7 @@ export function DriverDeliveriesPage() {
               ? orderByIdRef.get(podStop.orderId)?.warehouseAssignmentId
               : undefined,
           }}
-          onSubmitted={() => {
-            void handleRouteStopPodSubmitted()
-          }}
+          onSubmitted={handleRouteStopPodSubmitted}
         />
       </PageShell>
     </RequirePermission>

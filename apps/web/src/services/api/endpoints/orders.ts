@@ -53,7 +53,7 @@ export const ordersApi = api.injectEndpoints({
       query: (id) => `/api/orders/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Order', id }],
     }),
-    createOrder: builder.mutation<Order, CreateOrderRequest>({
+    createOrder: builder.mutation<{ order: Order } | { orders: Order[] }, CreateOrderRequest>({
       query: (body) => ({
         url: '/api/orders',
         method: 'POST',
@@ -65,7 +65,7 @@ export const ordersApi = api.injectEndpoints({
       }),
       invalidatesTags: ['Order'],
     }),
-    createManualOrder: builder.mutation<Order, CreateManualOrderRequest>({
+    createManualOrder: builder.mutation<{ order: Order }, CreateManualOrderRequest>({
       query: (body) => ({
         url: '/api/orders/manual',
         method: 'POST',
@@ -314,13 +314,14 @@ export const ordersApi = api.injectEndpoints({
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
     submitOrderProofOfDelivery: builder.mutation<
-      { proof: unknown },
+      { proof: ProofOfDelivery },
       {
         orderId: string
         recipient_name?: string
         notes?: string
         file_key?: string
         signature_file_key?: string
+        driver_assignment_id?: string
         latitude?: number
         longitude?: number
       }
@@ -333,7 +334,7 @@ export const ordersApi = api.injectEndpoints({
       invalidatesTags: ['Fulfillment', 'Order'],
     }),
     completeOrderDelivery: builder.mutation<
-      { proof: unknown; assignment: unknown },
+      { proof: ProofOfDelivery; assignment: { id: string; status: 'delivered' } },
       {
         orderId: string
         recipient_name?: string

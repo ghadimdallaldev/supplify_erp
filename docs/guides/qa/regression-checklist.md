@@ -872,6 +872,14 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 
 ### 7.4.2 Driver portal GPS (`/app/driver/deliveries` or driver role)
 
+Delivery-board regressions (2026-11-17): verify a delivery scheduled for a selected
+day stays on that day in web dispatch/tracking and native driver buckets when the
+legacy timestamp falls on the previous UTC date. In isolated fault tests, an
+enrichment failure must retain the actual assignment/status and all date, driver
+and area filters. Stored area labels `constructor`, `__proto__` and `toString`
+must produce ordinary groups. Missing filter dependencies must fail rather than
+return a broader board.
+
 | ID       | Steps                                                  | Expected                                                                      | Pass? |
 | -------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----- |
 | DRV-GPS1 | Log in as linked driver; open active assignment        | GPS badge (Live / waiting); browser location permission if prompted           |       |
@@ -905,6 +913,19 @@ Prereq: migration `0137_driver_location_tracking.sql`; API env `GPS_TRACKING_ENA
 | SUP-34 | Record **partial payment**                       | Remaining balance correct |       |
 | SUP-35 | Apply **credit**                                 | Balance adjusted          |       |
 | SUP-36 | Payment history tab                              | All payments listed       |       |
+
+Supplier receivables and export regressions (2026-11-17):
+
+- Open supplier receivables on Android and iOS with USD and EUR invoices. Verify
+  invoice numbers, due dates and remaining amounts; totals list both currencies.
+  An invoice with no currency must not acquire a USD label.
+- With more than 100 open invoices, verify the open-invoice count uses the full
+  summary. The overdue tile shows an amount; an `ISSUED` invoice whose due day has
+  passed in the supplier timezone still shows the overdue badge.
+- For a customer with USD and EUR balances, verify each top-debtor reminder targets
+  the oldest invoice in that currency even when it is outside the preview.
+- Export invoices/payments for a one-day or month range. Verify exact calendar
+  boundaries, invalid-date rejection and the inclusive 366-day maximum.
 
 ## 7.8 Chat (`/app/chat`) — requires `chat` feature
 
@@ -1480,6 +1501,133 @@ Use this pack after Parts 0–3 on a wiped DB, or as a focused delta on an exist
 ---
 
 ## Sign-off
+
+### Supplier assignment and proof regression pack (2026-11-17)
+
+- Assign a future order and an overdue/missing-date order in supplier timezones
+  on either side of UTC. Retain the requested future date and use supplier today
+  otherwise; board and detail must agree on `YYYY-MM-DD`.
+- Submit standalone proof as a driver with another driver's assignment ID on the
+  same order. Expect 403 and no proof write. Omit the ID with a legacy client and
+  verify proof binds to the driver's authorized assignment.
+- Complete a required-POD single-leg delivery without a supplier selector, then
+  repeat it. The proof ID and assignment ID must remain the same. Repeat with a
+  warehouse selector and confirm each of two warehouse legs separately.
+- Reject ambiguous multi-leg completion, nonexistent/foreign assignment IDs and
+  invalid status transitions; verify no partial proof or assignment write.
+- Race reassignment against dispatch. Expect one current assignment and either
+  a serialized success or a validation error, with no PostgreSQL deadlock. Run
+  completion with a single-connection pool to detect nested pool acquisition.
+- A driver without a current leg must not receive driver detail. An ambiguous
+  header-only legacy proof must not make every leg appear to have proof.
+- On Android/iOS, retry confirmation after a lost response with the same leg,
+  uploaded file and recipient. Invalidate driver/order views only on success.
+
+Automated evidence: `tests/integrity/supplier-fulfillment.pg.test.js`,
+`apps/api/src/routes/orders-driver-access.routes.test.js` and matching native
+`src/services/api/queries/driver.test.ts`. Hosted/device sign-off remains open.
+
+### Supplier route lifecycle regression pack (2026-11-17)
+
+- Build from two standalone assignments, read the committed route and replay the
+  request. Verify one route, the same stops and the supplier calendar day.
+- Create/add/reorder/next/remove/cancel a planned route. Check real stop sequence
+  and assignment release, then start/dispatch/deliver a fresh route and verify the
+  assignment, order and final route statuses together.
+- Change route/order state between precheck and write. Cancelled/finished routes
+  and cancelled orders must reject stale edits without partial changes.
+- Race route-stop dispatch against reassignment; expect serialization without
+  `40P01`. Change a route's driver during an old driver's request; reject its write.
+- Driver-only view/manage roles can use their own route paths. Unlinked/read-only
+  drivers cannot write; drivers cannot mutate supplier metadata or open its board.
+- Android/iOS reorder uses POST `stop_ids`; next stop uses PATCH `orderId`.
+  Optimization shows estimated distance from the nested preview response.
+- Fail route loading and refresh while the board is available. Show one retry
+  control, retain cached route/board data, and keep successful null-route distinct.
+
+Automated evidence: `tests/integrity/supplier-routes.pg.test.js`, route/reassignment
+regression in `supplier-fulfillment.pg.test.js`, fulfillment HTTP tests and native
+`driverRoutes.test.ts` / `DriverRouteErrors.test.tsx`. Hosted/device checks remain open.
+
+### Direct delivery and route consistency (2026-11-18)
+
+- Dispatch from a native/standalone order action, then complete with atomic proof.
+  Stop and route status must follow in the same commit; web must not send a second
+  delivered request after proof succeeds.
+- Complete one of two warehouse legs for the same route driver. Keep the stop open
+  until both finish. Leave another driver's leg/order fulfillment state unchanged.
+- Inject failure before transaction commit: proof, order, assignment, stop and route
+  must all retain their prior database state.
+- Change route driver before departure and mid-route. Preserve pickup/progress,
+  completed stops, old assignment history, warehouse identity and stock balances.
+- Race direct proof against cancellation and route-stop dispatch against reassignment;
+  expect a serialized result or a stale-state validation response, without deadlock.
+- On web/Android/iOS, use two warehouse rows with one order ID and different statuses.
+  Every action must use the clicked/selected leg and its warehouse. A missing explicit
+  leg must not select another; route navigation should choose remaining active work.
+
+### Delivery rollover regression pack (2026-11-18)
+
+- Run automatic selection against real PostgreSQL enum/DATE columns. Overdue assigned
+  work is selected, rescheduled and added to the next-day route; a second automatic
+  job on the same supplier day does not process it again.
+- Commit cancellation, a future schedule or another automatic rollover between
+  preflight and transaction entry. Preserve the newer state without partial writes.
+- Race driver pickup against rollover. Lock the order before route/assignment,
+  serialize without deadlock, and retain picked-up status rather than rescheduling it.
+- Leave a gap in existing daily route numbers. Rollover must allocate after the
+  maximum suffix and commit successfully without a duplicate route number.
+- On both native clients, move an assignment and verify dispatch, order, driver,
+  supplier deliveries and run-sheet caches refresh. Reject a request and retain
+  cached work; refresh the same views only after a successful retry.
+
+Automated evidence: `tests/integrity/supplier-rollover.pg.test.js` and matching native
+`src/services/api/queries/ordersRollover.test.ts`. Manual force replay, long-overdue
+date advancement, route membership and hosted/device sign-off remain open.
+
+### Supplier quote response regression pack (2026-11-18)
+
+- Send one RFQ with products from two suppliers. Each supplier sees/prices only its
+  own request lines; reject another supplier's line or substitute without a write.
+- Test historical cross-supplier/request response links. Exclude them from details,
+  comparison, cart conversion and single/batch/discovery/manual-lock pricing paths.
+- Quote a substitute and verify only that offered SKU receives its quote price;
+  the original SKU requires its own independent quote or normal pricing.
+- Race response against decline or commit closure after preflight. Preserve one
+  valid decision and send only its notification. Inject a failure before commit
+  during response replacement and retain the prior response and prices.
+- Return needed-by/delivery values as literal calendar days. Reject impossible
+  dates, duplicate lines, absent available prices and invalid quantities; allow
+  zero prices and price-free unavailable lines.
+- On web/Android/iOS, edit an open response with two line currencies and an offered
+  substitute. Preserve all metadata. Switch native requests and initialize fresh
+  drafts; reject nonnumeric prices/zero quantities locally. Keep closed quotes locked.
+
+Automated evidence: `tests/integrity/supplier-quotes.pg.test.js`, API quote/pricing
+regressions, web `SupplierQuoteResponsePage.test.tsx`, and matching native quote
+screen/hook suites. Order-commit races and hosted/device sign-off remain open.
+
+### Checkout quote and manual replay pack (2026-11-18)
+
+- Commit quote closure, changed price/quantity or a new response after checkout
+  preflight. Reject outdated quote/cached catalog pricing before order writes.
+- Hold an in-flight order after its quote locks, then edit/close the quote from
+  another transaction. Observe that writer blocked until the valid order commits.
+- Place restaurant and manual quote orders; verify stored totals, quote references
+  and reservation balances. Run manual checkout with a single-connection pool.
+- Reuse a manual key as another supplier with the same customer/payload. Never
+  return the original order. Independent valid suppliers may use the same raw key.
+- Retry owned historical and current keys, including after quote closure. Return
+  the original order once; changed payloads conflict. Concurrent retries reserve once.
+- Inject failure before commit: order, stock, usage and placement claim all roll
+  back, and the same key can safely retry. Verify the resolved manual delivery day.
+- Android/iOS normalize single/split confirmations, keep ambiguous/rejected cart
+  state, and preserve quote selectors/headers. Manual clients use server-derived
+  scope and refresh only after success. Check migration 0236 in the target environment.
+
+Automated evidence: `tests/integrity/supplier-order-checkout.pg.test.js` and matching
+native `queries/checkout.test.ts` plus cart-store retry suites. Hosted/mixed-version,
+all warehouse/plan combinations and physical-device sign-off remain open.
 
 | Role / surface                     | Tester | Date | Build / branch / app version | API env & device | Open defects |
 | ---------------------------------- | ------ | ---- | ---------------------------- | ---------------- | ------------ |

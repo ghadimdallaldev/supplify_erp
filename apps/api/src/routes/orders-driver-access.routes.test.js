@@ -50,12 +50,13 @@ vi.mock('../lib/storage-upload.js', () => ({
 const createPresignedUploadMock = vi.fn()
 const updateDeliveryStatusMock = vi.fn()
 const completeDeliveryWithProofMock = vi.fn()
+const submitProofOfDeliveryMock = vi.fn()
 
 vi.mock('../services/driver-fulfillment.service.js', () => ({
   assignDriverToOrder: vi.fn(),
   updateDeliveryStatus: (...args) => updateDeliveryStatusMock(...args),
   reassignDriver: vi.fn(),
-  submitProofOfDelivery: vi.fn(),
+  submitProofOfDelivery: (...args) => submitProofOfDeliveryMock(...args),
   completeDeliveryWithProof: (...args) => completeDeliveryWithProofMock(...args),
   confirmProofOfDelivery: vi.fn(),
   getProofOfDelivery: vi.fn(),
@@ -98,12 +99,22 @@ vi.mock('../lib/rbac.js', async (importOriginal) => {
 import { assertDriverAssignmentAccess } from '../lib/driver-rbac.js'
 import { meterStorageFromRequest } from '../lib/storage-upload.js'
 import { ordersRoutes } from './orders.routes.js'
+import { ForbiddenError } from '../middlewares/errorHandler.js'
+
+const ownAssignmentId = '11111111-1111-4111-8111-111111111111'
 
 describe('driver order delivery routes without ORDERS_VIEW', () => {
   let app
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    assertDriverAssignmentAccess.mockImplementation(async ({ assignmentId }) => {
+      if (assignmentId && assignmentId !== ownAssignmentId) {
+        throw new ForbiddenError('You can only access deliveries assigned to you')
+      }
+      return { driverId: 'driver-1', assignment: { id: ownAssignmentId } }
+    })
+    submitProofOfDeliveryMock.mockResolvedValue({ id: 'pod-1' })
     createPresignedUploadMock.mockResolvedValue({
       presignedUrl: 'https://api.example/api/files/upload/token',
       publicUrl: 'https://cdn.example/proof.jpg',
@@ -214,4 +225,30 @@ describe('driver order delivery routes without ORDERS_VIEW', () => {
     expect(res.body.ok).toBe(false)
     expect(res.body.error?.message).toMatch(/photo|signature|recipient/i)
   })
+
+  it('rejects a driver proof targeting another driver leg on an accessible order', async () => {
+    await request(app)
+      .post('/api/orders/order-1/proof-of-delivery')
+      .send({
+        recipient_name: 'Store manager',
+        driver_assignment_id: '22222222-2222-4222-8222-222222222222',
+      })
+      .expect(403)
+
+    expect(submitProofOfDeliveryMock).not.toHaveBeenCalled()
+  })
+
+  it.each([ownAssignmentId, undefined])(
+    'binds driver proof to the authorized leg when the selector is %s',
+    async (assignmentId) => {
+      await request(app)
+        .post('/api/orders/order-1/proof-of-delivery')
+        .send({ recipient_name: 'Store manager', driver_assignment_id: assignmentId })
+        .expect(201)
+
+      expect(submitProofOfDeliveryMock).toHaveBeenCalledWith(
+        expect.objectContaining({ driverAssignmentId: ownAssignmentId })
+      )
+    }
+  )
 })

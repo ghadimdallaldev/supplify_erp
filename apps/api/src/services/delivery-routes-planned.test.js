@@ -2,10 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const queryMock = vi.fn()
 const clientQueryMock = vi.fn()
+vi.mock('../lib/delivery-route-state.js', () => ({ lockRouteOrders: vi.fn() }))
+let loadedRoute = null
 
 vi.mock('../lib/db.js', () => ({
-  query: (...args) => queryMock(...args),
-  withTransaction: (fn) => fn({ query: (...args) => clientQueryMock(...args) }),
+  query: async (...args) => {
+    const result = await queryMock(...args)
+    if (/FROM delivery_route dr/.test(args[0])) loadedRoute = result?.rows?.[0]
+    return result
+  },
+  withTransaction: (fn) =>
+    fn({
+      query: (...args) =>
+        /SELECT dr\.\*[\s\S]*FOR UPDATE OF dr/.test(args[0])
+          ? Promise.resolve({ rows: [loadedRoute] })
+          : clientQueryMock(...args),
+    }),
 }))
 
 vi.mock('./driver-fulfillment.service.js', () => ({
@@ -19,6 +31,7 @@ describe('delivery-routes planned assignment', () => {
     vi.clearAllMocks()
     queryMock.mockReset()
     clientQueryMock.mockReset()
+    loadedRoute = null
   })
 
   it('creates driver assignments when planning a route', async () => {

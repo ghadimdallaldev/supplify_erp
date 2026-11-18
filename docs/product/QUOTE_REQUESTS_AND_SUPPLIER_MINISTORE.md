@@ -6,6 +6,11 @@ This document covers **Feature 3 — Supplier quote battle / Request best price*
 
 Restaurants can send multi-supplier quote requests, compare structured responses, and optionally add a winning response to the cart (manual checkout). Suppliers receive an inbox, respond per line item, and share a public catalog link at `/supplier/:slug`.
 
+Current contracts and verification limits are in [quote-requests.md](../features/quote-requests.md).
+The Phase 0 table below records the original implementation snapshot. As of the
+2026-11-18 local audit, quote locks resolve `QUOTE_PRICE`, Android/iOS have supplier
+quote screens, and ownership is enforced on response writes and pricing reads.
+
 ## 2. Audit result (Phase 0)
 
 | Area                      | Pre-implementation status               |
@@ -35,7 +40,7 @@ Restaurants can send multi-supplier quote requests, compare structured responses
 
 ### Quote requests (Feature 3)
 
-- Migration `0153_quote_requests_and_public_catalog.sql` — quote tables + `supplier.public_catalog_enabled`
+- Migration `0154_quote_requests_and_public_catalog.sql` — quote tables + `supplier.public_catalog_enabled`
 - `quote-requests.service.js` — create, list, detail, compare, supplier inbox/respond, cart payload
 - `quote-requests.routes.js` — `/api/quote-requests/*`
 - Notifications: `quote_request_received`, `quote_response_received` with dedup window
@@ -52,10 +57,10 @@ Restaurants can send multi-supplier quote requests, compare structured responses
 
 ## 5. What remains partial / missing
 
-- **Quoted price at checkout**: Order create still uses `resolveProductPricesBatch`; quoted prices are informational in cart only
+- **Checkout verification**: Quote locks resolve through `resolveProductPricesBatch`; real SQL verifies price/cart construction. Full order-commit concurrency and hosted transactions remain audit gates.
 - **Deals on public mini-store**: Excluded v1 (promotions routes untouched)
 - **Per-product public visibility flag**: Not added; all products shown when catalog enabled
-- **Mobile UI**: Web-only; API types added for future mobile
+- **Mobile UI**: Supplier inbox/response and restaurant quote screens exist in both native repositories; physical-device verification remains open.
 - **Email templates** for quote notifications: In-app only (category mapped to existing prefs)
 - **CreateQuoteRequestDialog** component: Full-page flow used instead
 
@@ -63,7 +68,7 @@ Restaurants can send multi-supplier quote requests, compare structured responses
 
 ### Backend
 
-- `apps/api/db/migrations/0153_quote_requests_and_public_catalog.sql`
+- `apps/api/db/migrations/0154_quote_requests_and_public_catalog.sql`
 - `apps/api/src/services/quote-requests.service.js`
 - `apps/api/src/services/quote-requests.service.test.js`
 - `apps/api/src/services/public-supplier-catalog.service.js`

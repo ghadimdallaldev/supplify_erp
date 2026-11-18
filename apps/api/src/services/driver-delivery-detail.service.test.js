@@ -37,6 +37,7 @@ describe('driver-delivery-detail.service', () => {
             assignment_status: 'assigned',
             assigned_at: '2026-09-15T08:00:00.000Z',
             scheduled_delivery_date: null,
+            effective_delivery_date: '2026-09-19',
             route_id: 'route-1',
             route_number: 'R-001',
             route_date: '2026-09-19',

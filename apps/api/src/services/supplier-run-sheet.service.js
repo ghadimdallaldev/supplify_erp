@@ -7,6 +7,8 @@ import { getSupplierCommandCenter } from './supplier-command-center.service.js'
 import { getSupplierDeliveryBoard } from './supplier-deliveries.service.js'
 import { getSupplierReceivables } from './supplier-receivables.service.js'
 import { getReorderIntelligence } from './supplier-reorder-intelligence.service.js'
+import { foldInvoiceCurrencyTotals } from '../lib/money.js'
+import { formatInvoiceCalendarDate } from './invoice.service.js'
 
 const OPEN_ISSUE_STATUSES = [
   'shortage_reported',
@@ -23,21 +25,15 @@ function normalizeRunSheetDate(date, fallbackDate) {
   return fallbackDate
 }
 
-function toDateOnly(value) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  date.setHours(0, 0, 0, 0)
-  return date
-}
-
 function filterReceivablesDueToday(receivables, runDate) {
-  const targetDate = toDateOnly(`${runDate}T00:00:00`)
+  const targetDate = formatInvoiceCalendarDate(runDate)
   const invoicesSource = Array.isArray(receivables?.invoices) ? receivables.invoices : []
   if (!targetDate) {
     return {
       summary: {
         count: 0,
         totalBalanceDue: 0,
+        byCurrency: [],
         dueTodayCount: 0,
         overdueCount: 0,
       },
@@ -47,26 +43,34 @@ function filterReceivablesDueToday(receivables, runDate) {
 
   const invoices = invoicesSource
     .map((inv) => {
-      const due = toDateOnly(inv.dueDate)
+      const due = formatInvoiceCalendarDate(inv.dueDate)
       const isOverdue = due ? due < targetDate : false
-      return { ...inv, isOverdue, daysOverdue: isOverdue ? inv.daysOverdue : 0, _dueDate: due }
+      const daysOverdue = isOverdue
+        ? Math.round(
+            (Date.parse(`${targetDate}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86400000
+          )
+        : 0
+      return { ...inv, isOverdue, daysOverdue, _dueDate: due }
     })
     .filter((inv) => inv._dueDate && inv._dueDate <= targetDate)
 
   let dueTodayCount = 0
   let overdueCount = 0
-  let totalBalanceDue = 0
 
   for (const inv of invoices) {
-    totalBalanceDue += Number(inv.balanceDue) || 0
     if (inv.isOverdue) overdueCount += 1
     else dueTodayCount += 1
   }
 
+  const totals = foldInvoiceCurrencyTotals(invoices, ['balanceDue'])
   return {
     summary: {
       count: invoices.length,
-      totalBalanceDue,
+      totalBalanceDue: totals.money.balanceDue,
+      byCurrency: totals.byCurrency.map(({ currency, balanceDue }) => ({
+        currency,
+        totalBalanceDue: balanceDue,
+      })),
       dueTodayCount,
       overdueCount,
     },
@@ -184,6 +188,7 @@ async function queryOrdersToPickWithPickLists(sql, supplierId, date) {
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     LEFT JOIN restaurant r ON r.id = o.restaurant_id
+    ${sql.driverAssignmentJoinSql || ''}
     LEFT JOIN LATERAL (
       SELECT pl2.id, pl2.status
       FROM pick_list pl2
@@ -215,6 +220,7 @@ async function queryOrdersToPickWithoutPickLists(sql, supplierId, date) {
     FROM customer_order o
     JOIN order_item oi ON oi.order_id = o.id AND oi.supplier_id = $1
     LEFT JOIN restaurant r ON r.id = o.restaurant_id
+    ${sql.driverAssignmentJoinSql || ''}
     WHERE o.status = ANY($3::order_status[])
       AND ${sql.scheduledAtExpr}::date = $2::date
     ORDER BY o.id, o.created_at DESC
@@ -311,6 +317,7 @@ export async function getSupplierRunSheet(supplierId, { date } = {}) {
     date: runDate,
     summary: {
       kpis: commandCenter.kpis ?? emptyRunSheetCommandCenter().kpis,
+      receivablesByCurrency: receivables.summary?.byCurrency ?? [],
       todaysPriorities: commandCenter.todaysPriorities ?? [],
     },
     ordersToPick,
