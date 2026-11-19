@@ -821,12 +821,18 @@ router.post('/logout', requireAuth, async (req, res) => {
     const refreshToken = req.cookies?.refresh_token
     const idTokenHint = req.cookies?.id_token || null
 
-    // Revoke tokens in Keycloak
-    if (accessToken) {
-      await revokeToken(accessToken)
-    }
-    if (refreshToken) {
-      await revokeToken(refreshToken)
+    // Revoke tokens in Keycloak. Each revoke is attempted independently: a failure
+    // revoking the access token must never leave the (long-lived) refresh token valid.
+    for (const [kind, token] of [
+      ['access', accessToken],
+      ['refresh', refreshToken],
+    ]) {
+      if (!token) continue
+      try {
+        await revokeToken(token)
+      } catch (e) {
+        logger.warn('Token revoke failed during logout', { kind, error: e.message })
+      }
     }
 
     // Clear cookies (same path/sameSite as set so browser actually removes them)

@@ -175,6 +175,13 @@ router.get(
     }
   }
 )
+/** Proof keys are minted by the presign route as uploads/<user>/pod/<orderId>/...; bind them to this order. */
+function assertProofKeyBelongsToOrder(fileKey, userId, orderId) {
+  if (!String(fileKey).startsWith(`uploads/${userId}/pod/${orderId}/`)) {
+    throw new ValidationError('Proof file does not belong to this order')
+  }
+}
+
 router.post(
   '/:id/delivery-retry',
   ...supplierFulfillmentGate,
@@ -546,6 +553,7 @@ router.post(
       }
       const tenant = await getRequestTenant(req)
       for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        assertProofKeyBelongsToOrder(key, req.userData.id, req.params.id)
         await assertCleanUploadOwnership(key, {
           userId: req.userData.id,
           tenantId: tenant?.tenantId || supplierId,
@@ -639,6 +647,7 @@ router.post(
       }
       const tenant = await getRequestTenant(req)
       for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        assertProofKeyBelongsToOrder(key, req.userData.id, req.params.id)
         await assertCleanUploadOwnership(key, {
           userId: req.userData.id,
           tenantId: tenant?.tenantId || supplierId,

@@ -26,7 +26,7 @@ export function notificationAccessScope(userId, userType, context) {
       AND (reference_type = ANY($4::text[]) OR (reference_type IS NULL AND 'SYSTEM' = ANY($4::text[])))
       ${
         driverOnly
-          ? `AND reference_type = 'ORDER' AND EXISTS (SELECT 1 FROM driver_assignment da JOIN driver d ON d.id = da.driver_id
+          ? `AND reference_type = 'ORDER' AND EXISTS (SELECT 1 FROM driver_assignments da JOIN drivers d ON d.id = da.driver_id
         WHERE da.order_id = notification_log.reference_id AND da.supplier_id = $3 AND d.user_id = $1 AND da.status NOT IN ('reassigned', 'failed'))`
           : ''
       }

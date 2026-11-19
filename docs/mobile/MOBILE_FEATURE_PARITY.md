@@ -1,5 +1,19 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-19 - Security audit hardening pass (mobile: verified, no code change)
+
+API: `POST /api/roles/users/:userId/assign` now 404s (`NOT_FOUND`) when the target user is not
+already a member of the workspace (role row or active membership); proof-of-delivery /
+complete-delivery now require the proof key to be under `uploads/<user>/pod/<orderId>/`;
+uploads in preprod/prod reject a per-file inconclusive ClamAV scan (503
+`MALWARE_SCAN_UNAVAILABLE`) instead of storing it; logout always attempts the refresh-token
+revoke. Web: legal markdown is HTML-escaped.
+
+Mobile (`supplify-mobile` and `supplify-mobile-ios`): no change required. Both apps only assign
+roles to existing team members (`warehouses.ts`), and `DeliveryProofScreen.tsx` uses the
+server-minted `presign.fileKey` for the same order, so the new proof-key check is already
+satisfied. Verified by reading both repos; not exercised on a device.
+
 ## 2026-11-19 - Every feature behind an admin flag (default-on kill switches)
 
 API: 35 new **default-on** feature keys (26 restaurant / 23 supplier, see
