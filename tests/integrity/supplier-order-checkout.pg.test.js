@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import express from '../../apps/api/node_modules/express/index.js'
 import request from '../../apps/api/node_modules/supertest/index.js'
 
@@ -42,7 +43,7 @@ vi.mock('../../apps/api/src/services/notification.service.js', () => ({
   notifyQuoteRequestDeclined: vi.fn(async () => {}),
 }))
 vi.mock('../../apps/api/src/routes/order-amendments.routes.js', () => ({
-  orderAmendmentsRouter: {},
+  orderAmendmentsRouter: (_req, _res, next) => next(),
 }))
 vi.mock('../../apps/api/src/routes/orders-driver.routes.js', () => ({ ordersDriverRoutes: {} }))
 vi.mock('../../apps/api/src/lib/driver-delivery.js', () => ({
@@ -161,6 +162,9 @@ vi.mock('../../apps/api/src/lib/db.js', async () => {
 
 import { pool, singlePool } from '../../apps/api/src/lib/db.js'
 import createRouter from '../../apps/api/src/routes/orders/create.js'
+import listRouter from '../../apps/api/src/routes/orders/list.js'
+import detailRouter from '../../apps/api/src/routes/orders/detail.js'
+import updateRouter from '../../apps/api/src/routes/orders/update.js'
 import {
   createQuoteRequest,
   submitQuoteResponse,
@@ -171,6 +175,7 @@ import { supplierOrderCreateSchema } from '../../apps/api/src/routes/orders/orde
 import { hashOrderPlacementPayload } from '../../apps/api/src/services/order-placement-idempotency.service.js'
 
 afterAll(() => Promise.all([pool.end(), singlePool.end()]))
+afterEach(() => vi.useRealTimers())
 beforeEach(() => {
   hooks.beforeTransaction = null
   hooks.beforeCommit = null
@@ -255,22 +260,35 @@ async function fixture() {
   }
 }
 
-function appFor(ids, supplier = null) {
+function appFor(ids, supplier = null, impersonatedAdmin = false) {
   const app = express()
   app.use(express.json())
   app.use((req, _res, next) => {
     req.auditIdentity = { restaurant: ids.restaurant, supplier }
-    req.userData = { id: ids.user, role: supplier ? 'SUPPLIER' : 'RESTAURANT' }
+    req.userData = {
+      id: ids.user,
+      role: impersonatedAdmin ? 'ADMIN' : supplier ? 'SUPPLIER' : 'RESTAURANT',
+    }
     req.user = { id: ids.user }
     req.tenantContext = {
       tenantId: supplier || ids.restaurant,
-      tenantType: req.userData.role,
-      permissions: ['ORDERS_CREATE'],
+      tenantType: supplier ? 'SUPPLIER' : 'RESTAURANT',
+      permissions: ['ORDERS_CREATE', 'ORDERS_VIEW', 'ORDERS_EDIT'],
     }
     req.requestId = 'checkout-audit'
+    req._requestTenantResolved = true
+    req._requestTenantCache = req.tenantContext
+    if (impersonatedAdmin)
+      req.impersonationContext = {
+        adminUserId: ids.user,
+        tenantId: req.tenantContext.tenantId,
+        tenantType: req.tenantContext.tenantType,
+      }
     next()
   })
   app.use('/api/orders', createRouter)
+  app.use('/api/orders', listRouter, detailRouter)
+  app.use('/api/orders', updateRouter)
   return app
 }
 function payload(ids, manual = false) {
@@ -308,6 +326,167 @@ async function stock(ids) {
 }
 
 describe('supplier order checkout over HTTP with real PostgreSQL', () => {
+  it('places an existing draft as an impersonating admin with one connection and preserves its day', async () => {
+    const ids = await fixture()
+    const created = await request(appFor(ids))
+      .post('/api/orders')
+      .send({ ...payload(ids), status: 'DRAFT' })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    hooks.singleConnection = true
+    const response = await request(appFor(ids, ids.supplier, true))
+      .patch('/api/orders/' + created.body.data.order.id)
+      .send({ status: 'PLACED' })
+    expect(response.status, JSON.stringify(response.body)).toBe(200)
+    expect(response.body.data.order.requested_delivery_date).toBe('2099-02-03')
+    expect(await stock(ids)).toEqual({ available: 98, reserved: 2 })
+    expect(hooks.poolQueryFailures).toEqual([])
+  })
+  it.each([false, true])(
+    'returns literal saved delivery days from order reads (supplier=%s)',
+    async (supplier) => {
+      const ids = await fixture()
+      const created = await request(appFor(ids)).post('/api/orders').send(payload(ids))
+      expect(created.status, JSON.stringify(created.body)).toBe(201)
+      const orderId = created.body.data.order.id
+      const app = appFor(ids, supplier ? ids.supplier : null)
+      const detail = await request(app).get('/api/orders/' + orderId)
+      const list = await request(app).get('/api/orders?includeItems=false')
+      expect(detail.status, JSON.stringify(detail.body)).toBe(200)
+      expect(list.status, JSON.stringify(list.body)).toBe(200)
+      expect.soft(detail.body.data.order.requested_delivery_date).toBe('2099-02-03')
+      expect.soft(list.body.data.orders[0].requested_delivery_date).toBe('2099-02-03')
+      const updated = await request(app)
+        .patch('/api/orders/' + orderId)
+        .send({ notes: 'Calendar regression' })
+      expect(updated.status, JSON.stringify(updated.body)).toBe(200)
+      expect(updated.body.data.order.requested_delivery_date).toBe('2099-02-03')
+      expect(updated.body.data.order.notes).toBe('Calendar regression')
+      const cleared = await request(app)
+        .patch('/api/orders/' + orderId)
+        .send({ notes: '' })
+      expect(cleared.status, JSON.stringify(cleared.body)).toBe(200)
+      expect(cleared.body.data.order.notes).toBe('')
+      await pool.query('UPDATE customer_order SET requested_delivery_date=NULL WHERE id=$1', [
+        orderId,
+      ])
+      const historical = await request(app).get('/api/orders/' + orderId)
+      expect(historical.body.data.order.requested_delivery_date).toBeNull()
+    }
+  )
+
+  it('repairs invalid historical timezones idempotently while preserving valid settings', async () => {
+    const ids = await fixture()
+    const migration = readFileSync(
+      new URL(
+        '../../apps/api/db/migrations/0237_supplier_timezone_validation.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query("UPDATE supplier SET last_order_timezone='Mars/Olympus' WHERE id=$1", [
+        ids.supplier,
+      ])
+      await client.query("UPDATE supplier SET last_order_timezone='Asia/Tokyo' WHERE id=$1", [
+        ids.secondSupplier,
+      ])
+      await client.query('SAVEPOINT invalid_zone')
+      await expect(
+        client.query('SELECT now() AT TIME ZONE last_order_timezone FROM supplier WHERE id=$1', [
+          ids.supplier,
+        ])
+      ).rejects.toMatchObject({ code: '22023' })
+      await client.query('ROLLBACK TO SAVEPOINT invalid_zone')
+      await client.query(migration)
+      await client.query(migration)
+      const { rows } = await client.query(
+        'SELECT id,last_order_timezone FROM supplier WHERE id=ANY($1::uuid[])',
+        [[ids.supplier, ids.secondSupplier]]
+      )
+      expect(rows.find((row) => row.id === ids.supplier).last_order_timezone).toBe('')
+      expect(rows.find((row) => row.id === ids.secondSupplier).last_order_timezone).toBe(
+        'Asia/Tokyo'
+      )
+      await expect(
+        client.query(
+          "SELECT now() AT TIME ZONE COALESCE(NULLIF(last_order_timezone,''),'Asia/Beirut') FROM supplier WHERE id=$1",
+          [ids.supplier]
+        )
+      ).resolves.toMatchObject({ rowCount: 1 })
+    } finally {
+      await client.query('ROLLBACK')
+      client.release()
+    }
+  })
+  it.each([false, true])(
+    'prices and stores the supplier-local resolved delivery day (manual=%s)',
+    async (manual) => {
+      const ids = await fixture()
+      await pool.query("UPDATE quote_requests SET status='closed' WHERE id=$1", [ids.request])
+      await pool.query(
+        `UPDATE supplier SET last_order_mode='cutoff',last_order_cutoff_type='absolute_time',
+       last_order_cutoff_time='15:00',last_order_timezone='Asia/Tokyo' WHERE id=$1`,
+        [ids.supplier]
+      )
+      await pool.query(
+        `INSERT INTO restaurant_pricing(supplier_id,restaurant_id,product_id,price,currency,
+        contract_start_date,contract_end_date)
+       VALUES($1,$2,$3,4,'USD','2099-02-04','2099-02-04')`,
+        [ids.supplier, ids.restaurant, ids.product]
+      )
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2099-02-02T07:00:00Z'))
+      const body = payload(ids, manual)
+      delete body.quoteLocks
+      const response = await request(appFor(ids, manual ? ids.supplier : null))
+        .post(manual ? '/api/orders/manual' : '/api/orders')
+        .send(body)
+      expect(response.status, JSON.stringify(response.body)).toBe(201)
+      expect((await placed(ids))[0]).toMatchObject({ day: '2099-02-04', total: 8 })
+      expect(response.body.data.order.requested_delivery_date).toBe('2099-02-04')
+      expect(response.body.data.order.deliveryResolution).toMatchObject({
+        deliveryDate: '2099-02-04',
+        rolled: true,
+      })
+      expect(Number(response.body.data.order.items[0].unit_price)).toBe(4)
+    }
+  )
+
+  it('keeps the priced delivery day when checkout crosses the cutoff before its transaction', async () => {
+    const ids = await fixture()
+    await pool.query("UPDATE quote_requests SET status='closed' WHERE id=$1", [ids.request])
+    await pool.query(
+      `UPDATE supplier SET last_order_mode='cutoff',last_order_cutoff_type='absolute_time',
+       last_order_cutoff_time='12:00',last_order_timezone='UTC' WHERE id=$1`,
+      [ids.supplier]
+    )
+    await pool.query(
+      `INSERT INTO restaurant_pricing(supplier_id,restaurant_id,product_id,price,currency,
+        contract_start_date,contract_end_date)
+       VALUES($1,$2,$3,4,'USD','2099-02-03','2099-02-03')`,
+      [ids.supplier, ids.restaurant, ids.product]
+    )
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2099-02-02T11:59:00Z'))
+    hooks.beforeTransaction = async () => vi.setSystemTime(new Date('2099-02-02T12:01:00Z'))
+    const body = payload(ids)
+    delete body.quoteLocks
+    const response = await request(appFor(ids)).post('/api/orders').send(body)
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    expect((await placed(ids))[0]).toMatchObject({ day: '2099-02-03', total: 8 })
+  })
+
+  it.each([false, true])('rejects an impossible checkout day (manual=%s)', async (manual) => {
+    const ids = await fixture()
+    const response = await request(appFor(ids, manual ? ids.supplier : null))
+      .post(manual ? '/api/orders/manual' : '/api/orders')
+      .send({ ...payload(ids, manual), deliveryDate: '2099-02-30' })
+    expect(response.status, JSON.stringify(response.body)).toBe(400)
+    expect(await placed(ids)).toHaveLength(0)
+    expect(await stock(ids)).toEqual({ available: 100, reserved: 0 })
+  })
   it('commits a restaurant quote order, stock reservation, daily meter and idempotent replay', async () => {
     const ids = await fixture(),
       app = appFor(ids),
@@ -408,16 +587,52 @@ describe('supplier order checkout over HTTP with real PostgreSQL', () => {
     expect(await placed(ids)).toHaveLength(1)
     expect(await stock(ids)).toEqual({ available: 98, reserved: 2 })
   })
-  it('places manual orders with a single database connection', async () => {
-    const ids = await fixture()
-    hooks.singleConnection = true
-    const response = await request(appFor(ids, ids.supplier))
-      .post('/api/orders/manual')
-      .send(payload(ids, true))
-    expect(response.status, JSON.stringify(response.body)).toBe(201)
-    expect(hooks.poolQueryFailures).toEqual([])
-    expect(hooks.featureOverrideReads).toBeGreaterThan(0)
-  })
+  it.each(['legacy', 'warehouse'])(
+    'places %s manual orders with a single database connection',
+    async (mode) => {
+      const ids = await fixture()
+      let warehouseId
+      if (mode === 'warehouse') {
+        warehouseId = randomUUID()
+        await pool.query(
+          `INSERT INTO warehouse(id,supplier_id,tenant_id,name,is_active,is_default)
+         VALUES($1::uuid,$2,$2,$1::text,true,true)`,
+          [warehouseId, ids.supplier]
+        )
+        await pool.query('UPDATE supplier SET default_warehouse_id=$2 WHERE id=$1', [
+          ids.supplier,
+          warehouseId,
+        ])
+        await pool.query(
+          `INSERT INTO warehouse_inventory(warehouse_id,product_id,quantity_available,quantity_on_hand)
+         VALUES($1,$2,100,100)`,
+          [warehouseId, ids.product]
+        )
+        await pool.query(
+          `INSERT INTO feature_flag_override(tenant_id,tenant_type,feature_key,is_enabled)
+         VALUES($1,'SUPPLIER','warehouses',true)`,
+          [ids.supplier]
+        )
+      }
+      hooks.singleConnection = true
+      const response = await request(appFor(ids, ids.supplier))
+        .post('/api/orders/manual')
+        .send(payload(ids, true))
+      expect(response.status, JSON.stringify(response.body)).toBe(201)
+      expect(hooks.poolQueryFailures).toEqual([])
+      expect(hooks.featureOverrideReads).toBeGreaterThan(0)
+      expect(response.body.data.order.stockMode).toBe(mode)
+      if (warehouseId) {
+        const { rows } = await pool.query(
+          `SELECT quantity_available::float8 AS available, quantity_reserved::float8 AS reserved
+         FROM warehouse_inventory WHERE warehouse_id=$1 AND product_id=$2`,
+          [warehouseId, ids.product]
+        )
+        expect(rows[0]).toEqual({ available: 98, reserved: 2 })
+        expect(await stock(ids)).toEqual({ available: 100, reserved: 0 })
+      }
+    }
+  )
   it('never replays another supplier manual-order response before checking ownership', async () => {
     const ids = await fixture(),
       key = 'manual-' + randomUUID(),

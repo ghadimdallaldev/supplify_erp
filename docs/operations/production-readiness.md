@@ -11,6 +11,15 @@ the owned disposable local audit database. Target-environment migration, legacy
 replay and mixed-version rollout checks remain release gates. Follow the staged
 branching/release workflow; this audit did not deploy any environment.
 
+## 2026-11-19 supplier timezone migration gate
+
+Migration `0237_supplier_timezone_validation.sql` clears historical supplier
+timezone names absent from PostgreSQL's timezone catalog. Empty values use the
+configured platform timezone in supplier reads and ordering. Recognized names
+are preserved. The migration and its idempotence were tested in the owned local
+audit database, where it has been applied. Target-environment application and
+historical replay JSON compatibility remain rollout gates alongside migration 0236. Hosted cutoff and physical-device verification remain open.
+
 ## 2026-08-21 ship-hardening checkpoint
 
 - **RBAC:** Demo email role shortcuts are dev-only; production rejects ALLOW_AUTO_SUPER_ADMIN=true; restaurant settings, invoice access during admin impersonation, chat read receipts, and branch query overrides are tenant-scoped.

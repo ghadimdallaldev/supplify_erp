@@ -8,6 +8,24 @@ import {
 } from './supplier-business-settings.js'
 
 describe('supplier-business-settings', () => {
+  it.each(['Mars/Olympus', 'garbage', '+05:00'])(
+    'rejects unsupported timezone %s',
+    (lastOrderTimezone) => {
+      expect(supplierBusinessSettingsUpdateSchema.safeParse({ lastOrderTimezone }).success).toBe(
+        false
+      )
+    }
+  )
+
+  it('normalizes a valid timezone and supports clearing the setting', () => {
+    expect(
+      supplierBusinessSettingsUpdateSchema.parse({ lastOrderTimezone: ' Asia/Beirut ' })
+        .lastOrderTimezone
+    ).toBe('Asia/Beirut')
+    expect(supplierBusinessSettingsUpdateSchema.safeParse({ lastOrderTimezone: '' }).success).toBe(
+      true
+    )
+  })
   it('normalizes stored hours and maps supplier row', () => {
     const row = {
       business_hours_json: {

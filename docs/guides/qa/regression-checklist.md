@@ -1607,6 +1607,27 @@ Automated evidence: `tests/integrity/supplier-quotes.pg.test.js`, API quote/pric
 regressions, web `SupplierQuoteResponsePage.test.tsx`, and matching native quote
 screen/hook suites. Order-commit races and hosted/device sign-off remain open.
 
+### Supplier calendar and note pack (2026-11-19)
+
+- Save a named supplier timezone and reject an unsupported name. Clear it to use
+  the platform fallback. Apply migration 0237 in the target environment before
+  checking historical invalid settings.
+- Execute restaurant/manual checkout across supplier/server day boundaries and
+  opposite cutoff clocks. Verify contract price and stored day agree, including
+  when the order transaction begins after the cutoff.
+- Exercise New York's 25-hour day and Beirut's skipped midnight for relative
+  cutoff rules. Check exact-cutoff and after-cutoff boundaries.
+- Reject impossible days before creating orders, usage or reservations.
+- Verify placement, list, detail and PATCH return literal requested delivery days
+  and preserve historical nulls. Save and clear notes as each permitted actor.
+- Verify both native placement hooks preserve original request dates and server
+  resolution metadata, then check existing cart and retry behavior.
+
+Automated evidence is in `supplier-last-order.test.js`, `tenant-timezone.test.js`,
+`supplier-business-settings.test.js`, `supplier-order-checkout.pg.test.js`,
+web `SupplierBusinessTab.test.tsx` and both native checkout suites. Hosted/device
+and historical replay JSON checks remain open.
+
 ### Checkout quote and manual replay pack (2026-11-18)
 
 - Commit quote closure, changed price/quantity or a new response after checkout
@@ -1614,7 +1635,10 @@ screen/hook suites. Order-commit races and hosted/device sign-off remain open.
 - Hold an in-flight order after its quote locks, then edit/close the quote from
   another transaction. Observe that writer blocked until the valid order commits.
 - Place restaurant and manual quote orders; verify stored totals, quote references
-  and reservation balances. Run manual checkout with a single-connection pool.
+  and reservation balances. Run legacy and warehouse manual checkout with a
+  single-connection pool and cold feature reads. Verify branch billing and trial
+  targets use that connection. Roll back a subscription/override change and verify
+  subsequent reads plus the absence of uncommitted shared-cache writes.
 - Reuse a manual key as another supplier with the same customer/payload. Never
   return the original order. Independent valid suppliers may use the same raw key.
 - Retry owned historical and current keys, including after quote closure. Return

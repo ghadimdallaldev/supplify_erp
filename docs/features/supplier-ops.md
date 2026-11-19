@@ -297,6 +297,17 @@ Header-only legacy invoices retain their total in the QuickBooks fallback row.
 
 Supplier Business settings can set `last_order_mode`: `none` | `cutoff` (absolute time or minutes-before-window + rollover days). Cart checkout persists resolved `deliveryDate` as `customer_order.requested_delivery_date`.
 
+The web Business tab exposes the stored cutoff timezone. Updates trim named IANA
+timezones and reject unsupported values. Clearing it selects the platform default.
+The resolver uses that supplier calendar for today, cutoff comparison and rollover;
+pricing and stored delivery day share one resolution. Calendar responses use
+`YYYY-MM-DD`. DST midnight gaps advance to the available time on that day.
+Migration 0237 clears historical names that PostgreSQL cannot resolve to the
+platform-default fallback. Existing recognized timezone choices are preserved.
+
+Ordinary order updates also persist the existing `notes` field, including an empty
+string to clear it. Restaurant ownership and supplier `ORDERS_EDIT` checks apply.
+
 - Lib: `apps/api/src/lib/supplier-last-order.js` (+ `supplier-last-order.test.js`)
 - Manual QA: [regression-checklist.md](../guides/qa/regression-checklist.md) **RST-18a–18c**
 - Design: [hospitality-excellence](../archive/superpowers/specs/2026-09-10-hospitality-excellence-design.md)

@@ -1,0 +1,118 @@
+Scope: all 3 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1239
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1239, reused 99, downloaded 0, added 0
+Progress: resolved 1239, reused 419, downloaded 0, added 0
+Progress: resolved 1239, reused 561, downloaded 0, added 0
+Progress: resolved 1239, reused 812, downloaded 0, added 0
+Progress: resolved 1239, reused 1001, downloaded 0, added 0
+Progress: resolved 1239, reused 1098, downloaded 0, added 0
+Progress: resolved 1239, reused 1228, downloaded 0, added 0
+Progress: resolved 1239, reused 1234, downloaded 0, added 0
+Progress: resolved 1239, reused 1235, downloaded 0, added 0
+Progress: resolved 1239, reused 1236, downloaded 0, added 0
+Progress: resolved 1239, reused 1238, downloaded 0, added 0
+Progress: resolved 1239, reused 1238, downloaded 0, added 1
+
+   ╭───────────────────────────────────────────────────────────────────╮
+   │                                                                   │
+   │                Update available! 8.15.9 → 12.21.0.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.21.0   │
+   │                 Run "pnpm add -g pnpm" to update.                 │
+   │                                                                   │
+   │      Follow @pnpmjs for updates: https://twitter.com/pnpmjs       │
+   │                                                                   │
+   ╰───────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 1239, reused 1238, downloaded 0, added 26
+Progress: resolved 1239, reused 1238, downloaded 0, added 44
+Progress: resolved 1239, reused 1238, downloaded 0, added 122
+Progress: resolved 1239, reused 1238, downloaded 0, added 155
+Progress: resolved 1239, reused 1238, downloaded 0, added 169
+Progress: resolved 1239, reused 1238, downloaded 0, added 224
+Progress: resolved 1239, reused 1238, downloaded 0, added 238
+Progress: resolved 1239, reused 1238, downloaded 0, added 275
+Progress: resolved 1239, reused 1238, downloaded 0, added 328
+Progress: resolved 1239, reused 1238, downloaded 0, added 329
+Progress: resolved 1239, reused 1238, downloaded 0, added 405
+Progress: resolved 1239, reused 1238, downloaded 0, added 414
+Progress: resolved 1239, reused 1238, downloaded 0, added 424
+Progress: resolved 1239, reused 1238, downloaded 0, added 449
+Progress: resolved 1239, reused 1238, downloaded 0, added 450
+Progress: resolved 1239, reused 1238, downloaded 0, added 469
+Progress: resolved 1239, reused 1238, downloaded 0, added 472
+Progress: resolved 1239, reused 1238, downloaded 0, added 479
+Progress: resolved 1239, reused 1238, downloaded 0, added 496
+Progress: resolved 1239, reused 1238, downloaded 0, added 511
+Progress: resolved 1239, reused 1238, downloaded 0, added 518
+Progress: resolved 1239, reused 1238, downloaded 0, added 536
+Progress: resolved 1239, reused 1238, downloaded 0, added 556
+Progress: resolved 1239, reused 1238, downloaded 0, added 557
+Progress: resolved 1239, reused 1238, downloaded 0, added 594
+Progress: resolved 1239, reused 1238, downloaded 0, added 630
+Progress: resolved 1239, reused 1238, downloaded 0, added 631
+Progress: resolved 1239, reused 1238, downloaded 0, added 669
+Progress: resolved 1239, reused 1238, downloaded 0, added 676
+Progress: resolved 1239, reused 1238, downloaded 0, added 677
+Progress: resolved 1239, reused 1238, downloaded 0, added 711
+Progress: resolved 1239, reused 1238, downloaded 0, added 712
+Progress: resolved 1239, reused 1238, downloaded 0, added 749
+Progress: resolved 1239, reused 1238, downloaded 0, added 771
+Progress: resolved 1239, reused 1238, downloaded 0, added 800
+Progress: resolved 1239, reused 1238, downloaded 0, added 829
+Progress: resolved 1239, reused 1238, downloaded 0, added 850
+Progress: resolved 1239, reused 1238, downloaded 0, added 879
+Progress: resolved 1239, reused 1238, downloaded 0, added 892
+Progress: resolved 1239, reused 1238, downloaded 0, added 910
+Progress: resolved 1239, reused 1238, downloaded 0, added 936
+Progress: resolved 1239, reused 1238, downloaded 0, added 952
+Progress: resolved 1239, reused 1238, downloaded 0, added 953
+Progress: resolved 1239, reused 1238, downloaded 0, added 978
+Progress: resolved 1239, reused 1238, downloaded 0, added 993
+Progress: resolved 1239, reused 1238, downloaded 0, added 994
+Progress: resolved 1239, reused 1238, downloaded 0, added 1008
+Progress: resolved 1239, reused 1238, downloaded 0, added 1039
+Progress: resolved 1239, reused 1238, downloaded 0, added 1040
+Progress: resolved 1239, reused 1238, downloaded 0, added 1072
+Progress: resolved 1239, reused 1238, downloaded 0, added 1073
+Progress: resolved 1239, reused 1238, downloaded 0, added 1083
+Progress: resolved 1239, reused 1238, downloaded 0, added 1117
+Progress: resolved 1239, reused 1238, downloaded 0, added 1126
+Progress: resolved 1239, reused 1238, downloaded 0, added 1152
+Progress: resolved 1239, reused 1238, downloaded 0, added 1160
+Progress: resolved 1239, reused 1238, downloaded 0, added 1180
+Progress: resolved 1239, reused 1238, downloaded 0, added 1207
+Progress: resolved 1239, reused 1239, downloaded 0, added 1228
+Progress: resolved 1239, reused 1239, downloaded 0, added 1231
+Progress: resolved 1239, reused 1239, downloaded 0, added 1232
+Progress: resolved 1239, reused 1239, downloaded 0, added 1235
+Progress: resolved 1239, reused 1239, downloaded 0, added 1236
+Progress: resolved 1239, reused 1239, downloaded 0, added 1237
+Progress: resolved 1239, reused 1239, downloaded 0, added 1238
+Progress: resolved 1239, reused 1239, downloaded 0, added 1239
+Progress: resolved 1239, reused 1239, downloaded 0, added 1239, done
+
+devDependencies:
++ @commitlint/cli 18.6.1
++ @commitlint/config-conventional 18.6.3
++ @playwright/test 1.58.2
++ @semantic-release/changelog 6.0.3
++ @semantic-release/git 10.0.1
++ @semantic-release/github 9.2.6
++ @types/node 20.19.23
++ concurrently 8.2.2
++ husky 8.0.3
++ lint-staged 15.5.2
++ marked 15.0.12
++ pnpm 8.15.9
++ pptxgenjs 3.12.0
++ prettier 3.6.2
++ semantic-release 22.0.12
++ typescript 5.9.3
+
+. prepare$ husky install
+. prepare: husky - Git hooks installed
+. prepare: Done
+Done in 1m 56.1s

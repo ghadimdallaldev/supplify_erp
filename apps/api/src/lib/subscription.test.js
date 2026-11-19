@@ -116,7 +116,7 @@ describe('Subscription lib', () => {
       expect(result).not.toBeNull()
       expect(result.plan_name).toBe('Free')
       expect(mockCreatePendingActivation).toHaveBeenCalledWith(
-        expect.any(Function),
+        { query: expect.any(Function) },
         'supp-1',
         'SUPPLIER',
         'free'

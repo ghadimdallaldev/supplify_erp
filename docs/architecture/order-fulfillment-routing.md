@@ -1,6 +1,14 @@
 # Order fulfillment routing map
 
-Updated 2026-11-18 (checkout quote locking and supplier manual replay).
+Updated 2026-11-19 (supplier calendar cutoffs, delivery DTOs and checkout consistency).
+
+Restaurant checkout prepares one supplier-local delivery resolution for pricing
+and header insertion, preserving their agreement across a cutoff boundary. The
+resolver uses supplier timezone settings and the platform fallback, with zoned
+midnight handling for relative cutoffs. Placement/read/update SQL projects requested
+delivery days as calendar text. Migration 0237 clears unresolvable historical
+timezone names. The optional `deliveryResolution` response metadata is typed in
+web, Android and iOS.
 
 ## Repository model
 

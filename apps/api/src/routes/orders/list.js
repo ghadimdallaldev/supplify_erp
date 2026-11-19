@@ -204,6 +204,7 @@ router.get('/', async (req, res) => {
     const sql = `
       SELECT
         o.*,
+        o.requested_delivery_date::text AS requested_delivery_date,
         r.name as restaurant_name,
         r.slug as restaurant_slug,
         COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS customer_display_name

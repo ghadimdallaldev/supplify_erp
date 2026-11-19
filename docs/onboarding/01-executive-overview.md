@@ -4,7 +4,7 @@
 
 **Source of truth:** Application code, database migrations, and route inventories in this repository (metrics verified 2026-06-17).
 
-SQL migration counts were refreshed on 2026-11-16; other metrics retain their stated verification date.
+SQL migration counts were refreshed on 2026-11-19; other metrics retain their stated verification date.
 
 ---
 
@@ -137,7 +137,7 @@ flowchart TB
 | ------------ | ------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **API**      | `apps/api`                                                          | 554 HTTP routes, RBAC, subscriptions, business logic, cron     |
 | **Web**      | `apps/web`                                                          | 80 frontend routes (`apps/web/src/App.tsx`), React SPA         |
-| **Database** | `apps/api/db/migrations`                                            | 236 SQL migrations, schema evolution since `0000`              |
+| **Database** | `apps/api/db/migrations`                                            | 238 SQL migrations, schema evolution since `0000`              |
 | **Tests**    | `apps/api/**/*.test.js`, `apps/web/**/*.test.{ts,tsx}`, `tests/e2e` | 213 API test files, 309 web test files (per bootstrap metrics) |
 
 ### Technology stack
@@ -190,7 +190,7 @@ These figures are generated from repository artifacts and should be re-verified 
 | ---------------------------- | ----: | -------------------------------------------------- |
 | **API routes**               |   554 | `docs/audits/route-inventory.json` (`count` field) |
 | **Frontend routes**          |    80 | `apps/web/src/App.tsx` route definitions           |
-| **SQL migrations**           |   236 | `apps/api/db/migrations/*.sql`                     |
+| **SQL migrations**           |   238 | `apps/api/db/migrations/*.sql`                     |
 | **API test files**           |   213 | `apps/api/**/*.test.js`                            |
 | **Web test files**           |   309 | `apps/web/**/*.test.{ts,tsx,jsx}`                  |
 | **Plan tiers (active)**      |     4 | `free`, `silver`, `gold`, `platinum`               |
@@ -265,7 +265,7 @@ The **supplier growth program** (migration `0169`) turns suppliers into acquisit
 
 ### For operations
 
-A **single PostgreSQL schema** with 236 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
+A **single PostgreSQL schema** with 238 migrations means auditability and consistent reporting across tenants. In-process cron jobs handle scheduled orders, billing, trial expiry, promotions expiry, reorder forecasts, and optional delivery rollover (disabled by default).
 
 ### For engineering
 

@@ -31,6 +31,37 @@ keys "Inherit (on by default)"; sidebar hides mapped entries. No permission key,
 var or notification payload changed. Admin-panel type change (`AdminFeatureFlag.defaultOn`)
 is admin-only — no mobile admin surface.
 
+## 2026-11-19 - Supplier calendars and order-note updates
+
+Web, Android and iOS Order types now expose optional `deliveryResolution` data.
+Both native checkout hooks preserve the server's requested delivery day and
+resolution for restaurant/manual placement, while sending the original selected
+calendar literal. Matching regressions cover these responses alongside existing
+cart/retry/quote behavior. The API validates real calendar dates, uses supplier
+timezones for cutoff decisions, keeps pricing/header dates aligned and serializes
+requested delivery days as calendar text across creation, reads and updates.
+Existing native note-update clients already forward `notes`; the server now
+persists note-only edits and empty-string clears with existing access guards.
+
+The new timezone input belongs to the existing web Business tab and has English
+and Arabic copy. Mobile UI edits are skipped for that web control. A full native
+business-settings screen remains in the broader parity audit. Migration 0237
+clears unresolvable historical timezone names to the platform fallback and was
+applied only to the disposable database. Existing permission gates apply to these
+requests.
+
+## 2026-11-19 - Transaction-scoped stock entitlement reads
+
+Server stock-mode checks now use the supplied transaction connection through
+organization billing, subscriptions, trial plans and feature overrides. Scoped
+reads bypass shared caches, and manual checkout resolves its routing feature
+before opening the transaction. Missing compatibility subscriptions retain their
+query executor and tolerate concurrent creation. Both native clients already contain the checkout
+request/response normalization, typed manual endpoint and quote audit metadata
+recorded below. This follow-up changes server database access with the existing
+client contract, so additional mobile source edits are skipped. Android/iOS
+checkout/cart/quote regressions pass 32 cases per client; all three typechecks pass.
+
 ## 2026-11-18 - Checkout transactions, scoped replay and order result contracts
 
 Both native clients now normalize actual restaurant `{ order }` / `{ orders }`

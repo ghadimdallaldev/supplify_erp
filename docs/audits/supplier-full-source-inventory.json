@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-18T14:00:25.344Z",
+  "generatedAt": "2026-11-19T15:57:56.956Z",
   "purpose": "Supplier source inventory. Reachability is not proof of review or verification.",
   "scope": "Supplier-specific entry points plus shared source dependencies, web screens, mobile navigation and background jobs. Shared barrels conservatively include other-workspace modules.",
   "limitations": [
@@ -8,17 +8,17 @@
     "Plan, permission, branch, warehouse, locale and runtime matrices require separate execution evidence."
   ],
   "counts": {
-    "erp": 946,
+    "erp": 949,
     "android": 168,
     "ios": 168
   },
   "sourceReviewCounts": {
-    "reviewed": 41,
-    "partial": 23,
-    "pending": 1218,
+    "reviewed": 57,
+    "partial": 33,
+    "pending": 1195,
     "stale": 0
   },
-  "totalLines": 271933,
+  "totalLines": 273213,
   "features": [
     {
       "feature": "identity",
@@ -27,7 +27,7 @@
         "erp:apps/api/src/routes/register.routes.js",
         "erp:apps/api/src/routes/account.routes.js"
       ],
-      "sourceFiles": 120,
+      "sourceFiles": 122,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -37,7 +37,7 @@
         "erp:apps/api/src/lib/supplier-business-settings.js",
         "erp:apps/api/src/lib/supplier-last-order.js"
       ],
-      "sourceFiles": 145,
+      "sourceFiles": 148,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -47,7 +47,7 @@
         "erp:apps/api/src/lib/role-matrix.js",
         "erp:apps/api/src/lib/rbac.js"
       ],
-      "sourceFiles": 115,
+      "sourceFiles": 116,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -57,7 +57,7 @@
         "erp:apps/api/src/routes/org.routes.js",
         "erp:apps/api/src/routes/branch-invitations.routes.js"
       ],
-      "sourceFiles": 128,
+      "sourceFiles": 130,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -66,7 +66,7 @@
         "erp:apps/api/src/routes/warehouses.routes.js",
         "erp:apps/api/src/lib/warehouse-access.js"
       ],
-      "sourceFiles": 123,
+      "sourceFiles": 124,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -76,7 +76,7 @@
         "erp:apps/api/src/services/product-import.service.js",
         "erp:apps/api/src/services/product-image-import.service.js"
       ],
-      "sourceFiles": 146,
+      "sourceFiles": 148,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -85,7 +85,7 @@
         "erp:apps/api/src/routes/prices.routes.js",
         "erp:apps/api/src/services/resolve-product-price.service.js"
       ],
-      "sourceFiles": 128,
+      "sourceFiles": 130,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -95,7 +95,7 @@
         "erp:apps/api/src/routes/orders.calendar.routes.js",
         "erp:apps/api/src/services/supplier-order-stock.service.js"
       ],
-      "sourceFiles": 185,
+      "sourceFiles": 189,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -105,7 +105,7 @@
         "erp:apps/api/src/services/supplier-inventory.service.js",
         "erp:apps/api/src/services/supplier-stock.service.js"
       ],
-      "sourceFiles": 122,
+      "sourceFiles": 124,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -115,7 +115,7 @@
         "erp:apps/api/src/services/warehouseRouting.js",
         "erp:apps/api/src/services/warehouseInventory.js"
       ],
-      "sourceFiles": 153,
+      "sourceFiles": 154,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -125,7 +125,7 @@
         "erp:apps/api/src/routes/driver-tracking.routes.js",
         "erp:apps/api/src/services/supplier-deliveries.service.js"
       ],
-      "sourceFiles": 147,
+      "sourceFiles": 148,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -135,7 +135,7 @@
         "erp:apps/api/src/services/supplier-command-center.service.js",
         "erp:apps/api/src/services/supplier-run-sheet.service.js"
       ],
-      "sourceFiles": 188,
+      "sourceFiles": 190,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -145,7 +145,7 @@
         "erp:apps/api/src/routes/payments.routes.js",
         "erp:apps/api/src/routes/credit-notes.routes.js"
       ],
-      "sourceFiles": 153,
+      "sourceFiles": 154,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -155,7 +155,7 @@
         "erp:apps/api/src/services/supplier-accounting-export.service.js",
         "erp:apps/api/src/services/collections-reminders.service.js"
       ],
-      "sourceFiles": 121,
+      "sourceFiles": 122,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -165,7 +165,7 @@
         "erp:apps/api/src/routes/supplier-growth.routes.js",
         "erp:apps/api/src/services/supplier-customer-import.service.js"
       ],
-      "sourceFiles": 130,
+      "sourceFiles": 132,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -174,13 +174,13 @@
         "erp:apps/api/src/routes/quote-requests.routes.js",
         "erp:apps/api/src/lib/ensure-quote-request-schema.js"
       ],
-      "sourceFiles": 116,
+      "sourceFiles": 118,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "disputes_returns",
       "entryPoints": ["erp:apps/api/src/routes/disputes.routes.js"],
-      "sourceFiles": 136,
+      "sourceFiles": 137,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -189,7 +189,7 @@
         "erp:apps/api/src/routes/promotions.routes.js",
         "erp:apps/api/src/services/featured-supplier-placement.service.js"
       ],
-      "sourceFiles": 128,
+      "sourceFiles": 129,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -198,13 +198,13 @@
         "erp:apps/api/src/routes/loyalty.routes.js",
         "erp:apps/api/src/services/loyalty.service.js"
       ],
-      "sourceFiles": 114,
+      "sourceFiles": 116,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "supplier_reviews",
       "entryPoints": ["erp:apps/api/src/routes/reviews.routes.js"],
-      "sourceFiles": 117,
+      "sourceFiles": 119,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -214,19 +214,19 @@
         "erp:apps/api/src/routes/public-sales.routes.js",
         "erp:apps/api/src/services/public-supplier-catalog.service.js"
       ],
-      "sourceFiles": 180,
+      "sourceFiles": 184,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "reports_analytics",
       "entryPoints": ["erp:apps/api/src/routes/reports.routes.js"],
-      "sourceFiles": 118,
+      "sourceFiles": 119,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "chat",
       "entryPoints": ["erp:apps/api/src/routes/chat.routes.js"],
-      "sourceFiles": 127,
+      "sourceFiles": 128,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -236,7 +236,7 @@
         "erp:apps/api/src/routes/push.routes.js",
         "erp:apps/api/src/services/notification.service.js"
       ],
-      "sourceFiles": 116,
+      "sourceFiles": 118,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -246,31 +246,31 @@
         "erp:apps/api/src/routes/billing.routes.js",
         "erp:apps/api/src/lib/feature-keys.js"
       ],
-      "sourceFiles": 115,
+      "sourceFiles": 117,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "files_storage",
       "entryPoints": ["erp:apps/api/src/routes/files.routes.js"],
-      "sourceFiles": 123,
+      "sourceFiles": 125,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "assistant",
       "entryPoints": ["erp:apps/api/src/routes/assistant.routes.js"],
-      "sourceFiles": 209,
+      "sourceFiles": 210,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "audit_activity",
       "entryPoints": ["erp:apps/api/src/routes/tenant-audit.routes.js"],
-      "sourceFiles": 113,
+      "sourceFiles": 114,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
       "feature": "realtime",
       "entryPoints": ["erp:apps/api/src/lib/socket.js"],
-      "sourceFiles": 112,
+      "sourceFiles": 113,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -295,7 +295,7 @@
         "erp:apps/api/src/jobs/subscription-billing.job.js",
         "erp:apps/api/src/jobs/trial-ending-soon.job.js"
       ],
-      "sourceFiles": 174,
+      "sourceFiles": 175,
       "reviewStatus": "not_exhaustively_reviewed"
     },
     {
@@ -1096,9 +1096,9 @@
     },
     {
       "key": "android:src/features/shared/FeatureGate.tsx",
-      "sha256": "260b446019dd6ba629c7b4075794ad6fc64cf8d11c244250bc1d9d758793ce22",
-      "bytes": 1192,
-      "lines": 40,
+      "sha256": "0b40de6a6b3211ccc28a7e8ac338e42268968564c035d34c41f2d6c54c03dd02",
+      "bytes": 1714,
+      "lines": 58,
       "features": ["mobile_navigation"],
       "dependencies": [
         "android:src/i18n/index.ts",
@@ -1635,9 +1635,9 @@
     },
     {
       "key": "android:src/hooks/useEntitlements.ts",
-      "sha256": "2867c4293ef692bc76d0d5be6a315603ffba95d0e43cc60945b47d597c8d1fe0",
-      "bytes": 1590,
-      "lines": 45,
+      "sha256": "55b357dbc07547082316c7859a4002c2949a1c215e1d5cafe69090466e981203",
+      "bytes": 3341,
+      "lines": 104,
       "features": ["mobile_navigation"],
       "dependencies": [
         "android:src/services/api/queries.ts",
@@ -1659,9 +1659,9 @@
     },
     {
       "key": "android:src/i18n/ar.json",
-      "sha256": "43c267546e528da2c51c9a9e593bba4a843182e8575387a8595261144e01ac9e",
-      "bytes": 90053,
-      "lines": 1332,
+      "sha256": "d126038d8796412572db1bbf3c9caba1ea855feba8e6a53663bf62fc2aa4a591",
+      "bytes": 90415,
+      "lines": 1335,
       "features": ["mobile_navigation"],
       "dependencies": [],
       "reviewStatus": "partial"
@@ -1751,9 +1751,9 @@
     },
     {
       "key": "android:src/navigation/SupplierNavigator.tsx",
-      "sha256": "0db0885dfe9cb087df3f2f26d0a834fd7cf0c2bdefe5c6a2d0e2e042e56a1f1f",
-      "bytes": 16245,
-      "lines": 448,
+      "sha256": "f60fdd7f9ff20456850c99320d99af1a5f827fbbcf74bf335920b00dc59b2ad4",
+      "bytes": 17759,
+      "lines": 511,
       "features": ["mobile_navigation"],
       "dependencies": [
         "android:src/i18n/index.ts",
@@ -2062,9 +2062,9 @@
     },
     {
       "key": "android:src/services/api/queries/orders.ts",
-      "sha256": "f0b2dae4b0b6c35c2674b058b0b88953f6bfc8224fbcf593bba406e62b7bf8dd",
-      "bytes": 7401,
-      "lines": 267,
+      "sha256": "ee9c86ed0c189611d0403c18d4a04c41cc99497c25f9370c375940fc03e951d4",
+      "bytes": 8692,
+      "lines": 296,
       "features": ["mobile_navigation"],
       "dependencies": [
         "android:src/types/supplify.ts",
@@ -2345,12 +2345,12 @@
     },
     {
       "key": "android:src/types/checkout.ts",
-      "sha256": "1d74bf882b85b672576ea82a4c61636d8948a9ffcb290e0b55a949c1f57423f3",
-      "bytes": 539,
-      "lines": 22,
+      "sha256": "e9b9ac89f1ebb15f571921503400723a992ac92f86287f2123149b497b375a5d",
+      "bytes": 803,
+      "lines": 32,
       "features": ["mobile_navigation"],
-      "dependencies": [],
-      "reviewStatus": "pending"
+      "dependencies": ["android:src/types/supplify.ts"],
+      "reviewStatus": "reviewed"
     },
     {
       "key": "android:src/types/consumer.ts",
@@ -2552,9 +2552,9 @@
     },
     {
       "key": "android:src/types/supplify.ts",
-      "sha256": "e5dc746795b90b3ac4b62e5fb4c46da563b6e2a98777355404e978c6447c3e5d",
-      "bytes": 9981,
-      "lines": 351,
+      "sha256": "79233a47e451419e6f1940751c04c6c7a0b563d16c2d75ef9493324285d282e9",
+      "bytes": 10487,
+      "lines": 365,
       "features": ["mobile_navigation"],
       "dependencies": [],
       "reviewStatus": "partial"
@@ -3931,9 +3931,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/billing/subscription-activation.js",
-      "sha256": "773c3fe28ad69432dc42630c1dd4c1463c1f7409eadee380c73be2414b449e15",
-      "bytes": 1806,
-      "lines": 58,
+      "sha256": "a528590eb8b61258ee63318db739e56fe9b8d8c22e7470028340afb9d3e605e1",
+      "bytes": 1951,
+      "lines": 62,
       "features": [
         "assistant",
         "audit_activity",
@@ -3967,7 +3967,7 @@
         "warehouses"
       ],
       "dependencies": ["erp:apps/api/src/lib/db.js", "erp:apps/api/src/lib/billing/constants.js"],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/branch-account-billing.js",
@@ -4662,9 +4662,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/feature-flags.js",
-      "sha256": "0de565b0075a47b6b0b4fc6e54bcb2c50f442db364252365c01f830d507990da",
-      "bytes": 16783,
-      "lines": 454,
+      "sha256": "c7560ded7c2b5cbc2de4d74b39f551d5c967a3c728839c5363ce95c75cf41f13",
+      "bytes": 17208,
+      "lines": 485,
       "features": [
         "assistant",
         "audit_activity",
@@ -4707,13 +4707,13 @@
         "erp:apps/api/src/lib/subscription/free-trial-plan-features.js",
         "erp:apps/api/src/lib/org-billing-tenant.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/lib/feature-keys.js",
-      "sha256": "6c6071a972919747ffa356cd505cc63d54b5e5910bd1b88d6818d043319d5fa8",
-      "bytes": 4063,
-      "lines": 135,
+      "sha256": "18f3974fb2bbd57485e9cce6f9979cba1d86b2dfccb6a1b503662db4b1a08262",
+      "bytes": 9533,
+      "lines": 299,
       "features": [
         "assistant",
         "audit_activity",
@@ -5209,6 +5209,46 @@
       "reviewStatus": "pending"
     },
     {
+      "key": "erp:apps/api/src/lib/maintenance-mode.js",
+      "sha256": "ba33835d5b179f9c7caff2497eef3215afdd4357888cb6a6f67aa6226d8125cd",
+      "bytes": 1042,
+      "lines": 33,
+      "features": [
+        "assistant",
+        "audit_activity",
+        "background_jobs",
+        "branches_organizations",
+        "catalog",
+        "chat",
+        "command_center_run_sheet",
+        "customers_growth",
+        "disputes_returns",
+        "drivers_delivery",
+        "files_storage",
+        "fulfillment",
+        "identity",
+        "inventory",
+        "invoices_payments",
+        "loyalty",
+        "notifications",
+        "orders",
+        "plans_billing_features",
+        "pricing",
+        "profile_settings",
+        "promotions_boosts",
+        "public_sales",
+        "quote_requests",
+        "realtime",
+        "receivables_collections_exports",
+        "reports_analytics",
+        "roles_team",
+        "supplier_reviews",
+        "warehouses"
+      ],
+      "dependencies": ["erp:apps/api/src/lib/feature-flags.js"],
+      "reviewStatus": "pending"
+    },
+    {
       "key": "erp:apps/api/src/lib/mobile-auth.js",
       "sha256": "231f30c5f4b3d620afe97d6325b7cf15e272fc05e68d9d1fb7fa8ea050fe1531",
       "bytes": 1464,
@@ -5309,7 +5349,7 @@
       "lines": 59,
       "features": ["orders", "public_sales"],
       "dependencies": ["erp:apps/api/src/middlewares/errorHandler.js"],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/order-status-transitions.js",
@@ -5347,9 +5387,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/org-billing-tenant.js",
-      "sha256": "500ad300283529919022d21df0ac62c2566e90f0c235bfa19a55c8f633a66456",
-      "bytes": 4807,
-      "lines": 133,
+      "sha256": "74f83a2287bbc23d23f3c1af76ce6d760fbe0414cdd3869cc0b4ccbc9c18d86d",
+      "bytes": 4878,
+      "lines": 137,
       "features": [
         "assistant",
         "audit_activity",
@@ -5387,7 +5427,7 @@
         "erp:apps/api/src/lib/cache.js",
         "erp:apps/api/src/lib/singleflight.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/org-branch-capacity.js",
@@ -5873,7 +5913,7 @@
       "sha256": "3bd07fd6449fcaa4c06a47262612e6c1597f7b06418a824270bc5804fd676f3b",
       "bytes": 1532,
       "lines": 35,
-      "features": ["quote_requests"],
+      "features": ["orders", "profile_settings", "public_sales", "quote_requests"],
       "dependencies": ["erp:apps/api/src/middlewares/errorHandler.js"],
       "reviewStatus": "reviewed"
     },
@@ -5934,9 +5974,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/rbac.js",
-      "sha256": "d64d12005722b51da9f509a1460c7d851f6e043686124d0574f0cb96b37cf0bf",
-      "bytes": 36860,
-      "lines": 1093,
+      "sha256": "6c0ae79bba9413f9b5888acd7cf0e183af63f182bfbe056101262eff9e43158e",
+      "bytes": 36143,
+      "lines": 1102,
       "features": [
         "assistant",
         "audit_activity",
@@ -5977,6 +6017,7 @@
         "erp:apps/api/src/lib/logger.js",
         "erp:apps/api/src/lib/request-log-context.js",
         "erp:apps/api/src/lib/cache.js",
+        "erp:apps/api/src/lib/maintenance-mode.js",
         "erp:apps/api/src/lib/warehouse-access.js",
         "erp:apps/api/src/lib/auth-session-events.js",
         "erp:apps/api/src/lib/email-verification-gate.js",
@@ -6872,8 +6913,8 @@
     },
     {
       "key": "erp:apps/api/src/lib/subscription/entitlements.js",
-      "sha256": "bc771d34ab52855c8240c21910b9d13d1ae832a6e499f57afd9ebc1c38226fec",
-      "bytes": 69237,
+      "sha256": "9409f8f2a3bbddbc720539e2c58473cadf785cd0259accdad740a67a809b44fd",
+      "bytes": 67316,
       "lines": 1945,
       "features": [
         "assistant",
@@ -6928,13 +6969,13 @@
         "erp:apps/api/src/lib/conversion-events.js",
         "erp:apps/api/src/lib/request-subscription.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/lib/subscription/free-trial-plan-features.js",
-      "sha256": "5d86e6f2729820e25e0f4c7cf3208b8005dc18da0bd40f25dfdff6dc542e1313",
-      "bytes": 3675,
-      "lines": 98,
+      "sha256": "1de79473bca85314e196319fb907ad94767d288080e91dbf13b08f91f204e09c",
+      "bytes": 3926,
+      "lines": 103,
       "features": [
         "assistant",
         "audit_activity",
@@ -6973,7 +7014,7 @@
         "erp:apps/api/src/lib/singleflight.js",
         "erp:apps/api/src/lib/plan-codes.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/subscription/index.js",
@@ -7021,9 +7062,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/subscription/plans.js",
-      "sha256": "eec944f47d6ca5f75033d2b9893296c16a70c820397a2b200d0535d5398cc3b5",
-      "bytes": 21385,
-      "lines": 559,
+      "sha256": "6e886f327eb83e79fc086cf494831b53a18e7ebbc31ebdcdddabcd0be9be92c5",
+      "bytes": 21039,
+      "lines": 561,
       "features": [
         "assistant",
         "audit_activity",
@@ -7074,25 +7115,29 @@
         "erp:apps/api/src/lib/billing/billing-service.js",
         "erp:apps/api/src/lib/quick-list-tier.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/lib/supplier-business-settings.js",
-      "sha256": "623e3fc22373cdb3eecd124def93d5f8fa7bcd3f9d17985de48ea8374df09856",
-      "bytes": 5129,
-      "lines": 142,
+      "sha256": "1f93dcf8c8855109eac820440e493a01ad6dfe547526044401852f7118575848",
+      "bytes": 5225,
+      "lines": 148,
       "features": ["profile_settings"],
-      "dependencies": [],
-      "reviewStatus": "pending"
+      "dependencies": ["erp:apps/api/src/lib/tenant-timezone.js"],
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/supplier-last-order.js",
-      "sha256": "c01686cb30d4ef774ab1f81c671d9420a995ce3299670daca8eebe6c8a423b80",
-      "bytes": 3743,
-      "lines": 119,
+      "sha256": "29ee02c541ce8ec5c909cb59c983355043f9e0b6eabaf2f1b62b940b628ea703",
+      "bytes": 3899,
+      "lines": 115,
       "features": ["orders", "profile_settings", "public_sales"],
-      "dependencies": [],
-      "reviewStatus": "pending"
+      "dependencies": [
+        "erp:apps/api/src/lib/delivery-rollover-time.js",
+        "erp:apps/api/src/lib/tenant-timezone.js",
+        "erp:apps/api/src/lib/quote-response-validation.js"
+      ],
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/supplier-org.js",
@@ -7292,6 +7337,37 @@
       "reviewStatus": "pending"
     },
     {
+      "key": "erp:apps/api/src/lib/tenant-feature-gate.js",
+      "sha256": "e458146c276f218df32254f2c54cafc6a16a34b4b7279a54102b1f6c1f628da0",
+      "bytes": 4629,
+      "lines": 115,
+      "features": [
+        "branches_organizations",
+        "catalog",
+        "command_center_run_sheet",
+        "customers_growth",
+        "files_storage",
+        "identity",
+        "inventory",
+        "loyalty",
+        "notifications",
+        "orders",
+        "plans_billing_features",
+        "pricing",
+        "profile_settings",
+        "public_sales",
+        "quote_requests",
+        "supplier_reviews"
+      ],
+      "dependencies": [
+        "erp:apps/api/src/lib/subscription.js",
+        "erp:apps/api/src/lib/feature-keys.js",
+        "erp:apps/api/src/lib/feature-flags.js",
+        "erp:apps/api/src/lib/impersonation.js"
+      ],
+      "reviewStatus": "reviewed"
+    },
+    {
       "key": "erp:apps/api/src/lib/tenant-profile-cache.js",
       "sha256": "b9cd380223d0cfc0e09856da1c0519957901ff99439a68ed7cded282d0eab007",
       "bytes": 1441,
@@ -7425,9 +7501,9 @@
     },
     {
       "key": "erp:apps/api/src/lib/tenant-timezone.js",
-      "sha256": "0fa03acf23383066c12b4e806744620813b2fa03904fa914d878f5ea442fa569",
-      "bytes": 3509,
-      "lines": 104,
+      "sha256": "58045b6992e1812ee95d74eb36c80fd6b180300879a12641ac69bfc564d6efca",
+      "bytes": 4322,
+      "lines": 128,
       "features": [
         "assistant",
         "background_jobs",
@@ -7450,7 +7526,7 @@
         "erp:apps/api/src/config/env.js",
         "erp:apps/api/src/lib/delivery-rollover-time.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/lib/user-seat-limits.js",
@@ -7836,13 +7912,14 @@
     },
     {
       "key": "erp:apps/api/src/routes/account.routes.js",
-      "sha256": "56226c421a8199831a061a2d651e0618b4ad83b10b3a78f88461b4d2e000c999",
-      "bytes": 2617,
-      "lines": 97,
+      "sha256": "f619792386d5f23efcbaeaa8ed724875bbe6dbc813b5acb2e488b62bf2976e31",
+      "bytes": 2816,
+      "lines": 101,
       "features": ["identity"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
-        "erp:apps/api/src/services/account-deletion.service.js"
+        "erp:apps/api/src/services/account-deletion.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -7895,9 +7972,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/billing.routes.js",
-      "sha256": "ce2c3d0001d8abb35150b442ac182d58ac08eb6ff293a6702f55ef8bde281d69",
-      "bytes": 13440,
-      "lines": 427,
+      "sha256": "660f45254579fad6eb3e911a91eb4199aafb1770b54981631e0aaf67ec1791d3",
+      "bytes": 13929,
+      "lines": 437,
       "features": ["plans_billing_features"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -7907,17 +7984,19 @@
         "erp:apps/api/src/lib/subscription.js",
         "erp:apps/api/src/lib/billing/gateway-registry.js",
         "erp:apps/api/src/lib/audit.js",
-        "erp:apps/api/src/lib/impersonation-guards.js"
+        "erp:apps/api/src/lib/impersonation-guards.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/branch-invitations.routes.js",
-      "sha256": "f35f1b12c6ed4b1111c8705d6f17b59493b40ada0d095d8d1799f63438703522",
-      "bytes": 11137,
-      "lines": 357,
+      "sha256": "3900e1eefad8f1ad1ff08e61b8c9fceaf65500bed4391f67000d40b92fcae382",
+      "bytes": 10888,
+      "lines": 359,
       "features": ["branches_organizations"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/impersonation.js",
         "erp:apps/api/src/lib/db.js",
@@ -7930,9 +8009,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/branches.routes.js",
-      "sha256": "53995261c5b9de7d4a02f0ea2365d50e629f1982f6c64af2f81e6f8af2d651a9",
-      "bytes": 10991,
-      "lines": 367,
+      "sha256": "0f16bcfb7954f5481da1fc504b07670a31d6a81bc88450deb6a47673cc5fe563",
+      "bytes": 11109,
+      "lines": 374,
       "features": ["branches_organizations"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -7945,6 +8024,7 @@
         "erp:apps/api/src/lib/linked-accounts.js",
         "erp:apps/api/src/lib/tenant-switch.js",
         "erp:apps/api/src/config/env.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/permissions.js"
       ],
       "reviewStatus": "pending"
@@ -8113,9 +8193,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/files.routes.js",
-      "sha256": "c24a62bfa3cae944a7d0e61b326316aac955f16f6b978194ddcc5f380ca000bd",
-      "bytes": 15577,
-      "lines": 510,
+      "sha256": "2cf8eed1b84e4aac70b1ce921659fd3dde83c8f0f6bd72a5e4cfd6fd3f82bd4d",
+      "bytes": 15337,
+      "lines": 518,
       "features": ["files_storage"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8128,7 +8208,8 @@
         "erp:apps/api/src/lib/sanitize-upload.js",
         "erp:apps/api/src/services/storage/storage.service.js",
         "erp:apps/api/src/services/storage/upload-security.service.js",
-        "erp:apps/api/src/lib/rate-limit-store.js"
+        "erp:apps/api/src/lib/rate-limit-store.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -8271,9 +8352,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/inventory.routes.js",
-      "sha256": "5228c4f26e1b470cd53c1334a923986574af16707c17f1697b3366b9ab2e1609",
-      "bytes": 35376,
-      "lines": 1153,
+      "sha256": "b57ecdf8498a69d6a52022dd0ded7d869c7a54edc9044bbe2129d2ea0ea5ae48",
+      "bytes": 34327,
+      "lines": 1155,
       "features": ["inventory"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8286,7 +8367,8 @@
         "erp:apps/api/src/lib/supplier-stock-status.js",
         "erp:apps/api/src/services/supplier-stock.service.js",
         "erp:apps/api/src/services/supplier-order-stock.service.js",
-        "erp:apps/api/src/lib/warehouse-helpers.js"
+        "erp:apps/api/src/lib/warehouse-helpers.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -8315,11 +8397,12 @@
     },
     {
       "key": "erp:apps/api/src/routes/loyalty.routes.js",
-      "sha256": "d1b4f53680daf4bac53a042a89441caa4a5c92f82316e0545538b77fb790aa02",
-      "bytes": 15429,
-      "lines": 489,
+      "sha256": "fb1c6ee841749c4f50820f1695aacfedd878a9b4764458d67cb4c51d7c188cfc",
+      "bytes": 15037,
+      "lines": 490,
       "features": ["loyalty"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/logger.js",
         "erp:apps/api/src/middlewares/errorHandler.js",
@@ -8329,9 +8412,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/notifications.routes.js",
-      "sha256": "e7bba4a19b20a4022bf758a22cb8805836613b583b098002d1bd0541fde43007",
-      "bytes": 15630,
-      "lines": 536,
+      "sha256": "e5b8153e67f109513ad3b177f65e5e3550fe0bfbdd1fcbf343fe42edf9b0e39c",
+      "bytes": 15203,
+      "lines": 537,
       "features": ["notifications"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8345,6 +8428,7 @@
         "erp:apps/api/src/services/notification/webhook.js",
         "erp:apps/api/src/lib/ssrf-guard.js",
         "erp:apps/api/src/services/notification/scoped-notifications.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/services/email/email.service.js"
       ],
       "reviewStatus": "pending"
@@ -8367,9 +8451,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/orders-driver.routes.js",
-      "sha256": "7addf0f54ca7fa6d2ac3d06ec4cad53fda497d1b22531b7e70133df4a4b43772",
-      "bytes": 33776,
-      "lines": 1042,
+      "sha256": "7323881fafbae2ff85f14d302c9f28f88ce32a8f3b93309b12e5a185c4db1e84",
+      "bytes": 33935,
+      "lines": 1044,
       "features": ["orders", "public_sales"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8387,7 +8471,8 @@
         "erp:apps/api/src/services/storage/storage.service.js",
         "erp:apps/api/src/services/storage/upload-security.service.js",
         "erp:apps/api/src/services/driver-delivery-detail.service.js",
-        "erp:apps/api/src/services/delivery-retry.service.js"
+        "erp:apps/api/src/services/delivery-retry.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "partial"
     },
@@ -8419,9 +8504,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/orders/create.js",
-      "sha256": "b2499968721435d45f16f29e39bd7bf089c04472b45523f318232d451e4a1e3d",
-      "bytes": 47399,
-      "lines": 1251,
+      "sha256": "d84db84f61e08a6c0ec778dce63caf1a475560f3251ea1e16131b29790c292b9",
+      "bytes": 47046,
+      "lines": 1270,
       "features": ["orders"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8439,6 +8524,7 @@
         "erp:apps/api/src/lib/permissions.js",
         "erp:apps/api/src/lib/driver-delivery.js",
         "erp:apps/api/src/services/resolve-product-price.service.js",
+        "erp:apps/api/src/services/quote-checkout.service.js",
         "erp:apps/api/src/services/restaurant-order-create.service.js",
         "erp:apps/api/src/lib/supplier-last-order.js",
         "erp:apps/api/src/services/restaurant-delivery-location.service.js",
@@ -8459,9 +8545,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/orders/detail.js",
-      "sha256": "9a3ae119d248047c064bfd439ac81b61debbe49972b1c4361f4e51b4f5338b12",
-      "bytes": 8202,
-      "lines": 248,
+      "sha256": "a2300890df63458c1e18e26e157dae2308d6e4e7e03399abdf6c2a2e75e844dd",
+      "bytes": 8023,
+      "lines": 249,
       "features": ["orders"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8486,7 +8572,7 @@
         "erp:apps/api/src/services/delivery-routes.service.js",
         "erp:apps/api/src/routes/orders/orders.helpers.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/routes/orders/documents.js",
@@ -8522,9 +8608,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/orders/index.js",
-      "sha256": "53a65deae63ed39932679db2c2a824c44dcf9b69437ca73badd56870bc120e6e",
-      "bytes": 968,
-      "lines": 32,
+      "sha256": "0e16789fa5296d569739c1daef0d2302f2699e1899fc8487afdce223d0881fe4",
+      "bytes": 1652,
+      "lines": 48,
       "features": ["orders"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8536,15 +8622,16 @@
         "erp:apps/api/src/routes/orders/create.js",
         "erp:apps/api/src/routes/orders/update.js",
         "erp:apps/api/src/routes/orders/documents.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/routes/orders/orders.helpers.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/orders/list.js",
-      "sha256": "9925b979ad7df082903794ed68a2be6b829996598cbe8f4bda55d1870e8d8e33",
-      "bytes": 10489,
-      "lines": 334,
+      "sha256": "ebe6c222dbfdf43c210f409b5785f46cd0b7de05f847316470de1b603f1f0899",
+      "bytes": 10557,
+      "lines": 335,
       "features": ["orders"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8569,13 +8656,13 @@
         "erp:apps/api/src/services/delivery-routes.service.js",
         "erp:apps/api/src/routes/orders/orders.helpers.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/routes/orders/orders.helpers.js",
-      "sha256": "99d0e63a38b2fd3495841b2c2a160b24cb898652a377c44b8a22785bba62d69c",
-      "bytes": 29278,
-      "lines": 902,
+      "sha256": "a1a7f1ddb755c68a4265b92fa82e253fa24b47a73269b998aa6892a17d936c2b",
+      "bytes": 29517,
+      "lines": 905,
       "features": ["orders", "public_sales"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8583,6 +8670,7 @@
         "erp:apps/api/src/lib/logger.js",
         "erp:apps/api/src/middlewares/errorHandler.js",
         "erp:apps/api/src/lib/subscription.js",
+        "erp:apps/api/src/lib/quote-response-validation.js",
         "erp:apps/api/src/services/notification.service.js",
         "erp:apps/api/src/services/promotions.service.js",
         "erp:apps/api/src/services/deal-promotions.service.js",
@@ -8604,13 +8692,13 @@
         "erp:apps/api/src/lib/impersonation.js",
         "erp:apps/api/src/i18n/index.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/routes/orders/update.js",
-      "sha256": "bfed9b38cf98ebf67f1e68410ee582d809c723b9d3a2c06363898cb4371f60fa",
-      "bytes": 24057,
-      "lines": 722,
+      "sha256": "4910e9961a7c9d72a10dee2433d145be3bb3424bb958e69b8c6b19e19e0ac0ca",
+      "bytes": 23816,
+      "lines": 733,
       "features": ["orders"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8643,7 +8731,7 @@
         "erp:apps/api/src/services/dashboard-summary.service.js",
         "erp:apps/api/src/lib/order-status-transitions.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/routes/orders/warehouses.js",
@@ -8678,9 +8766,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/org.routes.js",
-      "sha256": "d5d9529f66164e1906e4b0b9a610ea58ca45f84b76bec84c5cac149d8a3f4aea",
-      "bytes": 36532,
-      "lines": 1178,
+      "sha256": "2e1543f1962a5fa9e2f96d05a35b81042470be7ad254d9078b6a5fda0177cae0",
+      "bytes": 35463,
+      "lines": 1180,
       "features": ["branches_organizations"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8697,6 +8785,7 @@
         "erp:apps/api/src/lib/branch-account-link-invitations.js",
         "erp:apps/api/src/lib/branch-account-billing.js",
         "erp:apps/api/src/services/org-reports.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/branch-lifecycle-guards.js",
         "erp:apps/api/src/lib/permissions.js"
       ],
@@ -8721,11 +8810,12 @@
     },
     {
       "key": "erp:apps/api/src/routes/prices.routes.js",
-      "sha256": "8b954a9c744d022ea88de12c81e92b746659a8a80147ee71dd0e5d36e2ed5123",
-      "bytes": 9310,
-      "lines": 345,
+      "sha256": "06d5b27ed1340b6de647abf2c87c588c93d7a6a29c9966de37668326771ddd94",
+      "bytes": 9134,
+      "lines": 350,
       "features": ["pricing"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/db.js",
         "erp:apps/api/src/lib/logger.js",
@@ -8738,11 +8828,12 @@
     },
     {
       "key": "erp:apps/api/src/routes/products.routes.js",
-      "sha256": "1499fc08d30f4030af0e45bf9f34c01ea21e509e5622913be6d1f78e75b3e3c1",
-      "bytes": 49990,
-      "lines": 1573,
+      "sha256": "252d3c11a327068c3da9f677d16089825cf38b3dea1876c2f9960daf54cd6561",
+      "bytes": 50104,
+      "lines": 1579,
       "features": ["catalog"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/db.js",
         "erp:apps/api/src/lib/logger.js",
@@ -8854,9 +8945,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/public-sales.routes.js",
-      "sha256": "26860e12b692b40e637e72b56ff8165f62fa62828ac808656a9da3350b622899",
-      "bytes": 11177,
-      "lines": 344,
+      "sha256": "de2a2ed3b20183af45bc4d7070a05c7c78331ad83e3a20090fef349d8526b829",
+      "bytes": 11668,
+      "lines": 354,
       "features": ["public_sales"],
       "dependencies": [
         "erp:apps/api/src/config/env.js",
@@ -8867,6 +8958,8 @@
         "erp:apps/api/src/lib/app-url.js",
         "erp:apps/api/src/services/public-sales.service.js",
         "erp:apps/api/src/lib/feature-flags.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
+        "erp:apps/api/src/services/public-supplier-catalog.service.js",
         "erp:apps/api/src/routes/orders/orders.helpers.js",
         "erp:apps/api/src/services/email/email.service.js",
         "erp:apps/api/src/services/whatsapp.service.js"
@@ -8875,25 +8968,27 @@
     },
     {
       "key": "erp:apps/api/src/routes/push.routes.js",
-      "sha256": "6d9c0df3b313f734fa689493fbd7f66181fcbbfa8bc9dd55e11022309ab4760e",
-      "bytes": 3455,
-      "lines": 130,
+      "sha256": "b106d5dd1b0677c05e6e6b3f9b3fef6c1de75c9a698c4b23077c38f26db1f671",
+      "bytes": 3460,
+      "lines": 131,
       "features": ["notifications"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/subscription.js",
         "erp:apps/api/src/services/push.service.js",
-        "erp:apps/api/src/services/notification.service.js"
+        "erp:apps/api/src/services/notification.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/quote-requests.routes.js",
-      "sha256": "1af8347adb81d686d3c98a8587e455b53709757ae62e83258bdc4d78423a7241",
-      "bytes": 12378,
-      "lines": 409,
+      "sha256": "553aaa0bd155bb570e7ac38c0e250b0b0666fa457eec4b9f35684d627c24e9db",
+      "bytes": 12481,
+      "lines": 410,
       "features": ["quote_requests"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/permission-keys.js",
         "erp:apps/api/src/lib/quote-response-validation.js",
@@ -8904,9 +8999,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/register.routes.js",
-      "sha256": "3f1533241b45be926ff4ea426c0961865174648cd1ad1641fec496afd94555bf",
-      "bytes": 5471,
-      "lines": 183,
+      "sha256": "d3437041965f7381326d381f07fcad9b671686fdc0a5d33df65e20d7b8e07fa4",
+      "bytes": 5680,
+      "lines": 192,
       "features": ["identity"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8914,7 +9009,8 @@
         "erp:apps/api/src/lib/logger.js",
         "erp:apps/api/src/middlewares/errorHandler.js",
         "erp:apps/api/src/lib/identity-normalize.js",
-        "erp:apps/api/src/config/env.js"
+        "erp:apps/api/src/config/env.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -8939,9 +9035,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/restaurants.routes.js",
-      "sha256": "553cae791e85c8539a9019aa92fb2b7bad0c241ad8f8ea90979091ddc2e91fba",
-      "bytes": 26307,
-      "lines": 923,
+      "sha256": "e12d0b7f734a8de33562d1ffc508d28cfc7711bd42abccf4336baa6608bd4be7",
+      "bytes": 26545,
+      "lines": 928,
       "features": ["customers_growth"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8958,15 +9054,16 @@
         "erp:apps/api/src/routes/suppliers/suppliers.helpers.js",
         "erp:apps/api/src/lib/restaurant-targeting.js",
         "erp:apps/api/src/lib/tenant-profile-redaction.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/services/restaurant-delivery-location.service.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/reviews.routes.js",
-      "sha256": "a16f18fec987972a79cc7ee400a1f542c0a51b26ae593dd41fe960a6622c286a",
-      "bytes": 4519,
-      "lines": 162,
+      "sha256": "a514520e66924fc6fd3ef8510ee6db3946914868175b076aae9ac421a56ed070",
+      "bytes": 4470,
+      "lines": 164,
       "features": ["supplier_reviews"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -8974,7 +9071,8 @@
         "erp:apps/api/src/lib/subscription.js",
         "erp:apps/api/src/lib/tenant-resolve.js",
         "erp:apps/api/src/middlewares/errorHandler.js",
-        "erp:apps/api/src/services/reviews.service.js"
+        "erp:apps/api/src/services/reviews.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -8999,9 +9097,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/supplier-growth.routes.js",
-      "sha256": "da10f09a2d68396a1513d5fb022976de73c4617c945697bfd5473f896faa9aa6",
-      "bytes": 12575,
-      "lines": 414,
+      "sha256": "10bafaf0260fafb61cdc93b41cd17386f2036da68edd6b300ee0108744ce2c76",
+      "bytes": 12706,
+      "lines": 419,
       "features": ["customers_growth"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -9015,15 +9113,16 @@
         "erp:apps/api/src/lib/db.js",
         "erp:apps/api/src/middlewares/errorHandler.js",
         "erp:apps/api/src/lib/subscription.js",
-        "erp:apps/api/src/lib/audit.js"
+        "erp:apps/api/src/lib/audit.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/supplier-ops.routes.js",
-      "sha256": "890b3fd5112cbadfd48bc1d36cd93b07cff42cf3f554fbb6cdfd65cb7b626c07",
-      "bytes": 45847,
-      "lines": 1498,
+      "sha256": "1679b0d7b0417744d1a32540c1a5df5fccf63b61b155019aec8d8093562830cd",
+      "bytes": 46449,
+      "lines": 1506,
       "features": ["command_center_run_sheet"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -9065,17 +9164,19 @@
         "erp:apps/api/src/services/order-fulfillment-issues.service.js",
         "erp:apps/api/src/services/reorder-cadence.service.js",
         "erp:apps/api/src/lib/db.js",
-        "erp:apps/api/src/services/collections-reminders.service.js"
+        "erp:apps/api/src/services/collections-reminders.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/routes/supplier-public-sales.routes.js",
-      "sha256": "8752b45faa7ae44fada65cf5ce18ca9c69729f0e9e26f848a3c9cb9a26d3b7d7",
-      "bytes": 2382,
-      "lines": 68,
+      "sha256": "89814aac09f7d86226f82164ba602b92022592c3e4bddaa06e7ef0e15f5f17aa",
+      "bytes": 2426,
+      "lines": 74,
       "features": ["public_sales"],
       "dependencies": [
+        "erp:apps/api/src/lib/tenant-feature-gate.js",
         "erp:apps/api/src/lib/rbac.js",
         "erp:apps/api/src/lib/tenant-resolve.js",
         "erp:apps/api/src/services/public-sales.service.js"
@@ -9132,9 +9233,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/suppliers/catalog.js",
-      "sha256": "4db558ef4bf489d7640c6ae0098f3eb66e81d814ef9ab0f360ea1fa11bafc48a",
-      "bytes": 9408,
-      "lines": 292,
+      "sha256": "2369e44aa419d726a80423c7358baa6a2b55262e23435e4ed5de1f7723690131",
+      "bytes": 9502,
+      "lines": 300,
       "features": ["profile_settings"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -9151,7 +9252,8 @@
         "erp:apps/api/src/services/reviews.service.js",
         "erp:apps/api/src/services/featured-supplier-placement.service.js",
         "erp:apps/api/src/routes/suppliers/suppliers.helpers.js",
-        "erp:apps/api/src/lib/tenant-profile-redaction.js"
+        "erp:apps/api/src/lib/tenant-profile-redaction.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -9198,9 +9300,9 @@
     },
     {
       "key": "erp:apps/api/src/routes/suppliers/profile.js",
-      "sha256": "86b1c267d5b8284fe3189f157f92faf7a218c1c6fdd4d2d949914c3963e9c91b",
-      "bytes": 28931,
-      "lines": 915,
+      "sha256": "b4236613c7934e12b7fccb6183316f719ec2f8ed356ec33cba3530279bc150c0",
+      "bytes": 28301,
+      "lines": 921,
       "features": ["profile_settings"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -9222,15 +9324,16 @@
         "erp:apps/api/src/lib/supplier-business-settings.js",
         "erp:apps/api/src/services/featured-supplier-placement.service.js",
         "erp:apps/api/src/routes/suppliers/suppliers.helpers.js",
-        "erp:apps/api/src/services/public-supplier-catalog.service.js"
+        "erp:apps/api/src/services/public-supplier-catalog.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
     {
       "key": "erp:apps/api/src/routes/suppliers/relationships.js",
-      "sha256": "cd64ade150a5a4addd37399f2d545269d3a3c5ca8f92fe76141035ead2ea4206",
-      "bytes": 11842,
-      "lines": 385,
+      "sha256": "30337fc58afe7af898e627f51da3ab7e9b4f7aa89aecf66065da3ad8d3ad558a",
+      "bytes": 11783,
+      "lines": 392,
       "features": ["profile_settings"],
       "dependencies": [
         "erp:apps/api/src/lib/rbac.js",
@@ -9249,7 +9352,8 @@
         "erp:apps/api/src/services/featured-supplier-placement.service.js",
         "erp:apps/api/src/routes/suppliers/suppliers.helpers.js",
         "erp:apps/api/src/services/public-supplier-catalog.service.js",
-        "erp:apps/api/src/services/supplier-price-comparison.service.js"
+        "erp:apps/api/src/services/supplier-price-comparison.service.js",
+        "erp:apps/api/src/lib/tenant-feature-gate.js"
       ],
       "reviewStatus": "pending"
     },
@@ -10602,7 +10706,7 @@
       "lines": 88,
       "features": ["orders", "public_sales"],
       "dependencies": [],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/services/order-fulfillment-issues.service.js",
@@ -10622,12 +10726,12 @@
     },
     {
       "key": "erp:apps/api/src/services/order-placement-idempotency.service.js",
-      "sha256": "4d1bc470a3afc2fae2a55b5863d3f33dd55e0c03d755c4d6f6a81cd0ae6c486c",
-      "bytes": 5785,
-      "lines": 169,
+      "sha256": "045eb405f3ac4fd453e83e0787d01426ab5e876bc908d4d9c9f1d526a34a40ab",
+      "bytes": 7143,
+      "lines": 209,
       "features": ["orders", "public_sales"],
       "dependencies": [],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/services/org-reports.service.js",
@@ -10824,6 +10928,15 @@
         "erp:apps/api/src/middlewares/errorHandler.js"
       ],
       "reviewStatus": "pending"
+    },
+    {
+      "key": "erp:apps/api/src/services/quote-checkout.service.js",
+      "sha256": "1319ab6b0eca8e219d87fc12a18c1c0eddb0cab6ca575a6edf3faff69a6d99a7",
+      "bytes": 5223,
+      "lines": 108,
+      "features": ["orders", "public_sales"],
+      "dependencies": ["erp:apps/api/src/middlewares/errorHandler.js"],
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/services/quote-requests.service.js",
@@ -11212,18 +11325,19 @@
     },
     {
       "key": "erp:apps/api/src/services/restaurant-order-create.service.js",
-      "sha256": "e24f96da54ad15226ac4ada29cd9b09d994bbb0b1acc4bd22f7a3fa3e3222a19",
-      "bytes": 7683,
-      "lines": 240,
+      "sha256": "e6a1d5af885b968ef82589716f379b21ed1a37bba303126be4a9276bbc515a2e",
+      "bytes": 8126,
+      "lines": 257,
       "features": ["orders", "public_sales"],
       "dependencies": [
         "erp:apps/api/src/lib/subscription.js",
         "erp:apps/api/src/services/order-create.service.js",
         "erp:apps/api/src/services/supplier-order-stock.service.js",
         "erp:apps/api/src/lib/supplier-last-order.js",
-        "erp:apps/api/src/middlewares/errorHandler.js"
+        "erp:apps/api/src/middlewares/errorHandler.js",
+        "erp:apps/api/src/services/quote-checkout.service.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/api/src/services/restaurant-over-ordering-intelligence.service.js",
@@ -11824,9 +11938,9 @@
     },
     {
       "key": "erp:apps/api/src/services/supplier-stock.service.js",
-      "sha256": "f4d0d82d7692bfa382ac136dbb880090ef13a731dce75c74639402e2a93b9de3",
-      "bytes": 13354,
-      "lines": 361,
+      "sha256": "65738bd2ac565684c3c86ac3f0a86b9e5c8bb5966037185bc4538a563d6609bf",
+      "bytes": 13196,
+      "lines": 363,
       "features": [
         "assistant",
         "catalog",
@@ -11847,7 +11961,7 @@
         "erp:apps/api/src/lib/subscription.js",
         "erp:apps/api/src/lib/org-billing-tenant.js"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/api/src/services/supplier-stockout-intelligence.service.js",
@@ -14786,9 +14900,9 @@
     },
     {
       "key": "erp:apps/web/src/components/Sidebar.tsx",
-      "sha256": "a12b7cc4bc7255113f25c6ac4b9612ddc4437c0739034413d526db691aea4715",
-      "bytes": 8923,
-      "lines": 240,
+      "sha256": "741a2aa774add1d93752ae7bab66e3e03004655bd25897ce5b1d10d82b5d85b4",
+      "bytes": 8801,
+      "lines": 242,
       "features": ["web_navigation"],
       "dependencies": [
         "erp:apps/web/src/hooks/redux.ts",
@@ -14812,11 +14926,14 @@
     },
     {
       "key": "erp:apps/web/src/components/sidebar/sidebarNavConfig.ts",
-      "sha256": "803227c9b6e2cf043eef528180d8ffb573fd0a7585f62ed35c63d109f5b01304",
-      "bytes": 17544,
-      "lines": 609,
+      "sha256": "871e19f7fd51fe9d538e4d45264daeb61f4642347c26299fc43925f01d3e8092",
+      "bytes": 17339,
+      "lines": 618,
       "features": ["web_navigation"],
-      "dependencies": ["erp:apps/web/src/lib/workspaceRoleProfile.ts"],
+      "dependencies": [
+        "erp:apps/web/src/lib/workspaceRoleProfile.ts",
+        "erp:apps/web/src/lib/planFeatureGates.ts"
+      ],
       "reviewStatus": "pending"
     },
     {
@@ -15212,9 +15329,9 @@
     },
     {
       "key": "erp:apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.tsx",
-      "sha256": "ff741b2a627c33d13ed69657b67e1532cd9f4ae585272e6830cea8741ad11dd5",
-      "bytes": 18657,
-      "lines": 455,
+      "sha256": "eb2cc83b27f3cff75500ec4b4bb79b79d6cea9408c3f2644a6a686d907eaeb98",
+      "bytes": 18799,
+      "lines": 469,
       "features": ["web_navigation"],
       "dependencies": [
         "erp:apps/web/src/components/ui/card.tsx",
@@ -15227,7 +15344,7 @@
         "erp:apps/web/src/types/index.ts",
         "erp:apps/web/src/i18n/index.ts"
       ],
-      "reviewStatus": "pending"
+      "reviewStatus": "reviewed"
     },
     {
       "key": "erp:apps/web/src/components/supplier/settings/tabs/SupplierContactsTab.tsx",
@@ -16340,9 +16457,9 @@
     },
     {
       "key": "erp:apps/web/src/i18n/locales/ar/admin.json",
-      "sha256": "0ad173e6a91849e35ba2b785766e80ea7f20f867ea004b9c48faa09aeb631095",
-      "bytes": 77620,
-      "lines": 1347,
+      "sha256": "312edff57afefb6c3482be611ee9e5728150b79aa8f2a8746ef987bd762b49fd",
+      "bytes": 78268,
+      "lines": 1380,
       "features": ["web_navigation"],
       "dependencies": [],
       "reviewStatus": "pending"
@@ -16547,8 +16664,8 @@
     },
     {
       "key": "erp:apps/web/src/i18n/locales/ar/quotes.json",
-      "sha256": "57b9d4c5c4eeceabf52d77fc5b5cdf9ec310d670c9572517b52db57759319e9b",
-      "bytes": 8869,
+      "sha256": "8ab3e5853d3396afd4d0300a943ed05d79ee502fd97b57b4b6aa7dacdcd5eca5",
+      "bytes": 8708,
       "lines": 163,
       "features": ["web_navigation"],
       "dependencies": [],
@@ -16619,18 +16736,18 @@
     },
     {
       "key": "erp:apps/web/src/i18n/locales/ar/suppliers.json",
-      "sha256": "fe0abc8723a2d72c5f0d4584990d9296e0c277d7c6ff76bfa439f8443ba68dfa",
-      "bytes": 30653,
-      "lines": 617,
+      "sha256": "44bebf02e0774ce8464f427e7accc16b8d5b2f455909a4bafc93bc89bca15a66",
+      "bytes": 30113,
+      "lines": 620,
       "features": ["web_navigation"],
       "dependencies": [],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/web/src/i18n/locales/en/admin.json",
-      "sha256": "1a4f41ad93f04dd8b855446c9089b09674fdb9ef8f9feb7918a2878a80bd401e",
-      "bytes": 60248,
-      "lines": 1347,
+      "sha256": "994b241db785b2a7369c6be6c828c353126d6b5ef4a29fc1e598eb57dc345767",
+      "bytes": 60460,
+      "lines": 1380,
       "features": ["web_navigation"],
       "dependencies": [],
       "reviewStatus": "pending"
@@ -16835,8 +16952,8 @@
     },
     {
       "key": "erp:apps/web/src/i18n/locales/en/quotes.json",
-      "sha256": "782f7d98b745adffa4661545eaa5a7ae46b9994508861068bd6711dcb8139a89",
-      "bytes": 6979,
+      "sha256": "79e6898131a902bf139e2605fd3efa168661e0815c40b1823b680283ce99f628",
+      "bytes": 6818,
       "lines": 163,
       "features": ["web_navigation"],
       "dependencies": [],
@@ -16907,12 +17024,12 @@
     },
     {
       "key": "erp:apps/web/src/i18n/locales/en/suppliers.json",
-      "sha256": "88ceb4c1fa760a9a23b9610ff3b0bb4ddbd771052d7e1b3e6358c4135044e577",
-      "bytes": 24096,
-      "lines": 617,
+      "sha256": "b1bd27d0600f1caaefb4b5d8226fee5a100ae97d7a3f12cbcd8dbee57e2e630b",
+      "bytes": 23535,
+      "lines": 620,
       "features": ["web_navigation"],
       "dependencies": [],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/web/src/i18n/pageNamespaces.ts",
@@ -17411,9 +17528,9 @@
     },
     {
       "key": "erp:apps/web/src/lib/planFeatureGates.ts",
-      "sha256": "2ee3b29098b310562c3f25ef493b35a26bf67695855ac2c27d7bd4662f26b222",
-      "bytes": 1770,
-      "lines": 43,
+      "sha256": "9807cf8edd77402fb17efa76f53575c9cc0490f3ce106aca9ec0342a670a2360",
+      "bytes": 3243,
+      "lines": 82,
       "features": ["web_navigation"],
       "dependencies": ["erp:apps/web/src/types/index.ts", "erp:apps/web/src/lib/planLimits.ts"],
       "reviewStatus": "pending"
@@ -19073,8 +19190,8 @@
     },
     {
       "key": "erp:apps/web/src/services/api/endpoints/orders.ts",
-      "sha256": "f19c1ce6c3a85318f3ab54f7d83cd6224b2f5c54644c77e46fba46e4089f2184",
-      "bytes": 23361,
+      "sha256": "fa4553df147a84fe32099f4c782a726b0dfa620c1256b2f765788f8eb139f0a1",
+      "bytes": 23405,
       "lines": 737,
       "features": ["web_navigation"],
       "dependencies": ["erp:apps/web/src/services/api/base.ts", "erp:apps/web/src/types/index.ts"],
@@ -19377,9 +19494,9 @@
     },
     {
       "key": "erp:apps/web/src/types/admin.ts",
-      "sha256": "d5e3ecc561316c3e090f3f8ff5e58f6b68a58e2dafdfb63c89292b783219241d",
-      "bytes": 14961,
-      "lines": 590,
+      "sha256": "b4222768d581820e836b1181e332bcfff1dea7a5d9df976013498d0c393c8b19",
+      "bytes": 14552,
+      "lines": 594,
       "features": ["web_navigation"],
       "dependencies": [
         "erp:apps/web/src/types/products.ts",
@@ -19531,12 +19648,12 @@
     },
     {
       "key": "erp:apps/web/src/types/orders.ts",
-      "sha256": "f405ae9f118b3af9bdd66d1a230447df26edd8720dca30c0595c6c70cbc8574f",
-      "bytes": 13072,
-      "lines": 518,
+      "sha256": "2bb7882dec35b28cfe50c154e45251124f8f419e56b85d0a80bd3918d972624b",
+      "bytes": 13609,
+      "lines": 537,
       "features": ["web_navigation"],
       "dependencies": [],
-      "reviewStatus": "pending"
+      "reviewStatus": "partial"
     },
     {
       "key": "erp:apps/web/src/types/overOrderingIntelligence.ts",
@@ -20438,9 +20555,9 @@
     },
     {
       "key": "ios:src/features/shared/FeatureGate.tsx",
-      "sha256": "260b446019dd6ba629c7b4075794ad6fc64cf8d11c244250bc1d9d758793ce22",
-      "bytes": 1192,
-      "lines": 40,
+      "sha256": "0b40de6a6b3211ccc28a7e8ac338e42268968564c035d34c41f2d6c54c03dd02",
+      "bytes": 1714,
+      "lines": 58,
       "features": ["mobile_navigation"],
       "dependencies": [
         "ios:src/i18n/index.ts",
@@ -20977,9 +21094,9 @@
     },
     {
       "key": "ios:src/hooks/useEntitlements.ts",
-      "sha256": "2867c4293ef692bc76d0d5be6a315603ffba95d0e43cc60945b47d597c8d1fe0",
-      "bytes": 1590,
-      "lines": 45,
+      "sha256": "55b357dbc07547082316c7859a4002c2949a1c215e1d5cafe69090466e981203",
+      "bytes": 3341,
+      "lines": 104,
       "features": ["mobile_navigation"],
       "dependencies": ["ios:src/services/api/queries.ts", "ios:src/services/api/queries/auth.ts"],
       "reviewStatus": "pending"
@@ -20995,9 +21112,9 @@
     },
     {
       "key": "ios:src/i18n/ar.json",
-      "sha256": "43c267546e528da2c51c9a9e593bba4a843182e8575387a8595261144e01ac9e",
-      "bytes": 90053,
-      "lines": 1332,
+      "sha256": "d126038d8796412572db1bbf3c9caba1ea855feba8e6a53663bf62fc2aa4a591",
+      "bytes": 90415,
+      "lines": 1335,
       "features": ["mobile_navigation"],
       "dependencies": [],
       "reviewStatus": "partial"
@@ -21087,9 +21204,9 @@
     },
     {
       "key": "ios:src/navigation/SupplierNavigator.tsx",
-      "sha256": "0db0885dfe9cb087df3f2f26d0a834fd7cf0c2bdefe5c6a2d0e2e042e56a1f1f",
-      "bytes": 16245,
-      "lines": 448,
+      "sha256": "f60fdd7f9ff20456850c99320d99af1a5f827fbbcf74bf335920b00dc59b2ad4",
+      "bytes": 17759,
+      "lines": 511,
       "features": ["mobile_navigation"],
       "dependencies": [
         "ios:src/i18n/index.ts",
@@ -21398,9 +21515,9 @@
     },
     {
       "key": "ios:src/services/api/queries/orders.ts",
-      "sha256": "f0b2dae4b0b6c35c2674b058b0b88953f6bfc8224fbcf593bba406e62b7bf8dd",
-      "bytes": 7401,
-      "lines": 267,
+      "sha256": "ee9c86ed0c189611d0403c18d4a04c41cc99497c25f9370c375940fc03e951d4",
+      "bytes": 8692,
+      "lines": 296,
       "features": ["mobile_navigation"],
       "dependencies": [
         "ios:src/types/supplify.ts",
@@ -21681,12 +21798,12 @@
     },
     {
       "key": "ios:src/types/checkout.ts",
-      "sha256": "1d74bf882b85b672576ea82a4c61636d8948a9ffcb290e0b55a949c1f57423f3",
-      "bytes": 539,
-      "lines": 22,
+      "sha256": "e9b9ac89f1ebb15f571921503400723a992ac92f86287f2123149b497b375a5d",
+      "bytes": 803,
+      "lines": 32,
       "features": ["mobile_navigation"],
-      "dependencies": [],
-      "reviewStatus": "pending"
+      "dependencies": ["ios:src/types/supplify.ts"],
+      "reviewStatus": "reviewed"
     },
     {
       "key": "ios:src/types/consumer.ts",
@@ -21888,9 +22005,9 @@
     },
     {
       "key": "ios:src/types/supplify.ts",
-      "sha256": "e5dc746795b90b3ac4b62e5fb4c46da563b6e2a98777355404e978c6447c3e5d",
-      "bytes": 9981,
-      "lines": 351,
+      "sha256": "79233a47e451419e6f1940751c04c6c7a0b563d16c2d75ef9493324285d282e9",
+      "bytes": 10487,
+      "lines": 365,
       "features": ["mobile_navigation"],
       "dependencies": [],
       "reviewStatus": "partial"

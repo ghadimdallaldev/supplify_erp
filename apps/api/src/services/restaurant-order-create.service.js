@@ -21,6 +21,7 @@ export async function createRestaurantOrdersInTransaction({
   supplierProfiles,
   supplierPromoEligibility,
   supplierMultiWarehouse,
+  deliveryResolutions = new Map(),
   dailyMeterEnforcement,
   orderData,
   promotionHandlers,
@@ -86,10 +87,9 @@ export async function createRestaurantOrdersInTransaction({
     const orderCurrency = currencies[0] || 'USD'
 
     let phaseStart = performance.now()
-    const deliveryResolution = resolveSupplierDeliveryDate(
-      supplier,
-      orderData?.deliveryDate ?? null
-    )
+    const deliveryResolution =
+      deliveryResolutions.get(supplierId) ??
+      resolveSupplierDeliveryDate(supplier, orderData?.deliveryDate ?? null)
     const {
       rows: [order],
     } = await q(
@@ -100,7 +100,7 @@ export async function createRestaurantOrdersInTransaction({
             currency, status, notes, requested_delivery_date
           )
           VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::date)
-          RETURNING *
+          RETURNING *, requested_delivery_date::text AS requested_delivery_date
         `,
       [
         restaurantId,

@@ -58,6 +58,13 @@ export interface Order {
   requested_delivery_method?: string | null
   requested_delivery_time?: string | null
   requested_delivery_date?: string | null
+  deliveryResolution?: {
+    deliveryDate: string
+    rolled: boolean
+    reason: 'no_cutoff' | 'before_cutoff' | 'past_cutoff'
+    mode: 'none' | 'cutoff'
+    rolloverDays?: number
+  }
   warehouseFulfillment?: {
     warehouseId: string
     supplierTenantId?: string

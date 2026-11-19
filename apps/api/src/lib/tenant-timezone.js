@@ -17,6 +17,23 @@ export function getDefaultTenantTimezone() {
   return config.DEFAULT_TENANT_TIMEZONE || config.DELIVERY_ROLLOVER_TIMEZONE || 'Asia/Beirut'
 }
 
+/** Validate named timezones that can be used consistently by Intl and PostgreSQL. */
+export function isValidTenantTimezone(value) {
+  if (typeof value !== 'string' || !value || /^[+-]/.test(value)) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Resolve blank or historical invalid settings to the platform timezone. */
+export function normalizeTenantTimezone(value) {
+  const timeZone = typeof value === 'string' ? value.trim() : ''
+  return isValidTenantTimezone(timeZone) ? timeZone : getDefaultTenantTimezone()
+}
+
 /**
  * @param {Date} date
  * @param {string} timeZone
@@ -46,7 +63,7 @@ export async function getSupplierTimezone(supplierId) {
     `SELECT COALESCE(NULLIF(TRIM(last_order_timezone), ''), $2) AS tz FROM supplier WHERE id = $1`,
     [supplierId, getDefaultTenantTimezone()]
   )
-  return rows[0]?.tz || getDefaultTenantTimezone()
+  return normalizeTenantTimezone(rows[0]?.tz)
 }
 
 /**
@@ -78,12 +95,19 @@ function zonedClockParts(date, timeZone) {
 export function zonedWallTimeToUtc(dateKey, hour, minute, second, ms, timeZone) {
   const [year, month, day] = String(dateKey).split('-').map(Number)
   let utc = Date.UTC(year, month - 1, day, hour, minute, second, ms)
+  let previousUtc
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const got = zonedClockParts(new Date(utc), timeZone)
     const gotUtc = Date.UTC(got.year, got.month - 1, got.day, got.hour, got.minute, got.second, ms)
     const want = Date.UTC(year, month - 1, day, hour, minute, second, ms)
     const delta = want - gotUtc
     if (delta === 0) break
+    if (utc + delta === previousUtc) {
+      // A skipped wall time oscillates across the gap. Advance through it.
+      utc = Math.max(utc, previousUtc)
+      break
+    }
+    previousUtc = utc
     utc += delta
   }
   return new Date(utc)

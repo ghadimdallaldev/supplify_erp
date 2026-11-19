@@ -1,0 +1,12 @@
+PASS src/utils/driverSchedule.test.ts
+PASS src/utils/driverDeliveryUi.test.ts
+PASS src/services/api/queries/driver.test.ts
+PASS src/features/driver/screens/__tests__/DriverStopAssignment.test.tsx
+PASS src/services/api/queries/driverRoutes.test.ts
+PASS src/features/driver/screens/__tests__/DriverRouteErrors.test.tsx
+
+Test Suites: 6 passed, 6 total
+Tests:       32 passed, 32 total
+Snapshots:   0 total
+Time:        5.79 s, estimated 8 s
+jest exit 0

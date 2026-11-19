@@ -165,7 +165,8 @@ router.post(
         s.last_order_cutoff_type,
         s.last_order_cutoff_time,
         s.last_order_cutoff_minutes,
-        s.last_order_rollover_days
+        s.last_order_rollover_days,
+        s.last_order_timezone
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
@@ -193,19 +194,20 @@ router.post(
         }
       }
 
-      const deliveryDateBySupplier = new Map()
+      const deliveryResolutions = new Map()
+      const checkoutTime = new Date()
       const resolveItems = orderData.items.map((item) => {
         const product = productMap.get(item.productId)
         const supplierId = product?.supplier_id
         let deliveryDate = orderData.deliveryDate ?? undefined
         if (supplierId) {
-          if (!deliveryDateBySupplier.has(supplierId)) {
-            deliveryDateBySupplier.set(
+          if (!deliveryResolutions.has(supplierId)) {
+            deliveryResolutions.set(
               supplierId,
-              resolveSupplierDeliveryDate(product, orderData.deliveryDate ?? null).deliveryDate
+              resolveSupplierDeliveryDate(product, orderData.deliveryDate ?? null, checkoutTime)
             )
           }
-          deliveryDate = deliveryDateBySupplier.get(supplierId)
+          deliveryDate = deliveryResolutions.get(supplierId).deliveryDate
         }
         return {
           productId: item.productId,
@@ -544,6 +546,7 @@ router.post(
             supplierProfiles,
             supplierPromoEligibility,
             supplierMultiWarehouse,
+            deliveryResolutions,
             dailyMeterEnforcement,
             orderData,
             promotionHandlers: {
@@ -980,10 +983,11 @@ router.post(
           if (!lockByProductId.has(lock.productId)) lockByProductId.set(lock.productId, lock)
         const quoteLocks = [...lockByProductId.values()]
 
-        const manualDeliveryDate = resolveSupplierDeliveryDate(
+        const deliveryResolution = resolveSupplierDeliveryDate(
           supplierProfile,
           orderData.deliveryDate || null
-        ).deliveryDate
+        )
+        const manualDeliveryDate = deliveryResolution.deliveryDate
         const manualResolveItems = orderData.items.map((item) => ({
           productId: item.productId,
           supplierId,
@@ -1065,7 +1069,7 @@ router.post(
           currency, status, notes, requested_delivery_date
         )
         VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, 'PLACED', $8, $9::date)
-        RETURNING *
+        RETURNING *, requested_delivery_date::text AS requested_delivery_date
       `,
           [
             orderData.restaurant_id,
@@ -1169,6 +1173,7 @@ router.post(
 
         const createdOrder = {
           ...order,
+          deliveryResolution,
           total_amount: totalAmount,
           items: orderItems,
           warehouseFulfillment: reserved.fulfillment,

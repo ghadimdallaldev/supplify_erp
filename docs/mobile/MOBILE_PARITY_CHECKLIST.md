@@ -1,5 +1,15 @@
 # Mobile Parity Checklist
 
+## 2026-11-19 - Supplier calendar cutoffs and order notes
+
+- [x] Web/Android/iOS type optional delivery-resolution metadata.
+- [x] Matching native tests preserve selected/requested/resolved calendar days.
+- [x] Real SQL covers timezone-dependent pricing, cutoff boundaries, literal/null DTOs and note save/clear.
+- [x] Existing administrator draft placement uses one connection for its stock-feature lookup.
+- [x] Migration 0237 repair/idempotence verified and applied in the owned local database.
+- [x] Final broad API/lint/typecheck and native evidence recorded in the audit (2,771 API tests, 173 SQL tests, 34 mobile tests per client, all three typechecks).
+- [ ] Hosted migrations/replay compatibility, full native Business UI and physical-device workflows remain open.
+
 ## 2026-11-18 - Checkout quote/replay contracts
 
 - [x] Web mutation types match canonical single/split/manual success data.
@@ -8,7 +18,7 @@
 - [x] Existing quote/order audit fields are typed across all three clients.
 - [x] Real HTTP/SQL covers quote snapshots, replay ownership, legacy compatibility, rollback and writer serialization.
 - [x] Migration 0236 applied only to the owned disposable audit database.
-- [ ] Final broad API/lint/typecheck and matching native evidence recorded in the audit.
+- [x] Final broad API/lint/typecheck and matching native evidence recorded in the audit (2,758 API tests, 164 SQL tests, 32 mobile tests per platform, all three typechecks).
 - [ ] Hosted migration/rollout, native manual-order UI, remaining warehouse/plan/device matrices stay open.
 
 ## 2026-11-18 - Supplier quote response parity
@@ -19,7 +29,7 @@
 - [x] Real SQL verifies supplier/request/restaurant isolation, effective SKU pricing and response/decline transactions.
 - [x] Both native hook suites cover metadata, errors/retries and cache invalidation.
 - [x] Final broad regression/lint/typecheck evidence is recorded in the active audit (41 mobile regressions per platform plus quote/Arabic runtime checks; all three typechecks).
-- [ ] Checkout-commit races, precision boundaries, hosted and physical-device workflows remain open.
+- [ ] Precision boundaries, new-request phantoms, hosted and physical-device workflows remain open.
 
 ## 2026-11-18 - Rollover transaction and client refresh
 

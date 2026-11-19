@@ -17,15 +17,19 @@ constraint so independent supplier actors can use the same key for one customer.
 Checkout locks relevant quote-request parents in ID order, reads current eligible
 response lines with shared row locks, then checks selected product/supplier IDs,
 unit prices, currencies and quantity limits before writing orders or usage. A
-committed closure, changed price/quantity or newly available quote after preflight
-is rejected rather than committing an outdated quote or catalog fallback. Existing
-quote response/closure writers wait until the order transaction commits.
+committed closure, changed price/quantity or new response on a locked request after
+preflight is rejected before order writes. Existing quote response/closure writers
+wait until the order transaction commits.
 
 Supplier manual orders resolve automatic quote locks and prices through the same
 transaction client. This avoids nested pool acquisition and supports a single
-database connection. They retain `quote_response_item_id` on quoted order lines
-and persist the delivery date computed by the existing delivery-rule resolver.
-Supplier cutoff timezone policy remains a separate audit lead.
+database connection. Stock-mode resolution also carries that connection through
+organization billing, subscriptions, trial features and feature overrides. Those
+transactional reads bypass shared caches and singleflight to avoid publishing
+rolled-back values or waiting on a separate connection. They retain
+`quote_response_item_id` on quoted order lines and persist the delivery date
+computed by the existing delivery-rule resolver.
+Supplier-local cutoff behavior is covered by the calendar corrections below.
 
 Manual keys use `SUPPLIER:<supplierId>:RESTAURANT:<restaurantId>`. The server derives
 the supplier from the authenticated workspace. Historical restaurant-scoped manual
@@ -66,6 +70,32 @@ the container carrying its own ownership label.
 Supplier checkout HTTP/SQL regressions are in
 `tests/integrity/supplier-order-checkout.pg.test.js`, run with the separately owned
 supplier audit database via `node scripts/qa/supplier-audit-db.mjs test`.
+
+## Supplier delivery calendars and order notes (2026-11-19)
+
+Cutoffs use the supplier's named `last_order_timezone`. Blank or unsupported
+historical settings fall back to the platform timezone. A stored `UTC` setting
+uses UTC. Requested `YYYY-MM-DD` values retain their calendar
+day, and impossible days return 400 on restaurant and manual checkout.
+
+Restaurant checkout resolves each supplier's delivery day once during price
+preparation. Contract pricing and the order header share that result across a
+cutoff boundary. Manual checkout also returns its `deliveryResolution` metadata.
+Both native clients type and preserve this optional response object.
+
+Minutes-before-window rules use the supplier's zoned delivery midnight. A skipped
+midnight advances through the DST gap. Calendar rollover adds calendar days and
+handles the tested 25-hour New York day and Beirut midnight transition. Absolute
+cutoffs retain their existing minute precision and permit the configured minute.
+
+Placement, list, detail and ordinary update responses project the requested
+delivery day as calendar text, including historical nulls. Earlier saved replay
+JSON remains a separate rollout compatibility check. Note-only PATCH requests now
+write `notes`; an empty string clears them under the existing actor/access guards.
+
+Migration `0237_supplier_timezone_validation.sql` clears historical timezone names
+that PostgreSQL cannot resolve. An empty setting uses the platform fallback.
+It preserves recognized names and was applied only to the owned audit database.
 
 The [2026-11-16 restaurant feature audit](../audits/RESTAURANT_FEATURE_AUDIT_2026-11-16.md)
 records the tested scope and Development verification separately.

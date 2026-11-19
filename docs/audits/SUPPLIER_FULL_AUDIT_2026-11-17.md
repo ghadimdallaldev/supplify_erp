@@ -1,6 +1,6 @@
 # Full supplier code and feature audit - 2026-11-17
 
-Status: **active; exhaustive source review and feature verification are not yet
+Status: **incomplete; exhaustive source review and feature verification are not yet
 established.** The objective covers every supplier feature and functionality in
 the ERP API/web and both native clients. The earlier focused workflow audit is
 evidence for its named checks only, not completion of this broader objective.
@@ -17,9 +17,11 @@ The [manual review ledger](./supplier-full-review-ledger.json) records the exact
 hash and scope of each review. The generator marks a review stale if the source
 hash changes; partial reviews never count as full-file review.
 
-At the seventh-stage snapshot (2026-11-18) the manifest contains **1,282 reachable
-source files (271,933 lines)**: 41 fully source-reviewed, 23 partially reviewed and
-1,218 still pending, with no stale recorded hashes. These counts describe source inspection;
+At the ninth-stage snapshot (2026-11-19) the manifest contains **1,285 reachable
+source files (273,213 lines)**, with 57 fully source-reviewed, 33 partially reviewed,
+1,195 pending and zero stale recorded hashes. Earlier feature-gate deltas and scoped
+quote locale fields have been revalidated against the current source.
+These counts describe source inspection;
 feature/runtime completion uses the separate coverage ledger below.
 
 The inventory deliberately includes shared dependencies and some other-workspace
@@ -47,14 +49,14 @@ named automated tests exist; it does not establish exhaustive feature coverage.
 | Feature area                    | Required review and execution                                                    | Current evidence / next work                                                                                                                              |
 | ------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Identity and account lifecycle  | Registration, activation, auth/refresh/revocation, tenant switching, deletion    | Prior auth tests; complete supplier lifecycle matrix pending                                                                                              |
-| Profile and business settings   | Profile, contacts, tax/payment settings, cutoff/timezone, POD policy             | Entire settings source and validation matrix pending                                                                                                      |
+| Profile and business settings   | Profile, contacts, tax/payment settings, cutoff/timezone, POD policy             | Business/cutoff source and timezone/calendar fixes verified; profile/contact/lifecycle and full settings matrices pending                                 |
 | Roles and team                  | Default/custom roles, invitations, permission changes, revocation, navigation    | Summary finance leak reproduced and repaired; other permissions pending                                                                                   |
 | Organization and branches       | Creation/linking/invitations, branch capacity, scopes, concurrent changes        | Prior PostgreSQL scope/race regressions; full flows pending                                                                                               |
 | Warehouses                      | Ownership, assignments, CRUD, lifecycle, zones, stock transfer                   | Prior integrity regressions; complete UI/API/role matrix pending                                                                                          |
 | Catalog                         | CRUD/categories/media, publication, plan limits, availability                    | Prior unit/UI tests; complete supplier/restaurant visibility matrix pending                                                                               |
 | Product imports                 | CSV/XLSX parsing, partial/error paths, retries, jobs, images, upload isolation   | Prior unit tests; complete import/job/provider matrix pending                                                                                             |
-| Pricing and contracts           | Customer access, quantity tiers, discounts, dates, currency, tax                 | Prior pricing tests; full editable and purchase flows pending                                                                                             |
-| Orders                          | Lists/details/search, acknowledge/process/cancel/decline, history, idempotency   | Prior order/stock integrity tests; complete lifecycle matrix pending                                                                                      |
+| Pricing and contracts           | Customer access, quantity tiers, discounts, dates, currency, tax                 | Supplier-local contract as-of day and cutoff-boundary agreement verified; full editable and purchase flows pending                                        |
+| Orders                          | Lists/details/search, acknowledge/process/cancel/decline, history, idempotency   | Real quote/manual checkout, scoped replay, calendar DTOs, note save/clear and rollback verified; complete lifecycle matrix pending                        |
 | Inventory                       | Legacy/warehouse modes, reservations, adjustments, low stock, mirrors            | Prior integrity tests; all adjustment and fulfillment paths pending                                                                                       |
 | Fulfillment                     | Pick/pack/dispatch, assignments, shortages/substitutions, exceptions             | Atomic proof rollback, multi-leg completion and lock-order regressions pass; complete end-to-end flow review pending                                      |
 | Drivers and delivery            | Assignment, board filters, routes, status/POD, GPS/ETA, driver isolation         | Board/proof/date/scope, route lifecycle, direct completion/handover and exact-leg selection corrections verified; retry/rollover, GPS and devices pending |
@@ -62,7 +64,7 @@ named automated tests exist; it does not establish exhaustive feature coverage.
 | Invoices/payments/credit        | Issue/void, partial/full payment, credit, PDF, currency, transaction safety      | Prior tests; all lifecycle, permission and retry paths pending                                                                                            |
 | Receivables/collections/exports | Calendar aging, currencies, debtor targets, reminders, exports                   | Earlier reproduced fixes; finance summary access now repaired; full reminders/provider matrix pending                                                     |
 | Customers and growth            | Customer lists/details, matching/import, connect/invite/sponsor, limits          | Prior tenant/deduplication checks; full invitations/sponsorship lifecycle pending                                                                         |
-| Quotes                          | Supplier inbox/detail, response/decline, validity, conversion and access         | Real SQL ownership/calendar/response/decline/cart/price fixes and client edits verified; order commits, precision and full matrix remain open             |
+| Quotes                          | Supplier inbox/detail, response/decline, validity, conversion and access         | Real SQL ownership/calendar/response/decline/cart/price and checkout commits verified; precision, new-request phantoms and full matrix remain open        |
 | Disputes/returns                | Eligibility, shortages/substitutions, replacement/refund/credit and stock        | Prior tests; complete terminal/retry/permission matrix pending                                                                                            |
 | Promotions/boosts               | Eligibility, CRUD, review, redemption, limits, boost billing/expiry              | Prior tests; full lifecycle and client parity review pending                                                                                              |
 | Loyalty                         | Program settings, earn/redeem, ledger, customer balances, reversals              | Prior isolated tenant checks; full earn/reversal flows pending                                                                                            |
@@ -611,6 +613,213 @@ numeric scale/rounding/overflow, changes between checkout price reads and order
 commit, invalid path IDs, notification/provider failures, web draft refreshes,
 new substitute/date selection UI and the full role/plan/schema/device matrix.
 All other open supplier feature rows remain part of the active goal.
+
+## Checkout and stock entitlements - eighth audit stage (2026-11-18 to 2026-11-19)
+
+- **FULL-S41 (high) - Checkout committed stale quote state.** A quote closure,
+  price edit or reduced quantity committed between restaurant checkout preflight
+  and its order transaction still produced an order with the earlier quote.
+  Checkout now locks relevant request parents in ID order, reads eligible current
+  lines under shared locks and validates product/supplier identity, selected
+  response, price, currency and quantity before order writes. A response arriving
+  on an included request after preflight also prevents catalog fallback. Quote
+  writers wait while a valid checkout holds these locks. New RFQs and newly
+  relevant substitutes outside the initial parent set remain an open phantom lead.
+- **FULL-S42 (high) - Manual replay crossed supplier actors.** Reusing a manual
+  key with another supplier could return the first supplier's order. Separate
+  valid suppliers also conflicted on the same customer/key. Keys now include
+  authenticated supplier and restaurant IDs. Historical successful manual rows
+  replay only when the stored restaurant and every line belong to that supplier.
+  Migration 0236 preserves historical rows and the actor/key index while removing
+  the older restaurant/key uniqueness constraint. Concurrent owned retries,
+  payload mismatches, quote closure and rollback are covered by real SQL.
+- **FULL-S43 (high) - Manual price resolution acquired another connection.** The
+  transaction called batch pricing through the pool, causing a one-connection
+  checkout to time out. Automatic selectors and pricing now use the order's
+  transaction client. Stock feature acquisition is additionally addressed in
+  FULL-S47 below.
+- **FULL-S44 (medium) - Manual quote references were discarded.** Manual orders
+  stored the quote price without its response-item ID. The item insert now retains
+  `quote_response_item_id`, with an HTTP/SQL assertion on the actual stored row.
+- **FULL-S45 (medium) - Manual checkout discarded its resolved delivery day.** It
+  calculated the supplier delivery day for pricing but persisted the raw optional
+  request date. Headers now store the existing resolver's result, including when
+  the caller omits the day. Cutoff timezone policy remains open.
+- **FULL-S46 (medium) - Native placement hooks returned success wrappers.** Both
+  hooks promised arrays but returned `{ order }` or `{ orders }`. Empty success
+  data could confirm checkout. Android/iOS now normalize actual wrappers and
+  validate order IDs. They preserve selectors and retry headers and expose a
+  typed manual endpoint. Web types now describe the actual wrappers. The existing
+  native cart already had a supplier-count fallback, so the regression establishes
+  the hook contract and malformed-confirmation behavior.
+- **FULL-S47 (high) - Stock entitlement checks escaped the transaction client.**
+  Warehouse-mode selection queried organization billing, subscriptions, trials
+  and overrides through the pool while holding the order connection. These
+  dependencies now accept the scoped query. Transactional reads bypass shared
+  caches and singleflight, protecting rollback and avoiding a second acquisition.
+  Manual routing-feature preflight also runs before the transaction. Stock display
+  with a supplied query follows that same scope. Missing compatibility-subscription
+  creation retains its executor, serializes stock feature reads and handles the
+  existing nonterminal tenant unique conflict in both subscription constructors.
+
+### Eighth-stage evidence
+
+- Initial checkout reproduction passed one control and failed **eight of nine**
+  HTTP/SQL cases. Native reproduction failed **three of four** hook cases.
+  Logs are `output/supplier-checkout-verified-before-2026-11-18.log` and
+  `output/supplier-checkout-android-before-2026-11-18.log`.
+- Checkout PostgreSQL regressions now pass **17 cases**, covering quote state,
+  actual header/item/usage/reservation writes, manual audit references/dates,
+  independent/overlapping keys, historical ownership, rollback/retry and a writer
+  observed blocked via PostgreSQL while the order holds its quote lock. Both
+  legacy and warehouse manual checkout run with one connection. Tenant identities
+  and checkout eligibility/plan inputs are fixtures. The actual child router and
+  role/permission guards execute, while external notifications, cache, audit,
+  promotions and loyalty providers are mocked.
+- A separate **six-case** real stock-entitlement suite uses actual feature,
+  subscription, trial and organization code with a one-connection pool. It covers
+  cold overrides, branch inheritance, trial targets, overlapping missing-row
+  creation and rollback, including assertions that scoped values avoid shared
+  caches. Its first fixture revision needed UUID casts and a new branch warehouse
+  because warehouse ownership is immutable.
+- A strengthened checkout harness initially used an unintended connector, which
+  failed authentication. It was replaced by the guarded audit-pool query. The
+  controlled SQL reproduction is
+  `output/supplier-checkout-stock-feature-before-2026-11-19.log`. All subsequent
+  entitlement regressions use the owned local database.
+- The first broad SQL run found **11 transaction failures** from overlapping
+  compatibility-subscription inserts and one cold connection timeout. Sequential
+  reads, conflict-safe inserts and a less aggressive fixture connection timeout
+  corrected these. The affected restaurant/warehouse/entitlement rerun passes
+  **49 cases**. Final full isolated SQL verification passes **164 tests / ten
+  files** with the intended single-fork runner.
+- Current Android/iOS checkout, cart, quote and locale regressions pass **32 tests /
+  seven suites per platform**. Both typechecks pass. Focused web order/cart
+  regressions pass **nine tests / four files**. ERP typecheck passes.
+- API/web lint passes with **1,717 existing API warnings and zero errors**. The
+  earlier checkout broad run passed **2,650 API tests / 397 files** on 2026-11-18.
+  The first 2026-11-19 broad run passed 2,757 tests and timed out in one billing
+  fixture under high worker concurrency. That fixture passed independently.
+  Final bounded-worker API verification passes **2,758 tests / 404 files**.
+  Final touched-source lint also passes after the subscription race correction.
+- Migration 0236 was applied only in the disposable audit database. Application
+  and retry behavior in hosted environments, mixed API versions and all
+  warehouse/plan combinations remain rollout gates. Current source also includes
+  subsequent feature-flag work, whose changed hashes were recorded for follow-up.
+
+Final logs are `output/supplier-checkout-postgres-final-2026-11-19.log`,
+`output/supplier-checkout-full-api-final-2026-11-19.log`,
+`output/supplier-stock-entitlements-recovery-2026-11-19.log`,
+`output/supplier-checkout-{web,android,ios,android-typecheck,ios-typecheck,lint}-2026-11-19.log`,
+and `output/supplier-checkout-typecheck-2026-11-19.log`.
+Final touched-source lint is
+`output/supplier-stock-entitlements-lint-final-2026-11-19.log`.
+The four checkout/type/query/test files match by SHA-256 between native clients;
+all three worktree whitespace checks pass.
+The SQL tests are `tests/integrity/supplier-order-checkout.pg.test.js` and
+`tests/integrity/supplier-stock-entitlements.pg.test.js`.
+
+Domain, parity, RBAC, production-readiness and regression docs cover these changes.
+Remaining leads include non-quote pricing races, precision/rounding, supplier
+cutoff timezones, manual-order product/quantity/minimum policy, native manual-order
+UI, new quote request phantoms, provider failures and the complete role/plan/device
+matrix. Every other open feature row remains within the active objective.
+
+## Supplier calendars and notes - ninth audit stage (2026-11-19)
+
+- **FULL-S48 (high) - Cutoffs ignored supplier timezones.** Delivery resolution
+  used the process-local date and clock. Tokyo and Los Angeles fixtures produced
+  wrong cutoff decisions, and supplier-local today/default days shifted around
+  server midnight. The resolver now uses the supplier timezone, literal calendar
+  days and calendar addition. Restaurant price preparation also selects the
+  supplier timezone column. Blank/invalid historical settings use the platform
+  default; a stored UTC choice uses UTC.
+- **FULL-S49 (medium) - Skipped midnight resolved into the preceding day.** The
+  shared wall-time conversion oscillated across a DST gap and returned Beirut's
+  prior-day 23:00 for a missing local midnight. It now advances through the gap.
+  Relative supplier cutoffs use that zoned delivery midnight. Beirut's transition
+  and New York's 25-hour day have explicit boundary regressions.
+- **FULL-S50 (medium) - Impossible checkout days were accepted.** Both restaurant
+  and manual checkout accepted `2099-02-30`, created orders and normalized the day
+  silently. Their schemas now reuse the existing strict calendar validator and
+  reject before order or reservation writes.
+- **FULL-S51 (high) - Price and header days diverged across the cutoff.** After
+  the timezone correction, a controlled checkout priced a contract for February 3
+  and wrote February 4 when the transaction began after the cutoff. Each supplier's
+  preflight delivery resolution is now reused for header insertion. Manual pricing
+  and headers share their resolution and return its metadata.
+- **FULL-S52 (medium) - Unsupported timezone settings reached date queries.** The
+  update schema accepted unknown names, blank values were mapped inconsistently,
+  and the web form lacked its existing timezone field. Named zones now validate
+  and trim, blank selects the platform default, and reads normalize historical
+  invalid settings. The web Business tab exposes the field with English/Arabic
+  copy. Migration 0237 clears names absent from PostgreSQL's timezone catalog and
+  preserves recognized values. The SQL repair is idempotent.
+- **FULL-S53 (medium) - Order delivery days serialized as shifted timestamps.**
+  A saved `2099-02-04` returned `2099-02-03T22:00:00.000Z`. Placement, list, detail
+  and ordinary update queries now project requested days as text. Tests cover both
+  supplier and restaurant readers plus historical null values. Earlier saved
+  idempotency response JSON remains a separate compatibility lead.
+- **FULL-S54 (medium) - Note-only updates discarded accepted input.** Validation
+  and all clients exposed `notes`, but the update builder only wrote status and
+  cancellation fields, producing `No fields to update`. Notes now participate in
+  the transaction, including empty-string clears, under the existing access checks.
+
+The existing administrator draft-placement path also passes its transaction query
+to the remaining routing-feature lookup. Its one-connection HTTP/SQL case passes.
+Normal-actor draft admission differs from the shared transition map and requires
+broader review of plan, usage, quote, price and delivery rules before changing it.
+
+### Ninth-stage evidence
+
+- Initial helper/settings baseline fails **eight of 19 cases**. The skipped-
+  midnight baseline adds the shared conversion failure, with overlapping resolver
+  cases. Full checkout baseline fails **five of 22 cases** while prior checks pass.
+  After timezone repair, a separate run isolates **one cutoff-boundary failure**
+  with correct contract price and a mismatched stored day.
+- Serialization baselines reproduce shifted placement timestamps in both paths
+  and shifted list/detail days for both actor types. Extending the read workflows
+  exposed two actual note-update rejections. The initial read-router mock needed
+  a middleware function, and draft placement was corrected to use the existing
+  administrator impersonation fixture. These fixture issues are recorded separately
+  from the product failures.
+- Final checkout HTTP/SQL suite passes **26 cases**. It covers selected/resolved
+  contract days, cutoff interleaving, invalid calendar requests, literal/null
+  placement/read/update DTOs, note save/clear, legacy timezone repair/idempotence,
+  administrator draft placement with one connection, and prior quote/stock/replay
+  regressions. Authentication identities, checkout plan inputs and external side
+  effects remain fixture boundaries; actual SQL and child-router access logic run.
+- Final full isolated PostgreSQL suite passes **173 tests / ten files**. Migration
+  0237 was applied to the owned audit database, with one pending migration applied.
+  The repository now contains **238 SQL migrations**, reflected in onboarding.
+- Focused API suites pass **57 tests / five files**. Final full API passes
+  **2,771 tests / 404 files**. A western process-timezone run passes **16 resolver/
+  timezone tests**, verifying the same supplier clock/DST expectations.
+- Final web checks pass **19 tests / four files**, including the rendered timezone
+  form save, orders rendering, quote editing and actual namespace key/interpolation
+  parity. The new timezone labels were added with ASCII-safe Unicode escapes.
+- Android/iOS pass **34 tests / seven suites per client**. Both Order types expose
+  optional delivery-resolution metadata, and hook tests retain original selected
+  days plus server-resolved days. Both native typechecks and ERP typecheck pass.
+  API/web lint passes with **1,717 existing API warnings and zero errors**. Native
+  source/test parity and all worktree whitespace checks are verified separately.
+- Earlier stale API route hashes match commit 24345ca2 after EOL normalization.
+  Their full subsequent diffs add feature gates, which were reviewed with the
+  middleware implementation. Earlier scoped quote locale fields were re-read and
+  revalidated by current rendered/copy tests. These reviews preserve the earlier
+  partial scopes and their open full-role/feature/runtime matrices.
+
+Baseline logs are `output/supplier-cutoff-{before,midnight-before,workflow-before,boundary-before,response-date-before,order-read-reproduced}-2026-11-19.log`.
+Final logs are `output/supplier-cutoff-{full-api,api-focused,postgres-final,migration,western-tz,web-final,android,ios,typecheck,android-typecheck,ios-typecheck,lint}-2026-11-19.log`.
+The principal SQL regression is `tests/integrity/supplier-order-checkout.pg.test.js`.
+The 1,285-file manifest now has **57 reviewed, 33 partial, 1,195 pending and zero
+stale** entries at the recorded hashes.
+
+Migration application in hosted environments, historical replay JSON, complete
+manual-order quantity/minimum policy, normal-actor draft activation, all settings
+edit/refresh/error cases, native Business UI, precision and provider/device/role/
+plan matrices remain unverified. Source inspection counts and
+local regressions describe their named coverage.
 
 ## Remaining completion gates
 

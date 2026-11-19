@@ -14,10 +14,9 @@ export async function supplierUsesWarehouseInventory(supplierId, { client = null
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER', options)
   // Single-warehouse (Silver+) and multi-warehouse (Gold+) both use warehouse_inventory
   // when the supplier has at least one active warehouse.
-  const [warehousesFeature, multiWh] = await Promise.all([
-    isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses', options),
-    isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse', options),
-  ])
+  // Scoped reads can create a compatibility subscription. Serialize them on the client.
+  const warehousesFeature = await isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses', options)
+  const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse', options)
 
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
   const { rows } = await db(
@@ -58,11 +57,13 @@ export async function listSupplierStockDisplay(
   supplierId,
   { productIds = null, dbQuery = query } = {}
 ) {
-  const useWh = await supplierUsesWarehouseInventory(supplierId)
+  const useWh = await supplierUsesWarehouseInventory(supplierId, {
+    client: dbQuery === query ? null : { query: dbQuery },
+  })
   const db = dbQuery
 
   if (useWh) {
-    const supplierCol = await getWarehouseSupplierColumn()
+    const supplierCol = await getWarehouseSupplierColumn(db)
     const params = [supplierId]
     let productClause = ''
     if (productIds?.length) {

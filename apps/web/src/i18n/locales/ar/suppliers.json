@@ -320,6 +320,9 @@
       "friday": "الجمعة",
       "saturday": "السبت",
       "sunday": "الأحد"
+    },
+    "lastOrder": {
+      "timezone": "المنطقة الزمنية"
     }
   },
   "notifications": {

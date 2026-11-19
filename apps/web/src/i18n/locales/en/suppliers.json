@@ -320,6 +320,9 @@
       "friday": "Friday",
       "saturday": "Saturday",
       "sunday": "Sunday"
+    },
+    "lastOrder": {
+      "timezone": "Timezone"
     }
   },
   "notifications": {

@@ -15,10 +15,11 @@
     },
     {
       "key": "erp:apps/api/src/routes/supplier-ops.routes.js",
-      "sha256": "890b3fd5112cbadfd48bc1d36cd93b07cff42cf3f554fbb6cdfd65cb7b626c07",
+      "sha256": "1679b0d7b0417744d1a32540c1a5df5fccf63b61b155019aec8d8093562830cd",
       "status": "partial",
-      "date": "2026-11-17",
-      "scope": "Command-center/run-sheet admission, projection and driver board scoping traced. Other route bodies, feature gates and domain projections remain open."
+      "date": "2026-11-19",
+      "scope": "Command-center/run-sheet admission, projection and driver board scoping traced. Other route bodies, feature gates and domain projections remain open. Prior reviewed hash matches commit 24345ca2 after EOL normalization. All subsequent route deltas were read: tenant feature gates precede the existing handlers. Gate implementation and existing broad regressions reviewed separately; full mounted feature/role matrices remain open.",
+      "evidence": ["output/supplier-cutoff-full-api-2026-11-19.log"]
     },
     {
       "key": "erp:apps/web/src/pages/SupplierRunSheetPage.tsx",
@@ -140,19 +141,22 @@
     },
     {
       "key": "erp:apps/api/src/routes/orders-driver.routes.js",
-      "sha256": "7addf0f54ca7fa6d2ac3d06ec4cad53fda497d1b22531b7e70133df4a4b43772",
+      "sha256": "7323881fafbae2ff85f14d302c9f28f88ce32a8f3b93309b12e5a185c4db1e84",
       "status": "partial",
-      "date": "2026-11-17",
-      "scope": "Assignment/status/reassignment and proof presign/submission/completion handlers traced; FULL-S09 corrected. Driver proof selector authorization/binding regression passes. Remaining full route/read/confirmation/error matrix pending.",
-      "evidence": ["apps/api/src/routes/orders-driver-access.routes.test.js"]
+      "date": "2026-11-19",
+      "scope": "Assignment/status/reassignment and proof presign/submission/completion handlers traced; FULL-S09 corrected. Driver proof selector authorization/binding regression passes. Remaining full route/read/confirmation/error matrix pending. Prior reviewed hash matches commit 24345ca2 after EOL normalization. All subsequent route deltas were read: tenant feature gates precede the existing handlers. Gate implementation and existing broad regressions reviewed separately; full mounted feature/role matrices remain open.",
+      "evidence": [
+        "apps/api/src/routes/orders-driver-access.routes.test.js",
+        "output/supplier-cutoff-full-api-2026-11-19.log"
+      ]
     },
     {
       "key": "erp:apps/web/src/services/api/endpoints/orders.ts",
-      "sha256": "f19c1ce6c3a85318f3ab54f7d83cd6224b2f5c54644c77e46fba46e4089f2184",
+      "sha256": "fa4553df147a84fe32099f4c782a726b0dfa620c1256b2f765788f8eb139f0a1",
       "status": "partial",
-      "date": "2026-11-17",
-      "scope": "Standalone/atomic proof request and response contracts aligned. Other order endpoint definitions and complete client flow review pending.",
-      "evidence": ["output/supplier-fulfillment-typecheck-2026-11-17.log"]
+      "date": "2026-11-19",
+      "scope": "Checkout/manual mutation payloads, headers and success wrapper types inspected, plus order-detail cache/status logic. Remaining endpoints and runtime cache/retry matrices remain open.",
+      "evidence": ["output/supplier-checkout-web-2026-11-19.log"]
     },
     {
       "key": "android:src/services/api/queries/driver.ts",
@@ -167,12 +171,12 @@
     },
     {
       "key": "android:src/services/api/queries/orders.ts",
-      "sha256": "f0b2dae4b0b6c35c2674b058b0b88953f6bfc8224fbcf593bba406e62b7bf8dd",
+      "sha256": "ee9c86ed0c189611d0403c18d4a04c41cc99497c25f9370c375940fc03e951d4",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Proof presign/standalone submission and manual rollover blocks reviewed. Existing assignment selector and typed proof retained; successful rollover now invalidates dispatch/order/driver/supplier delivery/run-sheet caches, with error/retry cache behavior tested. Other order hooks and entire-file review remain pending.",
+      "date": "2026-11-19",
+      "scope": "Proof presign/standalone submission and manual rollover blocks reviewed. Existing assignment selector and typed proof retained; successful rollover now invalidates dispatch/order/driver/supplier delivery/run-sheet caches, with error/retry cache behavior tested. Other order hooks and entire-file review remain pending. Checkout follow-up inspects normalization, manual placement/headers, success/error caches and optional order quote/delivery metadata. Complete file and cross-feature/device review remain open.",
       "evidence": [
-        "android:src/services/api/queries/ordersRollover.test.ts",
+        "android:src/services/api/queries/checkout.test.ts",
         "android:src/services/api/queries/orders.test.ts"
       ]
     },
@@ -205,12 +209,12 @@
     },
     {
       "key": "ios:src/services/api/queries/orders.ts",
-      "sha256": "f0b2dae4b0b6c35c2674b058b0b88953f6bfc8224fbcf593bba406e62b7bf8dd",
+      "sha256": "ee9c86ed0c189611d0403c18d4a04c41cc99497c25f9370c375940fc03e951d4",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Proof presign/standalone submission and manual rollover blocks reviewed. Existing assignment selector and typed proof retained; successful rollover now invalidates dispatch/order/driver/supplier delivery/run-sheet caches, with error/retry cache behavior tested. Other order hooks and entire-file review remain pending.",
+      "date": "2026-11-19",
+      "scope": "Proof presign/standalone submission and manual rollover blocks reviewed. Existing assignment selector and typed proof retained; successful rollover now invalidates dispatch/order/driver/supplier delivery/run-sheet caches, with error/retry cache behavior tested. Other order hooks and entire-file review remain pending. Checkout follow-up inspects normalization, manual placement/headers, success/error caches and optional order quote/delivery metadata. Complete file and cross-feature/device review remain open.",
       "evidence": [
-        "ios:src/services/api/queries/ordersRollover.test.ts",
+        "ios:src/services/api/queries/checkout.test.ts",
         "ios:src/services/api/queries/orders.test.ts"
       ]
     },
@@ -294,11 +298,16 @@
     },
     {
       "key": "android:src/types/supplify.ts",
-      "sha256": "e5dc746795b90b3ac4b62e5fb4c46da563b6e2a98777355404e978c6447c3e5d",
+      "sha256": "79233a47e451419e6f1940751c04c6c7a0b563d16c2d75ef9493324285d282e9",
       "status": "partial",
-      "date": "2026-11-17",
-      "scope": "Delivery board/detail/route type blocks inspected; route stop currency added for API/web parity. Other shared domain type blocks and complete runtime schema agreement pending.",
-      "evidence": []
+      "date": "2026-11-19",
+      "scope": "Delivery board/detail/route type blocks inspected; route stop currency added for API/web parity. Other shared domain type blocks and complete runtime schema agreement pending. Checkout follow-up inspects normalization, manual placement/headers, success/error caches and optional order quote/delivery metadata. Complete file and cross-feature/device review remain open. Optional deliveryResolution metadata mirrored and both placement hooks verify requested/resolved days without rewriting the selected request literal.",
+      "evidence": [
+        "android:src/services/api/queries/checkout.test.ts",
+        "android:src/services/api/queries/orders.test.ts",
+        "android:src/services/api/queries/checkout.test.ts",
+        "output/supplier-cutoff-android-typecheck-2026-11-19.log"
+      ]
     },
     {
       "key": "ios:src/features/driver/screens/DriverHomeScreen.tsx",
@@ -321,11 +330,16 @@
     },
     {
       "key": "ios:src/types/supplify.ts",
-      "sha256": "e5dc746795b90b3ac4b62e5fb4c46da563b6e2a98777355404e978c6447c3e5d",
+      "sha256": "79233a47e451419e6f1940751c04c6c7a0b563d16c2d75ef9493324285d282e9",
       "status": "partial",
-      "date": "2026-11-17",
-      "scope": "Delivery board/detail/route type blocks inspected; route stop currency added for API/web parity. Other shared domain type blocks and complete runtime schema agreement pending.",
-      "evidence": []
+      "date": "2026-11-19",
+      "scope": "Delivery board/detail/route type blocks inspected; route stop currency added for API/web parity. Other shared domain type blocks and complete runtime schema agreement pending. Checkout follow-up inspects normalization, manual placement/headers, success/error caches and optional order quote/delivery metadata. Complete file and cross-feature/device review remain open. Optional deliveryResolution metadata mirrored and both placement hooks verify requested/resolved days without rewriting the selected request literal.",
+      "evidence": [
+        "ios:src/services/api/queries/checkout.test.ts",
+        "ios:src/services/api/queries/orders.test.ts",
+        "ios:src/services/api/queries/checkout.test.ts",
+        "output/supplier-cutoff-ios-typecheck-2026-11-19.log"
+      ]
     },
     {
       "key": "erp:apps/api/src/lib/delivery-route-state.js",
@@ -465,13 +479,14 @@
     },
     {
       "key": "erp:apps/api/src/routes/quote-requests.routes.js",
-      "sha256": "1af8347adb81d686d3c98a8587e455b53709757ae62e83258bdc4d78423a7241",
+      "sha256": "553aaa0bd155bb570e7ac38c0e250b0b0666fa457eec4b9f35684d627c24e9db",
       "status": "reviewed",
-      "date": "2026-11-18",
-      "scope": "Entire router read: supplier/restaurant admission, permission guards, body/query parsing, details/compare/cart, status, response and decline. HTTP tests verify malformed calendar/value/duplicate rejection and valid zero/unavailable lines. Real identity, all roles/plans, invalid path IDs and hosted/error matrices remain open.",
+      "date": "2026-11-19",
+      "scope": "Entire router read: supplier/restaurant admission, permission guards, body/query parsing, details/compare/cart, status, response and decline. HTTP tests verify malformed calendar/value/duplicate rejection and valid zero/unavailable lines. Real identity, all roles/plans, invalid path IDs and hosted/error matrices remain open. Prior reviewed hash matches commit 24345ca2 after EOL normalization. All subsequent route deltas were read: tenant feature gates precede the existing handlers. Gate implementation and existing broad regressions reviewed separately; full mounted feature/role matrices remain open.",
       "evidence": [
         "apps/api/src/routes/quote-requests.routes.test.js",
-        "tests/integrity/supplier-quotes.pg.test.js"
+        "tests/integrity/supplier-quotes.pg.test.js",
+        "output/supplier-cutoff-full-api-2026-11-19.log"
       ]
     },
     {
@@ -511,35 +526,49 @@
     },
     {
       "key": "erp:apps/web/src/types/admin.ts",
-      "sha256": "d5e3ecc561316c3e090f3f8ff5e58f6b68a58e2dafdfb63c89292b783219241d",
+      "sha256": "b4222768d581820e836b1181e332bcfff1dea7a5d9df976013498d0c393c8b19",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Quote summary/item/response/inbox/detail/cart interfaces inspected; existing optional substitute ID already matches the API. Other admin/shared domain types and full-file review remain pending.",
-      "evidence": ["output/supplier-quotes-typecheck-2026-11-18.log"]
+      "date": "2026-11-19",
+      "scope": "Quote summary/item/response/inbox/detail/cart interfaces inspected; existing optional substitute ID already matches the API. Other admin/shared domain types and full-file review remain pending. Reviewed baseline matches 24345ca2. Subsequent optional platformOnly/defaultOn admin flag fields were inspected outside the earlier quote scope; quote interfaces retain their earlier scoped review.",
+      "evidence": [
+        "output/supplier-quotes-typecheck-2026-11-18.log",
+        "output/supplier-cutoff-typecheck-2026-11-19.log"
+      ]
     },
     {
       "key": "erp:apps/api/src/routes/orders/create.js",
-      "sha256": "b2499968721435d45f16f29e39bd7bf089c04472b45523f318232d451e4a1e3d",
+      "sha256": "d84db84f61e08a6c0ec778dce63caf1a475560f3251ea1e16131b29790c292b9",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Restaurant quote-lock admission, batch price resolution and quote source/quantity validation blocks traced. Invalid/stale quote locks are checked before creation. Entire checkout/manual-order transaction, concurrent price/closure changes and downstream writes remain pending; SQL quote/cart tests do not certify order commits.",
-      "evidence": ["tests/integrity/supplier-quotes.pg.test.js"]
+      "date": "2026-11-19",
+      "scope": "Restaurant/manual quote selection, preflight and transaction guards, replay ownership, actor-scoped keys, item metadata, stock and delivery-day writes traced. Real HTTP/SQL verifies stale state, rollback, replay, writer blocking and legacy/warehouse one-connection manual checkout. Complete promotion/loyalty, manual policy, all roles/plans and non-quote races remain open. Calendar follow-up inspects supplier timezone selection, per-supplier delivery preparation, manual response metadata and literal header projection. Invalid calendar requests reject before writes.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js",
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
     },
     {
       "key": "erp:apps/web/src/i18n/locales/en/quotes.json",
-      "sha256": "782f7d98b745adffa4661545eaa5a7ae46b9994508861068bd6711dcb8139a89",
+      "sha256": "79e6898131a902bf139e2605fd3efa168661e0815c40b1823b680283ce99f628",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Supplier response message block inspected and positive-quantity validation copy added. Matching English/Arabic key and JSON parsing checked; full namespace translation, layout and interpolation review remain pending. New quantity copy verified after correcting PowerShell encoding loss, including Arabic runtime rendering.",
-      "evidence": ["apps/web/src/pages/SupplierQuoteResponsePage.test.tsx"]
+      "date": "2026-11-19",
+      "scope": "Supplier response message block inspected and positive-quantity validation copy added. Matching English/Arabic key and JSON parsing checked; full namespace translation, layout and interpolation review remain pending. New quantity copy verified after correcting PowerShell encoding loss, including Arabic runtime rendering. Current quantity message block re-read; available-quantity text and calendar/edit rendering revalidated.",
+      "evidence": [
+        "apps/web/src/pages/SupplierQuoteResponsePage.test.tsx",
+        "apps/web/src/pages/SupplierQuoteResponsePage.test.tsx"
+      ]
     },
     {
       "key": "erp:apps/web/src/i18n/locales/ar/quotes.json",
-      "sha256": "57b9d4c5c4eeceabf52d77fc5b5cdf9ec310d670c9572517b52db57759319e9b",
+      "sha256": "8ab3e5853d3396afd4d0300a943ed05d79ee502fd97b57b4b6aa7dacdcd5eca5",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Supplier response message block inspected and positive-quantity validation copy added. Matching English/Arabic key and JSON parsing checked; full namespace translation, layout and interpolation review remain pending. New quantity copy verified after correcting PowerShell encoding loss, including Arabic runtime rendering.",
-      "evidence": ["apps/web/src/pages/SupplierQuoteResponsePage.test.tsx"]
+      "date": "2026-11-19",
+      "scope": "Supplier response message block inspected and positive-quantity validation copy added. Matching English/Arabic key and JSON parsing checked; full namespace translation, layout and interpolation review remain pending. New quantity copy verified after correcting PowerShell encoding loss, including Arabic runtime rendering. Current quantity message block re-read; available-quantity text and calendar/edit rendering revalidated.",
+      "evidence": [
+        "apps/web/src/pages/SupplierQuoteResponsePage.test.tsx",
+        "apps/web/src/pages/SupplierQuoteResponsePage.test.tsx"
+      ]
     },
     {
       "key": "android:src/features/supplier/screens/SupplierQuoteResponseScreen.tsx",
@@ -578,13 +607,14 @@
     },
     {
       "key": "android:src/i18n/ar.json",
-      "sha256": "43c267546e528da2c51c9a9e593bba4a843182e8575387a8595261144e01ac9e",
+      "sha256": "d126038d8796412572db1bbf3c9caba1ea855feba8e6a53663bf62fc2aa4a591",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Only existing supplier quote field messages and the new quantity title/template inspected. Matched English/Arabic quantity keys added. Complete translation file, interpolation/layout and all locale workflows remain pending. Quantity messages verified with the actual Arabic copy runtime after correcting encoding loss.",
+      "date": "2026-11-19",
+      "scope": "Only existing supplier quote field messages and the new quantity title/template inspected. Matched English/Arabic quantity keys added. Complete translation file, interpolation/layout and all locale workflows remain pending. Quantity messages verified with the actual Arabic copy runtime after correcting encoding loss. Current quote quantity values re-read after later locale edits. Actual Arabic copy runtime and quote-screen regressions pass; the rest of the file remains unreviewed.",
       "evidence": [
         "android:src/features/supplier/screens/__tests__/QuoteResponseScreen.test.tsx",
-        "android:src/i18n/copyCount.test.ts"
+        "android:src/i18n/copyCount.test.ts",
+        "output/supplier-cutoff-android-2026-11-19.log"
       ]
     },
     {
@@ -624,13 +654,290 @@
     },
     {
       "key": "ios:src/i18n/ar.json",
-      "sha256": "43c267546e528da2c51c9a9e593bba4a843182e8575387a8595261144e01ac9e",
+      "sha256": "d126038d8796412572db1bbf3c9caba1ea855feba8e6a53663bf62fc2aa4a591",
       "status": "partial",
-      "date": "2026-11-18",
-      "scope": "Only existing supplier quote field messages and the new quantity title/template inspected. Matched English/Arabic quantity keys added. Complete translation file, interpolation/layout and all locale workflows remain pending. Quantity messages verified with the actual Arabic copy runtime after correcting encoding loss.",
+      "date": "2026-11-19",
+      "scope": "Only existing supplier quote field messages and the new quantity title/template inspected. Matched English/Arabic quantity keys added. Complete translation file, interpolation/layout and all locale workflows remain pending. Quantity messages verified with the actual Arabic copy runtime after correcting encoding loss. Current quote quantity values re-read after later locale edits. Actual Arabic copy runtime and quote-screen regressions pass; the rest of the file remains unreviewed.",
       "evidence": [
         "ios:src/features/supplier/screens/__tests__/QuoteResponseScreen.test.tsx",
-        "ios:src/i18n/copyCount.test.ts"
+        "ios:src/i18n/copyCount.test.ts",
+        "output/supplier-cutoff-ios-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/services/quote-checkout.service.js",
+      "sha256": "1319ab6b0eca8e219d87fc12a18c1c0eddb0cab6ca575a6edf3faff69a6d99a7",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Request and line locking, ownership, effective SKU, selected-price/currency/quantity validation and automatic manual selectors exercised with actual SQL. New RFQ phantoms, precision and full concurrency matrices remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/services/order-placement-idempotency.service.js",
+      "sha256": "045eb405f3ac4fd453e83e0787d01426ab5e876bc908d4d9c9f1d526a34a40ab",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Normalization, actor scopes, canonical/historical manual ownership, claim/replay/mismatch, concurrent retries and rollback exercised through HTTP/SQL. Key retention, malformed historical records and mixed-version rollout remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/services/restaurant-order-create.service.js",
+      "sha256": "e6a1d5af885b968ef82589716f379b21ed1a37bba303126be4a9276bbc515a2e",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Header/item/usage/stock writes, quote validation, batch items, promotion/loyalty callbacks and transaction timing traced. Real SQL verifies quote commit, stock, replay, rollback and writer blocking. Real promotion/loyalty providers, all warehouse/role/plan combinations and precision remain open. Calendar follow-up reuses the delivery resolution prepared for pricing, and projects the header day as text. Actual cutoff-boundary SQL regression verifies price/header agreement.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js",
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/services/order-create.service.js",
+      "sha256": "31e2b3651b1bc5bd41a65a3a514159253eeec0a273e7781b2534e045a345f3bf",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire batch-insert module read. Array alignment, quote references, pricing fields and stored line totals covered through checkout SQL. Numeric scale, overflow and all historical data remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/supplier-last-order.js",
+      "sha256": "29ee02c541ce8ec5c909cb59c983355043f9e0b6eabaf2f1b62b940b628ea703",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire resolver read. Supplier timezone and literal-day normalization, zoned relative cutoff and calendar addition verified. Tokyo/Los Angeles clocks, supplier-local today/default days, New York elapsed cutoff and Beirut skipped midnight exercised. Absolute minute precision retained. Complete policy/settings/race matrix remains open.",
+      "evidence": [
+        "apps/api/src/lib/supplier-last-order.test.js",
+        "output/supplier-cutoff-western-tz-2026-11-19.log",
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/order-quantity-rules.js",
+      "sha256": "05c6e41cfd55e2b63a9512433f7d61336a21563165190395329b7fd3a76391c2",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire MOQ, pack-multiple and minimum-order helper read. Caller coverage, fractional precision, manual checkout policy and all product combinations remain open.",
+      "evidence": ["apps/api/src/lib/order-quantity-rules.test.js"]
+    },
+    {
+      "key": "erp:apps/api/src/lib/org-billing-tenant.js",
+      "sha256": "74f83a2287bbc23d23f3c1af76ce6d760fbe0414cdd3869cc0b4ccbc9c18d86d",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Organization billing lookup now accepts a scoped query and bypasses shared cache/singleflight for transactions. Real SQL verifies branch inheritance. Subscription batch resolution, org changes and all fallback matrices remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/subscription/free-trial-plan-features.js",
+      "sha256": "1de79473bca85314e196319fb907ad94767d288080e91dbf13b08f91f204e09c",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Trial target and legacy gold fallback accept the transaction query and bypass shared caches. Real SQL verifies selected free-trial target. Complete plan catalog, alias and trial lifecycle matrices remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/billing/subscription-activation.js",
+      "sha256": "a528590eb8b61258ee63318db739e56fe9b8d8c22e7470028340afb9d3e605e1",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire two-constructor module read. Pending and org-covered inserts retain supplied query executors and tolerate the existing nonterminal tenant unique conflict. Scoped overlapping creation and rollback are exercised in real SQL. All registration/activation callers and cross-process races remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/subscription/plans.js",
+      "sha256": "6e886f327eb83e79fc086cf494831b53a18e7ebbc31ebdcdddabcd0be9be92c5",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "getTenantSubscription and missing compatibility-subscription creation read through cache, pending-plan application, commercial fallback and writes. Scoped query/cache isolation, concurrent creation and rollback verified. Remaining plan/billing helpers and lifecycle remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/subscription/entitlements.js",
+      "sha256": "9409f8f2a3bbddbc720539e2c58473cadf785cd0259accdad740a67a809b44fd",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "isFeatureEnabled delegation and selected usage-meter code traced. Optional transaction query forwarded. Complete entitlement/usage/storage/seat module review remains open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/lib/feature-flags.js",
+      "sha256": "c7560ded7c2b5cbc2de4d74b39f551d5c967a3c728839c5363ce95c75cf41f13",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Single-feature tenant/global/plan resolution and alias flow read, including transaction query/cache propagation. Actual plan/trial/override reads exercised. All administrative/default-on/platform switches, bulk resolution and client gates remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/services/supplier-stock.service.js",
+      "sha256": "65738bd2ac565684c3c86ac3f0a86b9e5c8bb5966037185bc4538a563d6609bf",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Stock-mode resolution, product availability/display, overlay and selected seeding paths read. Client/query supplied to stock display now reaches billing and feature checks. Reads serialized for missing subscription creation. Complete seeding/transfer/default-warehouse and adjustment matrices remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "tests/integrity/supplier-stock-entitlements.pg.test.js"
+      ]
+    },
+    {
+      "key": "erp:apps/web/src/types/orders.ts",
+      "sha256": "2bb7882dec35b28cfe50c154e45251124f8f419e56b85d0a80bd3918d972624b",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Order/item and restaurant/manual request types inspected. Quote audit metadata, delivery day and optional quote locks match API fields. Remaining driver/tracking/route types and full runtime agreement remain open. Optional deliveryResolution metadata now matches restaurant/manual response objects; requested-day strings verified by SQL and native hook reads.",
+      "evidence": [
+        "output/supplier-checkout-typecheck-2026-11-19.log",
+        "output/supplier-cutoff-typecheck-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "android:src/types/checkout.ts",
+      "sha256": "e9b9ac89f1ebb15f571921503400723a992ac92f86287f2123149b497b375a5d",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire checkout payload/attempt/response and manual payload type module read. Existing endpoint fields and wrappers mirrored. Manual screen parity and full device workflow remain open.",
+      "evidence": ["android:src/services/api/queries/checkout.test.ts"]
+    },
+    {
+      "key": "ios:src/types/checkout.ts",
+      "sha256": "e9b9ac89f1ebb15f571921503400723a992ac92f86287f2123149b497b375a5d",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire checkout payload/attempt/response and manual payload type module read. Existing endpoint fields and wrappers mirrored. Manual screen parity and full device workflow remain open.",
+      "evidence": ["ios:src/services/api/queries/checkout.test.ts"]
+    },
+    {
+      "key": "erp:apps/api/src/lib/supplier-business-settings.js",
+      "sha256": "1f93dcf8c8855109eac820440e493a01ad6dfe547526044401852f7118575848",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire schema/hours/mapper module read. Timezone patches trim/validate named zones and support blank fallback; reads normalize missing/invalid legacy settings. Seven schema/helper cases pass. Full business settings HTTP, operating-hour semantics, concurrent edits and historical data matrices remain open.",
+      "evidence": ["apps/api/src/lib/supplier-business-settings.test.js"]
+    },
+    {
+      "key": "erp:apps/api/src/lib/tenant-timezone.js",
+      "sha256": "58045b6992e1812ee95d74eb36c80fd6b180300879a12641ac69bfc564d6efca",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire module read. Named-zone validation/normalization and skipped-wall-time conversion corrected. Beirut skipped-midnight regression and western-process timezone run pass. Restaurant/supplier query helpers, day bounds and weekday calculations read. All ambiguous-zone/date/schema/configuration matrices remain open.",
+      "evidence": [
+        "apps/api/src/lib/tenant-timezone.test.js",
+        "output/supplier-cutoff-western-tz-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.tsx",
+      "sha256": "eb2cc83b27f3cff75500ec4b4bb79b79d6cea9408c3f2644a6a686d907eaeb98",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire component read, including loading/data sync, hours, cutoff, policies, fields and save/error flow. Timezone control added and normal rendered save verified. Full draft-refresh, permission, validation, locale/layout and error matrices remain open.",
+      "evidence": ["apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.test.tsx"]
+    },
+    {
+      "key": "erp:apps/api/src/lib/tenant-feature-gate.js",
+      "sha256": "e458146c276f218df32254f2c54cafc6a16a34b4b7279a54102b1f6c1f628da0",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire middleware module read while revalidating changed supplier route gates. Tenant/admin/default-on/plan/public/platform decisions and error delegation inspected. Existing resolution/middleware suites and broad API pass. Complete mounted role/plan/route/provider matrix remains open.",
+      "evidence": [
+        "apps/api/src/lib/tenant-feature-gate.test.js",
+        "apps/api/src/lib/tenant-feature-gate.resolution.test.js",
+        "output/supplier-cutoff-full-api-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/routes/orders/orders.helpers.js",
+      "sha256": "a1a7f1ddb755c68a4265b92fa82e253fa24b47a73269b998aa6892a17d936c2b",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Restaurant/manual create and order update schemas plus access, warehouse-assignment and customer-projection helpers inspected. Real calendar validation reuses the existing date validator. Other invoice/document/receiving helpers and all legacy status paths remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/routes/orders/list.js",
+      "sha256": "ebe6c222dbfdf43c210f409b5785f46cd0b7de05f847316470de1b603f1f0899",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Tenant/filter/pagination selection, DTO projection and amendment-router attachment read. Requested delivery day is projected as literal text; both supplier/restaurant reads and null history verified. Remaining inclusion/warehouse/search/date-window matrices and full module review remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/routes/orders/detail.js",
+      "sha256": "a2300890df63458c1e18e26e157dae2308d6e4e7e03399abdf6c2a2e75e844dd",
+      "status": "reviewed",
+      "date": "2026-11-19",
+      "scope": "Entire detail module read. Initial header/access, item/warehouse/promotion/replacement/dispute/POD queries and response/error mapping inspected. Requested delivery-day projection verified for restaurant and supplier callers and historical nulls. Full access, enrichment, schema/provider/error matrices remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/api/src/routes/orders/update.js",
+      "sha256": "4910e9961a7c9d72a10dee2433d145be3bb3424bb958e69b8c6b19e19e0ac0ca",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Role/ownership/permission admission, notes/status fields, header lock/update, ordinary response and delivery-refresh projections inspected. Notes save/clear and calendar DTOs verified through HTTP/SQL. Existing administrator draft placement uses the scoped feature query and one connection. Full state/plan/price/quote/receiving/cancellation matrix and remaining mutation paths remain open.",
+      "evidence": [
+        "tests/integrity/supplier-order-checkout.pg.test.js",
+        "output/supplier-cutoff-postgres-final-2026-11-19.log"
+      ]
+    },
+    {
+      "key": "erp:apps/web/src/i18n/locales/en/suppliers.json",
+      "sha256": "b1bd27d0600f1caaefb4b5d8226fee5a100ae97d7a3f12cbcd8dbee57e2e630b",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Only business/cutoff message structure and the new timezone label inspected. New English/Arabic label stored as UTF-8 and namespace parity checked. Complete translation, interpolation and layout review remains open.",
+      "evidence": [
+        "apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.test.tsx",
+        "apps/web/src/i18n/i18n.test.ts"
+      ]
+    },
+    {
+      "key": "erp:apps/web/src/i18n/locales/ar/suppliers.json",
+      "sha256": "44bebf02e0774ce8464f427e7accc16b8d5b2f455909a4bafc93bc89bca15a66",
+      "status": "partial",
+      "date": "2026-11-19",
+      "scope": "Only business/cutoff message structure and the new timezone label inspected. New English/Arabic label stored as UTF-8 and namespace parity checked. Complete translation, interpolation and layout review remains open.",
+      "evidence": [
+        "apps/web/src/components/supplier/settings/tabs/SupplierBusinessTab.test.tsx",
+        "apps/web/src/i18n/i18n.test.ts"
       ]
     }
   ]

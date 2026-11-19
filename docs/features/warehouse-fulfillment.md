@@ -13,6 +13,18 @@ Warehouses are a **fulfillment** concept inside a supplier branch (not a separat
 
 Both flags appear in **Admin → Features** (global + per-tenant override).
 
+Stock operations supplied with a transaction client resolve organization billing,
+subscription and trial features, tenant/global overrides and warehouse existence
+through that same connection. These reads bypass shared entitlement caches and
+singleflight. A rollback cannot cache an uncommitted subscription or override.
+Missing compatibility-subscription creation uses the same executor. Stock feature
+reads run sequentially, and both subscription constructors tolerate an existing
+nonterminal tenant row through the unique index introduced in migration 0171.
+This also supports a one-connection pool for legacy and warehouse checkout.
+The 2026-11-19 PostgreSQL regressions exercise both modes, branch billing, trial
+targets and rollback in `tests/integrity/supplier-stock-entitlements.pg.test.js`
+and `tests/integrity/supplier-order-checkout.pg.test.js`.
+
 ### Per-supplier toggle
 
 `multi_warehouse` also requires `supplier.multi_warehouse_enabled = true` and `fulfillment_mode = 'multi'`. A Gold supplier can keep single-warehouse mode while on a plan that allows multi-warehouse.
