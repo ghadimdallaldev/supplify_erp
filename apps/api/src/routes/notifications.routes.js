@@ -73,9 +73,11 @@ router.get('/', async (req, res) => {
     const userType = req.userData.role
     const { limit = '50', offset = '0', unreadOnly = 'false' } = req.query
 
+    const parsedLimit = Number.parseInt(limit, 10)
+    const parsedOffset = Number.parseInt(offset, 10)
     const options = {
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50,
+      offset: Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0,
       unreadOnly: unreadOnly === 'true',
     }
     const result = ['SUPPLIER', 'RESTAURANT'].includes(userType)
@@ -358,6 +360,14 @@ router.put('/webhook', ...tenantMutationGuard, async (req, res, next) => {
 router.post('/:id/read', async (req, res) => {
   try {
     const { id } = req.params
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Notification not found' },
+        requestId: req.requestId,
+      })
+    }
     const userId = req.userData.id
     const userType = req.userData.role
 

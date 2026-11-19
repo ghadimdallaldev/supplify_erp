@@ -2,7 +2,7 @@
  * RBAC safety guards: last owner, permission subset, self-escalation, immutable Owner role.
  */
 import { query } from './db.js'
-import { ForbiddenError, ValidationError } from '../middlewares/errorHandler.js'
+import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { MAIN_ADMIN_ROLE_NAME } from './workspace-membership.js'
 import {
   getAllPermissionsForTenantType,
@@ -132,6 +132,36 @@ export async function assertNotLastOwnerRemoval({
       'Cannot remove or downgrade the last Owner. Assign another Owner first.'
     )
   }
+}
+
+/**
+ * A tenant may only change roles for users who already belong to it (existing role row or an
+ * active workspace membership created by invitation acceptance). Without this, any staff member
+ * with STAFF_INVITE could enrol an arbitrary user UUID (other tenants, consumers, admins) into
+ * their workspace. contact_email is deliberately not accepted: it is editable tenant data.
+ * Throws NotFoundError (404) so the endpoint does not reveal whether the UUID exists elsewhere.
+ */
+export async function assertTargetUserBelongsToTenant({
+  targetUserId,
+  tenantId,
+  tenantType,
+  client = null,
+}) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(
+    `
+    SELECT 1 WHERE EXISTS (
+      SELECT 1 FROM user_role WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3
+    ) OR EXISTS (
+      SELECT 1 FROM tenant_user_roles WHERE user_id = $1 AND tenant_id = $2 AND tenant_type = $3
+    ) OR EXISTS (
+      SELECT 1 FROM user_workspace_membership
+      WHERE user_id = $1 AND home_tenant_id = $2 AND workspace_type = $3 AND status = 'active'
+    )
+    `,
+    [targetUserId, tenantId, tenantType]
+  )
+  if (!rows.length) throw new NotFoundError('User not found in this workspace')
 }
 
 export async function assertCanAssignRole({

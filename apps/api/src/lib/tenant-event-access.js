@@ -55,7 +55,7 @@ export async function canReceiveTenantEvent({
     )
       return false
     const { rows } = await query(
-      `SELECT a.id FROM driver_assignment a JOIN driver d ON d.id = a.driver_id
+      `SELECT a.id FROM driver_assignments a JOIN drivers d ON d.id = a.driver_id
       WHERE a.order_id = $1 AND a.supplier_id = $2 AND d.user_id = $3
         AND a.status NOT IN ('reassigned', 'failed') LIMIT 1`,
       [orderId, tenantId, userId]
@@ -65,7 +65,7 @@ export async function canReceiveTenantEvent({
   if (gps && tenantType === 'SUPPLIER' && !hasPermission(permissions, 'FULFILLMENT_VIEW')) {
     if (!driverId || !hasPermission(permissions, 'DRIVER_DELIVERIES_VIEW')) return false
     const { rows } = await query(
-      'SELECT id FROM driver WHERE id = $1 AND user_id = $2 AND supplier_id = $3',
+      'SELECT id FROM drivers WHERE id = $1 AND user_id = $2 AND supplier_id = $3',
       [driverId, userId, tenantId]
     )
     return rows.length > 0

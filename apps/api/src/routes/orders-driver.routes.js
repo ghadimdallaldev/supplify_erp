@@ -168,13 +168,30 @@ router.get(
         })
         driverId = access?.driverId ?? null
       }
-      const detail = await getDriverDeliveryDetail(req.params.id, supplierId, { driverId })
+      const rawAssignmentId =
+        typeof req.query.assignment_id === 'string' ? req.query.assignment_id : null
+      const assignmentId =
+        rawAssignmentId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawAssignmentId)
+          ? rawAssignmentId
+          : null
+      const detail = await getDriverDeliveryDetail(req.params.id, supplierId, {
+        driverId,
+        assignmentId,
+      })
       res.json({ ok: true, data: detail, error: null, requestId: req.requestId })
     } catch (error) {
       next(error)
     }
   }
 )
+/** Proof keys are minted by the presign route as uploads/<user>/pod/<orderId>/...; bind them to this order. */
+function assertProofKeyBelongsToOrder(fileKey, userId, orderId) {
+  if (!String(fileKey).startsWith(`uploads/${userId}/pod/${orderId}/`)) {
+    throw new ValidationError('Proof file does not belong to this order')
+  }
+}
+
 router.post(
   '/:id/delivery-retry',
   ...supplierFulfillmentGate,
@@ -320,13 +337,16 @@ router.patch(
       })
     } catch (error) {
       if (error instanceof ValidationError || error.name === 'ZodError') {
+        // A ZodError's .message is a JSON dump of the issues; show the first issue instead.
+        const issue = error.issues?.[0]
+        const message =
+          error.name === 'ZodError' && issue
+            ? `${issue.path?.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`
+            : error.message || 'Invalid request'
         return res.status(400).json({
           ok: false,
           data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: error.message || 'Invalid request',
-          },
+          error: { name: 'VALIDATION_ERROR', message },
           requestId: req.requestId,
         })
       }
@@ -335,6 +355,14 @@ router.patch(
           ok: false,
           data: null,
           error: { name: 'FORBIDDEN', message: error.message || 'Forbidden' },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message || 'Order not found' },
           requestId: req.requestId,
         })
       }
@@ -546,6 +574,7 @@ router.post(
       }
       const tenant = await getRequestTenant(req)
       for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        assertProofKeyBelongsToOrder(key, req.userData.id, req.params.id)
         await assertCleanUploadOwnership(key, {
           userId: req.userData.id,
           tenantId: tenant?.tenantId || supplierId,
@@ -639,6 +668,7 @@ router.post(
       }
       const tenant = await getRequestTenant(req)
       for (const key of [body.file_key, body.signature_file_key].filter(Boolean)) {
+        assertProofKeyBelongsToOrder(key, req.userData.id, req.params.id)
         await assertCleanUploadOwnership(key, {
           userId: req.userData.id,
           tenantId: tenant?.tenantId || supplierId,

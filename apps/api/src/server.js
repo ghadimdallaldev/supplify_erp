@@ -1,3 +1,4 @@
+import { isDriverLocationPing } from './lib/driver-location-path.js'
 import express from 'express'
 import http from 'http'
 import cors from 'cors'
@@ -254,6 +255,7 @@ const rateOpts = {
   legacyHeaders: false,
 }
 const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+// Driver GPS pings must not consume the shared per-IP budget (see lib/driver-location-path.js).
 
 function createLimiter(max, message, extra = {}) {
   const { storePrefix = 'rl:global', ...rest } = extra
@@ -261,7 +263,11 @@ function createLimiter(max, message, extra = {}) {
   return rateLimit({
     ...rateOpts,
     max,
-    message,
+    // JSON envelope so API clients (mobile/web) can parse a 429 instead of failing on text/plain.
+    message:
+      typeof message === 'string'
+        ? { ok: false, data: null, error: { name: 'RATE_LIMITED', message } }
+        : message,
     ...(store ? { store } : {}),
     ...rest,
   })
@@ -269,7 +275,13 @@ function createLimiter(max, message, extra = {}) {
 
 const noopLimiter = (_req, _res, next) => next()
 const limiter = config.RATE_LIMIT_ENABLED
-  ? createLimiter(config.RATE_LIMIT_MAX, rateLimitMessage)
+  ? createLimiter(config.RATE_LIMIT_MAX, rateLimitMessage, { skip: isDriverLocationPing })
+  : noopLimiter
+const driverLocationLimiter = config.RATE_LIMIT_ENABLED
+  ? createLimiter(isProduction ? 1500 : 5000, rateLimitMessage, {
+      skip: (req) => !isDriverLocationPing(req),
+      storePrefix: 'rl:driver-location',
+    })
   : noopLimiter
 const authLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(
@@ -324,7 +336,7 @@ const chatSendLimiter = config.RATE_LIMIT_ENABLED
   : noopLimiter
 const ordersWriteLimiter = config.RATE_LIMIT_ENABLED
   ? createLimiter(isProduction ? 120 : 500, 'Too many order requests, please try again later.', {
-      skip: skipReadOnlyRequests,
+      skip: (req) => skipReadOnlyRequests(req) || isDriverLocationPing(req),
       storePrefix: 'rl:orders',
     })
   : noopLimiter
@@ -356,6 +368,7 @@ app.use('/auth/mobile/refresh', refreshLimiter)
 app.use('/api/public/invitations', invitationAcceptLimiter)
 app.use('/api/public/reservations/availability', availabilityLimiter)
 app.use('/api/public', publicLimiter)
+app.use(driverLocationLimiter)
 app.use(limiter)
 
 // Body parsing middleware

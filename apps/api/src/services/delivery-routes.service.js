@@ -391,9 +391,7 @@ export async function getDriverActiveRoute(supplierId, driverId) {
       AND dr.status = ANY($3::text[])
       AND (
         dr.status = 'IN_PROGRESS'
-        OR dr.scheduled_date = (now() AT TIME ZONE COALESCE(
-          (SELECT NULLIF(TRIM(last_order_timezone), '') FROM supplier WHERE id = $1), $4
-        ))::date
+        OR dr.scheduled_date = (now() AT TIME ZONE $4)::date
       )
     ORDER BY
       CASE dr.status WHEN 'IN_PROGRESS' THEN 0 ELSE 1 END,
@@ -401,7 +399,7 @@ export async function getDriverActiveRoute(supplierId, driverId) {
       dr.created_at DESC
     LIMIT 1
     `,
-    [supplierId, driverId, DRIVER_TODAY_ROUTE_STATUSES, getDefaultTenantTimezone()]
+    [supplierId, driverId, DRIVER_TODAY_ROUTE_STATUSES, await getSupplierTimezone(supplierId)]
   )
   if (!rows.length) return null
   return getDeliveryRoute(supplierId, rows[0].id, { driverIdScope: driverId })

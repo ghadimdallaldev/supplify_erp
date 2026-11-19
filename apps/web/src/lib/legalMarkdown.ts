@@ -38,8 +38,16 @@ export function legalMarkdownToHtml(markdown: string): string {
     return '#'
   }
 
-  const inline = (text: string) =>
+  const escapeHtml = (text: string) =>
     text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const inline = (text: string) =>
+    escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\[(.+?)\]\((.+?)\)/g, (_match, label, href) => {
         const url = safeHref(href)
