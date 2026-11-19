@@ -3,7 +3,11 @@ import { NotFoundError } from '../middlewares/errorHandler.js'
 import { resolveDestinationFromOrderRow } from '../lib/delivery-coordinates.js'
 
 /** Operational allow-list for drivers; prices, billing and customer PII are intentionally excluded. */
-export async function getDriverDeliveryDetail(orderId, supplierId, { driverId = null } = {}) {
+export async function getDriverDeliveryDetail(
+  orderId,
+  supplierId,
+  { driverId = null, assignmentId = null } = {}
+) {
   const { rows } = await query(
     `
     SELECT

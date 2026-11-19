@@ -43,6 +43,7 @@ export async function reserveWarehouseStockBatch(client, warehouseId, lineItems,
   let { rows } = await client.query(
     `SELECT product_id, quantity_available FROM warehouse_inventory
      WHERE warehouse_id = $1 AND product_id = ANY($2)
+     ORDER BY product_id
      FOR UPDATE`,
     [warehouseId, productIds]
   )
