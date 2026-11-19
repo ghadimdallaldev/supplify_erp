@@ -17,6 +17,16 @@ GPS watcher no longer leaks when it finishes starting after cleanup; `Linking.op
 double `goBack` guarded. Android and iOS diffs are identical; tsc + full Android jest pass
 (150 tests). Not run on a device.
 
+Second pass (same branches): one `DriverTrackingProvider` for GPS (Home + Stop no longer each
+run a watcher), future-dated orders not tracked, tracking-off / waiting banner states,
+proof-of-delivery can be confirmed with a recipient name when photo upload is switched off,
+maintenance 503 no longer labelled a scan outage, double-tap guard, 44 new Arabic strings
+(needs native review), local-date fixes, `Planned` status label. API: per-order position and
+throttle from `driver_location_ping`, `stored:false reason:delivery_closed` for late pings,
+timezone validation, `delivery-status` 404. Android and iOS diffs identical; tsc + full jest
+pass on both (43 suites / 165 tests). Not implemented: background location (needs
+expo-task-manager + native rebuild + store declarations).
+
 ## 2026-11-19 - Security audit hardening pass (mobile: verified, no code change)
 
 API: `POST /api/roles/users/:userId/assign` now 404s (`NOT_FOUND`) when the target user is not

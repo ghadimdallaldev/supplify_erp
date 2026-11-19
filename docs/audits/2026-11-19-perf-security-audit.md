@@ -41,13 +41,18 @@ phone clock >2 min ahead → every ping 400 (now clamped up to 15 min); restrict
 "Delivery not found" on network errors, generic "check your connection" for 403/429/maintenance,
 orphan GPS watcher, unguarded `Linking.openURL`, double `goBack`.
 
-Still open (not changed):
+Second pass (same day) — also fixed, unit/render-tested, not run on a device:
 
-- **No background tracking**: `app.json` disables background location/foreground service and nothing uses TaskManager, so pings stop when the driver opens Maps or locks the phone. Product decision needed.
-- `driver_latest_location` is keyed by `driver_id` only, so with several active orders restaurants see one order's position at a time; a ping for another order inside 15 s is silently dropped (`stored:false`, HTTP 200) while the app shows "Location active".
-- Invalid `supplier.last_order_timezone` → 500 on `/fulfillment/routes/active` (migration 0237 is only in the main checkout, uncommitted); column defaults to `'UTC'` so "today" is 2-3 h behind Beirut.
-- `delivery_tracking` flag off blocks the POD presign while the app requires a photo → driver cannot complete; same with the `file_uploads` kill switch.
-- `delivery-status` 500 on a missing order (NotFoundError unmapped) and raw Zod JSON in the error text; maintenance 503 on the photo PUT mislabelled "security scan unavailable".
-- Two screens run `useDriverGpsTracking` at once (Home stays mounted under Stop) → duplicate watchers/pings; all pings include future-dated assignments.
-- Arabic UI shows English for GPS banner, status labels, schedule buckets and upload-progress strings (not in en/ar JSON); UTC-date bugs near midnight in the run sheet / schedule bucket; route stop status shown as raw `PLANNED`.
-- Complete-delivery retry after a timeout may hit "already delivered" (server idempotency not checked); possible double-tap on Confirm.
+- Per-order tracking: the throttle and the restaurant's order-scoped position now read `driver_location_ping` (history, per order) instead of the single per-driver `driver_latest_location` row (kept for the ~10 other readers; no schema change). Throttle tolerates the app's ~14.5 s cadence (was dropping about every other ping).
+- Late ping after delivery -> `stored:false` (was 400); invalid `supplier.last_order_timezone` -> platform default (was 500); `delivery-status` 404 + readable validation text; notifications `limit`/`offset`/non-UUID id no longer 500; warehouse allowlist now covers driver route endpoints + push/notification-preferences.
+- App: one `DriverTrackingProvider` (Home + Stop each ran a watcher), future-dated orders not tracked, "tracking off / getting your location" states, `stored:false` no longer shown as "Location active"; POD can be confirmed with a recipient name when photo upload is switched off (`FEATURE_DISABLED`); maintenance 503 no longer shown as scan outage; double-tap guard; Arabic strings (44 keys, written by Claude — needs native-speaker review); local-date fixes; `Planned` label; `route.stops` guards.
+- Checked, no change needed: `complete-delivery` retry is already idempotent (lost-response retry path + `ON CONFLICT (driver_assignment_id)`), so the earlier "suspected" item was wrong.
+
+Still open:
+
+- **Background tracking not implemented.** Needs `expo-task-manager` (not a dependency) + `app.json` background-location/foreground-service config + Android `ACCESS_BACKGROUND_LOCATION` / iOS "Always" strings, a native rebuild, and Google Play/App Store background-location declarations. Pings still stop when the app is backgrounded. Product/policy decision.
+- `supplier.last_order_timezone` defaults to `'UTC'` (NOT NULL), so the platform default Asia/Beirut never applies; "today" for a supplier that never set it is the UTC date. Needs a data/onboarding decision. Migration 0237 in the main checkout is Codex's and was not touched.
+- `driver_latest_location` is still keyed by driver (fine for readers that want the driver's last position).
+- `delivery_tracking` flag gates the POD presign for everyone; the app now falls back to recipient-name confirmation instead of blocking.
+- `driver-detail` resolves by order for the calling driver; a driver holding two legs of one order could see the other leg's detail (rare, unchanged).
+- Notification quirks left as-is: a driver's own `failed_delivery` notification is filtered out; `templates.js` derives tenantId with an unordered `LIMIT 1`.
