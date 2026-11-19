@@ -57,13 +57,32 @@ export async function getRestaurantTimezone(restaurantId, runQuery = query) {
   return rows[0]?.timezone || getDefaultTenantTimezone()
 }
 
-/** Supplier-local calendar day. Uses last-order timezone, then the platform default. */
+export function isValidTimeZone(timeZone) {
+  if (!timeZone || typeof timeZone !== 'string') return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Supplier-local calendar day. Uses last-order timezone, then the platform default. An unknown
+ * zone string would make `AT TIME ZONE` fail in SQL (500 on the driver run sheet), so it is
+ * validated here and falls back to the default.
+ */
 export async function getSupplierTimezone(supplierId) {
   const { rows } = await query(
     `SELECT COALESCE(NULLIF(TRIM(last_order_timezone), ''), $2) AS tz FROM supplier WHERE id = $1`,
     [supplierId, getDefaultTenantTimezone()]
   )
+<<<<<<< HEAD
   return normalizeTenantTimezone(rows[0]?.tz)
+=======
+  const tz = rows[0]?.tz
+  return isValidTimeZone(tz) ? tz : getDefaultTenantTimezone()
+>>>>>>> audit/perf-security-readiness-2026-11-19
 }
 
 /**

@@ -20,7 +20,11 @@ import {
 } from '../lib/tenant-roles.js'
 import { invalidateUserAuthCaches } from '../lib/access-cache.js'
 import { resolveWorkspaceScope } from '../lib/workspace-membership.js'
-import { assertCanAssignRole, assertCanGrantPermissions } from '../lib/rbac-guards.js'
+import {
+  assertCanAssignRole,
+  assertCanGrantPermissions,
+  assertTargetUserBelongsToTenant,
+} from '../lib/rbac-guards.js'
 import { MAIN_ADMIN_ROLE_NAME } from '../lib/workspace-membership.js'
 import { syncDriverLinkForRoleAssignment } from '../lib/driver-user-link.js'
 import {
@@ -485,6 +489,9 @@ router.post(
           ])
         }
         await client.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [tenantId])
+        if (req.userData.role !== 'ADMIN') {
+          await assertTargetUserBelongsToTenant({ targetUserId, tenantId, tenantType, client })
+        }
         const role = await assertCanAssignRole({
           requesterId: req.userData.id,
           requesterIsPlatformAdmin: req.userData.role === 'ADMIN',

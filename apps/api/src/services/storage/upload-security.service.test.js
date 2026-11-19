@@ -8,6 +8,7 @@ const securelyDeleteQuarantineFileMock = vi.fn()
 const spoolInboundFileMock = vi.fn()
 const putObjectMock = vi.fn()
 const readFileMock = vi.fn()
+const isHostedMock = vi.fn(() => false)
 
 vi.mock('node:fs/promises', () => {
   const api = { readFile: (...args) => readFileMock(...args) }
@@ -28,6 +29,7 @@ vi.mock('../../config/env.js', () => ({
 }))
 
 vi.mock('./malware-scanner.js', () => ({
+  isHostedSecurityEnvironment: () => isHostedMock(),
   scanQuarantineFile: (...args) => scanQuarantineFileMock(...args),
   securelyDeleteQuarantineFile: (...args) => securelyDeleteQuarantineFileMock(...args),
   spoolInboundFile: (...args) => spoolInboundFileMock(...args),
@@ -267,5 +269,63 @@ describe('upload security sessions', () => {
       })
     ).rejects.toMatchObject({ name: 'UPLOAD_INVALID_FILE' })
     expect(putObjectMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects an inconclusive per-file scan in hosted environments instead of storing it', async () => {
+    isHostedMock.mockReturnValue(true)
+    try {
+      queryMock
+        .mockResolvedValueOnce({ rows: [session()] })
+        .mockResolvedValueOnce({ rows: [session({ state: 'processing' })] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValue({ rows: [], rowCount: 1 })
+      scanQuarantineFileMock.mockRejectedValue(
+        Object.assign(new Error('scan timed out'), {
+          name: 'MALWARE_SCAN_UNAVAILABLE',
+          inconclusive: true,
+        })
+      )
+
+      await expect(
+        completeUploadSession({
+          token: 'opaque-token',
+          userId: 'user-1',
+          tenantId: 'tenant-1',
+          tenantType: 'SUPPLIER',
+          body: Buffer.from([0xff, 0xd8, 0xff]),
+          contentType: 'image/jpeg',
+        })
+      ).rejects.toMatchObject({ name: 'MALWARE_SCAN_UNAVAILABLE' })
+      expect(putObjectMock).not.toHaveBeenCalled()
+    } finally {
+      isHostedMock.mockReturnValue(false)
+    }
+  })
+
+  it('still degrades in hosted environments when clamd itself is unreachable', async () => {
+    isHostedMock.mockReturnValue(true)
+    try {
+      queryMock
+        .mockResolvedValueOnce({ rows: [session()] })
+        .mockResolvedValueOnce({ rows: [session({ state: 'processing' })] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValue({ rows: [], rowCount: 1 })
+      scanQuarantineFileMock.mockRejectedValue(
+        Object.assign(new Error('ECONNREFUSED'), { name: 'MALWARE_SCAN_UNAVAILABLE' })
+      )
+
+      await expect(
+        completeUploadSession({
+          token: 'opaque-token',
+          userId: 'user-1',
+          tenantId: 'tenant-1',
+          tenantType: 'SUPPLIER',
+          body: Buffer.from([0xff, 0xd8, 0xff]),
+          contentType: 'image/jpeg',
+        })
+      ).resolves.toMatchObject({ scanBypassed: true })
+    } finally {
+      isHostedMock.mockReturnValue(false)
+    }
   })
 })

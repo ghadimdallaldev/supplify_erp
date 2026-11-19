@@ -10,6 +10,7 @@ import {
   normalizeUploadMime,
 } from '../../lib/sanitize-upload.js'
 import {
+  isHostedSecurityEnvironment,
   scanQuarantineFile,
   securelyDeleteQuarantineFile,
   spoolInboundFile,
@@ -356,7 +357,11 @@ export async function completeUploadSession({
     return { fileKey: session.destination_key, idempotent: false }
   } catch (error) {
     if (error?.name === 'UPLOAD_MALWARE_DETECTED') throw error
-    if (error?.name === 'MALWARE_SCAN_UNAVAILABLE' && spool) {
+    // Degrade (store magic-byte-valid file) only when clamd itself is unreachable. A per-file
+    // inconclusive scan in hosted environments is rejected: otherwise a crafted file that
+    // times out or errors the scanner would be stored unscanned.
+    const rejectInconclusive = isHostedSecurityEnvironment() && error?.inconclusive === true
+    if (error?.name === 'MALWARE_SCAN_UNAVAILABLE' && spool && !rejectInconclusive) {
       try {
         return await acceptUploadWhenScannerUnavailable({ session, bodyHash, mime, spool, body })
       } catch (promoteError) {

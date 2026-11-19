@@ -366,6 +366,17 @@ export async function applyWarehouseInventoryAdjustment(
     throw new ValidationError('No warehouse available for this supplier')
   }
 
+  // Lock the target row BEFORE reading availability. Order reservations lock the same rows
+  // (FOR UPDATE), so a concurrent reserve/adjust is serialized and the check below cannot pass
+  // on a stale value and then be silently clamped by GREATEST(0, ...) in the upsert.
+  // No row yet means 0 available: an OUT is rejected below, an IN is a purely additive upsert.
+  const { rows: targetRows } = await run(
+    `SELECT COALESCE(quantity_available, 0)::numeric AS available_qty
+     FROM warehouse_inventory
+     WHERE warehouse_id = $1 AND product_id = $2
+     FOR UPDATE`,
+    [targetWarehouseId, productId]
+  )
   const { rows: sumRows } = await run(
     `
     SELECT
@@ -378,12 +389,6 @@ export async function applyWarehouseInventoryAdjustment(
       AND w.is_active = TRUE
     `,
     [productId, supplierId]
-  )
-  const { rows: targetRows } = await run(
-    `SELECT COALESCE(quantity_available, 0)::numeric AS available_qty
-     FROM warehouse_inventory
-     WHERE warehouse_id = $1 AND product_id = $2`,
-    [targetWarehouseId, productId]
   )
 
   const productAvailable = Number(sumRows[0]?.available_qty || 0)

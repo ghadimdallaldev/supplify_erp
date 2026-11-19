@@ -17,6 +17,7 @@ const isFeatureEnabled = vi.fn().mockResolvedValue(true)
 const assertTenantUserSeatAvailable = vi.fn().mockResolvedValue({ allowed: true })
 const ensureTenantSystemRoles = vi.fn().mockResolvedValue(undefined)
 const assignTenantUserRole = vi.fn().mockResolvedValue(undefined)
+const assertTargetUserBelongsToTenant = vi.fn().mockResolvedValue(undefined)
 const assertCanAssignRole = vi.fn().mockResolvedValue({ id: 'role-1', name: 'Manager' })
 const assertCanGrantPermissions = vi.fn()
 const { syncDriverLoginPolicyForUser, invalidateDriverLoginPolicyCache } = vi.hoisted(() => ({
@@ -88,6 +89,7 @@ vi.mock('../lib/workspace-membership.js', () => ({
 
 vi.mock('../lib/rbac-guards.js', () => ({
   assertCanAssignRole: (...args) => assertCanAssignRole(...args),
+  assertTargetUserBelongsToTenant: (...args) => assertTargetUserBelongsToTenant(...args),
   assertCanGrantPermissions: (...args) => assertCanGrantPermissions(...args),
 }))
 
@@ -313,6 +315,20 @@ describe('Tenant roles routes', () => {
     const res = await request(app).delete('/api/roles/r2').expect(409)
     expect(res.body.error.name).toBe('ROLE_IN_USE')
     expect(res.body.data.users).toHaveLength(1)
+  })
+
+  it('POST assign returns 404 and writes nothing when the target is not a workspace member', async () => {
+    const { NotFoundError } = await import('../middlewares/errorHandler.js')
+    assertTargetUserBelongsToTenant.mockRejectedValueOnce(
+      new NotFoundError('User not found in this workspace')
+    )
+    assertCanAssignRole.mockClear()
+    const res = await request(app)
+      .post('/api/roles/users/a0000001-0001-4000-8000-000000000077/assign')
+      .send({ role_id: 'a0000001-0001-4000-8000-000000000098' })
+      .expect(404)
+    expect(res.body.error.name).toBe('NOT_FOUND')
+    expect(assertCanAssignRole).not.toHaveBeenCalled()
   })
 
   it('POST assign Owner requires owner requester', async () => {

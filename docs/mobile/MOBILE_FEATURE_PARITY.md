@@ -1,5 +1,50 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-19 - driver-detail optional assignment id
+
+API: `GET /api/orders/:id/driver-detail?assignment_id=<uuid>` narrows to one driver assignment (invalid values ignored; driver scoping still applies). Mobile: `useDriverDetail(orderId, assignmentId)` and the Stop screen pass `driverAssignmentId` in both `supplify-mobile` and `supplify-mobile-ios` (branch `audit/driver-app-2026-11-19`). Background tracking, the supplier-timezone column default and the two notification quirks were deliberately not changed (see audit doc).
+
+## 2026-11-19 - Driver backend fixes (rate limits, clock skew, warehouse allowlist)
+
+API: driver `POST /api/orders/:id/location` pings are exempt from the global and orders-write
+per-IP limiters (own limiter, 1500/15min/IP in prod) so a driver with several active orders can
+still complete deliveries; every limiter 429 is now the JSON envelope
+`{ok:false,error:{name:'RATE_LIMITED'}}` instead of `text/plain` (mobile previously surfaced
+"Invalid server response"); `recordedAt` up to 15 min ahead is clamped to server time instead of
+400; restricted-warehouse drivers may call `complete-delivery`.
+
+Mobile (both `supplify-mobile` and `supplify-mobile-ios`, branch `audit/driver-app-2026-11-19`):
+no contract change (same URLs/bodies). Client now maps a 429 (JSON or legacy text/plain) to
+`RATE_LIMITED`; driver Home/Run sheet keep cached data on a failed refetch; Stop screen has an
+error state; load errors show the server message for not-linked / feature-off / maintenance;
+GPS watcher no longer leaks when it finishes starting after cleanup; `Linking.openURL` and
+double `goBack` guarded. Android and iOS diffs are identical; tsc + full Android jest pass
+(150 tests). Not run on a device.
+
+Second pass (same branches): one `DriverTrackingProvider` for GPS (Home + Stop no longer each
+run a watcher), future-dated orders not tracked, tracking-off / waiting banner states,
+proof-of-delivery can be confirmed with a recipient name when photo upload is switched off,
+maintenance 503 no longer labelled a scan outage, double-tap guard, 44 new Arabic strings
+(needs native review), local-date fixes, `Planned` status label. API: per-order position and
+throttle from `driver_location_ping`, `stored:false reason:delivery_closed` for late pings,
+timezone validation, `delivery-status` 404. Android and iOS diffs identical; tsc + full jest
+pass on both (43 suites / 165 tests). Not implemented: background location (needs
+expo-task-manager + native rebuild + store declarations).
+
+## 2026-11-19 - Security audit hardening pass (mobile: verified, no code change)
+
+API: `POST /api/roles/users/:userId/assign` now 404s (`NOT_FOUND`) when the target user is not
+already a member of the workspace (role row or active membership); proof-of-delivery /
+complete-delivery now require the proof key to be under `uploads/<user>/pod/<orderId>/`;
+uploads in preprod/prod reject a per-file inconclusive ClamAV scan (503
+`MALWARE_SCAN_UNAVAILABLE`) instead of storing it; logout always attempts the refresh-token
+revoke. Web: legal markdown is HTML-escaped.
+
+Mobile (`supplify-mobile` and `supplify-mobile-ios`): no change required. Both apps only assign
+roles to existing team members (`warehouses.ts`), and `DeliveryProofScreen.tsx` uses the
+server-minted `presign.fileKey` for the same order, so the new proof-key check is already
+satisfied. Verified by reading both repos; not exercised on a device.
+
 ## 2026-11-19 - Every feature behind an admin flag (default-on kill switches)
 
 API: 35 new **default-on** feature keys (26 restaurant / 23 supplier, see

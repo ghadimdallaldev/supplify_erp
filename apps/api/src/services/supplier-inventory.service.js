@@ -82,7 +82,7 @@ export async function assertAndDeductSupplierStockBatch(client, lineItems) {
 
   const productIds = lines.map((item) => item.productId)
   const { rows } = await client.query(
-    `SELECT product_id, available_qty FROM inventory WHERE product_id = ANY($1) FOR UPDATE`,
+    `SELECT product_id, available_qty FROM inventory WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE`,
     [productIds]
   )
   const availableByProduct = new Map(rows.map((row) => [row.product_id, Number(row.available_qty)]))
