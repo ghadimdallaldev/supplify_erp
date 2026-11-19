@@ -44,6 +44,8 @@ return getDefaultPaidTrialPlanFeatures(tenantType)
 
 Canonical keys live in `apps/api/src/lib/feature-keys.js`.
 
+Besides the plan-sold keys below, every other user-facing feature has a **default-on** admin kill switch (on unless an admin forces it off globally or per account). They are not part of plan JSON. Full list: `docs/admin/feature-flags.md` → _Default-on kill switches_.
+
 ### Restaurant (27 keys)
 
 `chat`, `order_calendar`, `reports`, `smart_reorder`, `recipe_costing`, `multi_branch`, `receiving_quality`, `disputes_returns`, `finance_invoices`, `quick_lists`, `inventory_management`, `waste_tracking`, `advanced_roles`, `notifications`, `api_integrations`, `support_sla`, `custom_branding`, `feature_flags_access`, `supplier_reviews`, `push_notifications`, `order_amendments`, `tenant_audit_log`, `waitlist_auto_promo`, `supplier_deals`, `supplier_deals_redeem`, `fulfillment_tools`, `ai_platform`

@@ -8,10 +8,14 @@ import {
   OWNER_BLOCKER_CODE,
   transferOrganizationOwnership,
 } from '../services/account-deletion.service.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 export const accountRoutes = express.Router()
 
 accountRoutes.use(requireAuth)
+
+// Account deletion (DELETE /) stays available regardless: app-store / privacy requirement.
+const organizationLifecycleGate = platformFeatureGate('organization_lifecycle')
 
 function ok(req, res, data, status = 200) {
   res.status(status).json({ ok: true, data, error: null, requestId: req.requestId })
@@ -26,7 +30,7 @@ accountRoutes.get('/deletion-status', async (req, res, next) => {
   }
 })
 
-accountRoutes.post('/transfer-ownership', async (req, res, next) => {
+accountRoutes.post('/transfer-ownership', organizationLifecycleGate, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -45,7 +49,7 @@ accountRoutes.post('/transfer-ownership', async (req, res, next) => {
   }
 })
 
-accountRoutes.post('/close-organization', async (req, res, next) => {
+accountRoutes.post('/close-organization', organizationLifecycleGate, async (req, res, next) => {
   try {
     const body = z
       .object({

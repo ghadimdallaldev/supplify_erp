@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import {
   requireAuth,
   requireRole,
@@ -128,6 +129,7 @@ router.use(
   requireRole(['SUPPLIER', 'ADMIN']),
   resolveTenantContext,
   resolveAdminContext,
+  tenantFeatureGate('team_invitations'),
   requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE'),
   resolveOrgContextFromTenant
 )

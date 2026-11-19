@@ -46,10 +46,12 @@ import { createPresignedUpload } from '../services/storage/storage.service.js'
 import { assertCleanUploadOwnership } from '../services/storage/upload-security.service.js'
 import { getDriverDeliveryDetail } from '../services/driver-delivery-detail.service.js'
 import { retryFailedDelivery } from '../services/delivery-retry.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router({ mergeParams: true })
 
 router.use(requireAuth, resolveTenantContext)
+router.use(/^\/[^/]+\/(proof-of-delivery|tracking)/, tenantFeatureGate('delivery_tracking'))
 
 const fulfillmentFeature = requireFeature(
   'fulfillment',

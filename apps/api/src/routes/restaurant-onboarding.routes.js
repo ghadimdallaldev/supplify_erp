@@ -12,10 +12,16 @@ import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { checkLimit } from '../lib/subscription.js'
 import { z } from 'zod'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT', 'ADMIN']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT', 'ADMIN']),
+  tenantFeatureGate('restaurant_profile')
+)
 
 async function restaurantIdOrNotFound(req) {
   const restaurantId = await getRestaurantIdForRequest(req)

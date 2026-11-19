@@ -25,17 +25,17 @@
 
 ## Metrics (code-verified)
 
-| Metric                  | Value | Source                             |
-| ----------------------- | ----: | ---------------------------------- |
-| API routes              |   554 | `docs/audits/route-inventory.json` |
-| SQL migrations          |   195 | `apps/api/db/migrations/`          |
-| API test files          |   213 | bootstrap-metrics                  |
-| Web test files          |   309 | bootstrap-metrics                  |
-| Playwright e2e specs    |    16 | `tests/e2e/suites/`                |
-| Frontend routes         |   ~80 | `apps/web/src/App.tsx`             |
-| Permission keys         |    56 | `permission-keys.js`               |
-| Restaurant feature keys |    27 | `feature-keys.js`                  |
-| Supplier feature keys   |    26 | `feature-keys.js`                  |
+| Metric                  | Value | Source                                |
+| ----------------------- | ----: | ------------------------------------- |
+| API routes              |   554 | `docs/audits/route-inventory.json`    |
+| SQL migrations          |   195 | `apps/api/db/migrations/`             |
+| API test files          |   213 | bootstrap-metrics                     |
+| Web test files          |   309 | bootstrap-metrics                     |
+| Playwright e2e specs    |    16 | `tests/e2e/suites/`                   |
+| Frontend routes         |   ~80 | `apps/web/src/App.tsx`                |
+| Permission keys         |    56 | `permission-keys.js`                  |
+| Restaurant feature keys | 29+26 | `feature-keys.js` (plan + default-on) |
+| Supplier feature keys   | 28+23 | `feature-keys.js` (plan + default-on) |
 
 ---
 
@@ -111,11 +111,11 @@ These domains have **UI + API + RBAC + plan gates + meaningful tests**:
 | ------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------- |
 | Free Trial feature parity       | Free plan uses **Gold feature JSON** with **Free limits** — looks like Gold in UI, hits limits quickly | Intentional; document in sales          |
 | GPS tracking                    | **Not plan-gated** — env flag only                                                                     | Product decision; surprises tier buyers |
-| Reservations                    | **No `feature-keys` entry** — always on                                                                | May not match packaging docs            |
+| Reservations                    | Default-on `reservations` admin kill switch                                                            | May not match packaging docs            |
 | `promotions` limit              | Supplier-only; restaurant uses `supplier_deals` + `deal_redemptions_per_day`                           | Correct in code; easy doc confusion     |
 | Enterprise tier                 | **Removed** from catalog (`0066`); maps to platinum in code only                                       | Legacy data may exist                   |
 | Bronze display name             | Mapped to Silver in UI (`formatPlanDisplayName`)                                                       | Cosmetic                                |
-| Contract pricing feature key    | Placeholder gating                                                                                     | Low                                     |
+| Contract pricing feature key    | Default-on `contract_pricing` kill switch                                                              | Low                                     |
 | Frontend-only permission checks | UX hiding; **API is source of truth**                                                                  | OK if API always called                 |
 
 **Verification tools that pass:** `pnpm verify:tier-matrix`, `plan-catalog-audit` tests, `adminLimitLabels.test.ts`.

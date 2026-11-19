@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -108,7 +109,7 @@ const updateQuoteRequestStatusSchema = z.object({
   status: z.enum(['closed', 'cancelled']),
 })
 
-router.use(requireAuth, resolveTenantContext)
+router.use(requireAuth, resolveTenantContext, tenantFeatureGate('quote_requests'))
 
 // Supplier routes first (more specific paths)
 router.get(

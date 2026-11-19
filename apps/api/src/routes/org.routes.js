@@ -46,6 +46,7 @@ import {
   recordBranchAccountLinkHistory,
 } from '../lib/branch-account-billing.js'
 import { supplierOrgConsolidatedOverview } from '../services/org-reports.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -231,6 +232,7 @@ router.use(
   resolveTenantContext,
   resolveAdminContext,
   requireSupplierOrgContext,
+  tenantFeatureGate('branch_management'),
   orgStructureGuard
 )
 

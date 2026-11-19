@@ -25,6 +25,11 @@ vi.mock('../lib/db.js', () => ({
   }),
 }))
 
+const mockOrderingEnabled = vi.fn(async () => true)
+vi.mock('../lib/feature-flags.js', () => ({
+  isFeatureEnabledForTenant: (...args) => mockOrderingEnabled(...args),
+}))
+
 vi.mock('../lib/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -255,6 +260,37 @@ describe('executeScheduledOrders', () => {
     expect(ledgerOutcomes).toEqual(['failed', 'reminder'])
     expect(result.errors).toBe(1)
     expect(result.executed).toBe(1)
+  })
+
+  it('only reminds when an admin turned ordering off for the restaurant', async () => {
+    mockOrderingEnabled.mockResolvedValueOnce(false)
+    const auto = dueQuickList({ id: 'ql-auto', auto_create_order: true })
+    const statements = []
+    const ledgerOutcomes = []
+    clientQueryMock.mockImplementation(async (sql, params) => {
+      const text = String(sql).trim()
+      statements.push(text.split(String.fromCharCode(10))[0].trim())
+      if (text.includes('FROM quick_list') && text.includes('LIMIT')) {
+        return {
+          rows: statements.filter((q) => q.startsWith('SELECT')).length <= 1 ? [auto] : [],
+        }
+      }
+      if (text.includes('INSERT INTO quick_list_execution')) {
+        return { rows: [{ id: 'ledger-' + params[0] }] }
+      }
+      if (text.includes('UPDATE quick_list_execution')) {
+        ledgerOutcomes.push(params[0])
+        return { rowCount: 1 }
+      }
+      if (text.includes('FROM quick_list_item')) throw new Error('must not load items to order')
+      return { rows: [], rowCount: 1 }
+    })
+
+    await executeScheduledOrders()
+
+    expect(mockOrderingEnabled).toHaveBeenCalledWith(auto.restaurant_id, 'RESTAURANT', 'ordering')
+    expect(ledgerOutcomes).toEqual(['reminder'])
+    expect(statements).not.toContain('SAVEPOINT sp_test')
   })
 
   it('propagates database errors from the due-list query', async () => {

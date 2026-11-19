@@ -3,6 +3,15 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockUser, clearAllMocks } from '../test/helpers.js'
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   return {

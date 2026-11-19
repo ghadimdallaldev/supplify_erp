@@ -7,6 +7,15 @@ const createPublicOrder = vi.fn()
 const getGuestPublicOrder = vi.fn()
 const listPublicSalesSuppliers = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/rbac.js', () => ({
   optionalAuth: (req, _res, next) => {
     const role = req.get('x-test-role')

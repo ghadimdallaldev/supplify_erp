@@ -5,6 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const createPublicOrder = vi.fn()
 const sendTemplateEmail = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/rbac.js', () => ({
   optionalAuth: (req, _res, next) => {
     req.userData = null

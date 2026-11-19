@@ -3,6 +3,15 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockSupplierUser, clearAllMocks } from '../test/helpers.js'
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/tenant-timezone.js', () => ({
   getRestaurantTimezone: vi.fn(async () => 'Asia/Beirut'),
   getSupplierTimezone: vi.fn(async () => 'Asia/Beirut'),

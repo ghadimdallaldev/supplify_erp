@@ -22,12 +22,13 @@ import {
   getScopedUserNotifications,
   notificationAccessScope,
 } from '../services/notification/scoped-notifications.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
 const tenantMutationGuard = [resolveTenantContext, notificationsMutationGuard]
 
-router.use(requireAuth, resolveTenantContext)
+router.use(requireAuth, resolveTenantContext, tenantFeatureGate('notification_center'))
 
 // Validation schemas
 const updatePreferencesSchema = z.object({

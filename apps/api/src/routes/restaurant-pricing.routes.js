@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import {
   requireAuth,
   requireRole,
@@ -21,7 +22,12 @@ import { z } from 'zod'
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, resolveAdminContext)
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  tenantFeatureGate('contract_pricing')
+)
 
 async function fireContractRecipeHook(pricing) {
   if (pricing?.price == null) return

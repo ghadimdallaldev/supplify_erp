@@ -5,6 +5,15 @@ import { mockUser, mockSupplierUser, clearAllMocks } from '../test/helpers.js'
 
 const queryMock = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))

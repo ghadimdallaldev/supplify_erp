@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import {
   requireAuth,
   requireRole,
@@ -113,7 +114,12 @@ const router = express.Router()
 
 const catalogReadAccess = requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW')
 
-router.use(requireAuth, resolveTenantContext, resolveAdminContext)
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  tenantFeatureGate('product_catalog')
+)
 
 router.use((req, res, next) => {
   const method = req.method.toUpperCase()

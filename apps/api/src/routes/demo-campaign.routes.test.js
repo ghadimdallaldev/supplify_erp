@@ -2,6 +2,15 @@ import express from 'express'
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => ({ query: vi.fn(), pool: { query: vi.fn() } }))
 vi.mock('../lib/rate-limit-store.js', () => ({ createRateLimitStore: () => undefined }))
 vi.mock('../lib/logger.js', () => ({

@@ -10,6 +10,9 @@ import {
   getAllowedFeatureKeys,
   isFeatureKeyAllowed,
   isPlatformFeatureKey,
+  defaultFeatureValue,
+  isDefaultOnFeatureKey,
+  PLATFORM_DEFAULT_ON_FEATURE_KEYS,
 } from './feature-keys.js'
 
 const FF_CACHE_TTL = 180 // seconds
@@ -98,7 +101,7 @@ export async function resolveFeatureEnabled(tenantId, tenantType, featureKey, pl
     return result
   }
 
-  const result = { enabled: false, source: 'default' }
+  const result = { enabled: defaultFeatureValue(featureKey), source: 'default' }
   await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
   return result
 }
@@ -171,7 +174,7 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
         features[key] = enabled ? raw : false
         featureSources[key] = 'plan'
       } else {
-        features[key] = false
+        features[key] = defaultFeatureValue(key)
         featureSources[key] = 'default'
       }
     }
@@ -261,12 +264,16 @@ export async function listGlobalFeatureFlags() {
       globalOverride: r ? r.global_override : null,
       updatedAt: r?.updated_at ? new Date(r.updated_at).toISOString() : null,
       platformOnly: isPlatformFeatureKey(featureKey),
+      /** true = ON when inherit (no plan value / no override) */
+      defaultOn:
+        isDefaultOnFeatureKey(featureKey) || PLATFORM_DEFAULT_ON_FEATURE_KEYS.includes(featureKey),
     }
   })
 }
 
 /**
- * Platform flags ignore plans/tenant overrides: only explicit global true enables.
+ * Platform flags ignore plans/tenant overrides: explicit global true enables; inherit is off
+ * except PLATFORM_DEFAULT_ON_FEATURE_KEYS.
  * @param {string} featureKey
  * @returns {Promise<boolean>}
  */
@@ -276,7 +283,11 @@ export async function isPlatformFeatureEnabled(featureKey) {
   const cached = await getCache(cacheKey)
   if (cached !== null) return Boolean(cached.enabled)
   const globalRow = await getGlobalOverride(featureKey)
-  const enabled = globalRow?.global_override === true
+  const override = globalRow?.global_override
+  const enabled =
+    override === true ||
+    ((override === null || override === undefined) &&
+      PLATFORM_DEFAULT_ON_FEATURE_KEYS.includes(featureKey))
   await setCache(cacheKey, { enabled }, FF_CACHE_TTL).catch(() => {})
   return enabled
 }

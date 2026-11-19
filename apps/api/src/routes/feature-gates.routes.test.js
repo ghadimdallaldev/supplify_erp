@@ -9,6 +9,15 @@ import {
   mockSubscriptionModule,
 } from '../test/feature-gate-mock.js'
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/subscription.js', () => mockSubscriptionModule())
 
 vi.mock('../lib/db.js', () => {

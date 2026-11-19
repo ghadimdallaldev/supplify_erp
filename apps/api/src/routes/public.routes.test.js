@@ -11,6 +11,15 @@ const TIME_ENTRY_ID = '44444444-4444-4444-4444-444444444444'
 const queryMock = vi.fn()
 const handleReservationCancelledMock = vi.fn().mockResolvedValue(null)
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => ({
   query: (...args) => queryMock(...args),
 }))

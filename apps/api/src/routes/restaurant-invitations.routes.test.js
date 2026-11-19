@@ -6,6 +6,15 @@ import { mockUser, clearAllMocks } from '../test/helpers.js'
 const createRestaurantMemberInvitation = vi.fn()
 const validateRestaurantRoleForBranch = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/restaurant-invitations.js', () => ({
   createRestaurantMemberInvitation: (...args) => createRestaurantMemberInvitation(...args),
   createRestaurantBranchInvitation: vi.fn(),

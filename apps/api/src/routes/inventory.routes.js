@@ -31,6 +31,7 @@ import {
   assertWarehouseOwnedBySupplier,
   getWarehouseSupplierColumn,
 } from '../lib/warehouse-helpers.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -43,6 +44,7 @@ const inventoryManagementGate = requireFeature(
 router.use(
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('stock_levels'),
   requirePermission('INVENTORY_VIEW'),
   inventoryMutationGuard
 )

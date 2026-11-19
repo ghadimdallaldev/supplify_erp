@@ -56,6 +56,7 @@ import {
   restaurantOrgStockTransferSuggestions,
   restaurantOrgAdvancedAnalytics,
 } from '../services/org-reports.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -250,6 +251,7 @@ router.use(
   resolveTenantContext,
   resolveAdminContext,
   requireRestaurantOrgContext,
+  tenantFeatureGate('branch_management'),
   orgStructureGuard
 )
 // Cross-branch purchasing is deliberately not a launch capability. Keep the

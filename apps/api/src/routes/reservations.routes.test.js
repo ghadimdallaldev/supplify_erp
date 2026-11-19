@@ -10,6 +10,15 @@ const mockUser = {
   role: 'RESTAURANT',
 }
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/tenant-resolve.js', () => ({
   requireRestaurantId: vi.fn().mockResolvedValue('restaurant-1'),
 }))

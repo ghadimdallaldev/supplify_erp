@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -21,7 +22,12 @@ import {
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext, requireRole(['RESTAURANT']))
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['RESTAURANT']),
+  tenantFeatureGate('supplier_connections')
+)
 
 async function resolveRestaurantId(req) {
   const id = await getRestaurantIdForRequest(req)

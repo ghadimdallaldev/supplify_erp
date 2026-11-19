@@ -1,5 +1,33 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-19 - Every feature behind an admin flag (default-on kill switches)
+
+API: 35 new **default-on** feature keys (26 restaurant / 23 supplier, see
+`docs/admin/feature-flags.md`) plus 8 platform default-on keys (demo, sign-up,
+consumer accounts, invite acceptance, referral landing, WhatsApp, web push,
+organization transfer/close). They resolve ON unless
+an admin forces them off globally or per account, so no current account loses access.
+Gates are `tenantFeatureGate` / `publicTenantFeatureGate` / `platformFeatureGate`;
+`feature-route-coverage.test.js` fails if a mounted router is neither gated nor exempt.
+Disabled authenticated routes return 403 `FEATURE_DISABLED` (no upgrade paywall, no
+conversion event; plan-sold keys keep `FEATURE_NOT_AVAILABLE`); disabled public routes (consumer storefront, public booking, staff portal, guest
+checkout, demo) return 404 `FEATURE_DISABLED`. The entitlements `features` map now
+carries the default-on keys (normally `true`).
+
+Mobile (both `supplify-mobile` and `supplify-mobile-ios`): `useEntitlements.ts`
+mirrors `DEFAULT_ON_FEATURE_KEYS` and `resolveFeatureFlag` (absent default-on key →
+ON; explicit false → OFF; plan-sold keys stay fail-closed). `withFeatureGate` shows
+"{{v0}} is turned off for this workspace" for default-on keys. Restaurant screens
+gated: Shop (suppliers), Catalog, Cart, DeliveryLocation, Notifications(+prefs),
+MyPrices, Consumer menu/orders/loyalty, Staff, Quote requests (list/create/detail),
+Reservations (+create). Supplier screens gated: Customers, Notifications(+prefs),
+PublicSales, RunSheet, QuoteInbox/QuoteResponse, SupplierProducts, ContractPricing,
+SupplierLoyalty, and Orders + OrderDetail in both apps (`order_management`). New en/ar copy added. `npx tsc --noEmit` passes in both repos;
+navigation/hooks/shared/i18n jest suites pass. Web: Admin → Features labels default-on
+keys "Inherit (on by default)"; sidebar hides mapped entries. No permission key, env
+var or notification payload changed. Admin-panel type change (`AdminFeatureFlag.defaultOn`)
+is admin-only — no mobile admin surface.
+
 ## 2026-11-18 - Checkout transactions, scoped replay and order result contracts
 
 Both native clients now normalize actual restaurant `{ order }` / `{ orders }`

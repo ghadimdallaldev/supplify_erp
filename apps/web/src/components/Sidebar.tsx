@@ -27,6 +27,7 @@ import {
   canUseQuickLists,
   canUseRecipeCosting,
   canUseSupplierGrowth,
+  isDefaultOnFeatureEnabled,
 } from '../lib/planFeatureGates'
 import { canViewSupplierGrowth } from '../lib/tenantRoles'
 import { formatPlanDisplayName } from '../lib/planComparison'
@@ -130,6 +131,7 @@ export function Sidebar({
     disputesEnabled,
     promotionsEnabled,
     supplierGrowthEnabled,
+    featureOn: (key) => isDefaultOnFeatureEnabled(entitlementsData?.entitlements, key),
   })
 
   const initials = (user?.displayName || user?.email || 'U')

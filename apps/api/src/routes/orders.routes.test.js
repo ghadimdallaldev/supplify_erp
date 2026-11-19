@@ -4,6 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 
 // Setup mocks at top level
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   const withTransactionMock = vi.fn()

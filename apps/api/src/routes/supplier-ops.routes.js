@@ -106,6 +106,7 @@ import {
   sendInvoiceReminder,
   sendBulkOverdueReminders,
 } from '../services/collections-reminders.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -134,6 +135,13 @@ const amendmentsGate = requireFeature(
 )
 
 router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
+
+// Admin kill switches for supplier-ops sub-features (default ON; see feature-keys.js).
+router.use(['/command-center', '/run-sheet'], tenantFeatureGate('ops_dashboard'))
+router.use(['/products/import', '/products/images/import'], tenantFeatureGate('catalog_import'))
+router.use(/^\/products\/[^/]+\/substitutes/, tenantFeatureGate('product_substitutes'))
+router.use(/^\/orders\/[^/]+\/substitutions/, tenantFeatureGate('product_substitutes'))
+router.use(/^\/orders\/[^/]+\/fulfillment-issues/, tenantFeatureGate('fulfillment_issues'))
 
 const noopLimiter = (_req, _res, next) => next()
 

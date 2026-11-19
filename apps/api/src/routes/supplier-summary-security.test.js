@@ -8,6 +8,15 @@ const state = vi.hoisted(() => ({
   commandCenter: vi.fn(),
   runSheet: vi.fn(),
 }))
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/cache.js', () => ({
   getCache: vi.fn(async () => null),
   setCache: vi.fn(),

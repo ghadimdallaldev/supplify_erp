@@ -6,6 +6,15 @@ const listMock = vi.fn()
 const updateRestaurantMock = vi.fn()
 const updateBranchMock = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, _res, next) => {
     req.userData = { id: 'user-1', email: 'owner@cafe.test', role: 'RESTAURANT' }

@@ -23,6 +23,7 @@ import {
   validateRestaurantRoleForBranch,
 } from '../lib/restaurant-invitations.js'
 import { ensureTenantSystemRoles } from '../lib/tenant-roles.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -134,6 +135,7 @@ membersRouter.use(
   requireRole(['RESTAURANT', 'ADMIN']),
   resolveTenantContext,
   requireRestaurantBranchContext,
+  tenantFeatureGate('team_invitations'),
   requireAnyPermission('STAFF_MANAGE', 'STAFF_INVITE', 'SETTINGS_MANAGE')
 )
 

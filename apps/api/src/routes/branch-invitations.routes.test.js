@@ -11,6 +11,15 @@ const assertSupplierInOrg = vi.fn()
 const validateBranchRoleForSupplier = vi.fn()
 const ensureSupplierOrganizationLinked = vi.fn()
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/branch-invitations.js', () => ({
   createBranchInvitation: (...args) => createBranchInvitation(...args),
   listBranchInvitations: (...args) => listBranchInvitations(...args),

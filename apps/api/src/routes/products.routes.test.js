@@ -5,6 +5,15 @@ import { setupMocks, mockUser, clearAllMocks } from '../test/helpers.js'
 
 // Setup mocks at top level - must be before any imports
 // Use a factory function that doesn't reference variables
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   const withTransactionMock = vi.fn()

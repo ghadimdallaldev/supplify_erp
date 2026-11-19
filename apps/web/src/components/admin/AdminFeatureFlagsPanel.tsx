@@ -40,9 +40,14 @@ function featureDisplayLabel(t: TFunction<'admin'>, featureKey: string, featureN
   return fromCatalog || featureName
 }
 
-function globalModeLabel(t: TFunction<'admin'>, globalOverride: boolean | null) {
+function globalModeLabel(
+  t: TFunction<'admin'>,
+  globalOverride: boolean | null,
+  defaultOn?: boolean
+) {
   if (globalOverride === true) return t('features.globalMode.onGlobal')
   if (globalOverride === false) return t('features.globalMode.offGlobal')
+  if (defaultOn) return t('features.globalMode.inheritDefaultOn')
   return t('features.globalMode.inheritFromPlans')
 }
 
@@ -422,7 +427,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                     variant="outline"
                     className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
                   >
-                    {globalModeLabel(t, flag.globalOverride)}
+                    {globalModeLabel(t, flag.globalOverride, flag.defaultOn)}
                   </Badge>
                 </article>
               ))}
@@ -458,7 +463,7 @@ export function AdminFeatureFlagsPanel({ tenants, tenantsLoading }: AdminFeature
                           variant="outline"
                           className={cn('text-xs font-medium', globalModeTone(flag.globalOverride))}
                         >
-                          {globalModeLabel(t, flag.globalOverride)}
+                          {globalModeLabel(t, flag.globalOverride, flag.defaultOn)}
                         </Badge>
                       </td>
                       <td className="px-4 py-3.5">

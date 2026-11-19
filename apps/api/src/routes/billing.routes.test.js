@@ -23,6 +23,15 @@ const rbacState = vi.hoisted(() => ({
   },
 }))
 
+vi.mock('../lib/tenant-feature-gate.js', () => {
+  const pass = (key) => Object.assign((_req, _res, next) => next(), { featureKey: key })
+  return {
+    tenantFeatureGate: pass,
+    publicTenantFeatureGate: pass,
+    platformFeatureGate: pass,
+  }
+})
+
 vi.mock('../lib/rbac.js', () => ({
   requireAuth: (req, res, next) => {
     req.userData = { ...rbacState.userData }
