@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
+import { businessSessionKey } from '../lib/businessSession'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useGetMeQuery, useGetRegisterStatusQuery } from '../services/api'
 import { useAppDispatch } from '../hooks/redux'
@@ -40,7 +41,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const { t } = useTranslation()
   const { data, error, isLoading, refetch } = useGetMeQuery(undefined, {
     refetchOnMountOrArgChange: false,
-    refetchOnFocus: false,
+    refetchOnFocus: true,
     refetchOnReconnect: true,
   })
   const needsLegalReacceptanceGate =
@@ -216,5 +217,5 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return null
   }
 
-  return <>{children}</>
+  return <Fragment key={businessSessionKey(data)}>{children}</Fragment>
 }

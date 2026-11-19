@@ -1,4 +1,5 @@
 import { api } from '../base'
+import type { WarehouseAccess } from '../../../types/auth'
 import type { LegalAcceptancePayload } from '../../../lib/legalDocuments'
 export const branchesApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -674,12 +675,24 @@ export const branchesApi = api.injectEndpoints({
           display_name: string
           role_id?: string
           role_name?: string
+          warehouseAccess?: WarehouseAccess
         }>
       },
       void
     >({
       query: () => '/api/roles/users',
       providesTags: ['TenantRoles'],
+    }),
+    setStaffWarehouseAccess: builder.mutation<
+      { userId: string; warehouseAccess: WarehouseAccess },
+      { userId: string; access: WarehouseAccess }
+    >({
+      query: ({ userId, access }) => ({
+        url: `/api/roles/users/${userId}/warehouse-access`,
+        method: 'PUT',
+        body: access,
+      }),
+      invalidatesTags: ['TenantRoles', 'User', 'Inventory'],
     }),
     createTenantRole: builder.mutation<
       { role: Record<string, unknown> },
@@ -717,12 +730,13 @@ export const branchesApi = api.injectEndpoints({
         role_id: string
         driver_id?: string | null
         create_driver_profile?: boolean
+        warehouseAccess?: WarehouseAccess
       }
     >({
-      query: ({ userId, role_id, driver_id, create_driver_profile }) => ({
+      query: ({ userId, role_id, driver_id, create_driver_profile, warehouseAccess }) => ({
         url: `/api/roles/users/${userId}/assign`,
         method: 'POST',
-        body: { role_id, driver_id, create_driver_profile },
+        body: { role_id, driver_id, create_driver_profile, warehouseAccess },
       }),
       invalidatesTags: ['TenantRoles', 'User'],
     }),

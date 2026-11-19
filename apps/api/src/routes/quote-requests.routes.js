@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -10,6 +11,7 @@ import {
   requireAnyPermission,
 } from '../lib/rbac.js'
 import { PERMISSION_KEYS as P } from '../lib/permission-keys.js'
+import { isQuoteCalendarDate } from '../lib/quote-response-validation.js'
 import { logger } from '../lib/logger.js'
 import {
   createQuoteRequest,
@@ -45,6 +47,7 @@ const createQuoteRequestSchema = z.object({
   neededBy: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'neededBy must be an ISO date (YYYY-MM-DD)')
+    .refine(isQuoteCalendarDate, 'neededBy must be a valid calendar day')
     .optional(),
 })
 
@@ -68,27 +71,45 @@ const declineSchema = z.object({
   reason: z.string().trim().max(500).optional().nullable(),
 })
 
-const responseItemSchema = z.object({
-  quoteRequestItemId: z.string().uuid(),
-  isAvailable: z.boolean().optional(),
-  unitPrice: z.number().nonnegative().optional().nullable(),
-  currency: z.string().optional(),
-  quantity: z.number().positive().optional().nullable(),
-  deliveryDate: z.string().optional().nullable(),
-  note: z.string().optional().nullable(),
-  substituteProductId: z.string().uuid().optional().nullable(),
-})
+const responseItemSchema = z
+  .object({
+    quoteRequestItemId: z.string().uuid(),
+    isAvailable: z.boolean().optional(),
+    unitPrice: z.number().finite().nonnegative().optional().nullable(),
+    currency: z
+      .string()
+      .regex(/^[A-Za-z]{3}$/)
+      .optional(),
+    quantity: z.number().finite().positive().optional().nullable(),
+    deliveryDate: z
+      .string()
+      .refine(isQuoteCalendarDate, 'deliveryDate must be a valid calendar day')
+      .optional()
+      .nullable(),
+    note: z.string().optional().nullable(),
+    substituteProductId: z.string().uuid().optional().nullable(),
+  })
+  .refine(
+    (item) => item.isAvailable === false || item.unitPrice != null,
+    'Available items require a unit price'
+  )
 
 const submitResponseSchema = z.object({
   note: z.string().optional(),
-  items: z.array(responseItemSchema).min(1),
+  items: z
+    .array(responseItemSchema)
+    .min(1)
+    .refine(
+      (items) => new Set(items.map((item) => item.quoteRequestItemId)).size === items.length,
+      'A quote request item can appear only once'
+    ),
 })
 
 const updateQuoteRequestStatusSchema = z.object({
   status: z.enum(['closed', 'cancelled']),
 })
 
-router.use(requireAuth, resolveTenantContext)
+router.use(requireAuth, resolveTenantContext, tenantFeatureGate('quote_requests'))
 
 // Supplier routes first (more specific paths)
 router.get(

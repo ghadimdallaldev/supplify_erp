@@ -41,6 +41,25 @@ export function isActiveDriverDeliveryStatus(status: string): boolean {
   return ACTIVE_STATUSES.has(String(status || 'pending').toLowerCase())
 }
 
+export function resolveDriverDeliveryLeg<
+  T extends {
+    orderId: string
+    assignmentId?: string | null
+    warehouseAssignmentId?: string | null
+    deliveryStatus: string
+  },
+>(orders: readonly T[], orderId: string, assignmentId?: string | null): T | undefined {
+  const legs = orders.filter((order) => order.orderId === orderId)
+  if (assignmentId != null) return legs.find((order) => order.assignmentId === assignmentId)
+  return (
+    legs.find(
+      (order) => order.assignmentId && isActiveDriverDeliveryStatus(order.deliveryStatus)
+    ) ??
+    legs.find((order) => isActiveDriverDeliveryStatus(order.deliveryStatus)) ??
+    legs[0]
+  )
+}
+
 export function isDoneDriverDeliveryStatus(status: string): boolean {
   return DONE_STATUSES.has(String(status || '').toLowerCase())
 }

@@ -107,7 +107,8 @@ export async function getSupplierReceivables(supplierId) {
         i.currency,
         SUM(i.balance_due)::numeric AS balance_due,
         COUNT(*)::int AS invoice_count,
-        MIN(i.due_date) AS oldest_due_date
+        MIN(i.due_date) AS oldest_due_date,
+        (array_agg(i.id ORDER BY i.due_date ASC NULLS LAST, i.created_at ASC, i.id ASC))[1] AS oldest_invoice_id
       FROM invoice i
       JOIN restaurant r ON r.id = i.restaurant_id
       WHERE i.supplier_id = $1
@@ -144,13 +145,6 @@ export async function getSupplierReceivables(supplierId) {
   const totalOverdue = folded.money.overdue_total
   const partialCount = folded.counts.partial_count || 0
 
-  const oldestInvoiceByRestaurant = {}
-  for (const row of invoices) {
-    if (!oldestInvoiceByRestaurant[row.restaurant_id]) {
-      oldestInvoiceByRestaurant[row.restaurant_id] = row.id
-    }
-  }
-
   const topDebtors = topDebtorRows.map((row) => ({
     restaurantId: row.restaurant_id,
     restaurantName: row.restaurant_name,
@@ -158,7 +152,7 @@ export async function getSupplierReceivables(supplierId) {
     balanceDue: parseFloat(row.balance_due) || 0,
     invoiceCount: parseInt(row.invoice_count, 10) || 0,
     oldestDueDate: formatInvoiceCalendarDate(row.oldest_due_date),
-    oldestInvoiceId: oldestInvoiceByRestaurant[row.restaurant_id] || null,
+    oldestInvoiceId: row.oldest_invoice_id || null,
   }))
 
   return {

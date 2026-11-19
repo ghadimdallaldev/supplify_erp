@@ -2,10 +2,7 @@
  * Resolve which supplier/restaurant tenant a user belongs to (workspace + role assignment).
  */
 import { query } from './db.js'
-import { getCache, setCache, deleteCache } from './cache.js'
-import { singleflight } from './singleflight.js'
-
-const WS_ASSIGN_CACHE_TTL_SECONDS = 180
+import { deleteCache } from './cache.js'
 
 export function workspaceAssignmentCacheKey(userId, tenantType) {
   return `ws:assign:${userId}:${tenantType}`
@@ -25,9 +22,10 @@ async function loadTenantAssignmentForUser(userId, appRole) {
     `
     SELECT tur.tenant_id, tur.tenant_type,
            COALESCE(r.name, s.name) AS tenant_name,
-           tr.name AS role_name
+           CASE WHEN tr.is_system IS NOT TRUE AND LOWER(TRIM(tr.name)) IN ('owner', 'restaurant_owner', 'supplier_owner')
+             THEN 'Custom: ' || TRIM(tr.name) ELSE tr.name END AS role_name
     FROM tenant_user_roles tur
-    JOIN tenant_roles tr ON tr.id = tur.role_id
+    JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
     LEFT JOIN restaurant r ON r.id = tur.tenant_id AND tur.tenant_type = 'RESTAURANT'
     LEFT JOIN supplier s ON s.id = tur.tenant_id AND tur.tenant_type = 'SUPPLIER'
     WHERE tur.user_id = $1 AND tur.tenant_type = $2
@@ -74,21 +72,7 @@ async function loadTenantAssignmentForUser(userId, appRole) {
 }
 
 export async function getTenantAssignmentForUser(userId, appRole) {
-  if (!userId || (appRole !== 'RESTAURANT' && appRole !== 'SUPPLIER')) return null
-
-  const tenantType = appRole
-  const cacheKey = workspaceAssignmentCacheKey(userId, tenantType)
-  const cached = await getCache(cacheKey)
-  if (cached !== null) return cached === 'null' ? null : cached
-
-  return singleflight(cacheKey, async () => {
-    const again = await getCache(cacheKey)
-    if (again !== null) return again === 'null' ? null : again
-
-    const assignment = await loadTenantAssignmentForUser(userId, appRole)
-    await setCache(cacheKey, assignment ?? 'null', WS_ASSIGN_CACHE_TTL_SECONDS).catch(() => {})
-    return assignment
-  })
+  return loadTenantAssignmentForUser(userId, appRole)
 }
 
 export async function isPrimaryTenantContact(userId, email, tenantId, tenantType) {

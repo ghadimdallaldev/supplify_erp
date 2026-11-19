@@ -13,15 +13,24 @@ export const assistantApi = api.injectEndpoints({
       query: () => '/api/assistant/capabilities',
       providesTags: ['Assistant'],
     }),
-    getAssistantConversations: builder.query<{ conversations: AssistantConversation[] }, void>({
-      query: () => '/api/assistant/conversations',
+    getAssistantConversations: builder.query<
+      { conversations: AssistantConversation[] },
+      { offset?: number } | void
+    >({
+      query: (arg) => ({
+        url: '/api/assistant/conversations',
+        params: { limit: 20, offset: arg?.offset || 0 },
+      }),
       providesTags: ['Assistant'],
     }),
     getAssistantMessages: builder.query<
-      { messages: AssistantMessage[] },
-      { conversationId: string }
+      { messages: AssistantMessage[]; hasMore?: boolean; nextBefore?: string | null },
+      { conversationId: string; before?: string }
     >({
-      query: ({ conversationId }) => `/api/assistant/conversations/${conversationId}/messages`,
+      query: ({ conversationId, before }) => ({
+        url: `/api/assistant/conversations/${conversationId}/messages`,
+        params: { before },
+      }),
       providesTags: (_r, _e, arg) => [{ type: 'Assistant' as const, id: arg.conversationId }],
     }),
     sendAssistantMessage: builder.mutation<

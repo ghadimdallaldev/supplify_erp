@@ -9,7 +9,7 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
   const { rows } = await query(
     `
     WITH restaurant_orders AS (
-      SELECT
+      SELECT DISTINCT
         o.restaurant_id,
         o.id AS order_id,
         COALESCE(o.placed_at, o.created_at) AS ordered_at
@@ -21,25 +21,25 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
     order_gaps AS (
       SELECT
         restaurant_id,
+        order_id,
         ordered_at,
-        LAG(ordered_at) OVER (PARTITION BY restaurant_id ORDER BY ordered_at) AS prev_ordered_at
+        LAG(ordered_at) OVER (PARTITION BY restaurant_id ORDER BY ordered_at, order_id) AS prev_ordered_at
       FROM restaurant_orders
     ),
     cadence AS (
       SELECT
-        ro.restaurant_id,
-        COUNT(DISTINCT ro.order_id)::int AS order_count,
-        MAX(ro.ordered_at) AS last_order_at,
+        og.restaurant_id,
+        COUNT(*)::int AS order_count,
+        MAX(og.ordered_at) AS last_order_at,
         AVG(
           CASE
             WHEN og.prev_ordered_at IS NOT NULL
             THEN EXTRACT(EPOCH FROM (og.ordered_at - og.prev_ordered_at)) / 86400.0
           END
         ) AS avg_days_between
-      FROM restaurant_orders ro
-      LEFT JOIN order_gaps og ON og.restaurant_id = ro.restaurant_id AND og.ordered_at = ro.ordered_at
-      GROUP BY ro.restaurant_id
-      HAVING COUNT(DISTINCT ro.order_id) >= $3
+      FROM order_gaps og
+      GROUP BY og.restaurant_id
+      HAVING COUNT(*) >= $3
     )
     SELECT
       c.restaurant_id,
@@ -69,6 +69,8 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
       restaurantId: row.restaurant_id,
       restaurantName: row.restaurant_name,
       orderCount: row.order_count,
+      lookbackDays: LOOKBACK_DAYS,
+      dataQuality: row.order_count >= 5 ? 'fair' : 'poor',
       lastOrderAt: row.last_order_at,
       avgDaysBetween: Math.round(parseFloat(row.avg_days_between) || 14),
       daysSinceLastOrder: daysSinceLast,

@@ -41,6 +41,10 @@ export async function listCommonProductBestPrices(restaurantId, { search = '', l
         AND COALESCE(followed_supplier.organization_id, followed_supplier.id) =
             COALESCE(s.organization_id, s.id)
     )
+      AND NOT EXISTS (
+        SELECT 1 FROM supplier_blocklist sb JOIN supplier blocked ON blocked.id = sb.supplier_id
+        WHERE sb.restaurant_id = $1 AND COALESCE(blocked.organization_id, blocked.id) = COALESCE(s.organization_id, s.id)
+      )
       AND (
         $2::text = '' OR p.name ILIKE '%' || $2 || '%'
         OR COALESCE(p.brand, '') ILIKE '%' || $2 || '%'

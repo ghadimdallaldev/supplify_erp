@@ -39,6 +39,8 @@ export const warehousesApi = api.injectEndpoints({
         code?: string
         address?: string
         is_active?: boolean
+        destination_warehouse_id?: string
+        confirm_transfer?: boolean
       }
     >({
       query: ({ id, ...body }) => ({

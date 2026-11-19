@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import { query } from '../../lib/db.js'
 import {
@@ -112,6 +113,7 @@ export const consumerFulfillmentAdminRoutes = express.Router()
 consumerFulfillmentAdminRoutes.use(
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('consumer_storefront'),
   requirePermission('SETTINGS_VIEW'),
   requireRole(['RESTAURANT', 'ADMIN'])
 )

@@ -356,6 +356,7 @@ export const {
   useUpdateTenantRoleMutation,
   useDeleteTenantRoleMutation,
   useAssignTenantUserRoleMutation,
+  useSetStaffWarehouseAccessMutation,
   useMarkNotificationReadMutation,
   useMarkAllNotificationsReadMutation,
   useGetPublicRestaurantQuery,

@@ -1,5 +1,6 @@
 import { query, withTransaction, withSavepoint } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
+import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { normalizeDaysOfWeek } from '../lib/quick-list-schedule.js'
 import {
   evaluateScheduledOrderLimit,
@@ -131,7 +132,12 @@ export async function executeScheduledOrders() {
           let aiAdjustments = null
 
           try {
-            if (quickList.auto_create_order) {
+            // Admin kill switch: with `ordering` off for this restaurant, a due list only
+            // reminds instead of placing an order.
+            const orderingEnabled = quickList.auto_create_order
+              ? await isFeatureEnabledForTenant(quickList.restaurant_id, 'RESTAURANT', 'ordering')
+              : false
+            if (quickList.auto_create_order && orderingEnabled) {
               // Savepoint per list: a failed list must not abort the shared transaction,
               // otherwise the ledger/outcome writes below and every later list roll back too.
               const result = await withSavepoint(client, () =>

@@ -22,7 +22,7 @@ export interface AssistantMessage {
   role: 'user' | 'assistant' | 'tool'
   content: string
   toolPayload?: {
-    sources?: Array<{ tool: string; args: unknown; ok: boolean }>
+    sources?: AssistantSource[]
     quotaLimited?: boolean
     attachments?: AssistantAttachment[]
   } | null
@@ -39,8 +39,23 @@ export interface AssistantAttachment {
 export interface AssistantSendResponse {
   conversationId: string
   reply: string
-  sources: Array<{ tool: string; args: unknown; ok: boolean }>
+  sources: AssistantSource[]
   usedLlm: boolean
   quotaLimited?: boolean
   quota?: AssistantCapabilities['quota']
+}
+export interface AssistantSource {
+  tool: string
+  args?: unknown
+  ok: boolean
+  evidence?: {
+    fetchedAt: string
+    status: 'ok' | 'unavailable'
+    scope: string
+    scopeId?: string
+    limited: boolean
+    totalCount?: number | null
+    returnedCount?: number | null
+    href?: string | null
+  }
 }

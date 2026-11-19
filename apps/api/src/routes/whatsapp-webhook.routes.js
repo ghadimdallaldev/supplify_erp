@@ -7,8 +7,10 @@ import {
   verifyWhatsAppSignature,
 } from '../lib/whatsapp-webhook.js'
 import { processWhatsAppWebhook } from '../services/whatsapp/webhook.service.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
+router.use(platformFeatureGate('whatsapp_ordering'))
 
 /**
  * Meta webhook verification handshake.

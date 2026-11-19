@@ -1,4 +1,5 @@
 import express from 'express'
+import { publicTenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import { query, withTransaction } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
@@ -55,6 +56,8 @@ import {
 } from '../services/public-supplier-catalog.service.js'
 import { resolveTenantByCustomHostname } from '../services/custom-domain.service.js'
 import { requireAuth, getRestaurantIdForRequest } from '../lib/rbac.js'
+import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
+import { resolveRestaurantBySlug } from '../services/consumer-menu.service.js'
 
 const router = express.Router()
 
@@ -126,6 +129,72 @@ let staffQueryTokenDeprecationLogged = false
  * Prefer `Authorization: Bearer <token>`, then JSON/body `token`.
  * Query string `?token=` is a deprecated fallback (logged once per process).
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Admin kill switch for public booking: new bookings/waitlist only (manage links keep working). */
+const publicReservationsGate = publicTenantFeatureGate(
+  'reservations',
+  'RESTAURANT',
+  async (req) => {
+    const id = req.query?.restaurantId || req.body?.restaurantId
+    return typeof id === 'string' && UUID_RE.test(id) ? id : null
+  }
+)
+
+/** Admin kill switch for public restaurant / supplier profile pages. */
+const publicRestaurantProfileGate = publicTenantFeatureGate(
+  'public_profile',
+  'RESTAURANT',
+  async (req) => (await resolveRestaurantBySlug(req.params.idOrSlug))?.id || null
+)
+const publicSupplierProfileGate = publicTenantFeatureGate(
+  'public_profile',
+  'SUPPLIER',
+  async (req) => {
+    const scope = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug).catch(() => null)
+    return scope?.tenantId || null
+  }
+)
+
+/** Reservations off → guest manage links and waitlist offers stop working too. */
+const publicReservationTokenGate = publicTenantFeatureGate(
+  'reservations',
+  'RESTAURANT',
+  async (req) => {
+    const token = req.query?.token || req.body?.token
+    if (typeof token !== 'string' || !UUID_RE.test(token)) return null
+    const { rows } = await query('SELECT restaurant_id FROM reservation WHERE public_token = $1', [
+      token,
+    ])
+    return rows[0]?.restaurant_id || null
+  }
+)
+const publicWaitlistTokenGate = publicTenantFeatureGate(
+  'reservations',
+  'RESTAURANT',
+  async (req) => {
+    const token = req.params?.token
+    if (typeof token !== 'string' || !UUID_RE.test(token)) return null
+    const { rows } = await query(
+      'SELECT restaurant_id FROM reservation_waitlist WHERE offer_token = $1',
+      [token]
+    )
+    return rows[0]?.restaurant_id || null
+  }
+)
+
+/** Admin kill switch for the public staff portal (magic-link sessions). */
+const publicStaffPortalGate = publicTenantFeatureGate(
+  'staff_management',
+  'RESTAURANT',
+  async (req) => {
+    const token = resolveStaffPortalToken(req)
+    if (typeof token !== 'string' || !UUID_RE.test(token)) return null
+    const session = await ensureStaffSession(token)
+    return session?.restaurant_id || null
+  }
+)
+
 function resolveStaffPortalToken(req) {
   const authHeader = req.headers.authorization
   if (authHeader?.startsWith('Bearer ')) {
@@ -189,7 +258,7 @@ function isUuid(str) {
 const PUBLIC_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600'
 const RESOLVE_HOST_CACHE_CONTROL = 'public, max-age=300, s-maxage=300, stale-while-revalidate=600'
 
-router.get('/restaurants/:idOrSlug', async (req, res) => {
+router.get('/restaurants/:idOrSlug', publicRestaurantProfileGate, async (req, res) => {
   try {
     const { idOrSlug } = req.params
     const byId = isUuid(idOrSlug)
@@ -246,7 +315,17 @@ router.get('/resolve-host', async (req, res) => {
         requestId: req.requestId,
       })
     }
-    const resolved = await resolveTenantByCustomHostname(host)
+    const resolvedHost = await resolveTenantByCustomHostname(host)
+    // Admin kill switch: public profile off for that tenant → custom domain resolves to nothing.
+    const resolved =
+      resolvedHost &&
+      (await isFeatureEnabledForTenant(
+        resolvedHost.tenantId,
+        resolvedHost.tenantType,
+        'public_profile'
+      ))
+        ? resolvedHost
+        : null
     if (!resolved) {
       return res.status(404).json({
         ok: false,
@@ -268,7 +347,7 @@ router.get('/resolve-host', async (req, res) => {
   }
 })
 
-router.get('/suppliers/:idOrSlug', async (req, res) => {
+router.get('/suppliers/:idOrSlug', publicSupplierProfileGate, async (req, res) => {
   try {
     const data = await getPublicSupplierProfile(req.params.idOrSlug)
     res.set('Cache-Control', PUBLIC_CACHE_CONTROL)
@@ -292,7 +371,7 @@ router.get('/suppliers/:idOrSlug', async (req, res) => {
   }
 })
 
-router.get('/suppliers/:idOrSlug/products', async (req, res) => {
+router.get('/suppliers/:idOrSlug/products', publicSupplierProfileGate, async (req, res) => {
   try {
     const params = publicSupplierProductsSchema.parse(req.query)
     const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
@@ -318,49 +397,54 @@ router.get('/suppliers/:idOrSlug/products', async (req, res) => {
   }
 })
 
-router.get('/suppliers/:idOrSlug/products/priced', requireAuth, async (req, res) => {
-  try {
-    const restaurantId = await getRestaurantIdForRequest(req)
-    if (!restaurantId) {
-      return res.status(403).json({
+router.get(
+  '/suppliers/:idOrSlug/products/priced',
+  publicSupplierProfileGate,
+  requireAuth,
+  async (req, res) => {
+    try {
+      const restaurantId = await getRestaurantIdForRequest(req)
+      if (!restaurantId) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: 'Restaurant login required for pricing' },
+          requestId: req.requestId,
+        })
+      }
+      const params = publicSupplierProductsSchema.parse(req.query)
+      const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+      const data = await listAuthenticatedRestaurantProducts(supplier.id, restaurantId, params)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (error) {
+      if (error.name === 'NotFoundError') {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
+          requestId: req.requestId,
+        })
+      }
+      if (error.name === 'ForbiddenError') {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'FORBIDDEN', message: error.message },
+          requestId: req.requestId,
+        })
+      }
+      logger.error('Public supplier priced products fetch failed', { error: error.message })
+      res.status(500).json({
         ok: false,
         data: null,
-        error: { name: 'FORBIDDEN', message: 'Restaurant login required for pricing' },
+        error: { name: 'PUBLIC_SUPPLIER_PRICED_ERROR', message: 'Unable to load priced products' },
         requestId: req.requestId,
       })
     }
-    const params = publicSupplierProductsSchema.parse(req.query)
-    const supplier = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
-    const data = await listAuthenticatedRestaurantProducts(supplier.id, restaurantId, params)
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (error) {
-    if (error.name === 'NotFoundError') {
-      return res.status(404).json({
-        ok: false,
-        data: null,
-        error: { name: 'SUPPLIER_NOT_FOUND', message: 'Supplier catalog not found' },
-        requestId: req.requestId,
-      })
-    }
-    if (error.name === 'ForbiddenError') {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: error.message },
-        requestId: req.requestId,
-      })
-    }
-    logger.error('Public supplier priced products fetch failed', { error: error.message })
-    res.status(500).json({
-      ok: false,
-      data: null,
-      error: { name: 'PUBLIC_SUPPLIER_PRICED_ERROR', message: 'Unable to load priced products' },
-      requestId: req.requestId,
-    })
   }
-})
+)
 
-router.get('/reservations/availability', async (req, res) => {
+router.get('/reservations/availability', publicReservationsGate, async (req, res) => {
   try {
     const params = availabilitySchema.parse({
       restaurantId: req.query.restaurantId,
@@ -417,7 +501,7 @@ router.get('/reservations/availability', async (req, res) => {
   }
 })
 
-router.post('/reservations', async (req, res) => {
+router.post('/reservations', publicReservationsGate, async (req, res) => {
   try {
     const payload = createPublicReservationSchema.parse(req.body)
     const scheduledAt = new Date(payload.scheduledAt)
@@ -591,7 +675,7 @@ router.post('/reservations', async (req, res) => {
   }
 })
 
-router.post('/reservations/waitlist', async (req, res) => {
+router.post('/reservations/waitlist', publicReservationsGate, async (req, res) => {
   try {
     const payload = publicWaitlistSchema.parse(req.body)
 
@@ -671,7 +755,7 @@ router.post('/reservations/waitlist', async (req, res) => {
   }
 })
 
-router.post('/reservations/waitlist/:token/accept', async (req, res) => {
+router.post('/reservations/waitlist/:token/accept', publicWaitlistTokenGate, async (req, res) => {
   try {
     const { token } = req.params
     if (!token) {
@@ -729,7 +813,7 @@ router.post('/reservations/waitlist/:token/accept', async (req, res) => {
   }
 })
 
-router.post('/reservations/waitlist/:token/decline', async (req, res) => {
+router.post('/reservations/waitlist/:token/decline', publicWaitlistTokenGate, async (req, res) => {
   try {
     const { token } = req.params
     if (!token) {
@@ -764,6 +848,8 @@ router.post('/reservations/waitlist/:token/decline', async (req, res) => {
     })
   }
 })
+
+router.use('/staff', publicStaffPortalGate)
 
 router.post('/staff/request-link', async (req, res) => {
   try {
@@ -1169,7 +1255,7 @@ router.post('/staff/availability', async (req, res) => {
   }
 })
 
-router.get('/reservations/manage', async (req, res) => {
+router.get('/reservations/manage', publicReservationTokenGate, async (req, res) => {
   try {
     const token = req.query.token
     if (!token) {
@@ -1240,7 +1326,7 @@ router.get('/reservations/manage', async (req, res) => {
   }
 })
 
-router.post('/reservations/manage/review', async (req, res) => {
+router.post('/reservations/manage/review', publicReservationTokenGate, async (req, res) => {
   try {
     const payload = publicReservationReviewSchema.parse(req.body)
     const review = await createReservationReviewByToken(payload)
@@ -1261,7 +1347,7 @@ router.post('/reservations/manage/review', async (req, res) => {
   }
 })
 
-router.post('/reservations/manage/cancel', async (req, res) => {
+router.post('/reservations/manage/cancel', publicReservationTokenGate, async (req, res) => {
   try {
     const token = req.body.token
     if (!token) {
@@ -1380,7 +1466,7 @@ router.post('/reservations/manage/cancel', async (req, res) => {
   }
 })
 
-router.post('/reservations/manage/reschedule', async (req, res) => {
+router.post('/reservations/manage/reschedule', publicReservationTokenGate, async (req, res) => {
   try {
     const { token, scheduledAt } = req.body ?? {}
     if (!token || !scheduledAt) {

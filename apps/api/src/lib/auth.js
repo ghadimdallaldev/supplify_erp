@@ -289,73 +289,36 @@ function normalizeIssuer(iss) {
   return iss.replace(/\/$/, '')
 }
 
-function isProductionAuthEnv() {
-  return config.APP_ENV === 'prod' || config.NODE_ENV === 'production'
-}
-
 // Verify JWT token
 export async function verifyToken(token) {
   try {
     const config = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID } = getKeycloakValues()
 
-    // Decode the token manually to extract payload (for issuer/audience handling)
-    const parts = token.split('.')
-    const headerPart = parts[0]
-    const payloadPart = parts[1]
-
-    const header = JSON.parse(Buffer.from(headerPart, 'base64url').toString())
-    const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString())
-
-    const expectedIssuer = normalizeIssuer(config.issuer)
-    const tokenIssuer = normalizeIssuer(payload.iss)
-    if (tokenIssuer && expectedIssuer && tokenIssuer !== expectedIssuer) {
-      if (isProductionAuthEnv()) {
-        throw new Error(`Token issuer mismatch. Expected: ${expectedIssuer}, Got: ${tokenIssuer}`)
-      }
-      logger.warn('Issuer mismatch', { expected: expectedIssuer, token: tokenIssuer })
-    }
-
-    const tokenAud = payload.aud
-    const tokenAzp = payload.azp
-    const audList = Array.isArray(tokenAud) ? tokenAud : tokenAud ? [tokenAud] : []
-    if (isProductionAuthEnv() && !tokenAzp && audList.length === 0) {
-      throw new Error('Token missing required aud and azp claims')
-    }
-
-    // Use issuer from token so we match Keycloak's exact format (with or without trailing slash)
-    const verifyIssuer = payload.iss || config.issuer
     const JWKS = getRemoteJwks(config.jwks_uri)
-
-    // Accept web, API, and mobile Keycloak clients (azp / aud vary by flow).
-    const acceptableAudiences = [KEYCLOAK_CLIENT_ID, 'supplify-web', 'supplify-mobile']
-    const hasValidAud =
-      audList.some((a) => acceptableAudiences.includes(a)) || acceptableAudiences.includes(tokenAzp)
-
-    try {
-      await jwtVerify(token, JWKS, {
-        issuer: verifyIssuer,
-        audience: KEYCLOAK_CLIENT_ID,
-      })
-      return payload
-    } catch (firstError) {
-      const msg = firstError?.message || ''
-      // Missing aud or wrong aud: verify signature + issuer only, then check audience manually
-      if (
-        msg.includes('missing required "aud" claim') ||
-        msg.includes('audience') ||
-        msg.includes('aud')
-      ) {
-        await jwtVerify(token, JWKS, { issuer: verifyIssuer })
-        if (!hasValidAud && (tokenAzp || audList.length > 0)) {
-          throw new Error(
-            `Token audience mismatch. Expected one of: ${acceptableAudiences.join(', ')}, Got azp: ${tokenAzp}, aud: ${JSON.stringify(tokenAud)}`
-          )
-        }
-        return payload
-      }
-      throw firstError
+    // Verify first. Only signed access-token claims may determine identity/client binding.
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: [normalizeIssuer(config.issuer), normalizeIssuer(config.issuer) + '/'],
+      algorithms: ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512'],
+      requiredClaims: ['iss', 'sub', 'exp'],
+    })
+    if (
+      !normalizeIssuer(payload.iss) ||
+      normalizeIssuer(payload.iss) !== normalizeIssuer(config.issuer)
+    )
+      throw new Error('Token issuer mismatch')
+    if (payload.typ && payload.typ !== 'Bearer') throw new Error('Only access tokens are accepted')
+    const acceptableClients = [KEYCLOAK_CLIENT_ID, 'supplify-web', 'supplify-mobile']
+    const audiences = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : []
+    if (payload.azp && !acceptableClients.includes(payload.azp))
+      throw new Error('Token authorized client mismatch')
+    if (
+      !audiences.some((value) => acceptableClients.includes(value)) &&
+      !acceptableClients.includes(payload.azp)
+    ) {
+      throw new Error('Token audience mismatch')
     }
+    return payload
   } catch (error) {
     const errorMessage = error?.message || 'Unknown error'
     const errorName = error?.name || 'Unknown'

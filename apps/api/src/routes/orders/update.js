@@ -98,7 +98,9 @@ async function reserveStockForDraftPlacement(client, order) {
   const { rows: supplierRows } = await client.query(`SELECT * FROM supplier WHERE id = $1`, [
     supplierId,
   ])
-  const multiWarehouseActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
+  const multiWarehouseActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse', {
+    dbQuery: (sql, params) => client.query(sql, params),
+  })
 
   return reserveStockForPlacedOrder(client, {
     supplierId,
@@ -141,7 +143,7 @@ router.patch('/:id', async (req, res) => {
     // Get order
     const { rows: orders } = await query(
       `
-      SELECT * FROM customer_order WHERE id = $1
+      SELECT *, requested_delivery_date::text AS requested_delivery_date FROM customer_order WHERE id = $1
     `,
       [id]
     )
@@ -181,7 +183,10 @@ router.patch('/:id', async (req, res) => {
         failureReason: updateData.failure_reason,
         actorUserId: req.userData.id,
       })
-      const { rows: refreshed } = await query(`SELECT * FROM customer_order WHERE id = $1`, [id])
+      const { rows: refreshed } = await query(
+        `SELECT *, requested_delivery_date::text AS requested_delivery_date FROM customer_order WHERE id = $1`,
+        [id]
+      )
       const { podRequired, hasPod } = await resolveDeliveryPodFlags({
         supplierId,
         orderId: id,
@@ -414,6 +419,12 @@ router.patch('/:id', async (req, res) => {
       paramIndex++
     }
 
+    if (updateData.notes !== undefined) {
+      updateFields.push(`notes = $${paramIndex}`)
+      updateValues.push(updateData.notes)
+      paramIndex++
+    }
+
     if (updateData.status === 'CANCELLED' && updateData.status !== order.status) {
       const cancelledBy = req.userData.role === 'SUPPLIER' ? 'SUPPLIER' : 'RESTAURANT'
       const cancelReason =
@@ -454,7 +465,7 @@ router.patch('/:id', async (req, res) => {
 
     const rows = await withTransaction(async (client) => {
       const { rows: lockedOrders } = await client.query(
-        `SELECT * FROM customer_order WHERE id = $1 FOR UPDATE`,
+        `SELECT *, requested_delivery_date::text AS requested_delivery_date FROM customer_order WHERE id = $1 FOR UPDATE`,
         [id]
       )
       if (!lockedOrders.length) throw new NotFoundError('Order not found')
@@ -533,7 +544,7 @@ router.patch('/:id', async (req, res) => {
         UPDATE customer_order
         SET ${updateFields.join(', ')}
         WHERE id = $${updateValues.length}
-        RETURNING *
+        RETURNING *, requested_delivery_date::text AS requested_delivery_date
       `,
         updateValues
       )

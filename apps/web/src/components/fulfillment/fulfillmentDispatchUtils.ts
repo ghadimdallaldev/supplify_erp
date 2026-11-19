@@ -21,6 +21,7 @@ export type DeliveryBoardOrder = {
   driverId?: string | null
   driverName?: string | null
   scheduledAt?: string
+  scheduledDeliveryDate?: string | null
   hasPod?: boolean
 }
 
@@ -56,6 +57,7 @@ export function enrichOrderFromBoard(
     ...order,
     delivery_area: meta.deliveryArea ?? order.delivery_area,
     scheduled_at: meta.scheduledAt ?? order.scheduled_at,
+    scheduledDeliveryDate: meta.scheduledDeliveryDate ?? order.scheduledDeliveryDate,
     delivery_status: meta.deliveryStatus ?? order.delivery_status,
   }
 }
@@ -154,6 +156,12 @@ export function canSelectOrderForRoute(order: {
 
 export function formatScheduledAt(value?: string | null): string {
   if (!value) return '—'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    })
+  }
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleString(undefined, {

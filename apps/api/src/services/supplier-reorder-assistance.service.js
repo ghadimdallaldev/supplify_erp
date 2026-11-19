@@ -20,12 +20,24 @@ function mergeSuggestions(intelligenceCustomers, cadenceAtRisk) {
       restaurantName: c.restaurantName,
       reasonCode: isChurnRisk ? 'churn_risk' : 'missed_pattern',
       reasonLabel: isChurnRisk
-        ? 'May be at risk of churn'
+        ? 'Longer than usual since the last order'
         : `Usually orders every ~${c.avgDaysBetween} days`,
       detail: c.suggestedFollowUp,
       daysSinceLastOrder: c.daysSinceLastOrder,
       avgDaysBetween: c.avgDaysBetween,
       lastOrderAt: c.lastOrderAt,
+      orderCount: c.orderCount,
+      dataQuality: c.dataQuality || (c.orderCount >= 5 ? 'fair' : 'poor'),
+      evidence: [
+        {
+          source: 'intelligence',
+          orderCount: c.orderCount,
+          lookbackDays: c.lookbackDays || 180,
+          avgDaysBetween: c.avgDaysBetween,
+          daysSinceLastOrder: c.daysSinceLastOrder,
+          lastOrderAt: c.lastOrderAt,
+        },
+      ],
       suggestedProducts: c.suggestedProducts,
       riskLevel: isChurnRisk ? 'high' : c.riskLevel,
       urgency: isChurnRisk ? 'HIGH' : c.riskLevel === 'high' ? 'HIGH' : 'MEDIUM',
@@ -41,8 +53,16 @@ function mergeSuggestions(intelligenceCustomers, cadenceAtRisk) {
       cadenceId: row.cadenceId,
       detail: `${row.restaurantName} usually orders on ${row.dayName}s but has not ordered yet.`,
     }
+    const cadenceEvidence = {
+      source: 'cadence',
+      cadenceId: row.cadenceId,
+      label: row.label,
+      dayName: row.dayName,
+    }
     if (existing) {
-      existing.sources.push('cadence')
+      if (!existing.sources.includes('cadence')) existing.sources.push('cadence')
+      if (!existing.evidence.some((entry) => entry.cadenceId === row.cadenceId))
+        existing.evidence.push(cadenceEvidence)
       if (!existing.cadenceId) {
         existing.cadenceId = row.cadenceId
         existing.reasonLabel = cadenceEntry.reasonLabel
@@ -60,6 +80,8 @@ function mergeSuggestions(intelligenceCustomers, cadenceAtRisk) {
         riskLevel: 'medium',
         urgency: 'MEDIUM',
         sources: ['cadence'],
+        dataQuality: 'poor',
+        evidence: [cadenceEvidence],
       })
     }
   }
@@ -85,6 +107,7 @@ export async function getSupplierReorderAssistance(supplierId, { graceDays } = {
     suggestions,
     total: suggestions.length,
     graceDays: intelligence.graceDays,
+    fetchedAt: new Date().toISOString(),
   }
 }
 

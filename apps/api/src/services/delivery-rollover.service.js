@@ -9,6 +9,8 @@ import {
 } from '../lib/delivery-rollover-time.js'
 import { notifyDeliveryRolloverBatch } from './notification.service.js'
 import { invalidateDispatchCacheForSupplier } from '../lib/dispatch-cache.js'
+import { lockDeliveryRoutesForOrder } from '../lib/delivery-route-state.js'
+import { nextRouteNumber } from '../lib/delivery-route-number.js'
 
 // picked_up and out_for_delivery are IN_PROGRESS states — rolling those over
 // would detach an already active leg from its live route stop.
@@ -80,12 +82,12 @@ export async function findUndeliveredAssignmentsForRollover({
       da.*,
       o.status AS order_status,
       d.full_name AS driver_name,
-      (${effDate}) AS effective_delivery_date
+      (${effDate})::text AS effective_delivery_date
     FROM driver_assignments da
     JOIN customer_order o ON o.id = da.order_id
     LEFT JOIN drivers d ON d.id = da.driver_id
     WHERE da.status = ANY($1::text[])
-      AND o.status <> ALL($2::text[])
+      AND o.status::text <> ALL($2::text[])
       AND EXISTS (
         SELECT 1
         FROM subscription sub
@@ -121,22 +123,6 @@ export async function findUndeliveredAssignmentsForRollover({
       cutoffHour: cutoff,
     })
   })
-}
-
-async function nextRouteNumber(supplierId, client) {
-  const db = client ? (sql, p) => client.query(sql, p) : query
-  const { rows } = await db(
-    `
-    SELECT COUNT(*)::int AS n
-    FROM delivery_route
-    WHERE supplier_id = $1
-      AND created_at >= date_trunc('day', now())
-    `,
-    [supplierId]
-  )
-  const seq = (rows[0]?.n ?? 0) + 1
-  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  return `R-${datePart}-${String(seq).padStart(3, '0')}`
 }
 
 async function findOrCreateRolloverRoute(
@@ -247,7 +233,7 @@ export async function rolloverAssignmentToNextDay({
     `
     SELECT da.*, o.status AS order_status, r.address_json,
       d.full_name AS driver_name, d.vehicle_type, d.vehicle_plate,
-      (${effDate}) AS effective_delivery_date
+      (${effDate})::text AS effective_delivery_date
     FROM driver_assignments da
     JOIN customer_order o ON o.id = da.order_id
     LEFT JOIN restaurant r ON r.id = o.restaurant_id
@@ -283,7 +269,6 @@ export async function rolloverAssignmentToNextDay({
   }
 
   const { calendarDate: today } = getZonedParts(now, cfg.timeZone)
-  const nextDate = addCalendarDays(row.effective_delivery_date || today, 1)
 
   if (row.rolled_over_at) {
     const rolledDay = getZonedParts(new Date(row.rolled_over_at), cfg.timeZone).calendarDate
@@ -293,8 +278,23 @@ export async function rolloverAssignmentToNextDay({
   }
 
   const result = await withTransaction(async (client) => {
+    const { rows: orders } = await client.query(
+      `SELECT id, status FROM customer_order WHERE id = $1 FOR UPDATE`,
+      [row.order_id]
+    )
+    if (!orders.length) return { ok: false, reason: 'not_found' }
+    if (TERMINAL_ORDER_STATUSES_FOR_ROLLOVER.includes(orders[0].status)) {
+      return { ok: false, reason: 'terminal_order', orderStatus: orders[0].status }
+    }
+    await lockDeliveryRoutesForOrder(client, { supplierId: row.supplier_id, orderId: row.order_id })
     const { rows: locked } = await client.query(
-      `SELECT * FROM driver_assignments WHERE id = $1 FOR UPDATE`,
+      `SELECT da.*, (${effDate})::text AS effective_delivery_date,
+         d.full_name AS driver_name, d.vehicle_type, d.vehicle_plate, r.address_json
+       FROM driver_assignments da
+       JOIN customer_order o ON o.id = da.order_id
+       LEFT JOIN restaurant r ON r.id = o.restaurant_id
+       LEFT JOIN drivers d ON d.id = da.driver_id
+       WHERE da.id = $1 FOR UPDATE OF da`,
       [assignmentId]
     )
     if (!locked.length) return { ok: false, reason: 'not_found' }
@@ -305,6 +305,24 @@ export async function rolloverAssignmentToNextDay({
     if (!(await isSupplierUnlockedForRollover(client, current.supplier_id))) {
       return { ok: false, reason: 'tenant_locked', supplierId: current.supplier_id }
     }
+    const currentNow = new Date()
+    const { calendarDate: currentDay } = getZonedParts(currentNow, cfg.timeZone)
+    if (!force && current.rolled_over_at) {
+      const rolledDay = getZonedParts(new Date(current.rolled_over_at), cfg.timeZone).calendarDate
+      if (rolledDay === currentDay) return { ok: false, reason: 'already_rolled_today' }
+    }
+    if (
+      !force &&
+      !isDeliveryDateEligibleForRollover({
+        effectiveDeliveryDate: current.effective_delivery_date,
+        now: currentNow,
+        timeZone: cfg.timeZone,
+        cutoffHour: cfg.cutoffHour,
+      })
+    ) {
+      return { ok: false, reason: 'before_cutoff', deliveryDate: current.effective_delivery_date }
+    }
+    const nextDate = addCalendarDays(current.effective_delivery_date || currentDay, 1)
 
     const rolloverNote = ROLLOVER_AUDIT_MESSAGE
     const notes = current.notes ? `${current.notes}\n${rolloverNote}` : rolloverNote
@@ -331,18 +349,19 @@ export async function rolloverAssignmentToNextDay({
 
     let routeId = null
     if (cfg.keepDriver && current.driver_id) {
-      const vehicleInfo = [row.vehicle_type, row.vehicle_plate].filter(Boolean).join(' · ') || null
+      const vehicleInfo =
+        [current.vehicle_type, current.vehicle_plate].filter(Boolean).join(' · ') || null
       routeId = await findOrCreateRolloverRoute(client, {
         supplierId: current.supplier_id,
         driverId: current.driver_id,
-        driverName: row.driver_name,
+        driverName: current.driver_name,
         vehicleInfo,
         scheduledDate: nextDate,
       })
       await appendStopToRolloverRoute(client, {
         routeId,
         orderId: current.order_id,
-        addressJson: row.address_json,
+        addressJson: current.address_json,
       })
     }
 
@@ -351,7 +370,7 @@ export async function rolloverAssignmentToNextDay({
       assignmentId,
       orderId: current.order_id,
       supplierId: current.supplier_id,
-      previousDate: row.effective_delivery_date,
+      previousDate: current.effective_delivery_date,
       scheduledDeliveryDate: nextDate,
       routeId,
       driverId: current.driver_id,

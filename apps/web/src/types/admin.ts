@@ -123,6 +123,10 @@ export interface AdminFeatureFlag {
   description: string | null
   globalOverride: boolean | null
   updatedAt: string | null
+  /** Platform-wide key (not per account). */
+  platformOnly?: boolean
+  /** ON when inherit — core feature kill switch rather than a plan-sold feature. */
+  defaultOn?: boolean
 }
 
 export interface EffectiveFeature {

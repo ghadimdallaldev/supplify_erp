@@ -46,6 +46,7 @@ import {
   recordBranchAccountLinkHistory,
 } from '../lib/branch-account-billing.js'
 import { supplierOrgConsolidatedOverview } from '../services/org-reports.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -231,6 +232,7 @@ router.use(
   resolveTenantContext,
   resolveAdminContext,
   requireSupplierOrgContext,
+  tenantFeatureGate('branch_management'),
   orgStructureGuard
 )
 
@@ -391,6 +393,13 @@ router.post('/branches', requireOrgOwner, multiBranchFeature, async (req, res) =
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error.code === 'LIMIT_EXCEEDED')
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+        requestId: req.requestId,
+      })
     logger.error('POST /api/org/branches error:', error)
     res.status(500).json({
       ok: false,
@@ -677,6 +686,13 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === 'LIMIT_EXCEEDED')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
       logger.error('POST org reactivate error:', error)
       res.status(500).json({
         ok: false,

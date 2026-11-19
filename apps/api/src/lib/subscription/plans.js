@@ -59,8 +59,8 @@ function subscriptionCacheKey(tenantId, tenantType) {
 /** Non-terminal commercial statuses — never mint a Free ACTIVE row over these. */
 const NON_TERMINAL_SUBSCRIPTION_STATUSES = ['TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED']
 
-async function ensureTenantSubscription(tenantId, tenantType) {
-  const { rows: plans } = await query(
+async function ensureTenantSubscription(tenantId, tenantType, dbQuery = query) {
+  const { rows: plans } = await dbQuery(
     `SELECT id, name, code FROM subscription_plan WHERE code = 'free' AND tenant_type = $1 AND is_active = true LIMIT 1`,
     [tenantType]
   )
@@ -76,7 +76,7 @@ async function ensureTenantSubscription(tenantId, tenantType) {
   }
   // Any live commercial row (incl. PAST_DUE / SUSPENDED) blocks Free minting so grace
   // and lock semantics are not overwritten by a newer pending-activation Free ACTIVE row.
-  const { rows: existing } = await query(
+  const { rows: existing } = await dbQuery(
     `SELECT 1 FROM subscription
      WHERE tenant_id = $1 AND tenant_type = $2
        AND status = ANY($3::text[])
@@ -85,7 +85,7 @@ async function ensureTenantSubscription(tenantId, tenantType) {
   )
   if (existing.length > 0) return
 
-  await createPendingActivationSubscription(query, tenantId, tenantType, 'free')
+  await createPendingActivationSubscription({ query: dbQuery }, tenantId, tenantType, 'free')
   logger.info('Created pending-activation Free subscription for tenant', {
     tenantId,
     tenantType,
@@ -100,23 +100,24 @@ async function ensureTenantSubscription(tenantId, tenantType) {
  * @returns {Promise<Object|null>} Subscription with plan details
  */
 export async function getTenantSubscription(tenantId, tenantType, options = {}) {
-  const { skipOrgBilling = false } = options
+  const { skipOrgBilling = false, dbQuery = query } = options
+  const useCache = dbQuery === query
   const billingTenantId = skipOrgBilling
     ? tenantId
-    : await resolveOrgBillingTenantId(tenantId, tenantType)
+    : await resolveOrgBillingTenantId(tenantId, tenantType, { dbQuery })
 
   // Check cache first - avoids repeated DB hits on hot paths (requireFeature, checkLimit, etc.)
   const cacheKey = subscriptionCacheKey(billingTenantId, tenantType)
-  const cached = await getCache(cacheKey)
+  const cached = useCache ? await getCache(cacheKey) : null
   if (cached !== null) return cached
 
-  return singleflight(cacheKey, async () => {
-    const again = await getCache(cacheKey)
+  const load = async () => {
+    const again = useCache ? await getCache(cacheKey) : null
     if (again !== null) return again
 
     try {
       try {
-        const { rows: subRows } = await query(
+        const { rows: subRows } = await dbQuery(
           `SELECT id, plan_id, pending_plan_id, pending_effective_at FROM subscription
          WHERE tenant_id = $1 AND tenant_type = $2 AND status IN ('TRIALING', 'ACTIVE') ORDER BY created_at DESC LIMIT 1`,
           [billingTenantId, tenantType]
@@ -128,17 +129,17 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
             sub.pending_effective_at &&
             new Date(sub.pending_effective_at) <= new Date()
           ) {
-            const { rows: planRows } = await query(
+            const { rows: planRows } = await dbQuery(
               'SELECT id, name, code FROM subscription_plan WHERE id = $1',
               [sub.pending_plan_id]
             )
             if (planRows.length > 0) {
               const newPlan = planRows[0]
-              const { rows: oldPlan } = await query(
+              const { rows: oldPlan } = await dbQuery(
                 'SELECT code FROM subscription_plan WHERE id = $1',
                 [sub.plan_id]
               )
-              await query(
+              await dbQuery(
                 `UPDATE subscription SET plan_id = $1, plan_name = $2, previous_plan_code = $3, pending_plan_id = NULL, pending_effective_at = NULL, updated_at = now() WHERE id = $4`,
                 [sub.pending_plan_id, newPlan.name, oldPlan[0]?.code || null, sub.id]
               )
@@ -170,14 +171,14 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
 
       // Prefer live entitlements first; fall back to commercial PAST_DUE/SUSPENDED
       // so feature gating never mints Free over an existing paid/grace row.
-      let { rows } = await query(subscriptionSelect, [
+      let { rows } = await dbQuery(subscriptionSelect, [
         billingTenantId,
         tenantType,
         ['TRIALING', 'ACTIVE'],
       ])
 
       if (rows.length === 0) {
-        const commercial = await query(subscriptionSelect, [
+        const commercial = await dbQuery(subscriptionSelect, [
           billingTenantId,
           tenantType,
           ['PAST_DUE', 'SUSPENDED'],
@@ -186,8 +187,8 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
       }
 
       if (rows.length === 0) {
-        await ensureTenantSubscription(billingTenantId, tenantType)
-        const result = await query(subscriptionSelect, [
+        await ensureTenantSubscription(billingTenantId, tenantType, dbQuery)
+        const result = await dbQuery(subscriptionSelect, [
           billingTenantId,
           tenantType,
           ['TRIALING', 'ACTIVE'],
@@ -198,7 +199,7 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
       const result = rows[0] || null
       // Populate cache (TTL=30s). On cache miss (null result), do NOT cache — tenant may have
       // just been created and ensureTenantSubscription will retry on next call.
-      if (result !== null) {
+      if (result !== null && useCache) {
         await setCache(cacheKey, result, SUBSCRIPTION_CACHE_TTL).catch(() => {})
       }
       return result
@@ -206,7 +207,8 @@ export async function getTenantSubscription(tenantId, tenantType, options = {}) 
       logger.error('Get tenant subscription error', { error: error.message })
       return null
     }
-  })
+  }
+  return useCache ? singleflight(cacheKey, load) : load()
 }
 
 /**

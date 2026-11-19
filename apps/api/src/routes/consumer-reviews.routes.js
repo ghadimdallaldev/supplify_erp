@@ -1,4 +1,6 @@
 import express from 'express'
+import { resolveRestaurantBySlug } from '../services/consumer-menu.service.js'
+import { publicTenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import { requireAuth, resolveTenantContext } from '../lib/rbac.js'
 import { optionalAuthConsumer } from '../middlewares/consumerAuth.js'
@@ -12,6 +14,22 @@ import {
 } from '../services/consumer-reviews.service.js'
 
 const router = express.Router()
+
+const ownReviewGate = publicTenantFeatureGate('consumer_reviews', 'RESTAURANT', async (req) => {
+  const { rows } = await query('SELECT restaurant_id FROM restaurant_reviews WHERE id = $1', [
+    req.params.id,
+  ]).catch(() => ({ rows: [] }))
+  return rows[0]?.restaurant_id || null
+})
+
+const consumerReviewsGate = publicTenantFeatureGate(
+  'consumer_reviews',
+  'RESTAURANT',
+  async (req) => {
+    const restaurant = await resolveRestaurantBySlug(req.params.restaurantId)
+    return restaurant?.id
+  }
+)
 
 const reviewBodySchema = z.object({
   consumerOrderId: z.string().uuid(),
@@ -41,7 +59,7 @@ const paginationSchema = z.object({
     .transform((v) => (v ? parseInt(v, 10) : 0)),
 })
 
-router.get('/restaurants/:restaurantId', async (req, res, next) => {
+router.get('/restaurants/:restaurantId', consumerReviewsGate, async (req, res, next) => {
   try {
     const { restaurantId } = req.params
     const { limit, offset } = paginationSchema.parse(req.query)
@@ -58,7 +76,7 @@ router.get('/restaurants/:restaurantId', async (req, res, next) => {
   }
 })
 
-router.get('/restaurants/:restaurantId/summary', async (req, res, next) => {
+router.get('/restaurants/:restaurantId/summary', consumerReviewsGate, async (req, res, next) => {
   try {
     const summary = await getRestaurantRatingSummary(req.params.restaurantId)
     res.json({
@@ -72,67 +90,72 @@ router.get('/restaurants/:restaurantId/summary', async (req, res, next) => {
   }
 })
 
-router.post('/restaurants/:restaurantId', optionalAuthConsumer, async (req, res, next) => {
-  try {
-    const body = reviewBodySchema.parse(req.body)
-    const reviewerUserId = req.userData?.id ?? null
-    const consumerMemberId = req.consumerMember?.id ?? null
+router.post(
+  '/restaurants/:restaurantId',
+  consumerReviewsGate,
+  optionalAuthConsumer,
+  async (req, res, next) => {
+    try {
+      const body = reviewBodySchema.parse(req.body)
+      const reviewerUserId = req.userData?.id ?? null
+      const consumerMemberId = req.consumerMember?.id ?? null
 
-    // M14: Require either an authenticated consumer session or a valid receipt_token.
-    // This prevents arbitrary users from submitting reviews for orders they didn't place.
-    if (!reviewerUserId && !consumerMemberId && !body.receiptToken) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'FORBIDDEN',
-          message: 'A consumer session or receipt_token is required to submit a review',
-        },
-        requestId: req.requestId,
-      })
-    }
-
-    // If receipt_token provided, verify it belongs to the claimed consumerOrderId.
-    if (body.receiptToken) {
-      const { rows: tokenRows } = await query(
-        `SELECT id FROM consumer_order WHERE id = $1 AND receipt_token = $2 LIMIT 1`,
-        [body.consumerOrderId, body.receiptToken]
-      )
-      if (!tokenRows.length) {
+      // M14: Require either an authenticated consumer session or a valid receipt_token.
+      // This prevents arbitrary users from submitting reviews for orders they didn't place.
+      if (!reviewerUserId && !consumerMemberId && !body.receiptToken) {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: { name: 'FORBIDDEN', message: 'receipt_token does not match the order' },
+          error: {
+            name: 'FORBIDDEN',
+            message: 'A consumer session or receipt_token is required to submit a review',
+          },
           requestId: req.requestId,
         })
       }
-    }
 
-    const review = await createRestaurantReview({
-      restaurantId: req.params.restaurantId,
-      consumerOrderId: body.consumerOrderId,
-      reviewerUserId,
-      reviewerName: body.reviewerName,
-      overallRating: body.overallRating,
-      foodRating: body.foodRating,
-      serviceRating: body.serviceRating,
-      ambianceRating: body.ambianceRating,
-      comment: body.comment,
-    })
-    res.status(201).json({
-      ok: true,
-      data: { review },
-      error: null,
-      requestId: req.requestId,
-    })
-  } catch (error) {
-    next(error)
+      // If receipt_token provided, verify it belongs to the claimed consumerOrderId.
+      if (body.receiptToken) {
+        const { rows: tokenRows } = await query(
+          `SELECT id FROM consumer_order WHERE id = $1 AND receipt_token = $2 LIMIT 1`,
+          [body.consumerOrderId, body.receiptToken]
+        )
+        if (!tokenRows.length) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: { name: 'FORBIDDEN', message: 'receipt_token does not match the order' },
+            requestId: req.requestId,
+          })
+        }
+      }
+
+      const review = await createRestaurantReview({
+        restaurantId: req.params.restaurantId,
+        consumerOrderId: body.consumerOrderId,
+        reviewerUserId,
+        reviewerName: body.reviewerName,
+        overallRating: body.overallRating,
+        foodRating: body.foodRating,
+        serviceRating: body.serviceRating,
+        ambianceRating: body.ambianceRating,
+        comment: body.comment,
+      })
+      res.status(201).json({
+        ok: true,
+        data: { review },
+        error: null,
+        requestId: req.requestId,
+      })
+    } catch (error) {
+      next(error)
+    }
   }
-})
+)
 
 router.use(requireAuth, resolveTenantContext)
 
-router.patch('/:id', async (req, res, next) => {
+router.patch('/:id', ownReviewGate, async (req, res, next) => {
   try {
     const body = reviewPatchSchema.parse(req.body)
     const review = await updateRestaurantReview(req.params.id, req.userData.id, body)
@@ -147,7 +170,7 @@ router.patch('/:id', async (req, res, next) => {
   }
 })
 
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', ownReviewGate, async (req, res, next) => {
   try {
     const result = await deleteRestaurantReview(req.params.id, req.userData.id)
     res.json({

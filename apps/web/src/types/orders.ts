@@ -57,6 +57,14 @@ export interface Order {
   delivery_location_snapshot?: DeliveryLocationSnapshot | null
   requested_delivery_method?: string | null
   requested_delivery_time?: string | null
+  requested_delivery_date?: string | null
+  deliveryResolution?: {
+    deliveryDate: string
+    rolled: boolean
+    reason: 'no_cutoff' | 'before_cutoff' | 'past_cutoff'
+    mode: 'none' | 'cutoff'
+    rolloverDays?: number
+  }
   warehouseFulfillment?: {
     warehouseId: string
     supplierTenantId?: string
@@ -66,6 +74,7 @@ export interface Order {
   created_at: string
   updated_at: string
   restaurant_name?: string
+  supplier_name?: string | null
   restaurant_slug?: string
   cancel_reason?: string | null
   cancelled_by?: 'RESTAURANT' | 'SUPPLIER' | null
@@ -91,6 +100,16 @@ export interface OrderItem {
   product_sku?: string
   supplier_name?: string
   supplier_slug?: string
+  pricing_source?:
+    | 'DEFAULT_PRICE'
+    | 'CONTRACT_PRICE'
+    | 'PROMOTION_PRICE'
+    | 'DISCOUNT_APPLIED'
+    | 'QUOTE_PRICE'
+    | null
+  quote_response_item_id?: string | null
+  contract_price_id?: string | null
+  default_catalog_price?: number | null
 }
 
 export interface CreateOrderRequest {
@@ -130,6 +149,7 @@ export interface CreateManualOrderRequest {
   deliveryTime?: string
   deliveryDate?: string
   idempotencyKey?: string
+  quoteLocks?: CreateOrderRequest['quoteLocks']
 }
 
 export interface UpdateOrderRequest {

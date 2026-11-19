@@ -18,12 +18,17 @@ import {
 } from '../services/notification.service.js'
 import { getTenantWebhook, upsertTenantWebhook } from '../services/notification/webhook.js'
 import { isPrivateHostname } from '../lib/ssrf-guard.js'
+import {
+  getScopedUserNotifications,
+  notificationAccessScope,
+} from '../services/notification/scoped-notifications.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
 const tenantMutationGuard = [resolveTenantContext, notificationsMutationGuard]
 
-router.use(requireAuth)
+router.use(requireAuth, resolveTenantContext, tenantFeatureGate('notification_center'))
 
 // Validation schemas
 const updatePreferencesSchema = z.object({
@@ -68,11 +73,14 @@ router.get('/', async (req, res) => {
     const userType = req.userData.role
     const { limit = '50', offset = '0', unreadOnly = 'false' } = req.query
 
-    const result = await getUserNotifications(userId, userType, {
+    const options = {
       limit: parseInt(limit),
       offset: parseInt(offset),
       unreadOnly: unreadOnly === 'true',
-    })
+    }
+    const result = ['SUPPLIER', 'RESTAURANT'].includes(userType)
+      ? await getScopedUserNotifications(userId, userType, req.tenantContext, options)
+      : await getUserNotifications(userId, userType, options)
 
     res.json({
       ok: true,
@@ -105,7 +113,9 @@ router.get('/unread-count', async (req, res) => {
     const userId = req.userData.id
     const userType = req.userData.role
 
-    const result = await getUnreadNotificationCount(userId, userType)
+    const result = ['SUPPLIER', 'RESTAURANT'].includes(userType)
+      ? await getScopedUserNotifications(userId, userType, req.tenantContext, { limit: 0 })
+      : await getUnreadNotificationCount(userId, userType)
 
     res.json({
       ok: true,
@@ -351,14 +361,31 @@ router.post('/:id/read', async (req, res) => {
     const userId = req.userData.id
     const userType = req.userData.role
 
-    await query(
-      `
+    const scope = ['SUPPLIER', 'RESTAURANT'].includes(userType)
+      ? notificationAccessScope(userId, userType, req.tenantContext)
+      : null
+    const marked = scope
+      ? await query(
+          `UPDATE notification_log SET is_read = TRUE, read_at = now()
+      WHERE ${scope.clause} AND id = $6 RETURNING id`,
+          [...scope.params, id]
+        )
+      : await query(
+          `
       UPDATE notification_log
       SET is_read = true, read_at = now()
       WHERE id = $1 AND user_id = $2 AND user_type = $3
     `,
-      [id, userId, userType]
-    )
+          [id, userId, userType]
+        )
+
+    if (scope && !marked.rowCount)
+      return res.status(404).json({
+        ok: false,
+        data: null,
+        error: { name: 'NOT_FOUND', message: 'Notification not found in this workspace' },
+        requestId: req.requestId,
+      })
 
     await invalidateUserNotificationsListCache(userId, userType)
 
@@ -393,14 +420,23 @@ router.post('/read-all', async (req, res) => {
     const userId = req.userData.id
     const userType = req.userData.role
 
-    const { rowCount } = await query(
-      `
+    const scope = ['SUPPLIER', 'RESTAURANT'].includes(userType)
+      ? notificationAccessScope(userId, userType, req.tenantContext)
+      : null
+    const { rowCount } = scope
+      ? await query(
+          `UPDATE notification_log SET is_read = TRUE, read_at = now()
+      WHERE ${scope.clause} AND is_read = FALSE`,
+          scope.params
+        )
+      : await query(
+          `
       UPDATE notification_log
       SET is_read = true, read_at = now()
       WHERE user_id = $1 AND user_type = $2 AND is_read = false
     `,
-      [userId, userType]
-    )
+          [userId, userType]
+        )
 
     await invalidateUserNotificationsListCache(userId, req.userData.role)
 

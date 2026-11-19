@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -25,7 +26,7 @@ import {
 
 const router = express.Router()
 
-router.use(requireAuth, resolveTenantContext)
+router.use(requireAuth, resolveTenantContext, tenantFeatureGate('loyalty'))
 
 const supplierProgramSchema = z.object({
   name: z.string().min(1).max(255).optional(),

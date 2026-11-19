@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 import { z, ZodError } from 'zod'
 import {
   requireAuth,
@@ -265,6 +266,7 @@ portalAdminRouter.use(
   requireAuth,
   requirePlatformAppAccess,
   resolveTenantContext,
+  tenantFeatureGate('staff_management'),
   requirePermission('STAFF_EDIT'),
   staffMutationGuard,
   requireRole(['RESTAURANT', 'ADMIN'])

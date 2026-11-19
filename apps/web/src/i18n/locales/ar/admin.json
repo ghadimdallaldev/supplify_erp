@@ -1098,7 +1098,8 @@
     "globalMode": {
       "onGlobal": "تشغيل (عام)",
       "offGlobal": "إيقاف (عام)",
-      "inheritFromPlans": "الوراثة من الخطط"
+      "inheritFromPlans": "الوراثة من الخطط",
+      "inheritDefaultOn": "الوراثة (مفعّل افتراضيًا)"
     },
     "source": {
       "tenantOverride": "تجاوز المستأجر",
@@ -1341,6 +1342,38 @@
     "fulfillment": "التنفيذ واللوجستيات",
     "driver_management": "إدارة السائقين",
     "promotions": "العروض",
-    "supplier_deals": "عروض الموردين"
+    "supplier_deals": "عروض الموردين",
+    "demo_campaign": "حملة العرض التجريبي العامة",
+    "ordering": "الطلبات",
+    "product_catalog": "كتالوج المنتجات والأسعار",
+    "global_search": "البحث الشامل",
+    "quote_requests": "طلبات عروض الأسعار",
+    "contract_pricing": "أسعار العقود",
+    "loyalty": "برامج الولاء",
+    "reservations": "الحجوزات وقائمة الانتظار",
+    "staff_management": "إدارة الموظفين",
+    "consumer_storefront": "متجر المستهلكين",
+    "consumer_reviews": "تقييمات المستهلكين",
+    "supplier_connections": "طلبات الربط مع الموردين",
+    "team_invitations": "دعوات الفريق",
+    "public_sales": "متجر المبيعات العام",
+    "branch_management": "إدارة الفروع",
+    "supplier_directory": "دليل الموردين",
+    "supplier_following": "متابعة / حظر الموردين",
+    "price_comparison": "مقارنة الأسعار",
+    "supplier_reviews_read": "تصفح تقييمات الموردين",
+    "delivery_locations": "مواقع التسليم",
+    "delivery_tracking": "تتبع التسليم وإثبات التسليم",
+    "packing_slips": "قوائم التعبئة",
+    "order_reminders": "تذكيرات الطلبات",
+    "notification_center": "صندوق الإشعارات",
+    "ops_dashboard": "مركز القيادة وورقة التشغيل",
+    "catalog_import": "استيراد الكتالوج بالجملة",
+    "product_substitutes": "بدائل المنتجات",
+    "fulfillment_issues": "مشكلات التنفيذ",
+    "stock_levels": "مستويات المخزون",
+    "order_warehouse_dispatch": "نقل المستودع والإرسال",
+    "featured_placement": "الظهور المميز",
+    "customer_directory": "دليل العملاء"
   }
 }

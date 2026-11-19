@@ -1,4 +1,8 @@
 import { query } from '../../lib/db.js'
+import Ajv from 'ajv'
+import addFormats from 'ajv-formats'
+import { createReadTools } from './read-tools.js'
+import { withAssistantEvidence } from './evidence.js'
 import { hasPermission } from '../../lib/permissions.js'
 import { rolesIncludeOwner } from '../../lib/tenant-roles.js'
 import { PERMISSION_KEYS as P } from '../../lib/permission-keys.js'
@@ -24,7 +28,6 @@ import { listSupplierWarehouseDemandForecast } from '../supplier-warehouse-deman
 import { getSupplierWeeklyIntelligenceSummary } from '../supplier-weekly-intelligence-summary.service.js'
 import { listCommonProductBestPrices } from '../supplier-price-comparison.service.js'
 import { buildAdminOverviewMetrics } from '../../lib/admin-overview-metrics.js'
-import { getTenantSubscription } from '../../lib/subscription.js'
 import { assertDriverAssignmentAccess, isDriverOnlyPermissions } from '../../lib/driver-rbac.js'
 import {
   getProductPriceHistory,
@@ -121,6 +124,7 @@ async function organizationHasForecast(ctx) {
 
 /** @type {Record<string, { definition: import('../../lib/ai/provider.js').AiToolDefinition, available: (ctx: AssistantToolContext) => Promise<boolean>, run: (ctx: AssistantToolContext, args: Record<string, unknown>) => Promise<unknown> }>} */
 const TOOLS = {
+  ...createReadTools({ can }),
   get_inventory: {
     definition: {
       name: 'get_inventory',
@@ -148,6 +152,7 @@ const TOOLS = {
         `
         SELECT
           ri.product_id AS "productId",
+          COUNT(*) OVER()::int AS "totalMatches",
           p.name AS "productName",
           p.sku AS sku,
           p.unit AS unit,
@@ -183,7 +188,12 @@ const TOOLS = {
         `,
         [ctx.tenantId, search, lowStockOnly, ROW_CAP]
       )
-      return { items: rows, filtered: Boolean(search) || lowStockOnly }
+      return {
+        items: rows,
+        filtered: Boolean(search) || lowStockOnly,
+        totalCount: rows[0]?.totalMatches ?? (rows.length < ROW_CAP ? rows.length : null),
+        hasMore: (rows[0]?.totalMatches ?? rows.length) > ROW_CAP,
+      }
     },
   },
 
@@ -194,7 +204,10 @@ const TOOLS = {
         'Whole-account snapshot for the restaurant: how many products are tracked, how many are low or out of stock, and recent order count and spend. Call this first for broad questions about how the business is doing or what needs attention.',
       parameters: { type: 'object', properties: {} },
     },
-    available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.INVENTORY_VIEW),
+    available: async (ctx) =>
+      ctx.tenantType === 'RESTAURANT' &&
+      can(ctx, P.INVENTORY_VIEW) &&
+      (await featureOn(ctx, 'inventory_management')),
     run: async (ctx) => {
       const { rows: inventoryRows } = await query(
         `
@@ -217,17 +230,22 @@ const TOOLS = {
       const { rows: orderRows } = await query(
         `
         SELECT
-          COUNT(*)::int AS "ordersLast30Days",
-          COALESCE(SUM(o.total_amount), 0) AS "spendLast30Days",
-          COUNT(*) FILTER (WHERE o.status NOT IN ('DELIVERED', 'CANCELLED'))::int AS "openOrders"
+          o.currency,
+          COUNT(*) FILTER (WHERE o.status::text NOT IN ('DRAFT','CANCELLED','PENDING_APPROVAL') AND COALESCE(o.placed_at,o.created_at) >= now() - interval '30 days')::int AS "ordersLast30Days",
+          COALESCE(SUM(o.total_amount) FILTER (WHERE o.status::text NOT IN ('DRAFT','CANCELLED','PENDING_APPROVAL') AND COALESCE(o.placed_at,o.created_at) >= now() - interval '30 days'), 0) AS "spendLast30Days",
+          COUNT(*) FILTER (WHERE o.status::text IN ('PLACED','ACKNOWLEDGED','PROCESSING','SHIPPED'))::int AS "openOrders"
         FROM customer_order o
         WHERE o.restaurant_id = $1
-          AND o.status <> 'DRAFT'
-          AND COALESCE(o.placed_at, o.created_at) >= now() - interval '30 days'
+        GROUP BY o.currency
         `,
         [ctx.tenantId]
       )
-      return { inventory: inventoryRows[0] || null, orders: orderRows[0] || null }
+      return {
+        inventory: inventoryRows[0] || null,
+        orders: orderRows.length === 1 ? orderRows[0] : null,
+        ordersByCurrency: orderRows,
+        periodDays: 30,
+      }
     },
   },
 
@@ -268,6 +286,8 @@ const TOOLS = {
     },
     available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
     run: async (ctx, args) => ({
+      pricingBasis: 'catalog',
+      note: 'Catalog comparison only. Contract and quote prices are resolved at checkout.',
       comparisons: await listCommonProductBestPrices(ctx.tenantId, {
         search: String(args.search || ''),
         limit: ROW_CAP,
@@ -292,8 +312,11 @@ const TOOLS = {
       can(ctx, P.INVENTORY_VIEW) &&
       (await featureOn(ctx, 'smart_reorder')),
     run: async (ctx, args) => {
-      const sub = await getTenantSubscription(ctx.tenantId, 'RESTAURANT')
-      const featureValue = sub?.features?.smart_reorder
+      const featureValue = await getResolvedFeatureValue(
+        ctx.tenantId,
+        'RESTAURANT',
+        'smart_reorder'
+      )
       const assistance = await getReorderAssistance(ctx.tenantId, {
         smartReorderFeatureValue: featureValue,
         limit: 40,
@@ -309,6 +332,14 @@ const TOOLS = {
         reasonCode: s.reasonCode,
         supplierName: s.supplierName,
         unit: s.unit || s.productUnit || null,
+        currentQty: s.currentQty,
+        incomingQty: s.incomingQty,
+        expectedUsage: s.expectedUsage,
+        action: s.action,
+        dataQuality: s.dataQuality,
+        warnings: s.warnings,
+        stockScope: s.stockScope,
+        orderBy: s.orderBy,
       }))
       if (search) {
         suggestions = suggestions.filter((s) =>
@@ -317,7 +348,13 @@ const TOOLS = {
             .includes(search)
         )
       }
-      return { suggestions: cap(suggestions), tier: assistance.smartReorder?.tier || null }
+      return {
+        suggestions: cap(suggestions),
+        hasMore: suggestions.length > ROW_CAP || assistance.hasMore,
+        tier: assistance.smartReorder?.tier || null,
+        asOf: assistance.asOf,
+        incomingKnown: assistance.incomingKnown,
+      }
     },
   },
 
@@ -375,6 +412,7 @@ const TOOLS = {
         `
         SELECT
           o.id,
+          COUNT(*) OVER()::int AS "totalMatches",
           'ORD-' || UPPER(SUBSTRING(o.id::text FROM 1 FOR 8)) AS "orderNumber",
           o.status,
           o.customer_type AS customer_type,
@@ -404,7 +442,11 @@ const TOOLS = {
         `,
         params
       )
-      return { orders: rows }
+      return {
+        orders: rows,
+        totalCount: rows[0]?.totalMatches ?? (rows.length < ROW_CAP ? rows.length : null),
+        hasMore: (rows[0]?.totalMatches ?? rows.length) > ROW_CAP,
+      }
     },
   },
 
@@ -544,7 +586,9 @@ const TOOLS = {
               id: inv.id,
               number: inv.invoice_number || inv.number,
               status: inv.status,
-              total: inv.total_amount || inv.total,
+              total: inv.total_amount ?? inv.total,
+              currency: inv.currency,
+              balanceDue: inv.balance_due ?? inv.balanceDue,
               dueDate: inv.due_date || inv.dueDate,
               counterparty: inv.supplier_name || inv.supplierName,
             }))
@@ -559,7 +603,9 @@ const TOOLS = {
             id: inv.id,
             number: inv.invoice_number || inv.number,
             status: inv.status,
-            total: inv.total_amount || inv.total,
+            total: inv.total_amount ?? inv.total,
+            currency: inv.currency,
+            balanceDue: inv.balance_due ?? inv.balanceDue,
             dueDate: inv.due_date || inv.dueDate,
             counterparty: inv.restaurant_name || inv.restaurantName,
           }))
@@ -951,9 +997,12 @@ const TOOLS = {
         ),
         commandCenter: command
           ? {
-              ordersToPrepare: command.ordersToPrepare ?? command.orders_to_prepare,
-              deliveriesPending: command.deliveriesPending ?? command.deliveries_pending,
-              lowStock: command.lowStock ?? command.low_stock,
+              ordersToPrepare: command.kpis?.ordersToPrepareToday,
+              deliveriesPending: command.kpis?.deliveriesPendingToday,
+              lowStock:
+                can(ctx, P.INVENTORY_VIEW) && (await featureOn(ctx, 'inventory_management'))
+                  ? command.kpis?.lowStockCount
+                  : undefined,
             }
           : null,
       }
@@ -1326,7 +1375,16 @@ export async function executeAssistantTool(ctx, name, args) {
     err.code = 'TOOL_FORBIDDEN'
     throw err
   }
-  return tool.run(ctx, args || {})
+  let validate = toolValidators.get(name)
+  if (!validate) {
+    validate = toolAjv.compile({ ...tool.definition.parameters, additionalProperties: false })
+    toolValidators.set(name, validate)
+  }
+  if (!validate(args || {}))
+    throw new Error(`Invalid arguments for ${name}: ${toolAjv.errorsText(validate.errors)}`)
+  return withAssistantEvidence(ctx, name, await tool.run(ctx, args || {}))
 }
 
 export const ASSISTANT_TOOL_NAMES = Object.keys(TOOLS)
+const toolAjv = addFormats(new Ajv({ strict: false }))
+const toolValidators = new Map()

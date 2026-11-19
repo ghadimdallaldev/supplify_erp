@@ -1,34 +1,13 @@
-import { query } from '../lib/db.js'
+import { loadIncomingSupply } from './reorder-supply.service.js'
 
-/**
- * Optional light query: open/pending order quantities for the given products.
- * Returns empty map when the query fails or productIds is empty.
- *
- * @param {string} restaurantId
- * @param {string[]} productIds
- * @returns {Promise<Map<string, number>>}
- */
 export async function fetchIncomingStockByProduct(restaurantId, productIds) {
-  const ids = [...new Set((productIds || []).filter(Boolean).map(String))]
-  if (ids.length === 0) return new Map()
-
-  try {
-    const { rows } = await query(
-      `
-      SELECT oi.product_id, COALESCE(SUM(oi.quantity), 0)::float AS incoming_qty
-      FROM order_item oi
-      JOIN customer_order co ON co.id = oi.order_id
-      WHERE co.restaurant_id = $1
-        AND oi.product_id = ANY($2::uuid[])
-        AND co.status IN ('PLACED', 'CONFIRMED', 'ACKNOWLEDGED', 'PROCESSING', 'INVOICED')
-      GROUP BY oi.product_id
-      `,
-      [restaurantId, ids]
-    )
-    return new Map(rows.map((r) => [String(r.product_id), Number(r.incoming_qty) || 0]))
-  } catch {
-    return new Map()
-  }
+  const supply = await loadIncomingSupply(restaurantId, productIds)
+  return new Map(
+    productIds.map((id) => [
+      String(id),
+      supply.known ? supply.products.get(String(id))?.confirmed || 0 : null,
+    ])
+  )
 }
 
 /**
@@ -56,12 +35,9 @@ export function buildReorderAiContextForProduct(suggestion, forecast = null, ext
     })
   }
 
-  const baseQuantity =
-    forecast?.forecastReorderQty != null && Number(forecast.forecastReorderQty) > 0
-      ? Number(forecast.forecastReorderQty)
-      : suggestion.suggestedQty != null && Number(suggestion.suggestedQty) > 0
-        ? Number(suggestion.suggestedQty)
-        : null
+  const baseQuantity = Object.hasOwn(suggestion, 'action')
+    ? (suggestion.suggestedQty ?? null)
+    : (forecast?.forecastReorderQty ?? suggestion.suggestedQty ?? null)
 
   const insufficientHistory = Boolean(forecast?.signals?.insufficientHistory)
   const weakConfidence =
@@ -90,6 +66,8 @@ export function buildReorderAiContextForProduct(suggestion, forecast = null, ext
     moq: Number(moq) || 1,
     orderMultiple: Number(orderMultiple) || 1,
     baseSuggestedQuantity: baseQuantity,
+    action: suggestion.action,
+    warnings: suggestion.warnings || [],
     defaultSupplierId: suggestion.supplierId ? String(suggestion.supplierId) : null,
     supplierOptions,
     forecast: forecast
@@ -111,20 +89,31 @@ export function buildReorderAiContextForProduct(suggestion, forecast = null, ext
         }
       : null,
     incomingStock:
-      extras.incomingStock != null && Number.isFinite(Number(extras.incomingStock))
-        ? Number(extras.incomingStock)
+      (suggestion.incomingQty ?? extras.incomingStock) != null &&
+      Number.isFinite(Number(suggestion.incomingQty ?? extras.incomingStock))
+        ? Number(suggestion.incomingQty ?? extras.incomingStock)
         : undefined,
     eligibility: {
       insufficientHistory,
       weakConfidence,
-      skipLlm: insufficientHistory || weakConfidence || baseQuantity == null,
-      skipReason: insufficientHistory
-        ? 'insufficient_history'
-        : weakConfidence
-          ? 'weak_confidence'
-          : baseQuantity == null
-            ? 'no_baseline_quantity'
-            : null,
+      skipLlm:
+        insufficientHistory ||
+        weakConfidence ||
+        baseQuantity == null ||
+        suggestion.action === 'wait' ||
+        suggestion.action === 'manual_review',
+      skipReason:
+        suggestion.action === 'wait'
+          ? 'supply_covers_need'
+          : suggestion.action === 'manual_review'
+            ? 'manual_review'
+            : insufficientHistory
+              ? 'insufficient_history'
+              : weakConfidence
+                ? 'weak_confidence'
+                : baseQuantity == null
+                  ? 'no_baseline_quantity'
+                  : null,
     },
   }
 
@@ -143,7 +132,9 @@ export async function buildReorderAiContexts(restaurantId, suggestions, forecast
   const productSuggestions = (suggestions || []).filter((s) => s.productId)
   const forecastByProduct = new Map((forecasts || []).map((f) => [String(f.productId), f]))
   const productIds = productSuggestions.map((s) => String(s.productId))
-  const incoming = await fetchIncomingStockByProduct(restaurantId, productIds)
+  const incoming = productSuggestions.every((s) => Object.hasOwn(s, 'incomingQty'))
+    ? new Map()
+    : await fetchIncomingStockByProduct(restaurantId, productIds)
 
   return productSuggestions.map((s) => {
     const pid = String(s.productId)

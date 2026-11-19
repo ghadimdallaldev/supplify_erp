@@ -1,5 +1,6 @@
 import { query } from '../lib/db.js'
 import { computeRestaurantForecasts } from './reorder-forecast.service.js'
+import { REORDER_MODEL_VERSION } from './reorder-forecast-model.js'
 import { getResolvedFeatureValue } from '../lib/feature-flags.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 
@@ -178,7 +179,7 @@ export async function getCachedForecasts(restaurantId, opts = {}) {
 
     if (opts.branchId) {
       params.push(opts.branchId)
-      branchClause = `AND COALESCE(rf.branch_id, $${params.length}::uuid) = $${params.length}::uuid`
+      branchClause = `AND rf.branch_id = $${params.length}::uuid`
     }
     if (opts.productId) {
       params.push(opts.productId)
@@ -207,6 +208,7 @@ export async function getCachedForecasts(restaurantId, opts = {}) {
       FROM reorder_forecast rf
       JOIN product p ON p.id = rf.product_id
       WHERE rf.restaurant_id = $1
+        AND rf.model_version = '${REORDER_MODEL_VERSION}'
         ${branchClause}
         ${productClause}
         ${staleClause}
@@ -256,7 +258,7 @@ export async function refreshIfStale(restaurantId, featureValue) {
       ) AS has_dirty,
       EXISTS (
         SELECT 1 FROM reorder_forecast
-        WHERE restaurant_id = $1 AND stale_after <= now()
+        WHERE restaurant_id = $1 AND (stale_after <= now() OR model_version <> '${REORDER_MODEL_VERSION}')
         LIMIT 1
       ) AS has_stale
       `,
@@ -303,7 +305,7 @@ export async function refreshAllDirtyForecasts() {
       `
       SELECT DISTINCT rf.restaurant_id
       FROM reorder_forecast rf
-      WHERE rf.stale_after <= now()
+      WHERE (rf.stale_after <= now() OR rf.model_version <> '${REORDER_MODEL_VERSION}')
         AND EXISTS (
           SELECT 1
           FROM subscription sub

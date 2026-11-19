@@ -163,7 +163,9 @@ export function DispatchOrderRow({
             </p>
             <p>
               {t('dispatch.orderRow.scheduled', {
-                date: formatScheduledAt(order.scheduled_at ?? order.created_at),
+                date: formatScheduledAt(
+                  order.scheduledDeliveryDate ?? order.scheduled_at ?? order.created_at
+                ),
               })}
             </p>
           </div>

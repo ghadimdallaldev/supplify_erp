@@ -12,6 +12,8 @@ export type LegalAcceptanceStatus = {
   accountType: 'RESTAURANT' | 'SUPPLIER' | 'CONSUMER' | null
 }
 
+export type WarehouseAccess = { mode: 'all' | 'assigned'; warehouseIds: string[] }
+
 export interface User {
   id: string
   email: string
@@ -31,6 +33,7 @@ export interface User {
   tenantRoles?: string[]
   /** Tenant-scoped permission codes for RBAC nav gating */
   tenantPermissions?: string[]
+  warehouseAccess?: WarehouseAccess | null
   /** Active workspace (supplier/restaurant account + role label) */
   workspace?: {
     tenantId: string

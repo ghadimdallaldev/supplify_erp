@@ -59,6 +59,7 @@ import {
   multiWarehouseFeature,
 } from './suppliers.helpers.js'
 import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -509,6 +510,7 @@ router.get(
   '/featured-placement/packages',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('featured_placement'),
   requireRole(['SUPPLIER', 'ADMIN']),
   async (req, res, next) => {
     try {
@@ -524,6 +526,7 @@ router.get(
   '/featured-placement/mine',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('featured_placement'),
   requireRole(['SUPPLIER']),
   requirePermission('SETTINGS_VIEW'),
   async (req, res, next) => {
@@ -542,6 +545,7 @@ router.post(
   '/featured-placement/purchase',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('featured_placement'),
   requireRole(['SUPPLIER']),
   requirePermission('SETTINGS_EDIT'),
   async (req, res, next) => {
@@ -571,6 +575,7 @@ router.post(
   '/featured-placement/:id/pay',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('featured_placement'),
   requireRole(['SUPPLIER']),
   requirePermission('SETTINGS_EDIT'),
   async (req, res, next) => {
@@ -670,6 +675,7 @@ router.get(
   '/:id/statistics',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_directory'),
   requireRole(['RESTAURANT']),
   requirePermission('CATALOG_VIEW'),
   async (req, res) => {

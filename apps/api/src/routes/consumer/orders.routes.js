@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import {
@@ -216,6 +217,7 @@ export const consumerOrdersAdminRoutes = express.Router()
 consumerOrdersAdminRoutes.use(
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('consumer_storefront'),
   requirePermission('ORDERS_VIEW'),
   requireRole(['RESTAURANT', 'ADMIN'])
 )

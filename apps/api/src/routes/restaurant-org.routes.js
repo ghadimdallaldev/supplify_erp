@@ -56,6 +56,7 @@ import {
   restaurantOrgStockTransferSuggestions,
   restaurantOrgAdvancedAnalytics,
 } from '../services/org-reports.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -250,6 +251,7 @@ router.use(
   resolveTenantContext,
   resolveAdminContext,
   requireRestaurantOrgContext,
+  tenantFeatureGate('branch_management'),
   orgStructureGuard
 )
 // Cross-branch purchasing is deliberately not a launch capability. Keep the
@@ -423,6 +425,13 @@ router.post('/branches', requireRestaurantOrgOwner, multiBranchFeature, async (r
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error.code === 'LIMIT_EXCEEDED')
+      return res.status(403).json({
+        ok: false,
+        data: null,
+        error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+        requestId: req.requestId,
+      })
     logger.error('POST /api/restaurant-org/branches error:', error)
     res.status(500).json({
       ok: false,
@@ -764,6 +773,13 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === 'LIMIT_EXCEEDED')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: 'LIMIT_EXCEEDED', message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
       logger.error('POST restaurant-org reactivate error:', error)
       res.status(500).json({
         ok: false,

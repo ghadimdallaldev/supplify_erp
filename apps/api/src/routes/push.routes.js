@@ -11,6 +11,7 @@ import {
   isValidExpoPushToken,
 } from '../services/push.service.js'
 import { setPushEnabledPreference } from '../services/notification.service.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -31,7 +32,7 @@ const deviceSchema = z.object({
   platform: z.enum(['ios', 'android']),
 })
 
-router.get('/vapid-public-key', (req, res) => {
+router.get('/vapid-public-key', platformFeatureGate('web_push'), (req, res) => {
   const publicKey = getVapidPublicKey()
   if (!publicKey) {
     return res.json({
@@ -116,7 +117,7 @@ router.post(
   }
 )
 
-router.delete('/devices', requireAuth, async (req, res, next) => {
+router.delete('/devices', platformFeatureGate('web_push'), requireAuth, async (req, res, next) => {
   try {
     const body = deviceSchema.parse(req.body)
     const removed = await removeExpoPushDevice(req.userData.id, body.token)

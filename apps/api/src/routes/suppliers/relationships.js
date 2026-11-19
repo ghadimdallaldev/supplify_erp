@@ -42,6 +42,7 @@ import {
 } from './suppliers.helpers.js'
 import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
 import { listCommonProductBestPrices } from '../../services/supplier-price-comparison.service.js'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -49,6 +50,7 @@ router.get(
   '/price-comparison',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('price_comparison'),
   requireRole(['RESTAURANT']),
   requirePermission('CATALOG_VIEW'),
   async (req, res, next) => {
@@ -73,6 +75,7 @@ router.get(
   '/followed',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_following'),
   requireRole(['RESTAURANT']),
   requirePermission('CATALOG_VIEW'),
   async (req, res) => {
@@ -125,6 +128,7 @@ router.post(
   '/:id/follow',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_following'),
   requireRole(['RESTAURANT']),
   restaurantSupplierMutationGuard,
   async (req, res) => {
@@ -231,6 +235,7 @@ router.delete(
   '/:id/follow',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_following'),
   requireRole(['RESTAURANT']),
   restaurantSupplierMutationGuard,
   async (req, res) => {
@@ -276,6 +281,7 @@ router.post(
   '/:id/block',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_following'),
   requireRole(['RESTAURANT']),
   restaurantSupplierMutationGuard,
   async (req, res) => {
@@ -339,6 +345,7 @@ router.delete(
   '/:id/block',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('supplier_following'),
   requireRole(['RESTAURANT']),
   restaurantSupplierMutationGuard,
   async (req, res) => {

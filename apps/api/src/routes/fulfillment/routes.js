@@ -477,19 +477,9 @@ router.patch('/routes/:id/stops/:stopId', async (req, res, next) => {
       })
     }
     const perms = req.tenantContext?.permissions ?? []
-    const canManage =
-      perms.includes('FULFILLMENT_MANAGE') ||
-      perms.includes('DRIVER_DELIVERIES_MANAGE') ||
-      isDriverOnlyPermissions(perms)
-    if (!canManage) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: 'Insufficient permission' },
-        requestId: req.requestId,
-      })
-    }
-    if (isDriverOnlyPermissions(perms) && !perms.includes('DRIVER_DELIVERIES_MANAGE')) {
+    const canManageSupplier =
+      rolesIncludeOwner(req.tenantContext?.roles) || hasPermission(perms, P.FULFILLMENT_MANAGE)
+    if (!canManageSupplier && !hasPermission(perms, P.DRIVER_DELIVERIES_MANAGE)) {
       return res.status(403).json({
         ok: false,
         data: null,
@@ -505,25 +495,19 @@ router.patch('/routes/:id/stops/:stopId', async (req, res, next) => {
       })
       .parse(req.body ?? {})
 
-    const route = await getDeliveryRoute(supplierId, req.params.id)
-    if (isDriverOnlyPermissions(perms)) {
-      const driverId = await getLinkedDriverId(req.userData.id, supplierId)
-      if (route.driverId !== driverId) {
+    let driverIdScope = null
+    if (!canManageSupplier) {
+      driverIdScope = await getLinkedDriverId(req.userData.id, supplierId)
+      if (!driverIdScope) {
         return res.status(403).json({
           ok: false,
           data: null,
-          error: { name: 'FORBIDDEN', message: 'Not your route' },
+          error: { name: 'FORBIDDEN', message: 'Driver profile not linked' },
           requestId: req.requestId,
         })
       }
-    } else if (!perms.includes('FULFILLMENT_MANAGE')) {
-      return res.status(403).json({
-        ok: false,
-        data: null,
-        error: { name: 'FORBIDDEN', message: 'Insufficient permission' },
-        requestId: req.requestId,
-      })
     }
+    await getDeliveryRoute(supplierId, req.params.id, { driverIdScope })
 
     const updated = await updateRouteStop(supplierId, req.params.id, req.params.stopId, {
       status: body.status,
@@ -531,6 +515,7 @@ router.patch('/routes/:id/stops/:stopId', async (req, res, next) => {
       failureReason: body.failure_reason,
       userId: req.userData.id,
       permissions: perms,
+      driverIdScope,
     })
     res.json({ ok: true, data: { route: updated }, error: null, requestId: req.requestId })
   } catch (err) {

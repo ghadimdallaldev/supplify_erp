@@ -6,6 +6,7 @@
 import { useAppSelector } from './redux'
 import { useImpersonation } from './useImpersonation'
 import { isTenantOwner } from '../lib/tenantRoles'
+import { warehouseScopeAllowsPermission } from '../lib/warehouseAccess'
 
 function hasPermission(permissions: string[] | undefined, required: string): boolean {
   if (!Array.isArray(permissions)) return false
@@ -25,6 +26,7 @@ export function usePermissions() {
 
   const can = (permissionKey: string): boolean => {
     if (!user) return false
+    if (!warehouseScopeAllowsPermission(user, permissionKey)) return false
     if (user.role === 'RESTAURANT' || user.role === 'SUPPLIER') {
       if (isTenantOwner(user)) return true
     }

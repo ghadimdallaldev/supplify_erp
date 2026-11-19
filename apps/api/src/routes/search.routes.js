@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import {
   requireAuth,
@@ -16,7 +17,13 @@ const router = express.Router()
 
 const catalogReadAccess = requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW')
 
-router.use(requireAuth, resolveTenantContext, resolveAdminContext, catalogReadAccess)
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  tenantFeatureGate('global_search'),
+  catalogReadAccess
+)
 
 const searchQuerySchema = z.object({
   q: z.string().min(1).max(200),

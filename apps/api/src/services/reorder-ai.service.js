@@ -341,7 +341,13 @@ export async function parseReorderIntent(restaurantId, opts) {
   })
 
   const allowedProducts = assistance.suggestions
-    .filter((s) => s.productId)
+    .filter(
+      (s) =>
+        s.productId &&
+        s.action !== 'wait' &&
+        s.action !== 'manual_review' &&
+        Number(s.suggestedQty) > 0
+    )
     .map((s) => ({
       productId: String(s.productId),
       productName: s.productName,
@@ -458,6 +464,7 @@ export async function parseReorderIntent(restaurantId, opts) {
 function contextToNormalizeCtx(ctx) {
   return {
     productId: ctx.productId,
+    action: ctx.action,
     baseQuantity: ctx.baseSuggestedQuantity,
     defaultSupplierId: ctx.defaultSupplierId,
     supplierOptions: ctx.supplierOptions || [],

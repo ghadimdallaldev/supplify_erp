@@ -2,6 +2,13 @@ import { query } from '../lib/db.js'
 import { toCalendarDateString } from '../lib/reservation-availability.js'
 import { getDefaultTenantTimezone } from '../lib/tenant-timezone.js'
 
+// Existing rows must satisfy ownership too; validation on new responses is insufficient.
+const QUOTE_LINE_JOINS = `
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id AND qreq.quote_request_id = qr.id
+    JOIN product p ON p.id = qreq.product_id AND p.supplier_id = qrs.supplier_id
+    LEFT JOIN product quote_sub ON quote_sub.id = qri.substitute_product_id AND quote_sub.supplier_id = qrs.supplier_id`
+const QUOTE_SUBSTITUTE_FILTER = `AND (qri.substitute_product_id IS NULL OR quote_sub.id IS NOT NULL)`
+
 /**
  * Fetch the current catalog price for a product.
  * @param {string} productId
@@ -121,14 +128,14 @@ export async function resolveQuotePrice(
     JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
     JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
-    JOIN product p ON p.id = qreq.product_id
+    ${QUOTE_LINE_JOINS}
     WHERE qri.id = $1
       AND qrs.id = $2
       AND qr.restaurant_id = $3
       AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
+      ${QUOTE_SUBSTITUTE_FILTER}
     `,
     [quoteResponseItemId, quoteRequestSupplierId, restaurantId]
   )
@@ -137,10 +144,10 @@ export async function resolveQuotePrice(
 
   const row = rows[0]
   const effectiveProductId = row.substitute_product_id || row.product_id
-  if (productId && productId !== row.product_id && productId !== effectiveProductId) return null
+  if (productId && productId !== effectiveProductId) return null
   if (supplierId && row.supplier_id !== supplierId) return null
 
-  const catalog = await getDefaultCatalogPrice(row.product_id, dbQuery)
+  const catalog = await getDefaultCatalogPrice(effectiveProductId, dbQuery)
   const defaultPrice = catalog?.amount ?? null
   const currency = row.currency || catalog?.currency || 'USD'
 
@@ -175,12 +182,12 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
     JOIN quote_response_items qri
       ON qri.id = v.qri_id AND qri.quote_response_id = qr_resp.id
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
-    JOIN product p ON p.id = qreq.product_id
+    ${QUOTE_LINE_JOINS}
     WHERE qr.restaurant_id = $3
       AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
+      ${QUOTE_SUBSTITUTE_FILTER}
     `,
     [qrsIds, qriIds, restaurantId]
   )
@@ -195,7 +202,7 @@ async function resolveQuotePricesBatch({ restaurantId, quoteLocks }, dbQuery = q
   const resolved = new Map()
   for (const row of rows) {
     const effectiveProductId = row.substitute_product_id || row.product_id
-    const lock = lockByProductId.get(effectiveProductId) ?? lockByProductId.get(row.product_id)
+    const lock = lockByProductId.get(effectiveProductId)
     if (!lock) continue
     if (lock.quoteRequestSupplierId !== row.quote_request_supplier_id) continue
     if (lock.quoteResponseItemId !== row.quote_response_item_id) continue
@@ -239,23 +246,20 @@ export async function findOpenQuotedProductsForOrder(
     SELECT
       qreq.product_id AS original_product_id,
       qri.substitute_product_id,
-      p.sku,
+      COALESCE(quote_sub.sku, p.sku) AS sku,
       qr_resp.submitted_at
     FROM quote_response_items qri
     JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
     JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
-    JOIN product p ON p.id = qreq.product_id
+    ${QUOTE_LINE_JOINS}
     WHERE qr.restaurant_id = $1
       AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
+      ${QUOTE_SUBSTITUTE_FILTER}
       AND qri.unit_price IS NOT NULL
-      AND (
-        qreq.product_id = ANY($2::uuid[])
-        OR qri.substitute_product_id = ANY($2::uuid[])
-      )
+      AND COALESCE(qri.substitute_product_id, qreq.product_id) = ANY($2::uuid[])
     ORDER BY qr_resp.submitted_at DESC
     `,
     [restaurantId, productIds]
@@ -264,7 +268,7 @@ export async function findOpenQuotedProductsForOrder(
   const orderProductIdSet = new Set(productIds)
   const quoted = new Map()
   for (const row of rows) {
-    const candidates = [row.original_product_id, row.substitute_product_id].filter(Boolean)
+    const candidates = [row.substitute_product_id || row.original_product_id].filter(Boolean)
     for (const pid of candidates) {
       if (orderProductIdSet.has(pid) && !quoted.has(pid)) {
         quoted.set(pid, { sku: row.sku ?? null, productId: pid })
@@ -308,16 +312,14 @@ export async function findOpenQuoteLocksForOrder(
     JOIN quote_responses qr_resp ON qr_resp.id = qri.quote_response_id
     JOIN quote_request_suppliers qrs ON qrs.id = qr_resp.quote_request_supplier_id
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
+    ${QUOTE_LINE_JOINS}
     WHERE qr.restaurant_id = $1
       AND qr.status = 'open'
       AND qrs.status = 'responded'
       AND qri.is_available = true
+      ${QUOTE_SUBSTITUTE_FILTER}
       AND qri.unit_price IS NOT NULL
-      AND (
-        qreq.product_id = ANY($2::uuid[])
-        OR qri.substitute_product_id = ANY($2::uuid[])
-      )
+      AND COALESCE(qri.substitute_product_id, qreq.product_id) = ANY($2::uuid[])
       ${supplierClause}
     ORDER BY qr_resp.submitted_at DESC
     `,
@@ -327,7 +329,7 @@ export async function findOpenQuoteLocksForOrder(
   const orderProductIdSet = new Set(productIds)
   const locksByProductId = new Map()
   for (const row of rows) {
-    const candidates = [row.original_product_id, row.substitute_product_id].filter(Boolean)
+    const candidates = [row.substitute_product_id || row.original_product_id].filter(Boolean)
     for (const pid of candidates) {
       if (orderProductIdSet.has(pid) && !locksByProductId.has(pid)) {
         locksByProductId.set(pid, {

@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import {
   requireAuth,
   requireRole,
@@ -16,6 +17,7 @@ import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { resolveRequestLocale, localizedError } from '../i18n/index.js'
 
 const router = express.Router()
+const catalogGate = tenantFeatureGate('product_catalog')
 
 function priceErr(req, name, key, vars = {}) {
   return localizedError(resolveRequestLocale(req), name, `errors.${key}`, vars, 'prices')
@@ -44,6 +46,7 @@ router.get(
   '/product/:productId',
   requireAuth,
   resolveTenantContext,
+  catalogGate,
   requireAnyPermission('CATALOG_VIEW', 'ORDERS_VIEW', 'INVENTORY_VIEW'),
   async (req, res) => {
     try {
@@ -147,6 +150,7 @@ router.post(
   '/',
   requireAuth,
   resolveTenantContext,
+  catalogGate,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('CATALOG_EDIT'),
   async (req, res) => {
@@ -242,6 +246,7 @@ router.patch(
   '/:id',
   requireAuth,
   resolveTenantContext,
+  catalogGate,
   requireRole(['SUPPLIER', 'ADMIN']),
   requirePermission('CATALOG_EDIT'),
   async (req, res) => {

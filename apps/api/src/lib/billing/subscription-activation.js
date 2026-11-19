@@ -23,6 +23,8 @@ export async function createPendingActivationSubscription(
     FROM subscription_plan sp
     WHERE sp.code = $4 AND sp.tenant_type = $2 AND sp.is_active = true
     LIMIT 1
+    ON CONFLICT (tenant_id, tenant_type) WHERE status NOT IN ('CANCELLED', 'EXPIRED')
+    DO NOTHING
     `,
     [tenantId, tenantType, LOCK_REASON_PENDING_ACTIVATION, planCode]
   )
@@ -51,6 +53,8 @@ export async function createOrgCoveredBranchSubscription(
     FROM subscription_plan sp
     WHERE sp.code = $3 AND sp.tenant_type = $2 AND sp.is_active = true
     LIMIT 1
+    ON CONFLICT (tenant_id, tenant_type) WHERE status NOT IN ('CANCELLED', 'EXPIRED')
+    DO NOTHING
     `,
     [tenantId, tenantType, planCode]
   )

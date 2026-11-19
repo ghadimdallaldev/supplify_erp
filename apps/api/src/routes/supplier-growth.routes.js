@@ -40,6 +40,7 @@ import { query } from '../lib/db.js'
 import { NotFoundError } from '../middlewares/errorHandler.js'
 import { requireFeature } from '../lib/subscription.js'
 import { writeAuditLog } from '../lib/audit.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -403,11 +404,15 @@ export { router as supplierGrowthRoutes }
 
 export const growthPublicRoutes = express.Router()
 
-growthPublicRoutes.get('/referral/:token', async (req, res, next) => {
-  try {
-    const data = await getReferralInvitePublic(req.params.token)
-    res.json({ ok: true, data, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+growthPublicRoutes.get(
+  '/referral/:token',
+  platformFeatureGate('referral_landing'),
+  async (req, res, next) => {
+    try {
+      const data = await getReferralInvitePublic(req.params.token)
+      res.json({ ok: true, data, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)

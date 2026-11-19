@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 import { requireAuth, resolveTenantContext, requirePermission } from '../../lib/rbac.js'
 import { requirePlatformAppAccess } from '../../lib/staff-portal-auth.js'
 import { staffMutationGuard } from '../../lib/route-permissions.js'
@@ -19,6 +20,7 @@ router.use(
   requireAuth,
   requirePlatformAppAccess,
   resolveTenantContext,
+  tenantFeatureGate('staff_management'),
   requirePermission('STAFF_VIEW'),
   staffMutationGuard,
   staffListCacheInvalidationMiddleware
