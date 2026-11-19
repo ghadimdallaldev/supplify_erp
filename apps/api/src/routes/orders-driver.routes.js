@@ -327,13 +327,16 @@ router.patch(
       })
     } catch (error) {
       if (error instanceof ValidationError || error.name === 'ZodError') {
+        // A ZodError's .message is a JSON dump of the issues; show the first issue instead.
+        const issue = error.issues?.[0]
+        const message =
+          error.name === 'ZodError' && issue
+            ? `${issue.path?.length ? `${issue.path.join('.')}: ` : ''}${issue.message}`
+            : error.message || 'Invalid request'
         return res.status(400).json({
           ok: false,
           data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: error.message || 'Invalid request',
-          },
+          error: { name: 'VALIDATION_ERROR', message },
           requestId: req.requestId,
         })
       }
@@ -342,6 +345,14 @@ router.patch(
           ok: false,
           data: null,
           error: { name: 'FORBIDDEN', message: error.message || 'Forbidden' },
+          requestId: req.requestId,
+        })
+      }
+      if (error instanceof NotFoundError) {
+        return res.status(404).json({
+          ok: false,
+          data: null,
+          error: { name: 'NOT_FOUND', message: error.message || 'Order not found' },
           requestId: req.requestId,
         })
       }

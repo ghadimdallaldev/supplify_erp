@@ -116,7 +116,7 @@ describe('driver-location.service', () => {
     config.GPS_TRACKING_ENABLED = true
   })
 
-  it('rejects location when assignment is delivered', async () => {
+  it('ignores (does not error on) a late ping after the stop was delivered', async () => {
     expect(isGpsTrackingEnabled()).toBe(true)
     assertSupplierOwnsOrder.mockResolvedValueOnce({ id: 'o1', status: 'DELIVERED' })
     getActiveDriverAssignment.mockResolvedValueOnce({
@@ -133,7 +133,72 @@ describe('driver-location.service', () => {
         latitude: 33.89,
         longitude: 35.5,
       })
-    ).rejects.toThrow(ValidationError)
+    ).resolves.toMatchObject({ stored: false, reason: 'delivery_closed' })
+    expect(query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO'))).toBe(false)
+  })
+
+  it('throttles per (driver, order) from ping history, tolerating the app 14.5s cadence', async () => {
+    assertSupplierOwnsOrder.mockResolvedValueOnce({ id: 'o1', status: 'SHIPPED' })
+    getActiveDriverAssignment.mockResolvedValueOnce({
+      id: 'da-1',
+      supplier_id: 's1',
+      driver_id: 'd1',
+      status: 'out_for_delivery',
+    })
+    // previous ping for THIS order was 14.5s ago: accepted (old strict 15s check dropped it)
+    query.mockImplementation(async (sql) => {
+      if (String(sql).includes('FROM driver_location_ping')) {
+        return { rows: [{ recorded_at: new Date(Date.now() - 14_500).toISOString() }] }
+      }
+      return {
+        rows: [{ latitude: '33.89', longitude: '35.5', recorded_at: new Date().toISOString() }],
+      }
+    })
+    const result = await recordDriverLocation({
+      supplierId: 's1',
+      orderId: 'o1',
+      driverId: 'd1',
+      latitude: 33.89,
+      longitude: 35.5,
+    })
+    expect(result.stored).toBe(true)
+    const throttleSql = query.mock.calls
+      .map(([sql]) => String(sql))
+      .find((q) => q.includes('ORDER BY recorded_at DESC'))
+    expect(throttleSql).toContain('driver_location_ping')
+    expect(throttleSql).not.toContain('driver_latest_location')
+  })
+
+  it('still throttles a ping sent 5s after the previous one for the same order', async () => {
+    assertSupplierOwnsOrder.mockResolvedValueOnce({ id: 'o1', status: 'SHIPPED' })
+    getActiveDriverAssignment.mockResolvedValueOnce({
+      id: 'da-1',
+      supplier_id: 's1',
+      driver_id: 'd1',
+      status: 'out_for_delivery',
+    })
+    query.mockImplementation(async (sql) =>
+      String(sql).includes('FROM driver_location_ping')
+        ? { rows: [{ recorded_at: new Date(Date.now() - 5_000).toISOString() }] }
+        : { rows: [] }
+    )
+    const result = await recordDriverLocation({
+      supplierId: 's1',
+      orderId: 'o1',
+      driverId: 'd1',
+      latitude: 33.89,
+      longitude: 35.5,
+    })
+    expect(result).toMatchObject({ stored: false, reason: 'rate_limited' })
+  })
+
+  it('reads an order-scoped position from that order ping history (not the per-driver row)', async () => {
+    const { getLatestLocationRowForOrder } = await import('./driver-location.service.js')
+    query.mockResolvedValueOnce({ rows: [{ latitude: '1', longitude: '2' }] })
+    await getLatestLocationRowForOrder('o2', 'd1', { orderScopedOnly: true })
+    const sql = String(query.mock.calls[0][0])
+    expect(sql).toContain('driver_location_ping')
+    expect(sql).toContain('ORDER BY recorded_at DESC')
   })
 
   it('stores ping and upserts latest location for active assignment', async () => {

@@ -50,6 +50,7 @@ export function validateCoordinates(latitude, longitude) {
 }
 
 const RECORDED_AT_FUTURE_SKEW_MS = 2 * 60 * 1000
+const LOCATION_INTERVAL_TOLERANCE_MS = 2000
 // Phones with a drifting clock are common. Up to this much ahead is clamped to server time
 // rather than failing every ping with a 400; anything further ahead is still rejected as bogus.
 const RECORDED_AT_CLAMP_SKEW_MS = 15 * 60 * 1000
@@ -104,10 +105,19 @@ async function assertRouteContextForOrder({ routeId, routeStopId, orderId, suppl
 }
 
 async function assertLocationRateLimit({ driverId, orderId }) {
-  const minIntervalMs = (config.GPS_UPDATE_INTERVAL_SECONDS ?? 15) * 1000
+  // The app sends on a ~(interval - 0.5s) cadence, so a strict `< interval` check dropped roughly
+  // every other ping. Allow a small tolerance.
+  const minIntervalMs = Math.max(
+    1000,
+    (config.GPS_UPDATE_INTERVAL_SECONDS ?? 15) * 1000 - LOCATION_INTERVAL_TOLERANCE_MS
+  )
+  // Per-order history, not the single per-driver latest row: with several active orders the latest
+  // row belongs to whichever order pinged last, so it throttled the wrong order.
   const { rows } = await query(
-    `SELECT recorded_at FROM driver_latest_location
-     WHERE driver_id = $1 AND order_id = $2`,
+    `SELECT recorded_at FROM driver_location_ping
+     WHERE driver_id = $1 AND order_id = $2
+     ORDER BY recorded_at DESC
+     LIMIT 1`,
     [driverId, orderId]
   )
   const prev = rows[0]?.recorded_at
@@ -182,6 +192,10 @@ export async function recordDriverLocation({
   }
   if (assignment.driver_id !== driverId) {
     throw new ForbiddenError('Driver is not assigned to this order')
+  }
+  if (['delivered', 'failed', 'rescheduled'].includes(assignment.status)) {
+    // Late ping after the stop was closed (the app may still have one in flight): not an error.
+    return { trackingEnabled: true, stored: false, reason: 'delivery_closed', latestLocation: null }
   }
   if (!LOCATION_TRACKING_STATUSES.includes(assignment.status)) {
     throw new ValidationError('Location updates are not allowed for this delivery status')
@@ -307,9 +321,12 @@ export async function getLatestLocationRowForOrder(
   { orderScopedOnly = false } = {}
 ) {
   if (!driverId) return null
+  // Order-scoped reads come from the ping history so each of a driver's concurrent orders has its
+  // own position; driver_latest_location holds only the driver's single most recent order.
   const sql = orderScopedOnly
-    ? `SELECT * FROM driver_latest_location
+    ? `SELECT * FROM driver_location_ping
        WHERE driver_id = $1 AND order_id = $2
+       ORDER BY recorded_at DESC
        LIMIT 1`
     : `SELECT * FROM driver_latest_location
        WHERE driver_id = $1 AND (order_id = $2 OR order_id IS NULL)

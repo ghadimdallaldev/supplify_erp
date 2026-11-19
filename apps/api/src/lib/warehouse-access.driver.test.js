@@ -40,4 +40,28 @@ describe('enforceWarehouseRequestAccess for restricted-warehouse drivers', () =>
       enforceWarehouseRequestAccess(req('GET', '/api/inventory/summary'), driverTenant())
     ).rejects.toThrow('broader warehouse access')
   })
+
+  it('allows driver route + own-profile endpoints for restricted-warehouse drivers', async () => {
+    const routeId = '1b6f9f0e-1a2b-4c3d-8e4f-5a6b7c8d9e0f'
+    for (const [method, url] of [
+      ['GET', '/api/fulfillment/routes/active'],
+      ['POST', '/api/fulfillment/routes/build-from-assignments'],
+      ['GET', `/api/fulfillment/routes/${routeId}`],
+      ['POST', `/api/fulfillment/routes/${routeId}/optimize`],
+      ['PATCH', `/api/fulfillment/routes/${routeId}/next-stop`],
+      ['POST', `/api/fulfillment/routes/${routeId}/stops/reorder`],
+      ['POST', '/api/push/devices'],
+      ['GET', '/api/notifications/preferences'],
+    ]) {
+      await expect(
+        enforceWarehouseRequestAccess(req(method, url), driverTenant())
+      ).resolves.toBeUndefined()
+    }
+  })
+
+  it('does not widen access to supplier-wide route creation', async () => {
+    await expect(
+      enforceWarehouseRequestAccess(req('POST', '/api/fulfillment/routes'), driverTenant())
+    ).rejects.toThrow('broader warehouse access')
+  })
 })
