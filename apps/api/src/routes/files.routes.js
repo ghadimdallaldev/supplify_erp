@@ -41,6 +41,7 @@ import {
   ensureObjectCleanForRead,
 } from '../services/storage/upload-security.service.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -73,6 +74,9 @@ const uploadTransferLimiter = createUploadLimiter('rl:file-upload', 30)
 const uploadPresignLimiter = createUploadLimiter('rl:file-presign', 60)
 
 /** Serve uploaded objects when buckets are private (Railway, R2 without public URL). */
+// Admin kill switch: new uploads only — downloads (/object) always keep working.
+const uploadsGate = platformFeatureGate('file_uploads')
+
 router.get('/object', optionalAuth, async (req, res) => {
   setObjectCorsHeaders(req, res)
   try {
@@ -218,6 +222,7 @@ async function handleTokenUpload(req, res) {
 
 router.put(
   '/upload/:token',
+  uploadsGate,
   requireAuth,
   uploadTransferLimiter,
   express.raw({ type: '*/*', limit: MAX_UPLOAD_BYTES }),
@@ -227,6 +232,7 @@ router.put(
 /** Large import archives (ZIP) — token maxBytes enforced in completeUpload. */
 router.put(
   '/upload-import/:token',
+  uploadsGate,
   requireAuth,
   uploadTransferLimiter,
   express.raw({ type: '*/*', limit: MAX_IMPORT_ZIP_BYTES }),
@@ -236,6 +242,7 @@ router.put(
 // Generate presigned URL for file upload
 router.post(
   '/presign',
+  uploadsGate,
   requireAuth,
   uploadPresignLimiter,
   requireRole(['SUPPLIER', 'RESTAURANT', 'ADMIN']),
@@ -372,6 +379,7 @@ router.post(
 // Attach file to product
 router.post(
   '/product/:productId/attach',
+  uploadsGate,
   requireAuth,
   requireRole(['SUPPLIER', 'ADMIN']),
   resolveTenantContext,

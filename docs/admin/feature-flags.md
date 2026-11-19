@@ -76,16 +76,20 @@ Every feature area (each mounted API module and its major sub-features) now has 
 
 Platform default-on keys (global only — no tenant exists for these requests; on at inherit, off only when forced off):
 
-| Key                      | What it switches off                                                           |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `demo_campaign`          | Public `/api/public/demo` lead capture                                         |
-| `public_registration`    | `POST /api/register/complete` (new workspaces / consumer sign-up completion)   |
-| `consumer_accounts`      | `/api/consumer` consumer profile, addresses, order history                     |
-| `invitation_acceptance`  | `/api/public/invitations` (accept / reject team & branch invites)              |
-| `referral_landing`       | `/api/growth/referral/:token`                                                  |
-| `whatsapp_ordering`      | `/webhooks/whatsapp` inbound messages                                          |
-| `web_push`               | `GET /api/push/vapid-public-key`, `DELETE /api/push/devices`                   |
-| `organization_lifecycle` | `POST /api/account/transfer-ownership`, `POST /api/account/close-organization` |
+| Key                      | What it switches off                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `demo_campaign`          | Public `/api/public/demo` lead capture                                                                                                     |
+| `public_registration`    | `POST /api/register/complete` (new workspaces / consumer sign-up completion)                                                               |
+| `consumer_accounts`      | `/api/consumer` consumer profile, addresses, order history                                                                                 |
+| `invitation_acceptance`  | `/api/public/invitations` (accept / reject team & branch invites)                                                                          |
+| `referral_landing`       | `/api/growth/referral/:token`                                                                                                              |
+| `whatsapp_ordering`      | `/webhooks/whatsapp` inbound messages                                                                                                      |
+| `web_push`               | `GET /api/push/vapid-public-key`, `DELETE /api/push/devices`                                                                               |
+| `organization_lifecycle` | `POST /api/account/transfer-ownership`, `POST /api/account/close-organization`                                                             |
+| `platform_access`        | **Maintenance mode** — every authenticated non-ADMIN request gets 503 `MAINTENANCE_MODE` (enforced in `requireAuth`); admins always get in |
+| `file_uploads`           | New uploads (`/api/files/presign`, `/upload*`, product attach); downloads (`/api/files/object`) keep working                               |
+| `stripe_webhooks`        | `/webhooks/stripe` — returns 503 so Stripe retries later; no event is lost                                                                 |
+| `e2e_routes`             | `/api/e2e` test routes (already absent in production)                                                                                      |
 
 Gate helpers live in `apps/api/src/lib/tenant-feature-gate.js`:
 
@@ -93,9 +97,9 @@ Gate helpers live in `apps/api/src/lib/tenant-feature-gate.js`:
 - `publicTenantFeatureGate(key, tenantType, resolveTenantId)` for public routes. Resolves the owning restaurant/supplier and returns 404 `FEATURE_DISABLED` when off.
 - `platformFeatureGate(key)` for platform keys (global override only).
 
-**Coverage guard:** `apps/api/src/lib/feature-route-coverage.test.js` parses every router mounted in `server.js` and fails unless it is listed as gated (and its source enforces each listed key) or exempt with a reason. Only infrastructure is exempt: auth/session (needed to reach any feature), file upload plumbing, the admin panel and Admin → Features itself (gating them could lock admins out), the subscriptions feature-map endpoint clients use to apply flags, the Stripe webhook (must always reconcile money), internal service auth and test-only e2e routes. A new router must be classified there.
+**Coverage guard:** `apps/api/src/lib/feature-route-coverage.test.js` parses every router mounted in `server.js` and fails unless it is listed as gated (and its source enforces each listed key) or exempt with a reason. Exempt (lockout safety only): the admin panel and Admin → Features itself, the subscriptions feature-map endpoint clients use to apply flags, internal Keycloak OTP email delivery (used by every login, including admins), and account deletion (app-store / privacy requirement). A new router must be classified there.
 
-**Within gated modules** every endpoint group is behind a flag. The only remaining always-on endpoints are `DELETE /api/account` / deletion status (account deletion is an app-store and privacy requirement) and admin-only moderation routes (admins bypass tenant flags). Scheduled quick-list auto-orders respect `ordering` (they downgrade to a reminder when it is off). Guest/consumer orders are governed by `public_sales` / `consumer_storefront`. Wiring tests: `orders-feature-gates.routes.test.js`, `supplier-ops-feature-gates.routes.test.js`; off-state resolution: `tenant-feature-gate.resolution.test.js`.
+**Within gated modules** every endpoint group is behind a flag. The only always-on endpoints inside them are `DELETE /api/account` / deletion status and admin-only moderation routes (admins bypass tenant flags). Scheduled quick-list auto-orders respect `ordering` (they downgrade to a reminder when it is off). Guest/consumer orders are governed by `public_sales` / `consumer_storefront`. Wiring tests: `orders-feature-gates.routes.test.js`, `supplier-ops-feature-gates.routes.test.js`; off-state resolution: `tenant-feature-gate.resolution.test.js`.
 
 Platform keys appear in Admin → Features global list (`platformOnly: true` in the API payload) and accept the same inherit / on / off modes; they never appear in per-tenant override maps.
 

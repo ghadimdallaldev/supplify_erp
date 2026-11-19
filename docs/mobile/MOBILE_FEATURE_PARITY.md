@@ -5,7 +5,10 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 API: 35 new **default-on** feature keys (26 restaurant / 23 supplier, see
 `docs/admin/feature-flags.md`) plus 8 platform default-on keys (demo, sign-up,
 consumer accounts, invite acceptance, referral landing, WhatsApp, web push,
-organization transfer/close). They resolve ON unless
+organization transfer/close, plus `platform_access` maintenance mode, `file_uploads`,
+`stripe_webhooks`, `e2e_routes`). Maintenance mode returns 503 `MAINTENANCE_MODE` to
+non-admin users on every authenticated call; both apps surface the API message through
+their existing error handling (no new client contract). They resolve ON unless
 an admin forces them off globally or per account, so no current account loses access.
 Gates are `tenantFeatureGate` / `publicTenantFeatureGate` / `platformFeatureGate`;
 `feature-route-coverage.test.js` fails if a mounted router is neither gated nor exempt.

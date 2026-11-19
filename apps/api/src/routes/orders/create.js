@@ -955,6 +955,7 @@ router.post(
 
       const productIds = orderData.items.map((item) => item.productId)
       const clientLocks = orderData.quoteLocks ?? []
+      const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
 
       // Create order with transaction
       let idempotencyReplay = null
@@ -1151,7 +1152,6 @@ router.post(
           [totalAmount, order.id]
         )
 
-        const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
         const reserved = await reserveStockForPlacedOrder(client, {
           supplierId,
           supplier: supplierProfile,

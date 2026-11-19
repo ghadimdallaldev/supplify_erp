@@ -9,8 +9,11 @@ import {
   verifyAndParseStripeEvent,
 } from '../lib/billing/stripe-webhook.js'
 import { handlePromotionAdDisputeByProviderPaymentId } from '../lib/billing/promotion-ad-billing.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
+// Admin kill switch: 503 makes Stripe retry later, so no event is lost while it is off.
+router.use(platformFeatureGate('stripe_webhooks', { status: 503 }))
 
 router.post('/', async (req, res) => {
   const signature = req.headers['stripe-signature']

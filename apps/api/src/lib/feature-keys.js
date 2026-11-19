@@ -144,6 +144,10 @@ export const PLATFORM_FEATURE_KEYS = [
   'whatsapp_ordering',
   'web_push',
   'organization_lifecycle',
+  'platform_access',
+  'file_uploads',
+  'stripe_webhooks',
+  'e2e_routes',
 ]
 
 /** Platform keys that are ON unless an admin forces them off. */
@@ -156,6 +160,10 @@ export const PLATFORM_DEFAULT_ON_FEATURE_KEYS = [
   'whatsapp_ordering',
   'web_push',
   'organization_lifecycle',
+  'platform_access',
+  'file_uploads',
+  'stripe_webhooks',
+  'e2e_routes',
 ]
 
 /** Keys admins can force on/off from Admin → Features (plans + default-on + platform). */
@@ -279,6 +287,10 @@ const DISPLAY_NAMES = {
   whatsapp_ordering: 'WhatsApp inbound messages',
   web_push: 'Web push key & device cleanup',
   organization_lifecycle: 'Transfer ownership / close organization',
+  platform_access: 'Platform access for non-admin users (off = maintenance mode)',
+  file_uploads: 'File uploads (downloads always work)',
+  stripe_webhooks: 'Stripe webhook processing (off = Stripe retries later)',
+  e2e_routes: 'E2E test routes (non-production only)',
 }
 
 export function featureDisplayName(featureKey) {

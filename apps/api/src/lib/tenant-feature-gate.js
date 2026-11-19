@@ -97,12 +97,14 @@ export function publicTenantFeatureGate(featureKey, tenantType, resolveTenantId)
  * Disabled → 404 so the surface looks absent.
  *
  * @param {string} featureKey one of PLATFORM_FEATURE_KEYS
+ * @param {{ status?: number }} [options] status when off (default 404; webhooks use 503 so the
+ *   provider retries later instead of dropping the event)
  */
-export function platformFeatureGate(featureKey) {
+export function platformFeatureGate(featureKey, { status = 404 } = {}) {
   async function platformFeatureGateMiddleware(req, res, next) {
     try {
       if (await isPlatformFeatureEnabled(featureKey)) return next()
-      return res.status(404).json(featureDisabledBody(req, featureKey))
+      return res.status(status).json(featureDisabledBody(req, featureKey))
     } catch (error) {
       next(error)
     }

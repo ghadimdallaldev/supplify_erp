@@ -5,6 +5,7 @@ import { query } from './db.js'
 import { logger } from './logger.js'
 import { syncRequestLogContext } from './request-log-context.js'
 import { deleteCache } from './cache.js'
+import { isPlatformAccessBlocked, maintenanceModeBody } from './maintenance-mode.js'
 import { enforceWarehouseRequestAccess } from './warehouse-access.js'
 import { emitAuthSessionEvent } from './auth-session-events.js'
 import { mustBlockUnverifiedEmail } from './email-verification-gate.js'
@@ -406,6 +407,10 @@ export async function requireAuth(req, res, next) {
         mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
       }
+      if (await isPlatformAccessBlocked(user)) {
+        mark(req, 'auth')
+        return res.status(503).json(maintenanceModeBody(req))
+      }
       mark(req, 'auth')
       if (await assertImpersonationAllowsMutation(req, res)) return
       next()
@@ -520,6 +525,10 @@ export async function requireAuth(req, res, next) {
       if (staffPortalBlock) {
         mark(req, 'auth')
         return res.status(staffPortalBlock.status).json(staffPortalBlock.body)
+      }
+      if (await isPlatformAccessBlocked(user)) {
+        mark(req, 'auth')
+        return res.status(503).json(maintenanceModeBody(req))
       }
       mark(req, 'auth')
       if (await assertImpersonationAllowsMutation(req, res)) return

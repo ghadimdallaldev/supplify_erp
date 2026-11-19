@@ -102,27 +102,30 @@ const GATED = {
   restaurantOnboardingRoutes: ['restaurant_profile'],
   growthPublicRoutes: ['referral_landing'],
   whatsappWebhookRoutes: ['whatsapp_ordering'],
+  // Maintenance mode lives in requireAuth (lib/rbac.js), which every authenticated route uses.
+  authRoutes: ['platform_access'],
+  filesRoutes: ['file_uploads'],
+  stripeWebhookRoutes: ['stripe_webhooks'],
+  e2eRoutes: ['e2e_routes'],
 }
 
 /** ident → why it is not a toggleable feature. */
 const EXEMPT = {
-  authRoutes: 'login/session — the mechanism users need to reach any flag-controlled feature',
-  filesRoutes: 'upload/download plumbing shared by every (already gated) feature',
   adminRoutes: 'platform admin surface — must stay reachable to manage flags (no lockout)',
   adminDashboardRoutes: 'hosts Admin → Features itself — gating it could lock admins out',
   subscriptionsRoutes: 'serves the resolved feature map that clients use to apply flags',
-  e2eRoutes: 'test-only, never mounted in production',
-  internalAuthRoutes: 'service-to-service auth, not a user feature',
-  stripeWebhookRoutes: 'payment provider webhook — must always reconcile money movements',
+  internalAuthRoutes:
+    'Keycloak OTP email delivery for every login incl. admins — gating it could lock admins out',
 }
 
 /** Routers whose sub-routers live outside their own file/directory. */
 const EXTRA_SOURCES = {
   ordersRoutes: ['routes/orders-driver.routes.js', 'routes/order-amendments.routes.js'],
+  authRoutes: ['lib/rbac.js', 'lib/maintenance-mode.js'],
 }
 
 const GATE_FNS =
-  'tenantFeatureGate|publicTenantFeatureGate|platformFeatureGate|requireFeature|isFeatureEnabled|isFeatureEnabledForTenant|requireIntelligenceTier|hasFeature'
+  'tenantFeatureGate|publicTenantFeatureGate|platformFeatureGate|isPlatformFeatureEnabled|requireFeature|isFeatureEnabled|isFeatureEnabledForTenant|requireIntelligenceTier|hasFeature'
 
 function mountedRouterIdents() {
   const idents = new Set()

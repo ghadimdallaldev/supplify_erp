@@ -6,6 +6,7 @@ import express from 'express'
 import { withTransaction } from '../lib/db.js'
 import { config } from '../config/env.js'
 import { safeEqualStrings } from '../lib/safe-compare.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -32,6 +33,7 @@ function requireE2ESecret(req, res, next) {
 }
 
 router.use(requireE2ESecret)
+router.use(platformFeatureGate('e2e_routes'))
 
 async function resolveBranchId(client, restaurantId) {
   const { rows } = await client.query(

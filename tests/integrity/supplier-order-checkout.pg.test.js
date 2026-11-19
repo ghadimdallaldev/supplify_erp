@@ -8,6 +8,9 @@ const hooks = vi.hoisted(() => ({
   beforeCommit: null,
   afterQuoteLock: null,
   singleConnection: false,
+  poolQueryFailures: [],
+  featureOverrideReads: 0,
+  query: null,
 }))
 vi.mock('../../apps/api/src/config/env.js', () => ({
   config: {
@@ -79,7 +82,15 @@ vi.mock('../../apps/api/src/lib/subscription.js', async (original) => ({
   })),
   resolveEffectivePlanFeatures: vi.fn(async () => ({})),
   getTenantSubscription: vi.fn(async () => ({ plan_name: 'audit', features: {} })),
-  isFeatureEnabled: vi.fn(async () => false),
+  isFeatureEnabled: vi.fn(async (tenantId, tenantType, featureKey, options = {}) => {
+    // A cold feature lookup uses the global pool, even during order creation.
+    const { rows } = await (options.dbQuery || hooks.query)(
+      `SELECT is_enabled FROM feature_flag_override
+       WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = $3`,
+      [tenantId, tenantType, featureKey]
+    )
+    return rows[0]?.is_enabled === true
+  }),
 }))
 vi.mock('../../apps/api/src/lib/rbac.js', async (original) => ({
   ...(await original()),
@@ -100,7 +111,17 @@ vi.mock('../../apps/api/src/lib/db.js', async () => {
     connectionTimeoutMillis: 500,
   })
   const selected = () => (hooks.singleConnection ? singlePool : pool)
-  const query = (sql, params) => selected().query(sql, params)
+  const query = async (sql, params) => {
+    try {
+      const result = await selected().query(sql, params)
+      if (/FROM feature_flag_override/.test(sql)) hooks.featureOverrideReads += 1
+      return result
+    } catch (error) {
+      hooks.poolQueryFailures.push(error.message)
+      throw error
+    }
+  }
+  hooks.query = query
   const withTransaction = async (callback) => {
     const hook = hooks.beforeTransaction
     hooks.beforeTransaction = null
@@ -155,6 +176,8 @@ beforeEach(() => {
   hooks.beforeCommit = null
   hooks.afterQuoteLock = null
   hooks.singleConnection = false
+  hooks.poolQueryFailures = []
+  hooks.featureOverrideReads = 0
 })
 
 async function fixture() {
@@ -392,6 +415,8 @@ describe('supplier order checkout over HTTP with real PostgreSQL', () => {
       .post('/api/orders/manual')
       .send(payload(ids, true))
     expect(response.status, JSON.stringify(response.body)).toBe(201)
+    expect(hooks.poolQueryFailures).toEqual([])
+    expect(hooks.featureOverrideReads).toBeGreaterThan(0)
   })
   it('never replays another supplier manual-order response before checking ownership', async () => {
     const ids = await fixture(),
