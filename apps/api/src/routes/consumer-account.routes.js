@@ -7,6 +7,7 @@ import {
   getConsumerPublicOrder,
   listConsumerPublicOrders,
 } from '../services/public-sales.service.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 export const consumerAccountRoutes = express.Router()
 
@@ -14,6 +15,7 @@ consumerAccountRoutes.use(requireAuth, (req, _res, next) => {
   if (req.userData?.role !== 'CONSUMER') return next('router')
   next()
 })
+consumerAccountRoutes.use(platformFeatureGate('consumer_accounts'))
 
 const addressSchema = z.object({
   label: z.string().max(80).nullable().optional(),

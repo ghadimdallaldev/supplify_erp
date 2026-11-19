@@ -158,6 +158,7 @@ export function normalizeDeliveryDate(deliveryDate, leadTimeDays = 7, now = new 
 export function buildForecastFallbackRecommendation(ctx, meta = {}) {
   const base = Number(ctx.baseQuantity)
   const hasBase = Number.isFinite(base) && base > 0
+  const shouldWait = ctx.action === 'wait' || (ctx.baseQuantity != null && base === 0)
   const supplier = normalizeSupplierId(null, ctx.supplierOptions, ctx.defaultSupplierId)
   const pack = {
     moq: ctx.moq,
@@ -169,13 +170,19 @@ export function buildForecastFallbackRecommendation(ctx, meta = {}) {
     : { quantity: null, clamped: false, warnings: [] }
 
   const source = meta.source || (hasBase ? 'forecast' : 'rule_based')
-  const action = hasBase ? 'order' : 'manual_review'
+  const action = shouldWait
+    ? 'wait'
+    : ctx.action === 'manual_review'
+      ? 'manual_review'
+      : hasBase
+        ? 'order'
+        : 'manual_review'
 
   return {
     productId: String(ctx.productId),
     source,
     action,
-    recommendedQuantity: qtyResult.quantity,
+    recommendedQuantity: shouldWait ? 0 : action === 'manual_review' ? null : qtyResult.quantity,
     supplierId: supplier.supplierId,
     deliveryDate: null,
     priority: ctx.urgency || 'MEDIUM',
@@ -187,9 +194,11 @@ export function buildForecastFallbackRecommendation(ctx, meta = {}) {
           : 0.2,
     summary:
       ctx.summary ||
-      (hasBase
-        ? 'Forecast reorder recommendation based on usage and stock levels'
-        : 'Insufficient data for a confident reorder quantity — review manually'),
+      (shouldWait
+        ? 'Existing stock and incoming supply cover the forecast; no purchase needed.'
+        : hasBase
+          ? 'Forecast reorder recommendation based on usage and stock levels'
+          : 'Insufficient data for a confident reorder quantity — review manually'),
     reasoning: hasBase
       ? ['Based on deterministic forecast / stock heuristics']
       : ['Insufficient forecast history'],
@@ -212,6 +221,13 @@ export function buildForecastFallbackRecommendation(ctx, meta = {}) {
  * @param {NormalizeContext} ctx
  */
 export function normalizeReorderAiDecision(decision, ctx) {
+  if (
+    ctx.action === 'manual_review' ||
+    ctx.action === 'wait' ||
+    (ctx.baseQuantity != null && Number(ctx.baseQuantity) === 0)
+  ) {
+    return buildForecastFallbackRecommendation(ctx)
+  }
   if (!decision || String(decision.productId) !== String(ctx.productId)) {
     return buildForecastFallbackRecommendation(ctx, {
       fallbackReason: 'invalid_or_mismatched_decision',
@@ -273,8 +289,7 @@ export function normalizeReorderAiDecision(decision, ctx) {
     productId: String(ctx.productId),
     source: 'ai',
     action,
-    recommendedQuantity:
-      action === 'wait' ? qtyResult.quantity : (qtyResult.quantity ?? (hasBase ? base : null)),
+    recommendedQuantity: action === 'wait' ? 0 : (qtyResult.quantity ?? (hasBase ? base : null)),
     supplierId: supplier.supplierId,
     deliveryDate: delivery.deliveryDate,
     priority,

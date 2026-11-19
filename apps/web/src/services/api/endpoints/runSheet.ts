@@ -4,8 +4,8 @@ export type SupplierRunSheetKpis = {
   ordersToPrepareToday: number
   deliveriesPendingToday: number
   ordersWaitingAction: number
-  unpaidBalance: number
-  overdueBalance: number
+  unpaidBalance: number | null
+  overdueBalance: number | null
   customersDueReorder: number
   lowStockCount: number
   openDisputes: number
@@ -40,6 +40,7 @@ export type SupplierRunSheetReceivableInvoice = {
   totalAmount?: number
   paidAmount?: number
   balanceDue: number
+  currency?: string | null
   isOverdue: boolean
   daysOverdue?: number
   agingBucket?: string
@@ -80,6 +81,11 @@ export type SupplierRunSheetResponse = {
   date: string
   summary: {
     kpis: SupplierRunSheetKpis
+    receivablesByCurrency?: Array<{
+      currency: string | null
+      unpaidTotal: number
+      overdueTotal: number
+    }>
     todaysPriorities: SupplierRunSheetPriority[]
   }
   ordersToPick: {
@@ -96,7 +102,8 @@ export type SupplierRunSheetResponse = {
   receivablesDueToday: {
     summary: {
       count: number
-      totalBalanceDue: number
+      totalBalanceDue: number | null
+      byCurrency?: Array<{ currency: string | null; totalBalanceDue: number }>
       dueTodayCount: number
       overdueCount: number
     }

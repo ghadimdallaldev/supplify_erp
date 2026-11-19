@@ -1,3 +1,6 @@
+import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import { updateWarehouseStock } from '../services/warehouse-stock-adjustment.service.js'
+import { deactivateSupplierWarehouse } from '../services/warehouse-lifecycle.service.js'
 import express from 'express'
 const router = express.Router()
 import {
@@ -21,10 +24,7 @@ import {
   ensureDefaultWarehouseForPaidSupplier,
 } from '../lib/warehouse-helpers.js'
 import { buildSimulationFromPayload } from '../services/warehouseRouting.js'
-import {
-  seedMissingWarehouseInventoryForSupplier,
-  transferWarehouseInventory,
-} from '../services/supplier-stock.service.js'
+import { seedMissingWarehouseInventoryForSupplier } from '../services/supplier-stock.service.js'
 import { syncLegacyMirrorFromWarehouse } from '../services/supplier-order-stock.service.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { normalizeZoneCoverage } from '../lib/delivery-zone-input.js'
@@ -83,14 +83,20 @@ router.get(
         })
       }
 
-      await ensureDefaultWarehouseForPaidSupplier(supplierId)
+      if (
+        req.tenantContext?.warehouseAccess?.mode !== 'assigned' &&
+        (rolesIncludeOwner(req.tenantContext?.roles) ||
+          hasPermission(req.tenantContext?.permissions, 'WAREHOUSES_MANAGE'))
+      ) {
+        await ensureDefaultWarehouseForPaidSupplier(supplierId)
+      }
 
       const supplierCol = await getWarehouseSupplierColumn()
       const { rows: warehouses } = await query(
         `SELECT w.*,
-          (SELECT COUNT(DISTINCT wi.product_id)::int FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS product_count,
-          (SELECT COALESCE(SUM(wi.quantity_available), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS total_available_qty,
-          (SELECT COALESCE(SUM(wi.quantity_reserved), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id) AS total_reserved_qty,
+          (SELECT COUNT(DISTINCT wi.product_id)::int FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id AND EXISTS (SELECT 1 FROM product owned WHERE owned.id = wi.product_id AND owned.supplier_id = $1)) AS product_count,
+          (SELECT COALESCE(SUM(wi.quantity_available), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id AND EXISTS (SELECT 1 FROM product owned WHERE owned.id = wi.product_id AND owned.supplier_id = $1)) AS total_available_qty,
+          (SELECT COALESCE(SUM(wi.quantity_reserved), 0) FROM warehouse_inventory wi WHERE wi.warehouse_id = w.id AND EXISTS (SELECT 1 FROM product owned WHERE owned.id = wi.product_id AND owned.supplier_id = $1)) AS total_reserved_qty,
           (SELECT COALESCE(SUM(wi.quantity_on_hand * COALESCE(pr.amount, 0)), 0)
            FROM warehouse_inventory wi
            LEFT JOIN LATERAL (
@@ -99,7 +105,7 @@ router.get(
              ORDER BY (CASE WHEN COALESCE(min_qty, 1) <= 1 THEN 0 ELSE 1 END), valid_from DESC
              LIMIT 1
            ) pr ON true
-           WHERE wi.warehouse_id = w.id) AS stock_value,
+           WHERE wi.warehouse_id = w.id AND EXISTS (SELECT 1 FROM product owned WHERE owned.id = wi.product_id AND owned.supplier_id = $1)) AS stock_value,
           COALESCE((
             SELECT json_agg(row_to_json(inv) ORDER BY inv.product_name)
             FROM (
@@ -113,15 +119,20 @@ router.get(
                 wi.quantity_available
               FROM warehouse_inventory wi
               JOIN product p ON p.id = wi.product_id
-              WHERE wi.warehouse_id = w.id
+              WHERE wi.warehouse_id = w.id AND EXISTS (SELECT 1 FROM product owned WHERE owned.id = wi.product_id AND owned.supplier_id = $1)
               ORDER BY p.name
               LIMIT 50
             ) inv
           ), '[]'::json) AS inventory
          FROM warehouse w
-         WHERE w.${supplierCol} = $1
+         WHERE w.${supplierCol} = $1 AND ($2::uuid[] IS NULL OR w.id = ANY($2::uuid[]))
          ORDER BY w.is_default DESC NULLS LAST, w.created_at DESC`,
-        [supplierId]
+        [
+          supplierId,
+          req.tenantContext?.warehouseAccess?.mode === 'assigned'
+            ? req.tenantContext.warehouseAccess.warehouseIds
+            : null,
+        ]
       )
 
       res.json({
@@ -340,6 +351,24 @@ router.post(
     try {
       const supplierId = await resolveSupplierId(req)
       const { items = [], restaurant_id: restaurantId, postal_code: bodyPostal } = req.body
+      if (
+        !Array.isArray(items) ||
+        items.length > 200 ||
+        items.some(
+          (item) =>
+            !item ||
+            typeof (item.product_id ?? item.productId) !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              item.product_id ?? item.productId
+            ) ||
+            typeof item.quantity !== 'number' ||
+            !Number.isFinite(item.quantity) ||
+            item.quantity <= 0
+        )
+      )
+        throw new ValidationError(
+          'Provide up to 200 products with valid IDs and positive quantities'
+        )
 
       const supplierCol = await getWarehouseSupplierColumn()
       const { rows: warehouses } = await query(
@@ -352,11 +381,13 @@ router.post(
       )
 
       let restaurantPostalCode = bodyPostal || null
+      let destination = null
       if (restaurantId) {
         const { rows: rRows } = await query(`SELECT address_json FROM restaurant WHERE id = $1`, [
           restaurantId,
         ])
         const addr = rRows[0]?.address_json
+        destination = addr || null
         restaurantPostalCode = addr?.postalCode ?? addr?.zip ?? restaurantPostalCode
       }
 
@@ -408,6 +439,8 @@ router.post(
           )
         : { rows: [] }
       const catMap = new Map(products.map((p) => [p.id, p.category_id]))
+      if (catMap.size !== productIds.length)
+        throw new ValidationError('Simulation products must belong to this supplier')
 
       const enrichedItems = items.map((item) => ({
         product_id: item.product_id ?? item.productId,
@@ -422,10 +455,25 @@ router.post(
         warehouseStock: stockRows,
         zones,
         restaurantPostalCode,
+        destination,
       })
 
       res.json({ ok: true, data: { preview }, error: null, requestId: req.requestId })
     } catch (error) {
+      if (error.code === 'NO_SINGLE_FULFILLMENT_LOCATION')
+        return res.status(409).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
+      if (error instanceof ValidationError)
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
       logger.error('Simulate routing error:', error)
       res.status(500).json({
         ok: false,
@@ -492,53 +540,68 @@ router.post(
         })
       }
 
-      const owner = await getWarehouseOwnerInsertSpec()
-      const { rows: existing } = await query(
-        `SELECT id FROM warehouse WHERE ${owner.filterColumn} = $1 AND is_active = TRUE`,
-        [supplierId]
-      )
-      const isFirst = existing.length === 0
-      const warehouseCode =
-        (typeof code === 'string' && code.trim()) ||
-        `WH-${String(Date.now()).slice(-8).toUpperCase()}`
+      const newWarehouse = await withTransaction(async (client) => {
+        const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
+        await client.query(
+          'SELECT id FROM supplier WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+          [[...new Set([billingId, supplierId])]]
+        )
+        const checked = await checkWarehouseLimit(supplierId)
+        if (!checked.allowed)
+          throw Object.assign(new ValidationError(checked.reason), {
+            code: 'WAREHOUSE_LIMIT_REACHED',
+            details: checked,
+          })
+        const owner = await getWarehouseOwnerInsertSpec((sql, params) => client.query(sql, params))
+        const { rows: existing } = await client.query(
+          `SELECT id FROM warehouse WHERE ${owner.filterColumn} = $1 AND is_active = TRUE`,
+          [supplierId]
+        )
+        const isFirst = existing.length === 0
+        const warehouseCode =
+          (typeof code === 'string' && code.trim()) ||
+          `WH-${String(Date.now()).slice(-8).toUpperCase()}`
 
-      const addressValue =
-        address == null || address === ''
-          ? null
-          : typeof address === 'string'
-            ? { line1: address }
-            : address
+        const addressValue =
+          address == null || address === ''
+            ? null
+            : typeof address === 'string'
+              ? { line1: address }
+              : address
 
-      const { rows: newWarehouse } = await query(
-        `INSERT INTO warehouse (
+        const { rows: created } = await client.query(
+          `INSERT INTO warehouse (
           ${owner.columns}, name, code, address, capacity, contact_name, contact_email, contact_phone,
           type, capacity_sqm, operating_hours, notes, is_default, is_main, is_active
         ) VALUES (${owner.placeholders}, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, TRUE)
         RETURNING *`,
-        [
-          supplierId,
-          name.trim(),
-          warehouseCode,
-          addressValue,
-          capacity || null,
-          contact_name || null,
-          contact_email || null,
-          contact_phone || null,
-          type,
-          capacity_sqm ?? null,
-          operating_hours ?? null,
-          notes ?? null,
-          isFirst,
-        ]
-      )
+          [
+            supplierId,
+            name.trim(),
+            warehouseCode,
+            addressValue,
+            capacity || null,
+            contact_name || null,
+            contact_email || null,
+            contact_phone || null,
+            type,
+            capacity_sqm ?? null,
+            operating_hours ?? null,
+            notes ?? null,
+            isFirst,
+          ]
+        )
 
-      if (isFirst) {
-        await query(`UPDATE supplier SET default_warehouse_id = $1 WHERE id = $2`, [
-          newWarehouse[0].id,
-          supplierId,
-        ])
-        await seedMissingWarehouseInventoryForSupplier(supplierId, newWarehouse[0].id)
-      }
+        if (isFirst) {
+          await client.query(`UPDATE supplier SET default_warehouse_id = $1 WHERE id = $2`, [
+            created[0].id,
+            supplierId,
+          ])
+          await seedMissingWarehouseInventoryForSupplier(supplierId, created[0].id, { client })
+        }
+
+        return created
+      })
 
       await createAuditLog('CREATE_WAREHOUSE', {
         entityType: 'WAREHOUSE',
@@ -554,6 +617,13 @@ router.post(
         requestId: req.requestId,
       })
     } catch (error) {
+      if (error.code === 'WAREHOUSE_LIMIT_REACHED')
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
       logger.error('Create warehouse error:', error)
       if (error.code === '23505') {
         return res.status(409).json({
@@ -624,99 +694,16 @@ router.patch(
             requestId: req.requestId,
           })
         }
-        const supplierCol = await getWarehouseSupplierColumn()
-        if (isDefaultWarehouse(wh)) {
-          const { rows: others } = await query(
-            `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE`,
-            [supplierId, warehouseId]
-          )
-          if (others.length > 0) {
-            return res.status(409).json({
-              ok: false,
-              data: null,
-              error: {
-                name: 'DEFAULT_WAREHOUSE',
-                message: 'Set another warehouse as default before deactivating this one',
-              },
-              requestId: req.requestId,
-            })
-          }
-        }
-
-        const { rows: pending } = await query(
-          `SELECT id FROM order_warehouse_assignment
-           WHERE warehouse_id = $1 AND status IN ('pending', 'picking', 'packed') LIMIT 1`,
-          [warehouseId]
-        )
-        if (pending.length) {
-          return res.status(409).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'PENDING_ASSIGNMENTS',
-              message: 'Cannot deactivate warehouse with pending order assignments',
-            },
+        const warehouse = await withTransaction((client) =>
+          deactivateSupplierWarehouse(client, {
+            supplierId,
+            warehouseId,
+            actorId: req.userData.id,
             requestId: req.requestId,
+            destinationWarehouseId: req.body.destination_warehouse_id,
+            confirmTransfer: req.body.confirm_transfer,
           })
-        }
-
-        const warehouse = await withTransaction(async (client) => {
-          const { rows: others } = await client.query(
-            `SELECT id FROM warehouse
-             WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE
-             ORDER BY is_default DESC NULLS LAST, is_main DESC NULLS LAST, created_at ASC`,
-            [supplierId, warehouseId]
-          )
-          const targetId = others[0]?.id
-          if (targetId) {
-            await transferWarehouseInventory(client, warehouseId, targetId)
-            await client.query(
-              `UPDATE supplier SET default_warehouse_id = COALESCE(default_warehouse_id, $1)
-               WHERE id = $2 AND (default_warehouse_id IS NULL OR default_warehouse_id = $3)`,
-              [targetId, supplierId, warehouseId]
-            )
-          } else {
-            await client.query(
-              `UPDATE supplier SET default_warehouse_id = NULL
-               WHERE id = $1 AND default_warehouse_id = $2`,
-              [supplierId, warehouseId]
-            )
-          }
-
-          const { rows } = await client.query(
-            `UPDATE warehouse SET
-              name = COALESCE($1, name),
-              address = COALESCE($2, address),
-              capacity = COALESCE($3, capacity),
-              contact_name = COALESCE($4, contact_name),
-              contact_email = COALESCE($5, contact_email),
-              contact_phone = COALESCE($6, contact_phone),
-              is_active = FALSE,
-              type = COALESCE($7, type),
-              capacity_sqm = COALESCE($8, capacity_sqm),
-              operating_hours = COALESCE($9, operating_hours),
-              notes = COALESCE($10, notes),
-              code = COALESCE($11, code),
-              updated_at = now()
-             WHERE id = $12 AND ${supplierCol} = $13 RETURNING *`,
-            [
-              name,
-              address,
-              capacity,
-              contact_name,
-              contact_email,
-              contact_phone,
-              type,
-              capacity_sqm,
-              operating_hours,
-              notes,
-              code,
-              warehouseId,
-              supplierId,
-            ]
-          )
-          return rows[0]
-        })
+        )
 
         return res.json({
           ok: true,
@@ -763,6 +750,19 @@ router.patch(
 
       res.json({ ok: true, data: { warehouse: rows[0] }, error: null, requestId: req.requestId })
     } catch (error) {
+      if (error.name === 'ConflictError' || error.name === 'ValidationError') {
+        return res.status(error.name === 'ConflictError' ? 409 : 400).json({
+          ok: false,
+          data: null,
+          error: {
+            name:
+              error.name === 'ConflictError' ? 'WAREHOUSE_LIFECYCLE_BLOCKED' : 'VALIDATION_ERROR',
+            message: error.message,
+            details: error.details,
+          },
+          requestId: req.requestId,
+        })
+      }
       logger.error('Update warehouse error:', error)
       res.status(500).json({
         ok: false,
@@ -786,6 +786,7 @@ router.post(
       const supplierCol = await getWarehouseSupplierColumn()
 
       const warehouse = await withTransaction(async (client) => {
+        await client.query('SELECT id FROM supplier WHERE id = $1 FOR UPDATE', [supplierId])
         await client.query(
           `UPDATE warehouse SET is_default = FALSE, is_main = FALSE WHERE ${supplierCol} = $1`,
           [supplierId]
@@ -833,73 +834,32 @@ router.delete(
     try {
       const supplierId = await resolveSupplierId(req)
       const warehouseId = req.params.id
-      const supplierCol = await getWarehouseSupplierColumn()
-
-      const wh = await getWarehouseForSupplier(warehouseId, supplierId)
-      if (!wh) throw new NotFoundError('Warehouse not found')
-
-      if (isDefaultWarehouse(wh)) {
-        const { rows: others } = await query(
-          `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE`,
-          [supplierId, warehouseId]
-        )
-        if (others.length > 0) {
-          return res.status(409).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'DEFAULT_WAREHOUSE',
-              message: 'Set another warehouse as default before deactivating this one',
-            },
-            requestId: req.requestId,
-          })
-        }
-      }
-
-      const { rows: pending } = await query(
-        `SELECT id FROM order_warehouse_assignment
-         WHERE warehouse_id = $1 AND status IN ('pending', 'picking', 'packed') LIMIT 1`,
-        [warehouseId]
+      const warehouse = await withTransaction((client) =>
+        deactivateSupplierWarehouse(client, {
+          supplierId,
+          warehouseId,
+          actorId: req.userData.id,
+          requestId: req.requestId,
+          destinationWarehouseId: req.body?.destination_warehouse_id,
+          confirmTransfer: req.body?.confirm_transfer,
+        })
       )
-      if (pending.length) {
-        return res.status(409).json({
+
+      res.json({ ok: true, data: { warehouse }, error: null, requestId: req.requestId })
+    } catch (error) {
+      if (error.name === 'ConflictError' || error.name === 'ValidationError') {
+        return res.status(error.name === 'ConflictError' ? 409 : 400).json({
           ok: false,
           data: null,
           error: {
-            name: 'PENDING_ASSIGNMENTS',
-            message: 'Cannot deactivate warehouse with pending order assignments',
+            name:
+              error.name === 'ConflictError' ? 'WAREHOUSE_LIFECYCLE_BLOCKED' : 'VALIDATION_ERROR',
+            message: error.message,
+            details: error.details,
           },
           requestId: req.requestId,
         })
       }
-
-      const warehouse = await withTransaction(async (client) => {
-        const { rows: others } = await client.query(
-          `SELECT id FROM warehouse
-           WHERE ${supplierCol} = $1 AND id != $2 AND is_active = TRUE
-           ORDER BY is_default DESC NULLS LAST, is_main DESC NULLS LAST, created_at ASC`,
-          [supplierId, warehouseId]
-        )
-        const targetId = others[0]?.id
-        if (targetId) {
-          await transferWarehouseInventory(client, warehouseId, targetId)
-          await client.query(
-            `UPDATE supplier SET default_warehouse_id = COALESCE(default_warehouse_id, $1)
-             WHERE id = $2 AND (default_warehouse_id IS NULL OR default_warehouse_id = $3)`,
-            [targetId, supplierId, warehouseId]
-          )
-        }
-
-        const { rows } = await client.query(
-          `UPDATE warehouse SET is_active = FALSE, updated_at = now()
-           WHERE id = $1 AND ${supplierCol} = $2 RETURNING *`,
-          [warehouseId, supplierId]
-        )
-        return rows[0]
-      })
-
-      res.json({ ok: true, data: { warehouse }, error: null, requestId: req.requestId })
-    } catch (error) {
       if (error instanceof NotFoundError) {
         return res.status(404).json({
           ok: false,
@@ -971,86 +931,25 @@ router.patch(
       const wh = await getWarehouseForSupplier(req.params.id, supplierId)
       if (!wh) throw new NotFoundError('Warehouse not found')
 
-      const {
-        quantity_available,
-        quantity_reserved,
-        quantity_on_hand,
-        reorder_point,
-        reorder_quantity,
-      } = req.body
-
-      const { rows: productRows } = await query(
-        `SELECT id FROM product WHERE id = $1 AND supplier_id = $2`,
-        [req.params.productId, supplierId]
+      const inventory = await withTransaction((client) =>
+        updateWarehouseStock(client, {
+          supplierId,
+          warehouseId: req.params.id,
+          productId: req.params.productId,
+          patch: req.body,
+          actorId: req.userData.id,
+          requestId: req.requestId,
+        })
       )
-      if (!productRows.length) throw new NotFoundError('Product not found')
-
-      const qtyAvailable = Object.hasOwn(req.body, 'quantity_available') ? quantity_available : null
-      const qtyReserved = Object.hasOwn(req.body, 'quantity_reserved') ? quantity_reserved : null
-      const qtyOnHand = Object.hasOwn(req.body, 'quantity_on_hand') ? quantity_on_hand : null
-
-      // M3: Reject negative values and enforce available+reserved <= on_hand invariant.
-      const checks = [
-        ['quantity_available', qtyAvailable],
-        ['quantity_reserved', qtyReserved],
-        ['quantity_on_hand', qtyOnHand],
-      ]
-      for (const [field, val] of checks) {
-        if (val !== null && (typeof val !== 'number' || !Number.isFinite(val) || val < 0)) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: { name: 'VALIDATION_ERROR', message: `${field} must be a non-negative number` },
-            requestId: req.requestId,
-          })
-        }
-      }
-      if (qtyAvailable !== null && qtyReserved !== null && qtyOnHand !== null) {
-        if (qtyAvailable + qtyReserved > qtyOnHand) {
-          return res.status(400).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'VALIDATION_ERROR',
-              message: 'quantity_available + quantity_reserved must not exceed quantity_on_hand',
-            },
-            requestId: req.requestId,
-          })
-        }
-      }
-
-      const { rows } = await query(
-        `INSERT INTO warehouse_inventory (
-          warehouse_id, product_id, quantity_available, quantity_reserved, quantity_on_hand,
-          reorder_point, reorder_quantity, last_counted_at, updated_at
-        ) VALUES ($1, $2, COALESCE($3, 0), COALESCE($4, 0), COALESCE($5, 0), $6, $7, now(), now())
-        ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
-          quantity_available = COALESCE($3, warehouse_inventory.quantity_available),
-          quantity_reserved = COALESCE($4, warehouse_inventory.quantity_reserved),
-          quantity_on_hand = COALESCE($5, warehouse_inventory.quantity_on_hand),
-          reorder_point = COALESCE($6, warehouse_inventory.reorder_point),
-          reorder_quantity = COALESCE($7, warehouse_inventory.reorder_quantity),
-          last_counted_at = now(),
-          updated_at = now()
-        RETURNING *`,
-        [
-          req.params.id,
-          req.params.productId,
-          qtyAvailable,
-          qtyReserved,
-          qtyOnHand,
-          Object.hasOwn(req.body, 'reorder_point') ? reorder_point : null,
-          Object.hasOwn(req.body, 'reorder_quantity') ? reorder_quantity : null,
-        ]
-      )
-
-      await syncLegacyMirrorFromWarehouse(query, {
-        supplierId,
-        productId: req.params.productId,
-      })
-
-      res.json({ ok: true, data: { inventory: rows[0] }, error: null, requestId: req.requestId })
+      res.json({ ok: true, data: { inventory }, error: null, requestId: req.requestId })
     } catch (error) {
+      if (error instanceof ValidationError)
+        return res.status(400).json({
+          ok: false,
+          data: null,
+          error: { name: 'VALIDATION_ERROR', message: error.message },
+          requestId: req.requestId,
+        })
       if (error instanceof NotFoundError) {
         return res.status(404).json({
           ok: false,
@@ -1073,6 +972,7 @@ router.get(
   '/:id/orders',
   warehousesFeature,
   requirePermission('WAREHOUSES_VIEW'),
+  requirePermission('ORDERS_VIEW'),
   requireRole(['SUPPLIER', 'ADMIN']),
   async (req, res) => {
     try {

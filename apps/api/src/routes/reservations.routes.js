@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import { requireAuth, requireRole, resolveTenantContext, requirePermission } from '../lib/rbac.js'
 import { requireRestaurantId } from '../lib/tenant-resolve.js'
@@ -203,6 +204,7 @@ async function fetchReservations(restaurantId, branchId, dayYmd) {
 router.use(
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('reservations'),
   requirePermission('RESERVATIONS_VIEW'),
   reservationsMutationGuard
 )

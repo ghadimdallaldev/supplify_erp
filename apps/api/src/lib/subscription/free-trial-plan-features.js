@@ -19,16 +19,17 @@ function trialTargetPlanCacheKey(subscription, tenantType) {
  * Default paid-plan feature JSON for a tenant type (cached). Legacy fallback only.
  * @param {'RESTAURANT'|'SUPPLIER'} tenantType
  */
-export async function getDefaultPaidTrialPlanFeatures(tenantType) {
+export async function getDefaultPaidTrialPlanFeatures(tenantType, { dbQuery = query } = {}) {
+  const useCache = dbQuery === query
   const cacheKey = goldFeaturesCacheKey(tenantType)
-  const cached = await getCache(cacheKey)
+  const cached = useCache ? await getCache(cacheKey) : null
   if (cached !== null) return cached
 
-  return singleflight(cacheKey, async () => {
-    const again = await getCache(cacheKey)
+  const load = async () => {
+    const again = useCache ? await getCache(cacheKey) : null
     if (again !== null) return again
 
-    const { rows } = await query(
+    const { rows } = await dbQuery(
       `SELECT features FROM subscription_plan
        WHERE code = 'gold' AND tenant_type = $1 AND is_active = true
        LIMIT 1`,
@@ -36,23 +37,25 @@ export async function getDefaultPaidTrialPlanFeatures(tenantType) {
     )
     const features =
       rows[0]?.features && typeof rows[0].features === 'object' ? rows[0].features : {}
-    await setCache(cacheKey, features, GOLD_FEATURES_CACHE_TTL).catch(() => {})
+    if (useCache) await setCache(cacheKey, features, GOLD_FEATURES_CACHE_TTL).catch(() => {})
     return features
-  })
+  }
+  return useCache ? singleflight(cacheKey, load) : load()
 }
 
-export async function getTrialTargetPlan(subscription) {
+export async function getTrialTargetPlan(subscription, { dbQuery = query } = {}) {
   if (!subscription) return null
   const planCode = normalizePlanCode(subscription.plan_code || 'free')
   const tenantType = subscription.plan_tenant_type || subscription.tenant_type
   if (planCode !== 'free' || !tenantType) return null
 
+  const useCache = dbQuery === query
   const cacheKey = trialTargetPlanCacheKey(subscription, tenantType)
-  const cached = await getCache(cacheKey)
+  const cached = useCache ? await getCache(cacheKey) : null
   if (cached !== null) return cached === 'null' ? null : cached
 
-  return singleflight(cacheKey, async () => {
-    const again = await getCache(cacheKey)
+  const load = async () => {
+    const again = useCache ? await getCache(cacheKey) : null
     if (again !== null) return again === 'null' ? null : again
 
     const params = []
@@ -65,7 +68,7 @@ export async function getTrialTargetPlan(subscription) {
       where = 'tenant_type = $1 AND code = $2 AND is_active = true'
     }
 
-    const { rows } = await query(
+    const { rows } = await dbQuery(
       `SELECT id, code, name, description, features, limits, price_per_month, price_per_year
        FROM subscription_plan
        WHERE ${where}
@@ -73,9 +76,11 @@ export async function getTrialTargetPlan(subscription) {
       params
     )
     const plan = rows[0] || null
-    await setCache(cacheKey, plan ?? 'null', TRIAL_TARGET_PLAN_CACHE_TTL).catch(() => {})
+    if (useCache)
+      await setCache(cacheKey, plan ?? 'null', TRIAL_TARGET_PLAN_CACHE_TTL).catch(() => {})
     return plan
-  })
+  }
+  return useCache ? singleflight(cacheKey, load) : load()
 }
 
 /**
@@ -83,7 +88,7 @@ export async function getTrialTargetPlan(subscription) {
  * @param {Record<string, unknown>|null|undefined} subscription
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function resolveEffectivePlanFeatures(subscription) {
+export async function resolveEffectivePlanFeatures(subscription, options = {}) {
   if (!subscription) return {}
   const raw =
     subscription.features && typeof subscription.features === 'object' ? subscription.features : {}
@@ -91,7 +96,7 @@ export async function resolveEffectivePlanFeatures(subscription) {
   const tenantType = subscription.plan_tenant_type || subscription.tenant_type
   if (planCode !== 'free' || !tenantType) return raw
 
-  const targetPlan = await getTrialTargetPlan(subscription)
+  const targetPlan = await getTrialTargetPlan(subscription, options)
   if (targetPlan?.features && typeof targetPlan.features === 'object') return targetPlan.features
-  return getDefaultPaidTrialPlanFeatures(tenantType)
+  return getDefaultPaidTrialPlanFeatures(tenantType, options)
 }

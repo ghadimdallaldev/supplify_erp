@@ -23,6 +23,8 @@ import {
 import { getRolesForUser, getPermissionsForUser } from '../lib/permissions.js'
 import { getTenantProfileRow } from '../lib/tenant-profile-cache.js'
 import { query } from '../lib/db.js'
+import { getWarehouseAccess } from '../lib/warehouse-access.js'
+import { rolesIncludeOwner } from '../lib/tenant-roles.js'
 import { logger } from '../lib/logger.js'
 import { config } from '../config/env.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
@@ -553,6 +555,12 @@ router.get('/me', requireAuth, async (req, res) => {
         createdAt: user.created_at,
         tenantRoles,
         tenantPermissions,
+        warehouseAccess:
+          tenant?.tenantType === 'SUPPLIER'
+            ? rolesIncludeOwner(tenantRoles)
+              ? { mode: 'all', warehouseIds: [] }
+              : await getWarehouseAccess(user.id, tenant.tenantId)
+            : null,
         workspace,
         adminRoles,
         adminPermissions,

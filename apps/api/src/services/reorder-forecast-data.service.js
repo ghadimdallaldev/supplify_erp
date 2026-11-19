@@ -1,8 +1,8 @@
 import { query } from '../lib/db.js'
 import { normalizeQuantityToProductUnit } from '../lib/reorder-unit-normalize.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 
 const CONSUMPTION_TYPES = new Set(['SUBTRACT', 'WASTAGE', 'SPOILAGE'])
-const RECEIVING_ADD = 'ADD'
 
 /**
  * Load per-day consumption events for a restaurant scope.
@@ -16,19 +16,23 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
   const lookbackDays = opts.lookbackDays ?? 90
   const branchId = opts.branchId ?? null
   const productId = opts.productId ?? null
+  const timeZone = opts.timeZone || (await getRestaurantTimezone(restaurantId))
+  // Calendar dates are serialized as text so the pg date parser cannot shift them.
 
   const branchFilter = branchId ? `AND COALESCE(iml.branch_id, co_mov.branch_id) = $3` : ''
   const productFilter = productId ? `AND iml.product_id = $${branchId ? 4 : 3}` : ''
   const params = [restaurantId, lookbackDays]
   if (branchId) params.push(branchId)
   if (productId) params.push(productId)
+  params.push(timeZone)
+  const timezoneSql = `$${params.length}`
 
   const { rows: movementRows } = await query(
     `
     SELECT
       iml.product_id,
       COALESCE(iml.branch_id, co_mov.branch_id) AS branch_id,
-      DATE(iml.created_at AT TIME ZONE 'UTC') AS usage_date,
+      to_char(iml.created_at AT TIME ZONE ${timezoneSql}, 'YYYY-MM-DD') AS usage_date,
       EXTRACT(DOW FROM iml.created_at AT TIME ZONE 'UTC')::int AS day_of_week,
       iml.type,
       iml.quantity,
@@ -55,7 +59,7 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
     SELECT
       rli.product_id,
       COALESCE(co.branch_id, iml.branch_id) AS branch_id,
-      DATE(rr.received_at AT TIME ZONE 'UTC') AS usage_date,
+      to_char(rr.received_at AT TIME ZONE ${timezoneSql}, 'YYYY-MM-DD') AS usage_date,
       EXTRACT(DOW FROM rr.received_at AT TIME ZONE 'UTC')::int AS day_of_week,
       rli.received_quantity AS quantity,
       rli.unit AS line_unit,
@@ -86,7 +90,7 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
     SELECT
       oi.product_id,
       co.branch_id,
-      DATE(COALESCE(co.placed_at, co.created_at) AT TIME ZONE 'UTC') AS usage_date,
+      to_char(COALESCE(co.placed_at, co.created_at) AT TIME ZONE ${timezoneSql}, 'YYYY-MM-DD') AS usage_date,
       EXTRACT(DOW FROM COALESCE(co.placed_at, co.created_at) AT TIME ZONE 'UTC')::int AS day_of_week,
       oi.quantity,
       p.unit AS product_unit,
@@ -95,7 +99,7 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
     JOIN customer_order co ON co.id = oi.order_id
     JOIN product p ON p.id = oi.product_id
     WHERE co.restaurant_id = $1
-      AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+      AND co.status::text NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       AND COALESCE(co.placed_at, co.created_at) >= NOW() - ($2::int || ' days')::interval
       ${branchFilterOrd}
       ${productFilterOrd}
@@ -109,11 +113,12 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
   const bucketKey = (productId, branchId) => `${productId}:${branchId ?? 'tenant'}`
 
   const addUsage = (productId, branchId, dateKey, qty, source, penalty = 0) => {
-    const key = bucketKey(productId, branchId)
+    const scopeBranch = opts.branchId ? branchId : null
+    const key = bucketKey(productId, scopeBranch)
     if (!buckets.has(key)) {
       buckets.set(key, {
         productId,
-        branchId: branchId ?? null,
+        branchId: scopeBranch,
         days: new Map(),
         sources: new Set(),
         unitPenalties: [],
@@ -131,29 +136,20 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
     addUsage(row.product_id, row.branch_id, row.usage_date, qty, 'movement')
   }
 
-  for (const row of receivedRows) {
-    const norm = normalizeQuantityToProductUnit(row.quantity, row.line_unit, row.product_unit)
-    addUsage(
-      row.product_id,
-      row.branch_id,
-      row.usage_date,
-      norm.quantity,
-      'receiving_inbound',
-      norm.confidencePenalty
-    )
-  }
+  // Receipts are supply evidence, never consumption. They must not change dailyUsage.
+  const receivedProducts = new Set(receivedRows.map((row) => row.product_id))
 
   // Order fallback only for product/branch keys with sparse movement consumption
   const movementTotals = new Map()
   for (const row of movementRows) {
-    const k = bucketKey(row.product_id, row.branch_id)
+    const k = bucketKey(row.product_id, opts.branchId ? row.branch_id : null)
     movementTotals.set(k, (movementTotals.get(k) || 0) + Math.abs(Number(row.quantity) || 0))
   }
 
   for (const row of orderRows) {
-    const k = bucketKey(row.product_id, row.branch_id)
+    const k = bucketKey(row.product_id, opts.branchId ? row.branch_id : null)
     const movTotal = movementTotals.get(k) || 0
-    if (movTotal >= 3) continue
+    if (movTotal > 0) continue
     const norm = normalizeQuantityToProductUnit(row.quantity, row.product_unit, row.product_unit)
     addUsage(row.product_id, row.branch_id, row.usage_date, norm.quantity, 'order_fallback')
   }
@@ -163,6 +159,8 @@ export async function loadConsumptionHistory(restaurantId, opts = {}) {
     branchId: b.branchId,
     dailyUsage: [...b.days.entries()].map(([date, quantity]) => ({ date, quantity })),
     sources: [...b.sources],
+    timeZone,
+    hasReceivingEvidence: receivedProducts.has(b.productId),
     avgUnitPenalty:
       b.unitPenalties.length > 0
         ? b.unitPenalties.reduce((a, c) => a + c, 0) / b.unitPenalties.length

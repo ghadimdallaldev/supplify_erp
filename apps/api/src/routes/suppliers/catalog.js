@@ -41,6 +41,7 @@ import {
   supplierListSchema,
 } from './suppliers.helpers.js'
 import { presentPublicSupplier } from '../../lib/tenant-profile-redaction.js'
+import { publicTenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 
 const log = createModuleLogger('suppliers.routes')
 
@@ -48,7 +49,14 @@ const router = express.Router()
 
 // List suppliers - publicly available with filters for restaurants
 // Use optionalAuth to get restaurant ID for follow status without requiring auth
-router.get('/', optionalAuth, async (req, res) => {
+// Admin kill switch: supplier directory off for this restaurant → 404 (guests unaffected).
+const supplierDirectoryGate = publicTenantFeatureGate(
+  'supplier_directory',
+  'RESTAURANT',
+  async (req) => (req.userData?.role === 'RESTAURANT' ? getRestaurantIdForRequest(req) : null)
+)
+
+router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
   try {
     const params = supplierListSchema.parse(req.query)
 

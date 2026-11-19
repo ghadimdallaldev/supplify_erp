@@ -138,6 +138,20 @@ export function SupplierFollowUpPanel({ className }: { className?: string }) {
                       {item.detail && (
                         <p className="text-xs text-[var(--text-mid)] mt-0.5">{item.detail}</p>
                       )}
+                      {item.orderCount != null && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          {t('followUp.evidence', {
+                            count: item.orderCount,
+                            interval: item.avgDaysBetween,
+                            elapsed: item.daysSinceLastOrder,
+                          })}
+                        </p>
+                      )}
+                      {item.dataQuality === 'poor' && (
+                        <p className="text-xs text-[var(--text-muted)] mt-1">
+                          {t('followUp.limitedHistory')}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-1 shrink-0">
                       <Button variant="outline" size="sm" asChild>

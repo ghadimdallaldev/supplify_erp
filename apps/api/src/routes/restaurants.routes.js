@@ -27,6 +27,7 @@ import {
 import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
 import { normalizeBusinessType } from '../lib/restaurant-targeting.js'
 import { presentRestaurant, canChangeTenantContactEmail } from '../lib/tenant-profile-redaction.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -99,6 +100,7 @@ router.get(
   '/',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('customer_directory'),
   resolveAdminContext,
   restaurantsDirectoryGuard,
   async (req, res) => {
@@ -400,6 +402,7 @@ router.get(
   '/me/delivery-locations',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('delivery_locations'),
   requireRole(['RESTAURANT']),
   requireAnyPermission('SETTINGS_VIEW', 'ORDERS_VIEW', 'ORDERS_CREATE'),
   async (req, res) => {
@@ -442,6 +445,7 @@ router.patch(
   '/me/delivery-location',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('delivery_locations'),
   requireRole(['RESTAURANT']),
   requirePermission('SETTINGS_EDIT'),
   async (req, res) => {
@@ -492,6 +496,7 @@ router.patch(
   '/branches/:branchId/delivery-location',
   requireAuth,
   resolveTenantContext,
+  tenantFeatureGate('delivery_locations'),
   requireRole(['RESTAURANT']),
   requirePermission('SETTINGS_EDIT'),
   async (req, res) => {

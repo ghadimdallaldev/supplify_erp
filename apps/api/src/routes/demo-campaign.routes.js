@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 import { query } from '../lib/db.js'
 import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import {
@@ -23,6 +24,7 @@ function campaignLimiter(prefix, max, windowMs) {
 }
 
 export const demoCampaignRoutes = Router()
+demoCampaignRoutes.use(platformFeatureGate('demo_campaign'))
 demoCampaignRoutes.post(
   '/leads',
   campaignLimiter('rl:demo-leads', 20, 10 * 60_000),

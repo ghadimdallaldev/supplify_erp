@@ -303,6 +303,20 @@ export function SupplierBusinessTab() {
                   </option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="last-order-timezone">
+                  {t('business.lastOrder.timezone', { defaultValue: 'Timezone' })}
+                </Label>
+                <Input
+                  id="last-order-timezone"
+                  value={form.lastOrderTimezone ?? ''}
+                  placeholder="Asia/Beirut"
+                  disabled={isBusy}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, lastOrderTimezone: event.target.value }))
+                  }
+                />
+              </div>
               {form.lastOrderCutoffType === 'minutes_before_window' ? (
                 <div className="space-y-2">
                   <Label htmlFor="last-order-minutes">

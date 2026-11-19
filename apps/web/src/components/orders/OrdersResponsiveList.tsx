@@ -20,7 +20,7 @@ import { StatusBadge } from '../ui/status-badge'
 import { CardActionGrid, cardActionBtnClass } from '../ui/card-layout'
 import { ResponsiveDataList, responsiveDataListClasses } from '../ui/responsive-data-list'
 import { cn } from '../../lib/utils'
-import { formatPrice } from '../../utils/format'
+import { formatCurrency } from '../../utils/format'
 import { resolveOrderStatusLabel } from './detail/orderDetailShared'
 import { isDisputeReplacementOrder, orderShortId } from '../../lib/orderPlacement'
 import { getActiveDisputeForOrder } from '../../lib/disputeHelpers'
@@ -311,8 +311,10 @@ export function OrdersResponsiveList({
                         {order.customer_type}
                       </Badge>
                     )}
-                    {t('page.restaurant', {
-                      name: order.customer_display_name || order.restaurant_name,
+                    {t(isSupplier ? 'page.restaurant' : 'page.supplier', {
+                      name: isSupplier
+                        ? order.customer_display_name || order.restaurant_name || '—'
+                        : order.supplier_name || '—',
                     })}
                   </div>
                   <div>
@@ -338,7 +340,7 @@ export function OrdersResponsiveList({
               </div>
               <div className="shrink-0 text-left sm:text-right">
                 <div className="text-xl font-bold text-[var(--brand-mid)] sm:text-2xl">
-                  ${formatPrice(order.total_amount)}
+                  {formatCurrency(order.total_amount, { currency: order.currency || 'USD' })}
                 </div>
                 <div className="text-sm text-[var(--text-muted)]">
                   {t('page.itemsCount', { count: order.items?.length || 0 })}
@@ -473,7 +475,9 @@ export function OrdersResponsiveList({
         <thead className="bg-[var(--brand-ultra)]/80">
           <tr>
             <th className={thClass}>Order</th>
-            <th className={cn(thClass, responsiveDataListClasses.columnSecondary)}>Restaurant</th>
+            <th className={cn(thClass, responsiveDataListClasses.columnSecondary)}>
+              {t(isSupplier ? 'page.restaurantColumn' : 'page.supplierColumn')}
+            </th>
             <th className={thClass}>Status</th>
             <th className={cn(thClass, responsiveDataListClasses.columnTertiary)}>Placed</th>
             <th className={cn(thClass, 'text-end', responsiveDataListClasses.columnSecondary)}>
@@ -508,9 +512,15 @@ export function OrdersResponsiveList({
               'max-w-[14rem] truncate',
               responsiveDataListClasses.columnSecondary
             )}
-            title={order.restaurant_name}
+            title={
+              isSupplier
+                ? order.customer_display_name || order.restaurant_name
+                : order.supplier_name
+            }
           >
-            {order.restaurant_name}
+            {isSupplier
+              ? order.customer_display_name || order.restaurant_name || '—'
+              : order.supplier_name || '—'}
           </td>
           <td className={tdClass}>
             <StatusBadge
@@ -542,7 +552,7 @@ export function OrdersResponsiveList({
               'whitespace-nowrap text-end text-sm font-semibold tabular-nums text-[var(--brand-mid)]'
             )}
           >
-            ${formatPrice(order.total_amount)}
+            {formatCurrency(order.total_amount, { currency: order.currency || 'USD' })}
           </td>
           <td className={cn(tdClass, 'text-end')}>
             <OrderTableActions

@@ -286,14 +286,11 @@ export async function getOwnerRoleId(tenantId, tenantType, client = null) {
   return rows[0]?.id || null
 }
 
-export async function assignTenantUserRole({
-  userId,
-  roleId,
-  tenantId,
-  tenantType,
-  assignedBy = null,
-}) {
-  await withTransaction(async (client) => {
+export async function assignTenantUserRole(
+  { userId, roleId, tenantId, tenantType, assignedBy = null },
+  transactionClient = null
+) {
+  const assign = async (client) => {
     const { rows: roleRows } = await client.query(
       `SELECT id, tenant_id, tenant_type, name FROM tenant_roles WHERE id = $1`,
       [roleId]
@@ -312,14 +309,16 @@ export async function assignTenantUserRole({
        DO UPDATE SET role_id = EXCLUDED.role_id, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()`,
       [userId, roleId, tenantType, tenantId, assignedBy]
     )
-  })
+  }
+  return transactionClient ? assign(transactionClient) : withTransaction(assign)
 }
 
-export async function userHasOwnerRole(userId, tenantId, tenantType) {
-  const { rows } = await query(
+export async function userHasOwnerRole(userId, tenantId, tenantType, client = null) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const { rows } = await db(
     `SELECT TRUE AS is_owner
      FROM tenant_user_roles tur
-     JOIN tenant_roles tr ON tr.id = tur.role_id
+     JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
      WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
        AND tr.name = 'Owner' AND tr.is_system = true`,
     [userId, tenantId, tenantType]
@@ -349,7 +348,7 @@ export async function userIsVerifiedTenantOwner(
   const { rows: ownerRows } = await db(
     `SELECT 1
      FROM tenant_user_roles tur
-     JOIN tenant_roles tr ON tr.id = tur.role_id
+     JOIN tenant_roles tr ON tr.id = tur.role_id AND tr.tenant_id = tur.tenant_id AND tr.tenant_type = tur.tenant_type
      WHERE tur.user_id = $1 AND tur.tenant_id = $2 AND tur.tenant_type = $3
        AND tr.name = 'Owner' AND tr.is_system = true
      LIMIT 1`,

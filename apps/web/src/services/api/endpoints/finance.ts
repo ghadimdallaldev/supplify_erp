@@ -1,4 +1,5 @@
 import { api } from '../base'
+import type { SupplierReorderAssistanceResponse } from '../../../types/reorder'
 export type SupplierWeeklyIntelligenceSummaryResponse = {
   periodDays: number
   summary: {
@@ -328,7 +329,10 @@ export const financeApi = api.injectEndpoints({
       },
       providesTags: ['SupplierOps'],
     }),
-    getSupplierReorderAssistance: builder.query<any, { graceDays?: number } | void>({
+    getSupplierReorderAssistance: builder.query<
+      SupplierReorderAssistanceResponse,
+      { graceDays?: number } | void
+    >({
       query: (arg) => {
         const params = new URLSearchParams()
         if (arg?.graceDays) params.set('grace_days', String(arg.graceDays))

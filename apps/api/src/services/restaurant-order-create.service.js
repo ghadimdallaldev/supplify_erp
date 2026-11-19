@@ -4,6 +4,7 @@ import { insertOrderItemsBatch } from './order-create.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
 import { resolveSupplierDeliveryDate } from '../lib/supplier-last-order.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { lockCheckoutQuoteRows, assertCheckoutQuotePrices } from './quote-checkout.service.js'
 
 function elapsedMsSince(start) {
   return Math.round(performance.now() - start)
@@ -20,6 +21,7 @@ export async function createRestaurantOrdersInTransaction({
   supplierProfiles,
   supplierPromoEligibility,
   supplierMultiWarehouse,
+  deliveryResolutions = new Map(),
   dailyMeterEnforcement,
   orderData,
   promotionHandlers,
@@ -40,6 +42,22 @@ export async function createRestaurantOrdersInTransaction({
     transactionQueryCount += 1
     return client.query(...args)
   }
+  const quoteLines = [...supplierGroups.entries()].flatMap(([supplierId, items]) =>
+    items.map((item) => ({ ...item, supplierId }))
+  )
+  const quoteRows = await lockCheckoutQuoteRows(
+    { query: q },
+    {
+      restaurantId,
+      productIds: quoteLines.map((line) => line.productId),
+      quoteLocks: orderData?.quoteLocks,
+    }
+  )
+  assertCheckoutQuotePrices({
+    rows: quoteRows,
+    lines: quoteLines,
+    quoteLocks: orderData?.quoteLocks,
+  })
 
   if (orderStatus === 'PLACED') {
     const usageStart = performance.now()
@@ -69,10 +87,9 @@ export async function createRestaurantOrdersInTransaction({
     const orderCurrency = currencies[0] || 'USD'
 
     let phaseStart = performance.now()
-    const deliveryResolution = resolveSupplierDeliveryDate(
-      supplier,
-      orderData?.deliveryDate ?? null
-    )
+    const deliveryResolution =
+      deliveryResolutions.get(supplierId) ??
+      resolveSupplierDeliveryDate(supplier, orderData?.deliveryDate ?? null)
     const {
       rows: [order],
     } = await q(
@@ -83,7 +100,7 @@ export async function createRestaurantOrdersInTransaction({
             currency, status, notes, requested_delivery_date
           )
           VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, $10::date)
-          RETURNING *
+          RETURNING *, requested_delivery_date::text AS requested_delivery_date
         `,
       [
         restaurantId,

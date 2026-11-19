@@ -11,6 +11,10 @@ import { listRestaurantReminders } from './reorder-cadence.service.js'
 import { listExpiryLots } from './inventory-expiry.service.js'
 import { getCachedForecasts, refreshIfStale } from './reorder-forecast-cache.service.js'
 import { buildReorderAiContexts } from './reorder-ai-context.service.js'
+import { loadIncomingSupply } from './reorder-supply.service.js'
+import { buildReorderGuidance } from '../lib/reorder-guidance.js'
+import { calendarDay } from '../lib/reorder-calendar.js'
+import { getRestaurantTimezone } from '../lib/tenant-timezone.js'
 
 const AI_RECOMMEND_CACHE_TTL_SECONDS = 15 * 60
 const AI_RECOMMEND_DEFAULT_LIMIT = 8
@@ -66,20 +70,28 @@ function isSuppressed(suppressions, scopeType, scopeId) {
   return suppressions.some((s) => s.scope_type === scopeType && s.scope_id === String(scopeId))
 }
 
-async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) {
+async function fetchLowStockSuggestions(
+  restaurantId,
+  { branchId = null, timeZone = 'Asia/Beirut' } = {}
+) {
   const { rows } = await query(
     `
     WITH usage_stats AS (
       SELECT
         iml.product_id,
+        COUNT(DISTINCT (iml.created_at AT TIME ZONE $3)::date) FILTER (WHERE iml.type IN ('SUBTRACT','WASTAGE','SPOILAGE') AND iml.created_at < ((now() AT TIME ZONE $3)::date::timestamp AT TIME ZONE $3))::int AS usage_days,
+        EXTRACT(DAY FROM now() - MIN(iml.created_at) FILTER (WHERE iml.type IN ('SUBTRACT','WASTAGE','SPOILAGE')))::int AS observed_days,
         COALESCE((
-          SELECT SUM(ABS(iml2.quantity))
+          SELECT SUM(ABS(iml2.quantity)) / GREATEST(1, LEAST(30,
+            (now() AT TIME ZONE $3)::date - MIN((iml2.created_at AT TIME ZONE $3)::date)))::numeric
           FROM inventory_movement_log iml2
           WHERE iml2.restaurant_id = iml.restaurant_id
             AND iml2.product_id = iml.product_id
-            AND iml2.type = 'SUBTRACT'
-            AND iml2.created_at >= NOW() - INTERVAL '30 days'
-        ), 0) / 30.0 AS avg_daily_usage_30day,
+            AND iml2.type IN ('SUBTRACT','WASTAGE','SPOILAGE')
+            AND ($2::uuid IS NULL OR iml2.branch_id = $2)
+            AND iml2.created_at >= (((now() AT TIME ZONE $3)::date - 30)::timestamp AT TIME ZONE $3)
+            AND iml2.created_at < ((now() AT TIME ZONE $3)::date::timestamp AT TIME ZONE $3)
+        ), 0) AS avg_daily_usage_30day,
         COALESCE((
           SELECT oi.quantity
           FROM order_item oi
@@ -106,9 +118,12 @@ async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) 
       s.name AS supplier_name,
       ri.quantity AS current_qty,
       ri.low_stock_threshold,
+      ri.branch_id,
       COALESCE(us.avg_daily_usage_30day, 0) AS avg_daily_usage_30day,
       COALESCE(us.last_order_qty, 0) AS last_order_qty,
       COALESCE(us.days_since_last_order, 999) AS days_since_last_order,
+      COALESCE(us.usage_days, 0) AS usage_days,
+      COALESCE(us.observed_days, 0) AS observed_days,
       COALESCE(pis.lead_time_days, 7) AS lead_time_days,
       COALESCE(pis.moq, 1) AS moq,
       COALESCE(pis.order_multiple, 1) AS order_multiple,
@@ -126,7 +141,7 @@ async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) 
     LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
     LEFT JOIN usage_stats us ON us.product_id = ri.product_id
     WHERE ri.restaurant_id = $1
-      AND ($2::uuid IS NULL OR ri.branch_id = $2)
+      AND ($2::uuid IS NULL OR ri.branch_id = $2 OR ri.branch_id IS NULL)
       AND (
         ri.quantity <= COALESCE(ri.low_stock_threshold, 0)
         OR (
@@ -145,7 +160,7 @@ async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) 
       ri.quantity ASC
     LIMIT 30
     `,
-    [restaurantId, branchId]
+    [restaurantId, branchId, timeZone]
   )
 
   return rows.map((row) => {
@@ -197,6 +212,9 @@ async function fetchLowStockSuggestions(restaurantId, { branchId = null } = {}) 
       urgency: row.urgency_level,
       suggestedQty,
       currentQty: parseFloat(row.current_qty),
+      dataQuality: Number(row.usage_days) >= 3 && Number(row.observed_days) >= 7 ? 'fair' : 'poor',
+      stockScope: row.branch_id ? 'branch' : 'restaurant',
+      branchId: row.branch_id || null,
       // Additive fields for AI/context builders (ignored by older clients)
       leadTimeDays: Number(row.lead_time_days) || 7,
       moq: Number(row.moq) || 1,
@@ -235,20 +253,21 @@ async function fetchExpirySuggestions(restaurantId) {
     .map((lot) => ({
       id: `expiry-${lot.id}`,
       productId: lot.productId,
-      productName: lot.productName || lot.label,
+      productName: lot.itemName || lot.productName || lot.label,
       supplierId: lot.supplierId,
       supplierName: lot.supplierName,
       reasonCode: lot.status === 'expired' ? 'expired' : 'near_expiry',
       reasonLabel: lot.status === 'expired' ? REASON_LABELS.expired : REASON_LABELS.near_expiry,
       urgency: lot.status === 'expired' ? 'URGENT' : 'HIGH',
-      suggestedQty: Math.max(1, Math.ceil(lot.quantity || 1)),
+      suggestedQty: null,
+      action: 'manual_review',
       expiryDate: lot.expiryDate,
       scopeType: 'product',
       scopeId: String(lot.productId || lot.id),
     }))
 }
 
-async function fetchQuickListSuggestions(restaurantId) {
+async function fetchQuickListSuggestions(restaurantId, { branchId = null } = {}) {
   const { rows } = await query(
     `
     SELECT DISTINCT ON (qli.product_id)
@@ -265,12 +284,13 @@ async function fetchQuickListSuggestions(restaurantId) {
     JOIN product p ON p.id = qli.product_id
     JOIN supplier s ON s.id = ql.supplier_id
     WHERE ql.restaurant_id = $1
+      AND ($2::uuid IS NULL OR ql.branch_id = $2)
       AND ql.is_scheduled = true
       AND ql.status = 'ACTIVE'
     ORDER BY qli.product_id, ql.updated_at DESC
     LIMIT 20
     `,
-    [restaurantId]
+    [restaurantId, branchId]
   )
 
   return rows.map((row) => ({
@@ -310,7 +330,7 @@ function applyForecastToSuggestion(item, forecastByProduct) {
 
   const merged = { ...item, forecast }
   if (forecast.forecastReorderQty != null && forecast.confidence >= 0.35) {
-    merged.suggestedQty = Math.max(merged.suggestedQty ?? 1, Math.ceil(forecast.forecastReorderQty))
+    merged.suggestedQty = forecast.forecastReorderQty
     if (forecast.urgency) {
       merged.urgency = forecast.urgency
     }
@@ -330,12 +350,13 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
   const capabilities = resolveSmartReorderCapabilities(smartReorderFeatureValue)
 
   const suppressions = await getActiveSuppressions(restaurantId)
+  const timeZone = await getRestaurantTimezone(restaurantId)
 
   const [stock, cadence, expiry, quickList] = await Promise.all([
-    fetchLowStockSuggestions(restaurantId, { branchId }),
-    fetchCadenceSuggestions(restaurantId),
-    fetchExpirySuggestions(restaurantId),
-    fetchQuickListSuggestions(restaurantId),
+    fetchLowStockSuggestions(restaurantId, { branchId, timeZone }),
+    branchId ? Promise.resolve([]) : fetchCadenceSuggestions(restaurantId),
+    branchId ? Promise.resolve([]) : fetchExpirySuggestions(restaurantId),
+    fetchQuickListSuggestions(restaurantId, { branchId }),
   ])
 
   // Expiry-driven items stay in the same suppression-filtered list: pulling them
@@ -354,13 +375,26 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
           .filter((f) => f.branchId == null || f.branchId === branchId)
           .map((f) => [f.productId, f])
       )
-      filtered = filtered.map((item) => applyForecastToSuggestion(item, forecastByProduct))
+      filtered = filtered.map((item) =>
+        ['expired', 'near_expiry', 'cadence'].includes(item.reasonCode)
+          ? item
+          : applyForecastToSuggestion(item, forecastByProduct)
+      )
     } catch {
       // Graceful fallback — keep heuristic suggestions when forecast tables unavailable
     }
   }
 
-  const suggestions = mergeAndDedupe(filtered).slice(0, limit)
+  const asOf = calendarDay(new Date(), timeZone)
+  const supply = await loadIncomingSupply(
+    restaurantId,
+    filtered.map((item) => item.productId),
+    { branchId }
+  )
+  const allSuggestions = mergeAndDedupe(filtered).map((item) =>
+    buildReorderGuidance(item, supply, { asOf, branchId })
+  )
+  const suggestions = allSuggestions.slice(0, limit)
 
   const ai =
     smartReorderFeatureValue !== undefined
@@ -374,7 +408,12 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
 
   return {
     suggestions,
-    total: suggestions.length,
+    total: allSuggestions.length,
+    hasMore: allSuggestions.length > limit,
+    asOf,
+    fetchedAt: new Date().toISOString(),
+    timeZone,
+    incomingKnown: supply.known,
     smartReorder: {
       tier: capabilities.tier,
       capabilities: capabilities.capabilities,
@@ -548,7 +587,7 @@ export function selectAiRecommendCandidates(suggestions, opts = {}) {
   const filterIds = opts.productIds?.length ? new Set(opts.productIds.map(String)) : null
 
   return (suggestions || [])
-    .filter((s) => s.productId)
+    .filter((s) => s.productId && !['expired', 'near_expiry', 'cadence'].includes(s.reasonCode))
     .filter((s) => !filterIds || filterIds.has(String(s.productId)))
     .filter((s) => AI_RECOMMEND_URGENCIES.has(String(s.urgency || '').toUpperCase()))
     .slice(0, limit)
@@ -589,7 +628,9 @@ export async function getReorderAiRecommendations(restaurantId, opts = {}) {
   }
 
   const productIds = candidates.map((c) => String(c.productId))
-  const forecastVersion = computeForecastVersion(assistance.forecasts, productIds)
+  const forecastVersion =
+    computeForecastVersion(assistance.forecasts, productIds) +
+    hashCachePart(JSON.stringify(candidates))
   const cacheKey = buildAiRecommendCacheKey(restaurantId, branchId, productIds, forecastVersion)
 
   const cached = await getCache(cacheKey)
@@ -625,6 +666,7 @@ export async function getReorderAiRecommendations(restaurantId, opts = {}) {
         const rec = buildForecastFallbackRecommendation(
           {
             productId: ctx.productId,
+            action: ctx.action,
             baseQuantity: ctx.baseSuggestedQuantity,
             defaultSupplierId: ctx.defaultSupplierId,
             supplierOptions: ctx.supplierOptions,

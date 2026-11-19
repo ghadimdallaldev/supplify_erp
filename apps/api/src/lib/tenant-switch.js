@@ -8,8 +8,6 @@ import { getEffectiveTenant, impersonationCanAccessBranch } from './impersonatio
 const COOKIE_NAME = 'active_tenant_token'
 const ALG = 'HS256'
 
-const ORG_ALL_SCOPE_ROLES = new Set(['Org Owner', 'Org Manager', 'Org Viewer'])
-
 function secret() {
   return new TextEncoder().encode(config.ACTIVE_TENANT_SECRET)
 }
@@ -59,17 +57,28 @@ export async function verifyActiveTenantToken(token) {
  * Returns false when the tenant row exists and is_branch_active is explicitly false.
  * Missing column / missing row is treated as active (legacy safety).
  */
-export async function isTenantBranchActive(tenantId, tenantType) {
-  if (!tenantId || !tenantType) return true
+export async function isTenantBranchActive(tenantId, tenantType, { userId = null } = {}) {
+  if (!tenantId || !['SUPPLIER', 'RESTAURANT'].includes(tenantType)) return false
   const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
-  try {
-    const { rows } = await query(`SELECT is_branch_active FROM ${table} WHERE id = $1`, [tenantId])
-    if (!rows.length) return false
-    return rows[0].is_branch_active !== false
-  } catch (err) {
-    if (err.code === '42703') return true
-    throw err
-  }
+  const { rows } = userId
+    ? await query(
+        `SELECT t.is_branch_active FROM ${table} t
+           JOIN app_user u ON u.id = $2 AND COALESCE(u.is_active, TRUE) = TRUE
+           LEFT JOIN user_workspace_membership m ON m.user_id = u.id
+           WHERE t.id = $1 AND (
+             m.user_id IS NULL OR (m.status = 'active' AND m.workspace_type = $3 AND (
+               m.home_tenant_id = t.id OR
+               (m.organization_id IS NOT NULL AND m.organization_id = t.organization_id) OR
+               EXISTS (SELECT 1 FROM tenant_account_link l
+                 WHERE l.parent_tenant_id = m.home_tenant_id AND l.child_tenant_id = t.id
+                   AND l.parent_tenant_type = $3 AND l.child_tenant_type = $3)
+             ))
+           )`,
+        [tenantId, userId, tenantType]
+      )
+    : await query(`SELECT is_branch_active FROM ${table} WHERE id = $1`, [tenantId])
+  if (!rows.length) return false
+  return rows[0].is_branch_active !== false
 }
 
 async function userHasOrgTenantAccess(userId, tenantId, tenantType) {
@@ -82,22 +91,22 @@ async function userHasOrgTenantAccess(userId, tenantId, tenantType) {
     const { rows: orgRole } = await query(
       `SELECT orgr.name, orp.branch_scope
        FROM org_user_roles our
-       JOIN org_roles orgr ON orgr.id = our.role_id
+       JOIN org_roles orgr ON orgr.id = our.role_id AND orgr.organization_id = our.organization_id
        JOIN org_role_permissions orp ON orp.role_id = orgr.id
        WHERE our.user_id = $1 AND our.organization_id = $2
-       LIMIT 1`,
+       `,
       [userId, targetOrg[0].organization_id]
     )
     if (!orgRole.length) return false
 
-    if (orgRole[0].branch_scope === 'all' || ORG_ALL_SCOPE_ROLES.has(orgRole[0].name)) {
+    if (orgRole.some((row) => row.branch_scope === 'all')) {
       return true
     }
 
     const { rows: assigned } = await query(
       `SELECT 1 FROM org_user_branch_access
-       WHERE user_id = $1 AND supplier_id = $2`,
-      [userId, tenantId]
+       WHERE user_id = $1 AND supplier_id = $2 AND organization_id = $3`,
+      [userId, tenantId, targetOrg[0].organization_id]
     )
     return assigned.length > 0
   }
@@ -112,22 +121,22 @@ async function userHasOrgTenantAccess(userId, tenantId, tenantType) {
     const { rows: orgRole } = await query(
       `SELECT ror.name, rorp.branch_scope
        FROM restaurant_org_user_roles rour
-       JOIN restaurant_org_roles ror ON ror.id = rour.role_id
+       JOIN restaurant_org_roles ror ON ror.id = rour.role_id AND ror.organization_id = rour.organization_id
        JOIN restaurant_org_role_permissions rorp ON rorp.role_id = ror.id
        WHERE rour.user_id = $1 AND rour.organization_id = $2
-       LIMIT 1`,
+       `,
       [userId, targetOrg[0].organization_id]
     )
     if (!orgRole.length) return false
 
-    if (orgRole[0].branch_scope === 'all' || ORG_ALL_SCOPE_ROLES.has(orgRole[0].name)) {
+    if (orgRole.some((row) => row.branch_scope === 'all')) {
       return true
     }
 
     const { rows: assigned } = await query(
       `SELECT 1 FROM restaurant_org_user_branch_access
-       WHERE user_id = $1 AND restaurant_id = $2`,
-      [userId, tenantId]
+       WHERE user_id = $1 AND restaurant_id = $2 AND organization_id = $3`,
+      [userId, tenantId, targetOrg[0].organization_id]
     )
     return assigned.length > 0
   }
@@ -138,7 +147,7 @@ async function userHasOrgTenantAccess(userId, tenantId, tenantType) {
 export async function userCanAccessTenant(userId, email, tenantId, tenantType) {
   const normalizedEmail = (email || '').trim().toLowerCase()
 
-  if (!(await isTenantBranchActive(tenantId, tenantType))) {
+  if (!userId || !(await isTenantBranchActive(tenantId, tenantType, { userId }))) {
     return false
   }
 

@@ -21,6 +21,7 @@ import {
   isFeatureEnabled,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
+import { isQuoteCalendarDate } from '../../lib/quote-response-validation.js'
 import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
@@ -237,6 +238,7 @@ const orderCreateSchema = z
     deliveryDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .refine(isQuoteCalendarDate, 'Delivery date must be a valid calendar day')
       .optional(),
     notes: z.string().max(2000).optional(),
   })
@@ -294,6 +296,7 @@ const supplierOrderCreateSchema = z
     deliveryDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .refine(isQuoteCalendarDate, 'Delivery date must be a valid calendar day')
       .optional(),
     branchId: z.string().uuid().optional(),
     branch_id: z.string().uuid().optional(),

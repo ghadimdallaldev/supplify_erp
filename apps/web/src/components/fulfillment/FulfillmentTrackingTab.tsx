@@ -148,7 +148,7 @@ export function FulfillmentTrackingTab() {
                         <p className="text-xs text-[var(--text-muted)]">
                           {t('tracking.table.scheduled')}
                         </p>
-                        <p>{formatScheduledAt(o.scheduledAt)}</p>
+                        <p>{formatScheduledAt(o.scheduledDeliveryDate ?? o.scheduledAt)}</p>
                       </div>
                       <div className="col-span-2">
                         <p className="text-xs text-[var(--text-muted)]">
@@ -242,7 +242,7 @@ export function FulfillmentTrackingTab() {
                             responsiveDataListClasses.columnTertiary
                           )}
                         >
-                          {formatScheduledAt(o.scheduledAt)}
+                          {formatScheduledAt(o.scheduledDeliveryDate ?? o.scheduledAt)}
                         </td>
                         <td
                           className={cn(

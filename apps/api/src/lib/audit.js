@@ -50,7 +50,7 @@ export function formatAuditLogRow(row) {
  * @param {object} [opts.payload_json] - Additional payload (resource_type, changes, etc.)
  * @param {string} [opts.actor_admin_role] - Set when actor is admin (e.g. 'ADMIN')
  */
-export async function writeAuditLog(req, opts) {
+export async function writeAuditLog(req, opts, { client = null, required = false } = {}) {
   const requestId = req?.requestId || null
   const actorUserId = req?.userData?.id || null
   const tenantType = opts.tenant_type || req?.tenantContext?.tenantType || null
@@ -64,7 +64,8 @@ export async function writeAuditLog(req, opts) {
     if (ip) payload.ip_address = ip
   }
   try {
-    await query(
+    const run = client ? (sql, params) => client.query(sql, params) : query
+    await run(
       `
       INSERT INTO audit_logs (
         action_type, actor_user_id, actor_admin_role, tenant_type, tenant_id, target_id, payload_json, request_id
@@ -82,6 +83,7 @@ export async function writeAuditLog(req, opts) {
       ]
     )
   } catch (err) {
+    if (required) throw err
     if (err.code === '42P01') {
       logger.warn('audit_logs table missing, skipping write', { action_type: opts.action_type })
     } else {

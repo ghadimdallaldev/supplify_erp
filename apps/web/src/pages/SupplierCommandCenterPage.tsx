@@ -276,7 +276,12 @@ export function SupplierCommandCenterPage() {
   const { can } = usePermissions()
   const { persona } = useWorkspaceRole()
   const hubMode = persona.commandCenterMode ?? 'full'
-  const layout = getCommandCenterLayout(hubMode, can)
+  const roleLayout = getCommandCenterLayout(hubMode, can)
+  const layout = {
+    ...roleLayout,
+    showFinanceKpi: roleLayout.showFinanceKpi && can('INVOICES_VIEW'),
+    showReceivablesPreview: roleLayout.showReceivablesPreview && can('INVOICES_VIEW'),
+  }
   const hubTitle = persona.overviewNav?.label ?? t('commandCenter.title')
   const hubDescription = useMemo(() => {
     if (hubMode === 'sales') return t('commandCenter.descriptions.sales')
@@ -300,6 +305,10 @@ export function SupplierCommandCenterPage() {
 
   const kpis = data?.kpis
   const previews = data?.previews
+  const todaysPriorities = (data?.todaysPriorities ?? []).filter(
+    (item: { type?: string; id: string }) =>
+      can('INVOICES_VIEW') || (item.type !== 'finance' && item.id !== 'overdue-invoices')
+  )
 
   const handleDraftReminder = async (restaurantId: string) => {
     try {
@@ -539,7 +548,7 @@ export function SupplierCommandCenterPage() {
               <ClipboardList size={16} />
               {t('commandCenter.priorities.title')}
             </h2>
-            {(data?.todaysPriorities || []).length === 0 ? (
+            {todaysPriorities.length === 0 ? (
               <div data-testid="priorities-empty">
                 <EmptyState
                   title={t('commandCenter.priorities.emptyTitle')}
@@ -549,7 +558,7 @@ export function SupplierCommandCenterPage() {
               </div>
             ) : (
               <ul className="list-none p-0 m-0 flex flex-col gap-2">
-                {data!.todaysPriorities.map((item: { id: string; title: string; href: string }) => (
+                {todaysPriorities.map((item: { id: string; title: string; href: string }) => (
                   <li key={item.id}>
                     <Link
                       to={item.href}

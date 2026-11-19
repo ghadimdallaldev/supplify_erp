@@ -386,5 +386,64 @@
   "reorderList": {
     "label": "Ordering list",
     "choose": "Choose an ordering list"
+  },
+  "guidance": {
+    "title": "Reorder assistance",
+    "description": "Clear purchase guidance from stock, incoming deliveries, usage, and purchasing patterns.",
+    "search": "Search products",
+    "status": "Next step",
+    "all": "All suggestions",
+    "supplier": "Supplier",
+    "allSuppliers": "All suppliers",
+    "refresh": "Refresh data",
+    "aiReview": "Ask AI to review",
+    "aiLoading": "Reviewing with AI…",
+    "viewAll": "View all",
+    "why": "Why these suggestions?",
+    "ask": "Ask",
+    "askPlaceholder": "Ask anything about this restaurant — stock, orders, invoices, waste",
+    "keywordPlaceholder": "Ask: \"order more tomatoes for the weekend\"",
+    "view": "View",
+    "list": "List",
+    "cart": "Cart",
+    "snooze": "Snooze 7 days",
+    "notNeeded": "Not needed",
+    "incorrect": "Recommendation incorrect",
+    "aiFailed": "AI review is unavailable. Forecast guidance remains available.",
+    "showing": "Showing {{count}} of {{total}} suggestions",
+    "noMatches": "No suggestions match your filters.",
+    "empty": "No reorder suggestions right now.",
+    "suggested": "Suggested quantity",
+    "onHand": "On hand",
+    "incoming": "Expected incoming",
+    "expectedUsage": "Expected usage",
+    "netNeed": "Net requirement",
+    "unknown": "Unknown",
+    "reviewBeforeOrdering": "Review stock and quantities before ordering.",
+    "actions": {
+      "order": "Buy now",
+      "wait": "Monitor",
+      "manual_review": "Review data"
+    },
+    "quality": {
+      "good": "Strong data",
+      "fair": "Limited data",
+      "poor": "Review data"
+    },
+    "scope": {
+      "restaurant": "Restaurant-wide stock",
+      "branch": "Branch stock"
+    },
+    "warnings": {
+      "incoming_unknown": "Incoming supply could not be checked. Review open orders before buying.",
+      "incoming_overdue": "Some incoming deliveries are overdue; they are excluded from dependable supply.",
+      "incoming_uncertain": "Some orders have an unconfirmed delivery date and are excluded from dependable supply.",
+      "limited_history": "Measured usage history is limited; confirm the required quantity.",
+      "review_expiry": "Review expiring stock before deciding whether to replenish.",
+      "cadence_only": "This reminder is based on ordering patterns, not measured consumption.",
+      "shared_stock": "This stock is shared across the restaurant; a branch quantity requires a branch count.",
+      "incoming_after_stockout": "Stock may run out before an incoming delivery. Confirm an earlier delivery or bridging purchase."
+    },
+    "orderBy": "Order by"
   }
 }

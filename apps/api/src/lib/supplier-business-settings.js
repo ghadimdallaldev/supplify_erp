@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isValidTenantTimezone, normalizeTenantTimezone } from './tenant-timezone.js'
 
 export const BUSINESS_DAY_KEYS = [
   'monday',
@@ -50,7 +51,12 @@ export const supplierBusinessSettingsUpdateSchema = z
     lastOrderCutoffTime: z.string().regex(timePattern).nullable().optional(),
     lastOrderCutoffMinutes: z.number().int().min(1).max(1440).nullable().optional(),
     lastOrderRolloverDays: z.number().int().min(1).max(14).optional(),
-    lastOrderTimezone: z.string().max(64).optional(),
+    lastOrderTimezone: z
+      .string()
+      .trim()
+      .max(64)
+      .refine((value) => value === '' || isValidTenantTimezone(value), 'Use a valid IANA timezone')
+      .optional(),
     podRequired: z.boolean().optional(),
   })
   .refine(
@@ -135,7 +141,7 @@ export function mapSupplierBusinessSettingsRow(row) {
     lastOrderCutoffMinutes:
       row.last_order_cutoff_minutes != null ? Number(row.last_order_cutoff_minutes) : null,
     lastOrderRolloverDays: Number(row.last_order_rollover_days ?? 1) || 1,
-    lastOrderTimezone: row.last_order_timezone || 'UTC',
+    lastOrderTimezone: normalizeTenantTimezone(row.last_order_timezone),
     podRequired: Boolean(row.pod_required),
   }
 }

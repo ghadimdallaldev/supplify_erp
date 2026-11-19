@@ -155,6 +155,7 @@
     "declineFailed": "Could not decline this quote request",
     "missingPrice_one": "Enter a unit price for {{count}} available item, or mark it unavailable.",
     "missingPrice_other": "Enter a unit price for {{count}} available items, or mark them unavailable.",
+    "invalidQuantity": "Enter a positive quantity for every available item, or leave it blank to use the requested quantity.",
     "lockedDeclined": "You declined this quote request. It can no longer be priced.",
     "lockedClosed": "This quote request is {{status}} and no longer accepts responses."
   }

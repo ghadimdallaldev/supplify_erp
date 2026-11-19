@@ -9,15 +9,15 @@ import { isFeatureEnabled } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
 export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
-  const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER')
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const options = { dbQuery: db }
+  const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER', options)
   // Single-warehouse (Silver+) and multi-warehouse (Gold+) both use warehouse_inventory
   // when the supplier has at least one active warehouse.
-  const [warehousesFeature, multiWh] = await Promise.all([
-    isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses'),
-    isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse'),
-  ])
+  // Scoped reads can create a compatibility subscription. Serialize them on the client.
+  const warehousesFeature = await isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses', options)
+  const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse', options)
 
-  const db = client ? (sql, params) => client.query(sql, params) : query
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
   const { rows } = await db(
     `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
@@ -57,11 +57,13 @@ export async function listSupplierStockDisplay(
   supplierId,
   { productIds = null, dbQuery = query } = {}
 ) {
-  const useWh = await supplierUsesWarehouseInventory(supplierId)
+  const useWh = await supplierUsesWarehouseInventory(supplierId, {
+    client: dbQuery === query ? null : { query: dbQuery },
+  })
   const db = dbQuery
 
   if (useWh) {
-    const supplierCol = await getWarehouseSupplierColumn()
+    const supplierCol = await getWarehouseSupplierColumn(db)
     const params = [supplierId]
     let productClause = ''
     if (productIds?.length) {
@@ -284,7 +286,7 @@ export async function transferWarehouseInventory(client, fromWarehouseId, toWare
   const { rows } = await db(
     `SELECT product_id, quantity_available, quantity_reserved, quantity_on_hand,
             reorder_point, reorder_quantity
-     FROM warehouse_inventory WHERE warehouse_id = $1`,
+     FROM warehouse_inventory WHERE warehouse_id = $1 ORDER BY product_id FOR UPDATE`,
     [fromWarehouseId]
   )
 

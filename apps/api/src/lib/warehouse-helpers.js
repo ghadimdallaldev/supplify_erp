@@ -162,5 +162,17 @@ export async function ensureDefaultWarehouseForPaidSupplier(supplierId) {
   const { rows: supplierRows } = await query(`SELECT * FROM supplier WHERE id = $1`, [supplierId])
   if (!supplierRows.length) return null
 
-  return withTransaction((client) => createDefaultWarehouseForSupplier(client, supplierRows[0]))
+  return withTransaction(async (client) => {
+    const { rows: suppliers } = await client.query(
+      'SELECT * FROM supplier WHERE id = $1 FOR UPDATE',
+      [supplierId]
+    )
+    if (!suppliers.length) return null
+    const { rows: active } = await client.query(
+      `SELECT id FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE LIMIT 1`,
+      [supplierId]
+    )
+    if (active.length) return active[0].id
+    return createDefaultWarehouseForSupplier(client, suppliers[0])
+  })
 }

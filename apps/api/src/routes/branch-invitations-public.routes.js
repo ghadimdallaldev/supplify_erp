@@ -26,8 +26,10 @@ import { ValidationError } from '../middlewares/errorHandler.js'
 import { WorkspaceMembershipError } from '../lib/workspace-membership.js'
 import { resolveInvitationAcceptIdentity } from '../lib/invitation-accept.js'
 import { recordInviteLegalAcceptances } from '../lib/legal-acceptance.js'
+import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
+router.use(platformFeatureGate('invitation_acceptance'))
 
 router.get('/', async (req, res) => {
   try {

@@ -44,6 +44,7 @@ function redirectToLoginForAuthError(error: ApiErrorBody['error'], requestUrl: s
 
 // Custom baseQuery to unwrap API response envelope
 const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
+  const contextVersion = api.getState()?.auth?.contextVersion
   const rawBaseQuery = fetchBaseQuery({
     baseUrl: API_URL,
     credentials: 'include',
@@ -54,6 +55,14 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
   })
 
   let result = await rawBaseQuery(args, api, extraOptions)
+  if (contextVersion !== api.getState()?.auth?.contextVersion) {
+    return {
+      error: {
+        status: 'CUSTOM_ERROR',
+        error: 'Workspace access changed; discard the previous response',
+      },
+    }
+  }
 
   const requestUrl = requestPath(args)
 
@@ -84,6 +93,14 @@ const baseQueryWithUnwrap = async (args: any, api: any, extraOptions: any) => {
       const refreshed = await refreshAuthSession('fallback')
       if (refreshed.ok) {
         result = await rawBaseQuery(args, api, extraOptions)
+        if (contextVersion !== api.getState()?.auth?.contextVersion) {
+          return {
+            error: {
+              status: 'CUSTOM_ERROR',
+              error: 'Workspace access changed; discard the previous response',
+            },
+          }
+        }
       } else if (refreshed.reason === 'transient') {
         return {
           error: {

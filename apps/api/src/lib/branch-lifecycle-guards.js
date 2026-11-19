@@ -28,15 +28,15 @@ export function deactivationBlockerMessage(code) {
   return BLOCKER_MESSAGES[code] || 'Branch Account cannot be deactivated'
 }
 
-export async function supplierHasActiveWarehouseReservations(supplierId) {
-  const supplierCol = await getWarehouseSupplierColumn()
-  const { rows } = await query(
+export async function supplierHasActiveWarehouseReservations(supplierId, db = query) {
+  const supplierCol = await getWarehouseSupplierColumn(db)
+  const { rows } = await db(
     `
     SELECT 1
     FROM order_warehouse_assignment owa
     JOIN warehouse w ON w.id = owa.warehouse_id
     WHERE w.${supplierCol} = $1
-      AND owa.status IN ('pending', 'picking', 'packed')
+      AND owa.status NOT IN ('delivered', 'failed', 'superseded')
     LIMIT 1
     `,
     [supplierId]
@@ -44,8 +44,8 @@ export async function supplierHasActiveWarehouseReservations(supplierId) {
   return rows.length > 0
 }
 
-export async function tenantHasOpenBillingInvoices(tenantId, tenantType) {
-  const { rows } = await query(
+export async function tenantHasOpenBillingInvoices(tenantId, tenantType, db = query) {
+  const { rows } = await db(
     `
     SELECT 1
     FROM billing_invoice
@@ -59,8 +59,8 @@ export async function tenantHasOpenBillingInvoices(tenantId, tenantType) {
   return rows.length > 0
 }
 
-export async function restaurantHasScheduledStaff(restaurantId) {
-  const { rows } = await query(
+export async function restaurantHasScheduledStaff(restaurantId, db = query) {
+  const { rows } = await db(
     `
     SELECT 1
     FROM staff_shift
@@ -74,8 +74,8 @@ export async function restaurantHasScheduledStaff(restaurantId) {
   return rows.length > 0
 }
 
-export async function restaurantHasPendingCentralPurchasingDrafts(restaurantId) {
-  const { rows } = await query(
+export async function restaurantHasPendingCentralPurchasingDrafts(restaurantId, db = query) {
+  const { rows } = await db(
     `
     SELECT 1
     FROM central_purchasing_draft
@@ -91,7 +91,10 @@ export async function restaurantHasPendingCentralPurchasingDrafts(restaurantId) 
 /**
  * Collect deactivation blockers for a supplier Branch Account (beyond main-branch).
  */
-export async function getSupplierDeactivationBlockers(supplierId, { hasPendingOrders }) {
+export async function getSupplierDeactivationBlockers(
+  supplierId,
+  { hasPendingOrders, db = query }
+) {
   const blockers = []
   if (hasPendingOrders) {
     blockers.push({
@@ -99,13 +102,13 @@ export async function getSupplierDeactivationBlockers(supplierId, { hasPendingOr
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.PENDING_ORDERS),
     })
   }
-  if (await supplierHasActiveWarehouseReservations(supplierId)) {
+  if (await supplierHasActiveWarehouseReservations(supplierId, db)) {
     blockers.push({
       code: DEACTIVATION_BLOCKER.ACTIVE_WAREHOUSE_RESERVATIONS,
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.ACTIVE_WAREHOUSE_RESERVATIONS),
     })
   }
-  if (await tenantHasOpenBillingInvoices(supplierId, 'SUPPLIER')) {
+  if (await tenantHasOpenBillingInvoices(supplierId, 'SUPPLIER', db)) {
     blockers.push({
       code: DEACTIVATION_BLOCKER.OPEN_INVOICES,
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.OPEN_INVOICES),
@@ -117,7 +120,10 @@ export async function getSupplierDeactivationBlockers(supplierId, { hasPendingOr
 /**
  * Collect deactivation blockers for a restaurant Branch Account (beyond main-branch).
  */
-export async function getRestaurantDeactivationBlockers(restaurantId, { hasPendingOrders }) {
+export async function getRestaurantDeactivationBlockers(
+  restaurantId,
+  { hasPendingOrders, db = query }
+) {
   const blockers = []
   if (hasPendingOrders) {
     blockers.push({
@@ -125,19 +131,19 @@ export async function getRestaurantDeactivationBlockers(restaurantId, { hasPendi
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.PENDING_ORDERS),
     })
   }
-  if (await tenantHasOpenBillingInvoices(restaurantId, 'RESTAURANT')) {
+  if (await tenantHasOpenBillingInvoices(restaurantId, 'RESTAURANT', db)) {
     blockers.push({
       code: DEACTIVATION_BLOCKER.OPEN_INVOICES,
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.OPEN_INVOICES),
     })
   }
-  if (await restaurantHasScheduledStaff(restaurantId)) {
+  if (await restaurantHasScheduledStaff(restaurantId, db)) {
     blockers.push({
       code: DEACTIVATION_BLOCKER.SCHEDULED_STAFF,
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.SCHEDULED_STAFF),
     })
   }
-  if (await restaurantHasPendingCentralPurchasingDrafts(restaurantId)) {
+  if (await restaurantHasPendingCentralPurchasingDrafts(restaurantId, db)) {
     blockers.push({
       code: DEACTIVATION_BLOCKER.PENDING_CENTRAL_PURCHASING,
       message: deactivationBlockerMessage(DEACTIVATION_BLOCKER.PENDING_CENTRAL_PURCHASING),

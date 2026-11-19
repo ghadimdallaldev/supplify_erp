@@ -103,9 +103,9 @@ export async function invalidateEntitlementsCache(tenantId, tenantType) {
   await deleteCache(entitlementsCacheKey(tenantId, tenantType)).catch(() => {})
 }
 
-export async function isFeatureEnabled(tenantId, tenantType, featureKey) {
+export async function isFeatureEnabled(tenantId, tenantType, featureKey, options = {}) {
   const { isFeatureEnabledForTenant } = await import('../feature-flags.js')
-  return isFeatureEnabledForTenant(tenantId, tenantType, featureKey)
+  return isFeatureEnabledForTenant(tenantId, tenantType, featureKey, options)
 }
 
 /**

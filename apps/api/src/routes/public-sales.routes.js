@@ -14,6 +14,8 @@ import {
   previewPublicOrder,
 } from '../services/public-sales.service.js'
 import { isPlatformFeatureEnabled } from '../lib/feature-flags.js'
+import { publicTenantFeatureGate } from '../lib/tenant-feature-gate.js'
+import { resolvePublicSupplierByIdOrSlug } from '../services/public-supplier-catalog.service.js'
 import { scheduleOrderPlacedNotification } from './orders/orders.helpers.js'
 import { sendTemplateEmail } from '../services/email/email.service.js'
 import { isWhatsAppConfigured, sendWhatsAppMessage } from '../services/whatsapp.service.js'
@@ -156,6 +158,12 @@ function sendError(res, req, error) {
   })
 }
 
+/** Admin kill switch: supplier's public sales off → guest checkout 404s. */
+const publicSalesGate = publicTenantFeatureGate('public_sales', 'SUPPLIER', async (req) => {
+  const scope = await resolvePublicSupplierByIdOrSlug(req.params.idOrSlug)
+  return scope?.tenantId || null
+})
+
 publicSalesRoutes.get('/features', async (req, res) => {
   try {
     const mobilePublicShop = await isPlatformFeatureEnabled('mobile_public_shop')
@@ -188,6 +196,7 @@ publicSalesRoutes.get('/suppliers', async (req, res) => {
 
 publicSalesRoutes.post(
   '/suppliers/:idOrSlug/orders/preview',
+  publicSalesGate,
   enforcePublicCheckoutBodySize,
   previewLimiter,
   async (req, res) => {
@@ -216,6 +225,7 @@ publicSalesRoutes.post(
 
 publicSalesRoutes.post(
   '/suppliers/:idOrSlug/orders',
+  publicSalesGate,
   enforcePublicCheckoutBodySize,
   createGlobalIpLimiter,
   createLimiter,

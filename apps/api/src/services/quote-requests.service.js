@@ -1,6 +1,10 @@
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
+  isQuoteCalendarDate,
+  validateQuoteResponseItems,
+} from '../lib/quote-response-validation.js'
+import {
   notifyQuoteRequestReceived,
   notifyQuoteResponseReceived,
   notifyQuoteRequestDeclined,
@@ -81,6 +85,8 @@ export async function createQuoteRequest(
   { restaurantId, userId, items, supplierIds, note, neededBy },
   dbQuery = query
 ) {
+  if (neededBy != null && !isQuoteCalendarDate(neededBy))
+    throw new ValidationError('neededBy must be a valid calendar day (YYYY-MM-DD)')
   const uniqueSupplierIds = [...new Set(supplierIds)]
   if (!uniqueSupplierIds.length) {
     throw new ValidationError('Select at least one supplier')
@@ -114,7 +120,7 @@ export async function createQuoteRequest(
       `
       INSERT INTO quote_requests (restaurant_id, status, note, needed_by, created_by)
       VALUES ($1, 'open', $2, $3, $4)
-      RETURNING *
+      RETURNING *, needed_by::text AS needed_by
       `,
       [restaurantId, note || null, neededBy || null, userId || null]
     )
@@ -192,7 +198,7 @@ export async function listRestaurantQuoteRequests(
   const { rows } = await dbQuery(
     `
     SELECT
-      qr.*,
+      qr.*, qr.needed_by::text AS needed_by,
       COALESCE(item_stats.item_count, 0) AS item_count,
       COALESCE(supplier_stats.supplier_count, 0) AS supplier_count,
       COALESCE(supplier_stats.response_count, 0) AS response_count
@@ -235,7 +241,7 @@ export async function listRestaurantQuoteRequests(
 
 async function loadQuoteRequestDetailRows(quoteRequestId, restaurantId, dbQuery = query) {
   const { rows: headers } = await dbQuery(
-    `SELECT * FROM quote_requests WHERE id = $1 AND restaurant_id = $2`,
+    `SELECT *, needed_by::text AS needed_by FROM quote_requests WHERE id = $1 AND restaurant_id = $2`,
     [quoteRequestId, restaurantId]
   )
   if (!headers.length) throw new NotFoundError('Quote request not found')
@@ -272,12 +278,17 @@ async function loadQuoteRequestDetailRows(quoteRequestId, restaurantId, dbQuery 
   if (responseIds.length) {
     const { rows: responseItems } = await dbQuery(
       `
-      SELECT qri.*,
+      SELECT qri.*, qri.delivery_date::text AS delivery_date,
              sub_p.name AS substitute_product_name,
              sub_p.sku AS substitute_product_sku
       FROM quote_response_items qri
+      JOIN quote_responses response ON response.id = qri.quote_response_id
+      JOIN quote_request_suppliers qrs ON qrs.id = response.quote_request_supplier_id
+      JOIN quote_request_items requested ON requested.id = qri.quote_request_item_id AND requested.quote_request_id = qrs.quote_request_id
+      JOIN product original ON original.id = requested.product_id AND original.supplier_id = qrs.supplier_id
       LEFT JOIN product sub_p ON sub_p.id = qri.substitute_product_id
       WHERE qri.quote_response_id = ANY($1::uuid[])
+        AND (qri.substitute_product_id IS NULL OR sub_p.supplier_id = qrs.supplier_id)
       `,
       [responseIds]
     )
@@ -384,7 +395,7 @@ export async function listSupplierQuoteRequests(
       qr.id AS quote_request_id,
       qr.status AS quote_request_status,
       qr.note AS quote_request_note,
-      qr.needed_by,
+      qr.needed_by::text AS needed_by,
       qr.created_at AS quote_request_created_at,
       r.name AS restaurant_name,
       COALESCE(item_stats.item_count, 0) AS item_count
@@ -486,7 +497,7 @@ export async function getSupplierQuoteRequestDetail(
 
   const { rows } = await dbQuery(
     `
-    SELECT qrs.*, qr.restaurant_id, qr.note AS quote_request_note, qr.needed_by,
+    SELECT qrs.*, qr.restaurant_id, qr.note AS quote_request_note, qr.needed_by::text AS needed_by,
            qr.status AS quote_request_status, qr.created_at AS quote_request_created_at,
            r.name AS restaurant_name
     FROM quote_request_suppliers qrs
@@ -518,8 +529,13 @@ export async function getSupplierQuoteRequestDetail(
   let responseItems = []
   if (existingResponses[0]) {
     const { rows: ri } = await dbQuery(
-      `SELECT * FROM quote_response_items WHERE quote_response_id = $1`,
-      [existingResponses[0].id]
+      `SELECT ri.*, ri.delivery_date::text AS delivery_date
+       FROM quote_response_items ri
+       JOIN quote_request_items requested ON requested.id = ri.quote_request_item_id AND requested.quote_request_id = $2
+       JOIN product original ON original.id = requested.product_id AND original.supplier_id = $3
+       LEFT JOIN product substitute ON substitute.id = ri.substitute_product_id
+       WHERE ri.quote_response_id = $1 AND (ri.substitute_product_id IS NULL OR substitute.supplier_id = $3)`,
+      [existingResponses[0].id, row.quote_request_id, supplierId]
     )
     responseItems = ri
   }
@@ -614,10 +630,13 @@ export async function submitQuoteResponse(
   if (qrs.status === 'declined') {
     throw new ValidationError('You have declined this quote request and cannot submit a response')
   }
+  validateQuoteResponseItems(items)
 
   const { rows: requestItems } = await dbQuery(
-    `SELECT id FROM quote_request_items WHERE quote_request_id = $1`,
-    [qrs.quote_request_id]
+    `SELECT qri.id FROM quote_request_items qri
+     JOIN product p ON p.id = qri.product_id
+     WHERE qri.quote_request_id = $1 AND p.supplier_id = $2`,
+    [qrs.quote_request_id, supplierId]
   )
   const validItemIds = new Set(requestItems.map((r) => r.id))
 
@@ -637,6 +656,35 @@ export async function submitQuoteResponse(
       throw new ValidationError(
         `This quote request is ${lockedQr[0]?.status || 'unavailable'} and no longer accepts responses`
       )
+    }
+    const { rows: lockedSuppliers } = await client.query(
+      `SELECT id, status FROM quote_request_suppliers
+       WHERE id = $1 AND supplier_id = $2 AND quote_request_id = $3 FOR UPDATE`,
+      [quoteRequestSupplierId, supplierId, qrs.quote_request_id]
+    )
+    if (!lockedSuppliers.length) throw new NotFoundError('Quote request not found')
+    if (lockedSuppliers[0].status === 'declined')
+      throw new ValidationError('You have declined this quote request and cannot submit a response')
+    // Freeze the request lines and product ownership until the response commits.
+    const { rows: ownedItems } = await client.query(
+      `SELECT qri.id FROM quote_request_items qri JOIN product p ON p.id = qri.product_id
+       WHERE qri.quote_request_id = $1 AND p.supplier_id = $2
+       ORDER BY qri.id FOR SHARE OF qri, p`,
+      [qrs.quote_request_id, supplierId]
+    )
+    const ownedIds = new Set(ownedItems.map((row) => row.id))
+    if (items.some((item) => !ownedIds.has(item.quoteRequestItemId)))
+      throw new ValidationError('Invalid quote request item')
+    const substituteIds = [
+      ...new Set(items.map((item) => item.substituteProductId).filter(Boolean)),
+    ]
+    if (substituteIds.length) {
+      const { rows: substitutes } = await client.query(
+        `SELECT id FROM product WHERE id = ANY($1::uuid[]) AND supplier_id = $2 ORDER BY id FOR SHARE`,
+        [substituteIds, supplierId]
+      )
+      if (substitutes.length !== substituteIds.length)
+        throw new ValidationError('Substitute products must belong to the responding supplier')
     }
 
     const { rows: existing } = await client.query(
@@ -682,7 +730,7 @@ export async function submitQuoteResponse(
           item.quoteRequestItemId,
           item.isAvailable !== false,
           item.unitPrice ?? null,
-          item.currency || 'USD',
+          item.currency?.toUpperCase() || 'USD',
           item.quantity ?? null,
           item.deliveryDate || null,
           item.note || null,
@@ -738,20 +786,36 @@ export async function declineQuoteRequest(
     throw new ValidationError(`This quote request is ${qrs.quote_request_status}`)
   }
 
-  await dbQuery(
-    `UPDATE quote_request_suppliers
-     SET status = 'declined', decline_reason = $2, updated_at = now()
-     WHERE id = $1`,
-    [quoteRequestSupplierId, reason?.trim() || null]
-  )
+  const changed = await withTransaction(async (client) => {
+    const { rows: requests } = await client.query(
+      'SELECT id,status FROM quote_requests WHERE id=$1 FOR UPDATE',
+      [qrs.quote_request_id]
+    )
+    const { rows: suppliers } = await client.query(
+      'SELECT id,status FROM quote_request_suppliers WHERE id=$1 AND supplier_id=$2 AND quote_request_id=$3 FOR UPDATE',
+      [quoteRequestSupplierId, supplierId, qrs.quote_request_id]
+    )
+    if (!suppliers.length) throw new NotFoundError('Quote request not found')
+    if (suppliers[0].status === 'declined') return false
+    if (suppliers[0].status === 'responded')
+      throw new ValidationError('You have already submitted a quote for this request')
+    if (!requests.length || requests[0].status !== 'open')
+      throw new ValidationError(`This quote request is ${requests[0]?.status || 'unavailable'}`)
+    await client.query(
+      `UPDATE quote_request_suppliers SET status='declined',decline_reason=$2,updated_at=now() WHERE id=$1`,
+      [quoteRequestSupplierId, reason?.trim() || null]
+    )
+    return true
+  })
 
-  await notifyQuoteRequestDeclined({
-    restaurantId: qrs.restaurant_id,
-    quoteRequestId: qrs.quote_request_id,
-    quoteRequestSupplierId,
-    supplierId,
-    reason: reason?.trim() || null,
-  }).catch(() => {})
+  if (changed)
+    await notifyQuoteRequestDeclined({
+      restaurantId: qrs.restaurant_id,
+      quoteRequestId: qrs.quote_request_id,
+      quoteRequestSupplierId,
+      supplierId,
+      reason: reason?.trim() || null,
+    }).catch(() => {})
 
   return getSupplierQuoteRequestDetail(supplierId, quoteRequestSupplierId, {}, dbQuery)
 }
@@ -801,13 +865,14 @@ export async function buildCartPayloadFromResponse(
            sub_p.description AS substitute_description,
            s.name AS supplier_name, s.slug AS supplier_slug
     FROM quote_response_items qri
-    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id
-    JOIN product p ON p.id = qreq.product_id
+    JOIN quote_request_items qreq ON qreq.id = qri.quote_request_item_id AND qreq.quote_request_id = $2
+    JOIN product p ON p.id = qreq.product_id AND p.supplier_id = $3
     LEFT JOIN product sub_p ON sub_p.id = qri.substitute_product_id
     JOIN supplier s ON s.id = p.supplier_id
-    WHERE qri.quote_response_id = $1 AND qri.is_available = true
+    WHERE qri.quote_response_id = $1 AND qri.is_available = true AND qri.unit_price IS NOT NULL
+      AND (qri.substitute_product_id IS NULL OR sub_p.supplier_id = $3)
     `,
-    [responseRows[0].id]
+    [responseRows[0].id, qrs.quote_request_id, qrs.supplier_id]
   )
 
   if (!lineItems.length) {

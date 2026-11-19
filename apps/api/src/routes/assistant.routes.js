@@ -143,8 +143,25 @@ router.post('/conversations', async (req, res, next) => {
 router.get('/conversations/:conversationId/messages', async (req, res, next) => {
   try {
     const ctx = await buildAssistantContext(req)
-    const messages = await listMessages(ctx, req.params.conversationId)
-    res.json({ ok: true, data: { messages }, error: null, requestId: req.requestId })
+    const params = z
+      .object({
+        conversationId: z.string().uuid(),
+        before: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(50).default(50),
+      })
+      .parse({ ...req.query, conversationId: req.params.conversationId })
+    const loaded = await listMessages(ctx, params.conversationId, {
+      limit: params.limit + 1,
+      before: params.before,
+    })
+    const hasMore = loaded.length > params.limit
+    const messages = hasMore ? loaded.slice(1) : loaded
+    res.json({
+      ok: true,
+      data: { messages, hasMore, nextBefore: hasMore ? messages[0]?.id : null },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }

@@ -56,6 +56,12 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    resetBusinessCart: (state) => {
+      state.items = []
+      state.groups = []
+      state.total = 0
+      state.drafts = []
+    },
     /** Restore cart from localStorage after login or hard refresh (scoped per user email). */
     rehydrateCart: (state, action: PayloadAction<{ email?: string | null }>) => {
       const saved = loadCartFromStorage(action.payload.email)
@@ -174,6 +180,7 @@ const cartSlice = createSlice({
 })
 
 export const {
+  resetBusinessCart,
   addItem,
   removeItem,
   updateQuantity,

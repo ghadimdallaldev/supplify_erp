@@ -26,6 +26,7 @@ import {
   canSwitchActiveTenant,
 } from '../lib/tenant-switch.js'
 import { config } from '../config/env.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -35,7 +36,13 @@ const multiBranchFeature = requireFeature(
   (req) => req.tenantContext?.tenantType || req.userData?.role || 'RESTAURANT'
 )
 
-router.use(requireAuth, resolveTenantContext, resolveAdminContext, settingsMutationGuard)
+router.use(
+  requireAuth,
+  resolveTenantContext,
+  resolveAdminContext,
+  tenantFeatureGate('branch_management'),
+  settingsMutationGuard
+)
 
 async function resolveParentTenant(req) {
   if (req.userData.role === 'ADMIN') {

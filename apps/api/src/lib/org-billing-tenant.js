@@ -18,24 +18,26 @@ export async function invalidateOrgBillingTenantCache(tenantId, tenantType) {
  * Usage meters stay on the active (operating) tenant id.
  * @returns {Promise<string>} Tenant id whose subscription row applies
  */
-export async function resolveOrgBillingTenantId(tenantId, tenantType) {
+export async function resolveOrgBillingTenantId(tenantId, tenantType, { dbQuery = query } = {}) {
+  const useCache = dbQuery === query
   const cacheKey = orgBillingCacheKey(tenantId, tenantType)
-  const cached = await getCache(cacheKey)
+  const cached = useCache ? await getCache(cacheKey) : null
   if (cached !== null && typeof cached === 'string') return cached
 
-  return singleflight(cacheKey, async () => {
-    const again = await getCache(cacheKey)
+  const load = async () => {
+    const again = useCache ? await getCache(cacheKey) : null
     if (again !== null && typeof again === 'string') return again
 
     const table = tenantType === 'SUPPLIER' ? 'supplier' : 'restaurant'
-    const { rows } = await query(`SELECT organization_id FROM ${table} WHERE id = $1`, [tenantId])
+    const { rows } = await dbQuery(`SELECT organization_id FROM ${table} WHERE id = $1`, [tenantId])
     const organizationId = rows[0]?.organization_id
     if (!organizationId) {
-      await setCache(cacheKey, tenantId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+      if (useCache)
+        await setCache(cacheKey, tenantId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
       return tenantId
     }
 
-    const { rows: mainRows } = await query(
+    const { rows: mainRows } = await dbQuery(
       `SELECT id FROM ${table}
      WHERE organization_id = $1 AND is_main_branch = true
      ORDER BY created_at ASC
@@ -43,18 +45,20 @@ export async function resolveOrgBillingTenantId(tenantId, tenantType) {
       [organizationId]
     )
     if (mainRows[0]?.id) {
-      await setCache(cacheKey, mainRows[0].id, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+      if (useCache)
+        await setCache(cacheKey, mainRows[0].id, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
       return mainRows[0].id
     }
 
-    const { rows: fallback } = await query(
+    const { rows: fallback } = await dbQuery(
       `SELECT id FROM ${table} WHERE organization_id = $1 ORDER BY created_at ASC LIMIT 1`,
       [organizationId]
     )
     const billingId = fallback[0]?.id || tenantId
-    await setCache(cacheKey, billingId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
+    if (useCache) await setCache(cacheKey, billingId, ORG_BILLING_CACHE_TTL_SECONDS).catch(() => {})
     return billingId
-  })
+  }
+  return useCache ? singleflight(cacheKey, load) : load()
 }
 
 /**

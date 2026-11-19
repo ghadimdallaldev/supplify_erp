@@ -20,6 +20,7 @@ import {
   rejectImpersonationMutation,
   IMPERSONATION_RESTRICTED_ACTIONS,
 } from '../lib/impersonation-guards.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -29,6 +30,15 @@ router.use(
   requireRole(['RESTAURANT', 'SUPPLIER', 'ADMIN']),
   billingAccessGuard
 )
+
+// Admin kill switch: self-serve billing off → reads still work, checkout/payment changes are blocked.
+const selfServeBillingGate = tenantFeatureGate('self_serve_billing')
+function billingMutationGate(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD') return next()
+  return selfServeBillingGate(req, res, next)
+}
+billingMutationGate.featureKey = 'self_serve_billing'
+router.use(billingMutationGate)
 
 const cardSchema = z.object({
   number: z.string().min(13).max(19).optional(),

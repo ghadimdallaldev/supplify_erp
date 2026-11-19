@@ -10,6 +10,9 @@ import {
   getAllowedFeatureKeys,
   isFeatureKeyAllowed,
   isPlatformFeatureKey,
+  defaultFeatureValue,
+  isDefaultOnFeatureKey,
+  PLATFORM_DEFAULT_ON_FEATURE_KEYS,
 } from './feature-keys.js'
 
 const FF_CACHE_TTL = 180 // seconds
@@ -37,9 +40,9 @@ export function resolveForcedFeatureValue(forcedOn, planValue) {
   return true
 }
 
-async function getTenantOverride(tenantId, tenantType, featureKey) {
+async function getTenantOverride(tenantId, tenantType, featureKey, dbQuery = query) {
   try {
-    const { rows } = await query(
+    const { rows } = await dbQuery(
       `SELECT is_enabled, reason, updated_at
        FROM feature_flag_override
        WHERE tenant_id = $1 AND tenant_type = $2 AND feature_key = $3`,
@@ -52,9 +55,9 @@ async function getTenantOverride(tenantId, tenantType, featureKey) {
   }
 }
 
-async function getGlobalOverride(featureKey) {
+async function getGlobalOverride(featureKey, dbQuery = query) {
   try {
-    const { rows } = await query(
+    const { rows } = await dbQuery(
       `SELECT global_override, feature_name, description
        FROM feature_flag
        WHERE feature_key = $1`,
@@ -73,33 +76,40 @@ async function getGlobalOverride(featureKey) {
  * Results are cached for FF_CACHE_TTL seconds (60s) to avoid repeated DB hits on hot paths.
  * @returns {Promise<{ enabled: boolean, source: 'tenant_override'|'global'|'plan'|'default' }>}
  */
-export async function resolveFeatureEnabled(tenantId, tenantType, featureKey, planFeatures) {
+export async function resolveFeatureEnabled(
+  tenantId,
+  tenantType,
+  featureKey,
+  planFeatures,
+  { dbQuery = query } = {}
+) {
+  const useCache = dbQuery === query
   const cacheKey = `ff:${tenantId}:${tenantType}:${featureKey}`
-  const cached = await getCache(cacheKey)
+  const cached = useCache ? await getCache(cacheKey) : null
   if (cached !== null) return cached
 
-  const tenantRow = await getTenantOverride(tenantId, tenantType, featureKey)
+  const tenantRow = await getTenantOverride(tenantId, tenantType, featureKey, dbQuery)
   if (tenantRow) {
     const result = { enabled: tenantRow.is_enabled, source: 'tenant_override' }
-    await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
+    if (useCache) await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
     return result
   }
 
-  const globalRow = await getGlobalOverride(featureKey)
+  const globalRow = await getGlobalOverride(featureKey, dbQuery)
   if (globalRow && globalRow.global_override !== null) {
     const result = { enabled: globalRow.global_override, source: 'global' }
-    await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
+    if (useCache) await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
     return result
   }
 
   if (planFeatures && featureKey in planFeatures) {
     const result = { enabled: evaluatePlanFeatureValue(planFeatures[featureKey]), source: 'plan' }
-    await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
+    if (useCache) await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
     return result
   }
 
-  const result = { enabled: false, source: 'default' }
-  await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
+  const result = { enabled: defaultFeatureValue(featureKey), source: 'default' }
+  if (useCache) await setCache(cacheKey, result, FF_CACHE_TTL).catch(() => {})
   return result
 }
 
@@ -171,7 +181,7 @@ export async function resolveAllFeaturesForTenant(tenantId, tenantType, planFeat
         features[key] = enabled ? raw : false
         featureSources[key] = 'plan'
       } else {
-        features[key] = false
+        features[key] = defaultFeatureValue(key)
         featureSources[key] = 'default'
       }
     }
@@ -210,23 +220,36 @@ export function shouldAliasAfterResolution(result, featureKey, planFeatures) {
   return shouldResolveFeatureAlias(featureKey, planFeatures)
 }
 
-export async function isFeatureEnabledForTenant(tenantId, tenantType, featureKey) {
+export async function isFeatureEnabledForTenant(
+  tenantId,
+  tenantType,
+  featureKey,
+  { dbQuery = query } = {}
+) {
   try {
     const { getTenantSubscription } = await import('./subscription.js')
     const { resolveEffectivePlanFeatures } = await import(
       './subscription/free-trial-plan-features.js'
     )
     const { resolveOrgBillingTenantId } = await import('./org-billing-tenant.js')
-    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType)
-    const subscription = await getTenantSubscription(tenantId, tenantType)
-    const planFeatures = await resolveEffectivePlanFeatures(subscription)
-    let result = await resolveFeatureEnabled(billingTenantId, tenantType, featureKey, planFeatures)
+    const options = { dbQuery }
+    const billingTenantId = await resolveOrgBillingTenantId(tenantId, tenantType, options)
+    const subscription = await getTenantSubscription(tenantId, tenantType, options)
+    const planFeatures = await resolveEffectivePlanFeatures(subscription, options)
+    let result = await resolveFeatureEnabled(
+      billingTenantId,
+      tenantType,
+      featureKey,
+      planFeatures,
+      options
+    )
     if (shouldAliasAfterResolution(result, featureKey, planFeatures)) {
       result = await resolveFeatureEnabled(
         billingTenantId,
         tenantType,
         FEATURE_ALIASES[featureKey],
-        planFeatures
+        planFeatures,
+        options
       )
     }
     return result.enabled
@@ -261,12 +284,16 @@ export async function listGlobalFeatureFlags() {
       globalOverride: r ? r.global_override : null,
       updatedAt: r?.updated_at ? new Date(r.updated_at).toISOString() : null,
       platformOnly: isPlatformFeatureKey(featureKey),
+      /** true = ON when inherit (no plan value / no override) */
+      defaultOn:
+        isDefaultOnFeatureKey(featureKey) || PLATFORM_DEFAULT_ON_FEATURE_KEYS.includes(featureKey),
     }
   })
 }
 
 /**
- * Platform flags ignore plans/tenant overrides: only explicit global true enables.
+ * Platform flags ignore plans/tenant overrides: explicit global true enables; inherit is off
+ * except PLATFORM_DEFAULT_ON_FEATURE_KEYS.
  * @param {string} featureKey
  * @returns {Promise<boolean>}
  */
@@ -276,7 +303,11 @@ export async function isPlatformFeatureEnabled(featureKey) {
   const cached = await getCache(cacheKey)
   if (cached !== null) return Boolean(cached.enabled)
   const globalRow = await getGlobalOverride(featureKey)
-  const enabled = globalRow?.global_override === true
+  const override = globalRow?.global_override
+  const enabled =
+    override === true ||
+    ((override === null || override === undefined) &&
+      PLATFORM_DEFAULT_ON_FEATURE_KEYS.includes(featureKey))
   await setCache(cacheKey, { enabled }, FF_CACHE_TTL).catch(() => {})
   return enabled
 }

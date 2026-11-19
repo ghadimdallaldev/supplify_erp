@@ -1,4 +1,5 @@
 import express from 'express'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 import { z } from 'zod'
 import { requireAuth, requirePermission, requireRole, resolveTenantContext } from '../lib/rbac.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
@@ -10,7 +11,12 @@ import {
 
 export const supplierPublicSalesRoutes = express.Router()
 
-supplierPublicSalesRoutes.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
+supplierPublicSalesRoutes.use(
+  requireAuth,
+  resolveTenantContext,
+  requireRole(['SUPPLIER', 'ADMIN']),
+  tenantFeatureGate('public_sales')
+)
 
 const updateSchema = z.object({
   enabled: z.boolean(),

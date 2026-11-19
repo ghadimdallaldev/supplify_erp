@@ -13,6 +13,11 @@ import {
   getRequestTenant,
 } from '../lib/rbac.js'
 import { getLinkedDriverId, isDriverOnlyPermissions } from '../lib/driver-rbac.js'
+import {
+  canViewSupplierSummaryFinance,
+  projectSupplierCommandCenterFinance,
+  projectSupplierRunSheetFinance,
+} from '../lib/supplier-summary-access.js'
 import { requireSupplierId } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { getResolvedFeatureValue } from '../lib/feature-flags.js'
@@ -101,6 +106,7 @@ import {
   sendInvoiceReminder,
   sendBulkOverdueReminders,
 } from '../services/collections-reminders.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -129,6 +135,13 @@ const amendmentsGate = requireFeature(
 )
 
 router.use(requireAuth, resolveTenantContext, requireRole(['SUPPLIER', 'ADMIN']))
+
+// Admin kill switches for supplier-ops sub-features (default ON; see feature-keys.js).
+router.use(['/command-center', '/run-sheet'], tenantFeatureGate('ops_dashboard'))
+router.use(['/products/import', '/products/images/import'], tenantFeatureGate('catalog_import'))
+router.use(/^\/products\/[^/]+\/substitutes/, tenantFeatureGate('product_substitutes'))
+router.use(/^\/orders\/[^/]+\/substitutions/, tenantFeatureGate('product_substitutes'))
+router.use(/^\/orders\/[^/]+\/fulfillment-issues/, tenantFeatureGate('fulfillment_issues'))
 
 const noopLimiter = (_req, _res, next) => next()
 
@@ -234,17 +247,15 @@ const imageImportPresignSchema = z.object({
 
 const commandCenterGate = requireAnyPermission('ORDERS_MANAGE', 'INVOICES_VIEW', 'FULFILLMENT_VIEW')
 
-const runSheetGate = requireAnyPermission(
-  'ORDERS_MANAGE',
-  'FULFILLMENT_VIEW',
-  'INVOICES_VIEW',
-  'DRIVER_DELIVERIES_VIEW'
-)
+const runSheetGate = requireAnyPermission('ORDERS_MANAGE', 'FULFILLMENT_VIEW', 'INVOICES_VIEW')
 
 router.get('/command-center', commandCenterGate, async (req, res, next) => {
   try {
     const supplierId = await resolveSupplier(req)
-    const data = await getSupplierCommandCenter(supplierId)
+    const data = projectSupplierCommandCenterFinance(
+      await getSupplierCommandCenter(supplierId),
+      canViewSupplierSummaryFinance(req)
+    )
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)
@@ -263,7 +274,10 @@ router.get('/run-sheet', runSheetGate, async (req, res, next) => {
     if (req.query.date && !parsedDate.success) {
       throw new ValidationError(parsedDate.error.issues[0]?.message || 'Invalid date')
     }
-    const data = await getSupplierRunSheet(supplierId, { date: parsedDate.data })
+    const data = projectSupplierRunSheetFinance(
+      await getSupplierRunSheet(supplierId, { date: parsedDate.data }),
+      canViewSupplierSummaryFinance(req)
+    )
     res.json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (err) {
     next(err)

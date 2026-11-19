@@ -1,4 +1,6 @@
 import express from 'express'
+import { resolveRestaurantBySlug } from '../../services/consumer-menu.service.js'
+import { publicTenantFeatureGate } from '../../lib/tenant-feature-gate.js'
 import { consumerMenuPublicRoutes, consumerMenuAdminRoutes } from './menu.routes.js'
 import { consumerOrdersPublicRoutes, consumerOrdersAdminRoutes } from './orders.routes.js'
 import {
@@ -18,6 +20,14 @@ consumerRoutes.use('/fulfillment', consumerFulfillmentAdminRoutes)
 
 /** Public guest-facing routes — mount at /api/public/consumer/:restaurantSlug */
 export const consumerPublicRoutes = express.Router({ mergeParams: true })
+
+// Admin kill switch: storefront off for this restaurant → every public consumer route 404s.
+consumerPublicRoutes.use(
+  publicTenantFeatureGate('consumer_storefront', 'RESTAURANT', async (req) => {
+    const restaurant = await resolveRestaurantBySlug(req.params.restaurantSlug)
+    return restaurant?.id
+  })
+)
 
 consumerPublicRoutes.use('/auth', consumerAuthPublicRoutes)
 consumerPublicRoutes.use('/loyalty', consumerLoyaltyPublicRoutes)

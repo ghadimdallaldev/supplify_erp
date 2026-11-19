@@ -13,6 +13,7 @@ import {
   listMyReviews,
   getSupplierRatingSummary,
 } from '../services/reviews.service.js'
+import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
 
 const router = express.Router()
 
@@ -78,6 +79,7 @@ router.use(
   requireAuth,
   resolveTenantContext,
   requireRole(['RESTAURANT', 'ADMIN']),
+  tenantFeatureGate('supplier_reviews_read'),
   reviewsAccessGuard
 )
 

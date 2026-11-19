@@ -30,6 +30,7 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import type { WorkspacePersonaProfile } from '../../lib/workspaceRoleProfile'
+import { NAV_HREF_DEFAULT_ON_FEATURE } from '../../lib/planFeatureGates'
 import {
   reorderNavSectionsForPrimaryFocus,
   restaurantAnalyticsNavAllowed,
@@ -102,6 +103,8 @@ export type BuildSidebarSectionsInput = {
   disputesEnabled: boolean
   promotionsEnabled: boolean
   supplierGrowthEnabled: boolean
+  /** Default-on admin kill switch lookup; items mapped in NAV_HREF_DEFAULT_ON_FEATURE hide when false. */
+  featureOn?: (key: string) => boolean
 }
 
 export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarNavSectionConfig[] {
@@ -600,7 +603,13 @@ export function buildSidebarSections(input: BuildSidebarSectionsInput): SidebarN
   sections = sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => navItemAllowed(item, can, canAny)),
+      items: section.items.filter(
+        (item) =>
+          navItemAllowed(item, can, canAny) &&
+          (!input.featureOn ||
+            !NAV_HREF_DEFAULT_ON_FEATURE[item.href] ||
+            input.featureOn(NAV_HREF_DEFAULT_ON_FEATURE[item.href]))
+      ),
     }))
     .filter((section) => section.items.length > 0)
 

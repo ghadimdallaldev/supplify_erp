@@ -17,6 +17,7 @@ async function loadBoardSqlFragments() {
         OR (table_name = 'restaurant' AND column_name IN ('delivery_latitude', 'delivery_longitude', 'delivery_location_label', 'address_json'))
         OR (table_name = 'branch' AND column_name IN ('name', 'address', 'delivery_latitude', 'delivery_longitude', 'delivery_location_label', 'tenant_id'))
         OR (table_name = 'drivers' AND column_name IN ('full_name'))
+        OR (table_name = 'driver_assignments' AND column_name IN ('scheduled_delivery_date', 'assigned_at', 'warehouse_assignment_id'))
       )
     `
   )
@@ -41,6 +42,9 @@ async function loadBoardSqlFragments() {
   const colKey = (table, column) =>
     colRows.some((r) => r.table_name === table && r.column_name === column)
   const hasTable = (table) => tableRows.some((r) => r.table_name === table)
+  const hasDriverAssignments = hasTable('driver_assignments')
+  const hasWarehouseAssignment =
+    hasDriverAssignments && colKey('driver_assignments', 'warehouse_assignment_id')
 
   const cityArea = colKey('restaurant', 'address_json')
     ? `COALESCE(r.address_json->>'city', 'Unassigned area')`
@@ -50,7 +54,11 @@ async function loadBoardSqlFragments() {
   let deliveryAreaExpr = cityArea
 
   if (hasTable('delivery_zone')) {
-    if (colKey('delivery_zone', 'warehouse_id') && hasTable('order_warehouse_assignment')) {
+    if (
+      colKey('delivery_zone', 'warehouse_id') &&
+      hasTable('order_warehouse_assignment') &&
+      hasWarehouseAssignment
+    ) {
       const supplierClause = colKey('delivery_zone', 'supplier_id')
         ? ' AND dz.supplier_id = $1'
         : ''
@@ -134,16 +142,22 @@ async function loadBoardSqlFragments() {
   const restaurantDestinationLabelExpr = colKey('restaurant', 'delivery_location_label')
     ? 'r.delivery_location_label'
     : 'NULL::text'
-  const hasDriverAssignments = hasTable('driver_assignments')
   const routeDateExpr =
-    hasDriverAssignments && hasTable('route_stop') && hasTable('delivery_route')
-      ? `(SELECT dr.scheduled_date FROM route_stop rs2 JOIN delivery_route dr ON dr.id = rs2.route_id WHERE rs2.order_id = o.id AND dr.status <> 'CANCELLED' ORDER BY dr.scheduled_date DESC LIMIT 1)`
+    hasTable('route_stop') && hasTable('delivery_route')
+      ? `(SELECT dr.scheduled_date FROM route_stop rs2 JOIN delivery_route dr ON dr.id = rs2.route_id WHERE rs2.order_id = o.id AND dr.supplier_id = $1 AND dr.status <> 'CANCELLED' ORDER BY dr.scheduled_date DESC LIMIT 1)`
       : 'NULL::date'
-  const assignmentDateExpr = hasDriverAssignments ? 'da.scheduled_delivery_date' : 'NULL::date'
+  const assignmentDateExpr =
+    hasDriverAssignments && colKey('driver_assignments', 'scheduled_delivery_date')
+      ? 'da.scheduled_delivery_date'
+      : 'NULL::date'
+  const assignedDateExpr =
+    hasDriverAssignments && colKey('driver_assignments', 'assigned_at')
+      ? 'da.assigned_at::date'
+      : 'NULL::date'
   const requestedDateExpr = colKey('customer_order', 'requested_delivery_date')
     ? 'o.requested_delivery_date'
     : 'NULL::date'
-  const scheduledAtExpr = `COALESCE(${assignmentDateExpr}, ${routeDateExpr}, ${requestedDateExpr}, ${hasDriverAssignments ? 'da.assigned_at::date' : 'NULL::date'}, o.created_at::date)`
+  const scheduledAtExpr = `COALESCE(${assignmentDateExpr}, ${routeDateExpr}, ${requestedDateExpr}, ${assignedDateExpr}, o.created_at::date)`
 
   const hasPodExpr =
     hasTable('proof_of_delivery') && hasTable('driver_assignments')
@@ -167,12 +181,17 @@ async function loadBoardSqlFragments() {
         ? `EXISTS (SELECT 1 FROM proof_of_delivery pod WHERE pod.order_id = o.id)`
         : 'FALSE'
 
+  const assignmentJoinSql = hasDriverAssignments
+    ? `LEFT JOIN driver_assignments da ON da.order_id = o.id AND da.supplier_id = $1 AND da.status NOT IN ('reassigned', 'superseded')`
+    : `LEFT JOIN (SELECT NULL::uuid AS id, NULL::uuid AS warehouse_assignment_id, NULL::text AS status, NULL::uuid AS driver_id) da ON true`
   const driverAssignmentJoinSql =
-    hasTable('driver_assignments') && hasTable('drivers')
-      ? `LEFT JOIN driver_assignments da ON da.order_id = o.id AND da.status NOT IN ('reassigned', 'superseded')
-    LEFT JOIN drivers d ON d.id = da.driver_id`
-      : `LEFT JOIN (SELECT NULL::uuid AS id, NULL::uuid AS warehouse_assignment_id, NULL::text AS status, NULL::uuid AS driver_id) da ON true
-    LEFT JOIN drivers d ON FALSE`
+    assignmentJoinSql +
+    (hasTable('drivers')
+      ? ` LEFT JOIN drivers d ON d.id = da.driver_id AND d.supplier_id = $1`
+      : '')
+  const warehouseAssignmentIdExpr = hasWarehouseAssignment
+    ? 'da.warehouse_assignment_id'
+    : 'NULL::uuid'
 
   const driverNameExpr =
     hasTable('drivers') && colKey('drivers', 'full_name') ? 'd.full_name' : 'NULL::text'
@@ -181,6 +200,9 @@ async function loadBoardSqlFragments() {
     zoneJoinSql,
     branchJoinSql,
     driverAssignmentJoinSql,
+    assignmentJoinSql,
+    warehouseAssignmentIdExpr,
+    fallbackDeliveryAreaExpr: cityArea,
     deliveryAreaExpr,
     destinationLatitudeExpr,
     destinationLongitudeExpr,
