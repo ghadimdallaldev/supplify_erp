@@ -9,8 +9,13 @@ still complete deliveries; every limiter 429 is now the JSON envelope
 "Invalid server response"); `recordedAt` up to 15 min ahead is clamped to server time instead of
 400; restricted-warehouse drivers may call `complete-delivery`.
 
-Mobile: no contract change required (same URLs/bodies). Client-side handling of the new
-RATE_LIMITED envelope and the driver error screens is tracked in the driver-app audit branch.
+Mobile (both `supplify-mobile` and `supplify-mobile-ios`, branch `audit/driver-app-2026-11-19`):
+no contract change (same URLs/bodies). Client now maps a 429 (JSON or legacy text/plain) to
+`RATE_LIMITED`; driver Home/Run sheet keep cached data on a failed refetch; Stop screen has an
+error state; load errors show the server message for not-linked / feature-off / maintenance;
+GPS watcher no longer leaks when it finishes starting after cleanup; `Linking.openURL` and
+double `goBack` guarded. Android and iOS diffs are identical; tsc + full Android jest pass
+(150 tests). Not run on a device.
 
 ## 2026-11-19 - Security audit hardening pass (mobile: verified, no code change)
 
