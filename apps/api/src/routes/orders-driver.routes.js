@@ -168,7 +168,17 @@ router.get(
         })
         driverId = access?.driverId ?? null
       }
-      const detail = await getDriverDeliveryDetail(req.params.id, supplierId, { driverId })
+      const rawAssignmentId =
+        typeof req.query.assignment_id === 'string' ? req.query.assignment_id : null
+      const assignmentId =
+        rawAssignmentId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawAssignmentId)
+          ? rawAssignmentId
+          : null
+      const detail = await getDriverDeliveryDetail(req.params.id, supplierId, {
+        driverId,
+        assignmentId,
+      })
       res.json({ ok: true, data: detail, error: null, requestId: req.requestId })
     } catch (error) {
       next(error)

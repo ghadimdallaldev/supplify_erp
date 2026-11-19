@@ -1,5 +1,9 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-19 - driver-detail optional assignment id
+
+API: `GET /api/orders/:id/driver-detail?assignment_id=<uuid>` narrows to one driver assignment (invalid values ignored; driver scoping still applies). Mobile: `useDriverDetail(orderId, assignmentId)` and the Stop screen pass `driverAssignmentId` in both `supplify-mobile` and `supplify-mobile-ios` (branch `audit/driver-app-2026-11-19`). Background tracking, the supplier-timezone column default and the two notification quirks were deliberately not changed (see audit doc).
+
 ## 2026-11-19 - Driver backend fixes (rate limits, clock skew, warehouse allowlist)
 
 API: driver `POST /api/orders/:id/location` pings are exempt from the global and orders-write

@@ -54,5 +54,5 @@ Still open:
 - `supplier.last_order_timezone` defaults to `'UTC'` (NOT NULL), so the platform default Asia/Beirut never applies; "today" for a supplier that never set it is the UTC date. Needs a data/onboarding decision. Migration 0237 in the main checkout is Codex's and was not touched.
 - `driver_latest_location` is still keyed by driver (fine for readers that want the driver's last position).
 - `delivery_tracking` flag gates the POD presign for everyone; the app now falls back to recipient-name confirmation instead of blocking.
-- `driver-detail` resolves by order for the calling driver; a driver holding two legs of one order could see the other leg's detail (rare, unchanged).
+- `driver-detail` now accepts an optional `?assignment_id=<uuid>`; the Stop screen passes its `driverAssignmentId` (both apps), so a driver holding two legs of one order sees the right leg. Without the param behaviour is unchanged (latest leg).
 - Notification quirks left as-is: a driver's own `failed_delivery` notification is filtered out; `templates.js` derives tenantId with an unordered `LIMIT 1`.
