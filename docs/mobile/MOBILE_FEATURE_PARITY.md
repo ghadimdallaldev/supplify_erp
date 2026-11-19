@@ -1,5 +1,17 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-19 - Driver backend fixes (rate limits, clock skew, warehouse allowlist)
+
+API: driver `POST /api/orders/:id/location` pings are exempt from the global and orders-write
+per-IP limiters (own limiter, 1500/15min/IP in prod) so a driver with several active orders can
+still complete deliveries; every limiter 429 is now the JSON envelope
+`{ok:false,error:{name:'RATE_LIMITED'}}` instead of `text/plain` (mobile previously surfaced
+"Invalid server response"); `recordedAt` up to 15 min ahead is clamped to server time instead of
+400; restricted-warehouse drivers may call `complete-delivery`.
+
+Mobile: no contract change required (same URLs/bodies). Client-side handling of the new
+RATE_LIMITED envelope and the driver error screens is tracked in the driver-app audit branch.
+
 ## 2026-11-19 - Security audit hardening pass (mobile: verified, no code change)
 
 API: `POST /api/roles/users/:userId/assign` now 404s (`NOT_FOUND`) when the target user is not

@@ -55,9 +55,14 @@ describe('driver-location.service', () => {
     expect(() => validateCoordinates(0, 0)).toThrow(ValidationError)
   })
 
-  it('parseRecordedAt rejects future timestamps', () => {
+  it('parseRecordedAt clamps a phone clock a few minutes ahead to server time', () => {
     const now = new Date('2026-06-03T10:00:00.000Z')
-    expect(() => parseRecordedAt('2026-06-03T10:05:00.000Z', now)).toThrow(ValidationError)
+    expect(parseRecordedAt('2026-06-03T10:05:00.000Z', now).toISOString()).toBe(now.toISOString())
+  })
+
+  it('parseRecordedAt still rejects timestamps far in the future', () => {
+    const now = new Date('2026-06-03T10:00:00.000Z')
+    expect(() => parseRecordedAt('2026-06-03T10:30:00.000Z', now)).toThrow(ValidationError)
   })
 
   it('parseRecordedAt rejects pings older than 24h', () => {

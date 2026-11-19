@@ -106,7 +106,7 @@ export async function enforceWarehouseRequestAccess(req, tenant) {
     isDriverOnlyPermissions(tenant.permissions) &&
     (pathname === '/api/supplier/deliveries/board' ||
       pathname === '/api/fulfillment/routes/active' ||
-      /^\/api\/orders\/[0-9a-f-]{36}\/(driver-detail|delivery-status|location|proof-of-delivery|pod)(?:\/|$)/i.test(
+      /^\/api\/orders\/[0-9a-f-]{36}\/(driver-detail|delivery-status|location|proof-of-delivery|pod|complete-delivery)(?:\/|$)/i.test(
         pathname
       ))
   )

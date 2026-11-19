@@ -50,6 +50,9 @@ export function validateCoordinates(latitude, longitude) {
 }
 
 const RECORDED_AT_FUTURE_SKEW_MS = 2 * 60 * 1000
+// Phones with a drifting clock are common. Up to this much ahead is clamped to server time
+// rather than failing every ping with a 400; anything further ahead is still rejected as bogus.
+const RECORDED_AT_CLAMP_SKEW_MS = 15 * 60 * 1000
 const RECORDED_AT_MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 export function parseRecordedAt(value, now = new Date()) {
@@ -57,9 +60,10 @@ export function parseRecordedAt(value, now = new Date()) {
   if (Number.isNaN(recorded.getTime())) throw new ValidationError('recordedAt is invalid')
   const nowMs = now.getTime()
   const recordedMs = recorded.getTime()
-  if (recordedMs > nowMs + RECORDED_AT_FUTURE_SKEW_MS) {
+  if (recordedMs > nowMs + RECORDED_AT_CLAMP_SKEW_MS) {
     throw new ValidationError('recordedAt cannot be in the future')
   }
+  if (recordedMs > nowMs + RECORDED_AT_FUTURE_SKEW_MS) return new Date(nowMs)
   if (recordedMs < nowMs - RECORDED_AT_MAX_AGE_MS) {
     throw new ValidationError('recordedAt is too old')
   }
