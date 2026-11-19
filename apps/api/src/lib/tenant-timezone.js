@@ -77,12 +77,7 @@ export async function getSupplierTimezone(supplierId) {
     `SELECT COALESCE(NULLIF(TRIM(last_order_timezone), ''), $2) AS tz FROM supplier WHERE id = $1`,
     [supplierId, getDefaultTenantTimezone()]
   )
-<<<<<<< HEAD
   return normalizeTenantTimezone(rows[0]?.tz)
-=======
-  const tz = rows[0]?.tz
-  return isValidTimeZone(tz) ? tz : getDefaultTenantTimezone()
->>>>>>> audit/perf-security-readiness-2026-11-19
 }
 
 /**
