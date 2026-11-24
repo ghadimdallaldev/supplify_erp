@@ -1,0 +1,178 @@
+@font-face {
+  font-family: Supplify Inter;
+  src: url('../fonts/Inter_400Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Supplify Instrument;
+  src: url('../fonts/InstrumentSerif_400Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Supplify Plex Arabic;
+  src: url('../fonts/IBMPlexSansArabic_400Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+html.supplify-mobile-auth {
+  --supplify-paper: #efede4;
+  --supplify-ink: #183032;
+  --supplify-muted: #59696c;
+  --supplify-purple: #6044ca;
+
+  min-height: 100%;
+  background: var(--supplify-paper);
+}
+
+html.supplify-mobile-auth body {
+  margin: 0;
+  background: var(--supplify-paper);
+  color: var(--supplify-ink);
+  font:
+    16px/1.5 'Supplify Inter',
+    system-ui,
+    sans-serif;
+}
+
+html.supplify-mobile-auth .login-pf-page {
+  max-width: 460px;
+  min-height: 100dvh;
+  padding: 24px;
+  margin-inline: auto;
+}
+
+html.supplify-mobile-auth #kc-header {
+  margin: 0 0 24px;
+  text-align: start;
+}
+
+html.supplify-mobile-auth #kc-header-wrapper {
+  padding: 0;
+  color: var(--supplify-ink);
+  text-transform: lowercase;
+  font:
+    700 18px/1.3 'Supplify Inter',
+    system-ui,
+    sans-serif;
+}
+
+html.supplify-mobile-auth .card-pf {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.supplify-mobile-auth #kc-page-title {
+  margin: 0 0 16px;
+  color: var(--supplify-ink);
+  font:
+    400 clamp(32px, 9vw, 44px) / 1.05 'Supplify Instrument',
+    Georgia,
+    serif;
+  text-align: start;
+}
+
+html.supplify-mobile-auth .login-pf-header {
+  margin-bottom: 16px;
+}
+
+html.supplify-mobile-auth form label {
+  margin-bottom: 8px;
+  color: var(--supplify-muted);
+  font-size: 13px;
+}
+
+html.supplify-mobile-auth
+  form
+  input:not([type='hidden']):not([type='submit']):not([type='checkbox']):not([type='radio']) {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: white;
+  color: var(--supplify-ink);
+  font: inherit;
+}
+
+html.supplify-mobile-auth .pf-c-input-group > .pf-c-button {
+  min-width: 48px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background-color: white;
+  color: var(--supplify-ink);
+}
+
+html.supplify-mobile-auth #kc-login,
+html.supplify-mobile-auth #kc-otp-form button[type='submit'],
+html.supplify-mobile-auth #kc-email-recovery-form button[type='submit'] {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--supplify-purple);
+  color: white;
+  font:
+    600 16px/1.25 'Supplify Inter',
+    system-ui,
+    sans-serif;
+}
+
+html.supplify-mobile-auth a {
+  color: var(--supplify-ink);
+  text-underline-offset: 3px;
+}
+
+html.supplify-mobile-auth a:focus-visible,
+html.supplify-mobile-auth button:focus-visible,
+html.supplify-mobile-auth input:focus-visible {
+  outline: 2px solid var(--supplify-purple);
+  outline-offset: 2px;
+}
+
+html.supplify-mobile-auth #kc-info-wrapper {
+  padding: 16px 0;
+  background: transparent;
+  color: var(--supplify-muted);
+}
+
+html.supplify-mobile-auth #kc-otp-form,
+html.supplify-mobile-auth #kc-email-recovery-form,
+html.supplify-mobile-auth .supplify-mobile-reset {
+  display: grid;
+  gap: 14px;
+}
+
+html.supplify-mobile-auth .supplify-mobile-reset label,
+html.supplify-mobile-auth #kc-otp-form label,
+html.supplify-mobile-auth #kc-email-recovery-form label {
+  margin: 0;
+}
+
+html.supplify-mobile-auth .supplify-reset-security {
+  padding: 16px;
+  border-radius: 12px;
+  background: #f7f5ef;
+}
+
+html.supplify-mobile-auth .supplify-reset-back {
+  margin-block: 10px;
+  text-align: center;
+}
+
+html.supplify-mobile-auth:lang(ar) body,
+html.supplify-mobile-auth:lang(ar) #kc-page-title,
+html.supplify-mobile-auth:lang(ar) #kc-header-wrapper,
+html.supplify-mobile-auth:lang(ar) #kc-login,
+html.supplify-mobile-auth:lang(ar) #kc-otp-form button[type='submit'],
+html.supplify-mobile-auth:lang(ar) #kc-email-recovery-form button[type='submit'] {
+  direction: rtl;
+  font-family: 'Supplify Plex Arabic', system-ui, sans-serif;
+}

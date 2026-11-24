@@ -266,7 +266,7 @@ router.post(
       JOIN customer_order co ON co.id = oi.order_id AND co.restaurant_id = $2
       LEFT JOIN product p ON p.id = oi.product_id
       WHERE oi.order_id = $1
-      ORDER BY oi.created_at
+      ORDER BY oi.id
     `,
         [orderId, restaurantId]
       )
