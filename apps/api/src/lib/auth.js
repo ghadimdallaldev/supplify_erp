@@ -221,23 +221,28 @@ export function classifyRefreshFailure(error) {
 
 /**
  * Refresh with structured outcome (preferred for session hardening).
+ * Keycloak only refreshes a token for the client it was issued to. Callers holding tokens from a
+ * different client (the public mobile client) must pass `client` with that client id and no secret.
  * @param {string} refreshToken
+ * @param {{ clientId: string, clientSecret?: string } | null} [client] defaults to KEYCLOAK_CLIENT_ID + secret
  * @returns {Promise<{ ok: true, tokens: object } | { ok: false, reason: 'invalid'|'transient'|'reuse', status?: number, message?: string }>}
  */
-export async function refreshAccessTokenDetailed(refreshToken) {
+export async function refreshAccessTokenDetailed(refreshToken, client = null) {
   if (!refreshToken || typeof refreshToken !== 'string') {
     return { ok: false, reason: 'invalid', message: 'Missing refresh token' }
   }
   try {
     const kcConfig = await getKeycloakConfig()
     const { KEYCLOAK_CLIENT_ID, KEYCLOAK_CLIENT_SECRET } = getKeycloakValues()
+    const clientId = client?.clientId ?? KEYCLOAK_CLIENT_ID
+    const clientSecret = client ? client.clientSecret : KEYCLOAK_CLIENT_SECRET
 
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: KEYCLOAK_CLIENT_ID,
-      client_secret: KEYCLOAK_CLIENT_SECRET,
+      client_id: clientId,
       refresh_token: refreshToken,
     })
+    if (clientSecret) params.set('client_secret', clientSecret)
 
     const response = await keycloakHttp.post(kcConfig.token_endpoint, params, {
       headers: {
@@ -267,13 +272,14 @@ export async function refreshAccessTokenDetailed(refreshToken) {
 /**
  * Single-flight Keycloak refresh per refresh-token fingerprint (rotation-safe concurrency).
  * @param {string} refreshToken
+ * @param {{ clientId: string, clientSecret?: string } | null} [client] see refreshAccessTokenDetailed
  */
-export async function refreshAccessTokenSingleFlight(refreshToken) {
+export async function refreshAccessTokenSingleFlight(refreshToken, client = null) {
   const key = `kc-refresh:${createHash('sha256').update(refreshToken).digest('hex').slice(0, 32)}`
   if (hasInflight(key)) {
     emitAuthSessionEvent('AUTH_REFRESH_SINGLE_FLIGHT_JOINED')
   }
-  return singleflight(key, () => refreshAccessTokenDetailed(refreshToken))
+  return singleflight(key, () => refreshAccessTokenDetailed(refreshToken, client))
 }
 
 /** Legacy helper: tokens or null (null covers invalid + transient — prefer Detailed). */

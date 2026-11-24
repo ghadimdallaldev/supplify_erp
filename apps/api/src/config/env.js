@@ -97,6 +97,9 @@ export const config = {
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID || 'supplify-api',
   KEYCLOAK_CLIENT_SECRET:
     process.env.KEYCLOAK_CLIENT_SECRET || (isProductionNode ? '' : 'changeme'),
+  // Public PKCE client the mobile apps sign in with. Mobile refresh tokens are bound to it, so
+  // POST /auth/mobile/refresh must refresh as this client (no secret), not as KEYCLOAK_CLIENT_ID.
+  KEYCLOAK_MOBILE_CLIENT_ID: process.env.KEYCLOAK_MOBILE_CLIENT_ID || 'supplify-mobile',
   KEYCLOAK_ADMIN: process.env.KEYCLOAK_ADMIN || 'admin',
   KEYCLOAK_ADMIN_PASSWORD: process.env.KEYCLOAK_ADMIN_PASSWORD || (isProductionNode ? '' : 'admin'),
   JWT_SECRET: process.env.JWT_SECRET || '',

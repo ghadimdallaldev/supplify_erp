@@ -748,7 +748,12 @@ router.post('/mobile/refresh', async (req, res) => {
       })
     }
 
-    const refreshResult = await refreshAccessTokenSingleFlight(refreshToken)
+    // Mobile refresh tokens are issued to the public mobile client (PKCE, no secret). Keycloak
+    // rejects a refresh presented by any other client, which signed mobile users out at the first
+    // access-token expiry.
+    const refreshResult = await refreshAccessTokenSingleFlight(refreshToken, {
+      clientId: config.KEYCLOAK_MOBILE_CLIENT_ID,
+    })
 
     if (!refreshResult.ok) {
       if (refreshResult.reason === 'transient') {
