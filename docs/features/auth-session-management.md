@@ -16,6 +16,12 @@ They must re-authenticate after logout, session expiry/revocation, password chan
 
 ## Architecture
 
+After native sign-in, a business account with several available workspaces can
+choose one using `GET /api/branches` and the existing workspace switch request.
+Pending accounts can use `POST /api/register/complete` to set up a restaurant,
+supplier, or personal account. The API assigns the role and scope. The client
+refreshes the authenticated session after setup.
+
 ```text
 Browser/PWA
   HttpOnly cookies: access_token + refresh_token

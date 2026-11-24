@@ -216,6 +216,15 @@ For ADMIN roles, `tenant_id` is NULL and `tenant_type` is `'ADMIN'`.
 
 **Impersonation:** [features/admin-impersonation.md](../features/admin-impersonation.md) · [IMPERSONATION_AUDIT.md](../archive/audits/impersonation-audit.md)
 
+Restaurant and Supplier mobile **More → Your team** reads the active workspace
+roster and role permissions under `advanced_roles` and `SETTINGS_VIEW`.
+Pending invitations use `team_invitations` and the existing
+`STAFF_MANAGE`, `STAFF_INVITE`, or `SETTINGS_MANAGE` check. The mobile role
+editor uses the existing `PATCH /api/roles/:id` permission update.
+`SETTINGS_MANAGE` is required, system roles are read-only, and the API checks
+the grantor's permissions before saving. Warehouse membership changes continue
+through the existing management flow.
+
 ## Subscription features vs RBAC
 
 Plan entitlements (`requireFeature`) and role permissions (`requirePermission`) are **both** required. They answer different questions: whether the **tenant** bought the module vs whether the **user** may use it.

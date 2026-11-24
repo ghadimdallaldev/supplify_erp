@@ -16,6 +16,10 @@ Plan feature key: `receiving_quality` (Silver+ for restaurants).
 8. Suppliers are notified of receiving completion (`RECEIVED_*` / `INVOICED` status) and of any automatically opened dispute.
 9. **Receiving history** tab lists past reports (not orders without a report).
 
+The Android and iOS V3 receiving form shows the number of order lines and
+keeps the actual quantity, quality, and optional notes together for each line.
+It submits these values through the existing receiving mutation.
+
 ### One receiving report per order (H13)
 
 Supplify supports **one** receiving report and **one** invoice per order/supplier. Partial accepts bill only accepted quantity. Remaining short-shipped quantity is handled via dispute resolution (credit / replacement order) or a new supplier order — not a second receive on the same order.
@@ -37,6 +41,11 @@ Deep link: `/app/receiving?order={orderId}` opens the receive dialog when the or
 Restaurant tenant resolution uses active branch context (`getRestaurantIdForRequest`) with `contact_email` fallback.
 
 ## Frontend
+
+On mobile, a successful receiving response opens the V3 confirmation with
+the order reference and supplier. The user returns to the order using the
+existing back path. Blank, invalid, or above-order quantities keep the submit
+action disabled. The form accepts localized decimal digits.
 
 Receiving history and supplier-reliability quality averages display at most one
 decimal place (for example, `4.5454545454545` displays as `4.5`). Missing or invalid

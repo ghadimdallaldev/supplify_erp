@@ -16,6 +16,12 @@ Supplier tenants can operate as a **multi-branch organization**: one parent org 
 
 ## Lifecycle (current)
 
+On Android and iOS, More → Your workspace shows the current supplier
+organization and linked accounts. It also shows permitted warehouses when the
+warehouse feature is enabled. Opening a warehouse takes the user to its
+scoped stock view. Switching organizations still goes through the existing
+mobile account switch.
+
 | Action                                    | Status                                                                                                            |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Create / deactivate / reactivate / unlink | Org Owner APIs under `/api/org/branches`; target must belong to the caller's org                                  |

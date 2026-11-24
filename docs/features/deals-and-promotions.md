@@ -20,6 +20,14 @@ Suppliers create **deals** (stored in `promotions`) — percentage/fixed discoun
 
 Both Android and iOS supplier apps collect a required deal description ("What is this deal about?"), deal type, conditional discount value, dates, audience, areas, and boost settings. Percentage values must be greater than zero and at most 100; fixed discounts must be positive; free-delivery deals do not send a discount value. The payload uses the existing promotion API contract and permission gates.
 
+## V3 mobile promotion editor
+
+The Android and iOS editor can save a draft for all eligible products or a
+specific catalog product. A product price is previewed in its returned currency.
+Optional offer dates are converted from the device's calendar to timestamps.
+The existing restaurant type and area filters continue to define the audience.
+Saving a draft and submitting it for approval with a boost are separate actions.
+
 ## Terminology
 
 | Term                | Meaning                                                     |

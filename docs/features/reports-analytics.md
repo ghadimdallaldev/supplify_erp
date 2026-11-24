@@ -71,6 +71,16 @@ Migration: `0071_reports_analytics_indexes.sql` — supporting indexes only (no 
 - Web: `apps/web/src/lib/reportResponse.test.ts` (RTK unwrap / envelope parsing), `contractPricingResponse.test.ts` (contract pricing pages)
 - Manual: Reports page loads on Silver+; Free → 403 (GATE-R09)
 
+## Mobile purchasing insights and sales performance
+
+Android and iOS both use the existing `reports` entitlement and `ORDERS_VIEW`
+permission. The overview compares daily order value or supplier revenue with
+the preceding range of the same length. Each shown currency has its own
+series, total and average. The breakdowns use restaurant categories, suppliers
+and products, or supplier restaurant accounts. Both roles can also open the
+order-volume breakdown. Supplier customer links use the directory's access
+rules. A budget plan requires a data source beyond the current reports API.
+
 ## Web reports page
 
 `/app/reports` lists every endpoint above.

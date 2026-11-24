@@ -5,12 +5,24 @@ currencies, stock availability, quantity rules, delivery location, and plan limi
 are enforced by the API. Order headers, lines, stock reservations, usage, and
 idempotency claims are committed in one transaction; a failure rolls them back.
 
+On Android and iOS, the V3 checkout confirmation opens after the API returns
+valid order IDs. It displays the returned date and total for each supplier
+order, in that order’s currency, and the selected location if available.
+Users with order-view permission can return directly to Orders. Uncertain
+responses keep the cart and retry key until checkout is resolved.
+
 An identical retry uses the same `Idempotency-Key` and normalized payload. A
 successful replay returns the original order IDs without reserving stock again;
 a different payload with a successful key returns a conflict. Claim insertion
 uses the actor/key unique index, including overlapping submissions. Migration
 `0236_manual_order_idempotency_actor_scope.sql` removes the older restaurant/key
 constraint so independent supplier actors can use the same key for one customer.
+
+## V3 mobile checkout feedback
+
+A definitive checkout rejection appears above the Place order control and
+leaves the cart available to correct. An uncertain outcome keeps the existing
+attempt locked to its original idempotency key for safe recovery.
 
 ## Quote and manual checkout corrections (2026-11-18)
 
@@ -41,9 +53,8 @@ API success data is `{ order }` or `{ orders }` for restaurant checkout and
 `{ order }` for manual checkout. Web mutation types reflect those wrappers. Both
 native clients normalize restaurant results into arrays, validate returned order
 IDs, and preserve the retry key on errors or ambiguous responses. They expose the
-typed manual endpoint and existing quote metadata. The existing native cart already
-has a supplier-count fallback; the hook correction establishes its promised return
-contract and prevents malformed success data from confirming checkout.
+typed manual endpoint and existing quote metadata. Malformed success data cannot
+open the native confirmation.
 
 Apply migration 0236 in each target environment before rollout. Only the disposable
 audit database was migrated in this session. Hosted migration application, mixed

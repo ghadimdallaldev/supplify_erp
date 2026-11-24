@@ -4,6 +4,16 @@
 
 Canonical reference for supplier dispatch, drivers, routes, live GPS, POD, and exceptions.
 
+The native stop screen uses the scoped destination and delivery instructions.
+After the proof endpoint confirms delivery, the app displays the recorded
+recipient when available and offers a return to the updated route.
+Reopening the delivered stop shows proof for that assignment and its recorded
+recipient when the existing proof response includes a name.
+
+The driver stop shows delivery instructions from the scoped response.
+The driver API supplies no authorized customer contact channel or driver to
+customer conversation for the stop.
+
 ## Feature flags
 
 | Flag                | Description                                                               |
@@ -81,6 +91,14 @@ a driver filter is supplied. An unbound legacy proof counts toward the detail
 POD indicator only when it cannot belong to a different current leg.
 
 ---
+
+## Mobile route activity
+
+The driver's run sheet shows the ordered stops from the scoped active route,
+with delivered counts and times when the API supplies them. Route progress
+remains visible without location updates. If a stop has several delivery
+assignments for the same order, each leg stays selectable in the delivery list
+using its assignment ID.
 
 ## Current state (GPS & delivery service)
 

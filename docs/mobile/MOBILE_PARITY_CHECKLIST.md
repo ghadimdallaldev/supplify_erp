@@ -1,5 +1,38 @@
 # Mobile Parity Checklist
 
+## 2026-11-24 — V3 account entry
+
+- [x] Mirror native workspace selection, account setup, and invitation review in both clients.
+- [x] Apply the mobile V3 theme to the hosted Keycloak client and password reset form.
+- [ ] Exercise the Android account workflows in the consolidated Expo pass.
+
+## 2026-11-24 — Figma V3 product, insights, and workflow states
+
+- [x] Mirror supplier product edits, restaurant insights, route activity, checkout and receiving states, and connectivity presentation.
+- [x] Reconcile the approval frames with the retired purchasing feature and the legacy placed-order display.
+- [x] Mirror restaurant Help & support and its existing permission and entitlement checks in both clients.
+- [x] Mirror the workspace team, pending invitations, role permissions, and restricted-access state.
+- [x] Mirror the delivered stop proof and long-content layout updates.
+- [x] Mirror supplier city and followed filters and warehouse account context.
+- [ ] Verify the latest screens and authenticated workflows on Android.
+
+## 2026-11-20 — Figma V3 native migration
+
+- [x] Inventory the 92 numbered Figma frames and both clients' registered routes.
+- [x] Apply matching V3 source and bundled assets in the two implementation worktrees.
+- [x] Record screen and workflow gaps in the [V3 coverage report](./MOBILE_FIGMA_V3_COVERAGE_2026-11-20.md).
+- [x] Build and install a native Android debug APK and review its welcome screen against A01.
+- [x] Install and launch the local Android Development APK with an embedded bundle.
+- [x] Mirror the V3 kitchen stock count, restaurant and supplier conversations, and reports in both source worktrees.
+- [x] Mirror the V3 dispatch queue, route tracking, driver assignment and promotion draft editor.
+- [x] Mirror the V3 branch and workspace routes and reuse the existing account switch.
+- [x] Apply all migrations and load the demo fixtures in a separate mobile QA database.
+- [x] Inspect the local iOS simulator source archive.
+- [x] Record the user's decision to defer the iOS build and device checks.
+- [x] Run the ERP and mobile typechecks, both native Jest suites, and Expo exports.
+- [ ] Finish the screen-specific redesigns and verify each route on available native devices.
+- [ ] Verify the production build and authenticated Restaurant, Supplier, Driver and public checkout journeys.
+
 ## 2026-11-19 - Supplier calendar cutoffs and order notes
 
 - [x] Web/Android/iOS type optional delivery-resolution metadata.

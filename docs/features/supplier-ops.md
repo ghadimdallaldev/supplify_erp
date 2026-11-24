@@ -4,6 +4,16 @@
 
 Supplier-facing operational APIs mounted at `/api/supplier/*` — command center KPIs, receivables aging, CSV product import, **bulk product image import**, delivery board, reorder intelligence, and fulfillment issue workflows.
 
+The native supplier customer directory opens a customer detail screen. The
+latest order is filtered to that restaurant and uses `ORDERS_VIEW`.
+Messaging continues to use the existing chat entitlement and permissions.
+
+The native Supplier catalog opens Product details. Catalog editors can save
+the name, SKU, unit, and category through `PATCH /api/products/:id`.
+Current catalog price and available quantity come from the catalog response.
+The product screen links to contract pricing and warehouse stock where access
+allows. Catalog price setup, creation, and bulk import remain in the web tools.
+
 Driver fulfillment now keeps requested future delivery dates and uses the supplier
 calendar day for missing/overdue dates when assigning drivers. Detail dates remain
 literal calendar strings. Atomic proof/completion, standalone proof authorization,
@@ -92,6 +102,12 @@ Receivables and restaurant payables total `balance_due` per currency. A supplier
 The overdue job marks a past-due invoice `OVERDUE` only while `balance_due > 0`, notifies both parties of that open balance, and sets `overdue_notified_at` after the notification call so a failed send can retry. When either tenant's subscription is locked the job still sets `OVERDUE` (so aging, receivables and filters stay correct) but skips the notification and leaves `overdue_notified_at` empty, so the notice goes out once the account is unlocked. Voiding an invoice (`PATCH /api/invoices/:id` with `VOID`) returns 409 when it has completed payments or applied credit notes (credit applications are stored as `CREDIT-` payments); reverse them first. `/api/payments` uses the same `finance_invoices` plan gate as `/api/invoices` and `/api/restaurant-finance`. Migration `0228` makes the one-invoice-per-order-per-supplier index ignore `VOID` invoices. A manual invoice must total more than zero. When `tax_included` is true, tax is extracted from the line prices instead of added on top. Currency follows the linked order unless the request sends a three-letter code. Invoice, due, payment, and credit-note dates are returned as `YYYY-MM-DD` calendar days, including receivables, payables, statements, and CSV export. Applying credit requires a credit note; an amount alone does not reduce the balance. Credit notes offered for an invoice are limited to that invoice's currency. Overdue days and expense windows use the restaurant's local calendar day. The invoice list, order invoice tab, and invoice detail use that day count, so a browser in another timezone does not mark the invoice overdue early. Receivables aging uses the supplier's local day, and payables aging uses the restaurant's. Overdue and statement totals are summed once per currency, and an invoice with no currency is not added into USD. The tax rate on a new invoice is the rate in effect on the supplier's local day. Payment lists return `payment_date` as `YYYY-MM-DD`. Invoice totals on the list, detail, payment dialog, and order invoice tab use the invoice currency.
 
 **Web:** `SupplierReceivablesPanel` on `/app/invoices` (supplier tenants with `finance_invoices`).
+
+Android and iOS V3 open a shared invoice detail screen from supplier
+Receivables and restaurant Invoices. The detail uses the existing scoped
+`GET /api/invoices/:id` endpoint with `finance_invoices` and `INVOICES_VIEW`.
+The linked-order action requires `ORDERS_VIEW). The invoice document opens
+through the authenticated web invoice view.
 
 Service: `supplier-receivables.service.js`
 

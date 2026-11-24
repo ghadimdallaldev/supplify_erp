@@ -13,6 +13,7 @@
 
 ## What remains (compatibility only)
 
+- Mobile Restaurant Orders lists legacy `PENDING_APPROVAL` records with placed orders and shows the Placed status on order detail. This matches the web timeline.
 - DB tables: `approval_rules`, `budget_periods`, `budget_allocations`, `order_approvals` (not dropped)
 - Deal/promotion **admin** approval flows (unrelated feature)
 - Promotion **boost budget** fields on deals (unrelated)

@@ -4,12 +4,19 @@
 
 How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture, recipients, and configuration.
 
+The native restaurant feed groups notifications into Today and Earlier. The
+supplier feed has a section for unread order and low-stock updates. Both
+continue to open the existing notification targets and support marking one or
+all notifications read.
+
 ## Mobile chat notification behavior (2026-09-12)
 
 - Authenticated mobile sessions keep one global Socket.IO notification listener active for the selected tenant. A `MESSAGE` notification invalidates both notifications and chat conversations.
 - Foreground Expo notifications also invalidate those caches; notification lists poll every 30 seconds as a fallback.
-- Restaurant and supplier Chat tabs derive an aggregate unread badge from conversation `unread_count` values. Chat lists refresh on focus and every 15 seconds, so a conversation is visible without first opening Home notifications.
+- The Restaurant Chat tab and Supplier Messages shortcut derive aggregate unread badges from conversation `unread_count` values. Chat lists refresh on focus and every 15 seconds, so a conversation is visible without first opening Home notifications.
 - Opening a thread calls `PATCH /api/chat/conversations/:conversationId/read`; the cached badge is cleared immediately and reconciled on the next server refresh.
+- V3 Restaurant and Supplier threads display the linked order when the conversation or message provides one. The native order detail action requires `ORDERS_VIEW`. The composer, order attachments and file uploads require `CHAT_SEND`.
+- Restaurant **More → Help & support** can start or resume a Supplify support conversation when the user has `CHAT_VIEW` and `CHAT_SEND` and the tenant has `chat` and `support_sla`. For other accounts the account help row opens Workspace. Order and invoice links follow their existing access checks.
 - The socket connection carries the same active-tenant token as REST requests, preventing branch/workspace mismatch after tenant switching.
 
 ## Human chat attachments (2026-09-25)
@@ -24,6 +31,7 @@ How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture,
 - `POST /api/push/devices` requires auth, tenant context, and the `push_notifications` plan feature (same as web `POST /subscribe`). `DELETE /api/push/devices` stays auth-only so logout can unregister after a downgrade.
 - A push endpoint belongs to exactly one user. Same-user re-register refreshes keys; registering an endpoint already owned by another account returns 409. Logout should `DELETE /devices` while the access token is still valid.
 - Native registration requires an installed development/preview/production build. It retries transient failures and exposes its state in mobile Notification settings instead of failing silently.
+- The Android Supplify alerts channel uses the system notification sound and its existing vibration pattern.
 - Native payloads include `notificationId`, `notificationType`, `notificationCategory`, `referenceId`, `referenceType`, their snake_case equivalents, metadata, and the resolved web URL. Chat uses `referenceType: CONVERSATION` with `conversationId` metadata.
 - Expo ticket acceptance is not treated as delivery. The API reconciles Expo receipts, marks `notification_log.push_sent` only after FCM/APNs returns success, and removes stale `DeviceNotRegistered` subscriptions.
 - Android remote push requires Firebase `google-services.json` plus a matching EAS FCM V1 service-account credential. Both mobile repos accept the client file through the EAS file variable `GOOGLE_SERVICES_JSON`; current `app.config.js` warns when it is absent and still allows an APK build. A successful build does not prove push readiness. iOS device builds require a valid APNs key in EAS. Validate both with physical-device background and terminated-app tests before release.

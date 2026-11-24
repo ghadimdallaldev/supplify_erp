@@ -5,6 +5,11 @@ The password and OTP pages remain hosted by Keycloak; Supplify does not expose
 custom password forms. Signup uses the same hosted flow and verifies the email
 before tenant activation.
 
+The native clients open the existing `supplify-mobile` Keycloak flow. The
+provider styles its sign-in, email verification, and password reset forms
+with the V3 mobile layout. The reset form posts to the existing Keycloak
+action and preserves its account-privacy response.
+
 Codes are six digits, expire after ten minutes, allow five attempts, and can be
 resent after 60 seconds. A resend invalidates the previous code. Only an HMAC
 digest is held by Keycloak, and API logs/audits redact the code.

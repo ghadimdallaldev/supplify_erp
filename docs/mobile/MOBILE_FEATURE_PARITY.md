@@ -1,5 +1,84 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-24 — V3 post-implementation audit fixes (Android verified, iOS mirrored)
+
+Device audit of the uncommitted V3 working set: `design-audit/mobile/v3-post-implementation/`.
+Mobile changes, identical in `.worktrees/mobile-v3-android` and `.worktrees/mobile-v3-ios`:
+role permission labels for every permission key (R23/S21, with Arabic strings and a readable
+fallback), and a taller line height for the 34 px confirmation headlines (R08, D04) so
+descenders are not clipped on Android. API changes, no mobile contract change:
+`POST /auth/mobile/refresh` now refreshes as the public mobile client
+(`KEYCLOAK_MOBILE_CLIENT_ID`, default `supplify-mobile`), which ends the sign-out at the first
+token refresh; receiving no longer orders lines by the non-existent `order_item.created_at`.
+Both API fixes need a deploy. iOS runtime is not verified (Windows host).
+
+## 2026-11-24 — V3 account setup and invitation acceptance
+
+Android and iOS carry the same workspace chooser, organization setup, and
+invitation review. Sign-in, email OTP and reset use hosted Keycloak. Native
+submissions use the existing registration and invitation contracts, including
+workspace authorization and legal consent. The next visual and workflow checks
+use one Android Expo pass. The user deferred iOS runtime and builds.
+
+## 2026-11-24 — V3 product details, route activity, and workflow states
+
+Both source worktrees carry the supplier product editor, the restaurant
+Assistant's stock and pricing evidence, and the driver's route activity.
+The restaurant support screen opens existing order, invoice and workspace
+screens and can start a Supplify support conversation under the existing
+chat permissions and entitlements.
+Both source worktrees now also show the active workspace team, pending invites,
+and role permissions. Managers can change custom-role permissions through the
+existing tenant role API. The access-denied screen gives account and team links.
+The driver stop reads proof for the delivered assignment. Catalog and invoice
+rows wrap long names and references and show price and unit together when space
+allows.
+Restaurant supplier filters use the directory city filter and followed status.
+The warehouse list shows the active supplier account under its title.
+Checkout rejections, receiving confirmations, startup, and connectivity use
+the shared V3 controls. The receiving confirmation requires a successful
+response. Legacy pending approvals display as placed orders on the restaurant
+list and detail. These changes use the existing API contracts. The user
+deferred the iOS build and device checks.
+
+## 2026-11-20 — Figma V3 native migration in progress
+
+Android and iOS carry matching V3 source on `design/figma-v3`. The
+worktrees contain shared V3 typography, color, navigation, controls, original
+Figma art, role Home and Driver overview presentation, catalog and product
+details, ordering and receiving presentation, invoices, and public shopping.
+Supplier Catalog and the Messages shortcut use the existing permission and
+feature gates. The existing order, stock, workspace and authentication
+contracts power the updated screens. The optional image fields in the native
+Product type match fields already supplied by the product API and used by web.
+Restaurant Invoices and Supplier Receivables open a shared native detail that
+uses the existing scoped invoice endpoint on both platforms.
+Restaurant checkout shows a native confirmation based on the validated API
+response, with separate currency totals and resolved delivery dates per order.
+Notification startup uses the Android system sound through the existing channel.
+The next pass mirrors V3 notification feeds, quick-list creation from the cart,
+supplier customer detail, scoped warehouse counts, public order receipts and
+driver delivery confirmation. Both apps reuse the existing endpoints and
+permission gates for these screens.
+Restaurant inventory and stock counts, business conversations, and purchasing
+and sales reports now use the same native V3 screens on Android and iOS.
+The inventory clients use the existing paginated list, stock summary and
+quantity endpoints. Conversation links use the existing order route and match
+the server's view and send permissions. Both report clients use the existing
+category and order-value endpoints, keep currency totals separate, and match
+the server's `ORDERS_VIEW` and `reports` checks.
+The dispatch queue in both apps now reads the fulfillment API's four
+delivery buckets and preserves multiple driver assignments for one order.
+Route progress, active driver selection, warehouse stop selection, and native
+route tracking use existing scoped endpoints. Promotion drafts can use live
+catalog products, offer dates, and the existing audience filters on both apps.
+Mobile More now opens the Restaurant Branches and Supplier Workspace screens.
+Account switching shares the existing session isolation, token storage and
+user refresh with the quick switcher. Supplier warehouse rows open the
+permitted warehouse's stock view.
+The [coverage report](./MOBILE_FIGMA_V3_COVERAGE_2026-11-20.md) tracks the
+individual frames, source paths, supported flows and native evidence.
+
 ## 2026-11-19 - driver-detail optional assignment id
 
 API: `GET /api/orders/:id/driver-detail?assignment_id=<uuid>` narrows to one driver assignment (invalid values ignored; driver scoping still applies). Mobile: `useDriverDetail(orderId, assignmentId)` and the Stop screen pass `driverAssignmentId` in both `supplify-mobile` and `supplify-mobile-ios` (branch `audit/driver-app-2026-11-19`). Background tracking, the supplier-timezone column default and the two notification quirks were deliberately not changed (see audit doc).

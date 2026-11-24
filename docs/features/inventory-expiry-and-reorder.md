@@ -4,6 +4,24 @@
 
 Operational features for restaurant inventory expiry, supplier shortage/substitution chat, ordering lists, and smart reorder reminders.
 
+## Kitchen inventory on Android and iOS
+
+Kitchen Inventory loads the restaurant's paginated stock with server-side
+search by product name, SKU or category. The stock summary shows the total and
+low or out-of-stock counts. Expiry counts still use the separate lot summary.
+The restock action opens Smart Reorder when the workspace includes that feature.
+
+Staff with `INVENTORY_EDIT` can set a physical count, including zero, and
+preview the resulting change. Counts use the existing quantity PATCH. Add,
+remove and waste use the existing movement endpoints and retain optional
+notes. Waste requires `waste_tracking`. The absolute-count PATCH accepts a
+quantity, while movement notes belong to the add and adjust actions.
+
+The Restaurant Assistant shows a stock risk when Smart Reorder returns both the
+on-hand quantity and a higher configured minimum. Eligible kitchen staff can
+open the inventory evidence. The same view can display an active negotiated
+price in its own currency for staff with catalog access.
+
 ## 2026-11-16 reliability corrections
 
 Expiry-derived reorder suggestions use the lot's `itemName` as `productName`.

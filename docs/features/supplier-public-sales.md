@@ -1,5 +1,10 @@
 # Supplier public sales
 
+The native public order receipt shows confirmed line prices, total,
+fulfillment method, payment method and status. Checkout carries the storefront
+into the receipt so the customer can return to that supplier. Saved guest
+receipts retain the existing token-based tracking flow.
+
 Supplier public sales extends the existing public supplier catalog and the existing
 `customer_order` fulfillment pipeline to personal consumers and guests. It does not
 replace restaurant B2B ordering and it does not reuse the restaurant-specific diner

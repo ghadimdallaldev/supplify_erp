@@ -4,6 +4,13 @@
 
 Warehouses are a **fulfillment** concept inside a supplier branch (not a separate account). Suppliers manage locations, per-warehouse inventory, delivery zones, and optional multi-warehouse routing.
 
+On Android and iOS, users open stock details from the warehouses they can
+access. The screen shows the returned physical, reserved and available
+quantities and the reorder point when supplied. Search covers the loaded
+pages by product name or SKU. A physical count requires `WAREHOUSES_MANAGE`,
+preserves reserved and unavailable stock, and uses the existing warehouse
+inventory update endpoint.
+
 ## Feature flags
 
 | Key               | Plans (supplier)                  | When off                                     | When on                              |
@@ -101,6 +108,21 @@ All warehouse routes: `requireAuth` → `requireFeature('warehouses')` → `requ
 | POST                  | `/api/orders/:id/warehouses/:assignmentId/dispatch` | Mark dispatched + commit reserved stock                 |
 
 Order creation (`POST /api/orders`, supplier manual create) calls `reserveStockForPlacedOrder` in the **same transaction** (warehouse reserve XOR legacy deduct); failure rolls back the order.
+
+## Mobile dispatch
+
+The Supplier dispatch queue reads the pending, assigned, out-for-delivery and
+delivered-today buckets from `/api/fulfillment/dispatch`. A row refers to one
+driver assignment, so one order can appear more than once for multiple legs.
+The queue reports when the server caps a bucket. Route groups and progress come
+from the existing fulfillment routes list and detail endpoints.
+
+Selecting a driver is a separate step from confirming assignment. A planned
+route uses the existing route update. Single-order assignment, reassignment,
+retry and rollover still use their order or leg endpoints. An order with
+multiple warehouses can require choosing a warehouse stop before confirming.
+The route map shows available GPS positions and destinations using the configured
+provider or the device map. The route timeline remains available without GPS.
 
 ## Frontend
 

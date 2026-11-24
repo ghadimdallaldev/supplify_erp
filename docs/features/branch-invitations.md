@@ -28,6 +28,13 @@ Tokens are generated with `crypto.randomBytes(48)` (96 hex characters). They are
 
 ## Accepting an invitation
 
+On mobile, open **Use an invitation** and paste a restaurant member,
+restaurant branch or supplier branch link from the current environment.
+The app loads the intended email and assigned role, then accepts through
+the existing invitation API after hosted sign-in and legal consent. New
+users can sign up in Keycloak or continue through the web invitation.
+Branch Account linking uses the existing web workflow.
+
 The invitee opens the link and sees:
 
 - **Valid**: signup form (name, email, password) or, if already logged in, **Accept & Join Branch**.

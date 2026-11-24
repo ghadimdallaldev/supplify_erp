@@ -2,6 +2,12 @@
 
 Smart Quick Lists add forecast-based quantity adjustment and reorder-assistance suggestions on top of scheduled quick lists. The quantity automation is deterministic forecasting from the same stack as [AI Smart Reorder](./ai-smart-reorder.md); it is not automatically a separate LLM product.
 
+The Android and iOS Quick Lists screen can save the current restaurant cart
+as a named list when the user can create orders. It submits the product IDs,
+suppliers and quantities to the existing quick-list endpoint. The cart stays
+available after the list is saved. Loading a saved list opens Cart, where
+pricing and availability are checked again before checkout.
+
 ## Commercial Positioning
 
 Use public tenant-specific plan names in customer-facing copy:

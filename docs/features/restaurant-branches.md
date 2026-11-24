@@ -65,6 +65,11 @@ Public page: `/invite?token=…&type=rm|rb|sb`
 
 ## Branch switcher
 
+On Android and iOS, More → Branches lists the accounts returned for the user
+and marks the current branch. Choosing another account uses the same mobile
+session switch as the quick switcher. Organization settings opens the existing
+web settings for users with the settings permission.
+
 Header switcher uses `/api/restaurant-org/branches` when the user belongs to a restaurant org. Switching calls `POST /api/restaurant-org/context/switch`.
 
 ## Feature flag
