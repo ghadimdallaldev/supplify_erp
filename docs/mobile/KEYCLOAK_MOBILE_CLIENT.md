@@ -72,6 +72,7 @@ Mobile obtains `activeTenantToken` from the `POST /api/branches/switch` JSON res
 4. Mobile stores tokens in `expo-secure-store`.
 5. API requests send `Authorization: Bearer <access_token>`.
 6. On 401 / expiry, mobile calls `POST /auth/mobile/refresh` with `{ "refresh_token": "..." }` to obtain new tokens (JSON response, no cookies).
+   The API refreshes as the public mobile client (`KEYCLOAK_MOBILE_CLIENT_ID`, default `supplify-mobile`, no secret). Keycloak refuses to refresh a token for any other client ("Token client and authorized client don't match"). Builds of the API without the 2026-11-24 fix refresh as `KEYCLOAK_CLIENT_ID`, so mobile sessions end at the first access-token expiry (20 min).
 
 ## API headers (mobile)
 

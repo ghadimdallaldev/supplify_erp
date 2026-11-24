@@ -804,7 +804,10 @@ describe('Auth Routes', () => {
         .send({ refresh_token: 'valid-refresh-token' })
         .expect(200)
 
-      expect(refreshAccessTokenSingleFlight).toHaveBeenCalledWith('valid-refresh-token')
+      // Mobile tokens belong to the public mobile client; refreshing them as the API client fails.
+      expect(refreshAccessTokenSingleFlight).toHaveBeenCalledWith('valid-refresh-token', {
+        clientId: 'supplify-mobile',
+      })
       expect(response.body.ok).toBe(true)
       expect(response.body.data.access_token).toBe('new-access-token')
       expect(response.body.data.refresh_token).toBe('new-refresh-token')
