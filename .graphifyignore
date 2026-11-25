@@ -1,0 +1,13 @@
+/output/
+/test-results/
+/design-audit/
+/tmp/
+/.agents/
+/.claude/
+/.release-checkouts/
+/.worktrees/
+/.playwright-mcp/
+/.gradle-user-home/
+/.aws/
+**/*.generated.*
+/docs/onboarding/output/

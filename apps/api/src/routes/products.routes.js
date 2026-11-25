@@ -26,6 +26,7 @@ import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../lib/safe-update.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import { toContainsPattern, toPrefixTsQuery } from '../lib/search-query.js'
 import {
   getSupplierProductAvailableQty,
   overlayProductRowsWithAuthoritativeStock,
@@ -502,11 +503,15 @@ router.get('/', async (req, res) => {
     // Full-text search (fallback to name LIKE when search_vector column absent)
     if (params.q) {
       const hasSearchVector = await productHasSearchVectorColumn()
-      if (hasSearchVector) {
-        whereConditions.push(`p.search_vector @@ plainto_tsquery('simple', $${paramIndex})`)
-        queryParams.push(params.q)
-        orderByClause = `ts_rank(p.search_vector, plainto_tsquery('simple', $${paramIndex})) DESC, p.created_at DESC`
-        paramIndex++
+      const prefixQuery = toPrefixTsQuery(params.q)
+      if (hasSearchVector && prefixQuery) {
+        // Search-as-you-type: prefix lexemes plus a name substring, so "tom" finds "Tomatoes".
+        whereConditions.push(
+          `(p.search_vector @@ to_tsquery('simple', $${paramIndex}) OR LOWER(p.name) LIKE $${paramIndex + 1})`
+        )
+        queryParams.push(prefixQuery, toContainsPattern(params.q))
+        orderByClause = `ts_rank(p.search_vector, to_tsquery('simple', $${paramIndex})) DESC, p.created_at DESC`
+        paramIndex += 2
       } else {
         whereConditions.push(
           `(LOWER(p.name) LIKE $${paramIndex} OR LOWER(p.sku) LIKE $${paramIndex})`
