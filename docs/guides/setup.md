@@ -212,6 +212,19 @@ The API follows RESTful conventions with:
 - `pnpm db:seed` - Seed database with sample data
 - `pnpm db:reset` - Reset database (drop, migrate, seed)
 
+### UI Skills for Codex and Claude Code
+
+Codex loads UI skills from `.agents/skills/`. This checkout also has matching copies in `.claude/skills/` for Claude Code. Git ignores the Claude Code copies, so a fresh checkout needs a local copy of those skill folders.
+
+- Emil Kowalski's full collection covers interface design, animation, gestures, prototyping, UI stress testing, and Swift. [Source revision](https://github.com/emilkowalski/skills/tree/64eb3deb9a5fbfa041faf783e0bc3fd635872e9c/skills)
+- Expo UI guidance includes `expo-animation`, `expo-brownfield`, `expo-design-system`, `expo-dom`, `expo-module`, `expo-native-ui`, `expo-overview`, `expo-project-structure`, `expo-router`, `expo-ui`, and `expo-web-to-native`. [Source revision](https://github.com/expo/skills/tree/c5e536273b6b4a7a3ad5dd9d74b6098c15138b21/plugins/expo/skills)
+
+### Graphify for Codex
+
+The repository includes the [Graphify skill](../../.agents/skills/graphify/SKILL.md) for exploring code and architecture. If `graphify --version` is unavailable, install the CLI with `uv tool install graphifyy`. In Codex, use `$graphify .` to build a repository graph.
+
+Open `graphify-out/graph.html` for the interactive overview or query the full graph with `graphify query "How are orders created?"`. Graphify also writes `graphify-out/GRAPH_REPORT.md`. The output is local to each checkout. `.graphifyignore` keeps generated outputs, local assistant tooling, and duplicate checkouts out of the corpus.
+
 ### Environment Variables
 
 #### API (.env)

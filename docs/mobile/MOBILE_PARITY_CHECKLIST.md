@@ -1,5 +1,18 @@
 # Mobile Parity Checklist
 
+## 2026-11-25 — Restaurant marketplace polish
+
+- [x] Mirror the polished supplier, catalog, and live cart summary UI in both native design worktrees.
+- [x] Typecheck ERP and both native worktrees. Run the cart and quantity tests, including the catalog summary regressions.
+- [x] Verify both screens on Android, including the live cart dock while scrolling and 135% catalog text.
+
+## 2026-11-25 — Restaurant Suppliers and Supplier Catalog
+
+- [x] Mirror the supplier directory, product catalog, and shopping controls in both design worktrees.
+- [x] Typecheck ERP, Android, and iOS. Run the focused native cart, quantity, currency, localization, and Restaurant navigation suites.
+- [x] Run both screens on Android and verify supplier discovery, relationships, messaging, catalog filters, quantities, cart, and back navigation.
+- [ ] Run the redesigned screens on iOS hardware or simulator.
+
 ## 2026-11-24 — V3 account entry
 
 - [x] Mirror native workspace selection, account setup, and invitation review in both clients.

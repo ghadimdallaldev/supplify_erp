@@ -135,5 +135,20 @@ describe('Search Routes', () => {
       expect(supplierSql).toContain('LEFT JOIN LATERAL')
       expect(supplierSql).toContain('COALESCE(stats.product_count, 0)')
     })
+
+    it('matches partial words with a prefix tsquery and a name substring', async () => {
+      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+
+      await request(app).get('/api/search?q=tom&grouped=true').expect(200)
+
+      const [productSql, productParams] = db.query.mock.calls[0]
+      expect(String(productSql)).toContain("to_tsquery('simple', $1)")
+      expect(String(productSql)).not.toContain('plainto_tsquery')
+      expect(String(productSql)).toContain('LOWER(p.name) LIKE $3')
+      expect(productParams[0]).toBe('tom:*')
+      expect(productParams[2]).toBe('%tom%')
+      // Blocklist uses the restaurant id after the pattern.
+      expect(productParams[3]).toBe('rest-1')
+    })
   })
 })

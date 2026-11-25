@@ -21,7 +21,9 @@ Migration: `0158_search_favorites.sql`
 
 ## Product list FTS
 
-`GET /api/products?q=` uses `search_vector @@ plainto_tsquery` when the column exists (falls back to name `LIKE`).
+Search-as-you-type (2026-11-25): `GET /api/search` products and `GET /api/products?q=` match **partial words**.
+`lib/search-query.js` turns the text into a sanitised prefix tsquery (`"cherry tom"` → `cherry:* & tom:*`, Unicode letters/digits only, max 6 terms) used with `to_tsquery('simple', …)`, OR'd with a `LOWER(p.name) LIKE '%…%'` substring match (LIKE wildcards escaped), ranked by `ts_rank`.
+Without the `search_vector` column, `/api/products` still falls back to name/SKU `LIKE`. Supplier search was already a substring match.
 
 ## Web
 
@@ -31,4 +33,12 @@ Migration: `0158_search_favorites.sql`
 
 ## Mobile parity
 
-Not yet implemented on mobile — document in `docs/mobile/MOBILE_FEATURE_PARITY.md` when scoped.
+Restaurant Suppliers searches supplier names, descriptions, and cities across
+the accessible directory. The Following filter uses the restaurant's supplier
+relationships.
+
+Supplier Catalog sends product and SKU searches to the existing supplier-scoped
+`/api/products` endpoint. The category and in-stock filters can be combined.
+Category choices come from loaded products, and the filter sheet can load more
+choices. See [mobile feature parity](../mobile/MOBILE_FEATURE_PARITY.md) for the
+paired app worktrees.

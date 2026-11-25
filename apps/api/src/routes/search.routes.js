@@ -12,6 +12,7 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import { toContainsPattern, toPrefixTsQuery } from '../lib/search-query.js'
 
 const router = express.Router()
 
@@ -91,13 +92,17 @@ const SEARCH_PRODUCT_COLUMNS = `
 `
 
 async function searchProducts(q, limit, restaurantId) {
-  const params = [q, limit]
+  // Search-as-you-type: prefix lexemes ("tom" -> "tom:*") plus a name substring match,
+  // so partial words find "Tomatoes". The tsquery string is sanitised in toPrefixTsQuery.
+  const tsQuery = toPrefixTsQuery(q)
+  if (!tsQuery) return []
+  const params = [tsQuery, limit, toContainsPattern(q)]
   let blocklistClause = ''
   if (restaurantId) {
     blocklistClause = `
       AND NOT EXISTS (
         SELECT 1 FROM supplier_blocklist sb
-        WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $3
+        WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $4
       )
     `
     params.push(restaurantId)
@@ -109,12 +114,15 @@ async function searchProducts(q, limit, restaurantId) {
       ${SEARCH_PRODUCT_COLUMNS},
       s.name AS supplier_name,
       s.slug AS supplier_slug,
-      ts_rank(p.search_vector, plainto_tsquery('simple', $1)) AS search_rank
+      ts_rank(p.search_vector, to_tsquery('simple', $1)) AS search_rank
     FROM product p
     JOIN supplier s ON s.id = p.supplier_id
-    WHERE p.search_vector @@ plainto_tsquery('simple', $1)
+    WHERE (
+      p.search_vector @@ to_tsquery('simple', $1)
+      OR LOWER(p.name) LIKE $3
+    )
     ${blocklistClause}
-    ORDER BY search_rank DESC, p.created_at DESC
+    ORDER BY search_rank DESC, p.name ASC
     LIMIT $2
     `,
     params

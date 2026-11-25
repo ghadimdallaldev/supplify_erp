@@ -1,5 +1,131 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-25 — Restaurant marketplace polish
+
+Both `design/round-01-home` native worktrees carry the polished Restaurant Suppliers
+and Supplier Catalog screens. Supplier cover and fallback treatments use the existing
+media, with order minimums grouped alongside city and product count. The catalog
+has a compact supplier header, category rail and one-tap in-stock filter. Product
+cards use consistent image, pricing and order-control areas. Contract and quote
+badges identify the pricing source.
+
+The floating cart keeps the ordered quantity and subtotal visible while browsing.
+Totals use the cart's current prices and stay separate by currency. If a cart
+contains products awaiting pricing, the dock labels the priced subtotal. Cart
+updates use the existing quantity, permission and checkout rules. The first add
+morphs into an editable quantity stepper with reduced-motion support.
+
+The catalog adjusts the column count for larger text so full product names and
+pack sizes can wrap. On the Android Pixel 7 emulator, supplier discovery,
+follow/unfollow with restoration, city filtering, messaging, SKU search, stock
+filtering, quantity entry, scrolling, cart navigation, and removal passed. The
+dock showed 13 items and a $424.40 subtotal throughout the scroll check. Default
+and 135% text captures are in `design-audit/mobile/round-04-marketplace-polish/`.
+ERP and both native typechecks passed, along with 17 cart and quantity tests
+per native worktree. Runtime verification was on Android.
+
+## 2026-11-25 — Restaurant Suppliers and Supplier Catalog
+
+Both `design/round-01-home` worktrees (`C:/myProjects/wt/sm-android` and
+`C:/myProjects/wt/sm-ios`) carry the redesign. Suppliers now uses cover cards
+with directory-provided imagery, a logo or monogram fallback, city, product
+count, order minimum, All/Following, and the existing follow, message, and
+price-comparison actions. The directory paginates through the existing
+`GET /api/suppliers` endpoint. The messaging shortcut uses the existing supplier
+`tenant_id` to open the conversation.
+
+Supplier Catalog now uses an adaptive product grid, the existing product image
+fields, resolved contract or quote pricing, stock, unit, SKU, MOQ, and order
+multiple. Search, category, and stock filters use the existing product endpoint.
+Category choices come from that supplier's loaded catalog pages. The filter
+sheet can load more choices. Quick Lists and Deals retain their existing
+navigation and entitlement checks.
+
+Quick-add uses the cart store's MOQ handling. The quantity controls use the
+Cart's order-multiple rules and support direct entry. The floating cart entry
+uses the existing cart and shows a subtotal when all products have prices in
+one currency. Press feedback respects reduced motion.
+
+The design reuses the Restaurant Home components, API contracts, permissions,
+entitlements, and cart rules.
+
+The Android Pixel 7 emulator verified supplier search, All/Following, city
+filters, follow/unfollow and restoration, messaging, product SKU search,
+category and stock filters, live contract pricing, quick-add, plus/minus, direct
+quantity entry, the cart subtotal, removal, and back navigation. ERP and both
+native TypeScript checks passed, with 27 focused Jest tests passing per native
+worktree. Local Android screenshot evidence is in
+`design-audit/mobile/round-03-restaurant-marketplace/`. Runtime verification
+was on Android.
+
+## 2026-11-25 — Restaurant floating tab bar and Home polish pass (Android verified, iOS mirrored)
+
+**Restaurant tab bar (both worktrees):** a floating frosted capsule above the home indicator replaces the docked bar.
+
+- The selection is a violet lens that springs between tabs and stretches slightly in flight. Icons cross-fade from outline to filled, with a press-in scale and a selection haptic.
+- All five tabs stay. Menu still opens the drawer, now with a haptic.
+- Each tab scene is wrapped through the navigator's `screenLayout` in its own blur target (`menu/tabGlass.tsx`), so the bar frosts whichever tab is on screen.
+- Home scrolls under the bar and pads its own content. Every other tab keeps its full content above the bar, so no other screen changed.
+- Wide/tablet layouts still use the side rail. iOS "Reduce transparency" makes the bar solid.
+
+**Home polish:**
+
+- Latest orders: the carousel snaps one card at a time. The neighbouring card shows only its padded edge (never cut content) and scales to 0.95. Sliding page dots and a selection haptic on snap. RTL starts at the right.
+- Supplier cards use the supplier's own image full-bleed with a scrim, or a tinted monogram cover.
+- Category photos share one colour grade, and labels fit in two lines.
+- On the order card, the amount sits on the name line so the reference and date are never truncated at 360dp.
+- Fix in the shared `AnimatedCount` (`components/ui/home.tsx`, also used by Supplier Home): an interrupted value fade, such as a live language switch, could leave the number invisible. It now always settles to a plain opacity-1 render. Covered by `animatedCount.test.tsx`.
+
+No API, auth, permission, feature-key or environment-variable change. No new dependency. iOS runtime is not verified (Windows host).
+
+## 2026-11-25 — Restaurant menu drawer, tab bar, Home V4.1, partial-word search (Android verified, iOS mirrored)
+
+**Restaurant navigation (both worktrees):** the More tab now opens a left (RTL: right) sliding drawer instead of a page.
+It keeps every former More destination with the same permission and plan gates (`menu/useRestaurantMenu.ts`, covered by `RestaurantMenu.test.tsx`), with no intermediate group pages.
+It adds a profile hero with branch switching, a screen filter, live badges (cart, receiving, unread), a language control, sign out and delete account.
+A More-only role still gets the full page.
+The restaurant tab bar is custom: docked, Phosphor icons, and a sliding indicator. Wide/tablet layouts keep the side rail.
+Supplier and other roles are unchanged.
+
+**Home V4.1:** frosted scroll header, gradient category art, cover-style supplier cards, open orders as tracker cards (Placed → Confirmed → On the way → Delivered, from the real status) plus a Recent list.
+
+**New mobile dependencies:** `phosphor-react-native` 3.0.6, `react-native-svg` 15.15.4, `expo-blur` ~56.0.4. iOS needs `pod install`.
+
+**API (needs deploy, no contract change):** `GET /api/search` and `GET /api/products?q=` match partial words (prefix tsquery + name substring, `lib/search-query.js`).
+Until it is deployed, the app also matches partial words on-device against up to 200 visible products.
+
+No auth, permission, feature-key or environment-variable change. iOS runtime is not verified (Windows host).
+
+## 2026-11-25 — Restaurant Home V4 (Android verified, iOS mirrored)
+
+Commerce-first redesign of the restaurant Home screen only, in `C:/myProjects/wt/sm-android`
+and mirrored byte-for-byte to `C:/myProjects/wt/sm-ios` (branch `design/round-01-home`,
+uncommitted). New layout: a header band with greeting and branch switcher; a search pill;
+an attention strip (to receive, low stock, in transit), shown only for real non-zero counts;
+quick actions; a category rail; a followed-supplier rail with logos; "Order again" (favourites
+and Quick Lists); and grouped latest orders with supplier identity and compact snapshot pills.
+New `HomeSearch` stack route (gated on `CATALOG_VIEW`): cross-supplier search through the
+existing `GET /api/search`, and category results through `GET /api/products?categoryId=|category=`.
+New client hooks for existing endpoints (`services/api/queries/discovery.ts`):
+`/api/products/categories` with a fallback to distinct `product.category` names,
+`/api/products/favorites`, `/api/restaurant-inventory?status=LOW_STOCK` summary, `/api/search`.
+Additive optional type fields: `Supplier.logo_url`, `Product.image_url` and `image_thumb_url`.
+Optional `enabled` arguments on `useQuickLists` and `useInfiniteProducts`. No API, auth,
+permission, feature-key or environment-variable change. Screenshots and decisions:
+`design-audit/mobile/round-02-restaurant-home/README.md`. iOS runtime is not verified (Windows host).
+
+## 2026-11-25 — Local Graphify repository graph
+
+Built a local Graphify index of repository source and Markdown. This developer tooling has no mobile contract impact.
+
+## 2026-11-25 — UI skills for Codex and Claude Code
+
+Added repository-local Emil Kowalski and Expo UI skills for design and implementation guidance. Mobile source changes are unnecessary because these skills are developer tooling.
+
+## 2026-11-25 — Graphify developer tooling
+
+The repository-local Codex skill supports codebase exploration. Android and iOS are out of scope because the installation only adds developer tooling.
+
 ## 2026-11-24 — V3 post-implementation audit fixes (Android verified, iOS mirrored)
 
 Device audit of the uncommitted V3 working set: `design-audit/mobile/v3-post-implementation/`.
