@@ -23,6 +23,7 @@ Non-goals
 - No change to pricing, the order state machine, receiving, delivery or billing.
 - No admin UI beyond what category requests and the tree need (a seeded tree is enough to ship).
 - The follow cap per plan (`suppliers_per_restaurant`) stays exactly as it is (owner decision).
+- No "send to all suppliers" quote broadcast (deferred, see §6.5).
 
 Anti-goals (a failure even if it works)
 
@@ -219,9 +220,12 @@ Deterministic, no ML: normalise (lower-case, strip accents and Arabic diacritics
 
 A block is stronger than an unfollow: the supplier loses the restaurant from every list, detail page, chat (including order chat), manual order, contract and sponsorship, and the restaurant no longer sees that supplier anywhere. **Financial records stay**: the supplier keeps read-only access to its own past orders, invoices, credit notes and payments with that restaurant (accounting and legal need), shown with the restaurant name as on the invoice. Open orders at the moment of blocking stay fulfillable but order chat closes. `lib/relationship.js` exposes separate predicates: `canTransact` (follow ∧ ¬blocked), `canSeeRestaurant` (follow ∧ ¬blocked), `canReadOrderRecord` (order participant, regardless of follow/block).
 
-### 6.5 Quote requests (designer's call)
+### 6.5 Quote requests (owner-approved 2026-11-25)
 
-A quote request is restaurant-initiated, so a supplier may read it and reply inside the quote thread even without a follow. Turning a quote into an order requires a follow ("Follow to order"). The quote does not grant the supplier the restaurant's customer-detail page or general chat.
+- The restaurant sends a quote to **any suppliers it selects** from the marketplace; no follow is required (today's behaviour, kept). Only the selected suppliers ever learn of the request or the restaurant. Blocked and inactive suppliers stay ineligible (`quote-requests.service.js` `assertAllSuppliersEligible`).
+- A selected supplier may read the quote and reply inside the quote thread even without a follow. Turning a quote into an order requires a follow ("Follow to order"). The quote does not grant the supplier the restaurant's customer-detail page or general chat.
+- **Supplier picker becomes searchable** on web (`CreateQuoteRequestPage.tsx`, today loads only the first 50 suppliers with `limit: 50`) and mobile: server-side search over the supplier directory with pagination, followed suppliers listed first and marked. The product picker gets the same treatment (also `limit: 50`).
+- **Later, not in this project:** an "all suppliers" quote broadcast. It would expose the restaurant to every supplier at once (against the current rule) and needs category-based lines ("10 kg tomatoes") instead of supplier product lines; the platform category tree from §5 makes it possible later.
 
 ## 7. Docs and parity (required by CLAUDE.md)
 
