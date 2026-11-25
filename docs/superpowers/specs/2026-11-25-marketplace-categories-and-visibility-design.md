@@ -253,3 +253,131 @@ A block is stronger than an unfollow: the supplier loses the restaurant from eve
 - **Q2. What non-followers see (owner, 2026-11-25).** Every non-blocked restaurant sees list prices (including tiered list prices) and an in-stock / out-of-stock flag, never stock quantities. Restaurant-specific contract prices are returned only to that restaurant. A supplier with `public_catalog_enabled = false` is visible to non-followers as a supplier card only ("Follow to see the catalog"): its products, prices and deals are excluded from their search, category browse, product detail and deal lists. Followers always see the full catalog. Applies to `/api/products`, `/api/search`, product detail, deal list/detail, category product counts, and image download auth (`object-download-auth.js`).
 
 - **Q1. Ordering after an unfollow (owner, 2026-11-25): follow is required for every new order.** The earlier "a past order also lets you order" exception is removed from `orders/create.js` (restaurant order path) and from product-detail access (`lib/product-supplier-access.js`, which becomes not-blocked only per D3). Reorder from order history, Quick Lists and favourites for a supplier the restaurant no longer follows shows "Follow to reorder" and does not add to the cart. Applies to recurring/scheduled orders too: a scheduled order for an unfollowed supplier is skipped and the restaurant is notified (builder confirms where scheduled orders are created).
+
+## 11. Amendment 2026-11-25 (owner review + second audit)
+
+Owner review added requirements: security, migration safety, real-database testing, premium UX, and preprod evidence before prod. A second audit covered routes, jobs, notifications, sockets, the Assistant, caches, exports and both clients. Where this section conflicts with §1–§10, this section wins.
+
+### 11.1 Precedence
+
+The owner's second instruction ("no legacy APIs or compatibility layers; Supplify is in testing") overrides the first instruction **only on backward compatibility**:
+
+- Installed mobile builds are not supported.
+- Old endpoints, params, columns and tables are removed once their replacements are verified.
+
+Everything else in the first instruction stands, including: do not silently discard business records. Also preserved: financial records, paid sponsorship obligations, open-order lifecycles, inventory integrity, RBAC, tenant isolation and subscription limits.
+
+### 11.2 Relationships are stored at organisation level
+
+`supplier_follow` and `supplier_blocklist` are re-keyed to `(restaurant_id, supplier_org_id)`, where `supplier_org_id = COALESCE(supplier.organization_id, supplier.id)`; duplicate rows for the same organisation are merged. This:
+
+- makes the follow cap count organisations;
+- makes every check an indexed lookup;
+- removes the exact-row vs organisation mismatches the audit found.
+
+Organisation-level relationship existence never widens data access. What a supplier user can see inside its organisation is still decided by the existing branch RBAC (`x-branch-id`, `getSupplierIdForRequest`) and warehouse-access guards.
+
+- Blocking deletes the follow row. Following a blocked supplier is refused until the restaurant unblocks it.
+- Every path that creates a follow enforces the plan cap inside one transaction: manual follow, accepting a supplier invite, referral signup.
+- Relationship changes and the writes that depend on them are serialised:
+  - follow, unfollow, block and unblock take an exclusive transaction-scoped advisory lock on `(restaurant, supplier org)`;
+  - order creation, message send, contract writes and sponsorship offers take the shared lock, and re-check inside the same transaction as their write.
+
+### 11.3 Contradictions resolved
+
+1. **Private catalog vs app-wide deals.** "App-wide" means every restaurant that can see the supplier's catalog: `not blocked AND (follows OR public catalog)`. A private-catalog supplier's deals reach only its followers.
+2. **Chat after a block (single rule).** A block closes the conversation for both sides:
+   - nobody can send;
+   - the supplier can no longer open it;
+   - the restaurant keeps read-only history.
+
+   Order-linked messages stay visible inside that order's detail for both parties, because they are part of the order record.
+
+3. **Order-linked chat after an unfollow.** There is one conversation per restaurant–supplier pair, so read-only is decided per message, not per conversation.
+   - A general message needs a follow and no block.
+   - A message tagged with `order_id` needs both parties on that order, the order open (not cancelled, and not delivered-and-received), and no block.
+
+   Sockets carry `order_id` like REST. When open orders exist, the client shows a read-only thread with a "Message about order #…" action.
+
+4. **What a supplier sees on a quote it was invited to.**
+   - Shown: the restaurant's display name, the quote note, the needed-by date, and its own products' quantities, units and notes.
+   - Never shown: the restaurant's id, contacts, address, branches, or the other invited suppliers.
+
+   Quotes stay restaurant-initiated and need no follow (owner decision). A block from the restaurant hides the quote from that supplier and closes responses.
+
+### 11.4 Further findings now in scope
+
+- **Supplier intelligence:**
+  - These list followers only: reorder assistance, reorder intelligence, customers at risk, reorder-cadence notifications, cross-sell opportunities, the Assistant cross-sell tool, and loyalty balances.
+  - The "top restaurants" report names followers and groups everyone else as "Other customers".
+  - Reminder drafts and "open chat" from these tools need a follow and no block.
+- **Notifications:**
+  - Message notifications are sent only after an authorised send.
+  - Deal-approved notifications go to followers (organisation level, blocked excluded).
+  - Quote-received notifications carry only the §11.3 quote fields.
+  - Connection-request and decline notifications never return a restaurant id to the supplier.
+- **Deal chat:** a restaurant must follow to message from a deal.
+- **Scheduled orders:** checked inside the transaction (Q1 rule).
+- **Disputes:** a replacement order from a dispute is allowed without a follow (it remedies an existing order), but not when blocked.
+- **Delivery documents:** packing slips and route stops use the delivery details captured on the order, not the restaurant's live profile. The snapshot is added at order creation if not already stored.
+- **Images and attachments:**
+  - Chat attachments are served through an authenticated endpoint that re-checks conversation access and issues short-lived URLs per view.
+  - Private-catalog product images use the organisation-level relationship check.
+- **Caches and live connections:** a relationship change immediately invalidates every relationship-dependent cache, and removes affected sockets from the conversation room, emitting `conversation_access_changed`. The caches are:
+  - category counts, which become per-restaurant keys;
+  - the dashboard summary;
+  - reorder recommendations;
+  - the supplier command center.
+- **Assistant:** restaurant reorder suggestions only offer suppliers the restaurant can order from; others are labelled "Follow to order". Blocked suppliers never appear.
+- **Paid sponsorships:** an active, paid sponsorship continues to its end date after an unfollow or block (the obligation is preserved). No new offers or renewals are made.
+- **Customer import:**
+  - Matched and unmatched invites are dispatched asynchronously and return identical responses, timing and statuses.
+  - Matching uses only exact normalised email or phone.
+  - Imports are rate-limited.
+
+### 11.5 Categories additions
+
+- **Shelves belong to the branch supplier row**, because products do (`UNIQUE(supplier_id, sku)`; no products are shared across branches). The database enforces shelf ownership with composite foreign keys:
+  - `product_shelf(product_id, supplier_id) → product(id, supplier_id)`
+  - `(shelf_id, supplier_id) → supplier_shelf(id, supplier_id)`
+- **Leaf-category validity** is enforced in the database by a trigger on `product.category_id`, `promotion_targets.category_id`, `warehouse_routing_rule.category_id` and `restaurant_order_cadence.category_id`.
+- **Promotion targets:** each row has exactly one of product, category or shelf (`num_nonnulls(...) = 1`). A supplier-wide deal is `applies_to = 'all'` with zero target rows. Switching a deal back to "all" clears its targets.
+- **Shelf deletion is soft** (archived). References from promotions, routing rules and cadences use `ON DELETE NO ACTION` (no cascades). The 16 existing categories keep their names and broad meaning as leaves; narrower leaves are added beside them. The API refuses to archive a shelf that an active deal or routing rule uses, and lists them.
+- **Counts and discounts:**
+  - A product on several shelves is counted once.
+  - A product matched by several targets of one deal is discounted once.
+  - Products on no shelf appear in an "All products" section.
+- **Reorder cadences are preserved:** a category-level cadence is remapped to the matched platform category. When there is no match, it is converted to a supplier-level cadence. Nothing is deleted.
+- **Matcher:**
+  - Covers English, Arabic, Lebanese and French terms.
+  - The longest matching phrase wins ("tomato paste" beats "tomato").
+  - Suggestions need a score ≥ 0.6.
+  - Automatic classification needs a score ≥ 0.85 and a lead of at least 0.1 over the runner-up; otherwise the product goes to `other` and is flagged for review.
+- **Taxonomy:** a comprehensive HoReCa tree (food, beverages, non-food, equipment) that keeps the 16 existing ids.
+- **Category requests:**
+  - One pending request per supplier and normalised name.
+  - Approve and merge run in a transaction that locks the request.
+  - Only pending requests can change.
+  - Every product flagged by the request moves when it is resolved.
+  - The example product must belong to the requester.
+- **Backfill:**
+  - Runs under a PostgreSQL advisory lock, records progress per supplier in a `data_migration_run` table, and resumes after a crash.
+  - Finishes with an integrity verification.
+  - The completion predicate covers inactive products, null categories, non-leaf categories, legacy text, any remaining supplier-owned category, and every referencing table.
+- **Legacy removal is a second release.** SQL migrations run before the JS backfill, so the legacy pieces are dropped by a later migration that refuses to run unless the verified completion record exists. They are `product.category`, `product_category.supplier_id`, `promotion_restaurant_targets` and the old index.
+
+### 11.6 UX additions
+
+- **Web category browse:** web gets real category browsing (department tiles with icons, a category rail, results), not only a filter.
+- **Icons:** the same icon vocabulary (`icon_key`) renders with Phosphor on web and mobile.
+- **Follow to order is one tap:** the stepper becomes **Follow & add**, which follows the supplier and adds the item in one action. At the follow cap it opens the existing upgrade prompt.
+- **Every task covers:** searchable pickers; loading, empty and error states; Arabic and RTL.
+- **Mobile:** UI work follows the `supplify-mobile-design` workflow and keeps Restaurant Home V4.
+
+### 11.7 Verification and release
+
+- **Real-PostgreSQL integration tests**, following the existing `tests/integrity` harness pattern, for authorisation, concurrency, caches, sockets and migrations.
+- **A migration rehearsal** on a copy of the dev database, with reconciliation counts.
+- **Benchmarks** with budgets, and **Playwright end-to-end flows**.
+- **Builds:** actual Android builds (local Gradle and EAS), and an EAS iOS simulator build. iOS cannot run on this Windows machine, so it is reported as not visually verified.
+- **Release order:** deploy to dev, then preprod (throwaway-worktree release procedure), then stop and hand over the evidence package. Production only with owner approval.
