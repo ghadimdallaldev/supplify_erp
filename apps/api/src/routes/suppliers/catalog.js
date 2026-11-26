@@ -99,7 +99,7 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
           whereConditions.push(`
             NOT EXISTS (
               SELECT 1 FROM supplier_blocklist sb
-              WHERE sb.supplier_org_id = scope.public_id AND sb.restaurant_id = ${paramIndex}
+              WHERE sb.supplier_org_id = scope.public_id AND sb.restaurant_id = $${paramIndex}
             )
           `)
           queryParams.push(restaurantId)
@@ -148,7 +148,7 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
         EXISTS (
           SELECT 1 FROM supplier_follow sf
           WHERE sf.supplier_org_id = scope.public_id
-            AND sf.restaurant_id = ${paramIndex}
+            AND sf.restaurant_id = $${paramIndex}
         ) as is_followed`
       queryParams.push(restaurantId)
       paramIndex++

@@ -29,6 +29,8 @@ Harness DB: docker `supplify-marketplace-audit` (postgres:16-alpine, `127.0.0.1`
 
 ## Rulings
 
+- A12: Ruling: found during Task 12 — Task 5 (a61c8372) collapsed two `${paramIndex}` placeholders in the supplier directory (block exclusion and is_followed) to `${paramIndex}`, so GET /api/suppliers returned 500 "uuid = integer" for every signed-in restaurant. Fixed in its own commit with a PG regression test (catalog-visibility "supplier directory for a signed-in restaurant"). A scan of every added line on the branch found no other bare placeholder. Cost if wrong: none — the endpoint was broken.
+
 - A11: Ruling: the large seed spreads `product.created_at` over a year (it was one `now()` for all 60k rows, which made the default sort a tie and the plan unrepresentative) — the route sorts by created_at, so an all-equal column measured a case no real catalog has. Cost if wrong: the "before" 66 ms figure overstates the real-world gain from the index.
 - A11: Ruling: one index only (`idx_product_created_id_desc`, migration 0239); follow/blocklist already have UNIQUE (restaurant_id, supplier_org_id) and the semi-join rewrite of `catalogVisibleSql` measured slower, so the predicate is unchanged. Cost if wrong: a later catalog size needs a further index; the bench will show it.
 - A11: Ruling: budgets are judged on p95 best of 3 rounds of 50 runs, and getRelationship is timed on one checked-out client — single rounds on the Windows/Docker host varied by up to 70%. Cost if wrong: on a quieter host the worst round may exceed a budget the best round meets; all rounds are recorded in bench-results.md.

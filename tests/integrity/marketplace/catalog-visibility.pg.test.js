@@ -117,6 +117,22 @@ describe('restaurant catalog visibility (real PG)', () => {
     expect((await deals.discoverDealsForRestaurant(fan.id)).map((d) => d.id)).toContain(dealId)
   })
 
+  it('supplier directory for a signed-in restaurant: follow status set, blocked hidden', async () => {
+    const followed = await createSupplierOrg(db.pool, { name: 'Dir Followed Foods' })
+    const other = await createSupplierOrg(db.pool, { name: 'Dir Other Foods' })
+    const blocked = await createSupplierOrg(db.pool, { name: 'Dir Blocked Foods' })
+    const r = await createRestaurant(db.pool)
+    await follow(db.pool, r.id, followed.orgId)
+    await block(db.pool, r.id, blocked.orgId)
+
+    const res = await get(r.userSub, '/api/suppliers?q=Dir&limit=50')
+    expect(res.status, JSON.stringify(res.body)).toBe(200)
+    const byName = new Map(res.body.data.suppliers.map((s) => [s.name, s]))
+    expect(byName.get('Dir Followed Foods')?.is_followed).toBe(true)
+    expect(byName.get('Dir Other Foods')?.is_followed).toBe(false)
+    expect(byName.has('Dir Blocked Foods')).toBe(false)
+  })
+
   it('blocked supplier is invisible even when it was followed', async () => {
     const org = await createSupplierOrg(db.pool, { publicCatalog: true, branches: 2 })
     const p = await createProduct(db.pool, org.branchIds[1])
