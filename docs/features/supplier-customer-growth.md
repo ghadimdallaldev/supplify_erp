@@ -26,6 +26,15 @@ Suppliers can import their existing restaurant customer base, match records to S
 
 ## Supplier-paid sponsorship lifecycle
 
+**Followers only (marketplace visibility release 1, 2026-11-26).**
+
+- A sponsorship offer to a matched restaurant needs a current follow and no block.
+  - Unknown, not-followed and blocked restaurants get the same 404 `RESTAURANT_NOT_AVAILABLE`.
+  - The check is repeated under the shared relationship lock inside the offer transaction, so an offer racing an unfollow cannot be created.
+- When another supplier already holds a live sponsorship, eligibility reports a plain `not_eligible`, never `already_sponsored`.
+- An active, paid sponsorship continues after an unfollow or block. No new offer can be made until the restaurant follows again.
+- Prospects with no matched restaurant are unaffected: there is no relationship to check yet.
+
 ```mermaid
 flowchart TD
   offer[SupplierCreatesOffer] --> accept[RestaurantSelectsPlanAndAccepts]

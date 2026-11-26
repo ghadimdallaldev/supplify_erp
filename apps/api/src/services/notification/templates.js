@@ -1303,20 +1303,20 @@ export async function notifyDealApproved(deal, { supplierName } = {}, locale = D
   if (!supplierId || !dealId) return { followers: 0, nonFollowers: 0 }
 
   try {
+    // Followers of the whole supplier organisation (any branch), never across a block.
     const { rows: followers } = await query(
-      `SELECT restaurant_id FROM supplier_follow WHERE supplier_id = $1`,
+      `SELECT sf.restaurant_id
+       FROM supplier s
+       JOIN supplier_follow sf ON sf.supplier_org_id = COALESCE(s.organization_id, s.id)
+       WHERE s.id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM supplier_blocklist sb
+           WHERE sb.restaurant_id = sf.restaurant_id AND sb.supplier_org_id = sf.supplier_org_id
+         )`,
       [supplierId]
     )
 
-    const { rows: targeted } = await query(
-      `SELECT restaurant_id FROM promotion_restaurant_targets WHERE promotion_id = $1`,
-      [dealId]
-    )
-
-    const recipientIds = new Set([
-      ...followers.map((r) => r.restaurant_id),
-      ...targeted.map((r) => r.restaurant_id),
-    ])
+    const recipientIds = new Set(followers.map((r) => r.restaurant_id))
 
     let notifiedCount = 0
 

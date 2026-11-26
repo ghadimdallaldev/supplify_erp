@@ -19,6 +19,11 @@ import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import {
+  RestaurantNotAvailableError,
+  canSeeRestaurant,
+  lockAndAssertRestaurantVisible,
+} from '../lib/relationship.js'
 
 const LIVE_STATUSES = [
   'offered',
@@ -206,13 +211,22 @@ export async function canCreateSponsorship(
   const resolvedRestaurantId = restaurantId || prospect?.matched_restaurant_id || null
   if (resolvedRestaurantId) {
     if (resolvedRestaurantId === supplierId) reasons.push('same_tenant')
-    const { rows: live } = await query(
-      `SELECT id FROM supplier_sponsorship
-       WHERE restaurant_id = $1 AND status = ANY($2::text[])
-       LIMIT 1`,
-      [resolvedRestaurantId, LIVE_STATUSES]
-    )
-    if (live.length) reasons.push('already_sponsored')
+    // A sponsorship pays one restaurant's plan: it needs a current follow and no block
+    // (spec §6.2 item 3). Unknown and not-followed restaurants share one reason.
+    if (!(await canSeeRestaurant(resolvedRestaurantId, supplierId))) {
+      reasons.push('restaurant_not_available')
+    } else {
+      const { rows: live } = await query(
+        `SELECT supplier_id FROM supplier_sponsorship
+         WHERE restaurant_id = $1 AND status = ANY($2::text[])
+         LIMIT 1`,
+        [resolvedRestaurantId, LIVE_STATUSES]
+      )
+      // Only the holder learns it already sponsors this restaurant; another supplier's
+      // sponsorship is reported as a plain "not eligible" (no cross-supplier disclosure).
+      if (live.length)
+        reasons.push(live[0].supplier_id === supplierId ? 'already_sponsored' : 'not_eligible')
+    }
   }
 
   return {
@@ -262,6 +276,9 @@ export async function createSponsorshipOffer(
   } = {}
 ) {
   const eligibility = await canCreateSponsorship(supplierId, { prospectId, restaurantId })
+  if (eligibility.reasons.includes('restaurant_not_available')) {
+    throw new RestaurantNotAvailableError()
+  }
   if (!eligibility.eligible) {
     const code = eligibility.reasons.includes('limit_reached')
       ? 'SPONSORSHIP_LIMIT_REACHED'
@@ -315,6 +332,10 @@ export async function createSponsorshipOffer(
     await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [
       `supplier_sponsorship:${supplierId}`,
     ])
+    // Serialised with follow/unfollow/block: re-check under the shared relationship lock.
+    if (resolvedRestaurantId) {
+      await lockAndAssertRestaurantVisible(client, resolvedRestaurantId, supplierId)
+    }
 
     if (idempotencyKey) {
       const { rows: existing } = await client.query(

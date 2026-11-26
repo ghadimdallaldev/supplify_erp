@@ -1,3 +1,4 @@
+import { supplierSeesRestaurantSql } from '../../lib/relationship.js'
 import express from 'express'
 import { z } from 'zod'
 import {
@@ -65,7 +66,6 @@ import {
   getRestaurantId,
   loadPromotionForSupplier,
   syncPromotionTargets,
-  syncRestaurantTargets,
   mapPromotionInsertFields,
   supplierDealsGate,
   BOOST_PRICING_WHERE,
@@ -230,9 +230,6 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
           body.categoryIds || []
         )
       }
-      if (body.restaurantIds?.length) {
-        await syncRestaurantTargets(client, created.id, body.restaurantIds)
-      }
       return created
     })
     let finalPromotion = promotion
@@ -332,7 +329,7 @@ router.patch('/:id', async (req, res, next) => {
           }
         }
       }
-      if (!fields.length && !body.productIds && !body.categoryIds && !body.restaurantIds) {
+      if (!fields.length && !body.productIds && !body.categoryIds) {
         return existing
       }
       let updated = existing
@@ -352,16 +349,16 @@ router.patch('/:id', async (req, res, next) => {
         )
         updated = rows[0]
       }
-      if (body.productIds || body.categoryIds) {
+      if (body.appliesTo === 'all') {
+        // A supplier-wide deal has zero target rows (spec §11.5).
+        await syncPromotionTargets(client, updated.id, [], [])
+      } else if (body.productIds || body.categoryIds) {
         await syncPromotionTargets(
           client,
           updated.id,
           body.productIds || [],
           body.categoryIds || []
         )
-      }
-      if (body.restaurantIds) {
-        await syncRestaurantTargets(client, updated.id, body.restaurantIds)
       }
       return updated
     })
@@ -679,7 +676,10 @@ router.get('/:id/analytics', async (req, res, next) => {
     const analytics = await getDealAnalytics(req.params.id, supplierId)
     const { rows: topRestaurants } = await query(
       `
-      SELECT r.id, r.name, COUNT(*)::int AS usage_count,
+      SELECT
+        CASE WHEN ${supplierSeesRestaurantSql('r.id', '$2')} THEN r.id END AS id,
+        CASE WHEN ${supplierSeesRestaurantSql('r.id', '$2')} THEN r.name ELSE 'Verified restaurant' END AS name,
+        COUNT(*)::int AS usage_count,
         SUM(pu.discount_applied)::numeric AS discount_total
       FROM promotion_usages pu
       JOIN restaurant r ON r.id = pu.restaurant_id
@@ -688,7 +688,7 @@ router.get('/:id/analytics', async (req, res, next) => {
       ORDER BY usage_count DESC
       LIMIT 10
       `,
-      [req.params.id]
+      [req.params.id, supplierId]
     )
     res.json({
       ok: true,

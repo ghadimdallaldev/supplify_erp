@@ -67,7 +67,9 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 ## Targeting
 
 - **Products/categories:** `applies_to` + `promotion_targets` (supplier UI: DealTargetingPickers)
-- **Restaurants:** empty `promotion_restaurant_targets` = all eligible; otherwise restricted list
+- **Restaurants:** none. Deals are app-wide (marketplace visibility release 1, 2026-11-26).
+  - The API rejects `restaurantIds` with 400. `promotion_restaurant_targets` is no longer read or written; the table stays for history.
+  - Switching a deal to `appliesTo: 'all'` clears its product and category targets.
 - **Audience (types + areas):**
   - Deal columns: `promotions.target_restaurant_types`, `promotions.target_areas`
   - Boost copy: on publish, `deal_promotions.target_audience` is built from those columns via `buildBoostTargetAudienceFromDeal` (`{ all: true }` when both empty; otherwise `{ all: false, restaurantTypes, areas }`)
@@ -79,7 +81,10 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 ## Visibility
 
-- **Organic:** restaurants that **follow** the supplier (or explicit restaurant targets)
+- **Deal-approved notification** goes to every restaurant following any branch of the supplier organisation, except restaurants that blocked it.
+- **Analytics "top restaurants"** names followers only. Other restaurants appear as `Verified restaurant` with a null id.
+
+- **Organic:** any restaurant that can see the supplier's catalog (follows it, or the catalog is public) and has not blocked it
 - **Sponsored:** active `deal_promotions` campaign + audience match, even without follow
 - Expired, paused, draft, or over-limit deals are hidden from restaurant discovery
 
@@ -130,7 +135,7 @@ Restaurants with `supplier_deals` see a dismissible banner in the app shell when
 
 - Deal `status = active`, payment ok, within `starts_at` / `ends_at`
 - Started within the last **14 days**
-- Restaurant follows the supplier, is explicitly targeted, or deal has no restaurant targets
+- Restaurant can see the supplier's catalog (not blocked; follows or public catalog)
 - Matches `target_restaurant_types` / `target_areas` when set
 - Not previously dismissed (`deal_interactions.interaction_type = 'banner_dismiss'`)
 

@@ -71,7 +71,6 @@ import {
   getRestaurantId,
   loadPromotionForSupplier,
   syncPromotionTargets,
-  syncRestaurantTargets,
   mapPromotionInsertFields,
   supplierDealsGate,
   BOOST_PRICING_WHERE,

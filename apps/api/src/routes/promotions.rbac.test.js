@@ -72,7 +72,7 @@ vi.mock('../services/promotions.service.js', () => ({
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
-vi.mock('../lib/systemEvent.js', () => ({ writeSystemEvent: vi.fn() }))
+vi.mock('../lib/systemEvent.js', () => ({ writeSystemEvent: vi.fn(async () => undefined) }))
 
 import { promotionsRoutes } from './promotions.routes.js'
 import { errorHandler } from '../middlewares/errorHandler.js'
@@ -107,6 +107,47 @@ describe('promotions RBAC', () => {
       .mockResolvedValueOnce({ rows: [{ total: 0 }] })
       .mockResolvedValueOnce({ rows: [] })
     await request(app).get('/api/promotions').expect(200)
+  })
+
+  it('restaurantIds is rejected (deals are app-wide)', async () => {
+    tenantPermissions.value = ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']
+    const res = await request(app)
+      .post('/api/promotions')
+      .send({
+        name: 'Deal',
+        description: 'Ten percent off',
+        type: 'percentage_discount',
+        discountValue: 10,
+        startsAt: new Date().toISOString(),
+        restaurantIds: ['11111111-1111-4111-8111-111111111111'],
+      })
+    expect(res.status, JSON.stringify(res.body)).toBe(400)
+    expect(JSON.stringify(res.body)).toMatch(/restaurantIds/)
+    const dbModule = await import('../lib/db.js')
+    const sql = vi.mocked(dbModule.query).mock.calls.map((c) => String(c[0]))
+    expect(sql.some((q) => /promotion_restaurant_targets/.test(q))).toBe(false)
+  })
+
+  it('switching to applies_to all clears targets', async () => {
+    tenantPermissions.value = ['PROMOTIONS_VIEW', 'PROMOTIONS_MANAGE']
+    const dbModule = await import('../lib/db.js')
+    const existing = {
+      id: '22222222-2222-4222-8222-222222222222',
+      supplier_id: 'supplier-1',
+      status: 'draft',
+      name: 'Deal',
+      description: 'Ten percent off',
+      type: 'percentage_discount',
+      discount_value: 10,
+      applies_to: 'specific_products',
+      starts_at: new Date().toISOString(),
+      cta_type: 'order_now',
+    }
+    vi.mocked(dbModule.query).mockResolvedValue({ rows: [existing] })
+    await request(app).patch(`/api/promotions/${existing.id}`).send({ appliesTo: 'all' })
+    const sql = vi.mocked(dbModule.query).mock.calls.map((c) => String(c[0]))
+    expect(sql.some((q) => /DELETE FROM promotion_targets WHERE promotion_id/.test(q))).toBe(true)
+    expect(sql.some((q) => /promotion_restaurant_targets/.test(q))).toBe(false)
   })
 
   it('viewer cannot mutate promotions (POST /)', async () => {
