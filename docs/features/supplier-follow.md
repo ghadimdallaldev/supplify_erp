@@ -67,6 +67,22 @@ Following a supplier affects:
 
 `GET /api/suppliers` and `GET /api/suppliers/:id` include `is_followed` (boolean) when the caller is a restaurant tenant.
 
+`GET /api/suppliers?sort=followed` puts the restaurant's followed suppliers first, then featured suppliers, then sorts by name. Any other `sort` value returns 400. The quote request pickers and the new-conversation dialog use it.
+
+### Follow-gated actions (web, marketplace visibility release 1)
+
+- **Follow & add.** Product payloads carry `is_followed` and `can_order`. If the supplier is not followed, the add button becomes "Follow & add": one tap follows the supplier, then adds the item.
+  - At the follow cap, the upgrade prompt opens.
+  - For a blocked supplier, a toast offers "Unblock".
+- **Cart.** The cart refuses to add a product from a supplier the restaurant does not follow, or to raise the quantity of such a line. Lowering or removing the line still works.
+  - When checkout answers `403 FOLLOW_REQUIRED`, the cart shows a "Follow & keep in cart" row for each supplier.
+- **Quotes.** Quote cart payloads include `isFollowed`. Adding a quote to the cart follows the supplier first.
+- **Chat.** Conversations expose `can_send_general`, `is_closed_by_block` and `open_order_ids`.
+  - A read-only thread shows a banner and "Message about order #…" chips.
+  - A thread closed by a block shows a closed banner.
+  - The socket events `conversation_access_changed` and `chat_error` (code `CHAT_READ_ONLY`) refresh the thread live.
+- **Restaurant pickers.** The supplier's manual-order, contract-pricing and new-conversation pickers search followers on the server (`q`, `limit=20`).
+
 ## Web UI
 
 | Surface              | Behavior                                                                             |

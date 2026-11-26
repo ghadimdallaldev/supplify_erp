@@ -182,7 +182,8 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
         LIMIT 1
       ) feat ON true
       ${whereClause}
-      ORDER BY (feat.is_featured IS TRUE) DESC, scope.public_id, s.created_at DESC
+      ORDER BY ${params.sort === 'followed' && restaurantId ? 'is_followed DESC, ' : ''}(feat.is_featured IS TRUE) DESC,
+        ${params.sort === 'followed' ? 'COALESCE(so.name, s.name), ' : ''}scope.public_id, s.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 

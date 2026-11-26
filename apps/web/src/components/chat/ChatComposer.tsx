@@ -7,6 +7,34 @@ import { COMMON_CHAT_EMOJIS } from './constants'
 
 type OrderOption = { id: string; total_amount?: number; status?: string }
 
+/**
+ * Relationship access for a conversation (spec §11.3.2-3), from the conversation list:
+ * `can_send_general`, `is_closed_by_block`, `open_order_ids`.
+ */
+export type ChatAccess = {
+  canSendGeneral: boolean
+  closedByBlock: boolean
+  openOrderIds: string[]
+}
+
+export function chatAccessFromConversation(
+  conversation:
+    | {
+        can_send_general?: boolean | null
+        is_closed_by_block?: boolean | null
+        open_order_ids?: string[] | null
+      }
+    | null
+    | undefined
+): ChatAccess | undefined {
+  if (!conversation || conversation.can_send_general == null) return undefined
+  return {
+    canSendGeneral: conversation.can_send_general === true,
+    closedByBlock: conversation.is_closed_by_block === true,
+    openOrderIds: Array.isArray(conversation.open_order_ids) ? conversation.open_order_ids : [],
+  }
+}
+
 type Props = {
   canSend: boolean
   message: string
@@ -33,6 +61,8 @@ type Props = {
   fileInputRef: RefObject<HTMLInputElement>
   inputRef: RefObject<HTMLTextAreaElement>
   userRole?: string
+  /** Absent for support/admin threads and older payloads: no relationship restriction. */
+  access?: ChatAccess
 }
 
 export function ChatComposer({
@@ -61,8 +91,62 @@ export function ChatComposer({
   fileInputRef,
   inputRef,
   userRole,
+  access,
 }: Props) {
   const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
+
+  if (canSend && access?.closedByBlock) {
+    return (
+      <div className="shrink-0 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <p
+          className="py-2 text-center text-sm text-[var(--text-mid)]"
+          role="status"
+          data-testid="chat-closed-banner"
+        >
+          {tc('marketplace.chatClosedByBlock')}
+        </p>
+      </div>
+    )
+  }
+
+  const readOnly = canSend && access != null && !access.canSendGeneral
+  const orderTagged =
+    readOnly && selectedOrder != null && access.openOrderIds.includes(selectedOrder.id)
+
+  if (readOnly && !orderTagged) {
+    return (
+      <div className="shrink-0 space-y-3 border-t border-[var(--app-border)] bg-[var(--surface)] px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <p
+          className="text-center text-sm text-[var(--text-mid)]"
+          role="status"
+          data-testid="chat-read-only-banner"
+        >
+          {access.openOrderIds.length === 0
+            ? tc('marketplace.chatReadOnlyNoOrders')
+            : userRole === 'SUPPLIER'
+              ? tc('marketplace.chatReadOnlySupplier')
+              : tc('marketplace.chatReadOnly')}
+        </p>
+        {access.openOrderIds.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            {access.openOrderIds.slice(0, 5).map((orderId) => (
+              <Button
+                key={orderId}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onSelectOrder({ id: orderId })}
+              >
+                <ShoppingCart className="me-1 h-4 w-4" aria-hidden />
+                {tc('marketplace.messageAboutOrder', { id: orderId.slice(0, 8) })}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   if (!canSend) {
     return (

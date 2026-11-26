@@ -19,7 +19,6 @@ import {
   usePreviewCustomerImportMutation,
   useExecuteCustomerImportMutation,
   useInviteProspectMutation,
-  useConnectProspectMutation,
   useCreateSponsorshipOfferMutation,
   useGetSupplierSponsorshipsQuery,
   type SupplierGrowthMetrics,
@@ -183,7 +182,6 @@ export function SupplierCustomerGrowthPage() {
   const [previewImport] = usePreviewCustomerImportMutation()
   const [executeImport, { isLoading: importing }] = useExecuteCustomerImportMutation()
   const [inviteProspect] = useInviteProspectMutation()
-  const [connectProspect] = useConnectProspectMutation()
   const [createSponsorshipOffer, { isLoading: creatingSponsorship }] =
     useCreateSponsorshipOfferMutation()
   const [paySponsorship] = usePaySponsorshipMutation()
@@ -321,8 +319,8 @@ export function SupplierCustomerGrowthPage() {
             value={metrics.importedCustomers}
           />
           <MetricTile
-            label={t('customerGrowth.metrics.onSupplify')}
-            value={metrics.existingSupplifyCustomers}
+            label={t('customerGrowth.metrics.following')}
+            value={metrics.followingCustomers ?? 0}
           />
           <MetricTile
             label={t('customerGrowth.metrics.invited')}
@@ -558,7 +556,6 @@ export function SupplierCustomerGrowthPage() {
                   <thead>
                     <tr className="text-left text-[var(--text-muted)] border-b">
                       <th className="py-2 pr-4">{t('customerGrowth.import.restaurant')}</th>
-                      <th className="py-2 pr-4">{t('customerGrowth.prospects.match')}</th>
                       <th className="py-2 pr-4">{t('customerGrowth.prospects.status')}</th>
                       <th className="py-2">{t('customerGrowth.prospects.actions')}</th>
                     </tr>
@@ -567,121 +564,78 @@ export function SupplierCustomerGrowthPage() {
                     {prospects.map((p) => (
                       <tr key={p.id} className="border-b border-[var(--app-border)]">
                         <td className="py-3 pr-4">
-                          <div className="font-medium">{p.restaurant_name}</div>
+                          <div className="font-medium">{p.name}</div>
                           <div className="text-xs text-[var(--text-muted)]">
                             {p.email || p.phone}
                           </div>
                         </td>
                         <td className="py-3 pr-4">
-                          <Badge variant="outline">{p.match_status}</Badge>
-                          {p.matched_restaurant_name && (
-                            <span className="text-xs block mt-1">{p.matched_restaurant_name}</span>
-                          )}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <Badge>{p.lifecycle_status}</Badge>
+                          <Badge
+                            variant={p.status === 'following' ? 'default' : 'outline'}
+                            data-testid={`prospect-status-${p.id}`}
+                          >
+                            {t(`customerGrowth.prospects.statuses.${p.status}`, {
+                              defaultValue: p.status,
+                            })}
+                          </Badge>
                         </td>
                         <td className="py-3">
-                          <div className="flex flex-wrap gap-2">
-                            {p.match_status === 'existing_supplify' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canManageCustomers || creatingSponsorship}
-                                  onClick={async () => {
-                                    try {
-                                      await connectProspect({ prospectId: p.id }).unwrap()
-                                      toast.success(t('customerGrowth.toasts.connectionSent'))
-                                      refetchProspects()
-                                    } catch {
-                                      toast.error(t('customerGrowth.toasts.connectionFailed'))
-                                    }
-                                  }}
-                                >
-                                  {t('customerGrowth.prospects.connect')}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canManageCustomers || creatingSponsorship}
-                                  onClick={async () => {
-                                    try {
-                                      await createSponsorshipOffer({
-                                        prospectId: p.id,
-                                        planCode: sponsorPlanCode,
-                                        idempotencyKey: `offer_${p.id}_${Date.now()}`,
-                                      }).unwrap()
-                                      toast.success(
-                                        'Sponsorship offer sent. Restaurant must accept and select a plan before you are charged.'
-                                      )
-                                      refetchProspects()
-                                      refetchSponsorships()
-                                    } catch (e: unknown) {
-                                      const msg =
-                                        (e as { data?: { error?: { message?: string } } })?.data
-                                          ?.error?.message ||
-                                        t('customerGrowth.toasts.sponsorFailed')
-                                      toast.error(msg)
-                                    }
-                                  }}
-                                >
-                                  <Gift className="h-3 w-3 mr-1" />
-                                  Sponsor first month
-                                </Button>
-                              </>
+                          {/* Same actions for every not-yet-following prospect: the supplier
+                              cannot tell whether an imported contact is already on Supplify. */}
+                          <div
+                            className="flex flex-wrap gap-2"
+                            data-testid={`prospect-actions-${p.id}`}
+                          >
+                            {p.status !== 'following' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!canManageCustomers}
+                                onClick={async () => {
+                                  try {
+                                    const res = await inviteProspect({
+                                      prospectId: p.id,
+                                      channel: 'link',
+                                    }).unwrap()
+                                    await navigator.clipboard.writeText(res.inviteUrl)
+                                    toast.success(t('customerGrowth.toasts.inviteCopied'))
+                                    refetchProspects()
+                                  } catch {
+                                    toast.error(t('customerGrowth.toasts.inviteFailed'))
+                                  }
+                                }}
+                              >
+                                <Link2 className="h-3 w-3 mr-1" />
+                                {t('customerGrowth.prospects.invite')}
+                              </Button>
                             )}
-                            {p.match_status === 'import_only' && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={async () => {
-                                    try {
-                                      const res = await inviteProspect({
-                                        prospectId: p.id,
-                                        channel: 'link',
-                                      }).unwrap()
-                                      await navigator.clipboard.writeText(res.inviteUrl)
-                                      toast.success(t('customerGrowth.toasts.inviteCopied'))
-                                    } catch {
-                                      toast.error(t('customerGrowth.toasts.inviteFailed'))
-                                    }
-                                  }}
-                                >
-                                  <Link2 className="h-3 w-3 mr-1" />
-                                  {t('customerGrowth.prospects.invite')}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={!canManageCustomers || creatingSponsorship}
-                                  onClick={async () => {
-                                    try {
-                                      await createSponsorshipOffer({
-                                        prospectId: p.id,
-                                        planCode: sponsorPlanCode,
-                                        idempotencyKey: `offer_${p.id}_${Date.now()}`,
-                                      }).unwrap()
-                                      toast.success(
-                                        'Sponsorship offer sent. Restaurant must accept and select a plan before you are charged.'
-                                      )
-                                      refetchProspects()
-                                      refetchSponsorships()
-                                    } catch (e: unknown) {
-                                      const msg =
-                                        (e as { data?: { error?: { message?: string } } })?.data
-                                          ?.error?.message ||
-                                        t('customerGrowth.toasts.sponsorFailed')
-                                      toast.error(msg)
-                                    }
-                                  }}
-                                >
-                                  <Gift className="h-3 w-3 mr-1" />
-                                  Sponsor first month
-                                </Button>
-                              </>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canManageCustomers || creatingSponsorship}
+                              onClick={async () => {
+                                try {
+                                  await createSponsorshipOffer({
+                                    prospectId: p.id,
+                                    planCode: sponsorPlanCode,
+                                    idempotencyKey: `offer_${p.id}_${Date.now()}`,
+                                  }).unwrap()
+                                  toast.success(
+                                    'Sponsorship offer sent. Restaurant must accept and select a plan before you are charged.'
+                                  )
+                                  refetchProspects()
+                                  refetchSponsorships()
+                                } catch (e: unknown) {
+                                  const msg =
+                                    (e as { data?: { error?: { message?: string } } })?.data?.error
+                                      ?.message || t('customerGrowth.toasts.sponsorFailed')
+                                  toast.error(msg)
+                                }
+                              }}
+                            >
+                              <Gift className="h-3 w-3 mr-1" />
+                              {t('customerGrowth.prospects.sponsor')}
+                            </Button>
                           </div>
                         </td>
                       </tr>

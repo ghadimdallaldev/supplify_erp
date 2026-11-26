@@ -2,6 +2,17 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 12 (web)**: web implemented. The mobile change is deferred to Plan A Task 13, which must port the same behaviour:
+  - **Follow & add.** Products carry `is_followed` / `can_order`. One tap follows the supplier, then adds the item. At the follow cap, open the upgrade prompt. For a blocked supplier, offer "Unblock".
+  - **Cart.** A checkout `403 FOLLOW_REQUIRED` lists suppliers. Show a "Follow & keep in cart" row per supplier, and refuse to raise the quantity of a line from a supplier the restaurant does not follow.
+  - **Chat.** Conversations carry `can_send_general`, `is_closed_by_block` and `open_order_ids`.
+    - Read-only threads show a banner plus "Message about order #…" chips. Threads closed by a block show a closed banner.
+    - The socket sends `conversation_access_changed`, and sends `chat_error` with code `CHAT_READ_ONLY`. Both refetch the conversations.
+  - **New API fields.**
+    - `GET /api/suppliers?sort=followed` puts the signed-in restaurant's followed suppliers first. It is used by the quote pickers and the new-conversation dialog.
+    - Quote cart payloads add `isFollowed`. The quote detail page follows the supplier before it adds to the cart.
+  - **Supplier pickers.** Restaurant pickers search followers on the server with `q`, `limit=20` and `offset`. There is no client-side 200-row list.
+  - **Strings.** "Other customers" (top-restaurants report rows with a null `restaurant_id`) and "Verified restaurant" (`reviewer_label`) are localised on the client.
 - **Plan A Task 11 (performance and indexes)**: mobile skipped, not applicable. Server-only change: migration `0239_marketplace_indexes.sql` (product sort index) and a batched warehouse-stock overlay. Response shapes and endpoints are unchanged, so neither mobile repo needs an update.
 - **Plan A Task 10 (reviews, customer import, quotes)**: the API change is complete. The mobile change is deferred to Plan A Task 13, and the web change to Task 12.
   - **Customer growth.** `CustomerGrowthScreen.tsx` and `src/types/growth.ts` still read `match_status`, `matched_restaurant_name`, `lifecycle_status` and `existingSupplifyCustomers`.

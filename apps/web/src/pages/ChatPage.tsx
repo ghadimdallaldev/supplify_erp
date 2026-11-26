@@ -29,7 +29,8 @@ import { useChatRealtime } from '../hooks/useChatRealtime'
 import { ChatConversationList } from '../components/chat/ChatConversationList'
 import { ChatHeader } from '../components/chat/ChatHeader'
 import { ChatThread } from '../components/chat/ChatThread'
-import { ChatComposer } from '../components/chat/ChatComposer'
+import { ChatComposer, chatAccessFromConversation } from '../components/chat/ChatComposer'
+import { isRelationshipError } from '../lib/relationshipErrors'
 import { NewConversationDialog } from '../components/chat/NewConversationDialog'
 import { Skeleton } from '../components/ui/skeleton'
 
@@ -109,10 +110,21 @@ export function ChatPage() {
     setOtherPartyTyping(typing)
   }, [])
 
+  const handleAccessChanged = useCallback(
+    (conversationId: string) => {
+      if (conversationId !== selectedConversation) return
+      // A follow/unfollow/block happened: the open-order chip state may no longer apply.
+      setSelectedOrder(null)
+      void refetchConversations()
+    },
+    [refetchConversations, selectedConversation]
+  )
+
   const { connected, emitTyping } = useChatRealtime({
     userId: user?.id,
     selectedConversationId: selectedConversation,
     onOtherPartyTyping: handleTypingChange,
+    onAccessChanged: handleAccessChanged,
   })
 
   const formatMessageDate = (date: string) => {
@@ -436,6 +448,13 @@ export function ChatPage() {
       setSelectedOrder(null)
       setTimeout(() => scrollToBottom(), 100)
     } catch (error: unknown) {
+      if (isRelationshipError(error, 'CHAT_READ_ONLY')) {
+        // Access changed since the list loaded: refresh it so the composer shows the banner.
+        setSelectedOrder(null)
+        void refetchConversations()
+        toast.error(t('common:marketplace.chatReadOnlyNoOrders'))
+        return
+      }
       const err = error as { data?: { error?: { message?: string } } }
       toast.error(err?.data?.error?.message || t('toast.failedSendMessage'))
     } finally {
@@ -610,6 +629,7 @@ export function ChatPage() {
                       fileInputRef={fileInputRef}
                       inputRef={inputRef}
                       userRole={user?.role}
+                      access={chatAccessFromConversation(activeConv)}
                     />
                   </CardContent>
                 </>

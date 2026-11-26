@@ -17,17 +17,26 @@ type UseChatRealtimeOptions = {
   userId: string | undefined
   selectedConversationId: string | null
   onOtherPartyTyping?: (isTyping: boolean) => void
+  /**
+   * A follow/unfollow/block changed who may send in a conversation (socket
+   * `conversation_access_changed`, or a `CHAT_READ_ONLY` send error). Conversation data is
+   * refetched; this lets the page drop composer state such as a selected order.
+   */
+  onAccessChanged?: (conversationId: string) => void
 }
 
 export function useChatRealtime({
   userId,
   selectedConversationId,
   onOtherPartyTyping,
+  onAccessChanged,
 }: UseChatRealtimeOptions) {
   const dispatch = useAppDispatch()
   const socketRef = useRef<Socket | null>(null)
   const selectedRef = useRef(selectedConversationId)
   const userIdRef = useRef(userId)
+  const onAccessChangedRef = useRef(onAccessChanged)
+  onAccessChangedRef.current = onAccessChanged
   const [connected, setConnected] = useState(false)
 
   selectedRef.current = selectedConversationId
@@ -117,7 +126,21 @@ export function useChatRealtime({
       onOtherPartyTyping?.(Boolean(data.isTyping))
     }
 
+    const handleAccessChanged = (data: { conversationId?: string }) => {
+      dispatch(api.util.invalidateTags(['Chat']))
+      if (data?.conversationId) onAccessChangedRef.current?.(data.conversationId)
+    }
+
+    const handleChatError = (data: { code?: string }) => {
+      if (data?.code !== 'CHAT_READ_ONLY') return
+      dispatch(api.util.invalidateTags(['Chat']))
+      const active = selectedRef.current
+      if (active) onAccessChangedRef.current?.(active)
+    }
+
     socket.on('connect', handleConnect)
+    socket.on('conversation_access_changed', handleAccessChanged)
+    socket.on('chat_error', handleChatError)
     socket.on('disconnect', handleDisconnect)
     socket.on('new_message', handleNewMessage)
     socket.on('message_read_update', handleReadUpdate)
@@ -129,6 +152,8 @@ export function useChatRealtime({
 
     return () => {
       socket.off('connect', handleConnect)
+      socket.off('conversation_access_changed', handleAccessChanged)
+      socket.off('chat_error', handleChatError)
       socket.off('disconnect', handleDisconnect)
       socket.off('new_message', handleNewMessage)
       socket.off('message_read_update', handleReadUpdate)

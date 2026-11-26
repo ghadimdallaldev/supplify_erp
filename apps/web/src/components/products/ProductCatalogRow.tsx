@@ -1,12 +1,13 @@
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Package, Plus, TrendingUp, Heart, Eye } from 'lucide-react'
+import { Package, TrendingUp, Heart, Eye } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { formatNumber } from '../../utils/format'
 import { ContractPriceDisplay } from '../ContractPriceDisplay'
 import { AddToOrderingListButton } from '../ordering/AddToOrderingListButton'
+import { FollowAndAddButton } from '../marketplace/FollowAndAddButton'
 import { CardActionGrid, cardActionBtnClass } from '../ui/card-layout'
 import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { cn } from '../../lib/utils'
@@ -191,16 +192,15 @@ function ProductActions({
       <CardActionGrid columns={isSupplier ? 2 : 3}>
         {!isSupplier && (
           <>
-            <Button
+            <FollowAndAddButton
               size="sm"
               className={cardActionBtnClass()}
-              onClick={() => onAddToCart(product)}
-              disabled={!product.available_qty || product.available_qty <= 0}
+              product={product}
+              onAdd={onAddToCart}
+              label={t('catalog.addToCart')}
+              outOfStock={!product.available_qty || product.available_qty <= 0}
               data-testid={`product-add-to-cart-${product.id}`}
-            >
-              <Plus className="me-1 h-4 w-4 shrink-0" />
-              {t('catalog.addToCart')}
-            </Button>
+            />
             {product.supplier_id ? (
               <div className="[&_button]:h-auto [&_button]:min-h-9 [&_button]:w-full [&_button]:justify-center [&_button]:whitespace-normal [&_button]:px-2 [&_button]:py-2 [&_button]:text-xs [&_button]:leading-snug">
                 <AddToOrderingListButton
@@ -235,18 +235,17 @@ function ProductActions({
     <div className="flex items-center gap-1.5 xl:gap-2">
       {!isSupplier && (
         <>
-          <Button
+          <FollowAndAddButton
             size="sm"
             className={cn(compactTable && 'h-8 w-8 px-0 xl:h-9 xl:w-auto xl:px-3')}
-            onClick={() => onAddToCart(product)}
-            disabled={!product.available_qty || product.available_qty <= 0}
+            product={product}
+            onAdd={onAddToCart}
+            label={t('catalog.addToCart')}
+            outOfStock={!product.available_qty || product.available_qty <= 0}
             data-testid={`product-add-to-cart-${product.id}`}
-            aria-label={t('catalog.addToCart')}
-            title={t('catalog.addToCart')}
-          >
-            <Plus className={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)} />
-            <span className={responsiveDataListClasses.actionLabel}>{t('catalog.addToCart')}</span>
-          </Button>
+            iconClassName={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)}
+            labelClassName={responsiveDataListClasses.actionLabel}
+          />
           {product.supplier_id && (
             <div className="hidden xl:block">
               <AddToOrderingListButton

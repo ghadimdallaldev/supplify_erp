@@ -18,9 +18,9 @@ import {
   useCreateContractPricingMutation,
   useUpdateContractPricingMutation,
   useDeactivateContractPricingMutation,
-  useGetRestaurantsQuery,
   useGetProductsQuery,
 } from '../services/api'
+import { FollowerRestaurantPicker } from '../components/marketplace/FollowerRestaurantPicker'
 import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { RequirePermission } from '../components/RequirePermission'
@@ -142,7 +142,6 @@ export function ContractPricingPage() {
   const PRODUCT_PAGE_SIZE = 50
 
   const { data, isLoading, refetch } = useGetContractPricingQuery(queryParams)
-  const { data: restaurantsData } = useGetRestaurantsQuery({ limit: 200, offset: 0 })
   const { data: productsData } = useGetProductsQuery(
     {
       limit: PRODUCT_PAGE_SIZE,
@@ -156,7 +155,6 @@ export function ContractPricingPage() {
   const [deactivatePricing] = useDeactivateContractPricingMutation()
 
   const pricing = data?.pricing ?? []
-  const restaurants = restaurantsData?.restaurants ?? []
   const products = productsData?.products ?? []
   const hasNextProductPage = Boolean(productsData?.pagination?.nextCursor)
 
@@ -288,16 +286,18 @@ export function ContractPricingPage() {
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[180px]">
               <Label htmlFor="restaurant">{t('pricing.restaurant')}</Label>
-              <Select value={restaurantFilter} onValueChange={setRestaurantFilter}>
-                <SelectTrigger id="restaurant" className="mt-1">
-                  <option value="">{t('pricing.allRestaurants')}</option>
-                  {restaurants.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
+              <FollowerRestaurantPicker
+                id="restaurant"
+                className="mt-1"
+                value={restaurantFilter}
+                onChange={(id) => setRestaurantFilter(id)}
+                clearLabel={t('pricing.allRestaurants')}
+                placeholder={t('pricing.allRestaurants')}
+                selectedName={
+                  pricing.find((row: any) => row.restaurant_id === restaurantFilter)
+                    ?.restaurant_name as string | undefined
+                }
+              />
             </div>
             <div className="w-full sm:max-w-none lg:min-w-[140px]">
               <Label htmlFor="status">{t('pricing.status')}</Label>
@@ -515,19 +515,17 @@ export function ContractPricingPage() {
             <div className="space-y-4 py-2">
               <div>
                 <Label>{t('pricing.restaurant')}</Label>
-                <Select
+                <FollowerRestaurantPicker
+                  className="mt-1"
                   value={form.restaurantId}
-                  onValueChange={(value) => setForm({ ...form, restaurantId: value })}
-                >
-                  <SelectTrigger className="mt-1" disabled={!!editingId}>
-                    <option value="">{t('pricing.dialog.selectRestaurant')}</option>
-                    {restaurants.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </SelectTrigger>
-                </Select>
+                  onChange={(id) => setForm({ ...form, restaurantId: id })}
+                  placeholder={t('pricing.dialog.selectRestaurant')}
+                  disabled={!!editingId}
+                  selectedName={
+                    pricing.find((row: any) => row.restaurant_id === form.restaurantId)
+                      ?.restaurant_name as string | undefined
+                  }
+                />
               </div>
               <div>
                 <Label>{t('pricing.product')}</Label>

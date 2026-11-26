@@ -133,6 +133,25 @@ describe('restaurant catalog visibility (real PG)', () => {
     expect(byName.has('Dir Blocked Foods')).toBe(false)
   })
 
+  it('supplier directory sort=followed lists followed suppliers first', async () => {
+    const a = await createSupplierOrg(db.pool, { name: 'Sort Alpha Foods' })
+    const b = await createSupplierOrg(db.pool, { name: 'Sort Beta Foods' })
+    const c = await createSupplierOrg(db.pool, { name: 'Sort Gamma Foods' })
+    const r = await createRestaurant(db.pool)
+    await follow(db.pool, r.id, c.orgId)
+    void a
+    void b
+
+    const res = await get(r.userSub, '/api/suppliers?q=Sort&sort=followed&limit=50')
+    expect(res.status, JSON.stringify(res.body)).toBe(200)
+    const names = res.body.data.suppliers.map((s) => s.name)
+    expect(names[0]).toBe('Sort Gamma Foods')
+    expect(names).toHaveLength(3)
+
+    const bad = await get(r.userSub, '/api/suppliers?sort=bogus')
+    expect(bad.status).toBe(400)
+  })
+
   it('blocked supplier is invisible even when it was followed', async () => {
     const org = await createSupplierOrg(db.pool, { publicCatalog: true, branches: 2 })
     const p = await createProduct(db.pool, org.branchIds[1])

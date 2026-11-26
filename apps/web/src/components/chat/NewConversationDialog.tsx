@@ -25,29 +25,23 @@ export function NewConversationDialog({
   const [search, setSearch] = useState('')
   const isSupplier = userRole === 'SUPPLIER'
 
+  const query = search.trim() || undefined
+  // Restaurants: suppliers may only open threads with followers. GET /api/restaurants is
+  // followers-only and searched server-side (no 200-row client filter).
+  // Suppliers: a restaurant may only open threads with suppliers it follows.
   const { data: suppliersData, isLoading: suppliersLoading } = useGetSuppliersQuery(
-    { q: search.trim() || undefined, limit: 50 },
+    { q: query, limit: 50, sort: 'followed' },
     { skip: !open || isSupplier }
   )
   const { data: restaurantsData, isLoading: restaurantsLoading } = useGetRestaurantsQuery(
-    { limit: 200, offset: 0 },
+    { q: query, limit: 20, offset: 0 },
     { skip: !open || !isSupplier }
   )
 
   const participants = useMemo(() => {
-    if (isSupplier) {
-      const restaurants = restaurantsData?.restaurants ?? []
-      const query = search.trim().toLowerCase()
-      if (!query) return restaurants
-      return restaurants.filter(
-        (restaurant) =>
-          restaurant.name?.toLowerCase().includes(query) ||
-          restaurant.contact_email?.toLowerCase().includes(query) ||
-          restaurant.slug?.toLowerCase().includes(query)
-      )
-    }
-    return suppliersData?.suppliers ?? []
-  }, [isSupplier, restaurantsData?.restaurants, search, suppliersData?.suppliers])
+    if (isSupplier) return restaurantsData?.restaurants ?? []
+    return (suppliersData?.suppliers ?? []).filter((s) => s.is_followed !== false)
+  }, [isSupplier, restaurantsData?.restaurants, suppliersData?.suppliers])
 
   const isLoading = isSupplier ? restaurantsLoading : suppliersLoading
 

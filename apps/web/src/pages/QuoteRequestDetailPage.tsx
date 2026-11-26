@@ -7,6 +7,7 @@ import {
   useUpdateQuoteRequestStatusMutation,
 } from '../services/api'
 import { useCartActions } from '../hooks/useCartActions'
+import { useFollowSupplier } from '../hooks/useFollowSupplier'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -43,6 +44,7 @@ export function QuoteRequestDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addItem } = useCartActions()
+  const { follow } = useFollowSupplier()
   const { data, isLoading, isError, refetch } = useGetQuoteRequestCompareQuery(id!, { skip: !id })
   const [convertToCart, { isLoading: converting }] = useConvertQuoteResponseToCartMutation()
   const [updateStatus, { isLoading: updatingStatus }] = useUpdateQuoteRequestStatusMutation()
@@ -64,6 +66,8 @@ export function QuoteRequestDetailPage() {
         quoteRequestId: id,
         supplierRowId: supplier.id,
       }).unwrap()
+      // A quote can come from a supplier the restaurant does not follow: one tap follows first.
+      if (payload.isFollowed === false && (await follow(payload.supplierId)) !== 'followed') return
       for (const line of payload.items) {
         addItem({
           productId: line.productId,
@@ -74,6 +78,8 @@ export function QuoteRequestDetailPage() {
           product: {
             ...line.product,
             current_price: line.quotedUnitPrice ?? line.product.current_price,
+            is_followed: true,
+            can_order: true,
           },
         })
       }

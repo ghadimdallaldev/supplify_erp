@@ -120,6 +120,8 @@ export const supplierUpdateSchema = supplierCreateSchema.partial().extend({
 export const supplierListSchema = z.object({
   q: z.string().optional(),
   city: z.string().optional(),
+  // 'followed': the signed-in restaurant's followed suppliers first (quote pickers, chat).
+  sort: z.enum(['followed']).optional(),
   limit: z
     .string()
     .transform((val) => parseInt(val, 10))

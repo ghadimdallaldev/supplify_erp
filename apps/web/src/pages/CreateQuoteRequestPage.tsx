@@ -17,8 +17,13 @@ import { PageHeader } from '../components/ui/page-header'
 import { PageShell } from '../components/ui/page-shell'
 import { toast } from 'sonner'
 import { ArrowLeft, Send } from 'lucide-react'
-import type { Product } from '../types'
+import type { Product, Supplier } from '../types'
 import { ensureNamespace } from '../i18n'
+import { Badge } from '../components/ui/badge'
+import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
+import { useAccumulatedPages } from '../hooks/useAccumulatedPages'
+
+const PICKER_PAGE_SIZE = 20
 
 type PrefillState = {
   items?: Array<{ productId: string; quantity: number }>
@@ -36,27 +41,58 @@ export function CreateQuoteRequestPage() {
   const location = useLocation()
   const prefill = (location.state as { prefill?: PrefillState } | null)?.prefill
 
-  const [search, setSearch] = useState('')
+  const { search, setSearch, debouncedSearch: productQuery } = useDebouncedSearch('', 250)
+  const {
+    search: supplierSearch,
+    setSearch: setSupplierSearch,
+    debouncedSearch: supplierQuery,
+  } = useDebouncedSearch('', 250)
+  const [productOffset, setProductOffset] = useState(0)
+  const [supplierOffset, setSupplierOffset] = useState(0)
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
   const [neededBy, setNeededBy] = useState('')
 
-  const { data: productsData, isLoading: loadingProducts } = useGetProductsQuery({
-    q: search || undefined,
-    limit: 50,
-    offset: 0,
+  // Both pickers search and page on the server (quotes may go to any supplier, spec §11.4);
+  // followed suppliers come first and are marked.
+  useEffect(() => setProductOffset(0), [productQuery])
+  useEffect(() => setSupplierOffset(0), [supplierQuery])
+  const {
+    data: productsData,
+    isLoading: loadingProducts,
+    isFetching: fetchingProducts,
+  } = useGetProductsQuery({
+    q: productQuery || undefined,
+    limit: PICKER_PAGE_SIZE,
+    offset: productOffset,
   })
-  const { data: suppliersData, isLoading: loadingSuppliers } = useGetSuppliersQuery({
-    limit: 50,
-    offset: 0,
+  const {
+    data: suppliersData,
+    isLoading: loadingSuppliers,
+    isFetching: fetchingSuppliers,
+  } = useGetSuppliersQuery({
+    q: supplierQuery || undefined,
+    sort: 'followed',
+    limit: PICKER_PAGE_SIZE,
+    offset: supplierOffset,
   })
 
   const [createQuoteRequest, { isLoading: submitting }] = useCreateQuoteRequestMutation()
 
-  const products = productsData?.products ?? []
-  const suppliers = suppliersData?.suppliers ?? []
+  const products = useAccumulatedPages<Product>(productsData?.products, productOffset, productQuery)
+  const suppliers = useAccumulatedPages<Supplier>(
+    suppliersData?.suppliers,
+    supplierOffset,
+    supplierQuery
+  )
+  const productsTotal = Number(productsData?.pagination?.total ?? 0)
+  const suppliersTotal = Number(suppliersData?.pagination?.total ?? 0)
+  const hasMoreProducts =
+    productOffset + PICKER_PAGE_SIZE < productsTotal ||
+    Boolean(productsData?.pagination?.nextCursor)
+  const hasMoreSuppliers = supplierOffset + PICKER_PAGE_SIZE < suppliersTotal
 
   useEffect(() => {
     if (!prefill) return
@@ -208,6 +244,7 @@ export function CreateQuoteRequestPage() {
               placeholder={t('create.searchProductsPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              data-testid="quote-product-search"
             />
             {loadingProducts ? (
               <p className="text-sm text-[var(--text-muted)]">{t('create.loadingProducts')}</p>
@@ -292,6 +329,18 @@ export function CreateQuoteRequestPage() {
                 </div>
               </div>
             )}
+            {hasMoreProducts && products.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={fetchingProducts}
+                onClick={() => setProductOffset(productOffset + PICKER_PAGE_SIZE)}
+              >
+                {t('create.loadMoreProducts')}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -301,7 +350,13 @@ export function CreateQuoteRequestPage() {
               <CardTitle className="text-base">{t('create.suppliersTitle')}</CardTitle>
               <CardDescription>{t('create.suppliersDescription')}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <Input
+                placeholder={t('create.searchSuppliersPlaceholder')}
+                value={supplierSearch}
+                onChange={(e) => setSupplierSearch(e.target.value)}
+                data-testid="quote-supplier-search"
+              />
               {loadingSuppliers ? (
                 <p className="text-sm text-[var(--text-muted)]">{t('create.loadingSuppliers')}</p>
               ) : suppliers.length === 0 ? (
@@ -339,6 +394,7 @@ export function CreateQuoteRequestPage() {
                       <div
                         key={supplier.id}
                         className="flex items-center gap-3 rounded-lg border border-[var(--app-border)] p-3"
+                        data-testid={`quote-supplier-${supplier.id}`}
                       >
                         <input
                           type="checkbox"
@@ -353,9 +409,26 @@ export function CreateQuoteRequestPage() {
                         >
                           {supplier.name}
                         </label>
+                        {supplier.is_followed ? (
+                          <Badge variant="secondary" className="shrink-0">
+                            {t('common:marketplace.following')}
+                          </Badge>
+                        ) : null}
                       </div>
                     ))}
                   </div>
+                  {hasMoreSuppliers ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={fetchingSuppliers}
+                      onClick={() => setSupplierOffset(supplierOffset + PICKER_PAGE_SIZE)}
+                    >
+                      {t('create.loadMoreSuppliers')}
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </CardContent>

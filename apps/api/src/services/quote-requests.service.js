@@ -1,4 +1,4 @@
-import { blockedExistsSql } from '../lib/relationship.js'
+import { blockedExistsSql, followExistsSql } from '../lib/relationship.js'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
@@ -829,15 +829,20 @@ export async function buildCartPayloadFromResponse(
 ) {
   const { rows } = await dbQuery(
     `
-    SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
+    SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status,
+           ${followExistsSql('qr.restaurant_id', 'qs')} AS is_followed
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    LEFT JOIN supplier qs ON qs.id = qrs.supplier_id
     WHERE qrs.id = $1
     `,
     [quoteRequestSupplierId]
   )
   if (!rows.length) throw new NotFoundError('Quote response not found')
   const qrs = rows[0]
+  // Quotes may come from any supplier (spec §11.4); ordering still needs a follow, so the
+  // client offers "Follow & add" when this is false (FOLLOW_REQUIRED at checkout otherwise).
+  const isFollowed = qrs.is_followed === true
   if (quoteRequestId && qrs.quote_request_id !== quoteRequestId) {
     throw new ValidationError('Supplier row does not belong to this quote request')
   }
@@ -906,6 +911,8 @@ export async function buildCartPayloadFromResponse(
         supplier_slug: row.supplier_slug,
         current_price: quotedUnitPrice,
         currency: row.currency || 'USD',
+        is_followed: isFollowed,
+        can_order: isFollowed,
       },
     }
   })
@@ -913,6 +920,7 @@ export async function buildCartPayloadFromResponse(
   return {
     supplierId: qrs.supplier_id,
     quoteRequestSupplierId: qrs.id,
+    isFollowed,
     items,
   }
 }

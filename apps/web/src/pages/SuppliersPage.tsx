@@ -1,10 +1,6 @@
 import { useState, useMemo, useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  useGetSuppliersQuery,
-  useFollowSupplierMutation,
-  useUnfollowSupplierMutation,
-} from '../services/api'
+import { useGetSuppliersQuery, useUnfollowSupplierMutation } from '../services/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -28,8 +24,10 @@ import {
   Clock,
   X,
   Tag,
+  Lock,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
+import { useFollowSupplier } from '../hooks/useFollowSupplier'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatPrice } from '../utils/format'
@@ -119,6 +117,11 @@ function getStoreDealSortScore(supplier: {
   return value
 }
 
+/** Private-catalog supplier the restaurant does not follow: products are followers-only. */
+function isPrivateCatalog(supplier: { is_followed?: boolean; public_catalog_enabled?: boolean }) {
+  return !supplier.is_followed && supplier.public_catalog_enabled === false
+}
+
 export function SuppliersPage() {
   const { t } = useTranslation('suppliers')
   const { user } = useAppSelector((state) => state.auth)
@@ -144,7 +147,7 @@ export function SuppliersPage() {
     offset: 0,
   })
 
-  const [followSupplier] = useFollowSupplierMutation()
+  const { follow } = useFollowSupplier()
   const [unfollowSupplier] = useUnfollowSupplierMutation()
 
   // Calculate statistics
@@ -214,14 +217,11 @@ export function SuppliersPage() {
     return suppliers
   }, [data?.suppliers, filterBy, sortBy])
 
+  // Limit → upgrade prompt, blocked → "Unblock to follow" (useFollowSupplier).
   const handleFollow = async (supplierId: string) => {
-    try {
-      await followSupplier(supplierId).unwrap()
-      toast.success(t('list.toast.followed'))
-      refetch()
-    } catch (error: any) {
-      toast.error(error?.data?.error?.message || t('list.toast.followFailed'))
-    }
+    if ((await follow(supplierId)) !== 'followed') return
+    toast.success(t('list.toast.followed'))
+    refetch()
   }
 
   const handleUnfollow = async (supplierId: string) => {
@@ -639,7 +639,7 @@ export function SuppliersPage() {
 
                   {/* Actions */}
                   <CardActionGrid>
-                    {isRestaurant && (
+                    {isRestaurant && supplier.is_followed && (
                       <Button variant="default" size="sm" className={cardActionBtnClass()} asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>
                           <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
@@ -647,15 +647,28 @@ export function SuppliersPage() {
                         </Link>
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={cardActionBtnClass()}
-                      onClick={() => handleViewProducts(supplier.id)}
-                    >
-                      <Package className="h-4 w-4 mr-1 shrink-0" />
-                      {t('list.card.products')}
-                    </Button>
+                    {isRestaurant && isPrivateCatalog(supplier) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cardActionBtnClass()}
+                        onClick={() => handleFollow(supplier.id)}
+                        data-testid={`supplier-follow-to-see-${supplier.id}`}
+                      >
+                        <Lock className="h-4 w-4 mr-1 shrink-0" />
+                        {t('common:marketplace.followToSeeCatalog')}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={cardActionBtnClass()}
+                        onClick={() => handleViewProducts(supplier.id)}
+                      >
+                        <Package className="h-4 w-4 mr-1 shrink-0" />
+                        {t('list.card.products')}
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" className={cardActionBtnClass()} asChild>
                       <Link to={`/app/suppliers/${supplier.id}`}>
                         <Eye className="h-4 w-4 mr-1 shrink-0" />
@@ -787,7 +800,7 @@ export function SuppliersPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
-                    {isRestaurant && (
+                    {isRestaurant && supplier.is_followed && (
                       <Button variant="default" size="sm" asChild>
                         <Link to={`/app/chat?supplier=${supplier.id}`}>
                           <MessageCircle className="h-4 w-4 mr-1" />
@@ -795,14 +808,21 @@ export function SuppliersPage() {
                         </Link>
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewProducts(supplier.id)}
-                    >
-                      <Package className="h-4 w-4 mr-1" />
-                      {t('list.card.viewProducts')}
-                    </Button>
+                    {isRestaurant && isPrivateCatalog(supplier) ? (
+                      <Button variant="outline" size="sm" onClick={() => handleFollow(supplier.id)}>
+                        <Lock className="h-4 w-4 mr-1" />
+                        {t('common:marketplace.followToSeeCatalog')}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewProducts(supplier.id)}
+                      >
+                        <Package className="h-4 w-4 mr-1" />
+                        {t('list.card.viewProducts')}
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" asChild>
                       <Link to={`/app/suppliers/${supplier.id}`}>
                         <Eye className="h-4 w-4 mr-1" />

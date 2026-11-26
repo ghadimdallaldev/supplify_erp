@@ -20,6 +20,8 @@ export interface Supplier {
   brand_accent?: string
   brand_display_name?: string
   public_catalog_enabled?: boolean
+  /** Set for a signed-in restaurant: it follows this supplier organisation. */
+  is_followed?: boolean
   minimum_order_amount?: number | null
   payment_terms?: string | null
   return_policy?: string | null
@@ -104,6 +106,8 @@ export interface SupplierFilters {
   city?: string
   limit?: number
   offset?: number
+  /** 'followed': suppliers the signed-in restaurant follows come first (then featured). */
+  sort?: 'followed'
 }
 
 export interface SuppliersResponse {
