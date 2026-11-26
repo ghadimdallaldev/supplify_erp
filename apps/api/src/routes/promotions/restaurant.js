@@ -1,3 +1,10 @@
+import { canSendMessage } from '../../lib/chat-access.js'
+import {
+  FollowRequiredError,
+  canTransact,
+  lockRelationshipShared,
+  resolveSupplierOrgId,
+} from '../../lib/relationship.js'
 import express from 'express'
 import { z } from 'zod'
 import {
@@ -792,20 +799,36 @@ router.post(
       const deal = await loadDealDetailForRestaurant(req.params.id, restaurantId)
       if (!deal) throw new NotFoundError('Deal not found or not available')
 
+      // Messaging from a deal needs a follow (spec §11.4), even when the deal is visible.
+      const followRequiredError = new FollowRequiredError([
+        { id: deal.supplier_id, name: deal.supplier_name ?? null },
+      ])
+      if (!(await canTransact(restaurantId, deal.supplier_id))) throw followRequiredError
+
       // Shared helper backfills missing participant rows so unread triggers work
       const conversation = await getOrCreateConversation(deal.supplier_id, restaurantId, {
         enforceOpenLimit: false,
       })
 
       const initialMessage = `Hello, I am interested in your deal: ${deal.name}`
-      const { rows: messages } = await query(
-        `
-        INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type)
-        VALUES ($1, 'RESTAURANT', $2, $3, 'TEXT')
-        RETURNING *
-        `,
-        [conversation.id, restaurantId, initialMessage]
-      )
+      const messages = await withTransaction(async (client) => {
+        const orgId = await resolveSupplierOrgId(deal.supplier_id, client)
+        await lockRelationshipShared(client, restaurantId, orgId)
+        const access = await canSendMessage(
+          { conversation, orderId: null, actorRole: 'RESTAURANT' },
+          client
+        )
+        if (!access.allowed) throw followRequiredError
+        const { rows } = await client.query(
+          `
+          INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type)
+          VALUES ($1, 'RESTAURANT', $2, $3, 'TEXT')
+          RETURNING *
+          `,
+          [conversation.id, restaurantId, initialMessage]
+        )
+        return rows
+      })
 
       const activePromo = await getActiveDealPromotion({ query }, deal.id)
       await recordDealInteraction({

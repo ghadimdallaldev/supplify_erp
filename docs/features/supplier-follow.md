@@ -16,6 +16,13 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
 - **Scheduled quick lists** skip suppliers the restaurant no longer follows (or has blocked); the other suppliers in the same run still get their orders, and the restaurant gets a `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` notification per skipped supplier (`{ quickListId, supplierId, supplierName }`).
 - **Dispute replacement orders** need no follow (they remedy an existing order) but are refused with 409 `SUPPLIER_BLOCKED` when the restaurant has blocked the supplier.
 - **Catalog visibility.** A restaurant sees a supplier's products, list prices (incl. tiers), deals and product images when the organisation is not blocked AND (it follows OR `public_catalog_enabled`). Product rows carry `is_followed` and `in_stock`; only followers get `available_qty` and `/api/inventory/product/:id`. Contract prices are only ever the caller's own. A private-catalog supplier appears to non-followers as a supplier card only. Deals: the old "follows or targeted or boosted" condition is gone; boosts only rank and filter the audience, and restaurant-targeted deals still go to their targets only.
+- **Chat.** A restaurant can start a conversation, or message from a deal, only while it follows the supplier (403 `FOLLOW_REQUIRED`).
+  - Suppliers cannot start a conversation with a restaurant that does not follow them, or that blocked them. Both get 404 `RESTAURANT_NOT_AVAILABLE`, the same answer as an unknown restaurant.
+  - In an existing conversation, a general message needs a follow. A message tagged with `orderId` stays sendable while that order is open between the two parties (statuses in `OPEN_ORDER_STATUSES`). Otherwise the conversation is read-only: 403 `CHAT_READ_ONLY` with `details.openOrderIds`.
+  - A block closes the conversation. The supplier can no longer open it, its messages or its attachments (404), and it is dropped from the supplier's list. The restaurant keeps read-only history (`is_closed_by_block`).
+  - Every send path (REST, socket, deal chat, order fulfilment issues) checks under the shared relationship lock in the insert's transaction. A refused send reserves no daily chat slot and sends no notification.
+  - A relationship change removes the supplier branch's sockets from the affected conversation rooms and emits `conversation_access_changed { conversationId }` to both tenants.
+  - Attachments are served only via `GET /api/chat/attachments/:id`, which re-checks access and redirects to a 5-minute signed object URL.
 - Manual supplier orders (`POST /api/orders/manual`) require the restaurant to **follow** the supplier or have placed an order before.
 
 ## Downstream effects

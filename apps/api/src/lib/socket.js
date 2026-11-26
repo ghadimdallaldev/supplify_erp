@@ -7,6 +7,33 @@ import { resolveSocketUserFromCookieHeader } from './socket-auth.js'
 import { attachSocketRedisAdapter } from './socket-redis-adapter.js'
 import { query } from './db.js'
 import { canReceiveTenantEvent } from './tenant-event-access.js'
+import { onRelationshipChanged } from './relationship.js'
+
+let unregisterChatRelationshipHook = null
+
+/**
+ * A relationship change (follow, unfollow, block, unblock) may close or reopen chat between a
+ * restaurant and every branch of a supplier organisation. Conversations exist per branch, so
+ * load all of them, drop the supplier branch's sockets from each conversation room (clients
+ * re-join if still allowed), and tell both tenants to refetch the conversation's access.
+ */
+export async function revokeConversationSocketsForRelationship({ restaurantId, supplierOrgId }) {
+  if (!io || !restaurantId || !supplierOrgId) return
+  const { rows } = await query(
+    `SELECT c.id, c.supplier_id
+     FROM conversation c
+     JOIN supplier s ON s.id = c.supplier_id
+     WHERE c.restaurant_id = $1 AND COALESCE(s.organization_id, s.id) = $2
+       AND COALESCE(c.is_admin_conversation, false) = false`,
+    [restaurantId, supplierOrgId]
+  )
+  for (const conversation of rows) {
+    io.in(supplierRoom(conversation.supplier_id)).socketsLeave(`conversation_${conversation.id}`)
+    const payload = { conversationId: conversation.id }
+    io.to(supplierRoom(conversation.supplier_id)).emit('conversation_access_changed', payload)
+    io.to(restaurantRoom(restaurantId)).emit('conversation_access_changed', payload)
+  }
+}
 
 let io = null
 
@@ -224,6 +251,11 @@ export async function initializeSocket(server) {
 
   await attachSocketRedisAdapter(io)
 
+  if (unregisterChatRelationshipHook) unregisterChatRelationshipHook()
+  unregisterChatRelationshipHook = onRelationshipChanged((event) =>
+    revokeConversationSocketsForRelationship(event)
+  )
+
   io.use(async (socket, next) => {
     try {
       const { user, tenantId, tenantType, expiresAt } = await resolveSocketUserFromCookieHeader(
@@ -344,7 +376,16 @@ export async function initializeSocket(server) {
           const persisted = await persistMessageFromSocket(conversationId, senderId, content, {
             tenantId: socket.data.tenantId,
             role: socket.data.role,
+            orderId: typeof data.orderId === 'string' ? data.orderId : null,
           })
+          if (persisted?.error === 'CHAT_READ_ONLY') {
+            socket.emit('chat_error', {
+              code: 'CHAT_READ_ONLY',
+              message: 'This conversation is read-only',
+              openOrderIds: persisted.openOrderIds,
+            })
+            return
+          }
           if (!persisted) {
             socket.emit('chat_error', { code: 'SEND_FAILED', message: 'Message was not sent' })
             return

@@ -1152,11 +1152,21 @@ export async function notifyMessageReceived(
   locale = DEFAULT_LOCALE
 ) {
   const { rows: cRows } = await query(
-    `SELECT supplier_id, restaurant_id FROM conversation WHERE id = $1`,
+    `SELECT c.supplier_id, c.restaurant_id,
+            EXISTS (
+              SELECT 1 FROM supplier_blocklist sb
+              JOIN supplier s ON s.id = c.supplier_id
+              WHERE sb.restaurant_id = c.restaurant_id
+                AND sb.supplier_org_id = COALESCE(s.organization_id, s.id)
+            ) AS is_blocked
+     FROM conversation c WHERE c.id = $1`,
     [conversationId]
   )
   if (!cRows.length) return null
   const conv = cRows[0]
+  // Callers notify only after an authorised send; a block closes the conversation, so never
+  // notify across one (defence in depth, spec §11.4).
+  if (conv.is_blocked === true) return null
 
   let tenantId
   let tenantType

@@ -70,6 +70,11 @@ function attachTestContext(permissions, role = 'RESTAURANT') {
   }
 }
 
+vi.mock('../lib/chat-access.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSendMessage: vi.fn(async () => ({ allowed: true, openOrderIds: [] })),
+}))
+
 vi.mock('../lib/rbac.js', async (importOriginal) => {
   const actual = await importOriginal()
   return {
@@ -263,6 +268,17 @@ describe('orders and chat permission routes', () => {
       app.use('/api/chat', chatRoutes)
       const { errorHandler } = await import('../middlewares/errorHandler.js')
       app.use(errorHandler)
+
+      // The conversation is loaded and authorised before a chat slot is reserved.
+      vi.mocked(query).mockResolvedValueOnce({
+        rows: [
+          {
+            id: '00000000-0000-4000-8000-000000000099',
+            supplier_id: 'supplier-1',
+            restaurant_id: 'restaurant-1',
+          },
+        ],
+      })
 
       const res = await request(app)
         .post('/api/chat/conversations/00000000-0000-4000-8000-000000000099/messages')

@@ -111,6 +111,26 @@ export async function resetMarketplaceDb(pool) {
       }
     }
   }
+  // A table can hold leftover business rows from an earlier run whose root FKs are NULL but
+  // whose parents (e.g. a conversation) are cascaded away: restore row by row and drop the
+  // orphans from the snapshot for good.
+  for (const table of [...pending]) {
+    const { rows: snapRows } = await pool.query(
+      `SELECT ctid::text AS t FROM ${SNAPSHOT_SCHEMA}."${table}"`
+    )
+    for (const { t } of snapRows) {
+      try {
+        await pool.query(
+          `INSERT INTO public."${table}" SELECT * FROM ${SNAPSHOT_SCHEMA}."${table}" WHERE ctid = $1::tid`,
+          [t]
+        )
+      } catch (error) {
+        if (error.code !== '23503' && error.code !== '23505') throw error
+        await pool.query(`DELETE FROM ${SNAPSHOT_SCHEMA}."${table}" WHERE ctid = $1::tid`, [t])
+      }
+    }
+    pending.splice(pending.indexOf(table), 1)
+  }
   if (pending.length) throw new Error(`Could not restore seeded tables: ${pending.join(', ')}`)
   const { clearMemoryCacheForTests } = await import('../../../apps/api/src/lib/cache.js').catch(
     () => ({})
