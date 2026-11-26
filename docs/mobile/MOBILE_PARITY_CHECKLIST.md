@@ -1,5 +1,35 @@
 # Mobile Parity Checklist
 
+## 2026-11-26 — Restaurant V4
+
+- [x] Mirror the Restaurant notification center across Android and iOS.
+- [x] Verify Android notification filtering, individual read updates, target navigation, preferences access, and offline browsing in Development.
+- [x] Mirror the Restaurant Assistant workspace, conversation, and history sheet across Android and iOS.
+- [x] Verify Android Assistant capabilities, persisted history, keyboard, and provider failure. Test reply and source rendering with a controlled response.
+- [ ] Verify a live Assistant answer after Development model access is restored.
+- [x] Mirror Restaurant Inventory and its stock adjustment sheet. On Android verify the live stock summary, low-stock filtering, count comparison, and paired add and remove operations.
+- [x] Mirror Restaurant Reports and verify real order activity, period selection, chart interaction, and supplier spend on Android.
+- [x] Mirror Quick Lists and verify creating and renaming a list, catalog search, quantity editing, and cart review on Android.
+- [x] Mirror the Restaurant Settings destination and verify drawer access, the existing workspace picker, notification preferences, and Staff on Android.
+- [ ] Verify remote push on a configured device.
+- [ ] Run the redesigns on iOS hardware or simulator.
+
+## 2026-11-25 — Restaurant Chat and Orders
+
+- [x] Mirror the Restaurant inbox, new conversation sheet, thread, Orders, and Order Details across Android and iOS.
+- [x] Exercise Android sending, filtering, supplier and order navigation, draft recovery on reconnect, and the English and Arabic layouts, including narrow Arabic at 135% text.
+- [x] Run ERP and native typechecks and the focused order, chat, navigation, and localization tests.
+- [x] Verify a live incoming message and unread-count transition from a signed-in Development supplier.
+- [x] Verify creating a fresh thread with a Development test supplier outside the existing seeded conversations.
+- [ ] Verify retry after a failed message request.
+- [ ] Run the redesigned screens on iOS hardware or simulator.
+
+## 2026-11-25 — Restaurant marketplace craftsmanship
+
+- [x] Mirror the Restaurant Catalog dock, product card, media rules, and supplier card presentation in both native design worktrees.
+- [x] Typecheck ERP and both native worktrees. Pass the 23 focused imagery, cart summary, currency, and quantity tests in each native worktree.
+- [x] Verify the Android dock at rest and during keyboard entry, the last catalog row, and both screens at 100%, 135%, and 200% text.
+
 ## 2026-11-25 — Restaurant marketplace polish
 
 - [x] Mirror the polished supplier, catalog, and live cart summary UI in both native design worktrees.

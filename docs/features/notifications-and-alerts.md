@@ -4,10 +4,11 @@
 
 How Supplify delivers in-app, email, push, and WhatsApp alerts — architecture, recipients, and configuration.
 
-The native restaurant feed groups notifications into Today and Earlier. The
-supplier feed has a section for unread order and low-stock updates. Both
-continue to open the existing notification targets and support marking one or
-all notifications read.
+The native restaurant feed groups notifications into Today and Earlier and
+offers All, Unread, and Read filters over the loaded records. A row can open
+its registered destination or expand its message. Marking one or all records
+as read uses the workspace-scoped API. Cached records stay visible offline.
+The supplier feed has a section for unread order and low-stock updates.
 
 ## Mobile chat notification behavior (2026-09-12)
 

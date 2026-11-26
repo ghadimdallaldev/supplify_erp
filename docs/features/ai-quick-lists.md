@@ -5,8 +5,12 @@ Smart Quick Lists add forecast-based quantity adjustment and reorder-assistance 
 The Android and iOS Quick Lists screen can save the current restaurant cart
 as a named list when the user can create orders. It submits the product IDs,
 suppliers and quantities to the existing quick-list endpoint. The cart stays
-available after the list is saved. Loading a saved list opens Cart, where
-pricing and availability are checked again before checkout.
+available after the list is saved. Mobile Quick Lists can also create and
+rename lists, add products, edit quantities, and remove products or lists.
+Opening a card shows the saved products. Reviewing the list for Cart fetches
+the current products and checks matching suppliers, purchase quantities,
+pricing, and availability. Replacing an occupied cart needs confirmation.
+Checkout continues through the existing cart flow.
 
 ## Commercial Positioning
 

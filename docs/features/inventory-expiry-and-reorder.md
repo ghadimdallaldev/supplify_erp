@@ -11,11 +11,12 @@ search by product name, SKU or category. The stock summary shows the total and
 low or out-of-stock counts. Expiry counts still use the separate lot summary.
 The restock action opens Smart Reorder when the workspace includes that feature.
 
-Staff with `INVENTORY_EDIT` can set a physical count, including zero, and
-preview the resulting change. Counts use the existing quantity PATCH. Add,
-remove and waste use the existing movement endpoints and retain optional
-notes. Waste requires `waste_tracking`. The absolute-count PATCH accepts a
-quantity, while movement notes belong to the add and adjust actions.
+Staff with `INVENTORY_EDIT` can compare a physical count, including zero, with
+the displayed stock. They record an explicit quantity to add, remove, or log
+as waste through the audited movement endpoints. Those writes apply the
+delta to the current server balance and retain optional notes. Waste requires
+`waste_tracking`. The quantity PATCH has no balance precondition or movement
+record, so the mobile count comparison does not call it.
 
 The Restaurant Assistant shows a stock risk when Smart Reorder returns both the
 on-hand quantity and a higher configured minimum. Eligible kitchen staff can

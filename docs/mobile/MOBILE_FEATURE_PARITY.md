@@ -1,5 +1,99 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-26 — Restaurant V4
+
+The paired Android and iOS clients use the Restaurant
+notification center with date grouping, All, Unread, and Read filters, and
+individual and bulk mark-as-read actions. Navigation is offered when the
+notification resolves to a route registered for the current session. Cached
+notifications remain browsable offline. The app uses the existing notification
+payload, tenant scope, refresh cadence, read endpoints, and channel preferences.
+
+The Restaurant Assistant has a dedicated workspace with capability-gated prompts,
+conversation history, a keyboard-aware composer, and source cards for the
+existing evidence payload. The assistant remains read-only against operational
+records. Both native clients preserve the prompt and attachments after a failed
+request. The Development model provider returned a credential error during QA.
+
+Restaurant Inventory displays server-paginated stock, stock-status totals,
+expiry metrics, search, and category filtering. Its count comparison stays
+local. Add, Remove, and Waste submit explicit deltas through existing audited
+endpoints. The redesign does not use the absolute-quantity PATCH for counts.
+
+Restaurant Reports uses the existing order volume, supplier and category spend,
+top products, receiving quality, waste, and invoice aging APIs with their domain
+access checks. Its trends and totals keep currencies separate. Date ranges,
+chart selection and grouped details are available in both native clients.
+
+Restaurant Quick Lists has saved-product previews, a dedicated detail view,
+and create, rename, item management, and delete actions through the existing
+order permission and list APIs. The cart handoff checks served product data
+and requires confirmation before replacing a populated cart.
+
+Restaurant Settings is a dedicated destination in the existing left drawer.
+It displays the current account and workspace, uses the existing locale
+preference and workspace switcher, and opens the established notification,
+staff, organization, delivery, subscription, and account flows.
+Android verification used the Pixel 7 emulator against Development. Local
+captures are in `design-audit/mobile/round-07-restaurant-v4/`.
+
+The Android EAS `demo` profile packages these changes as an internal APK using
+the Development API and Keycloak realm. It uses the existing application ID and
+EAS project. The iOS client receives the same Restaurant workflows and uses its
+own distribution profiles. There are no new server contracts or environment
+variables for the Android demo build.
+
+## 2026-11-25 — Restaurant Chat and Orders
+
+The paired Android and iOS clients carry the Restaurant inbox, new
+conversation flow, thread, order list, and order detail redesigns. Restaurant Chat
+uses the existing conversation participant and read fields, and resolves the
+supplier catalog through the directory. Conversations retain the socket and
+polling paths, read counts, permission checks, drafts, attachments, and order
+references. Failed sends keep the draft and attachment choices available for retry.
+
+Orders retains All, Open, Delivered, and Cancelled and puts open orders first in
+All. Details uses the existing lifecycle, recorded placement and delivery proof
+timestamps, historical item prices, delivery information, and action permissions.
+Catalog metadata supplies product imagery and units when available. Receiving,
+disputes, and tracking continue through the existing flows. The work uses existing
+API endpoints and adds no new persistence or API requirements.
+
+The Android Pixel 7 emulator exercised the seeded Development workspace. Evidence
+includes a persisted send, inbox search and unread filtering, supplier selection,
+catalog navigation, order reference selection, and the composer retaining a draft
+while offline and re-enabling send on reconnect. A fresh conversation with a
+Development test supplier opened and appeared in the inbox. A message from a signed-in
+Development supplier appeared in the inbox, was visible under Unread, and cleared
+from that filter after opening the thread. Order checks covered order-number
+search, one-item and multi-item orders, Delivered and Cancelled, and sticky actions
+that open receiving and disputes. A dispatched order showed the existing live
+tracking section. A previously unopened order displayed a recoverable connection
+error and loaded after reconnection. English, Arabic, and narrow layouts at 135%
+text size are recorded locally in `design-audit/mobile/round-06-chat-and-orders/`.
+
+## 2026-11-25 — Restaurant marketplace craftsmanship
+
+Both native clients reserve a safe-area-aware footer outside the
+Catalog list for the live cart count and subtotal. The dock uses a brief,
+reduced-motion-aware transition and fits above the on-screen keyboard. Product
+cards keep names, pack sizes, prices, stock, and editable quantity controls
+readable as the grid reflows for text size and screen width.
+
+The Catalog uses the original image attached to the SKU. Known stock and demo
+image sources, missing images, and load failures use category artwork. Supplier
+cards place the directory logo on a consistent branded cover with a monogram
+fallback. The directory viewport ends above the floating navigation, keeping
+the Browse and Message controls reachable at enlarged text sizes.
+Both screens continue to use the existing API, permissions, cart calculations,
+stock validation and routes.
+
+Android Pixel 7 verification covered default text, a two-column grid at 135%,
+and a narrow single-column layout at 200%. The catalog test edited bulk
+quantities, checked the dock above the keyboard and at its resting inset after
+dismissal, and reached the last product with the subtotal still visible.
+Captures are in design-audit/mobile/round-05-marketplace-craft/.
+
 ## 2026-11-25 — Restaurant marketplace polish
 
 Both `design/round-01-home` native worktrees carry the polished Restaurant Suppliers

@@ -81,6 +81,16 @@ and products, or supplier restaurant accounts. Both roles can also open the
 order-volume breakdown. Supplier customer links use the directory's access
 rules. A budget plan requires a data source beyond the current reports API.
 
+The Restaurant Reports destination offers 7-, 30-, and 90-day ranges and a
+same-length prior-period comparison for order value. Its chart shows the
+order counts returned for recorded periods and reveals the selected period's
+order value. Currency-bearing reports keep each currency separate. The
+supplier, category, and product breakdowns use the existing grouped rows.
+Receiving quality shows the recorded average fill rate and quality scores.
+Waste presents incident counts. Invoice aging reflects outstanding balances
+as of the displayed date. These reports follow the existing plan and domain
+permissions.
+
 ## Web reports page
 
 `/app/reports` lists every endpoint above.

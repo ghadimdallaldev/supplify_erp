@@ -97,6 +97,13 @@ Migration `0195_assistant_conversations.sql`:
 
 UI shows **From live data** when tools ran. Quota exhaustion returns a clear message, never heuristic text labeled as AI.
 
+The Restaurant mobile workspace offers starters for domains returned by the
+capabilities endpoint. Saved conversations open in a history sheet. Restaurant
+replies show the tool sources, retrieval time and limitations supplied by the
+API. Source links lead to registered native destinations. Failed sends keep the
+prompt and selected files available. The client shows request progress while
+the endpoint prepares a full response.
+
 ## Env
 
 Reuses existing AI vars: `AI_ENABLED`, `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_MODEL`, `AI_REQUEST_TIMEOUT_MS`, `AI_MAX_RETRIES`, `AI_MAX_REQUESTS_PER_TENANT_PER_DAY`. See [../operations/environment-variables.md](../operations/environment-variables.md).

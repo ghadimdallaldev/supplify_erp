@@ -11,6 +11,14 @@ order, in that order’s currency, and the selected location if available.
 Users with order-view permission can return directly to Orders. Uncertain
 responses keep the cart and retry key until checkout is resolved.
 
+In the Restaurant mobile Orders tab, All groups active orders ahead of delivery
+history and cancellations. The individual filters keep their existing status
+definitions. Order Details shows the lifecycle stage separately from timestamps
+recorded by placement and proof of delivery. Historical order lines retain their
+recorded prices. Product thumbnails and units can come from the permitted
+catalog lookup, while the receiving and dispute actions use the existing
+permission and order-state rules.
+
 An identical retry uses the same `Idempotency-Key` and normalized payload. A
 successful replay returns the original order IDs without reserving stock again;
 a different payload with a successful key returns a conflict. Claim insertion
