@@ -46,33 +46,33 @@ describe('supplier stock source of truth', () => {
 
   it('does not enable warehouse mode without warehouses/multi_warehouse feature', async () => {
     featureMock.mockResolvedValue(false)
-    queryMock.mockResolvedValueOnce({ rows: [{ c: 1 }] })
     await expect(supplierUsesWarehouseInventory('supplier-1')).resolves.toBe(false)
+    // No feature → no per-supplier warehouse COUNT (Task 11 query-count budget).
+    expect(queryMock).not.toHaveBeenCalled()
   })
 
   it('overlays warehouse qty and fail-closes missing rows', async () => {
-    // overlay -> supplierUsesWarehouseInventory (warehouses + multi_warehouse)
+    // Batched: one active-warehouse lookup for the page's suppliers, the (cached) feature
+    // check per warehouse supplier, then one stock aggregate.
     featureMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
     queryMock
-      .mockResolvedValueOnce({ rows: [{ c: 1 }] })
-      // listSupplierStockDisplay -> supplierUsesWarehouseInventory
-      .mockResolvedValueOnce({ rows: [{ c: 1 }] })
-      // listSupplierStockDisplay warehouse aggregate (only product a)
-      .mockResolvedValueOnce({
-        rows: [{ product_id: 'a', available_qty: 7, reserved_qty: 0, on_hand_qty: 7 }],
-      })
-    // listSupplierStockDisplay also calls supplierUsesWarehouseInventory
-    featureMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+      .mockResolvedValueOnce({ rows: [{ supplier_id: 's1' }] })
+      // warehouse aggregate (only product a)
+      .mockResolvedValueOnce({ rows: [{ product_id: 'a', available_qty: 7 }] })
 
     const rows = await overlayProductRowsWithAuthoritativeStock([
       { id: 'a', supplier_id: 's1', available_qty: 99 },
       { id: 'b', supplier_id: 's1', available_qty: 99 },
+      { id: 'c', supplier_id: 's2', available_qty: 5 }, // no warehouse → legacy qty kept
     ])
 
     expect(rows).toEqual([
       { id: 'a', supplier_id: 's1', available_qty: 7 },
       { id: 'b', supplier_id: 's1', available_qty: 0 },
+      { id: 'c', supplier_id: 's2', available_qty: 5 },
     ])
+    expect(queryMock).toHaveBeenCalledTimes(2)
+    expect(queryMock.mock.calls[0][1]).toEqual([['s1', 's2']])
   })
 
   it('heals a missing warehouse row without overwriting a concurrent reservation', async () => {

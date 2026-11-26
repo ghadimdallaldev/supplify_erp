@@ -2,6 +2,7 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 11 (performance and indexes)**: mobile skipped, not applicable. Server-only change: migration `0239_marketplace_indexes.sql` (product sort index) and a batched warehouse-stock overlay. Response shapes and endpoints are unchanged, so neither mobile repo needs an update.
 - **Plan A Task 10 (reviews, customer import, quotes)**: the API change is complete. The mobile change is deferred to Plan A Task 13, and the web change to Task 12.
   - **Customer growth.** `CustomerGrowthScreen.tsx` and `src/types/growth.ts` still read `match_status`, `matched_restaurant_name`, `lifecycle_status` and `existingSupplifyCustomers`.
     - The API now returns `{ id, name, email, phone, contact_person, area_region, status, invited_at }` and `followingCustomers`.
