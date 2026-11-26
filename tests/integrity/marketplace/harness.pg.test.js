@@ -22,7 +22,7 @@ let api
 beforeAll(async () => {
   db = await startMarketplaceDb()
   api = await startApiForTest()
-})
+}, 180_000)
 afterAll(async () => {
   await api?.close()
 })

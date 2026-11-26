@@ -1,5 +1,12 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-26 — Marketplace visibility and categories (release 1)
+
+Running log for branch `feat/marketplace-visibility` (plans `docs/superpowers/plans/2026-11-25-*`).
+
+- Plan A Task 1 (organisation-level relationships): mobile skipped — server-only. Follow and
+  block rows are now stored per supplier organisation; no endpoint, payload or error code changed.
+
 ## 2026-11-26 — Restaurant V4
 
 The paired Android and iOS clients use the Restaurant

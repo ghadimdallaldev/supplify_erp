@@ -25,22 +25,44 @@ const SNAPSHOT_SCHEMA = 'mkt_harness_snapshot'
 
 let started = null
 
+/**
+ * Seeded reference rows that the root TRUNCATE ... CASCADE would wipe live in tables with a
+ * direct FK to a root table, with that FK NULL (e.g. platform product_category rows have
+ * supplier_id NULL). Snapshot exactly those rows, so leftover business rows from an earlier
+ * test file are never captured. Tables only transitively linked to a root are not
+ * snapshotted (none hold seeded rows today).
+ */
 async function snapshotSeededTables(pool) {
-  await pool.query(`DROP SCHEMA IF EXISTS ${SNAPSHOT_SCHEMA} CASCADE`)
-  await pool.query(`CREATE SCHEMA ${SNAPSHOT_SCHEMA}`)
+  await pool.query(`
+    DO $snap$
+    DECLARE r record; has_rows boolean;
+    BEGIN
+      DROP SCHEMA IF EXISTS ${SNAPSHOT_SCHEMA} CASCADE;
+      CREATE SCHEMA ${SNAPSHOT_SCHEMA};
+      FOR r IN
+        SELECT c.conrelid::regclass::text AS tbl,
+               string_agg(format('%I IS NULL', a.attname), ' AND ') AS cond
+        FROM pg_constraint c
+        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+        WHERE c.contype = 'f'
+          AND c.confrelid::regclass::text = ANY (ARRAY[${ROOT_TABLES.map((t) => `'${t}'`).join(', ')}])
+          AND c.conrelid::regclass::text <> ALL (ARRAY[${ROOT_TABLES.map((t) => `'${t}'`).join(', ')}])
+        GROUP BY c.conrelid
+      LOOP
+        EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I WHERE %s)', r.tbl, r.cond)
+          INTO has_rows;
+        IF has_rows THEN
+          EXECUTE format('CREATE TABLE ${SNAPSHOT_SCHEMA}.%I AS SELECT * FROM public.%I WHERE %s',
+                         r.tbl, r.tbl, r.cond);
+        END IF;
+      END LOOP;
+    END
+    $snap$`)
   const { rows } = await pool.query(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'`
+    `SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY tablename`,
+    [SNAPSHOT_SCHEMA]
   )
-  const seeded = []
-  for (const { tablename } of rows) {
-    const { rows: c } = await pool.query(`SELECT EXISTS (SELECT 1 FROM public."${tablename}") AS x`)
-    if (!c[0].x || ROOT_TABLES.includes(tablename)) continue
-    await pool.query(
-      `CREATE TABLE ${SNAPSHOT_SCHEMA}."${tablename}" AS SELECT * FROM public."${tablename}"`
-    )
-    seeded.push(tablename)
-  }
-  return seeded
+  return rows.map((r) => r.tablename)
 }
 
 export async function startMarketplaceDb() {

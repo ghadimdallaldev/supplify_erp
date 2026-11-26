@@ -12,11 +12,20 @@ Harness DB: docker `supplify-marketplace-audit` (postgres:16-alpine, `127.0.0.1`
 
 ## Tasks
 
-| Task       | Commits (ERP / Android / iOS)                                    | Tests                                                    | Notes |
-| ---------- | ---------------------------------------------------------------- | -------------------------------------------------------- | ----- |
-| A0 harness | see git log `test(integrity): real-postgres marketplace harness` | `pnpm test:marketplace:pg` 5/5; `pnpm test:api` 411/2805 |       |
+| Task                       | Commits (ERP / Android / iOS)                                      | Tests                                                                                             | Notes          |
+| -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | -------------- |
+| A0 harness                 | 4074ced9                                                           | `pnpm test:marketplace:pg` 5/5; `pnpm test:api` 411/2805                                          |                |
+| A1 org-level relationships | see git log `feat(api): organisation-level supplier relationships` | relationship.test.js 15/15; `pnpm test:marketplace:pg` 14/14 (fresh DB); `pnpm test:api` 412/2820 | migration 0238 |
 
 ## Rulings
+
+- A1: Ruling: `supplier.organization_id` NOT NULL is backed by trigger `supplier_ensure_organization` (BEFORE INSERT OR UPDATE OF organization_id): any orgless insert or an unlink (which sets NULL) gets a new single-branch organisation. Registration now creates the organisation first. Seeds, admin create, e2e and the existing integrity tests keep working unchanged. Cost if wrong: trigger-created orgs lack org system roles until the next startup backfill (registration and unlink call `ensureOrgSystemRoles` themselves).
+- A1: Ruling: a "standalone" supplier is now the only branch of its own organisation. `linkSupplierToOrganization` moves such a supplier into the target org, re-keys/merges its follows and blocks under the exclusive locks (both org keys, ascending order), closes the emptied org (`closed_at`, `close_reason = merged_into:<id>`, never deleted) and emits `kind: rekey` (an extension of the interface's kinds). The branch-account-link email lookup uses the same definition for suppliers. Cost if wrong: linking an org that already has other branches is refused (`ok:false`), as it was before (non-NULL org never linked).
+- A1: Ruling: trigger `relationship_fill_supplier_org_id` fills `supplier_org_id` from `supplier_id` on insert for writers that only know the branch (seeds, legacy paths) during release 1; removed with `supplier_id` in Plan A Task 16. Cost if wrong: none (Task 2 writers set it explicitly).
+- A1: Ruling: `emitRelationshipChanged` awaits every hook and logs (does not throw) a failing hook, because the relationship change is already committed. In `linkSupplierToOrganization` the hooks run inside the caller's transaction (before commit). Cost if wrong: a cache could be repopulated with pre-commit state for the moved pairs (same relationships, different org key) until its TTL / next version bump.
+- A1: Ruling: "org-level relationship does not widen branch data scope" asserts 403 or 404 for a branch-B user on a branch-A order; existing branch RBAC returns 403 and Task 1 does not change order access. Cost if wrong: none for confidentiality (no data in body).
+- A1: Ruling: the re-key PG tests mock `lockOrgBranchCapacity` (trial plans allow 1 branch); capacity has its own tests. Cost if wrong: none.
+- A1: Added beyond the interface: `lockRelationshipsShared` (sorted), `FollowRequiredError`, `rekeyRelationshipsToOrg`, `resetRelationshipHooksForTests`, `connectMigrationClient` (db.js). Pre-flight: Interfaces A1→A2..A10 checked, names match.
 
 - A0: Ruling: the harness sets `SUPPLIFY_DATABASE_URL` as well as `DATABASE_URL` — `resolveNativeDatabaseUrl()` rewrites any localhost `DATABASE_URL` whose port differs from the dev `supplify-postgres` container to that container, so `DATABASE_URL` alone silently targets the developer database. Cost if wrong: none (extra guard; harness also asserts `current_database()`).
 - A0: Ruling: test identities come from mocking `lib/auth.js` `verifyToken` (JWT-shaped `test.<payload>.sig` tokens with `exp`), with `x-test-user` translated to a Bearer header by an outer express wrapper; user/tenant/RBAC resolution stays real. Cost if wrong: auth itself is not covered by these tests (covered by existing unit tests).

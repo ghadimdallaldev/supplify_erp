@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { query, migrationQuery } from './db.js'
+import { query, migrationQuery, connectMigrationClient } from './db.js'
 import { logger } from './logger.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -148,8 +148,31 @@ export async function baseSchemaExists() {
   return Boolean(rows[0]?.exists)
 }
 
-/** Apply numbered SQL files from apps/api/db/migrations (idempotent via schema_migrations). */
+const MIGRATION_LOCK_KEY = 'supplify:sql-migrations'
+
+/**
+ * Apply numbered SQL files from apps/api/db/migrations (idempotent via schema_migrations).
+ * A session-level advisory lock, held on one dedicated client for the whole run, serialises
+ * concurrent runs (several API instances starting at once); the applied set is read only
+ * after the lock is held, so each file is applied exactly once.
+ */
 export async function runAllSqlMigrations() {
+  const lockClient = await connectMigrationClient()
+  try {
+    await lockClient.query('SELECT pg_advisory_lock(hashtextextended($1, 0))', [MIGRATION_LOCK_KEY])
+    try {
+      await runAllSqlMigrationsLocked()
+    } finally {
+      await lockClient
+        .query('SELECT pg_advisory_unlock(hashtextextended($1, 0))', [MIGRATION_LOCK_KEY])
+        .catch((error) => logger.warn('Migration lock release failed', { error: error.message }))
+    }
+  } finally {
+    lockClient.release()
+  }
+}
+
+async function runAllSqlMigrationsLocked() {
   logger.info('Ensuring schema_migrations table exists')
   await query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (

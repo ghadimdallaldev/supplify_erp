@@ -96,11 +96,18 @@ async function resolveTargetTenant({ orgType, targetTenantId, targetOwnerEmail }
   }
   const email = (targetOwnerEmail || '').trim().toLowerCase()
   if (!email) return null
+  // Every supplier has an organisation (0238); a standalone supplier is the only branch of its
+  // own organisation. Restaurants keep the NULL-organisation meaning.
+  const standalone =
+    table === 'supplier'
+      ? `NOT EXISTS (SELECT 1 FROM supplier sib
+                     WHERE sib.organization_id = t.organization_id AND sib.id <> t.id)`
+      : 't.organization_id IS NULL'
   const { rows } = await query(
-    `SELECT id, name, contact_email, organization_id, is_branch_active
-     FROM ${table}
-     WHERE LOWER(TRIM(contact_email)) = $1 AND organization_id IS NULL
-     ORDER BY created_at ASC
+    `SELECT t.id, t.name, t.contact_email, t.organization_id, t.is_branch_active
+     FROM ${table} t
+     WHERE LOWER(TRIM(t.contact_email)) = $1 AND ${standalone}
+     ORDER BY t.created_at ASC
      LIMIT 1`,
     [email]
   )
