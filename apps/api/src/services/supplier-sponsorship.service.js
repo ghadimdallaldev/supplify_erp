@@ -19,6 +19,7 @@ import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
+import { getProspectView } from './supplier-customer-matching.service.js'
 import {
   RestaurantNotAvailableError,
   canSeeRestaurant,
@@ -199,16 +200,24 @@ export async function canCreateSponsorship(
   }
 
   let prospect = null
+  let prospectRestaurantId = null
   if (prospectId) {
     const { rows } = await query(
-      `SELECT * FROM supplier_customer_prospect WHERE id = $1 AND supplier_id = $2`,
+      `SELECT matched_restaurant_id FROM supplier_customer_prospect WHERE id = $1 AND supplier_id = $2`,
       [prospectId, supplierId]
     )
-    prospect = rows[0] || null
-    if (!prospect) reasons.push('prospect_not_found')
+    if (!rows.length) reasons.push('prospect_not_found')
+    else {
+      prospect = await getProspectView(supplierId, prospectId)
+      // A prospect's match is used only when the restaurant already follows the supplier;
+      // otherwise the offer behaves exactly like one to an unregistered prospect, so the
+      // response never reveals whether the contact is on Supplify (spec §6.2 item 1).
+      const matched = rows[0].matched_restaurant_id
+      if (matched && (await canSeeRestaurant(matched, supplierId))) prospectRestaurantId = matched
+    }
   }
 
-  const resolvedRestaurantId = restaurantId || prospect?.matched_restaurant_id || null
+  const resolvedRestaurantId = restaurantId || prospectRestaurantId || null
   if (resolvedRestaurantId) {
     if (resolvedRestaurantId === supplierId) reasons.push('same_tenant')
     // A sponsorship pays one restaurant's plan: it needs a current follow and no block

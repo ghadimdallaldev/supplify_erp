@@ -1,9 +1,10 @@
 import { query } from '../lib/db.js'
+import { PROSPECT_STATUS_SQL_FOR_METRICS } from './supplier-customer-matching.service.js'
 
 export async function getSupplierGrowthMetrics(supplierId) {
   const [
     imported,
-    existingSupplify,
+    following,
     invited,
     sponsored,
     registered,
@@ -15,9 +16,10 @@ export async function getSupplierGrowthMetrics(supplierId) {
     query(`SELECT COUNT(*)::int AS c FROM supplier_customer_prospect WHERE supplier_id = $1`, [
       supplierId,
     ]),
+    // Prospects whose restaurant now follows the supplier (never "already on Supplify").
     query(
-      `SELECT COUNT(*)::int AS c FROM supplier_customer_prospect
-       WHERE supplier_id = $1 AND match_status = 'existing_supplify'`,
+      `SELECT COUNT(*)::int AS c FROM supplier_customer_prospect p
+       WHERE p.supplier_id = $1 AND (${PROSPECT_STATUS_SQL_FOR_METRICS}) = 'following'`,
       [supplierId]
     ),
     query(
@@ -85,7 +87,7 @@ export async function getSupplierGrowthMetrics(supplierId) {
 
   return {
     importedCustomers: imported.rows[0]?.c ?? 0,
-    existingSupplifyCustomers: existingSupplify.rows[0]?.c ?? 0,
+    followingCustomers: following.rows[0]?.c ?? 0,
     invitedCustomers: invited.rows[0]?.c ?? 0,
     sponsoredCustomers: sponsored.rows[0]?.c ?? 0,
     registeredCustomers: registered.rows[0]?.c ?? 0,

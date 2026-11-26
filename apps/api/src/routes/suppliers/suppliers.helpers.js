@@ -18,7 +18,7 @@ export const brandingUpdateSchema = z.object({
   brandDisplayName: z.string().max(120).optional().nullable(),
 })
 
-export async function attachReviewFields(suppliers) {
+export async function attachReviewFields(suppliers, { viewerRestaurantId = null } = {}) {
   if (!suppliers.length) return suppliers
   const ids = [
     ...new Set(
@@ -31,7 +31,7 @@ export async function attachReviewFields(suppliers) {
   ]
   const [summaries, reviewsBySupplier] = await Promise.all([
     getSupplierRatingSummariesBatch(ids),
-    getRecentReviewsForSuppliersBatch(ids, 3),
+    getRecentReviewsForSuppliersBatch(ids, 3, { viewerRestaurantId }),
   ])
   return suppliers.map((s) => {
     const scopeIds =

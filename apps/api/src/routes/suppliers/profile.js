@@ -841,7 +841,7 @@ async function handleGetSupplierById(req, res) {
     const supplier = result.rows[0]
     const [summaries, reviewsBySupplier] = await Promise.all([
       getSupplierRatingSummariesBatch(supplierIds),
-      getRecentReviewsForSuppliersBatch(supplierIds, 5),
+      getRecentReviewsForSuppliersBatch(supplierIds, 5, { viewerRestaurantId: restaurantId }),
     ])
     let reviewCount = 0
     let weightedRating = 0

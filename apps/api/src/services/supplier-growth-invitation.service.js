@@ -37,9 +37,6 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   )
   if (!prospects.length) throw new NotFoundError('Prospect not found')
   const prospect = prospects[0]
-  if (prospect.match_status === 'existing_supplify') {
-    throw new ValidationError('Restaurant already on Supplify - use connection request instead')
-  }
 
   await assertSupplierActiveCustomerLocationCapacity(supplierId, {
     action: 'growth.invite_sent',
@@ -70,17 +67,10 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   const inviteUrl = buildReferralInviteUrl(token)
   const message = `${supplierName} has invited you to join Supplify and manage your ordering digitally. ${inviteUrl}`
 
-  if (channel === 'email' && prospect.email) {
-    await sendTeamInvitationEmail({
-      to: prospect.email,
-      inviteUrl,
-      invitedName: prospect.contact_person || prospect.restaurant_name,
-      tenantName: supplierName,
-      tenantType: 'SUPPLIER',
-      invitationId: rows[0].id,
-      tenantId: supplierId,
-    }).catch(() => {})
-  }
+  // Matching and the matched/unmatched branch run after the response (identical for every
+  // prospect, spec §11.4); the job also sends the email for unmatched prospects.
+  const { enqueueProspectInvite } = await import('../jobs/prospect-invite.job.js')
+  enqueueProspectInvite({ supplierId, prospectId, invitationId: rows[0].id, channel })
 
   if (req) {
     await writeAuditLog(req, {
@@ -94,12 +84,43 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   const whatsappUrl =
     channel === 'whatsapp' ? buildWhatsAppShareLink(prospect.phone, message) : null
 
+  const invitation = rows[0]
   return {
-    invitation: rows[0],
+    invitation: {
+      id: invitation.id,
+      channel: invitation.channel,
+      status: invitation.status,
+      expiresAt: invitation.expires_at,
+      sentAt: invitation.sent_at,
+    },
     inviteUrl,
     whatsappUrl,
     message,
   }
+}
+
+/** Email invite for a prospect with no Supplify match (run by the invite job). */
+export async function sendUnmatchedProspectInvite({ supplierId, prospectId, invitationId }) {
+  const { rows } = await query(
+    `SELECT gi.token, p.email, p.contact_person, p.restaurant_name, s.name AS supplier_name
+     FROM supplier_growth_invitation gi
+     JOIN supplier_customer_prospect p ON p.id = gi.prospect_id
+     JOIN supplier s ON s.id = gi.supplier_id
+     WHERE gi.id = $1 AND gi.supplier_id = $2 AND gi.prospect_id = $3`,
+    [invitationId, supplierId, prospectId]
+  )
+  const inv = rows[0]
+  if (!inv?.email) return false
+  await sendTeamInvitationEmail({
+    to: inv.email,
+    inviteUrl: buildReferralInviteUrl(inv.token),
+    invitedName: inv.contact_person || inv.restaurant_name,
+    tenantName: inv.supplier_name || 'Your supplier',
+    tenantType: 'SUPPLIER',
+    invitationId,
+    tenantId: supplierId,
+  }).catch(() => {})
+  return true
 }
 
 export async function getReferralInvitePublic(token) {

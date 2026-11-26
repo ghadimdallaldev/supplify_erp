@@ -27,6 +27,10 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
   - Others appear as `Other customers` in aggregates.
   - Accounting CSV exports stay order-scoped: the supplier's own invoices and payments, including those of restaurants that later unfollowed or blocked.
   - The Assistant's `get_followed_suppliers` lists followed organisations. Reorder suggestions exclude blocked suppliers and label non-followed ones. See `ai-smart-reorder.md`.
+- **Quotes** stay restaurant-initiated and need no follow.
+  - The invited supplier sees only the restaurant's display name, the note, the needed-by date and its own product lines. The detail response no longer has `restaurantId`.
+  - A block (organisation level) hides the quote from that supplier's inbox, detail, response and decline (404). The block also makes the supplier ineligible for new quotes.
+- **Customer import and reviews** never reveal a restaurant. See `supplier-customer-growth.md` and `supplier-reviews.md`.
 - **Supplier side: followers only.** The customer list (`GET /api/restaurants`) shows only restaurants that follow the supplier's organisation and have not blocked it. Past customers who unfollowed drop off the list; their names stay on the supplier's own orders and invoices.
   - Customer detail, manual orders (`POST /api/orders/manual`) and contract pricing (create, bulk, PATCH) need a current follow and no block. A past order no longer qualifies.
   - The check runs before any restaurant, branch or contract lookup. Unknown, never-followed and blocked restaurants (and foreign branch ids, and unknown contract ids) all get the same 404 `RESTAURANT_NOT_AVAILABLE`.

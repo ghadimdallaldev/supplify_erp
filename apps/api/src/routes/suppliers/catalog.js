@@ -196,7 +196,9 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
 
     const { rows } = await query(sql, queryParams)
 
-    const suppliersWithReviews = await attachReviewFields(rows)
+    const suppliersWithReviews = await attachReviewFields(rows, {
+      viewerRestaurantId: restaurantId,
+    })
     const suppliersWithDeals = await attachStoreDealFields(suppliersWithReviews, { restaurantId })
     const publicSuppliers = suppliersWithDeals.map(({ supplier_ids, ...supplier }) => {
       const presented = presentPublicSupplier(supplier)

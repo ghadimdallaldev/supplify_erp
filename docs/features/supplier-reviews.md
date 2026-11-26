@@ -6,6 +6,12 @@ Restaurants can rate suppliers after a delivered order. Ratings are aggregated p
 
 **Plan gate:** `supplier_reviews` — **Silver+** restaurant plans (off on Free Trial).
 
+## Reviewer identity (marketplace visibility release 1, 2026-11-26)
+
+- Every review list (public `GET /api/reviews/suppliers/:id`, supplier directory cards, supplier detail) returns `reviewer_label: "Verified restaurant"` and no restaurant id or name.
+- `is_own` is `true` only for the signed-in restaurant's own reviews. The public route accepts an optional session for this.
+- `GET /api/reviews/my` is unchanged: a restaurant always sees its own reviews.
+
 ## Rules
 
 - One review per `customer_order` (enforced by unique `order_id`).

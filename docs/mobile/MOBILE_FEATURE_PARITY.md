@@ -2,6 +2,14 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 10 (reviews, customer import, quotes)**: the API change is complete. The mobile change is deferred to Plan A Task 13, and the web change to Task 12.
+  - **Customer growth.** `CustomerGrowthScreen.tsx` and `src/types/growth.ts` still read `match_status`, `matched_restaurant_name`, `lifecycle_status` and `existingSupplifyCustomers`.
+    - The API now returns `{ id, name, email, phone, contact_person, area_region, status, invited_at }` and `followingCustomers`.
+    - `/connect` and `/rematch` are gone. Invite is the single action.
+  - **Reviews.** Reviews carry `reviewer_label` and `is_own`, and no restaurant name.
+  - **Quotes.** Supplier quote detail has no `restaurantId`. A quote from a restaurant that blocked the supplier returns 404.
+  - **Notifications.** The new in-app notification type `SUPPLIER_FOLLOW_INVITE` (category `supplier_connection_request`) is sent to restaurants. Its metadata is `{ connectionRequestId, supplierId, ctaUrl }`, with Follow / Dismiss through the existing connection-request accept and decline endpoints.
+
 - **Plan A Task 9 (sponsorships and deals)**: the API change is complete. Mobile follow-up is deferred to Plan A Task 13.
   - Deal create and update reject `restaurantIds` with 400, and deal payloads no longer carry `restaurant_ids`. Neither mobile repo sends or reads them (checked with grep), so nothing changes there.
   - The sponsorship offer endpoint returns 404 `RESTAURANT_NOT_AVAILABLE`. Task 13 adds the copy, if the mobile supplier growth surface exposes sponsorship.

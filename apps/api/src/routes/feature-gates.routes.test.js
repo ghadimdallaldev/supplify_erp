@@ -31,6 +31,7 @@ vi.mock('../lib/db.js', () => {
 })
 
 vi.mock('../lib/rbac.js', () => ({
+  optionalAuth: (req, res, next) => next(),
   requireAuth: vi.fn(async (req, res, next) => {
     req.userData = req.userData || { ...mockUser, id: 'user-1', role: 'RESTAURANT' }
     next()

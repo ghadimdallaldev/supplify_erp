@@ -1873,8 +1873,8 @@ export async function notifyQuoteRequestReceived(
     })
     if (alreadySent) return null
 
+    // §11.3: the supplier learns only the restaurant's display name (no id in metadata).
     const { rows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [restaurantId])
-    const restaurantName = rows[0]?.name || nt('common.aRestaurant', locale)
 
     return notifyTenantUsers({
       tenantId: supplierId,

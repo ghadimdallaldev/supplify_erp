@@ -1,10 +1,10 @@
 import { query } from '../lib/db.js'
 import { getReferralProgramConfig } from '../lib/platform-settings.js'
-import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
+import { NotFoundError } from '../middlewares/errorHandler.js'
+import { blockedExistsSql, followExistsSql } from '../lib/relationship.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 import { followSupplier } from './relationship-writes.service.js'
-import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
   const d = new Date(date)
@@ -12,45 +12,28 @@ function addDays(date, days) {
   return d
 }
 
-export async function createConnectionRequest(supplierId, prospectId, { req = null } = {}) {
+/**
+ * In-app follow invite for a prospect that matched an existing restaurant. Called only from
+ * the asynchronous invite job; the supplier never learns which branch ran. A restaurant that
+ * blocked the supplier organisation, or already follows it, gets nothing.
+ * @returns {Promise<'blocked' | 'already_following' | 'pending' | 'sent'>}
+ */
+export async function dispatchMatchedFollowInvite({ supplierId, prospectId, restaurantId }) {
   const config = await getReferralProgramConfig()
-  const { rows: prospects } = await query(
-    `SELECT * FROM supplier_customer_prospect WHERE id = $1 AND supplier_id = $2`,
-    [prospectId, supplierId]
-  )
-  if (!prospects.length) throw new NotFoundError('Prospect not found')
-  const prospect = prospects[0]
-  if (prospect.match_status !== 'existing_supplify' || !prospect.matched_restaurant_id) {
-    throw new ValidationError('Prospect is not matched to an existing Supplify restaurant')
-  }
-
-  const restaurantId = prospect.matched_restaurant_id
-
-  const { rows: followRows } = await query(
-    `SELECT 1 FROM supplier_follow WHERE supplier_id = $1 AND restaurant_id = $2`,
+  const { rows: rel } = await query(
+    `SELECT ${blockedExistsSql('$2', 's')} AS blocked, ${followExistsSql('$2', 's')} AS following
+     FROM supplier s WHERE s.id = $1`,
     [supplierId, restaurantId]
   )
-  if (followRows.length) {
-    await query(
-      `UPDATE supplier_customer_prospect SET lifecycle_status = 'connected', updated_at = now()
-       WHERE id = $1`,
-      [prospectId]
-    )
-    return { alreadyConnected: true, restaurantId }
-  }
+  if (!rel.length || rel[0].blocked) return 'blocked'
+  if (rel[0].following) return 'already_following'
 
   const { rows: pending } = await query(
     `SELECT id FROM supplier_connection_request
-     WHERE supplier_id = $1 AND restaurant_id = $2 AND status = 'pending'`,
+     WHERE supplier_id = $1 AND restaurant_id = $2 AND status = 'pending' AND expires_at > now()`,
     [supplierId, restaurantId]
   )
-  if (pending.length) {
-    return { connectionRequest: pending[0], restaurantId }
-  }
-
-  await assertSupplierActiveCustomerLocationCapacity(supplierId, {
-    action: 'growth.connection_request',
-  })
+  if (pending.length) return 'pending'
 
   const expiresAt = addDays(new Date(), config.connectionRequestExpiryDays || 30)
   const { rows } = await query(
@@ -58,44 +41,29 @@ export async function createConnectionRequest(supplierId, prospectId, { req = nu
        supplier_id, restaurant_id, prospect_id, status, expires_at
      )
      VALUES ($1, $2, $3, 'pending', $4)
-     RETURNING *`,
+     RETURNING id`,
     [supplierId, restaurantId, prospectId, expiresAt]
   )
-
-  await query(
-    `UPDATE supplier_customer_prospect SET lifecycle_status = 'connection_pending', updated_at = now()
-     WHERE id = $1`,
-    [prospectId]
-  )
-
   const { rows: supplierRows } = await query(`SELECT name FROM supplier WHERE id = $1`, [
     supplierId,
   ])
-
+  const supplierName = supplierRows[0]?.name || 'A supplier'
   await notifyTenantUsers({
     tenantId: restaurantId,
     tenantType: 'RESTAURANT',
-    notificationType: 'supplier_connection_request',
+    notificationType: 'SUPPLIER_FOLLOW_INVITE',
     notificationCategory: 'supplier_connection_request',
-    title: 'Supplier connection request',
-    message: `${supplierRows[0]?.name || 'A supplier'} wants to connect with your restaurant on Supplify.`,
+    title: 'Follow invite',
+    message: `${supplierName} invited you to follow them`,
+    referenceId: rows[0].id,
+    referenceType: 'SUPPLIER_FOLLOW_INVITE',
     metadata: {
       connectionRequestId: rows[0].id,
       supplierId,
       ctaUrl: '/app/suppliers',
     },
   }).catch(() => {})
-
-  if (req) {
-    await writeAuditLog(req, {
-      action: 'growth.connection_request',
-      entityType: 'supplier_connection_request',
-      entityId: rows[0].id,
-      metadata: { prospectId, restaurantId },
-    })
-  }
-
-  return { connectionRequest: rows[0], restaurantId }
+  return 'sent'
 }
 
 export async function listConnectionRequestsForRestaurant(restaurantId) {
@@ -105,6 +73,7 @@ export async function listConnectionRequestsForRestaurant(restaurantId) {
      JOIN supplier s ON s.id = cr.supplier_id
      LEFT JOIN supplier_customer_prospect p ON p.id = cr.prospect_id
      WHERE cr.restaurant_id = $1 AND cr.status = 'pending' AND cr.expires_at > now()
+       AND NOT ${blockedExistsSql('cr.restaurant_id', 's')}
      ORDER BY cr.created_at DESC`,
     [restaurantId]
   )
@@ -136,33 +105,14 @@ export async function respondToConnectionRequest(
     [requestId, status]
   )
 
-  if (accept) {
-    if (cr.prospect_id) {
-      await query(
-        `UPDATE supplier_customer_prospect SET lifecycle_status = 'connected', updated_at = now()
-         WHERE id = $1`,
-        [cr.prospect_id]
-      )
-    }
-    await notifyTenantUsers({
-      tenantId: cr.supplier_id,
-      tenantType: 'SUPPLIER',
-      notificationType: 'connection_request_accepted',
-      notificationCategory: 'connection_request_accepted',
-      title: 'Connection accepted',
-      message: 'A restaurant accepted your connection request.',
-      metadata: { restaurantId, connectionRequestId: requestId, ctaUrl: '/app/restaurants' },
-    }).catch(() => {})
-  } else {
-    await notifyTenantUsers({
-      tenantId: cr.supplier_id,
-      tenantType: 'SUPPLIER',
-      notificationType: 'connection_request_declined',
-      notificationCategory: 'connection_request_declined',
-      title: 'Connection declined',
-      message: 'A restaurant declined your connection request.',
-      metadata: { restaurantId, connectionRequestId: requestId, ctaUrl: '/app/restaurants' },
-    }).catch(() => {})
+  // No notification goes back to the supplier on accept or decline (spec §11.4): the
+  // prospect simply shows "following" once the follow exists.
+  if (accept && cr.prospect_id) {
+    await query(
+      `UPDATE supplier_customer_prospect SET lifecycle_status = 'connected', updated_at = now()
+       WHERE id = $1`,
+      [cr.prospect_id]
+    )
   }
 
   if (req) {
