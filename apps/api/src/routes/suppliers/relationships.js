@@ -40,9 +40,14 @@ import {
   supplierUpdateSchema,
   supplierListSchema,
 } from './suppliers.helpers.js'
-import { resolveSupplierScope } from '../../services/public-supplier-catalog.service.js'
 import { listCommonProductBestPrices } from '../../services/supplier-price-comparison.service.js'
 import { tenantFeatureGate } from '../../lib/tenant-feature-gate.js'
+import {
+  blockSupplier,
+  followSupplier,
+  unblockSupplier,
+  unfollowSupplier,
+} from '../../services/relationship-writes.service.js'
 
 const router = express.Router()
 
@@ -88,16 +93,16 @@ router.get(
 
       const { rows } = await query(
         `
-      SELECT DISTINCT ON (COALESCE(s.organization_id, s.id))
+      SELECT DISTINCT ON (sf.supplier_org_id)
         s.*,
-        COALESCE(so.id, s.id) AS supplier_organization_id,
-        COALESCE(so.name, s.name) AS organization_name,
+        so.id AS supplier_organization_id,
+        so.name AS organization_name,
         sf.created_at as followed_at
-      FROM supplier s
-      JOIN supplier_follow sf ON sf.supplier_id = s.id
-      LEFT JOIN supplier_organizations so ON so.id = s.organization_id
+      FROM supplier_follow sf
+      JOIN supplier_organizations so ON so.id = sf.supplier_org_id
+      JOIN supplier s ON s.organization_id = sf.supplier_org_id AND s.is_branch_active = TRUE
       WHERE sf.restaurant_id = $1
-      ORDER BY COALESCE(s.organization_id, s.id), sf.created_at DESC
+      ORDER BY sf.supplier_org_id, s.is_main_branch DESC, s.created_at ASC
     `,
         [restaurantId]
       )
@@ -123,268 +128,91 @@ router.get(
   }
 )
 
-// Follow/Unfollow supplier (restaurant only)
-router.post(
-  '/:id/follow',
-  requireAuth,
-  resolveTenantContext,
-  tenantFeatureGate('supplier_following'),
-  requireRole(['RESTAURANT']),
-  restaurantSupplierMutationGuard,
-  async (req, res) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
-        throw new ValidationError('Restaurant not found')
-      }
-      const restaurantId = tenant.tenantId
-      const supplierScope = await resolveSupplierScope(id)
-
-      // Check if already followed
-      const { rows: existing } = await query(
-        'SELECT * FROM supplier_follow WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
-        [supplierScope.supplierIds, restaurantId]
-      )
-
-      if (existing.length > 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Supplier is already being followed',
-          },
-          requestId: req.requestId,
-        })
-      }
-
-      // Check plan limit for suppliers_per_restaurant
-      const { checkLimit } = await import('../../lib/subscription.js')
-      const limitCheck = await checkLimit(restaurantId, 'RESTAURANT', 'suppliers_per_restaurant')
-
-      // Get current follow count
-      const { rows: followCount } = await query(
-        'SELECT COUNT(*) as count FROM supplier_follow WHERE restaurant_id = $1',
-        [restaurantId]
-      )
-
-      const currentFollowCount = parseInt(followCount[0]?.count || 0)
-
-      // Check if within limit (or unlimited)
-      if (
-        !limitCheck.isUnlimited &&
-        limitCheck.limit !== null &&
-        currentFollowCount >= limitCheck.limit
-      ) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'SUPPLIER_FOLLOW_LIMIT_REACHED',
-            message: `You have reached your plan limit for followed suppliers (${limitCheck.limit}). Upgrade your plan to follow more suppliers.`,
-            details: {
-              current: currentFollowCount,
-              limit: limitCheck.limit,
-              requiredPlan: 'Growth',
-            },
-          },
-          requestId: req.requestId,
-        })
-      }
-
-      await query('INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)', [
-        supplierScope.tenantId,
-        restaurantId,
-      ])
-
-      logger.info('Supplier followed', {
-        supplierId: id,
-        restaurantId,
-        followCount: currentFollowCount + 1,
-      })
-
-      res.json({
-        ok: true,
-        data: { message: 'Supplier followed successfully' },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Follow supplier error:', error)
-
-      // ValidationError is already handled by the error handler middleware
-      if (error instanceof ValidationError) {
-        throw error
-      }
-
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to follow supplier',
-        },
-        requestId: req.requestId,
-      })
-    }
+// Follow / unfollow / block / unblock (restaurant only). Relationships are per supplier
+// organisation; every write goes through relationship-writes.service (locks, cap, hooks).
+async function requireRestaurantTenant(req) {
+  const tenant = await getRequestTenant(req)
+  if (!tenant || tenant.tenantType !== 'RESTAURANT') {
+    throw new ValidationError('Restaurant not found')
   }
-)
+  return tenant.tenantId
+}
 
-router.delete(
-  '/:id/follow',
-  requireAuth,
-  resolveTenantContext,
-  tenantFeatureGate('supplier_following'),
-  requireRole(['RESTAURANT']),
-  restaurantSupplierMutationGuard,
-  async (req, res) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
-        throw new ValidationError('Restaurant not found')
+/** Any active branch of the supplier (by branch id, organisation id or slug). Private
+ * catalogs are followable ("Follow to see the catalog"), so no public-catalog filter. */
+async function resolveRelationshipTarget(idOrSlug) {
+  const { rows } = await query(
+    `SELECT s.id
+     FROM supplier s
+     JOIN supplier_organizations so ON so.id = s.organization_id
+     WHERE (s.id::text = $1 OR so.id::text = $1 OR s.slug = $1 OR so.slug = $1)
+       AND s.is_branch_active = TRUE
+     ORDER BY s.is_main_branch DESC, s.created_at ASC
+     LIMIT 1`,
+    [idOrSlug]
+  )
+  if (!rows[0]) throw new NotFoundError('Supplier not found')
+  return rows[0].id
+}
+
+function relationshipWriteRoute(method, path, handler) {
+  router[method](
+    path,
+    requireAuth,
+    resolveTenantContext,
+    tenantFeatureGate('supplier_following'),
+    requireRole(['RESTAURANT']),
+    restaurantSupplierMutationGuard,
+    async (req, res, next) => {
+      try {
+        const restaurantId = await requireRestaurantTenant(req)
+        const supplierId = await resolveRelationshipTarget(req.params.id)
+        const data = await handler({ req, restaurantId, supplierId })
+        res.json({ ok: true, data, error: null, requestId: req.requestId })
+      } catch (error) {
+        next(error)
       }
-      const restaurantId = tenant.tenantId
-      const supplierScope = await resolveSupplierScope(id)
-
-      await query(
-        'DELETE FROM supplier_follow WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
-        [supplierScope.supplierIds, restaurantId]
-      )
-
-      logger.info('Supplier unfollowed', { supplierId: id, restaurantId })
-
-      res.json({
-        ok: true,
-        data: { message: 'Supplier unfollowed successfully' },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Unfollow supplier error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to unfollow supplier',
-        },
-        requestId: req.requestId,
-      })
     }
+  )
+}
+
+relationshipWriteRoute('post', '/:id/follow', async ({ restaurantId, supplierId }) => {
+  const result = await followSupplier({ restaurantId, supplierId, source: 'manual' })
+  return {
+    message: 'Supplier followed successfully',
+    followed: true,
+    alreadyFollowing: result.alreadyFollowing,
+    supplierOrganizationId: result.supplierOrgId,
   }
-)
+})
 
-// Block/Unblock supplier (restaurant only)
-router.post(
-  '/:id/block',
-  requireAuth,
-  resolveTenantContext,
-  tenantFeatureGate('supplier_following'),
-  requireRole(['RESTAURANT']),
-  restaurantSupplierMutationGuard,
-  async (req, res) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
-        throw new ValidationError('Restaurant not found')
-      }
-      const restaurantId = tenant.tenantId
-      const supplierScope = await resolveSupplierScope(id)
-      const { reason } = req.body
-
-      // Check if already blocked
-      const { rows: existing } = await query(
-        'SELECT * FROM supplier_blocklist WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
-        [supplierScope.supplierIds, restaurantId]
-      )
-
-      if (existing.length > 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message: 'Supplier is already blocked',
-          },
-          requestId: req.requestId,
-        })
-      }
-
-      await query(
-        'INSERT INTO supplier_blocklist (supplier_id, restaurant_id, reason) VALUES ($1, $2, $3)',
-        [supplierScope.tenantId, restaurantId, reason || null]
-      )
-
-      logger.info('Supplier blocked', { supplierId: id, restaurantId, reason })
-
-      res.json({
-        ok: true,
-        data: { message: 'Supplier blocked successfully' },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Block supplier error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to block supplier',
-        },
-        requestId: req.requestId,
-      })
-    }
+relationshipWriteRoute('delete', '/:id/follow', async ({ restaurantId, supplierId }) => {
+  const result = await unfollowSupplier({ restaurantId, supplierId })
+  return {
+    message: 'Supplier unfollowed successfully',
+    followed: false,
+    supplierOrganizationId: result.supplierOrgId,
   }
-)
+})
 
-router.delete(
-  '/:id/block',
-  requireAuth,
-  resolveTenantContext,
-  tenantFeatureGate('supplier_following'),
-  requireRole(['RESTAURANT']),
-  restaurantSupplierMutationGuard,
-  async (req, res) => {
-    try {
-      const { id } = req.params
-      const tenant = await getRequestTenant(req)
-      if (!tenant || tenant.tenantType !== 'RESTAURANT') {
-        throw new ValidationError('Restaurant not found')
-      }
-      const restaurantId = tenant.tenantId
-      const supplierScope = await resolveSupplierScope(id)
-
-      await query(
-        'DELETE FROM supplier_blocklist WHERE supplier_id = ANY($1::uuid[]) AND restaurant_id = $2',
-        [supplierScope.supplierIds, restaurantId]
-      )
-
-      logger.info('Supplier unblocked', { supplierId: id, restaurantId })
-
-      res.json({
-        ok: true,
-        data: { message: 'Supplier unblocked successfully' },
-        error: null,
-        requestId: req.requestId,
-      })
-    } catch (error) {
-      logger.error('Unblock supplier error:', error)
-      res.status(500).json({
-        ok: false,
-        data: null,
-        error: {
-          name: 'INTERNAL_ERROR',
-          message: 'Failed to unblock supplier',
-        },
-        requestId: req.requestId,
-      })
-    }
+relationshipWriteRoute('post', '/:id/block', async ({ req, restaurantId, supplierId }) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : null
+  const result = await blockSupplier({ restaurantId, supplierId, reason })
+  return {
+    message: 'Supplier blocked successfully',
+    blocked: true,
+    supplierOrganizationId: result.supplierOrgId,
   }
-)
+})
+
+relationshipWriteRoute('delete', '/:id/block', async ({ restaurantId, supplierId }) => {
+  const result = await unblockSupplier({ restaurantId, supplierId })
+  return {
+    message: 'Supplier unblocked successfully',
+    blocked: false,
+    supplierOrganizationId: result.supplierOrgId,
+  }
+})
 
 export { router as suppliersRoutes }
 

@@ -3,6 +3,7 @@ import { getReferralProgramConfig } from '../lib/platform-settings.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { notifyTenantUsers } from './notification/in-app.js'
+import { followSupplier } from './relationship-writes.service.js'
 import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
@@ -125,17 +126,17 @@ export async function respondToConnectionRequest(
   const cr = rows[0]
   const status = accept ? 'accepted' : 'declined'
 
+  // Follow first (blocklist + plan cap enforced, race-safe), then record the response.
+  if (accept) {
+    await followSupplier({ restaurantId, supplierId: cr.supplier_id, source: 'invite' })
+  }
+
   await query(
     `UPDATE supplier_connection_request SET status = $2, responded_at = now() WHERE id = $1`,
     [requestId, status]
   )
 
   if (accept) {
-    await query(
-      `INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [cr.supplier_id, restaurantId]
-    )
     if (cr.prospect_id) {
       await query(
         `UPDATE supplier_customer_prospect SET lifecycle_status = 'connected', updated_at = now()

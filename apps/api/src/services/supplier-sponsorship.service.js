@@ -1012,11 +1012,7 @@ export async function activateSponsorship(sponsorshipId, { client = null } = {})
       if (e.code !== '42P01') throw e
     }
 
-    await db.query(
-      `INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)
-       ON CONFLICT DO NOTHING`,
-      [sponsorship.supplier_id, sponsorship.restaurant_id]
-    )
+    // No auto-follow: offers only go to restaurants that already follow the supplier.
 
     if (sponsorship.prospect_id) {
       await db.query(

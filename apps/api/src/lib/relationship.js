@@ -166,13 +166,34 @@ export function followRequired(res, req, suppliers) {
   })
 }
 
-/** Error class for service-level code; the error handler maps it to the same 403 body. */
-export class FollowRequiredError extends Error {
+/**
+ * Base for relationship domain errors with a public contract; errorHandler maps
+ * `expose: true` errors to `{ name: code, message, details }` with `statusCode`.
+ */
+export class RelationshipError extends Error {
+  constructor(code, message, statusCode, details = null) {
+    super(message)
+    this.name = 'RelationshipError'
+    this.code = code
+    this.statusCode = statusCode
+    this.details = details
+    this.expose = true
+  }
+}
+
+/** Service-level FOLLOW_REQUIRED; same 403 body as followRequired(). */
+export class FollowRequiredError extends RelationshipError {
   constructor(suppliers) {
-    super('Follow this supplier to continue')
-    this.name = 'FOLLOW_REQUIRED'
-    this.statusCode = 403
-    this.details = { suppliers: (suppliers || []).map((s) => ({ id: s.id, name: s.name ?? null })) }
+    super('FOLLOW_REQUIRED', 'Follow this supplier to continue', 403, {
+      suppliers: (suppliers || []).map((s) => ({ id: s.id, name: s.name ?? null })),
+    })
+  }
+}
+
+/** Service-level RESTAURANT_NOT_AVAILABLE; same 404 body as restaurantNotAvailable(). */
+export class RestaurantNotAvailableError extends RelationshipError {
+  constructor() {
+    super('RESTAURANT_NOT_AVAILABLE', 'Restaurant not available', 404)
   }
 }
 

@@ -1,10 +1,16 @@
 import { query, withTransaction, withSavepoint } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { getReferralProgramConfig, getFreeSandboxDays } from '../lib/platform-settings.js'
 import { generateInviteToken, buildInviteUrl, inviteExpiresAt } from './invitationTokens.js'
 import { sendTeamInvitationEmail } from './invitation-mail.service.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
+import {
+  SupplierBlockedError,
+  SupplierFollowLimitError,
+  followSupplier,
+} from './relationship-writes.service.js'
 import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
@@ -163,11 +169,21 @@ export async function acceptReferralOnRegistration({ token, restaurantId, client
     ]
   )
 
-  await db.query(
-    `INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
-    [inv.supplier_id, restaurantId]
-  )
+  // Referral signup follows the inviting supplier through the shared write path (cap and
+  // blocklist enforced). A refused follow never fails the registration itself.
+  try {
+    const inTransaction = typeof client?.query === 'function'
+    // A brand-new restaurant has no relationship-dependent cache to invalidate.
+    await followSupplier(
+      { restaurantId, supplierId: inv.supplier_id, source: 'referral' },
+      inTransaction ? client : undefined
+    )
+  } catch (error) {
+    if (!(error instanceof SupplierFollowLimitError) && !(error instanceof SupplierBlockedError)) {
+      throw error
+    }
+    logger.warn('Referral follow skipped', { reason: error.code })
+  }
 
   await notifyTenantUsers({
     tenantId: restaurantId,
