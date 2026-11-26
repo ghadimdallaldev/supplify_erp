@@ -48,6 +48,15 @@ vi.mock('../lib/subscription.js', () => ({
 vi.mock('./notification.service.js', () => ({
   notifyScheduledOrderEvent: vi.fn(),
   notifyOrderStatusChange: vi.fn(),
+  notifyScheduledOrderSkippedUnfollowed: vi.fn(),
+}))
+
+const mockPartition = vi.fn(async (_client, _restaurantId, supplierIds) => ({
+  allowed: new Set(supplierIds),
+  missing: [],
+}))
+vi.mock('./order-relationship-guard.service.js', () => ({
+  lockAndPartitionOrderSuppliers: (...args) => mockPartition(...args),
 }))
 
 vi.mock('./quick-list-ai.service.js', () => ({
@@ -408,5 +417,73 @@ describe('executeScheduledOrders', () => {
     expect(args.legacyLineItems).toEqual([
       expect.objectContaining({ productId: 'prod-1', quantity: 2, reserve: true }),
     ])
+  })
+
+  it('skips unfollowed supplier and notifies', async () => {
+    const { resolveProductPricesBatch } = await import('./resolve-product-price.service.js')
+    const { notifyScheduledOrderSkippedUnfollowed } = await import('./notification.service.js')
+    vi.mocked(resolveProductPricesBatch).mockResolvedValueOnce([
+      {
+        productId: 'prod-1',
+        supplierId: 'sup-1',
+        quantity: 2,
+        unitPrice: 5,
+        source: 'DEFAULT_PRICE',
+      },
+    ])
+    mockPartition.mockImplementationOnce(async () => ({
+      allowed: new Set(['sup-1']),
+      missing: [{ id: 'sup-2', name: 'Gone Co', blocked: false }],
+    }))
+    const q = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: [
+          { product_id: 'prod-1', supplier_id: 'sup-1', quantity: 2, notes: '' },
+          { product_id: 'prod-2', supplier_id: 'sup-2', quantity: 1, notes: '' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'prod-1', sku: 'SKU-1' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'ord-1', restaurant_id: 'rest-1', total_amount: 10 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'oi-1', product_id: 'prod-1', unit_price: 5 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'sup-1' }] })
+
+    const result = await createOrderFromQuickList(
+      { id: 'ql-1', restaurant_id: 'rest-1' },
+      { query: q }
+    )
+    expect(result.orders).toHaveLength(1)
+    expect(result.skippedUnfollowed).toEqual([
+      { quickListId: 'ql-1', supplierId: 'sup-2', supplierName: 'Gone Co' },
+    ])
+    const itemInserts = q.mock.calls.filter((c) => String(c[0]).includes('INSERT INTO order_item'))
+    expect(itemInserts.map((c) => c[1][2])).toEqual(['sup-1'])
+
+    // The executor notifies the restaurant after commit.
+    clientQueryMock.mockReset()
+    mockPartition.mockImplementationOnce(async () => ({
+      allowed: new Set(),
+      missing: [{ id: 'sup-2', name: 'Gone Co', blocked: false }],
+    }))
+    clientQueryMock.mockImplementation(async (sql) => {
+      const text = String(sql)
+      if (text.includes('FROM quick_list ql') || text.includes('DUE')) return { rows: [] }
+      if (text.includes('INSERT INTO quick_list_execution')) return { rows: [{ id: 'led-1' }] }
+      if (text.includes('FROM quick_list_item')) {
+        return { rows: [{ product_id: 'prod-2', supplier_id: 'sup-2', quantity: 1, notes: '' }] }
+      }
+      return { rows: [] }
+    })
+    let first = true
+    clientQueryMock.mockImplementationOnce(async () => {
+      first = false
+      return { rows: [dueQuickList({ auto_create_order: true })] }
+    })
+    await executeScheduledOrders()
+    expect(first).toBe(false)
+    expect(notifyScheduledOrderSkippedUnfollowed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'ql-1' }),
+      [{ quickListId: 'ql-1', supplierId: 'sup-2', supplierName: 'Gone Co' }]
+    )
   })
 })

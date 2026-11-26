@@ -962,6 +962,40 @@ export async function notifyScheduledOrderEvent(quickList, action, locale = DEFA
   return sent[0] || null
 }
 
+/**
+ * A scheduled quick list ran but skipped suppliers the restaurant no longer follows (or has
+ * blocked). One notification per skipped supplier; metadata is { quickListId, supplierId, supplierName }.
+ */
+export async function notifyScheduledOrderSkippedUnfollowed(quickList, skipped = []) {
+  const restaurantId = quickList.restaurant_id || quickList.restaurantId
+  if (!restaurantId || !skipped.length) return []
+  const results = []
+  for (const entry of skipped) {
+    const sent = await notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'SCHEDULED_ORDER_SKIPPED_UNFOLLOWED',
+      notificationCategory: 'SCHEDULED_ORDER',
+      contentForLocale: (userLocale) => ({
+        title: nt('scheduledOrder.skippedUnfollowedTitle', userLocale),
+        message: nt('scheduledOrder.skippedUnfollowedMessage', userLocale, {
+          name: quickList.name,
+          supplier: entry.supplierName || '',
+        }),
+      }),
+      referenceId: quickList.id,
+      referenceType: 'QUICK_LIST',
+      metadata: {
+        quickListId: entry.quickListId || quickList.id,
+        supplierId: entry.supplierId,
+        supplierName: entry.supplierName ?? null,
+      },
+    })
+    if (sent[0]) results.push(sent[0])
+  }
+  return results
+}
+
 export async function notifyInvoiceIssued(invoice, locale = DEFAULT_LOCALE) {
   const sent = await notifyTenantUsers({
     tenantId: invoice.restaurant_id,

@@ -86,6 +86,8 @@ import {
   scheduleOrdersCalendarCacheInvalidation,
 } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
+import { RelationshipError } from '../../lib/relationship.js'
+import { lockAndAssertOrderRelationships } from '../../services/order-relationship-guard.service.js'
 
 const router = express.Router()
 
@@ -324,66 +326,9 @@ router.post(
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
-      // Enforce supplier blocklist (parity with supplier manual-order eligibility)
+      // Follow required (spec §11.2): checked inside the order transaction below, under the
+      // shared relationship locks, so an unfollow/block cannot race the order.
       const cartSupplierIds = [...supplierGroups.keys()]
-      if (cartSupplierIds.length > 0) {
-        const { rows: blockedSuppliers } = await query(
-          `
-          SELECT sb.supplier_id, s.name AS supplier_name
-          FROM supplier_blocklist sb
-          JOIN supplier s ON s.id = sb.supplier_id
-          WHERE sb.restaurant_id = $1
-            AND COALESCE(s.organization_id, s.id) IN (
-              SELECT COALESCE(s2.organization_id, s2.id)
-              FROM supplier s2
-              WHERE s2.id = ANY($2::uuid[])
-            )
-          `,
-          [restaurantId, cartSupplierIds]
-        )
-        if (blockedSuppliers.length > 0) {
-          const names = blockedSuppliers.map((r) => r.supplier_name || r.supplier_id).join(', ')
-          throw new ValidationError(
-            `Cannot order from blocked supplier${blockedSuppliers.length > 1 ? 's' : ''}: ${names}`
-          )
-        }
-
-        // Require follow or prior order (parity with product detail / supplier manual order)
-        const { rows: linkedSuppliers } = await query(
-          `
-          SELECT s.id AS supplier_id, s.name AS supplier_name
-          FROM supplier s
-          WHERE s.id = ANY($2::uuid[])
-            AND (
-              EXISTS (
-                SELECT 1 FROM supplier_follow sf
-                JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
-                WHERE COALESCE(followed_supplier.organization_id, followed_supplier.id) = COALESCE(s.organization_id, s.id)
-                  AND sf.restaurant_id = $1
-              )
-              OR EXISTS (
-                SELECT 1
-                FROM customer_order o
-                JOIN order_item oi ON oi.order_id = o.id
-                JOIN supplier historical_supplier ON historical_supplier.id = oi.supplier_id
-                WHERE o.restaurant_id = $1
-                  AND COALESCE(historical_supplier.organization_id, historical_supplier.id) = COALESCE(s.organization_id, s.id)
-              )
-            )
-          `,
-          [restaurantId, cartSupplierIds]
-        )
-        const linkedIds = new Set(linkedSuppliers.map((r) => r.supplier_id))
-        const unlinked = cartSupplierIds.filter((id) => !linkedIds.has(id))
-        if (unlinked.length > 0) {
-          const { rows: names } = await query(
-            `SELECT name FROM supplier WHERE id = ANY($1::uuid[])`,
-            [unlinked]
-          )
-          const label = names.map((r) => r.name).join(', ') || unlinked.join(', ')
-          throw new ValidationError(`Follow the supplier before ordering: ${label}`)
-        }
-      }
 
       // Resolve daily limit + supplier preflight (reuse req.subscription when available)
       phaseStart = performance.now()
@@ -538,6 +483,7 @@ router.post(
             idempotencyReplay = idempotencyClaim.replay
             return []
           }
+          await lockAndAssertOrderRelationships(client, restaurantId, cartSupplierIds)
           const txResult = await createRestaurantOrdersInTransaction({
             client,
             restaurantId,
@@ -811,6 +757,15 @@ router.post(
             message: 'Invalid order data',
             details: error.errors,
           },
+          requestId: req.requestId,
+        })
+      }
+
+      if (error instanceof RelationshipError) {
+        return res.status(error.statusCode).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
           requestId: req.requestId,
         })
       }

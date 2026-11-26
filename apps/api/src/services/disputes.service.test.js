@@ -40,6 +40,11 @@ vi.mock('../lib/dispute-replacement-order.js', () => ({
     'Cannot create replacement order because no disputed quantities were found.',
 }))
 
+const relationshipGuardMock = vi.fn()
+vi.mock('./order-relationship-guard.service.js', () => ({
+  lockAndAssertOrderRelationships: (...args) => relationshipGuardMock(...args),
+}))
+
 vi.mock('../lib/fulfillment-exceptions.js', () => ({
   createFulfillmentException: vi.fn().mockResolvedValue(undefined),
 }))
@@ -60,6 +65,8 @@ describe('Disputes Service', () => {
     vi.mocked(assertCleanUploadOwnership).mockReset().mockResolvedValue({})
     createReplacementOrderFromDisputeMock.mockReset()
     createReplacementOrderFromDisputeMock.mockResolvedValue('replacement-order-1')
+    relationshipGuardMock.mockReset()
+    relationshipGuardMock.mockResolvedValue(undefined)
   })
 
   describe('createDispute', () => {
@@ -761,6 +768,30 @@ describe('Disputes Service', () => {
       })
 
       expect(createReplacementOrderFromDisputeMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('dispute replacement allowed without follow, refused when blocked', async () => {
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockResolveTransaction()
+      mockLoadDetail()
+      await resolveDispute('d-1', 's-1', { resolutionType: 'replacement' })
+      expect(relationshipGuardMock).toHaveBeenCalledWith(expect.anything(), 'r-1', ['s-1'], {
+        mode: 'notBlocked',
+      })
+      expect(createReplacementOrderFromDisputeMock).toHaveBeenCalledTimes(1)
+
+      createReplacementOrderFromDisputeMock.mockClear()
+      const blocked = Object.assign(new Error('Unblock this supplier to follow it'), {
+        code: 'SUPPLIER_BLOCKED',
+        statusCode: 409,
+      })
+      relationshipGuardMock.mockRejectedValueOnce(blocked)
+      queryMock.mockResolvedValueOnce({ rows: [disputeRow] })
+      mockResolveTransaction()
+      await expect(
+        resolveDispute('d-1', 's-1', { resolutionType: 'replacement' })
+      ).rejects.toMatchObject({ code: 'SUPPLIER_BLOCKED' })
+      expect(createReplacementOrderFromDisputeMock).not.toHaveBeenCalled()
     })
 
     it('rejects when replacement order already exists', async () => {

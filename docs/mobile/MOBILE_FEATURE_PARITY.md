@@ -2,6 +2,8 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 4 (follow required for every new order)** — mobile change deferred to Plan A Task 13: `POST /api/orders` and `PATCH /api/orders/:id` (draft → placed) now return 403 `FOLLOW_REQUIRED` with `details.suppliers[{id,name}]` instead of the old 400 "Follow the supplier before ordering"; a past order no longer grants ordering. New notification type `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` (metadata `{ quickListId, supplierId, supplierName }`, reference `QUICK_LIST`). Task 13 adds the cart follow prompt and the notification deep link.
+
 - **Plan A Task 3 (relationship caches)** — skipped for mobile: server-side cache keys and invalidation only. `/api/products/categories` and `/tags` keep their response shape; restaurants now see counts only for catalogs visible to them.
 
 - **Plan A Task 2 (relationship writes)** — mobile change deferred to Plan A Task 13: follow is now idempotent (200 `alreadyFollowing`), following a blocked supplier returns 409 `SUPPLIER_BLOCKED`, responses add `supplierOrganizationId`. Existing mobile calls keep working; Task 13 adds the 409 handling and copy.

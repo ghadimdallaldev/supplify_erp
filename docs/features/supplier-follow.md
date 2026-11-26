@@ -8,10 +8,13 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
 
 ## Rules
 
-- One follow row per `(restaurant_id, supplier_id)` (unique constraint).
-- Follow requires restaurant role; blocked suppliers are excluded from search but can still be unfollowed if previously followed.
+- One follow row per `(restaurant_id, supplier_org_id)`: a follow or block covers every branch of the supplier organisation (marketplace visibility release 1, migration `0238`).
+- Follow is idempotent (200 with `alreadyFollowing: true`). Following a blocked supplier returns 409 `SUPPLIER_BLOCKED` until the restaurant unblocks it. Manual follow, accepting a supplier invite and referral signup all enforce the plan cap in one transaction.
 - Unfollow is idempotent (DELETE with no error if not followed).
-- **Block** is separate (`supplier_blocklist`) — blocked suppliers are hidden from supplier list/search and cannot receive new follows while blocked.
+- **Block** (`supplier_blocklist`, also per organisation) deletes the follow; blocked suppliers are hidden from supplier list/search.
+- **Every new restaurant order needs a current follow and no block.** `POST /api/orders` and placing a draft (`PATCH /api/orders/:id` to `PLACED`) return 403 `FOLLOW_REQUIRED` with `details.suppliers[{ id, name }]`. A past order no longer grants ordering. The check runs inside the order transaction under a shared `rel:<restaurant>:<org>` advisory lock (ascending org id), so it is serialised with follow/unfollow/block.
+- **Scheduled quick lists** skip suppliers the restaurant no longer follows (or has blocked); the other suppliers in the same run still get their orders, and the restaurant gets a `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` notification per skipped supplier (`{ quickListId, supplierId, supplierName }`).
+- **Dispute replacement orders** need no follow (they remedy an existing order) but are refused with 409 `SUPPLIER_BLOCKED` when the restaurant has blocked the supplier.
 - Manual supplier orders (`POST /api/orders/manual`) require the restaurant to **follow** the supplier or have placed an order before.
 
 ## Downstream effects

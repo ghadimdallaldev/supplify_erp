@@ -120,7 +120,7 @@ export async function transactableSupplierIds(restaurantId, supplierIds, db) {
   for (const id of ids) {
     const row = byId.get(id)
     if (row && row.following === true && row.blocked !== true) allowed.add(id)
-    else missing.push({ id, name: row?.name ?? null })
+    else missing.push({ id, name: row?.name ?? null, blocked: row?.blocked === true })
   }
   return { allowed, missing }
 }

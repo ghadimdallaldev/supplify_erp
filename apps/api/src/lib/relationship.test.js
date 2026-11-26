@@ -135,8 +135,8 @@ describe('relationship predicates (one query each)', () => {
     const result = await transactableSupplierIds('r1', ['s1', 's2', 's3', 's1'])
     expect([...result.allowed]).toEqual(['s1'])
     expect(result.missing).toEqual([
-      { id: 's2', name: 'Bakery' },
-      { id: 's3', name: 'Blocked Ltd' },
+      { id: 's2', name: 'Bakery', blocked: false },
+      { id: 's3', name: 'Blocked Ltd', blocked: true },
     ])
     expect(queryMock).toHaveBeenCalledTimes(1)
   })
