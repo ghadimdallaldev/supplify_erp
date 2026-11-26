@@ -2,6 +2,8 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 14 (docs)**: new [marketplace-visibility.md](../features/marketplace-visibility.md) (rule table, unfollow, block, chat, quotes, error codes, realtime revocation). Search, deals, supplier ops, RBAC and onboarding counts updated. Docs only; no mobile code change.
+
 - **Plan A Task 13 (mobile)**: implemented in both `supplify-mobile` and `supplify-mobile-ios` (branch `feat/marketplace-visibility`; `src/` identical). This closes the mobile items deferred from Tasks 2, 4–10 and 12.
   - **Follow & add.** `FollowAndAddButton` on catalog cards, reorder guidance, quote detail and Quick Lists. `useFollowSupplierAction` follows first. At the follow cap an alert offers "Manage plan", which opens the web subscription settings (mobile has no billing surface). For a blocked supplier (409 `SUPPLIER_BLOCKED`) it offers "Unblock", then follows.
   - **Cart.** The cart store refuses to add, or raise, a line of a supplier the restaurant does not follow. A checkout `403 FOLLOW_REQUIRED` shows a "Follow & keep in cart" row per supplier.

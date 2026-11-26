@@ -16,7 +16,7 @@ const product = {
   current_price: 10,
   currency: 'USD',
 }
-const addItem = vi.fn(),
+const addItem = vi.fn(() => ({ ok: true })),
   refetch = vi.fn()
 let result: any
 vi.mock('../services/api', () => ({ useGetProductQuery: () => result }))

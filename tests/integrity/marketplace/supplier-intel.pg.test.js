@@ -98,7 +98,15 @@ describe('supplier intelligence respects the follow rule (real PG)', () => {
     const crossIds = new Set(cross.opportunities.map((o) => o.restaurantId))
     expect([...crossIds].every((id) => id === follower.id)).toBe(true)
 
-    const today = (await db.pool.query(`SELECT EXTRACT(DOW FROM now())::int AS d`)).rows[0].d
+    // Same day as the service: in the tenant timezone, not the DB session's (UTC differs near midnight).
+    const { getDefaultTenantTimezone } = await import(
+      '../../../apps/api/src/lib/tenant-timezone.js'
+    )
+    const today = (
+      await db.pool.query(`SELECT EXTRACT(DOW FROM (now() AT TIME ZONE $1))::int AS d`, [
+        getDefaultTenantTimezone(),
+      ])
+    ).rows[0].d
     for (const r of [follower, lapsed, blocker]) {
       await db.pool.query(
         `INSERT INTO restaurant_order_cadence (restaurant_id, supplier_id, product_id, cadence_level, day_of_week, label)

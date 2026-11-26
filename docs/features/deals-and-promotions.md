@@ -85,12 +85,12 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 - **Analytics "top restaurants"** names followers only. Other restaurants appear as `Verified restaurant` with a null id.
 
 - **Organic:** any restaurant that can see the supplier's catalog (follows it, or the catalog is public) and has not blocked it
-- **Sponsored:** active `deal_promotions` campaign + audience match, even without follow
+- **Sponsored:** an active `deal_promotions` campaign only changes ranking and the area / business-type audience filter; it never shows a deal outside catalog visibility (a private-catalog supplier's deals reach followers only). `restaurantIds` targeting was removed.
 - Expired, paused, draft, or over-limit deals are hidden from restaurant discovery
 
 The new-deals banner starts from this same discoverable set, then applies its
-14-day recency window and dismissals. An organic follower/explicit-target deal
-does not require a paid boost. Blocklisted suppliers are excluded. The web supplier
+14-day recency window and dismissals. An organic deal does not require a paid
+boost. Blocklisted suppliers are excluded. The web supplier
 filter derives its choices from the complete eligible result, so selecting one
 supplier does not remove the others from the dropdown. Load failures show a retry.
 

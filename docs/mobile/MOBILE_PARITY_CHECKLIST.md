@@ -1,5 +1,17 @@
 # Mobile Parity Checklist
 
+## 2026-11-26 — Marketplace visibility (release 1)
+
+- [x] Follow & add on catalog cards, reorder guidance, quote detail and Quick Lists (Android source, iOS mirror, `src/` identical).
+- [x] Cart refuses unfollowed suppliers; checkout `403 FOLLOW_REQUIRED` rows with "Follow & keep in cart".
+- [x] Private catalog card ("Follow to see the catalog") and "Follow to order" on Usuals.
+- [x] Chat closed and read-only banners with "Message about order" chips; `conversation_access_changed` refetch.
+- [x] Supplier follower pickers search the server; customer detail `404 RESTAURANT_NOT_AVAILABLE` state; growth status without match; "Other customers" in reports.
+- [x] `SUPPLIER_FOLLOW_INVITE` and `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` open the supplier catalog.
+- [x] `tsc` and jest in both worktrees (70 suites, 275 tests each).
+- [ ] Android emulator captures (390x844, scrolled, Arabic RTL, 360x800, font scale 1.3) — pending: the build was stopped for low host memory.
+- [ ] Run on iOS hardware or simulator.
+
 ## 2026-11-26 — Restaurant V4
 
 - [x] Mirror the Restaurant notification center across Android and iOS.

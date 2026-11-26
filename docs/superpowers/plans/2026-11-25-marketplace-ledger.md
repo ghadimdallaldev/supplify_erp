@@ -31,6 +31,14 @@ Harness DB: docker `supplify-marketplace-audit` (postgres:16-alpine, `127.0.0.1`
 
 ## Rulings
 
+- A14: Ruling: `ProductDetailPage.test.tsx` mocked `addItem` as `vi.fn()` (returns undefined) while Task 12 made `useCartActions().addItem` return `{ ok }`; the page read `.ok` of undefined and vitest reported an unhandled rejection (exit 1). The mock now returns `{ ok: true }` — production contract is correct, the mock was stale — if wrong, none (test only).
+
+- A14: Ruling: `supplier-intel.pg.test.js` computed "today" with `EXTRACT(DOW FROM now())` in the DB session timezone (UTC) while `getMissedCadencesForToday` uses the tenant timezone, so the test failed between local and UTC midnight (the 01:50 run). It now uses `now() AT TIME ZONE getDefaultTenantTimezone()`; proven with `PGTZ=Pacific/Kiritimati`: old version RED, new GREEN — if wrong, none (test only).
+
+- A14: Ruling: the Task 14 regression runs web vitest with `--exclude src/store/sessionIsolation.test.ts`; that test fails identically at base (see A12) and is outside this project — if wrong, a real regression in session isolation would be masked (it fails either way today).
+
+- A14: Ruling: the route inventory counts in onboarding (`docs/audits/route-inventory.json`, 554 routes, dated 2026-06-17) are a dated generated snapshot and were not regenerated; migration counts were updated to 240 — if wrong, onboarding quotes a stale route count with its date.
+
 - A13: Ruling: the five brief tests were written after the implementation, then confirmed RED by running them against the base code in the iOS worktree (4 suites fail: modules missing) before copying the change; the notification routing tests were written first — compaction interrupted strict test-first order — if wrong, a test could miss an edge case it was not designed against.
 
 - A13: Ruling: chat access logic moved out of `ChatThreadScreen` into `features/chat/chatAccess.tsx` (`chatAccess()` + `ChatAccessBanner`) and is tested there, instead of rendering the whole thread screen — the screen needs sockets, queries and navigation mocks — if wrong, the screen wiring (socket listener, send error) is covered by tsc and manual capture only.
