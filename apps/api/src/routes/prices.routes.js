@@ -10,6 +10,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { query } from '../lib/db.js'
+import { canViewCatalog } from '../lib/relationship.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { z } from 'zod'
@@ -92,21 +93,8 @@ router.get(
             requestId: req.requestId,
           })
         }
-        const { rows: connected } = await query(
-          `
-        SELECT 1
-        FROM supplier_follow sf
-        WHERE sf.supplier_id = $1
-          AND sf.restaurant_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM supplier_blocklist sb
-            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
-          )
-        LIMIT 1
-      `,
-          [product.supplier_id, restaurantId]
-        )
-        if (!connected.length) {
+        // List prices (incl. tiers) are visible wherever the catalog is (spec §10 Q2).
+        if (!(await canViewCatalog(restaurantId, product.supplier_id))) {
           return res.status(404).json({
             ok: false,
             data: null,

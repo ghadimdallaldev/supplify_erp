@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { config } from '../config/env.js'
 import { query } from './db.js'
+import { canViewCatalog } from './relationship.js'
 import { getSupplierIdForRequest, getRestaurantIdForRequest } from './rbac.js'
 
 /** L5: Keep leaked object URLs short-lived (1h). */
@@ -57,22 +58,9 @@ async function supplierHasPublicCatalog(supplierId) {
   return rows[0].public_catalog_enabled === true
 }
 
+/** Organisation-level: a follow of any branch covers every branch's images; a block wins. */
 async function restaurantHasCatalogAccess(restaurantId, supplierId) {
-  const { rows } = await query(
-    `
-      SELECT 1
-      FROM supplier_follow sf
-      WHERE sf.supplier_id = $1
-        AND sf.restaurant_id = $2
-        AND NOT EXISTS (
-          SELECT 1 FROM supplier_blocklist sb
-          WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
-        )
-      LIMIT 1
-    `,
-    [supplierId, restaurantId]
-  )
-  return rows.length > 0
+  return canViewCatalog(restaurantId, supplierId)
 }
 
 async function userHasProductImageCatalogAccess(req, supplierId) {

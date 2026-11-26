@@ -39,7 +39,16 @@ import {
   restaurantCatalogMetaKey,
   supplierCatalogMetaKey,
 } from '../lib/relationship-cache.js'
-import { catalogVisibleSql } from '../lib/relationship.js'
+import {
+  blockedExistsSql,
+  catalogVisibleSql,
+  followExistsSql,
+  getRelationship,
+} from '../lib/relationship.js'
+import {
+  applyRestaurantStockView,
+  applyRestaurantStockViewToRows,
+} from '../lib/restaurant-catalog-view.js'
 import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
@@ -603,16 +612,11 @@ router.get('/', async (req, res) => {
       paramIndex++
     }
 
-    // Hide blocklisted suppliers from restaurant catalog (match search/detail)
+    // Restaurant catalog visibility (spec §10 Q2): not blocked AND (follows OR public catalog).
+    let restaurantParamIdx = null
     if (restaurantId) {
-      whereConditions.push(`
-        NOT EXISTS (
-          SELECT 1 FROM supplier_blocklist sb
-          JOIN supplier blocked_supplier ON blocked_supplier.id = sb.supplier_id
-          WHERE COALESCE(blocked_supplier.organization_id, blocked_supplier.id) = COALESCE(s.organization_id, s.id)
-            AND sb.restaurant_id = $${paramIndex}
-        )
-      `)
+      restaurantParamIdx = paramIndex
+      whereConditions.push(catalogVisibleSql(`$${paramIndex}::uuid`, 's'))
       queryParams.push(restaurantId)
       paramIndex++
     }
@@ -653,7 +657,9 @@ router.get('/', async (req, res) => {
     }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''
-    const needsInventoryJoin = Boolean(params.inStock || params.includeStock)
+    // Restaurants always get an in_stock flag, so their rows always get authoritative stock.
+    const restaurantStockView = Boolean(restaurantId)
+    const needsInventoryJoin = Boolean(params.inStock || params.includeStock || restaurantStockView)
     const supplierParamIndex = scopedSupplierId ? 1 : null
     const inventoryJoin = needsInventoryJoin
       ? buildInventoryJoin(scopedSupplierId, supplierParamIndex)
@@ -686,6 +692,11 @@ router.get('/', async (req, res) => {
         s.minimum_order_amount as supplier_minimum_order_amount,
         ${availableQtyExpr},
         ${favoritedExpr},
+        ${
+          restaurantParamIdx
+            ? `${followExistsSql(`$${restaurantParamIdx}::uuid`, 's')} as is_followed`
+            : 'false as is_followed'
+        },
         pr.amount as current_price,
         pr.currency
       FROM product p
@@ -804,7 +815,7 @@ router.get('/', async (req, res) => {
         rows = await enrichProductsWithResolvedPricing(rows, restaurantId)
       }
 
-      if (params.includeStock || params.inStock) {
+      if (params.includeStock || params.inStock || restaurantStockView) {
         rows = await overlayProductRowsWithAuthoritativeStock(rows)
         if (params.inStock) {
           rows = rows.filter((row) => Number(row.available_qty || 0) > 0)
@@ -823,6 +834,8 @@ router.get('/', async (req, res) => {
         }
       }
     }
+
+    if (restaurantStockView) rows = applyRestaurantStockViewToRows(rows)
 
     res.json({
       ok: true,
@@ -899,6 +912,7 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
           s.slug AS supplier_slug,
           pf.created_at AS favorited_at,
           true AS is_favorited,
+          ${followExistsSql('$1', 's')} AS is_followed,
           pr.amount AS current_price,
           pr.currency
         FROM product_favorite pf
@@ -913,6 +927,7 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
           LIMIT 1
         ) pr ON true
         WHERE pf.restaurant_id = $1 AND pf.user_id = $2
+          AND NOT ${blockedExistsSql('$1', 's')}
         ORDER BY pf.created_at DESC
         LIMIT $3 OFFSET $4
         `,
@@ -922,13 +937,21 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
         `
         SELECT COUNT(*)::int AS total
         FROM product_favorite pf
+        JOIN product p ON p.id = pf.product_id
+        JOIN supplier s ON s.id = p.supplier_id
         WHERE pf.restaurant_id = $1 AND pf.user_id = $2
+          AND NOT ${blockedExistsSql('$1', 's')}
         `,
         [restaurantId, userId]
       ),
     ])
 
-    const products = await enrichProductsWithResolvedPricing(rows, restaurantId)
+    // Favourites of a supplier the restaurant no longer follows stay listed, flagged
+    // `can_order: false` so clients show "Follow to order" (spec §10 Q1). Blocked are hidden.
+    const products = (await enrichProductsWithResolvedPricing(rows, restaurantId)).map((row) => {
+      const { available_qty: _qty, ...rest } = row
+      return { ...rest, is_followed: row.is_followed === true, can_order: row.is_followed === true }
+    })
 
     res.json({
       ok: true,
@@ -1150,11 +1173,10 @@ router.get('/:id', async (req, res) => {
           requestId: req.requestId,
         })
       }
-      const { rows: linked } = await query(RESTAURANT_PRODUCT_SUPPLIER_ACCESS_SQL, [
-        product.supplier_id,
-        restaurantId,
-      ])
-      if (!linked.length) {
+      // Any restaurant may open a product of a visible catalog (spec D3 / §10 Q2): not blocked
+      // AND (follows OR public catalog). A past order no longer grants access.
+      const relationship = await getRelationship(restaurantId, product.supplier_id)
+      if (relationship.blocked || !(relationship.following || relationship.publicCatalog)) {
         return res.status(404).json({
           ok: false,
           data: null,
@@ -1166,7 +1188,7 @@ router.get('/:id', async (req, res) => {
         })
       }
       const [enriched] = await enrichProductsWithResolvedPricing([product], restaurantId)
-      product = enriched
+      product = { ...enriched, is_followed: relationship.following }
     } else {
       return res.status(404).json({
         ok: false,
@@ -1180,6 +1202,7 @@ router.get('/:id', async (req, res) => {
     }
 
     product.available_qty = await getSupplierProductAvailableQty(product.supplier_id, product.id)
+    if (product.is_followed !== undefined) product = applyRestaurantStockView(product)
 
     delete product.supplier_email
     delete product.contact_email
@@ -1603,4 +1626,3 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
 })
 
 export { router as productsRoutes }
-import { RESTAURANT_PRODUCT_SUPPLIER_ACCESS_SQL } from '../lib/product-supplier-access.js'
