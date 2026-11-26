@@ -17,6 +17,7 @@
     "test:api": "node scripts/pnpm-run.mjs --filter @supplify/api test:api",
     "test:api:watch": "pnpm --filter @supplify/api test:api:watch",
     "test:web": "node scripts/pnpm-run.mjs --filter @supplify/web test:run",
+    "test:marketplace:pg": "pnpm --filter @supplify/api exec vitest run --config ../../tests/integrity/vitest.config.js tests/integrity/marketplace",
     "test:web:watch": "pnpm --filter @supplify/web test",
     "test:billing": "node scripts/pnpm-run.mjs --filter @supplify/api test:billing",
     "test:ci": "node scripts/pnpm-run.mjs --filter @supplify/api test:run && node scripts/pnpm-run.mjs --filter @supplify/web test:run",
