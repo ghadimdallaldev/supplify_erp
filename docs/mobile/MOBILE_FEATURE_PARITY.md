@@ -2,6 +2,16 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 13 (mobile)**: implemented in both `supplify-mobile` and `supplify-mobile-ios` (branch `feat/marketplace-visibility`; `src/` identical). This closes the mobile items deferred from Tasks 2, 4–10 and 12.
+  - **Follow & add.** `FollowAndAddButton` on catalog cards, reorder guidance, quote detail and Quick Lists. `useFollowSupplierAction` follows first. At the follow cap an alert offers "Manage plan", which opens the web subscription settings (mobile has no billing surface). For a blocked supplier (409 `SUPPLIER_BLOCKED`) it offers "Unblock", then follows.
+  - **Cart.** The cart store refuses to add, or raise, a line of a supplier the restaurant does not follow. A checkout `403 FOLLOW_REQUIRED` shows a "Follow & keep in cart" row per supplier.
+  - **Catalog.** A private catalog of an unfollowed supplier shows "Follow to see the catalog". Usuals show "Follow to order" when `can_order` is false.
+  - **Chat.** `chatAccess()` and `ChatAccessBanner` add a closed banner and a read-only banner with "Message about order" chips. `conversation_access_changed` and a `CHAT_READ_ONLY` send error refetch the conversations.
+  - **Supplier screens.** Customers, contract pricing and new-conversation pickers search followers on the server (`q`). Customer detail shows "Restaurant not available" on 404 `RESTAURANT_NOT_AVAILABLE`. Customer growth shows a single status (Imported, Invited, Follows you) and no match. The top-restaurants report shows "Other customers" for a null `restaurant_id`, not tappable.
+  - **Notifications.** `SUPPLIER_FOLLOW_INVITE` and `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` open the supplier's catalog.
+  - **Not applicable on mobile:** sponsorship offers and reviews (no mobile surface), deal `restaurantIds` (never sent).
+  - **Verification:** supplify-mobile c48707f and supplify-mobile-ios 4bf2090 (base bf24cb0 / a2262fb): tsc clean; jest 70/70 suites, 275/275 tests in each; src/ identical. Brief tests confirmed RED on base code. Android emulator screenshots PENDING: the debug build was stopped by the host for low memory and was not restarted (3.4 GB free of 32 GB); iOS not visually verified.
+
 - **Plan A Task 12 (web)**: web implemented. The mobile change is deferred to Plan A Task 13, which must port the same behaviour:
   - **Follow & add.** Products carry `is_followed` / `can_order`. One tap follows the supplier, then adds the item. At the follow cap, open the upgrade prompt. For a blocked supplier, offer "Unblock".
   - **Cart.** A checkout `403 FOLLOW_REQUIRED` lists suppliers. Show a "Follow & keep in cart" row per supplier, and refuse to raise the quantity of a line from a supplier the restaurant does not follow.
