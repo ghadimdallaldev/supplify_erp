@@ -2,6 +2,12 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 8 (supplier intelligence)** — mobile change deferred to Plan A Task 13.
+  - Restaurant reorder suggestions (`GET /api/reorder-assistance` and the Assistant) add `isFollowed`, `canOrder` and `orderBlockedReason: 'FOLLOW_REQUIRED'`, and drop blocked suppliers. Task 13 shows "Follow to order" when `canOrder` is false.
+  - Supplier "top restaurants" can contain an `Other customers` row with `restaurant_id: null`, which must not be tappable.
+  - Supplier reminder-draft creation returns 404 for non-followers. The loyalty ledger returns 404 `RESTAURANT_NOT_AVAILABLE`.
+  - Packing slips show the order-time address.
+
 - **Plan A Task 7 (supplier lookups)** — mobile change deferred to Plan A Task 13. Supplier role only:
   - `GET /api/restaurants` lists followers only.
   - `GET /api/restaurants/:id` returns 404 `RESTAURANT_NOT_AVAILABLE` for non-followers and blockers (was 403).

@@ -240,10 +240,10 @@ router.get(
       const { rows: orders } = await query(
         `
       SELECT o.*,
-        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') as restaurant_name,
-        COALESCE(r.contact_email, o.customer_contact_snapshot->>'email') as contact_email,
-        COALESCE(r.phone, o.customer_contact_snapshot->>'phone') as phone,
-        COALESCE(r.address_json, o.delivery_location_snapshot) as restaurant_address
+        COALESCE(o.customer_contact_snapshot->>'name', r.name, 'Guest customer') as restaurant_name,
+        COALESCE(o.customer_contact_snapshot->>'email', r.contact_email) as contact_email,
+        COALESCE(o.customer_contact_snapshot->>'phone', r.phone) as phone,
+        COALESCE(o.delivery_location_snapshot->'address', r.address_json, o.delivery_location_snapshot) as restaurant_address
       FROM customer_order o
       LEFT JOIN restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1
@@ -324,10 +324,10 @@ router.get(
       const { rows: orders } = await query(
         `
       SELECT o.*,
-        COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') as restaurant_name,
-        COALESCE(r.contact_email, o.customer_contact_snapshot->>'email') as contact_email,
-        COALESCE(r.phone, o.customer_contact_snapshot->>'phone') as phone,
-        COALESCE(r.address_json, o.delivery_location_snapshot) as restaurant_address
+        COALESCE(o.customer_contact_snapshot->>'name', r.name, 'Guest customer') as restaurant_name,
+        COALESCE(o.customer_contact_snapshot->>'email', r.contact_email) as contact_email,
+        COALESCE(o.customer_contact_snapshot->>'phone', r.phone) as phone,
+        COALESCE(o.delivery_location_snapshot->'address', r.address_json, o.delivery_location_snapshot) as restaurant_address
       FROM customer_order o
       LEFT JOIN restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1

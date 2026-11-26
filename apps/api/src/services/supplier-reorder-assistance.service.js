@@ -1,4 +1,4 @@
-import { canTransact } from '../lib/relationship.js'
+import { canSeeRestaurant, canTransact } from '../lib/relationship.js'
 import {
   getReorderIntelligence,
   createReorderReminderDraft,
@@ -121,6 +121,8 @@ export async function createSupplierFollowUpDraft(
   createdBy,
   { openChat = false } = {}
 ) {
+  // Drafts and chat need a current follow and no block (spec §6.2).
+  if (!(await canSeeRestaurant(restaurantId, supplierId))) return null
   const draft = await createReorderReminderDraft(supplierId, restaurantId, createdBy)
   if (!draft) return null
 

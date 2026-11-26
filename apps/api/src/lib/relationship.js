@@ -61,6 +61,34 @@ export function catalogVisibleSql(restaurantExpr, supplierAlias) {
   return `(NOT ${blockedExistsSql(restaurantExpr, supplierAlias)} AND (${followExistsSql(restaurantExpr, supplierAlias)} OR ${assertIdent(supplierAlias)}.public_catalog_enabled))`
 }
 
+/**
+ * EXISTS(...) — restaurant `restaurantExpr` follows, and has not blocked, the organisation of
+ * the supplier whose id is `supplierIdExpr` (a bind param like '$1' or a column). The
+ * supplier-side "customer" predicate for intelligence, reports and loyalty lists.
+ */
+export function supplierSeesRestaurantSql(restaurantExpr, supplierIdExpr) {
+  return `EXISTS (SELECT 1 FROM supplier rel_sv WHERE rel_sv.id = ${supplierIdExpr} AND ${followExistsSql(restaurantExpr, 'rel_sv')} AND NOT ${blockedExistsSql(restaurantExpr, 'rel_sv')})`
+}
+
+/**
+ * Follow / block flags of one restaurant against many supplier branches.
+ * @returns {Promise<Map<string, { following: boolean, blocked: boolean }>>}
+ */
+export async function relationshipFlagsForSuppliers(restaurantId, supplierIds, db) {
+  const ids = [...new Set((supplierIds || []).filter(Boolean))]
+  const map = new Map()
+  if (!restaurantId || !ids.length) return map
+  const { rows } = await run(db)(
+    `SELECT s.id, ${followExistsSql('$1', 's')} AS following, ${blockedExistsSql('$1', 's')} AS blocked
+     FROM supplier s WHERE s.id = ANY($2::uuid[])`,
+    [restaurantId, ids]
+  )
+  for (const row of rows) {
+    map.set(row.id, { following: row.following === true, blocked: row.blocked === true })
+  }
+  return map
+}
+
 export async function resolveSupplierOrgId(supplierId, db) {
   if (!supplierId) return null
   const { rows } = await run(db)(
