@@ -88,6 +88,7 @@ import { requireStartupMigrationsReady, isStartupMigrationsReady } from './lib/s
 import { getMemorySnapshot, shouldExposeMemoryOnHealth } from './lib/memory-monitor.js'
 import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
 import { stripeWebhookRoutes } from './routes/stripe-webhook.routes.js'
+import { registerRelationshipCacheHook } from './lib/relationship-cache.js'
 import { internalAuthRoutes } from './routes/internal-auth.routes.js'
 
 /**
@@ -96,6 +97,7 @@ import { internalAuthRoutes } from './routes/internal-auth.routes.js'
  * (tests/integrity/marketplace) mount this on an ephemeral port.
  */
 export function createApp() {
+  registerRelationshipCacheHook()
   const app = express()
   const isProduction = config.NODE_ENV === 'production'
 

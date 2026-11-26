@@ -32,7 +32,14 @@ import {
   overlayProductRowsWithAuthoritativeStock,
 } from '../services/supplier-stock.service.js'
 import { syncWarehouseMirrorFromLegacy } from '../services/supplier-order-stock.service.js'
-import { getCache, setCache, deleteCache } from '../lib/cache.js'
+import { getCache, setCache } from '../lib/cache.js'
+import {
+  bumpCatalogVersionSafe,
+  getCatalogVersion,
+  restaurantCatalogMetaKey,
+  supplierCatalogMetaKey,
+} from '../lib/relationship-cache.js'
+import { catalogVisibleSql } from '../lib/relationship.js'
 import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
@@ -72,21 +79,40 @@ function buildInventoryJoin(scopedSupplierId, supplierParamIndex) {
       ) inv ON true`
 }
 
-function catalogCategoriesCacheKey(supplierId) {
-  return `productCats:${supplierId ?? 'all'}`
+/**
+ * Catalog meta (category counts, tags) is cached per viewer and per catalogVersion:
+ * restaurants only count catalogs visible to them (catalogVisibleSql), suppliers their own,
+ * admin everything. Any product write bumps catalogVersion instead of deleting keys.
+ */
+async function catalogMetaScope(req, kind) {
+  const tenant = await getRequestTenant(req)
+  const version = await getCatalogVersion()
+  if (tenant?.tenantType === 'RESTAURANT') {
+    return {
+      supplierId: null,
+      restaurantId: tenant.tenantId,
+      cacheKey: restaurantCatalogMetaKey(kind, tenant.tenantId, version),
+    }
+  }
+  const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
+  return {
+    supplierId,
+    restaurantId: null,
+    cacheKey: supplierCatalogMetaKey(kind, supplierId, version),
+  }
 }
 
-function catalogTagsCacheKey(supplierId) {
-  return `productTags:${supplierId ?? 'all'}`
+/** SQL predicate on product row `p`: visible to restaurant `$<idx>` (TRUE when $idx is NULL). */
+function restaurantVisibleProductSql(paramIdx) {
+  const param = `$${paramIdx}::uuid`
+  return `(${param} IS NULL OR EXISTS (
+    SELECT 1 FROM supplier vis_s
+    WHERE vis_s.id = p.supplier_id AND ${catalogVisibleSql(param, 'vis_s')}
+  ))`
 }
 
-async function invalidateCatalogMetaCache(supplierId) {
-  await Promise.all([
-    deleteCache(catalogCategoriesCacheKey(supplierId)).catch(() => {}),
-    deleteCache(catalogCategoriesCacheKey(null)).catch(() => {}),
-    deleteCache(catalogTagsCacheKey(supplierId)).catch(() => {}),
-    deleteCache(catalogTagsCacheKey(null)).catch(() => {}),
-  ])
+async function invalidateCatalogMetaCache() {
+  await bumpCatalogVersionSafe()
 }
 
 function encodeProductCursor(createdAt, id) {
@@ -237,10 +263,7 @@ const productListSchema = z.object({
 // Get product categories
 router.get('/categories', async (req, res) => {
   try {
-    const tenant = await getRequestTenant(req)
-    const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
-
-    const cacheKey = catalogCategoriesCacheKey(supplierId)
+    const { supplierId, restaurantId, cacheKey } = await catalogMetaScope(req, 'productCats')
     let categories = await getCache(cacheKey)
     if (!Array.isArray(categories)) {
       const { rows } = await query(
@@ -256,13 +279,14 @@ router.get('/categories', async (req, res) => {
         FROM product_category pc
         LEFT JOIN product p ON p.category_id = pc.id
           AND ($1::uuid IS NULL OR p.supplier_id = $1)
+          AND ${restaurantVisibleProductSql(2)}
         WHERE pc.is_active = true
           AND (pc.supplier_id IS NULL OR pc.supplier_id = $1)
         GROUP BY pc.id
         HAVING ($1::uuid IS NOT NULL OR COUNT(p.id) > 0)
         ORDER BY product_count DESC, pc.display_order, pc.name
         `,
-        [supplierId],
+        [supplierId, restaurantId],
         req
       )
       categories = rows
@@ -320,7 +344,7 @@ router.post('/categories', requireRole(['SUPPLIER']), async (req, res) => {
       ]
     )
     if (!rows[0]) throw new ValidationError('A category with this name already exists')
-    await invalidateCatalogMetaCache(supplierId)
+    await invalidateCatalogMetaCache()
     return res
       .status(201)
       .json({ ok: true, data: { category: rows[0] }, error: null, requestId: req.requestId })
@@ -370,7 +394,7 @@ router.patch('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, r
       values
     )
     if (!rows[0]) throw new NotFoundError('Supplier category not found')
-    await invalidateCatalogMetaCache(supplierId)
+    await invalidateCatalogMetaCache()
     return res.json({
       ok: true,
       data: { category: rows[0] },
@@ -406,7 +430,7 @@ router.delete('/categories/:categoryId', requireRole(['SUPPLIER']), async (req, 
       [categoryId, supplierId]
     )
     if (!rows[0]) throw new NotFoundError('Supplier category not found')
-    await invalidateCatalogMetaCache(supplierId)
+    await invalidateCatalogMetaCache()
     return res.json({ ok: true, data: { id: categoryId }, error: null, requestId: req.requestId })
   } catch (error) {
     const status =
@@ -433,20 +457,19 @@ router.get('/tags', async (req, res) => {
     if (!hasTags) {
       return res.json({ ok: true, data: { tags: [] }, error: null, requestId: req.requestId })
     }
-    const tenant = await getRequestTenant(req)
-    const supplierId = tenant?.tenantType === 'SUPPLIER' ? tenant.tenantId : null
-    const cacheKey = `productTags:${supplierId ?? 'all'}`
+    const { supplierId, restaurantId, cacheKey } = await catalogMetaScope(req, 'productTags')
     let tagRows = await getCache(cacheKey)
     if (!Array.isArray(tagRows)) {
       const { rows } = await query(
         `
         SELECT DISTINCT tag
-        FROM product, jsonb_array_elements_text(tags) AS tag
-        WHERE tags IS NOT NULL AND jsonb_array_length(tags) > 0
-          AND ($1::uuid IS NULL OR supplier_id = $1)
+        FROM product p, jsonb_array_elements_text(p.tags) AS tag
+        WHERE p.tags IS NOT NULL AND jsonb_array_length(p.tags) > 0
+          AND ($1::uuid IS NULL OR p.supplier_id = $1)
+          AND ${restaurantVisibleProductSql(2)}
         ORDER BY tag
         `,
-        [supplierId],
+        [supplierId, restaurantId],
         req
       )
       tagRows = rows
@@ -1347,7 +1370,7 @@ router.post('/', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req, re
       payload_json: { resource_type: 'product', sku: product.sku },
     })
 
-    await invalidateCatalogMetaCache(supplierId)
+    await invalidateCatalogMetaCache()
 
     res.status(201).json({
       ok: true,
@@ -1540,7 +1563,7 @@ router.patch('/:id', requireAuth, requireRole(['SUPPLIER', 'ADMIN']), async (req
       payload_json: { resource_type: 'product', changes: Object.keys(updateData) },
     })
 
-    await invalidateCatalogMetaCache(product.supplier_id)
+    await invalidateCatalogMetaCache()
 
     res.json({
       ok: true,

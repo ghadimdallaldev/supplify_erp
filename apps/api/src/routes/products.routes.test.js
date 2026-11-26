@@ -85,6 +85,8 @@ vi.mock('../lib/cache.js', () => ({
   getCache: vi.fn().mockResolvedValue(null),
   setCache: vi.fn().mockResolvedValue(undefined),
   deleteCache: vi.fn().mockResolvedValue(undefined),
+  deleteCacheByPrefix: vi.fn().mockResolvedValue(undefined),
+  getRedisClient: vi.fn(() => null),
 }))
 
 vi.mock('../lib/warehouse-helpers.js', () => ({

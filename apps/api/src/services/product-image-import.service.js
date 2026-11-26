@@ -4,6 +4,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import yauzl from 'yauzl'
 import { query, withTransaction, withSavepoint } from '../lib/db.js'
+import { bumpCatalogVersionSafe } from '../lib/relationship-cache.js'
 import { config } from '../config/env.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
@@ -1012,6 +1013,8 @@ export async function processImageImportJob(jobId) {
         })
       })
     }
+
+    if (matched > 0) await bumpCatalogVersionSafe()
 
     await updateJobProgress(jobId, {
       status: 'completed',

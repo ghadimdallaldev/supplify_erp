@@ -2,6 +2,8 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 3 (relationship caches)** — skipped for mobile: server-side cache keys and invalidation only. `/api/products/categories` and `/tags` keep their response shape; restaurants now see counts only for catalogs visible to them.
+
 - **Plan A Task 2 (relationship writes)** — mobile change deferred to Plan A Task 13: follow is now idempotent (200 `alreadyFollowing`), following a blocked supplier returns 409 `SUPPLIER_BLOCKED`, responses add `supplierOrganizationId`. Existing mobile calls keep working; Task 13 adds the 409 handling and copy.
 
 Running log for branch `feat/marketplace-visibility` (plans `docs/superpowers/plans/2026-11-25-*`).

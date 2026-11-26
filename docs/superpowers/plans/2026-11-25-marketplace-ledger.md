@@ -20,6 +20,11 @@ Harness DB: docker `supplify-marketplace-audit` (postgres:16-alpine, `127.0.0.1`
 
 ## Rulings
 
+- A3: Ruling: restaurant category/tag counts are filtered by `catalogVisibleSql` now (not only re-keyed), because a per-viewer key over an unfiltered query would still be identical for every restaurant; this is a subset of Task 5's catalog visibility. Cost if wrong: none (Task 5 extends it to product lists).
+- A3: Ruling: `reorder-forecast-cache` stores forecasts in Postgres, not under a cache key, so "key includes the relationship version" is implemented as: the relationship hook marks the restaurant's forecasts dirty (`markReorderForecastDirty`, reason `relationship_change`) and deletes the `reorder-ai-rec:<restaurant>:` prefix. Cost if wrong: one recompute per relationship change.
+- A3: Ruling: the hook bumps the global `catalogVersion` on every relationship change (spec: bumped on any product, visibility or relationship change), which retires all catalog-meta entries; TTL stays 5 min. Cost if wrong: extra category-count queries right after follows.
+- A3: Ruling: supplier `publicCatalogEnabled` updates bump `catalogVersion`; image import bumps only when at least one image matched; product import bumps when anything was created/updated. `registerRelationshipCacheHook()` runs inside `createApp()` (idempotent). Cost if wrong: none.
+
 - A2: Ruling: errorHandler maps any error with `expose: true` + `code` + `statusCode` to `{name: code, message}` with that status; `RelationshipError` (lib/relationship.js) is the base, and `FollowRequiredError`, `RestaurantNotAvailableError`, `SupplierBlockedError`, `SupplierFollowLimitError` extend it. Cost if wrong: none (opt-in flag).
 - A2: Ruling: a duplicate follow returns 200 `alreadyFollowing: true` instead of the old 400 "already being followed" (the plan's idempotency requirement); a duplicate block returns 200 `alreadyBlocked: true`. Cost if wrong: clients that relied on the 400 show success instead.
 - A2: Ruling: follow/block targets resolve by branch id, org id or slug over active branches WITHOUT the public-catalog filter, so private suppliers can be followed (spec: "Follow to see the catalog"). Cost if wrong: a restaurant could follow an org whose catalog it still cannot see until the follow lands — intended.
