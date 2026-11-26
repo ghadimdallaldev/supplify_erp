@@ -96,6 +96,13 @@ vi.mock('../services/resolve-product-price.service.js', () => ({
     ),
 }))
 
+const canSeeRestaurantMock = vi.fn(async () => true)
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSeeRestaurant: (...args) => canSeeRestaurantMock(...args),
+  lockAndAssertRestaurantVisible: vi.fn(async () => undefined),
+}))
+
 import { restaurantPricingRoutes } from './restaurant-pricing.routes.js'
 import { errorHandler } from '../middlewares/errorHandler.js'
 import { query } from '../lib/db.js'
@@ -108,6 +115,9 @@ describe('restaurant-pricing routes', () => {
     clearAllMocks()
     setupMocks()
     hookRecipeCostingAfterCatalogPriceChangeMock.mockClear()
+    query.mockReset()
+    canSeeRestaurantMock.mockReset()
+    canSeeRestaurantMock.mockResolvedValue(true)
     tenantPermissions.value = ['CATALOG_VIEW', 'CATALOG_MANAGE']
     getSupplierIdForRequest.mockResolvedValue('supplier-1')
     app = express()
@@ -145,22 +155,18 @@ describe('restaurant-pricing routes', () => {
   })
 
   it('creates contract price for own product when restaurant is eligible', async () => {
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'product-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'rp-new',
-            supplier_id: 'supplier-1',
-            restaurant_id: 'restaurant-1',
-            product_id: 'product-1',
-            price: '8.00',
-            is_active: true,
-          },
-        ],
-      })
+    query.mockResolvedValueOnce({ rows: [{ id: 'product-1' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'rp-new',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          product_id: 'product-1',
+          price: '8.00',
+          is_active: true,
+        },
+      ],
+    })
 
     const res = await request(app).post('/api/restaurant-pricing').send({
       restaurantId: '11111111-1111-4111-8111-111111111111',
@@ -188,11 +194,8 @@ describe('restaurant-pricing routes', () => {
     expect(listSql).not.toMatch(/status = 'expired'.*is_active/)
   })
 
-  it('rejects create when restaurant has no commercial relationship', async () => {
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'product-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [] })
+  it('rejects create when restaurant does not follow: same 404 as unknown, before any lookup', async () => {
+    canSeeRestaurantMock.mockResolvedValue(false)
 
     const res = await request(app).post('/api/restaurant-pricing').send({
       restaurantId: '11111111-1111-4111-8111-111111111111',
@@ -200,15 +203,13 @@ describe('restaurant-pricing routes', () => {
       price: 8,
     })
 
-    expect(res.status).toBe(400)
-    expect(res.body.error.message).toMatch(/not eligible for contract pricing/)
+    expect(res.status).toBe(404)
+    expect(res.body.error.name).toBe('RESTAURANT_NOT_AVAILABLE')
+    expect(query).not.toHaveBeenCalled()
   })
 
   it('rejects create when contract end date is before start date', async () => {
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'product-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
+    query.mockResolvedValueOnce({ rows: [{ id: 'product-1' }] })
 
     const res = await request(app).post('/api/restaurant-pricing').send({
       restaurantId: '11111111-1111-4111-8111-111111111111',
@@ -292,23 +293,19 @@ describe('restaurant-pricing routes', () => {
       new Map([['22222222-2222-4222-8222-222222222222', { amount: 100, currency: 'USD' }]])
     )
 
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'product-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'rp-new',
-            supplier_id: 'supplier-1',
-            restaurant_id: 'restaurant-1',
-            product_id: 'product-1',
-            price: '90.00',
-            contract_discount_percentage: '10',
-            is_active: true,
-          },
-        ],
-      })
+    query.mockResolvedValueOnce({ rows: [{ id: 'product-1' }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'rp-new',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          product_id: 'product-1',
+          price: '90.00',
+          contract_discount_percentage: '10',
+          is_active: true,
+        },
+      ],
+    })
 
     const res = await request(app).post('/api/restaurant-pricing').send({
       restaurantId: '11111111-1111-4111-8111-111111111111',
@@ -323,22 +320,18 @@ describe('restaurant-pricing routes', () => {
 
   it('deduplicates bulk items by productId (last wins)', async () => {
     const productId = '22222222-2222-4222-8222-222222222222'
-    query
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'restaurant-1' }] })
-      .mockResolvedValueOnce({ rows: [{ id: productId }] })
-      .mockResolvedValueOnce({
-        rows: [
-          {
-            id: 'rp-bulk',
-            supplier_id: 'supplier-1',
-            restaurant_id: 'restaurant-1',
-            product_id: productId,
-            price: '12.00',
-            is_active: true,
-          },
-        ],
-      })
+    query.mockResolvedValueOnce({ rows: [{ id: productId }] }).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'rp-bulk',
+          supplier_id: 'supplier-1',
+          restaurant_id: 'restaurant-1',
+          product_id: productId,
+          price: '12.00',
+          is_active: true,
+        },
+      ],
+    })
 
     const res = await request(app)
       .post('/api/restaurant-pricing/bulk')
@@ -356,6 +349,28 @@ describe('restaurant-pricing routes', () => {
       String(call[0]).includes('INSERT INTO restaurant_pricing')
     )
     expect(insertCall?.[1]?.[3]).toEqual([12])
+  })
+
+  it('lists only contracts of current followers', async () => {
+    query.mockResolvedValueOnce({ rows: [] })
+    await request(app).get('/api/restaurant-pricing')
+    const listSql = String(query.mock.calls[0][0])
+    expect(listSql).toContain('supplier_follow')
+    expect(listSql).toContain('supplier_blocklist')
+    expect(query.mock.calls[0][1]).toHaveLength(2)
+  })
+
+  it('PATCH of a contract whose restaurant no longer follows is RESTAURANT_NOT_AVAILABLE', async () => {
+    query.mockResolvedValueOnce({
+      rows: [{ restaurant_id: 'restaurant-1', product_id: 'product-1' }],
+    })
+    canSeeRestaurantMock.mockResolvedValue(false)
+    const res = await request(app)
+      .patch('/api/restaurant-pricing/33333333-3333-4333-8333-333333333333')
+      .send({ price: 9 })
+    expect(res.status).toBe(404)
+    expect(res.body.error.name).toBe('RESTAURANT_NOT_AVAILABLE')
+    expect(query.mock.calls.some((c) => /UPDATE restaurant_pricing/.test(String(c[0])))).toBe(false)
   })
 
   it('deactivates contract price scoped to supplier', async () => {

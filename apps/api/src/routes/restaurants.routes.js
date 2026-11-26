@@ -28,6 +28,7 @@ import { brandingUpdateSchema } from './suppliers/suppliers.helpers.js'
 import { normalizeBusinessType } from '../lib/restaurant-targeting.js'
 import { presentRestaurant, canChangeTenantContactEmail } from '../lib/tenant-profile-redaction.js'
 import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
+import { canSeeRestaurant, restaurantNotAvailable } from '../lib/relationship.js'
 
 const router = express.Router()
 
@@ -95,7 +96,9 @@ const restaurantListSchema = z.object({
     .default('0'),
 })
 
-// List restaurants (admin sees all; suppliers see customers who ordered or follow them)
+// List restaurants for a supplier: followers of its organisation that have not blocked it
+// (spec §6.2 item 6). Past customers who unfollowed are not listed; their names stay on the
+// supplier's own order and invoice records.
 router.get(
   '/',
   requireAuth,
@@ -126,21 +129,13 @@ router.get(
         })
       }
 
+      const orgOf = `(SELECT COALESCE(s_org.organization_id, s_org.id) FROM supplier s_org WHERE s_org.id = $${paramIndex})`
       whereConditions.push(`
         id IN (
-          SELECT DISTINCT o.restaurant_id
-          FROM customer_order o
-          JOIN order_item oi ON oi.order_id = o.id
-          WHERE oi.supplier_id = $${paramIndex}
-          UNION
-          SELECT sf.restaurant_id
-          FROM supplier_follow sf
-          WHERE sf.supplier_id = $${paramIndex}
+          SELECT sf.restaurant_id FROM supplier_follow sf WHERE sf.supplier_org_id = ${orgOf}
         )
         AND id NOT IN (
-          SELECT sb.restaurant_id
-          FROM supplier_blocklist sb
-          WHERE sb.supplier_id = $${paramIndex}
+          SELECT sb.restaurant_id FROM supplier_blocklist sb WHERE sb.supplier_org_id = ${orgOf}
         )
       `)
       queryParams.push(supplierId)
@@ -558,9 +553,26 @@ router.get(
     try {
       const { id } = req.params
 
+      // Suppliers: relationship check before any restaurant lookup, so unknown, never-followed
+      // and blocked restaurants get the same 404 (spec §6.2 item 6; fixes the blocklist bypass
+      // through past orders).
+      if (req.userData?.role === 'SUPPLIER') {
+        const supplierId = await getSupplierIdForRequest(req)
+        if (!supplierId) {
+          return res.status(403).json({
+            ok: false,
+            data: null,
+            error: { name: 'FORBIDDEN', message: 'Access denied' },
+            requestId: req.requestId,
+          })
+        }
+        if (!(await canSeeRestaurant(id, supplierId))) return restaurantNotAvailable(res, req)
+      }
+
       const { rows } = await query('SELECT * FROM restaurant WHERE id = $1', [id])
 
       if (rows.length === 0) {
+        if (req.userData?.role === 'SUPPLIER') return restaurantNotAvailable(res, req)
         return res.status(404).json({
           ok: false,
           data: null,
@@ -600,37 +612,8 @@ router.get(
             requestId: req.requestId,
           })
         }
-        const { rows: linked } = await query(
-          `
-        SELECT 1
-        FROM supplier_follow sf
-        WHERE sf.supplier_id = $1
-          AND sf.restaurant_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM supplier_blocklist sb
-            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
-          )
-        UNION
-        SELECT 1
-        FROM customer_order o
-        JOIN order_item oi ON oi.order_id = o.id
-        WHERE o.restaurant_id = $2
-          AND oi.supplier_id = $1
-        LIMIT 1
-      `,
-          [supplierId, id]
-        )
-        if (!linked.length) {
-          return res.status(403).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'FORBIDDEN',
-              message: 'Access denied',
-            },
-            requestId: req.requestId,
-          })
-        }
+        // Non-supplier, non-restaurant callers without a supplier workspace (checked above for
+        // suppliers) keep the old behaviour.
       }
 
       res.json({

@@ -23,7 +23,11 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
   - Every send path (REST, socket, deal chat, order fulfilment issues) checks under the shared relationship lock in the insert's transaction. A refused send reserves no daily chat slot and sends no notification.
   - A relationship change removes the supplier branch's sockets from the affected conversation rooms and emits `conversation_access_changed { conversationId }` to both tenants.
   - Attachments are served only via `GET /api/chat/attachments/:id`, which re-checks access and redirects to a 5-minute signed object URL.
-- Manual supplier orders (`POST /api/orders/manual`) require the restaurant to **follow** the supplier or have placed an order before.
+- **Supplier side: followers only.** The customer list (`GET /api/restaurants`) shows only restaurants that follow the supplier's organisation and have not blocked it. Past customers who unfollowed drop off the list; their names stay on the supplier's own orders and invoices.
+  - Customer detail, manual orders (`POST /api/orders/manual`) and contract pricing (create, bulk, PATCH) need a current follow and no block. A past order no longer qualifies.
+  - The check runs before any restaurant, branch or contract lookup. Unknown, never-followed and blocked restaurants (and foreign branch ids, and unknown contract ids) all get the same 404 `RESTAURANT_NOT_AVAILABLE`.
+  - Manual orders and contract writes re-check under the shared relationship lock inside the write's transaction.
+  - Contracts of restaurants that unfollow stay in the database but are hidden from the supplier's list. They reappear if the restaurant follows again.
 
 ## Downstream effects
 

@@ -95,6 +95,31 @@ export async function canTransact(restaurantId, supplierId, db) {
   return r.following && !r.blocked
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Supplier-side view of a restaurant (customer list/detail, manual orders, contracts, offers):
+ * follow AND not blocked (spec §6.2 items 6–8). Non-UUID ids are simply "not visible", so the
+ * caller answers with the same RESTAURANT_NOT_AVAILABLE as for an unknown restaurant.
+ */
+export async function canSeeRestaurant(restaurantId, supplierId, db) {
+  if (!UUID_RE.test(String(restaurantId || '')) || !supplierId) return false
+  return canTransact(restaurantId, supplierId, db)
+}
+
+/**
+ * Lock the relationship (shared) inside `client`'s transaction and re-check that the supplier
+ * may still act on the restaurant; throws RestaurantNotAvailableError otherwise.
+ */
+export async function lockAndAssertRestaurantVisible(client, restaurantId, supplierId) {
+  const orgId = await resolveSupplierOrgId(supplierId, client)
+  if (!orgId) throw new RestaurantNotAvailableError()
+  await lockRelationshipShared(client, restaurantId, orgId)
+  if (!(await canSeeRestaurant(restaurantId, supplierId, client))) {
+    throw new RestaurantNotAvailableError()
+  }
+}
+
 export async function canViewCatalog(restaurantId, supplierId, db) {
   const r = await getRelationship(restaurantId, supplierId, db)
   return Boolean(r.orgId) && !r.blocked && (r.following || r.publicCatalog)

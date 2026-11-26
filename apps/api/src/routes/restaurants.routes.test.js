@@ -101,6 +101,12 @@ vi.mock('../lib/logger.js', () => ({
 }))
 
 // Import routes after mocks
+const canSeeRestaurantMock = vi.fn(async () => true)
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSeeRestaurant: (...args) => canSeeRestaurantMock(...args),
+}))
+
 import { restaurantsRoutes } from './restaurants.routes.js'
 
 describe('Restaurants Routes', () => {
@@ -368,19 +374,18 @@ describe('Restaurants Routes', () => {
       expect(response.body.error.name).toBe('FORBIDDEN')
     })
 
-    it('allows SUPPLIER when restaurant has active connection', async () => {
-      db.query
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 'restaurant-1',
-              name: 'Test Restaurant',
-              tax_id: 'secret-tax',
-              vat_number: 'secret-vat',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+    it('allows SUPPLIER when the restaurant follows and has not blocked it', async () => {
+      canSeeRestaurantMock.mockResolvedValue(true)
+      db.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'restaurant-1',
+            name: 'Test Restaurant',
+            tax_id: 'secret-tax',
+            vat_number: 'secret-vat',
+          },
+        ],
+      })
 
       const localApp = express()
       localApp.use(express.json())
@@ -398,6 +403,21 @@ describe('Restaurants Routes', () => {
       expect(response.body.data.restaurant.id).toBe('restaurant-1')
       expect(response.body.data.restaurant.tax_id).toBeUndefined()
       expect(response.body.data.restaurant.vat_number).toBeUndefined()
+    })
+
+    it('SUPPLIER gets RESTAURANT_NOT_AVAILABLE before any lookup when not followed', async () => {
+      canSeeRestaurantMock.mockResolvedValue(false)
+      const localApp = express()
+      localApp.use(express.json())
+      localApp.use((req, res, next) => {
+        req.requestId = 'test-request-id'
+        req.userData = { ...mockUser, role: 'SUPPLIER' }
+        next()
+      })
+      localApp.use('/api/restaurants', restaurantsRoutes)
+      const response = await request(localApp).get('/api/restaurants/restaurant-1').expect(404)
+      expect(response.body.error.name).toBe('RESTAURANT_NOT_AVAILABLE')
+      expect(db.query.mock.calls.some((c) => /FROM restaurant/.test(String(c[0])))).toBe(false)
     })
   })
 })

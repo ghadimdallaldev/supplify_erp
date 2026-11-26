@@ -2,6 +2,13 @@ Mobile parity audit — source of truth for this repo. Native Expo apps live onl
 
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
+- **Plan A Task 7 (supplier lookups)** — mobile change deferred to Plan A Task 13. Supplier role only:
+  - `GET /api/restaurants` lists followers only.
+  - `GET /api/restaurants/:id` returns 404 `RESTAURANT_NOT_AVAILABLE` for non-followers and blockers (was 403).
+  - `POST /api/orders/manual` returns 404 `RESTAURANT_NOT_AVAILABLE` instead of the 400 "cannot receive manual orders" error.
+  - Contract pricing create, bulk and PATCH return 404 `RESTAURANT_NOT_AVAILABLE` (was 400 / 404 `NOT_FOUND`).
+  - Payload shapes are unchanged. Task 13 maps the new error code to copy.
+
 - **Plan A Task 6 (relationship-aware chat)** — mobile change deferred to Plan A Task 13. A general message needs a follow; without one `POST /api/chat/conversations/:id/messages` and socket `send_message` return 403 / `chat_error` `CHAT_READ_ONLY` with `openOrderIds`. A message tagged with `orderId` is allowed while that order is open, and a block closes everything. Conversation list rows add `can_send_general`, `open_order_ids` and `is_closed_by_block`. Suppliers no longer see conversations with restaurants that blocked them (404). New socket event `conversation_access_changed { conversationId }` means the client should refetch and re-join. Attachment `fileUrl` is now `/api/chat/attachments/<id>`, which 302-redirects to a 5-minute signed URL. Starting a chat (including from a deal) needs a follow: 403 `FOLLOW_REQUIRED`. A supplier starting a chat with a non-follower gets 404 `RESTAURANT_NOT_AVAILABLE`. Task 13 adds the read-only composer, the order picker, the event handler and authenticated attachment opening.
 
 - **Plan A Task 5 (catalog visibility)** — mobile change deferred to Plan A Task 13. Restaurants can now open any product of a visible catalog (not blocked AND (follows OR `public_catalog_enabled`)); `/api/products`, `/api/products/:id`, `/api/search` product rows and deal rows carry `is_followed` and `in_stock`; `available_qty` is omitted for non-followers; `/api/inventory/product/:id` is 404 for non-followers; `/api/products/favorites` rows add `can_order` (false → "Follow to order"). Deals of public suppliers reach non-followers. Task 13 adds "Follow to order" / "Follow & add" and the in-stock badge.
