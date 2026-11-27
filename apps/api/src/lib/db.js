@@ -59,6 +59,11 @@ function getMigrationPool() {
   return migrationPool
 }
 
+/** Dedicated client on the migration pool (caller must release). Used for session-level locks. */
+export async function connectMigrationClient() {
+  return getMigrationPool().connect()
+}
+
 /** Run schema DDL / migration SQL (not for hot request paths unless repairing drift). */
 export async function migrationQuery(text, params = []) {
   const start = Date.now()

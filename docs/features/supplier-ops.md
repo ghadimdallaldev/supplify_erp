@@ -233,14 +233,19 @@ Supplier CRM import, referral invites, sponsored onboarding, and growth metrics.
 | Method | Path                               | Permission         | Description                               |
 | ------ | ---------------------------------- | ------------------ | ----------------------------------------- |
 | POST   | `/customers/import/preview`        | `CUSTOMERS_IMPORT` | CSV validation preview                    |
-| POST   | `/customers/import`                | `CUSTOMERS_IMPORT` | Execute import + auto-match               |
+| POST   | `/customers/import`                | `CUSTOMERS_IMPORT` | Execute import (private match, see below) |
 | GET    | `/customers/prospects`             | `GROWTH_VIEW`      | List imported prospects                   |
-| POST   | `/customers/prospects/:id/connect` | `CUSTOMERS_MANAGE` | Connection request to existing restaurant |
 | POST   | `/customers/prospects/:id/invite`  | `CUSTOMERS_MANAGE` | Email / WhatsApp / link invite            |
 | POST   | `/customers/prospects/:id/sponsor` | `CUSTOMERS_MANAGE` | Sponsor 1-month plan (limits apply)       |
 | GET    | `/metrics`                         | `GROWTH_VIEW`      | Dashboard aggregates                      |
 
 **Web:** `/app/customer-growth` — `SupplierCustomerGrowthPage`; dashboard widget in `DashboardWidgetGrid`.
+
+Matching is private (marketplace release 1): only exact normalised email or phone, the result is
+never returned, and every invite looks the same to the supplier. Prospect statuses are `imported`,
+`invited`, `following`. The `connect` and `rematch` endpoints were removed. Customer lists, pickers,
+manual orders, contract pricing, sponsorships and supplier intelligence reach following restaurants
+only; see [marketplace-visibility.md](./marketplace-visibility.md).
 
 Full spec: [supplier-customer-growth.md](./supplier-customer-growth.md) · Migration: `0169_supplier_growth_program.sql`
 

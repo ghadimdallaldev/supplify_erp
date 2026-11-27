@@ -118,6 +118,13 @@ vi.mock('../services/resolve-product-price.service.js', async (importOriginal) =
   }
 })
 
+// Relationship guard (follow required, shared locks) is covered by create.follow.test.js and
+// tests/integrity/marketplace/orders.pg.test.js; here it always allows.
+vi.mock('../services/order-relationship-guard.service.js', () => ({
+  lockAndAssertOrderRelationships: vi.fn().mockResolvedValue(undefined),
+  lockAndPartitionOrderSuppliers: vi.fn(),
+}))
+
 vi.mock('../services/restaurant-order-create.service.js', () => ({
   createRestaurantOrdersInTransaction: vi.fn(),
 }))
@@ -151,7 +158,7 @@ vi.mock('../services/dashboard-summary.service.js', () => ({
   invalidateDashboardSummaryCache: vi.fn().mockResolvedValue(undefined),
 }))
 
-/** Shared checkout preflight mocks: product → blocklist → follow/link → supplier profile */
+/** Shared checkout preflight mocks: product → supplier profile (follow is checked in the tx) */
 function mockRestaurantCheckoutPreflight(
   db,
   { productId, supplierId, openQuotedProducts = [], quoteLockQtyRows = null }
@@ -182,23 +189,18 @@ function mockRestaurantCheckoutPreflight(
     db.query.mockResolvedValueOnce({ rows: quoteLockQtyRows })
   }
 
-  db.query
-    .mockResolvedValueOnce({ rows: [] }) // blocklist empty
-    .mockResolvedValueOnce({
-      rows: [{ supplier_id: supplierId, supplier_name: 'Supplier' }],
-    }) // follow/prior-order linked
-    .mockResolvedValueOnce({
-      rows: [
-        {
-          id: supplierId,
-          default_warehouse_id: 'wh-1',
-          fulfillment_mode: 'single',
-          multi_warehouse_enabled: false,
-          name: 'Supplier',
-          minimum_order_amount: 0,
-        },
-      ],
-    })
+  db.query.mockResolvedValueOnce({
+    rows: [
+      {
+        id: supplierId,
+        default_warehouse_id: 'wh-1',
+        fulfillment_mode: 'single',
+        multi_warehouse_enabled: false,
+        name: 'Supplier',
+        minimum_order_amount: 0,
+      },
+    ],
+  })
 }
 
 // Import routes after mocks

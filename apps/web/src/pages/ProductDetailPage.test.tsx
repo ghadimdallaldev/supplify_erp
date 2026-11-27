@@ -16,11 +16,14 @@ const product = {
   current_price: 10,
   currency: 'USD',
 }
-const addItem = vi.fn(),
+const addItem = vi.fn(() => ({ ok: true })),
   refetch = vi.fn()
 let result: any
 vi.mock('../services/api', () => ({ useGetProductQuery: () => result }))
 vi.mock('../hooks/useCartActions', () => ({ useCartActions: () => ({ addItem }) }))
+vi.mock('../hooks/useFollowSupplier', () => ({
+  useFollowSupplier: () => ({ follow: vi.fn(async () => 'followed'), pendingSupplierId: null }),
+}))
 vi.mock('../hooks/useImpersonation', () => ({
   useImpersonation: () => ({ isEffectiveSupplier: false }),
 }))

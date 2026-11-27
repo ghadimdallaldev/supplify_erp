@@ -25,6 +25,18 @@ Search-as-you-type (2026-11-25): `GET /api/search` products and `GET /api/produc
 `lib/search-query.js` turns the text into a sanitised prefix tsquery (`"cherry tom"` → `cherry:* & tom:*`, Unicode letters/digits only, max 6 terms) used with `to_tsquery('simple', …)`, OR'd with a `LOWER(p.name) LIKE '%…%'` substring match (LIKE wildcards escaped), ranked by `ts_rank`.
 Without the `search_vector` column, `/api/products` still falls back to name/SKU `LIKE`. Supplier search was already a substring match.
 
+## Visibility (marketplace release 1)
+
+- Suppliers are searchable by every restaurant that has not blocked them.
+- Products, prices, deals and category counts follow `catalogVisibleSql`: not blocked and (follows
+  or `public_catalog_enabled`). A private-catalog supplier appears to non-followers as a supplier
+  card only ("Follow to see the catalog").
+- Non-followers see list prices and an in-stock flag, never stock quantities. Results carry
+  `is_followed` and `can_order` so clients show **Follow & add**.
+- Category and tag counts are cached per viewer under the `catalog:version` key.
+
+Full rules: [marketplace-visibility.md](./marketplace-visibility.md).
+
 ## Web
 
 - `useDebouncedSearch` hook (300ms default)

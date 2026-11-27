@@ -5,7 +5,6 @@ import {
   useGetSupplierQuery,
   useGetProductsQuery,
   useCreateConversationMutation,
-  useFollowSupplierMutation,
   useUnfollowSupplierMutation,
   useBlockSupplierMutation,
   useUnblockSupplierMutation,
@@ -46,6 +45,7 @@ import {
   Ban,
 } from 'lucide-react'
 import { useAppSelector } from '../hooks/redux'
+import { useFollowSupplier } from '../hooks/useFollowSupplier'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { formatCurrency, formatPrice } from '../utils/format'
@@ -83,7 +83,8 @@ export function SupplierDetailPage() {
   const { data, isLoading, error, refetch } = useGetSupplierQuery(id!)
   const [createConversation, { isLoading: isCreatingConversation }] =
     useCreateConversationMutation()
-  const [followSupplier, { isLoading: isFollowing }] = useFollowSupplierMutation()
+  const { follow, pendingSupplierId } = useFollowSupplier()
+  const isFollowing = pendingSupplierId != null
   const [unfollowSupplier, { isLoading: isUnfollowing }] = useUnfollowSupplierMutation()
   const [blockSupplier, { isLoading: isBlocking }] = useBlockSupplierMutation()
   const [unblockSupplier, { isLoading: isUnblocking }] = useUnblockSupplierMutation()
@@ -164,7 +165,8 @@ export function SupplierDetailPage() {
         await unfollowSupplier(id).unwrap()
         toast.success(t('detail.toast.unfollowed'))
       } else {
-        await followSupplier(id).unwrap()
+        // Limit → upgrade prompt, blocked → "Unblock to follow" (handled by the hook).
+        if ((await follow(id)) !== 'followed') return
         toast.success(t('detail.toast.followed'))
       }
     } catch (error: any) {
@@ -559,7 +561,8 @@ export function SupplierDetailPage() {
               ) : (
                 (reviewsData?.reviews || []).map((r: Record<string, unknown>) => {
                   const reviewId = String(r.id)
-                  const isOwnReview = myReviewIds.has(reviewId)
+                  // is_own comes from the API; reviewer identity is never returned (spec §6.2).
+                  const isOwnReview = r.is_own === true || myReviewIds.has(reviewId)
                   const ownReviewMeta = myReviewsById.get(reviewId) as
                     | Record<string, unknown>
                     | undefined
@@ -578,13 +581,23 @@ export function SupplierDetailPage() {
                   return (
                     <div key={reviewId} className="rounded-lg border p-3 text-sm">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-1 text-amber-600">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-3.5 w-3.5 ${i < Number(r.overall_rating || 0) ? 'fill-amber-400' : 'text-amber-200'}`}
-                            />
-                          ))}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1 text-amber-600">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3.5 w-3.5 ${i < Number(r.overall_rating || 0) ? 'fill-amber-400' : 'text-amber-200'}`}
+                              />
+                            ))}
+                          </div>
+                          {r.reviewer_label ? (
+                            <span
+                              className="text-xs text-[var(--text-muted)]"
+                              data-testid={`review-reviewer-${reviewId}`}
+                            >
+                              {t('common:marketplace.verifiedRestaurant')}
+                            </span>
+                          ) : null}
                         </div>
                         {isOwnReview && (
                           <div className="flex gap-1 shrink-0">
@@ -657,6 +670,18 @@ export function SupplierDetailPage() {
               {isLoadingProducts ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"></div>
+                </div>
+              ) : isRestaurant &&
+                !supplier.is_followed &&
+                supplier.public_catalog_enabled === false ? (
+                <div className="text-center py-12" data-testid="supplier-private-catalog">
+                  <Package className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-4" />
+                  <p className="text-[var(--text-muted)]">
+                    {t('common:marketplace.privateCatalog')}
+                  </p>
+                  <Button className="mt-4" onClick={handleFollowToggle} disabled={isFollowing}>
+                    {t('common:marketplace.followToSeeCatalog')}
+                  </Button>
                 </div>
               ) : productsData?.products.length === 0 ? (
                 <div className="text-center py-12">

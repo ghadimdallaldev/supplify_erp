@@ -1,0 +1,487 @@
+import { isDriverLocationPing } from './lib/driver-location-path.js'
+import express from 'express'
+import cors from 'cors'
+import compression from 'compression'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import cookieParser from 'cookie-parser'
+import session from 'express-session'
+import { config, allowE2eRoutes } from './config/env.js'
+import { createSessionStore } from './lib/session-store.js'
+import { requestContext } from './middlewares/requestContext.js'
+import { sanitizeServerErrors } from './middlewares/sanitizeServerErrors.js'
+import { requestLogger } from './middlewares/requestLogger.js'
+import { impersonationContext } from './middlewares/impersonationContext.js'
+import { activeTenantContext } from './middlewares/activeTenantContext.js'
+import { errorHandler } from './middlewares/errorHandler.js'
+import { csrfProtection } from './middlewares/csrf.js'
+import { authRoutes } from './routes/auth.routes.js'
+import { registerRoutes } from './routes/register.routes.js'
+import { productsRoutes } from './routes/products.routes.js'
+import { searchRoutes } from './routes/search.routes.js'
+import { pricesRoutes } from './routes/prices.routes.js'
+import { inventoryRoutes } from './routes/inventory.routes.js'
+import { suppliersRoutes } from './routes/suppliers.routes.js'
+import { restaurantsRoutes } from './routes/restaurants.routes.js'
+import { ordersCalendarRoutes } from './routes/orders.calendar.routes.js'
+import { ordersRoutes } from './routes/orders.routes.js'
+import { filesRoutes } from './routes/files.routes.js'
+import { adminRoutes } from './routes/admin.routes.js'
+import { chatRoutes } from './routes/chat.routes.js'
+import { assistantRoutes } from './routes/assistant.routes.js'
+import { invoicesRoutes } from './routes/invoices.routes.js'
+import { paymentsRoutes } from './routes/payments.routes.js'
+import { quickListsRoutes } from './routes/quick-lists.routes.js'
+import { restaurantInventoryRoutes } from './routes/restaurant-inventory.routes.js'
+import { restaurantOnboardingRoutes } from './routes/restaurant-onboarding.routes.js'
+import { receivingRoutes } from './routes/receiving.routes.js'
+import { restaurantFinanceRoutes } from './routes/restaurant-finance.routes.js'
+import { reservationsRoutes } from './routes/reservations.routes.js'
+import { recipesRoutes, recipeCostingRoutes } from './routes/recipes.routes.js'
+import { restaurantPricingRoutes } from './routes/restaurant-pricing.routes.js'
+import { restaurantIntelligenceRoutes } from './routes/restaurant-intelligence.routes.js'
+import { notificationsRoutes } from './routes/notifications.routes.js'
+import { subscriptionsRoutes } from './routes/subscriptions.routes.js'
+import adminDashboardRoutes from './routes/admin-dashboard.routes.js'
+import branchesRoutes from './routes/branches.routes.js'
+import orgRoutes from './routes/org.routes.js'
+import warehousesRoutes from './routes/warehouses.routes.js'
+import { billingAccessMiddleware } from './middlewares/billingAccess.js'
+import { billingRoutes } from './routes/billing.routes.js'
+import { staffRoutes } from './routes/staff.routes.js'
+import { publicRoutes } from './routes/public.routes.js'
+import { demoCampaignRoutes } from './routes/demo-campaign.routes.js'
+import { publicSalesRoutes } from './routes/public-sales.routes.js'
+import { supplierPublicSalesRoutes } from './routes/supplier-public-sales.routes.js'
+import { consumerAccountRoutes } from './routes/consumer-account.routes.js'
+import { accountRoutes } from './routes/account.routes.js'
+import { e2eRoutes } from './routes/e2e.routes.js'
+import { fulfillmentRoutes } from './routes/fulfillment.routes.js'
+import { driverTrackingRoutes } from './routes/driver-tracking.routes.js'
+import { driversRoutes } from './routes/drivers.routes.js'
+import { supplierOpsRoutes } from './routes/supplier-ops.routes.js'
+import { supplierGrowthRoutes, growthPublicRoutes } from './routes/supplier-growth.routes.js'
+import { restaurantConnectionRequestRoutes } from './routes/restaurant-connection-requests.routes.js'
+import { promotionsRoutes } from './routes/promotions.routes.js'
+import { tenantAuditRoutes } from './routes/tenant-audit.routes.js'
+import { disputesRoutes } from './routes/disputes.routes.js'
+import { creditNotesRoutes } from './routes/credit-notes.routes.js'
+import { pushRoutes } from './routes/push.routes.js'
+import { reviewsRoutes } from './routes/reviews.routes.js'
+import { consumerReviewsRoutes } from './routes/consumer-reviews.routes.js'
+import { reportsRoutes } from './routes/reports.routes.js'
+import { tenantRolesRoutes } from './routes/tenant-roles.routes.js'
+import branchInvitationsRoutes from './routes/branch-invitations.routes.js'
+import branchInvitationsPublicRoutes from './routes/branch-invitations-public.routes.js'
+import { quoteRequestsRoutes } from './routes/quote-requests.routes.js'
+import { loyaltyRoutes } from './routes/loyalty.routes.js'
+import { consumerRoutes, consumerPublicRoutes } from './routes/consumer/index.js'
+import restaurantOrgRoutes from './routes/restaurant-org.routes.js'
+import restaurantInvitationsRoutes from './routes/restaurant-invitations.routes.js'
+import path from 'node:path'
+import { checkStorageHealth } from './services/storage/storage.service.js'
+import { pool } from './lib/db.js'
+import { requestTimingMiddleware } from './middlewares/request-timing.js'
+import { isRedisConnected } from './lib/cache.js'
+import { createRateLimitStore } from './lib/rate-limit-store.js'
+import { requireStartupMigrationsReady, isStartupMigrationsReady } from './lib/startup-readiness.js'
+import { getMemorySnapshot, shouldExposeMemoryOnHealth } from './lib/memory-monitor.js'
+import { whatsappWebhookRoutes } from './routes/whatsapp-webhook.routes.js'
+import { stripeWebhookRoutes } from './routes/stripe-webhook.routes.js'
+import { registerRelationshipCacheHook } from './lib/relationship-cache.js'
+import { internalAuthRoutes } from './routes/internal-auth.routes.js'
+
+/**
+ * Build the Express application: middleware, rate limiters and every API router.
+ * No listen, sockets, crons or startup migrations — see server.js. Integration tests
+ * (tests/integrity/marketplace) mount this on an ephemeral port.
+ */
+export function createApp() {
+  registerRelationshipCacheHook()
+  const app = express()
+  const isProduction = config.NODE_ENV === 'production'
+
+  if (config.TRUST_PROXY) {
+    app.set('trust proxy', 1)
+  }
+
+  // Per-request timing — slow requests (>SLOW_REQUEST_MS) log structured stage breakdown.
+  app.use(requestTimingMiddleware)
+
+  // Gzip/deflate response compression. Big win on Railway where JSON list payloads
+  // (orders, products, reports) cross the public network to the browser uncompressed.
+  // Uses the `compressible` content-type filter (skips images/PDF/already-compressed),
+  // default 1kb threshold (skips tiny bodies). API responses never embed the CSRF token
+  // (header-based defense), so there is no BREACH exposure from compressing them.
+  app.use(compression())
+
+  // Security middleware
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+        },
+      },
+      hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+      frameguard: { action: 'deny' },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      // Allow web app on another Railway host to load /api/files/object images
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+  )
+
+  // CORS configuration (allow multiple dev origins e.g. Vite 5173–5175)
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin || config.WEB_ORIGINS.includes(origin)) return cb(null, true)
+        return cb(null, false)
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-CSRF-Token',
+        'X-Requested-With',
+        'X-Branch-Id',
+      ],
+      maxAge: 600, // browsers cache preflight for 10 minutes — eliminates repeated OPTIONS round-trips
+    })
+  )
+
+  const rateLimitMessage = 'Too many requests from this IP, please try again later.'
+  const rateOpts = {
+    windowMs: config.RATE_LIMIT_WINDOW_MS,
+    standardHeaders: true,
+    legacyHeaders: false,
+  }
+  const skipReadOnlyRequests = (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+  // Driver GPS pings must not consume the shared per-IP budget (see lib/driver-location-path.js).
+
+  function createLimiter(max, message, extra = {}) {
+    const { storePrefix = 'rl:global', ...rest } = extra
+    const store = createRateLimitStore(storePrefix)
+    return rateLimit({
+      ...rateOpts,
+      max,
+      // JSON envelope so API clients (mobile/web) can parse a 429 instead of failing on text/plain.
+      message:
+        typeof message === 'string'
+          ? { ok: false, data: null, error: { name: 'RATE_LIMITED', message } }
+          : message,
+      ...(store ? { store } : {}),
+      ...rest,
+    })
+  }
+
+  const noopLimiter = (_req, _res, next) => next()
+  const limiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(config.RATE_LIMIT_MAX, rateLimitMessage, { skip: isDriverLocationPing })
+    : noopLimiter
+  const driverLocationLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(isProduction ? 1500 : 5000, rateLimitMessage, {
+        skip: (req) => !isDriverLocationPing(req),
+        storePrefix: 'rl:driver-location',
+      })
+    : noopLimiter
+  const authLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(
+        isProduction ? 30 : 500,
+        'Too many authentication attempts, please try again later.',
+        { storePrefix: 'rl:auth' }
+      )
+    : noopLimiter
+  const refreshLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(isProduction ? 20 : 500, 'Too many refresh attempts, please try again later.', {
+        storePrefix: 'rl:auth-refresh',
+      })
+    : noopLimiter
+  const invitationAcceptLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(
+        isProduction ? 12 : 200,
+        'Too many invitation attempts, please try again later.',
+        {
+          storePrefix: 'rl:invite-accept',
+        }
+      )
+    : noopLimiter
+  const availabilityLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(
+        isProduction ? 60 : 300,
+        'Too many availability checks, please try again later.',
+        {
+          storePrefix: 'rl:availability',
+        }
+      )
+    : noopLimiter
+  const staffLinkLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(
+        isProduction ? 10 : 100,
+        'Too many staff portal link requests, please try again later.',
+        { storePrefix: 'rl:staff-link' }
+      )
+    : noopLimiter
+  const publicLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(isProduction ? 60 : 200, rateLimitMessage, { storePrefix: 'rl:public' })
+    : noopLimiter
+  const whatsappIngressLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(isProduction ? 60 : 200, rateLimitMessage, {
+        storePrefix: 'rl:whatsapp-ingress',
+        keyGenerator: (req) => `ip:${req.ip}`,
+      })
+    : noopLimiter
+  const chatSendLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(300, 'Too many messages sent, please try again later.', {
+        storePrefix: 'rl:chat',
+      })
+    : noopLimiter
+  const ordersWriteLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(isProduction ? 120 : 500, 'Too many order requests, please try again later.', {
+        skip: (req) => skipReadOnlyRequests(req) || isDriverLocationPing(req),
+        storePrefix: 'rl:orders',
+      })
+    : noopLimiter
+  const promotionsWriteLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(
+        isProduction ? 80 : 400,
+        'Too many promotion requests, please try again later.',
+        {
+          skip: skipReadOnlyRequests,
+          storePrefix: 'rl:promotions',
+        }
+      )
+    : noopLimiter
+
+  // Meta WhatsApp webhooks — raw body required for X-Hub-Signature-256 verification.
+  app.use(
+    '/webhooks/whatsapp',
+    whatsappIngressLimiter,
+    express.raw({ type: 'application/json', limit: '1mb' }),
+    whatsappWebhookRoutes
+  )
+
+  // Stripe billing webhooks — raw body required for Stripe-Signature verification.
+  app.use(
+    '/webhooks/stripe',
+    express.raw({ type: 'application/json', limit: '1mb' }),
+    stripeWebhookRoutes
+  )
+
+  app.use('/auth', authLimiter)
+  app.use('/auth/refresh', refreshLimiter)
+  app.use('/auth/mobile/refresh', refreshLimiter)
+  app.use('/api/public/invitations', invitationAcceptLimiter)
+  app.use('/api/public/reservations/availability', availabilityLimiter)
+  app.use('/api/public', publicLimiter)
+  app.use(driverLocationLimiter)
+  app.use(limiter)
+
+  // Body parsing middleware
+  app.use(express.json({ limit: '10mb' }))
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+  app.use(cookieParser())
+
+  // Session configuration (PostgreSQL store for OAuth state across instances)
+  // Scoped to /auth only — sessions are only needed for OAuth state (login/callback/logout).
+  // Applying session globally would hit the PostgreSQL store on every API request (~15-25ms on Railway).
+  const sessionStore = createSessionStore()
+
+  const sessionCookie = {
+    secure: config.COOKIE_SECURE,
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: config.COOKIE_SAME_SITE,
+  }
+  if (config.COOKIE_DOMAIN) {
+    sessionCookie.domain = config.COOKIE_DOMAIN
+  }
+
+  const sessionMiddleware = session({
+    store: sessionStore,
+    secret: config.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: sessionCookie,
+  })
+  app.use('/auth', sessionMiddleware)
+
+  app.use(requestContext)
+  // Strip error.message/details from 5xx bodies outside local dev (handlers echo raw error.message).
+  app.use(sanitizeServerErrors())
+  if (config.ENABLE_REQUEST_LOGGING) {
+    app.use(requestLogger)
+  }
+
+  // Impersonation: read signed cookie and set req.impersonationContext when admin is "viewing as" a tenant
+  app.use(impersonationContext)
+  app.use(activeTenantContext)
+
+  // Block locked tenants except billing/subscription read endpoints
+  app.use(billingAccessMiddleware)
+
+  // CSRF protection for state-changing operations. Only signature-verified webhooks bypass it here;
+  // /api/public and /auth are handled inside csrfProtection (exempt only when not cookie-authenticated).
+  const csrfBypassPrefixes = ['/webhooks']
+  app.use((req, res, next) => {
+    if (csrfBypassPrefixes.some((prefix) => req.path.startsWith(prefix))) {
+      return next()
+    }
+    return csrfProtection(req, res, next)
+  })
+
+  const mountLocalUploadsStatic =
+    config.STORAGE_DRIVER === 'local' && config.STORAGE_PUBLIC_READ === true
+  if (mountLocalUploadsStatic) {
+    const uploadsDir = path.resolve(config.STORAGE_LOCAL_PATH)
+    app.use('/uploads', express.static(uploadsDir, { maxAge: '1y', immutable: true }))
+  }
+
+  app.get('/health', async (req, res) => {
+    const storage = await checkStorageHealth()
+    const ok = storage.ok
+    const payload = {
+      status: ok ? 'ok' : 'degraded',
+      service: 'supplify-api',
+      env: config.APP_ENV,
+    }
+
+    if (shouldExposeMemoryOnHealth()) {
+      payload.ok = ok
+      payload.timestamp = new Date().toISOString()
+      payload.storage = storage
+      payload.requestId = req.requestId
+      payload.memory = getMemorySnapshot()
+      payload.dbPool = {
+        total: pool.totalCount,
+        idle: pool.idleCount,
+        waiting: pool.waitingCount,
+        max: pool.options.max,
+      }
+      payload.redis = { connected: isRedisConnected() }
+    }
+
+    res.status(ok ? 200 : 503).json(payload)
+  })
+
+  app.get('/ready', async (req, res) => {
+    try {
+      await pool.query('SELECT 1')
+      if (!isStartupMigrationsReady()) {
+        return res.status(503).json({
+          status: 'migrating',
+          service: 'supplify-api',
+          env: config.APP_ENV,
+        })
+      }
+      res.json({ status: 'ok', service: 'supplify-api', env: config.APP_ENV })
+    } catch {
+      res.status(503).json({ status: 'degraded', service: 'supplify-api', env: config.APP_ENV })
+    }
+  })
+
+  // API routes — blocked until startup SQL migrations finish on this instance
+  app.use(requireStartupMigrationsReady)
+  app.use('/auth', authLimiter)
+  app.use('/auth', authRoutes)
+  app.use('/api/register', authLimiter)
+  app.use('/api/register', registerRoutes)
+  app.use('/api/products', productsRoutes)
+  app.use('/api/search', searchRoutes)
+  app.use('/api/prices', pricesRoutes)
+  app.use('/api/inventory', inventoryRoutes)
+  app.use('/api/suppliers', suppliersRoutes)
+  app.use('/api/restaurants', restaurantsRoutes)
+  app.use('/api/orders/calendar', ordersCalendarRoutes)
+  app.use('/api/orders', ordersWriteLimiter)
+  app.use('/api/orders', ordersRoutes)
+  app.use('/api/promotions', promotionsWriteLimiter)
+  app.use('/api/promotions', promotionsRoutes)
+  app.use('/api/audit', tenantAuditRoutes)
+  app.use('/api/disputes', disputesRoutes)
+  app.use('/api/credit-notes', creditNotesRoutes)
+  app.use('/api/push', pushRoutes)
+  app.use('/api/reviews', reviewsRoutes)
+  app.use('/api/consumer-reviews', consumerReviewsRoutes)
+  app.use('/api/reports', reportsRoutes)
+  app.use('/api/roles', tenantRolesRoutes)
+  app.use('/api/files', filesRoutes)
+  app.use('/api/admin', adminRoutes)
+  app.use('/api/chat', chatSendLimiter)
+  app.use('/api/chat', chatRoutes)
+  const assistantSendLimiter = config.RATE_LIMIT_ENABLED
+    ? createLimiter(120, 'Too many assistant requests, please try again later.', {
+        storePrefix: 'rl:assistant',
+      })
+    : noopLimiter
+  app.use('/api/assistant', assistantSendLimiter)
+  app.use('/api/assistant', assistantRoutes)
+  app.use('/api/invoices', invoicesRoutes)
+  app.use('/api/payments', paymentsRoutes)
+  app.use('/api/quick-lists', quickListsRoutes)
+  app.use('/api/quote-requests', quoteRequestsRoutes)
+  app.use('/api/loyalty', loyaltyRoutes)
+  app.use('/api/restaurant-inventory', restaurantInventoryRoutes)
+  app.use('/api/restaurant-onboarding', restaurantOnboardingRoutes)
+  app.use('/api/receiving', receivingRoutes)
+  app.use('/api/restaurant-finance', restaurantFinanceRoutes)
+  app.use('/api/recipes', recipesRoutes)
+  app.use('/api/recipe-costing', recipeCostingRoutes)
+  app.use('/api/reservations', reservationsRoutes)
+  app.use('/api/staff', staffRoutes)
+  app.use('/api/restaurant-pricing', restaurantPricingRoutes)
+  app.use('/api/restaurant-intelligence', restaurantIntelligenceRoutes)
+  app.use('/api/notifications', notificationsRoutes)
+  app.use('/api/subscriptions', subscriptionsRoutes)
+  app.use('/api/billing', billingRoutes)
+  app.use('/api/public/staff/request-link', staffLinkLimiter)
+  app.use('/api/public/demo', demoCampaignRoutes)
+  app.use('/api/public', publicSalesRoutes)
+  app.use('/api/public', publicRoutes)
+  app.use('/api/internal', internalAuthRoutes)
+  app.use('/api/public/consumer/:restaurantSlug', consumerPublicRoutes)
+  app.use('/api/consumer', consumerAccountRoutes)
+  app.use('/api/consumer', consumerRoutes)
+  app.use('/api/account', accountRoutes)
+  app.use('/api/admin-dashboard', adminDashboardRoutes)
+  if (allowE2eRoutes()) {
+    app.use('/api/e2e', e2eRoutes)
+  }
+  app.use('/api/branches', branchesRoutes)
+  app.use('/api/org', orgRoutes)
+  app.use('/api/org/invitations', branchInvitationsRoutes)
+  app.use('/api/restaurant-org', restaurantOrgRoutes)
+  app.use('/api/restaurants/invitations', restaurantInvitationsRoutes)
+  app.use('/api/public/invitations', branchInvitationsPublicRoutes)
+  app.use('/api/warehouses', warehousesRoutes)
+  app.use('/api/fulfillment', fulfillmentRoutes)
+  app.use('/api/driver', driverTrackingRoutes)
+  app.use('/api/drivers', driversRoutes)
+  app.use('/api/supplier', supplierPublicSalesRoutes)
+  app.use('/api/supplier', supplierOpsRoutes)
+  app.use('/api/supplier/growth', supplierGrowthRoutes)
+  app.use('/api/growth', growthPublicRoutes)
+  app.use('/api/restaurant/growth', restaurantConnectionRequestRoutes)
+
+  // 404 handler
+  app.use('*', (req, res) => {
+    res.status(404).json({
+      ok: false,
+      data: null,
+      error: {
+        name: 'NOT_FOUND',
+        message: `Route ${req.method} ${req.originalUrl} not found`,
+      },
+      requestId: req.requestId,
+    })
+  })
+
+  // Error handling middleware
+  app.use(errorHandler)
+
+  return app
+}

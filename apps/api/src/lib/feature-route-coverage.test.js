@@ -1,5 +1,5 @@
 /**
- * Every router mounted in server.js must either be behind an admin-toggleable feature flag
+ * Every router mounted in app.js (createApp) must either be behind an admin-toggleable feature flag
  * (global + per-account via Admin → Features) or be explicitly exempt with a reason.
  *
  * Adding a new router without classifying it here fails this test — that is the point.
@@ -16,7 +16,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const srcDir = path.resolve(here, '..')
-const serverSource = fs.readFileSync(path.join(srcDir, 'server.js'), 'utf8')
+const serverSource = fs.readFileSync(path.join(srcDir, 'app.js'), 'utf8')
 
 /** ident → feature keys that must be enforced somewhere in the router's source. */
 const GATED = {

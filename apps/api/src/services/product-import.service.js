@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { query, withTransaction } from '../lib/db.js'
+import { bumpCatalogVersionSafe } from '../lib/relationship-cache.js'
 import { ValidationError, NotFoundError, ConflictError } from '../middlewares/errorHandler.js'
 import { checkLimit } from '../lib/subscription.js'
 import { escapeCsvField, MAX_UPLOAD_BYTES } from '../lib/sanitize-upload.js'
@@ -516,6 +517,9 @@ export async function executeProductImport(
     }
   }
 
+  if (summary.created + summary.updated + summary.imagesImported > 0) {
+    await bumpCatalogVersionSafe()
+  }
   return { summary, errors: rowErrors }
 }
 

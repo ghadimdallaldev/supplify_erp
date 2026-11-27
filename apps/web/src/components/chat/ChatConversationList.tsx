@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Building2, MessageSquare, Pin, Plus, Search, Store, X } from 'lucide-react'
+import { Lock, Building2, MessageSquare, Pin, Plus, Search, Store, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -13,6 +13,9 @@ type Conversation = {
   last_message_at?: string
   unread_count?: number
   is_pinned?: boolean
+  /** Relationship access (marketplace visibility): general messages need a follow. */
+  can_send_general?: boolean | null
+  is_closed_by_block?: boolean | null
 }
 
 type Props = {
@@ -51,6 +54,7 @@ export function ChatConversationList({
   className = '',
 }: Props) {
   const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const hasConversations = conversations.length > 0
   const filtered = listFilter.trim()
     ? conversations.filter((c) =>
@@ -204,6 +208,17 @@ export function ChatConversationList({
                       >
                         {conv.last_message_preview || t('list.noMessagesYet')}
                       </p>
+                      {conv.is_closed_by_block || conv.can_send_general === false ? (
+                        <span
+                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]"
+                          data-testid={`conversation-access-${conv.id}`}
+                        >
+                          <Lock className="h-3 w-3" aria-hidden />
+                          {conv.is_closed_by_block
+                            ? tc('marketplace.chatClosedByBlock')
+                            : tc('marketplace.chatReadOnlyNoOrders')}
+                        </span>
+                      ) : null}
                       {unread ? (
                         <span className="mt-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--brand-mid)] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white">
                           {conv.unread_count}

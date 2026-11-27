@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mockQuery = vi.fn()
 const mockNotifyTenantUsers = vi.fn().mockResolvedValue([{ id: 'notif-1' }])
 
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSeeRestaurant: vi.fn(async () => true),
+}))
+
 vi.mock('../lib/db.js', () => ({
   query: (...args) => mockQuery(...args),
 }))

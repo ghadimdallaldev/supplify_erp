@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSeeRestaurant: vi.fn(async () => true),
+}))
+
 vi.mock('../lib/db.js', () => {
   const queryMock = vi.fn()
   return {

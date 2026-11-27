@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { query } from '../lib/db.js'
+import { relationshipFlagsForSuppliers } from '../lib/relationship.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { resolveSmartReorderCapabilities } from '../lib/smart-reorder-tier.js'
 import { resolveReorderAiCapabilities, canUseReorderAiExplain } from '../lib/ai-platform.js'
@@ -364,6 +365,25 @@ export async function getReorderAssistance(restaurantId, opts = {}) {
   let filtered = [...stock, ...cadence, ...expiry, ...quickList].filter(
     (item) => !isSuppressed(suppressions, item.scopeType, item.scopeId)
   )
+
+  // Never suggest a blocked supplier; label suppliers the restaurant does not follow, since
+  // ordering needs a follow (spec Q1). Items without a supplier pass through unchanged.
+  const relFlags = await relationshipFlagsForSuppliers(
+    restaurantId,
+    filtered.map((item) => item.supplierId)
+  )
+  filtered = filtered
+    .filter((item) => !item.supplierId || relFlags.get(item.supplierId)?.blocked !== true)
+    .map((item) => {
+      if (!item.supplierId) return item
+      const following = relFlags.get(item.supplierId)?.following === true
+      return {
+        ...item,
+        isFollowed: following,
+        canOrder: following,
+        ...(following ? {} : { orderBlockedReason: 'FOLLOW_REQUIRED' }),
+      }
+    })
 
   let forecasts = []
   if (capabilities.capabilities.forecast && smartReorderFeatureValue !== undefined) {

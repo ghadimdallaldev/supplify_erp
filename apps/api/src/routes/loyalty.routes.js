@@ -10,6 +10,7 @@ import {
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
 import { logger } from '../lib/logger.js'
+import { canSeeRestaurant, restaurantNotAvailable } from '../lib/relationship.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import {
   getSupplierLoyaltyProgram,
@@ -211,6 +212,9 @@ router.get(
           error: { name: 'FORBIDDEN', message: 'Supplier not found' },
           requestId: req.requestId,
         })
+      }
+      if (!(await canSeeRestaurant(req.params.restaurantId, supplierId))) {
+        return restaurantNotAvailable(res, req)
       }
       const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200)
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0)

@@ -13,6 +13,18 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canTransact: vi.fn(async () => true),
+  lockRelationshipShared: vi.fn(async () => undefined),
+  resolveSupplierOrgId: vi.fn(async () => 'org-1'),
+}))
+
+vi.mock('../lib/chat-access.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSendMessage: vi.fn(async () => ({ allowed: true, openOrderIds: [] })),
+}))
+
 vi.mock('../lib/rbac.js', async (importOriginal) => {
   const { loadRbacRouteMock } = await import('../test/rbac-route-mock.js')
   return loadRbacRouteMock(importOriginal, {

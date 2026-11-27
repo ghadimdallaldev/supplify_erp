@@ -8,8 +8,8 @@ import { getWarehouseSupplierColumn, isDefaultWarehouse } from '../lib/warehouse
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { resolveOrgBillingTenantId } from '../lib/org-billing-tenant.js'
 
-export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
-  const db = client ? (sql, params) => client.query(sql, params) : query
+/** Plan side of the warehouse-stock decision (feature checks are cached per tenant). */
+async function supplierHasWarehouseFeature(supplierId, db = query) {
   const options = { dbQuery: db }
   const billingId = await resolveOrgBillingTenantId(supplierId, 'SUPPLIER', options)
   // Single-warehouse (Silver+) and multi-warehouse (Gold+) both use warehouse_inventory
@@ -17,13 +17,21 @@ export async function supplierUsesWarehouseInventory(supplierId, { client = null
   // Scoped reads can create a compatibility subscription. Serialize them on the client.
   const warehousesFeature = await isFeatureEnabled(billingId, 'SUPPLIER', 'warehouses', options)
   const multiWh = await isFeatureEnabled(billingId, 'SUPPLIER', 'multi_warehouse', options)
+  return Boolean(warehousesFeature || multiWh)
+}
+
+export async function supplierUsesWarehouseInventory(supplierId, { client = null } = {}) {
+  const db = client ? (sql, params) => client.query(sql, params) : query
+  const warehousesFeature = await supplierHasWarehouseFeature(supplierId, db)
+  // Without the feature the answer is false whatever the warehouse count; skip the COUNT.
+  if (!warehousesFeature) return false
 
   const supplierCol = await getWarehouseSupplierColumn((sql, params) => db(sql, params))
   const { rows } = await db(
     `SELECT COUNT(*)::int AS c FROM warehouse WHERE ${supplierCol} = $1 AND is_active = TRUE`,
     [supplierId]
   )
-  return Boolean(warehousesFeature || multiWh) && Number(rows[0]?.c || 0) >= 1
+  return Number(rows[0]?.c || 0) >= 1
 }
 
 /**
@@ -128,25 +136,37 @@ export async function overlayProductRowsWithAuthoritativeStock(productRows) {
     if (!bySupplier.has(supplierId)) bySupplier.set(supplierId, [])
     bySupplier.get(supplierId).push(row)
   }
+  if (bySupplier.size === 0) return productRows
 
-  const authoritativeQty = new Map()
-  await Promise.all(
-    [...bySupplier.entries()].map(async ([supplierId, products]) => {
-      if (!(await supplierUsesWarehouseInventory(supplierId))) return
-      const productIds = products.map((p) => p.id)
-      const stockRows = await listSupplierStockDisplay(supplierId, { productIds })
-      const seen = new Set()
-      for (const stock of stockRows) {
-        authoritativeQty.set(stock.product_id, Number(stock.available_qty ?? 0))
-        seen.add(stock.product_id)
-      }
-      for (const product of products) {
-        if (!seen.has(product.id)) authoritativeQty.set(product.id, 0)
-      }
-    })
+  // Batched (Plan A Task 11): one warehouse lookup and one stock query for the whole page,
+  // instead of a COUNT + aggregate per supplier.
+  const supplierCol = await getWarehouseSupplierColumn()
+  const supplierIds = [...bySupplier.keys()]
+  const { rows: whRows } = await query(
+    `SELECT DISTINCT ${supplierCol} AS supplier_id FROM warehouse
+     WHERE ${supplierCol} = ANY($1::uuid[]) AND is_active = TRUE`,
+    [supplierIds]
   )
+  const withWarehouse = new Set(whRows.map((r) => String(r.supplier_id)))
+  const candidates = supplierIds.filter((id) => withWarehouse.has(String(id)))
+  const featureFlags = await Promise.all(candidates.map((id) => supplierHasWarehouseFeature(id)))
+  const warehouseSuppliers = candidates.filter((_, i) => featureFlags[i])
+  if (!warehouseSuppliers.length) return productRows
 
-  if (authoritativeQty.size === 0) return productRows
+  const productIds = warehouseSuppliers.flatMap((id) => bySupplier.get(id).map((p) => p.id))
+  const { rows: stockRows } = await query(
+    `SELECT wi.product_id, COALESCE(SUM(wi.quantity_available), 0)::numeric AS available_qty
+     FROM warehouse_inventory wi
+     JOIN warehouse w ON w.id = wi.warehouse_id AND w.is_active = TRUE
+     JOIN product p ON p.id = wi.product_id AND p.supplier_id = w.${supplierCol}
+     WHERE w.${supplierCol} = ANY($1::uuid[]) AND wi.product_id = ANY($2::uuid[])
+     GROUP BY wi.product_id`,
+    [warehouseSuppliers, productIds]
+  )
+  const authoritativeQty = new Map(productIds.map((id) => [id, 0])) // fail closed
+  for (const stock of stockRows) {
+    authoritativeQty.set(stock.product_id, Number(stock.available_qty ?? 0))
+  }
 
   return productRows.map((row) =>
     authoritativeQty.has(row.id) ? { ...row, available_qty: authoritativeQty.get(row.id) } : row

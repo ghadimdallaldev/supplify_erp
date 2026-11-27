@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const ROUTES_DIR = path.join(ROOT, 'src/routes')
-const SERVER_JS = path.join(ROOT, 'src/server.js')
+const SERVER_JS = path.join(ROOT, 'src/app.js')
 const outputArg = process.argv.indexOf('--output-dir')
 const outputDir = outputArg >= 0 ? path.resolve(process.argv[outputArg + 1]) : path.join(ROOT, '../../docs/audits')
 fs.mkdirSync(outputDir, { recursive: true })

@@ -17,20 +17,8 @@ export function formatStoreDealLabel(type, discountValue) {
 export async function getActiveStoreWideDealsBatch(supplierIds, restaurantId = null) {
   if (!supplierIds?.length) return new Map()
 
+  // Deals are app-wide; restaurant targets are no longer read (spec §6.2 item 4).
   const params = [supplierIds]
-  let restaurantClause = ''
-  if (restaurantId) {
-    params.push(restaurantId)
-    restaurantClause = `
-      AND (
-        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-        OR EXISTS (
-          SELECT 1 FROM promotion_restaurant_targets prt
-          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
-        )
-      )
-    `
-  }
 
   const { rows } = await query(
     `
@@ -48,7 +36,6 @@ export async function getActiveStoreWideDealsBatch(supplierIds, restaurantId = n
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-      ${restaurantClause}
     ORDER BY
       p.supplier_id,
       CASE WHEN p.type = 'percentage_discount' THEN 0 ELSE 1 END,

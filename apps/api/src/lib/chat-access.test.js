@@ -22,7 +22,84 @@ vi.mock('./subscription.js', () => ({
   isFeatureEnabled: (...args) => isFeatureEnabledMock(...args),
 }))
 
-import { userCanAccessConversation } from './chat-access.js'
+import {
+  ChatReadOnlyError,
+  canOpenConversation,
+  canSendMessage,
+  userCanAccessConversation,
+} from './chat-access.js'
+
+/** db for the relationship predicates: { following, blocked, openOrderIds } */
+function relDb({ following = true, blocked = false, openOrderIds = [] } = {}) {
+  return {
+    query: vi.fn(async (sql) => {
+      if (/AS following/.test(sql) && /AS blocked/.test(sql)) {
+        return { rows: [{ org_id: 'org-1', following, blocked, public_catalog: false }] }
+      }
+      if (/customer_order/.test(sql)) return { rows: openOrderIds.map((id) => ({ id })) }
+      return { rows: [] }
+    }),
+  }
+}
+
+const conv = { id: 'conv-1', supplier_id: 'supplier-1', restaurant_id: 'restaurant-1' }
+
+describe('chat relationship rules', () => {
+  it('general send without follow is read-only and lists open orders', async () => {
+    const result = await canSendMessage(
+      { conversation: conv, orderId: null, actorRole: 'RESTAURANT' },
+      relDb({ following: false, openOrderIds: ['o-1'] })
+    )
+    expect(result).toEqual({ allowed: false, openOrderIds: ['o-1'] })
+  })
+
+  it('general send with follow is allowed for both sides', async () => {
+    for (const actorRole of ['RESTAURANT', 'SUPPLIER']) {
+      const result = await canSendMessage({ conversation: conv, actorRole }, relDb())
+      expect(result.allowed).toBe(true)
+    }
+  })
+
+  it('order-tagged message allowed while open after unfollow; refused after block', async () => {
+    const open = await canSendMessage(
+      { conversation: conv, orderId: 'o-1', actorRole: 'SUPPLIER' },
+      relDb({ following: false, openOrderIds: ['o-1'] })
+    )
+    expect(open.allowed).toBe(true)
+    const closed = await canSendMessage(
+      { conversation: conv, orderId: 'o-2', actorRole: 'SUPPLIER' },
+      relDb({ following: false, openOrderIds: ['o-1'] })
+    )
+    expect(closed.allowed).toBe(false)
+    const blocked = await canSendMessage(
+      { conversation: conv, orderId: 'o-1', actorRole: 'RESTAURANT' },
+      relDb({ following: false, blocked: true, openOrderIds: ['o-1'] })
+    )
+    expect(blocked).toEqual({ allowed: false, openOrderIds: [] })
+  })
+
+  it('support conversations are exempt', async () => {
+    const db = relDb({ following: false, blocked: true })
+    const result = await canSendMessage(
+      { conversation: { ...conv, is_admin_conversation: true }, actorRole: 'ADMIN' },
+      db
+    )
+    expect(result.allowed).toBe(true)
+    expect(db.query).not.toHaveBeenCalled()
+  })
+
+  it('supplier cannot open conversation after block; restaurant reads history', async () => {
+    expect(await canOpenConversation(conv, 'SUPPLIER', relDb({ blocked: true }))).toBe(false)
+    expect(await canOpenConversation(conv, 'RESTAURANT', relDb({ blocked: true }))).toBe(true)
+    expect(await canOpenConversation(conv, 'SUPPLIER', relDb({ following: false }))).toBe(true)
+  })
+
+  it('CHAT_READ_ONLY carries openOrderIds', () => {
+    const err = new ChatReadOnlyError(['o-1'])
+    expect(err).toMatchObject({ code: 'CHAT_READ_ONLY', statusCode: 403 })
+    expect(err.details).toEqual({ openOrderIds: ['o-1'] })
+  })
+})
 
 describe('socket chat access', () => {
   beforeEach(() => {

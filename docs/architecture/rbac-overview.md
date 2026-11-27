@@ -160,6 +160,25 @@ Permission codes are string enums used in code and DB. `*_MANAGE` implies all ac
 - Platform tenant creation (`POST /api/restaurants`, `POST /api/suppliers`) requires an ADMIN identity with resolved admin context and `ADMIN_TENANTS`; the coarse ADMIN role alone is insufficient.
 - Featured-placement review actions require `ADMIN_GROWTH`. Explicit placement refunds require `ADMIN_FINANCE`. The web operations panel hides review/refund controls unless the matching permission is present.
 
+## Relationship layer (marketplace visibility)
+
+Permissions decide what a user may do inside its own tenant. A second, independent check decides
+which **other** tenants a supplier may reach: the restaurant ↔ supplier-organisation relationship in
+`apps/api/src/lib/relationship.js`.
+
+- A supplier reaches a restaurant (customer list and detail, pickers, manual orders, contract
+  prices, sponsorship offers, general chat, intelligence) only while the restaurant follows the
+  supplier organisation and has not blocked it. Otherwise the API returns `404
+RESTAURANT_NOT_AVAILABLE`, the same as for a restaurant that does not exist.
+- A restaurant orders only from followed, non-blocked suppliers (`403 FOLLOW_REQUIRED`), and sees
+  products only where `catalogVisibleSql` allows.
+- Order records stay readable by both order participants regardless of follow or block.
+- The relationship check runs after `requirePermission`, never instead of it, and never widens
+  branch RBAC (`x-branch-id`) or warehouse access inside the supplier organisation.
+
+No new permission keys or roles were added. Full rules:
+[marketplace-visibility.md](../features/marketplace-visibility.md).
+
 ## Database
 
 **Primary schema** (used for RESTAURANT/SUPPLIER tenant-role checks):

@@ -35,6 +35,8 @@ import {
   getDealRedeemGate,
 } from '../lib/planLimits'
 import { openBrowseUpgrade } from '../lib/openBrowseUpgrade'
+import { followRequiredSuppliers } from '../lib/relationshipErrors'
+import { FollowRequiredPanel } from '../components/cart/FollowRequiredPanel'
 import { toast } from 'sonner'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -111,8 +113,33 @@ export function CartPage() {
     loadDraft,
     deleteDraft,
     rehydrateCart,
+    markSupplierFollowed,
   } = useCartActions()
   const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  // Suppliers checkout refused with FOLLOW_REQUIRED, plus lines already known as not followed.
+  const [serverFollowRequired, setServerFollowRequired] = useState<
+    Array<{ id: string; name: string | null }>
+  >([])
+  const followRequired = useMemo(() => {
+    const byId = new Map<string, { id: string; name: string | null }>()
+    for (const group of groups) {
+      if (
+        group.items.some((i) => i.product.is_followed === false || i.product.can_order === false)
+      ) {
+        byId.set(group.supplierId, { id: group.supplierId, name: group.supplierName })
+      }
+    }
+    for (const supplier of serverFollowRequired) {
+      const group = groups.find((g) => g.supplierId === supplier.id)
+      if (!group) continue
+      byId.set(supplier.id, { id: supplier.id, name: supplier.name ?? group.supplierName })
+    }
+    return [...byId.values()]
+  }, [groups, serverFollowRequired])
+  const handleSupplierFollowed = (supplierId: string) => {
+    markSupplierFollowed(supplierId)
+    setServerFollowRequired((prev) => prev.filter((s) => s.id !== supplierId))
+  }
   const [createOrder] = useCreateOrderMutation()
   const [resolveContractPrices] = useResolveContractPricesMutation()
   const { data: deliveryLocations } = useGetRestaurantDeliveryLocationsQuery()
@@ -219,7 +246,8 @@ export function CartPage() {
   }, [applyResolvedPrices, groups])
 
   const handleUpdateQuantity = async (productId: string, quantity: number) => {
-    updateQuantity(productId, quantity)
+    // A not-followed line can be lowered or removed, not raised; the panel above offers the follow.
+    if (!updateQuantity(productId, quantity).ok) return
     if (quantity <= 0) return
     const item = groups.flatMap((g) => g.items).find((i) => i.productId === productId)
     if (!item?.product.supplier_id || item.quoteResponseItemId) return
@@ -364,6 +392,12 @@ export function CartPage() {
         error?.data?.error?.message || error?.message || t('toast.placeOrderFailed')
       const errorName = error?.data?.error?.name
 
+      if (errorName === 'FOLLOW_REQUIRED') {
+        setShowOrderDetails(false)
+        setServerFollowRequired(followRequiredSuppliers(error))
+        return
+      }
+
       // For limit exceeded errors, show a more helpful message with upgrade suggestion
       if (errorName === 'LIMIT_EXCEEDED') {
         toast.error(errorMessage, {
@@ -464,6 +498,8 @@ export function CartPage() {
             {formatOrderPlaceGateMessage(orderGate)}
           </div>
         )}
+
+        <FollowRequiredPanel suppliers={followRequired} onFollowed={handleSupplierFollowed} />
 
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-6">

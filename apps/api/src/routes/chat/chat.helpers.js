@@ -1,6 +1,6 @@
 import { getRestaurantIdForRequest, getSupplierIdForRequest } from '../../lib/rbac.js'
 import { getEffectiveTenant } from '../../lib/impersonation.js'
-import { adminHasSupportChatAccess } from '../../lib/chat-access.js'
+import { adminHasSupportChatAccess, canOpenConversation } from '../../lib/chat-access.js'
 import { query } from '../../lib/db.js'
 import { ValidationError } from '../../middlewares/errorHandler.js'
 import { requireFeature, checkLimit } from '../../lib/subscription.js'
@@ -173,7 +173,9 @@ export async function userCanAccessConversation(req, conversation) {
 
   if (role === 'SUPPLIER') {
     const supplierId = await getSupplierIdForRequest(req)
-    return Boolean(supplierId && supplierId === conversation.supplier_id)
+    if (!supplierId || supplierId !== conversation.supplier_id) return false
+    // A block closes the conversation for the supplier (spec §11.3.2).
+    return canOpenConversation(conversation, 'SUPPLIER')
   }
 
   return false

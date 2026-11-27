@@ -1,5 +1,72 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-26 — Marketplace visibility and categories (release 1)
+
+- **Plan A Task 14 (docs)**: new [marketplace-visibility.md](../features/marketplace-visibility.md) (rule table, unfollow, block, chat, quotes, error codes, realtime revocation). Search, deals, supplier ops, RBAC and onboarding counts updated. Docs only; no mobile code change.
+
+- **Plan A Task 13 (mobile)**: implemented in both `supplify-mobile` and `supplify-mobile-ios` (branch `feat/marketplace-visibility`; `src/` identical). This closes the mobile items deferred from Tasks 2, 4–10 and 12.
+  - **Follow & add.** `FollowAndAddButton` on catalog cards, reorder guidance, quote detail and Quick Lists. `useFollowSupplierAction` follows first. At the follow cap an alert offers "Manage plan", which opens the web subscription settings (mobile has no billing surface). For a blocked supplier (409 `SUPPLIER_BLOCKED`) it offers "Unblock", then follows.
+  - **Cart.** The cart store refuses to add, or raise, a line of a supplier the restaurant does not follow. A checkout `403 FOLLOW_REQUIRED` shows a "Follow & keep in cart" row per supplier.
+  - **Catalog.** A private catalog of an unfollowed supplier shows "Follow to see the catalog". Usuals show "Follow to order" when `can_order` is false.
+  - **Chat.** `chatAccess()` and `ChatAccessBanner` add a closed banner and a read-only banner with "Message about order" chips. `conversation_access_changed` and a `CHAT_READ_ONLY` send error refetch the conversations.
+  - **Supplier screens.** Customers, contract pricing and new-conversation pickers search followers on the server (`q`). Customer detail shows "Restaurant not available" on 404 `RESTAURANT_NOT_AVAILABLE`. Customer growth shows a single status (Imported, Invited, Follows you) and no match. The top-restaurants report shows "Other customers" for a null `restaurant_id`, not tappable.
+  - **Notifications.** `SUPPLIER_FOLLOW_INVITE` and `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` open the supplier's catalog.
+  - **Not applicable on mobile:** sponsorship offers and reviews (no mobile surface), deal `restaurantIds` (never sent).
+  - **Verification:** supplify-mobile c48707f and supplify-mobile-ios 4bf2090 (base bf24cb0 / a2262fb): tsc clean; jest 70/70 suites, 275/275 tests in each; src/ identical. Brief tests confirmed RED on base code. Android emulator screenshots PENDING: the debug build was stopped by the host for low memory and was not restarted (3.4 GB free of 32 GB); iOS not visually verified.
+
+- **Plan A Task 12 (web)**: web implemented. The mobile change is deferred to Plan A Task 13, which must port the same behaviour:
+  - **Follow & add.** Products carry `is_followed` / `can_order`. One tap follows the supplier, then adds the item. At the follow cap, open the upgrade prompt. For a blocked supplier, offer "Unblock".
+  - **Cart.** A checkout `403 FOLLOW_REQUIRED` lists suppliers. Show a "Follow & keep in cart" row per supplier, and refuse to raise the quantity of a line from a supplier the restaurant does not follow.
+  - **Chat.** Conversations carry `can_send_general`, `is_closed_by_block` and `open_order_ids`.
+    - Read-only threads show a banner plus "Message about order #…" chips. Threads closed by a block show a closed banner.
+    - The socket sends `conversation_access_changed`, and sends `chat_error` with code `CHAT_READ_ONLY`. Both refetch the conversations.
+  - **New API fields.**
+    - `GET /api/suppliers?sort=followed` puts the signed-in restaurant's followed suppliers first. It is used by the quote pickers and the new-conversation dialog.
+    - Quote cart payloads add `isFollowed`. The quote detail page follows the supplier before it adds to the cart.
+  - **Supplier pickers.** Restaurant pickers search followers on the server with `q`, `limit=20` and `offset`. There is no client-side 200-row list.
+  - **Strings.** "Other customers" (top-restaurants report rows with a null `restaurant_id`) and "Verified restaurant" (`reviewer_label`) are localised on the client.
+- **Plan A Task 11 (performance and indexes)**: mobile skipped, not applicable. Server-only change: migration `0239_marketplace_indexes.sql` (product sort index) and a batched warehouse-stock overlay. Response shapes and endpoints are unchanged, so neither mobile repo needs an update.
+- **Plan A Task 10 (reviews, customer import, quotes)**: the API change is complete. The mobile change is deferred to Plan A Task 13, and the web change to Task 12.
+  - **Customer growth.** `CustomerGrowthScreen.tsx` and `src/types/growth.ts` still read `match_status`, `matched_restaurant_name`, `lifecycle_status` and `existingSupplifyCustomers`.
+    - The API now returns `{ id, name, email, phone, contact_person, area_region, status, invited_at }` and `followingCustomers`.
+    - `/connect` and `/rematch` are gone. Invite is the single action.
+  - **Reviews.** Reviews carry `reviewer_label` and `is_own`, and no restaurant name.
+  - **Quotes.** Supplier quote detail has no `restaurantId`. A quote from a restaurant that blocked the supplier returns 404.
+  - **Notifications.** The new in-app notification type `SUPPLIER_FOLLOW_INVITE` (category `supplier_connection_request`) is sent to restaurants. Its metadata is `{ connectionRequestId, supplierId, ctaUrl }`, with Follow / Dismiss through the existing connection-request accept and decline endpoints.
+
+- **Plan A Task 9 (sponsorships and deals)**: the API change is complete. Mobile follow-up is deferred to Plan A Task 13.
+  - Deal create and update reject `restaurantIds` with 400, and deal payloads no longer carry `restaurant_ids`. Neither mobile repo sends or reads them (checked with grep), so nothing changes there.
+  - The sponsorship offer endpoint returns 404 `RESTAURANT_NOT_AVAILABLE`. Task 13 adds the copy, if the mobile supplier growth surface exposes sponsorship.
+  - Deal-approved push notifications now go to followers of the whole supplier organisation, except restaurants that blocked it. The payload is unchanged.
+
+- **Plan A Task 8 (supplier intelligence)** — mobile change deferred to Plan A Task 13.
+  - Restaurant reorder suggestions (`GET /api/reorder-assistance` and the Assistant) add `isFollowed`, `canOrder` and `orderBlockedReason: 'FOLLOW_REQUIRED'`, and drop blocked suppliers. Task 13 shows "Follow to order" when `canOrder` is false.
+  - Supplier "top restaurants" can contain an `Other customers` row with `restaurant_id: null`, which must not be tappable.
+  - Supplier reminder-draft creation returns 404 for non-followers. The loyalty ledger returns 404 `RESTAURANT_NOT_AVAILABLE`.
+  - Packing slips show the order-time address.
+
+- **Plan A Task 7 (supplier lookups)** — mobile change deferred to Plan A Task 13. Supplier role only:
+  - `GET /api/restaurants` lists followers only.
+  - `GET /api/restaurants/:id` returns 404 `RESTAURANT_NOT_AVAILABLE` for non-followers and blockers (was 403).
+  - `POST /api/orders/manual` returns 404 `RESTAURANT_NOT_AVAILABLE` instead of the 400 "cannot receive manual orders" error.
+  - Contract pricing create, bulk and PATCH return 404 `RESTAURANT_NOT_AVAILABLE` (was 400 / 404 `NOT_FOUND`).
+  - Payload shapes are unchanged. Task 13 maps the new error code to copy.
+
+- **Plan A Task 6 (relationship-aware chat)** — mobile change deferred to Plan A Task 13. A general message needs a follow; without one `POST /api/chat/conversations/:id/messages` and socket `send_message` return 403 / `chat_error` `CHAT_READ_ONLY` with `openOrderIds`. A message tagged with `orderId` is allowed while that order is open, and a block closes everything. Conversation list rows add `can_send_general`, `open_order_ids` and `is_closed_by_block`. Suppliers no longer see conversations with restaurants that blocked them (404). New socket event `conversation_access_changed { conversationId }` means the client should refetch and re-join. Attachment `fileUrl` is now `/api/chat/attachments/<id>`, which 302-redirects to a 5-minute signed URL. Starting a chat (including from a deal) needs a follow: 403 `FOLLOW_REQUIRED`. A supplier starting a chat with a non-follower gets 404 `RESTAURANT_NOT_AVAILABLE`. Task 13 adds the read-only composer, the order picker, the event handler and authenticated attachment opening.
+
+- **Plan A Task 5 (catalog visibility)** — mobile change deferred to Plan A Task 13. Restaurants can now open any product of a visible catalog (not blocked AND (follows OR `public_catalog_enabled`)); `/api/products`, `/api/products/:id`, `/api/search` product rows and deal rows carry `is_followed` and `in_stock`; `available_qty` is omitted for non-followers; `/api/inventory/product/:id` is 404 for non-followers; `/api/products/favorites` rows add `can_order` (false → "Follow to order"). Deals of public suppliers reach non-followers. Task 13 adds "Follow to order" / "Follow & add" and the in-stock badge.
+
+- **Plan A Task 4 (follow required for every new order)** — mobile change deferred to Plan A Task 13: `POST /api/orders` and `PATCH /api/orders/:id` (draft → placed) now return 403 `FOLLOW_REQUIRED` with `details.suppliers[{id,name}]` instead of the old 400 "Follow the supplier before ordering"; a past order no longer grants ordering. New notification type `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` (metadata `{ quickListId, supplierId, supplierName }`, reference `QUICK_LIST`). Task 13 adds the cart follow prompt and the notification deep link.
+
+- **Plan A Task 3 (relationship caches)** — skipped for mobile: server-side cache keys and invalidation only. `/api/products/categories` and `/tags` keep their response shape; restaurants now see counts only for catalogs visible to them.
+
+- **Plan A Task 2 (relationship writes)** — mobile change deferred to Plan A Task 13: follow is now idempotent (200 `alreadyFollowing`), following a blocked supplier returns 409 `SUPPLIER_BLOCKED`, responses add `supplierOrganizationId`. Existing mobile calls keep working; Task 13 adds the 409 handling and copy.
+
+Running log for branch `feat/marketplace-visibility` (plans `docs/superpowers/plans/2026-11-25-*`).
+
+- Plan A Task 1 (organisation-level relationships): mobile skipped — server-only. Follow and
+  block rows are now stored per supplier organisation; no endpoint, payload or error code changed.
+
 ## 2026-11-26 — Restaurant V4
 
 The paired Android and iOS clients use the Restaurant

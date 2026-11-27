@@ -1,6 +1,8 @@
-import { query } from './db.js'
+import { query, withTransaction } from './db.js'
 import { checkLimit } from './subscription.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
+import { ChatReadOnlyError, canSendMessage } from './chat-access.js'
+import { lockRelationshipShared, resolveSupplierOrgId } from './relationship.js'
 
 /**
  * Get or create a 1:1 conversation between supplier and restaurant.
@@ -70,6 +72,11 @@ export async function getOrCreateConversation(
 
 /**
  * Post an order-referenced chat message from supplier or restaurant.
+ *
+ * Goes through the chat relationship rules (canSendMessage) under the shared relationship
+ * lock, in the caller's transaction when `client` is given: an order-tagged message needs the
+ * order open between the two parties and no block; a general message needs a follow. Throws
+ * CHAT_READ_ONLY (403) otherwise. Support/admin paths do not use this helper.
  */
 export async function postConversationMessage({
   conversationId,
@@ -80,14 +87,27 @@ export async function postConversationMessage({
   orderId = null,
   client = null,
 }) {
-  const q = client ? client.query.bind(client) : query
-  const { rows } = await q(
-    `
-    INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type, order_id)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING *
-    `,
-    [conversationId, senderType, senderId, content, messageType, orderId]
-  )
-  return rows[0]
+  const work = async (db) => {
+    const { rows: convRows } = await db.query(
+      'SELECT id, supplier_id, restaurant_id, is_admin_conversation FROM conversation WHERE id = $1',
+      [conversationId]
+    )
+    const conversation = convRows[0]
+    if (conversation && !conversation.is_admin_conversation) {
+      const orgId = await resolveSupplierOrgId(conversation.supplier_id, db)
+      await lockRelationshipShared(db, conversation.restaurant_id, orgId)
+      const access = await canSendMessage({ conversation, orderId, actorRole: senderType }, db)
+      if (!access.allowed) throw new ChatReadOnlyError(access.openOrderIds)
+    }
+    const { rows } = await db.query(
+      `
+      INSERT INTO message (conversation_id, sender_type, sender_id, content, message_type, order_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+      `,
+      [conversationId, senderType, senderId, content, messageType, orderId]
+    )
+    return rows[0]
+  }
+  return client ? work(client) : withTransaction(work)
 }

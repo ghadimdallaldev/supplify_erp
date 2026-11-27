@@ -687,6 +687,48 @@ describe('quote-requests.service', () => {
     expect(payload.items[0].quotedUnitPrice).toBe(7.5)
   })
 
+  it('buildCartPayloadFromResponse reports whether the restaurant follows the quoting supplier', async () => {
+    const line = {
+      id: 'qri-1',
+      product_id: 'product-1',
+      requested_quantity: 2,
+      quantity: 2,
+      unit_price: 4,
+      currency: 'USD',
+      name: 'Rice',
+      sku: 'RICE',
+      unit: 'kg',
+      supplier_id: 'supplier-1',
+      supplier_name: 'Fresh Co',
+      supplier_slug: 'fresh-co',
+    }
+    for (const followed of [false, true]) {
+      queryMock
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'qrs-1',
+              supplier_id: 'supplier-1',
+              restaurant_id: 'rest-1',
+              status: 'responded',
+              quote_request_status: 'open',
+              is_followed: followed,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [{ id: 'resp-1' }] })
+        .mockResolvedValueOnce({ rows: [line] })
+
+      const payload = await buildCartPayloadFromResponse({
+        restaurantId: 'rest-1',
+        quoteRequestSupplierId: 'qrs-1',
+      })
+      expect(payload.isFollowed).toBe(followed)
+      expect(payload.items[0].product).toMatchObject({ is_followed: followed, can_order: followed })
+    }
+    expect(String(queryMock.mock.calls[0][0])).toMatch(/supplier_follow/)
+  })
+
   it('buildCartPayloadFromResponse returns cart items without creating order', async () => {
     queryMock
       .mockResolvedValueOnce({

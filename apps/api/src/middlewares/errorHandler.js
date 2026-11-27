@@ -8,7 +8,12 @@ export function resolveHttpError(err) {
   let errorName = 'INTERNAL_ERROR'
   let message = 'Internal server error'
 
-  if (
+  if (err.expose === true && err.code && err.statusCode) {
+    // Domain errors that carry their own public contract (e.g. FOLLOW_REQUIRED, SUPPLIER_BLOCKED).
+    statusCode = err.statusCode
+    errorName = err.code
+    message = err.message
+  } else if (
     err.name === 'SponsorshipError' ||
     (err.code && String(err.code).startsWith('SPONSORSHIP_'))
   ) {

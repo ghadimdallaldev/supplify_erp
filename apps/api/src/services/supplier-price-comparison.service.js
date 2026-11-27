@@ -1,3 +1,4 @@
+import { blockedExistsSql, followExistsSql } from '../lib/relationship.js'
 import { query } from '../lib/db.js'
 
 function normalized(value) {
@@ -33,18 +34,8 @@ export async function listCommonProductBestPrices(restaurantId, { search = '', l
       ORDER BY (CASE WHEN COALESCE(pr.min_qty, 1) <= 1 THEN 0 ELSE 1 END), pr.amount ASC, pr.min_qty ASC
       LIMIT 1
     ) current_price ON true
-    WHERE EXISTS (
-      SELECT 1
-      FROM supplier_follow sf
-      JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
-      WHERE sf.restaurant_id = $1
-        AND COALESCE(followed_supplier.organization_id, followed_supplier.id) =
-            COALESCE(s.organization_id, s.id)
-    )
-      AND NOT EXISTS (
-        SELECT 1 FROM supplier_blocklist sb JOIN supplier blocked ON blocked.id = sb.supplier_id
-        WHERE sb.restaurant_id = $1 AND COALESCE(blocked.organization_id, blocked.id) = COALESCE(s.organization_id, s.id)
-      )
+    WHERE ${followExistsSql('$1::uuid', 's')}
+      AND NOT ${blockedExistsSql('$1::uuid', 's')}
       AND (
         $2::text = '' OR p.name ILIKE '%' || $2 || '%'
         OR COALESCE(p.brand, '') ILIKE '%' || $2 || '%'

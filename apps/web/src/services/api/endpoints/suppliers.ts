@@ -44,6 +44,10 @@ export const suppliersApi = api.injectEndpoints({
         { type: 'Supplier', id: 'LIST' },
         'Restaurant',
         'Subscription',
+        // Follow state drives is_followed/can_order on products and chat access.
+        'Product',
+        'ProductList',
+        'Chat',
       ],
     }),
     unfollowSupplier: builder.mutation<any, string>({
@@ -56,6 +60,10 @@ export const suppliersApi = api.injectEndpoints({
         { type: 'Supplier', id: 'LIST' },
         'Restaurant',
         'Subscription',
+        // Follow state drives is_followed/can_order on products and chat access.
+        'Product',
+        'ProductList',
+        'Chat',
       ],
     }),
     getSupplierMe: builder.query<{ supplier: Supplier }, void>({
@@ -106,6 +114,9 @@ export const suppliersApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Product',
+        'ProductList',
+        'Chat',
       ],
     }),
     uploadSupplierLogo: builder.mutation<Supplier, { id: string; logoUrl: string }>({
@@ -155,6 +166,9 @@ export const suppliersApi = api.injectEndpoints({
       invalidatesTags: (_result, _error, id) => [
         { type: 'Supplier', id },
         { type: 'Supplier', id: 'LIST' },
+        'Product',
+        'ProductList',
+        'Chat',
       ],
     }),
     getSupplierCustomDomain: builder.query<

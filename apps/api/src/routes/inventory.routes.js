@@ -32,6 +32,7 @@ import {
   getWarehouseSupplierColumn,
 } from '../lib/warehouse-helpers.js'
 import { tenantFeatureGate } from '../lib/tenant-feature-gate.js'
+import { canTransact } from '../lib/relationship.js'
 
 const router = express.Router()
 
@@ -403,21 +404,8 @@ router.get('/product/:productId', requireAuth, async (req, res) => {
           requestId: req.requestId,
         })
       }
-      const { rows: connected } = await query(
-        `
-        SELECT 1
-        FROM supplier_follow sf
-        WHERE sf.supplier_id = $1
-          AND sf.restaurant_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM supplier_blocklist sb
-            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
-          )
-        LIMIT 1
-      `,
-        [inventory.supplier_id, restaurantId]
-      )
-      if (!connected.length) {
+      // Stock quantities are for followers only (spec §10 Q2), org-level, block wins.
+      if (!(await canTransact(restaurantId, inventory.supplier_id))) {
         return res.status(404).json({
           ok: false,
           data: null,
@@ -816,21 +804,8 @@ router.get('/product/:productId/adjustments', requireAuth, async (req, res) => {
           requestId: req.requestId,
         })
       }
-      const { rows: connected } = await query(
-        `
-        SELECT 1
-        FROM supplier_follow sf
-        WHERE sf.supplier_id = $1
-          AND sf.restaurant_id = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM supplier_blocklist sb
-            WHERE sb.supplier_id = $1 AND sb.restaurant_id = $2
-          )
-        LIMIT 1
-      `,
-        [products[0].supplier_id, restaurantId]
-      )
-      if (!connected.length) {
+      // Stock quantities are for followers only (spec §10 Q2), org-level, block wins.
+      if (!(await canTransact(restaurantId, products[0].supplier_id))) {
         return res.status(404).json({
           ok: false,
           data: null,

@@ -142,12 +142,7 @@ async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
         (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
          FROM promotion_targets pt WHERE pt.promotion_id = p.id),
         '{}'
-      ) AS target_category_ids,
-      COALESCE(
-        (SELECT array_agg(prt.restaurant_id) FROM promotion_restaurant_targets prt
-         WHERE prt.promotion_id = p.id),
-        '{}'
-      ) AS restaurant_ids
+      ) AS target_category_ids
     FROM promotions p
     WHERE p.supplier_id = $1
       AND p.status = 'active'
@@ -155,16 +150,9 @@ async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
       AND p.starts_at <= NOW()
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-      AND (
-        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-        OR EXISTS (
-          SELECT 1 FROM promotion_restaurant_targets prt
-          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
-        )
-      )
     ORDER BY p.is_featured DESC, p.starts_at DESC
     `,
-    [supplierId, restaurantId]
+    [supplierId]
   )
   return rows
 }
@@ -179,19 +167,12 @@ const ACTIVE_ORDER_PROMO_EXISTS_SQL = `
     AND p.starts_at <= NOW()
     AND (p.ends_at IS NULL OR p.ends_at > NOW())
     AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-    AND (
-      NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-      OR EXISTS (
-        SELECT 1 FROM promotion_restaurant_targets prt
-        WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
-      )
-    )
   LIMIT 1
 `
 
 /** Fast EXISTS check — skip heavy promotion scan when supplier has no eligible deals. */
 export async function hasActiveSupplierOrderPromotions(db, supplierId, restaurantId) {
-  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_EXISTS_SQL, [supplierId, restaurantId])
+  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_EXISTS_SQL, [supplierId])
   return rows.length > 0
 }
 
@@ -205,13 +186,6 @@ const ACTIVE_ORDER_PROMO_BATCH_SQL = `
     AND p.starts_at <= NOW()
     AND (p.ends_at IS NULL OR p.ends_at > NOW())
     AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-    AND (
-      NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-      OR EXISTS (
-        SELECT 1 FROM promotion_restaurant_targets prt
-        WHERE prt.promotion_id = p.id AND prt.restaurant_id = $2
-      )
-    )
 `
 
 /**
@@ -223,7 +197,7 @@ export async function hasActiveSupplierOrderPromotionsBatch(db, supplierIds, res
   const result = new Map(uniqueIds.map((id) => [id, false]))
   if (!uniqueIds.length) return result
 
-  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_BATCH_SQL, [uniqueIds, restaurantId])
+  const { rows } = await runQuery(db, ACTIVE_ORDER_PROMO_BATCH_SQL, [uniqueIds])
   for (const row of rows) {
     result.set(row.supplier_id, true)
   }

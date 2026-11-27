@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useChatRealtime } from './useChatRealtime'
+import { api } from '../services/api'
 
 const mockSocket = {
   connected: false,
@@ -72,5 +73,38 @@ describe('useChatRealtime', () => {
       conversationId: 'conv-1',
       isTyping: true,
     })
+  })
+
+  it('access change event closes composer live', () => {
+    const onAccessChanged = vi.fn()
+    renderHook(() =>
+      useChatRealtime({
+        userId: 'user-1',
+        selectedConversationId: 'conv-1',
+        onAccessChanged,
+      })
+    )
+    const handler = mockSocket.on.mock.calls.find(
+      (c) => c[0] === 'conversation_access_changed'
+    )?.[1]
+    expect(handler).toBeTypeOf('function')
+    act(() => {
+      handler?.({ conversationId: 'conv-1' })
+    })
+    expect(api.util.invalidateTags).toHaveBeenCalledWith(['Chat'])
+    expect(onAccessChanged).toHaveBeenCalledWith('conv-1')
+  })
+
+  it('a CHAT_READ_ONLY send error refreshes the conversation access', () => {
+    const onAccessChanged = vi.fn()
+    renderHook(() =>
+      useChatRealtime({ userId: 'user-1', selectedConversationId: 'conv-1', onAccessChanged })
+    )
+    const handler = mockSocket.on.mock.calls.find((c) => c[0] === 'chat_error')?.[1]
+    act(() => {
+      handler?.({ code: 'CHAT_READ_ONLY', openOrderIds: [] })
+    })
+    expect(api.util.invalidateTags).toHaveBeenCalledWith(['Chat'])
+    expect(onAccessChanged).toHaveBeenCalledWith('conv-1')
   })
 })

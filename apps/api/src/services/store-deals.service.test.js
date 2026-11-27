@@ -47,8 +47,8 @@ describe('store-deals.service', () => {
       const [sql, params] = vi.mocked(query).mock.calls[0]
       expect(sql).toContain("p.applies_to = 'all'")
       expect(sql).toContain("p.type IN ('percentage_discount', 'fixed_discount')")
-      expect(sql).toContain('promotion_restaurant_targets')
-      expect(params).toEqual([['sup-1', 'sup-2'], 'rest-1'])
+      expect(sql).not.toContain('promotion_restaurant_targets') // deals are app-wide
+      expect(params).toEqual([['sup-1', 'sup-2']])
 
       expect(map.get('sup-1')).toEqual({
         id: 'deal-1',

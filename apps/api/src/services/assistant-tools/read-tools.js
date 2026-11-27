@@ -1,3 +1,4 @@
+import { blockedExistsSql, followExistsSql } from '../../lib/relationship.js'
 import { query } from '../../lib/db.js'
 import { getRestaurantTimezone, zonedDayBounds } from '../../lib/tenant-timezone.js'
 import { calendarDay } from '../../lib/reorder-calendar.js'
@@ -53,10 +54,8 @@ export function createReadTools({ can }) {
            FROM product p JOIN supplier s ON s.id = p.supplier_id
            WHERE (p.name ILIKE '%' || $2 || '%' OR p.sku ILIKE '%' || $2 || '%' OR COALESCE(p.brand,'') ILIKE '%' || $2 || '%')
              AND ($3::text = 'SUPPLIER' AND p.supplier_id = $1 OR $3::text = 'RESTAURANT'
-               AND EXISTS (SELECT 1 FROM supplier_follow sf JOIN supplier followed ON followed.id = sf.supplier_id
-                 WHERE sf.restaurant_id = $1 AND COALESCE(followed.organization_id,followed.id) = COALESCE(s.organization_id,s.id))
-               AND NOT EXISTS (SELECT 1 FROM supplier_blocklist sb JOIN supplier blocked ON blocked.id = sb.supplier_id
-                 WHERE sb.restaurant_id = $1 AND COALESCE(blocked.organization_id,blocked.id) = COALESCE(s.organization_id,s.id)))
+               AND ${followExistsSql('$1::uuid', 's')}
+               AND NOT ${blockedExistsSql('$1::uuid', 's')})
            ORDER BY p.name, p.id LIMIT 16`,
           [ctx.tenantId, String(args.search || '').trim(), ctx.tenantType]
         )

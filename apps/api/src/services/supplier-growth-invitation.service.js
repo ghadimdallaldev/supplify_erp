@@ -1,10 +1,16 @@
 import { query, withTransaction, withSavepoint } from '../lib/db.js'
+import { logger } from '../lib/logger.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { getReferralProgramConfig, getFreeSandboxDays } from '../lib/platform-settings.js'
 import { generateInviteToken, buildInviteUrl, inviteExpiresAt } from './invitationTokens.js'
 import { sendTeamInvitationEmail } from './invitation-mail.service.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 import { writeAuditLog } from '../lib/audit.js'
+import {
+  SupplierBlockedError,
+  SupplierFollowLimitError,
+  followSupplier,
+} from './relationship-writes.service.js'
 import { assertSupplierActiveCustomerLocationCapacity } from '../lib/subscription.js'
 
 function addDays(date, days) {
@@ -31,9 +37,6 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   )
   if (!prospects.length) throw new NotFoundError('Prospect not found')
   const prospect = prospects[0]
-  if (prospect.match_status === 'existing_supplify') {
-    throw new ValidationError('Restaurant already on Supplify - use connection request instead')
-  }
 
   await assertSupplierActiveCustomerLocationCapacity(supplierId, {
     action: 'growth.invite_sent',
@@ -64,17 +67,10 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   const inviteUrl = buildReferralInviteUrl(token)
   const message = `${supplierName} has invited you to join Supplify and manage your ordering digitally. ${inviteUrl}`
 
-  if (channel === 'email' && prospect.email) {
-    await sendTeamInvitationEmail({
-      to: prospect.email,
-      inviteUrl,
-      invitedName: prospect.contact_person || prospect.restaurant_name,
-      tenantName: supplierName,
-      tenantType: 'SUPPLIER',
-      invitationId: rows[0].id,
-      tenantId: supplierId,
-    }).catch(() => {})
-  }
+  // Matching and the matched/unmatched branch run after the response (identical for every
+  // prospect, spec §11.4); the job also sends the email for unmatched prospects.
+  const { enqueueProspectInvite } = await import('../jobs/prospect-invite.job.js')
+  enqueueProspectInvite({ supplierId, prospectId, invitationId: rows[0].id, channel })
 
   if (req) {
     await writeAuditLog(req, {
@@ -88,12 +84,43 @@ export async function createGrowthInvitation(supplierId, prospectId, { channel, 
   const whatsappUrl =
     channel === 'whatsapp' ? buildWhatsAppShareLink(prospect.phone, message) : null
 
+  const invitation = rows[0]
   return {
-    invitation: rows[0],
+    invitation: {
+      id: invitation.id,
+      channel: invitation.channel,
+      status: invitation.status,
+      expiresAt: invitation.expires_at,
+      sentAt: invitation.sent_at,
+    },
     inviteUrl,
     whatsappUrl,
     message,
   }
+}
+
+/** Email invite for a prospect with no Supplify match (run by the invite job). */
+export async function sendUnmatchedProspectInvite({ supplierId, prospectId, invitationId }) {
+  const { rows } = await query(
+    `SELECT gi.token, p.email, p.contact_person, p.restaurant_name, s.name AS supplier_name
+     FROM supplier_growth_invitation gi
+     JOIN supplier_customer_prospect p ON p.id = gi.prospect_id
+     JOIN supplier s ON s.id = gi.supplier_id
+     WHERE gi.id = $1 AND gi.supplier_id = $2 AND gi.prospect_id = $3`,
+    [invitationId, supplierId, prospectId]
+  )
+  const inv = rows[0]
+  if (!inv?.email) return false
+  await sendTeamInvitationEmail({
+    to: inv.email,
+    inviteUrl: buildReferralInviteUrl(inv.token),
+    invitedName: inv.contact_person || inv.restaurant_name,
+    tenantName: inv.supplier_name || 'Your supplier',
+    tenantType: 'SUPPLIER',
+    invitationId,
+    tenantId: supplierId,
+  }).catch(() => {})
+  return true
 }
 
 export async function getReferralInvitePublic(token) {
@@ -163,11 +190,21 @@ export async function acceptReferralOnRegistration({ token, restaurantId, client
     ]
   )
 
-  await db.query(
-    `INSERT INTO supplier_follow (supplier_id, restaurant_id) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
-    [inv.supplier_id, restaurantId]
-  )
+  // Referral signup follows the inviting supplier through the shared write path (cap and
+  // blocklist enforced). A refused follow never fails the registration itself.
+  try {
+    const inTransaction = typeof client?.query === 'function'
+    // A brand-new restaurant has no relationship-dependent cache to invalidate.
+    await followSupplier(
+      { restaurantId, supplierId: inv.supplier_id, source: 'referral' },
+      inTransaction ? client : undefined
+    )
+  } catch (error) {
+    if (!(error instanceof SupplierFollowLimitError) && !(error instanceof SupplierBlockedError)) {
+      throw error
+    }
+    logger.warn('Referral follow skipped', { reason: error.code })
+  }
 
   await notifyTenantUsers({
     tenantId: restaurantId,

@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`FollowAndAddButton > renders right-to-left in Arabic 1`] = `
+<div
+  dir="rtl"
+>
+  <button
+    aria-label="تابِع وأضِف"
+    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,border-color,color,opacity] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-mid)]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none bg-[var(--brand)] text-white border border-[var(--brand)] shadow-none hover:bg-[var(--brand-mid)] hover:border-[var(--brand-mid)] h-10 px-4 py-2"
+    data-follow-required="true"
+    title="تابِع وأضِف"
+  >
+    <svg
+      class="lucide lucide-user-plus me-1 h-4 w-4 shrink-0"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+      />
+      <circle
+        cx="9"
+        cy="7"
+        r="4"
+      />
+      <line
+        x1="19"
+        x2="19"
+        y1="8"
+        y2="14"
+      />
+      <line
+        x1="22"
+        x2="16"
+        y1="11"
+        y2="11"
+      />
+    </svg>
+    <span>
+      تابِع وأضِف
+    </span>
+  </button>
+</div>
+`;

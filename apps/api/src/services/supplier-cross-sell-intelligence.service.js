@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { supplierSeesRestaurantSql } from '../lib/relationship.js'
 
 const DEFAULT_DAYS = 180
 const MIN_DAYS = 30
@@ -70,6 +71,8 @@ export async function listSupplierCrossSellOpportunities(
       JOIN product anchor_product ON anchor_product.id = evidence.anchor_product_id AND anchor_product.supplier_id = $1
       JOIN product candidate_product ON candidate_product.id = evidence.candidate_product_id AND candidate_product.supplier_id = $1
       WHERE customer_candidate.product_id IS NULL
+        -- Pair evidence is aggregate over all customers; suggestions name followers only.
+        AND ${supplierSeesRestaurantSql('customer_anchor.restaurant_id', '$1')}
       ORDER BY evidence.paired_order_count DESC, restaurant.name, anchor_product.name, candidate_product.name
       LIMIT $4
     `,

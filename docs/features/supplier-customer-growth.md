@@ -12,19 +12,28 @@ Suppliers can import their existing restaurant customer base, match records to S
 
 ## Product rules
 
-| Rule                         | Behavior                                                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Import                       | CSV with columns: Restaurant Name, Contact Person, Phone, Email, Address, Area/Region, Credit Limit, Payment Terms, Sales Rep, Notes |
-| Matching                     | Email exact → phone → name+area fuzzy; status `existing_supplify` or `import_only`                                                   |
-| Existing Supplify restaurant | Supplier sends **connection request**; restaurant must accept before `supplier_follow` is created                                    |
-| Not on Supplify              | Supplier **invites** (email / WhatsApp share link / copy link) or **offers sponsorship**                                             |
-| Referral signup              | Restaurant registers via `/register?ref={token}`; optional `referralToken` on `POST /api/register/complete`                          |
-| Restaurant incentive         | Free Trial (platform `free_sandbox_days`) + first-paid discount from `referral_program_config.firstPaidDiscountPercent`              |
-| Supplier reward              | On referred restaurant’s first paid conversion: free month OR platform billing credit (admin-configurable)                           |
-| Sponsorship                  | Supplier offers → restaurant selects **monthly** plan + accepts → supplier `billing_invoice` → pay → schedule after trial → activate |
-| After sponsored month        | Restaurant becomes payer; referral discount applies per `referralDiscountAppliesTo` (default: first restaurant-funded cycle)         |
+| Rule                  | Behavior                                                                                                                                                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Import                | CSV with columns: Restaurant Name, Contact Person, Phone, Email, Address, Area/Region, Credit Limit, Payment Terms, Sales Rep, Notes                                                                                                                                                  |
+| Matching              | Exact normalised email, then exact phone digits. Never by name or area. Runs server-side after the response; the result is never returned to the supplier                                                                                                                             |
+| Invite                | One path for every prospect. Matched (not blocked, not already following): in-app `SUPPLIER_FOLLOW_INVITE` "{Supplier} invited you to follow them" with Follow / Dismiss. Blocked: silently dropped. Unmatched: email for the email channel; link/WhatsApp are shared by the supplier |
+| Not on Supplify       | Supplier **invites** (email / WhatsApp share link / copy link) or **offers sponsorship**                                                                                                                                                                                              |
+| Referral signup       | Restaurant registers via `/register?ref={token}`; optional `referralToken` on `POST /api/register/complete`                                                                                                                                                                           |
+| Restaurant incentive  | Free Trial (platform `free_sandbox_days`) + first-paid discount from `referral_program_config.firstPaidDiscountPercent`                                                                                                                                                               |
+| Supplier reward       | On referred restaurant’s first paid conversion: free month OR platform billing credit (admin-configurable)                                                                                                                                                                            |
+| Sponsorship           | Supplier offers → restaurant selects **monthly** plan + accepts → supplier `billing_invoice` → pay → schedule after trial → activate                                                                                                                                                  |
+| After sponsored month | Restaurant becomes payer; referral discount applies per `referralDiscountAppliesTo` (default: first restaurant-funded cycle)                                                                                                                                                          |
 
 ## Supplier-paid sponsorship lifecycle
+
+**Followers only (marketplace visibility release 1, 2026-11-26).**
+
+- A sponsorship offer to a matched restaurant needs a current follow and no block.
+  - Unknown, not-followed and blocked restaurants get the same 404 `RESTAURANT_NOT_AVAILABLE`.
+  - The check is repeated under the shared relationship lock inside the offer transaction, so an offer racing an unfollow cannot be created.
+- When another supplier already holds a live sponsorship, eligibility reports a plain `not_eligible`, never `already_sponsored`.
+- An active, paid sponsorship continues after an unfollow or block. No new offer can be made until the restaurant follows again.
+- Prospects with no matched restaurant are unaffected: there is no relationship to check yet.
 
 ```mermaid
 flowchart TD
@@ -84,17 +93,30 @@ Under the four-plan model, Supplier Growth is code `gold` and Supplier Scale is 
 
 Admin → Plans → Growth settings edits these values.
 
+## No enumeration (marketplace visibility release 1, 2026-11-26)
+
+A supplier can never learn from the import whether a contact is a Supplify restaurant.
+
+- **Prospect payloads** carry only `{ id, name, email, phone, contact_person, area_region, status, invited_at }`. All but `status` are the supplier's own input.
+  - `status` is `imported`, `invited` or `following`. It becomes `following` only when the matched restaurant follows the supplier organisation and has not blocked it.
+  - `match_status`, `matched_restaurant_id`, `matched_restaurant_name` and `match_signals` are never returned. The `lifecycleStatus` filter takes the three new statuses.
+- **Invites** return the same body, status and headers for matched, unmatched and blocked prospects. The handler persists the invitation and enqueues `jobs/prospect-invite.job.js`; matching and dispatch run after the response.
+- **Removed:** `POST /customers/prospects/:id/connect`, `POST /customers/prospects/:id/rematch` and the "already on Supplify" error.
+- **Accepting** an in-app follow invite runs the shared follow write (plan cap and blocklist). Neither accept nor decline notifies the supplier.
+- **Metrics:** `existingSupplifyCustomers` is replaced by `followingCustomers`.
+- **Sponsoring a prospect** uses the matched restaurant only when it already follows the supplier. Otherwise the offer behaves exactly like one to an unregistered prospect.
+- **Imports** are capped at 500 rows per request and 10 requests per supplier per hour (429 `RATE_LIMITED` when `RATE_LIMIT_ENABLED`).
+
 ## End-to-end growth funnel
 
 ```mermaid
 flowchart TD
-  import[CSVImport] --> match[AutoMatch]
-  match --> existing{OnSupplify?}
-  existing -->|yes| connReq[ConnectionRequest]
-  existing -->|no| invite[InviteOrSponsorOffer]
+  import[CSVImport] --> invite[Invite]
+  invite --> job[AsyncMatchAndDispatch]
+  job -->|matched, not blocked| connReq[InAppFollowInvite]
+  job -->|unmatched| register[RegisterWithRefToken]
   connReq --> acceptConn{RestaurantAccepts?}
   acceptConn -->|yes| follow[supplier_follow]
-  invite --> register[RegisterWithRefToken]
   register --> trial[FreeTrial]
   follow --> sponsorOffer[SponsorshipOffer]
   trial --> sponsorOffer
@@ -115,13 +137,13 @@ Requires `SUPPLIER` + `supplier_growth` feature + permissions:
 | Permission         | Use                                        |
 | ------------------ | ------------------------------------------ |
 | `CUSTOMERS_IMPORT` | Import preview / execute                   |
-| `CUSTOMERS_MANAGE` | Invite, sponsor, connect, rematch, pay     |
+| `CUSTOMERS_MANAGE` | Invite, sponsor, pay                       |
 | `GROWTH_VIEW`      | Prospects list, metrics, list sponsorships |
 
 | Method | Path                               | Description                                           |
 | ------ | ---------------------------------- | ----------------------------------------------------- |
 | POST   | `/customers/import/preview`        | Validate CSV                                          |
-| POST   | `/customers/import`                | Execute import + auto-match                           |
+| POST   | `/customers/import`                | Execute import (matching runs in the background)      |
 | GET    | `/customers/prospects`             | List prospects                                        |
 | POST   | `/customers/prospects/:id/sponsor` | Compat: create sponsorship **offer**                  |
 | GET    | `/sponsorships`                    | List sponsorships                                     |
@@ -136,9 +158,9 @@ Requires `SUPPLIER` + `supplier_growth` feature + permissions:
 
 `GET /customers/prospects` and `GET /sponsorships` accept `limit` (clamped 1–200,
 default 50) and `offset` (negative values coerced to 0 — a raw negative offset made
-Postgres throw and surfaced as a 500). Prospects also accept `search`, matched
+Postgres throw and surfaced as a 500). Prospects also accept `search`, compared
 case-insensitively against restaurant name, email, phone and contact person, and
-`lifecycleStatus`.
+`lifecycleStatus` (`imported`, `invited`, `following`).
 
 ### Sponsorship funnel metrics
 

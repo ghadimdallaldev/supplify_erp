@@ -8,11 +8,34 @@ Restaurants **follow** suppliers to curate their marketplace feed, unlock organi
 
 ## Rules
 
-- One follow row per `(restaurant_id, supplier_id)` (unique constraint).
-- Follow requires restaurant role; blocked suppliers are excluded from search but can still be unfollowed if previously followed.
+- One follow row per `(restaurant_id, supplier_org_id)`: a follow or block covers every branch of the supplier organisation (marketplace visibility release 1, migration `0238`).
+- Follow is idempotent (200 with `alreadyFollowing: true`). Following a blocked supplier returns 409 `SUPPLIER_BLOCKED` until the restaurant unblocks it. Manual follow, accepting a supplier invite and referral signup all enforce the plan cap in one transaction.
 - Unfollow is idempotent (DELETE with no error if not followed).
-- **Block** is separate (`supplier_blocklist`) — blocked suppliers are hidden from supplier list/search and cannot receive new follows while blocked.
-- Manual supplier orders (`POST /api/orders/manual`) require the restaurant to **follow** the supplier or have placed an order before.
+- **Block** (`supplier_blocklist`, also per organisation) deletes the follow; blocked suppliers are hidden from supplier list/search.
+- **Every new restaurant order needs a current follow and no block.** `POST /api/orders` and placing a draft (`PATCH /api/orders/:id` to `PLACED`) return 403 `FOLLOW_REQUIRED` with `details.suppliers[{ id, name }]`. A past order no longer grants ordering. The check runs inside the order transaction under a shared `rel:<restaurant>:<org>` advisory lock (ascending org id), so it is serialised with follow/unfollow/block.
+- **Scheduled quick lists** skip suppliers the restaurant no longer follows (or has blocked); the other suppliers in the same run still get their orders, and the restaurant gets a `SCHEDULED_ORDER_SKIPPED_UNFOLLOWED` notification per skipped supplier (`{ quickListId, supplierId, supplierName }`).
+- **Dispute replacement orders** need no follow (they remedy an existing order) but are refused with 409 `SUPPLIER_BLOCKED` when the restaurant has blocked the supplier.
+- **Catalog visibility.** A restaurant sees a supplier's products, list prices (incl. tiers), deals and product images when the organisation is not blocked AND (it follows OR `public_catalog_enabled`). Product rows carry `is_followed` and `in_stock`; only followers get `available_qty` and `/api/inventory/product/:id`. Contract prices are only ever the caller's own. A private-catalog supplier appears to non-followers as a supplier card only. Deals: the old "follows or targeted or boosted" condition is gone; boosts only rank and filter the audience, and restaurant-targeted deals still go to their targets only.
+- **Chat.** A restaurant can start a conversation, or message from a deal, only while it follows the supplier (403 `FOLLOW_REQUIRED`).
+  - Suppliers cannot start a conversation with a restaurant that does not follow them, or that blocked them. Both get 404 `RESTAURANT_NOT_AVAILABLE`, the same answer as an unknown restaurant.
+  - In an existing conversation, a general message needs a follow. A message tagged with `orderId` stays sendable while that order is open between the two parties (statuses in `OPEN_ORDER_STATUSES`). Otherwise the conversation is read-only: 403 `CHAT_READ_ONLY` with `details.openOrderIds`.
+  - A block closes the conversation. The supplier can no longer open it, its messages or its attachments (404), and it is dropped from the supplier's list. The restaurant keeps read-only history (`is_closed_by_block`).
+  - Every send path (REST, socket, deal chat, order fulfilment issues) checks under the shared relationship lock in the insert's transaction. A refused send reserves no daily chat slot and sends no notification.
+  - A relationship change removes the supplier branch's sockets from the affected conversation rooms and emits `conversation_access_changed { conversationId }` to both tenants.
+  - Attachments are served only via `GET /api/chat/attachments/:id`, which re-checks access and redirects to a 5-minute signed object URL.
+- **Supplier intelligence and reports** (at-risk, cadence, cross-sell, loyalty balances and ledger, reminder drafts, top restaurants) name followers only.
+  - Others appear as `Other customers` in aggregates.
+  - Accounting CSV exports stay order-scoped: the supplier's own invoices and payments, including those of restaurants that later unfollowed or blocked.
+  - The Assistant's `get_followed_suppliers` lists followed organisations. Reorder suggestions exclude blocked suppliers and label non-followed ones. See `ai-smart-reorder.md`.
+- **Quotes** stay restaurant-initiated and need no follow.
+  - The invited supplier sees only the restaurant's display name, the note, the needed-by date and its own product lines. The detail response no longer has `restaurantId`.
+  - A block (organisation level) hides the quote from that supplier's inbox, detail, response and decline (404). The block also makes the supplier ineligible for new quotes.
+- **Customer import and reviews** never reveal a restaurant. See `supplier-customer-growth.md` and `supplier-reviews.md`.
+- **Supplier side: followers only.** The customer list (`GET /api/restaurants`) shows only restaurants that follow the supplier's organisation and have not blocked it. Past customers who unfollowed drop off the list; their names stay on the supplier's own orders and invoices.
+  - Customer detail, manual orders (`POST /api/orders/manual`) and contract pricing (create, bulk, PATCH) need a current follow and no block. A past order no longer qualifies.
+  - The check runs before any restaurant, branch or contract lookup. Unknown, never-followed and blocked restaurants (and foreign branch ids, and unknown contract ids) all get the same 404 `RESTAURANT_NOT_AVAILABLE`.
+  - Manual orders and contract writes re-check under the shared relationship lock inside the write's transaction.
+  - Contracts of restaurants that unfollow stay in the database but are hidden from the supplier's list. They reappear if the restaurant follows again.
 
 ## Downstream effects
 
@@ -43,6 +66,22 @@ Following a supplier affects:
 ## Catalog enrichment
 
 `GET /api/suppliers` and `GET /api/suppliers/:id` include `is_followed` (boolean) when the caller is a restaurant tenant.
+
+`GET /api/suppliers?sort=followed` puts the restaurant's followed suppliers first, then featured suppliers, then sorts by name. Any other `sort` value returns 400. The quote request pickers and the new-conversation dialog use it.
+
+### Follow-gated actions (web, marketplace visibility release 1)
+
+- **Follow & add.** Product payloads carry `is_followed` and `can_order`. If the supplier is not followed, the add button becomes "Follow & add": one tap follows the supplier, then adds the item.
+  - At the follow cap, the upgrade prompt opens.
+  - For a blocked supplier, a toast offers "Unblock".
+- **Cart.** The cart refuses to add a product from a supplier the restaurant does not follow, or to raise the quantity of such a line. Lowering or removing the line still works.
+  - When checkout answers `403 FOLLOW_REQUIRED`, the cart shows a "Follow & keep in cart" row for each supplier.
+- **Quotes.** Quote cart payloads include `isFollowed`. Adding a quote to the cart follows the supplier first.
+- **Chat.** Conversations expose `can_send_general`, `is_closed_by_block` and `open_order_ids`.
+  - A read-only thread shows a banner and "Message about order #…" chips.
+  - A thread closed by a block shows a closed banner.
+  - The socket events `conversation_access_changed` and `chat_error` (code `CHAT_READ_ONLY`) refresh the thread live.
+- **Restaurant pickers.** The supplier's manual-order, contract-pricing and new-conversation pickers search followers on the server (`q`, `limit=20`).
 
 ## Web UI
 

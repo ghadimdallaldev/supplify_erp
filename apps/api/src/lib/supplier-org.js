@@ -5,6 +5,7 @@ import { query, withTransaction } from './db.js'
 import { lockOrgBranchCapacity } from './org-branch-capacity.js'
 import { orgRolePermissionsUnchanged, replaceOrgRolePermissions } from './org-role-permissions.js'
 import { logger } from './logger.js'
+import { emitRelationshipChanged, rekeyRelationshipsToOrg } from './relationship.js'
 import {
   ensureTenantSystemRoles,
   assignOwnerRoleForUser,
@@ -670,16 +671,25 @@ export async function unlinkSupplierFromOrganization(
   if (!rows[0].organization_id) return { ok: false, reason: 'DETACHED' }
 
   await db(`DELETE FROM org_user_branch_access WHERE supplier_id = $1`, [supplierId])
-  await db(
+  // Setting NULL fires supplier_ensure_organization (0238): the detached branch becomes the
+  // main branch of a new single-branch organisation. Follows stay with the old organisation.
+  const { rows: detached } = await db(
     `UPDATE supplier
      SET organization_id = NULL, is_main_branch = false, is_branch_active = true,
          deactivated_at = NULL, updated_at = NOW()
-     WHERE id = $1`,
+     WHERE id = $1
+     RETURNING organization_id`,
     [supplierId]
   )
+  if (detached[0]?.organization_id) await ensureOrgSystemRoles(detached[0].organization_id, client)
   return { ok: true, organizationId, supplierId }
 }
 
+/**
+ * Move a standalone supplier (the only branch of its organisation) into `organizationId`.
+ * Its follows and blocks are re-keyed and merged onto the target organisation under the
+ * exclusive relationship locks; the emptied organisation is closed, never deleted.
+ */
 export async function linkSupplierToOrganization(
   supplierId,
   organizationId,
@@ -691,16 +701,43 @@ export async function linkSupplierToOrganization(
     )
   await lockOrgBranchCapacity(client, organizationId, 'SUPPLIER', { initializingMain: isMain })
   const db = (sql, params) => client.query(sql, params)
-  const { rowCount } = await db(
+  const { rows } = await db(
+    `SELECT s.organization_id,
+            EXISTS (SELECT 1 FROM supplier o
+                    WHERE o.organization_id = s.organization_id AND o.id <> s.id) AS has_siblings
+     FROM supplier s WHERE s.id = $1 FOR UPDATE OF s`,
+    [supplierId]
+  )
+  const current = rows[0]
+  if (!current || current.organization_id === organizationId || current.has_siblings) {
+    return { ok: false }
+  }
+  const fromOrgId = current.organization_id
+  await db(
     `
     UPDATE supplier
     SET organization_id = $2, is_main_branch = $3, is_branch_active = true,
         deactivated_at = NULL, updated_at = NOW()
-    WHERE id = $1 AND organization_id IS NULL
+    WHERE id = $1
   `,
     [supplierId, organizationId, isMain]
   )
-  return { ok: (rowCount ?? 0) > 0 }
+  const restaurantIds = fromOrgId
+    ? await rekeyRelationshipsToOrg(client, fromOrgId, organizationId)
+    : []
+  if (fromOrgId) {
+    await db(
+      `UPDATE supplier_organizations
+       SET closed_at = NOW(), close_reason = 'merged_into:' || $2::text, updated_at = NOW()
+       WHERE id = $1 AND closed_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM supplier WHERE organization_id = $1)`,
+      [fromOrgId, organizationId]
+    )
+  }
+  for (const restaurantId of restaurantIds) {
+    await emitRelationshipChanged({ restaurantId, supplierOrgId: organizationId, kind: 'rekey' })
+  }
+  return { ok: true, previousOrganizationId: fromOrgId }
 }
 
 export async function isOrgMigrationComplete() {

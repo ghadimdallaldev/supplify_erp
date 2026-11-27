@@ -60,7 +60,10 @@
     "selectAllProducts": "تحديد كل المنتجات",
     "selectAllSuppliers": "تحديد كل الموردين",
     "visibleCount": "{{count}} معروض",
-    "selectedCount": "{{count}} محدد"
+    "selectedCount": "{{count}} محدد",
+    "searchSuppliersPlaceholder": "ابحث عن الموردين…",
+    "loadMoreSuppliers": "تحميل المزيد من الموردين",
+    "loadMoreProducts": "تحميل المزيد من المنتجات"
   },
   "detail": {
     "notFoundTitle": "طلب عرض السعر غير موجود",

@@ -45,6 +45,17 @@ A single list is selected automatically. Invalid/nonpositive recommendation
 quantities fall back to one unit before product quantity rules are applied.
 Suggestions never place a supplier order automatically.
 
+### Follow rule (marketplace visibility release 1, 2026-11-26)
+
+- **Restaurant suggestions** never include products of a supplier the restaurant has blocked.
+  - Every suggestion with a supplier carries `isFollowed` and `canOrder`. For a supplier the restaurant does not follow, they are `false` with `orderBlockedReason: 'FOLLOW_REQUIRED'`, and the UI offers "Follow to order".
+- **Supplier intelligence** names current followers only: at-risk customers, cadence at-risk, cross-sell opportunities and the loyalty balances list.
+  - Cross-sell pair evidence is still computed over all of the supplier's orders, as an anonymous aggregate.
+  - Reminder drafts, sending a draft and opening chat from reorder assistance need a current follow.
+  - The supplier's missed-cadence notification is sent only for followers. A block silences cadence reminders for both sides.
+- **Reports.** Supplier "top restaurants" names followers and aggregates everyone else into one `Other customers` row per currency (`restaurant_id` null).
+- **Order documents.** Packing slips and route stops prefer the order's snapshots (`customer_contact_snapshot`, `delivery_location_snapshot`) over the live restaurant profile.
+
 ## Branch Scope
 
 Forecasts are keyed by `(restaurant_id, branch_id, product_id)`. `branch_id` NULL is the restaurant-wide aggregate.

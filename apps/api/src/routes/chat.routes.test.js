@@ -74,6 +74,18 @@ vi.mock('../services/notification.service.js', async (importOriginal) => {
   }
 })
 
+const canSendMessageMock = vi.fn(async () => ({ allowed: true, openOrderIds: [] }))
+vi.mock('../lib/chat-access.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  canSendMessage: (...args) => canSendMessageMock(...args),
+  canOpenConversation: vi.fn(async () => true),
+}))
+vi.mock('../lib/relationship.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  lockRelationshipShared: vi.fn(async () => undefined),
+  resolveSupplierOrgId: vi.fn(async () => 'org-1'),
+}))
+
 // Import routes after mocks
 import { chatRoutes } from './chat.routes.js'
 
@@ -84,6 +96,7 @@ describe('Chat Routes', () => {
   beforeEach(async () => {
     clearAllMocks()
     db = setupMocks()
+    canSendMessageMock.mockImplementation(async () => ({ allowed: true, openOrderIds: [] }))
 
     // Sync db mocks
     const dbModule = await import('../lib/db.js')
@@ -133,7 +146,10 @@ describe('Chat Routes', () => {
       const listSql = String(db.query.mock.calls[0][0])
       expect(listSql).toContain('LEFT JOIN LATERAL')
       expect(listSql).toContain('LIMIT $2 OFFSET $3')
-      expect(db.query.mock.calls[0][1]).toEqual(['rest-1', 25, 10])
+      expect(db.query.mock.calls[0][1].slice(0, 3)).toEqual(['rest-1', 25, 10])
+      expect(listSql).toContain('can_send_general')
+      expect(listSql).toContain('open_order_ids')
+      expect(listSql).toContain('is_closed_by_block')
     })
   })
 
@@ -177,7 +193,7 @@ describe('Chat Routes', () => {
       expect(response.body.data.messages).toBeDefined()
       expect(response.body.data.messages).toHaveLength(1)
       expect(response.body.data.messages[0].content).toBe('Hi')
-      expect(String(db.query.mock.calls[2][0])).toContain('file_url AS "fileUrl"')
+      expect(String(db.query.mock.calls[2][0])).not.toContain('file_url')
     })
   })
 
@@ -279,6 +295,32 @@ describe('Chat Routes', () => {
       // The route returns fullMessages[0], so check if message exists
       expect(response.body.data.message).toBeDefined()
       expect(response.body.data.message.content).toBe('Hello')
+    })
+  })
+
+  describe('POST message relationship rules', () => {
+    it('general send without follow is CHAT_READ_ONLY with openOrderIds', async () => {
+      const rbac = await import('../lib/rbac.js')
+      vi.mocked(rbac.getSupplierIdForRequest).mockResolvedValue('supplier-1')
+      canSendMessageMock.mockImplementation(async () => ({
+        allowed: false,
+        openOrderIds: ['order-1'],
+      }))
+      db.query.mockResolvedValue({
+        rows: [{ id: 'conv-1', restaurant_id: 'restaurant-1', supplier_id: 'supplier-1' }],
+      })
+      const { checkAndIncrementUsage } = await import('../lib/subscription.js')
+      const response = await request(app)
+        .post('/api/chat/conversations/conv-1/messages')
+        .send({ content: 'Hello' })
+        .expect(403)
+      expect(response.body.error).toMatchObject({
+        name: 'CHAT_READ_ONLY',
+        details: { openOrderIds: ['order-1'] },
+      })
+      // A refused send never reserves a chat slot or writes a message.
+      expect(checkAndIncrementUsage).not.toHaveBeenCalled()
+      expect(db.query.mock.calls.some((c) => /INSERT INTO message/.test(String(c[0])))).toBe(false)
     })
   })
 
