@@ -72,6 +72,8 @@ import {
 } from './orders.helpers.js'
 import { scheduleOrdersCalendarCacheInvalidation } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
+import { RelationshipError } from '../../lib/relationship.js'
+import { lockAndAssertOrderRelationships } from '../../services/order-relationship-guard.service.js'
 import {
   assertValidOrderStatusTransition,
   requiresDriverAssignment,
@@ -539,6 +541,20 @@ router.patch('/:id', async (req, res) => {
         })
       }
 
+      // Placing a draft creates a new live order: follow required (spec §11.2), checked under
+      // the shared relationship locks in this transaction.
+      if (lockedOrder.status === 'DRAFT' && updateData.status === 'PLACED') {
+        const { rows: draftSuppliers } = await client.query(
+          'SELECT DISTINCT supplier_id FROM order_item WHERE order_id = $1',
+          [id]
+        )
+        await lockAndAssertOrderRelationships(
+          client,
+          lockedOrder.restaurant_id,
+          draftSuppliers.map((r) => r.supplier_id)
+        )
+      }
+
       const { rows: updated } = await client.query(
         `
         UPDATE customer_order
@@ -668,6 +684,15 @@ router.patch('/:id', async (req, res) => {
           message: 'Invalid update data',
           details: error.errors,
         },
+        requestId: req.requestId,
+      })
+    }
+
+    if (error instanceof RelationshipError) {
+      return res.status(error.statusCode).json({
+        ok: false,
+        data: null,
+        error: { name: error.code, message: error.message, details: error.details },
         requestId: req.requestId,
       })
     }

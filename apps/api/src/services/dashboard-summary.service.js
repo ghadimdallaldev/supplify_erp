@@ -7,6 +7,7 @@ import {
 import { supplierUsesWarehouseInventory } from './supplier-stock.service.js'
 import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 import { deleteCache } from '../lib/cache.js'
+import { blockedExistsSql, followExistsSql } from '../lib/relationship.js'
 import { getSupplierTimezone } from '../lib/tenant-timezone.js'
 
 const RECENT_ORDER_LIMIT = 7
@@ -146,14 +147,9 @@ async function buildRestaurantStats(restaurantId) {
     query(
       `SELECT COUNT(*)::int AS count
        FROM product p
-       WHERE EXISTS (
-         SELECT 1 FROM supplier_follow sf
-         WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
-       )
-       AND NOT EXISTS (
-         SELECT 1 FROM supplier_blocklist sb
-         WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1
-       )`,
+       JOIN supplier ps ON ps.id = p.supplier_id
+       WHERE ${followExistsSql('$1', 'ps')}
+         AND NOT ${blockedExistsSql('$1', 'ps')}`,
       [restaurantId]
     ),
     query('SELECT COUNT(*)::int AS count FROM customer_order WHERE restaurant_id = $1', [

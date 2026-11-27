@@ -14,6 +14,7 @@ import {
 } from '../lib/dispute-replacement-order.js'
 import { applyCreditToInvoice, roundMoney } from './invoice.service.js'
 import { assertCleanUploadOwnership } from './storage/upload-security.service.js'
+import { lockAndAssertOrderRelationships } from './order-relationship-guard.service.js'
 
 const ACTIVE_STATUSES = ['open', 'under_review', 'escalated']
 
@@ -751,6 +752,14 @@ export async function resolveDispute(
     let creditNote = null
     let invoiceAdjustment = null
     if (resolutionType === 'replacement') {
+      // A replacement remedies an existing order, so no follow is needed, but a block
+      // (spec §11.4) still refuses it. Shared relationship lock, checked in this transaction.
+      await lockAndAssertOrderRelationships(
+        client,
+        disputeRow.restaurant_id,
+        [disputeRow.supplier_id],
+        { mode: 'notBlocked' }
+      )
       const { rows: disputeItems } = await client.query(
         `SELECT * FROM dispute_items WHERE dispute_id = $1 ORDER BY created_at`,
         [disputeId]

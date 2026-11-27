@@ -12,15 +12,11 @@ import {
   executeCustomerImport,
   buildCustomerImportErrorReportCsv,
 } from '../services/supplier-customer-import.service.js'
-import {
-  listProspects,
-  matchSingleProspect,
-} from '../services/supplier-customer-matching.service.js'
+import { listProspects } from '../services/supplier-customer-matching.service.js'
 import {
   createGrowthInvitation,
   getReferralInvitePublic,
 } from '../services/supplier-growth-invitation.service.js'
-import { createConnectionRequest } from '../services/supplier-connection-request.service.js'
 import {
   sponsorProspect,
   getSponsorshipLimitForSupplier,
@@ -37,7 +33,10 @@ import {
 import { getSupplierGrowthMetrics } from '../services/supplier-growth-metrics.service.js'
 import { getReferralProgramConfig } from '../lib/platform-settings.js'
 import { query } from '../lib/db.js'
-import { NotFoundError } from '../middlewares/errorHandler.js'
+import { ValidationError } from '../middlewares/errorHandler.js'
+import rateLimit from 'express-rate-limit'
+import { config } from '../config/env.js'
+import { createRateLimitStore } from '../lib/rate-limit-store.js'
 import { requireFeature } from '../lib/subscription.js'
 import { writeAuditLog } from '../lib/audit.js'
 import { platformFeatureGate } from '../lib/tenant-feature-gate.js'
@@ -60,6 +59,38 @@ async function resolveSupplierId(req) {
 
 const importSchema = z.object({ csv: z.string().min(1) })
 
+/** Rows per import request (Interfaces, Plan A Task 10). */
+export const MAX_IMPORT_ROWS = 500
+
+function assertImportRowCap(csv) {
+  const dataRows = String(csv)
+    .split(/\r?\n/)
+    .slice(1)
+    .filter((line) => line.trim() !== '').length
+  if (dataRows > MAX_IMPORT_ROWS) {
+    throw new ValidationError(`An import can contain at most ${MAX_IMPORT_ROWS} rows`)
+  }
+}
+
+// 10 import requests per supplier per hour, on the shared rate-limit store.
+const importLimiter = config.RATE_LIMIT_ENABLED
+  ? rateLimit({
+      windowMs: 60 * 60 * 1000,
+      max: 10,
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req) => `supplier:${req.tenantContext?.tenantId || req.ip}`,
+      message: {
+        ok: false,
+        data: null,
+        error: { name: 'RATE_LIMITED', message: 'Too many imports, please try again later.' },
+      },
+      ...(createRateLimitStore('rl:customer-import')
+        ? { store: createRateLimitStore('rl:customer-import') }
+        : {}),
+    })
+  : (_req, _res, next) => next()
+
 /** Guard LIMIT/OFFSET: a negative offset made Postgres throw and surfaced as a 500. */
 function parsePaging(reqQuery, { defaultLimit = 50, maxLimit = 200 } = {}) {
   const rawLimit = Number(reqQuery.limit)
@@ -77,6 +108,7 @@ router.post(
     try {
       await resolveSupplierId(req)
       const body = importSchema.parse(req.body)
+      assertImportRowCap(body.csv)
       const data = previewCustomerImport(body.csv)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
@@ -85,32 +117,38 @@ router.post(
   }
 )
 
-router.post('/customers/import', requirePermission('CUSTOMERS_IMPORT'), async (req, res, next) => {
-  try {
-    const supplierId = await resolveSupplierId(req)
-    const body = importSchema.parse(req.body)
-    const result = await executeCustomerImport(supplierId, body.csv, {
-      userId: req.userData.id,
-    })
-    await writeAuditLog(req, {
-      action_type: 'customers.import.completed',
-      tenant_type: 'SUPPLIER',
-      tenant_id: supplierId,
-      target_id: result.batchId,
-      payload_json: {
-        resource_type: 'supplier_customer_import_batch',
-        summary: {
-          created: result.created,
-          skipped: result.skipped,
-          failed: result.failed,
+router.post(
+  '/customers/import',
+  requirePermission('CUSTOMERS_IMPORT'),
+  importLimiter,
+  async (req, res, next) => {
+    try {
+      const supplierId = await resolveSupplierId(req)
+      const body = importSchema.parse(req.body)
+      assertImportRowCap(body.csv)
+      const result = await executeCustomerImport(supplierId, body.csv, {
+        userId: req.userData.id,
+      })
+      await writeAuditLog(req, {
+        action_type: 'customers.import.completed',
+        tenant_type: 'SUPPLIER',
+        tenant_id: supplierId,
+        target_id: result.batchId,
+        payload_json: {
+          resource_type: 'supplier_customer_import_batch',
+          summary: {
+            created: result.created,
+            skipped: result.skipped,
+            failed: result.failed,
+          },
         },
-      },
-    })
-    res.json({ ok: true, data: result, error: null, requestId: req.requestId })
-  } catch (err) {
-    next(err)
+      })
+      res.json({ ok: true, data: result, error: null, requestId: req.requestId })
+    } catch (err) {
+      next(err)
+    }
   }
-})
+)
 
 router.post('/customers/import/error-report', requirePermission('CUSTOMERS_IMPORT'), (req, res) => {
   const csv = buildCustomerImportErrorReportCsv(req.body?.errors || [])
@@ -135,39 +173,6 @@ router.get('/customers/prospects', requirePermission('GROWTH_VIEW'), async (req,
     next(err)
   }
 })
-
-router.post(
-  '/customers/prospects/:id/rematch',
-  requirePermission('CUSTOMERS_MANAGE'),
-  async (req, res, next) => {
-    try {
-      const supplierId = await resolveSupplierId(req)
-      const { rows } = await query(
-        `SELECT id FROM supplier_customer_prospect WHERE id = $1 AND supplier_id = $2`,
-        [req.params.id, supplierId]
-      )
-      if (!rows.length) throw new NotFoundError('Prospect not found')
-      const data = await matchSingleProspect(req.params.id)
-      res.json({ ok: true, data, error: null, requestId: req.requestId })
-    } catch (err) {
-      next(err)
-    }
-  }
-)
-
-router.post(
-  '/customers/prospects/:id/connect',
-  requirePermission('CUSTOMERS_MANAGE'),
-  async (req, res, next) => {
-    try {
-      const supplierId = await resolveSupplierId(req)
-      const data = await createConnectionRequest(supplierId, req.params.id, { req })
-      res.json({ ok: true, data, error: null, requestId: req.requestId })
-    } catch (err) {
-      next(err)
-    }
-  }
-)
 
 const inviteSchema = z.object({ channel: z.enum(['email', 'whatsapp', 'link']).default('link') })
 

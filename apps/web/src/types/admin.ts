@@ -434,6 +434,8 @@ export interface SupplierQuoteRequestDetail {
 export interface QuoteCartPayload {
   supplierId: string
   quoteRequestSupplierId: string
+  /** The restaurant follows the quoting supplier; ordering needs a follow (spec §10 Q1). */
+  isFollowed?: boolean
   items: Array<{
     productId: string
     quantity: number

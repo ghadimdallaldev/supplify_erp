@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { supplierSeesRestaurantSql } from '../lib/relationship.js'
 import { ValidationError, NotFoundError } from '../middlewares/errorHandler.js'
 import { logger } from '../lib/logger.js'
 
@@ -232,6 +233,8 @@ export async function listSupplierLoyaltyBalances(supplierId, { limit = 50, offs
     FROM restaurant_loyalty_balance b
     JOIN restaurant r ON r.id = b.restaurant_id
     WHERE b.supplier_id = $1
+      -- Balances of restaurants that unfollowed or blocked stay stored, hidden (spec §6.2).
+      AND ${supplierSeesRestaurantSql('b.restaurant_id', '$1')}
     ORDER BY b.points_balance DESC, r.name ASC
     LIMIT $2 OFFSET $3
     `,

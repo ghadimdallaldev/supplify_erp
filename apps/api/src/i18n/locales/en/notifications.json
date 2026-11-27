@@ -149,7 +149,9 @@
     "executedTitle": "Scheduled order executed",
     "reminderTitle": "Scheduled order reminder",
     "executedMessage": "Scheduled order \"{{name}}\" has been created automatically.",
-    "reminderMessage": "Scheduled order \"{{name}}\" will run soon. Review inventory if you need to pause it."
+    "reminderMessage": "Scheduled order \"{{name}}\" will run soon. Review inventory if you need to pause it.",
+    "skippedUnfollowedTitle": "Scheduled order skipped a supplier",
+    "skippedUnfollowedMessage": "Scheduled order \"{{name}}\" skipped {{supplier}} because you no longer follow this supplier. Follow it again to include it next time."
   },
   "invoice": {
     "issuedTitle": "Invoice Issued",

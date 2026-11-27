@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   useGetPublicSupplierQuery,
+  useGetSupplierQuery,
   useGetPublicSupplierProductsQuery,
   useGetPublicSupplierPricedProductsQuery,
 } from '../services/api'
 import { useAppSelector } from '../hooks/redux'
 import { useCartActions } from '../hooks/useCartActions'
+import { useFollowSupplier } from '../hooks/useFollowSupplier'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
@@ -41,8 +43,10 @@ function ProductCard({
   onRequestQuote,
   canOrder,
   loginHref,
+  followRequired = false,
 }: {
   product: PublicSupplierProduct
+  followRequired?: boolean
   showPrice: boolean
   onAdd?: (product: PublicSupplierProduct) => void
   onRequestQuote?: (product: PublicSupplierProduct) => void
@@ -122,10 +126,12 @@ function ProductCard({
           )}
 
           <div className="mt-auto flex flex-wrap gap-2 pt-1">
-            {canOrder && onAdd && product.inStock !== false && (
+            {canOrder && onAdd && (followRequired || product.inStock !== false) && (
               <Button size="sm" className="consumer-pressable" onClick={() => onAdd(product)}>
                 <ShoppingCart className="mr-1 h-4 w-4" />
-                {t('catalog.product.addToCart')}
+                {followRequired
+                  ? t('common:marketplace.followAndAdd')
+                  : t('catalog.product.addToCart')}
               </Button>
             )}
             {canOrder && onRequestQuote && (
@@ -244,6 +250,7 @@ export function PublicSupplierCatalogPage({
   const isRestaurant = user?.role === 'RESTAURANT'
   const isConsumer = user?.role === 'CONSUMER'
   const { addItem } = useCartActions()
+  const { follow } = useFollowSupplier()
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -268,6 +275,11 @@ export function PublicSupplierCatalogPage({
     isLoading: loadingSupplier,
     isError: supplierError,
   } = useGetPublicSupplierQuery(idOrSlug ?? '', { skip: !idOrSlug })
+  // Signed-in restaurant: ordering needs a follow, so the add button follows first (spec §10 Q1).
+  const { data: relationship } = useGetSupplierQuery(supplier?.id ?? '', {
+    skip: !isRestaurant || !supplier?.id,
+  })
+  const followRequired = isRestaurant && relationship?.is_followed === false
 
   const productArgs = useMemo(
     () => ({
@@ -306,8 +318,9 @@ export function PublicSupplierCatalogPage({
     return [{ id: '', name: t('catalog.categoryAll') }, ...list]
   }, [catalog?.categories, t])
 
-  const handleAddToCart = (product: PublicSupplierProduct) => {
+  const handleAddToCart = async (product: PublicSupplierProduct) => {
     if (!supplier) return
+    if (isRestaurant && followRequired && (await follow(supplier.id)) !== 'followed') return
     if (!isRestaurant) {
       const supplierLocationId = product.supplierId || supplier.id
       if (publicCart.supplierLocationId && publicCart.supplierLocationId !== supplierLocationId) {
@@ -348,6 +361,8 @@ export function PublicSupplierCatalogPage({
         currency: product.currency,
         created_at: '',
         updated_at: '',
+        is_followed: followRequired || relationship?.is_followed ? true : undefined,
+        can_order: followRequired || relationship?.is_followed ? true : undefined,
       },
     })
     toast.success(t('catalog.toast.addedToCart'))
@@ -589,6 +604,7 @@ export function PublicSupplierCatalogPage({
                   (Boolean(supplier.publicSalesEnabled) && product.orderable === true)
                 }
                 loginHref={loginHref}
+                followRequired={followRequired}
                 onAdd={handleAddToCart}
                 onRequestQuote={handleRequestQuote}
               />

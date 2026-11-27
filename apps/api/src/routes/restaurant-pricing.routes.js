@@ -10,7 +10,15 @@ import {
   getSupplierIdForRequest,
   getRestaurantIdForRequest,
 } from '../lib/rbac.js'
-import { query } from '../lib/db.js'
+import { query, withTransaction } from '../lib/db.js'
+import {
+  RelationshipError,
+  RestaurantNotAvailableError,
+  canSeeRestaurant,
+  followExistsSql,
+  blockedExistsSql,
+  lockAndAssertRestaurantVisible,
+} from '../lib/relationship.js'
 import { getRestaurantTimezone, getSupplierTimezone } from '../lib/tenant-timezone.js'
 import { logger } from '../lib/logger.js'
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -210,44 +218,24 @@ function dedupeBulkItemsByProductId(items) {
   return [...byProductId.values()]
 }
 
-/** Follow, prior order, and not blocklisted — parity with supplier manual order / order create */
+/**
+ * Contracts need a current follow and no block (spec §6.2 item 8, D9). Checked before any
+ * product or restaurant lookup; unknown and not-allowed restaurants get the same 404
+ * RESTAURANT_NOT_AVAILABLE. Writes re-check under the shared relationship lock.
+ */
 async function assertRestaurantEligibleForContract(supplierId, restaurantId) {
-  const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
-    restaurantId,
-  ])
-  if (restaurants.length === 0) {
-    throw new NotFoundError('Restaurant not found')
+  if (!(await canSeeRestaurant(restaurantId, supplierId))) {
+    throw new RestaurantNotAvailableError()
   }
+}
 
-  const { rows: eligible } = await query(
-    `
-    SELECT r.id
-    FROM restaurant r
-    WHERE r.id = $1
-      AND r.id NOT IN (
-        SELECT sb.restaurant_id FROM supplier_blocklist sb WHERE sb.supplier_id = $2
-      )
-      AND (
-        EXISTS (
-          SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = $2 AND sf.restaurant_id = r.id
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM customer_order o
-          JOIN order_item oi ON oi.order_id = o.id
-          WHERE o.restaurant_id = r.id AND oi.supplier_id = $2
-        )
-      )
-    `,
-    [restaurantId, supplierId]
-  )
-
-  if (eligible.length === 0) {
-    throw new ValidationError(
-      'This restaurant is not eligible for contract pricing. They must follow your supplier profile or have placed an order with you before, and must not be blocklisted.'
-    )
-  }
+function relationshipErrorResponse(res, req, error) {
+  return res.status(error.statusCode).json({
+    ok: false,
+    data: null,
+    error: { name: error.code, message: error.message },
+    requestId: req.requestId,
+  })
 }
 
 // Restaurant: resolve prices for cart preview (must be before /:id)
@@ -414,7 +402,13 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
     const { restaurantId, productId, q, status = 'all' } = req.query
     const timeZone = await getSupplierTimezone(supplierId)
     const today = '(now() AT TIME ZONE $2)::date'
-    const conditions = ['rp.supplier_id = $1']
+    // $2 (timezone) is bound even when no status filter uses it; keep it referenced.
+    // Contracts for restaurants that no longer follow (or blocked) stay in the DB, hidden.
+    const conditions = [
+      'rp.supplier_id = $1',
+      followExistsSql('rp.restaurant_id', 'rp_s'),
+      `NOT ${blockedExistsSql('rp.restaurant_id', 'rp_s')}`,
+    ]
     const params = [supplierId, timeZone]
     let idx = 3
 
@@ -431,6 +425,7 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
       params.push(`%${q}%`)
       idx++
     }
+    conditions.push('$2::text IS NOT NULL')
     if (status === 'active') {
       conditions.push('rp.is_active = true')
       conditions.push(`(rp.contract_end_date IS NULL OR rp.contract_end_date >= ${today})`)
@@ -452,6 +447,7 @@ router.get('/', requireRole(['SUPPLIER', 'ADMIN']), supplierRead, async (req, re
         p.sku as product_sku,
         pr.amount as catalog_price
       FROM restaurant_pricing rp
+      JOIN supplier rp_s ON rp_s.id = rp.supplier_id
       JOIN restaurant r ON r.id = rp.restaurant_id
       JOIN product p ON p.id = rp.product_id
       LEFT JOIN LATERAL (
@@ -498,6 +494,8 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       })
     }
 
+    await assertRestaurantEligibleForContract(supplierId, pricingData.restaurantId)
+
     const { rows: products } = await query(
       'SELECT id FROM product WHERE id = $1 AND supplier_id = $2',
       [pricingData.productId, supplierId]
@@ -505,8 +503,6 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
     if (products.length === 0) {
       throw new NotFoundError('Product not found or does not belong to supplier')
     }
-
-    await assertRestaurantEligibleForContract(supplierId, pricingData.restaurantId)
     validateContractDateRange(pricingData.contractStartDate, pricingData.contractEndDate)
 
     // Explicit price is authoritative; discount % derives from catalog only when price is omitted.
@@ -524,8 +520,10 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
 
     const {
       rows: [pricing],
-    } = await query(
-      `
+    } = await withTransaction(async (client) => {
+      await lockAndAssertRestaurantVisible(client, pricingData.restaurantId, supplierId)
+      return client.query(
+        `
       INSERT INTO restaurant_pricing (
         supplier_id, restaurant_id, product_id, price, currency,
         contract_discount_percentage, contract_start_date, contract_end_date,
@@ -545,20 +543,21 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
         updated_at = now()
       RETURNING *
       `,
-      [
-        supplierId,
-        pricingData.restaurantId,
-        pricingData.productId,
-        resolvedPrice.price,
-        currency,
-        resolvedPrice.contractDiscountPercentage,
-        pricingData.contractStartDate || null,
-        pricingData.contractEndDate || null,
-        pricingData.agreementType,
-        pricingData.minOrderQuantity ?? null,
-        pricingData.notes || null,
-      ]
-    )
+        [
+          supplierId,
+          pricingData.restaurantId,
+          pricingData.productId,
+          resolvedPrice.price,
+          currency,
+          resolvedPrice.contractDiscountPercentage,
+          pricingData.contractStartDate || null,
+          pricingData.contractEndDate || null,
+          pricingData.agreementType,
+          pricingData.minOrderQuantity ?? null,
+          pricingData.notes || null,
+        ]
+      )
+    })
 
     logger.info('Restaurant pricing upserted', {
       supplierId,
@@ -575,6 +574,7 @@ router.post('/', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (req, 
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof RelationshipError) return relationshipErrorResponse(res, req, error)
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         ok: false,
@@ -647,8 +647,10 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
 
     const created = []
     if (resolvedItems.length > 0) {
-      const { rows: inserted } = await query(
-        `
+      const { rows: inserted } = await withTransaction(async (client) => {
+        await lockAndAssertRestaurantVisible(client, bulkData.restaurantId, supplierId)
+        return client.query(
+          `
         INSERT INTO restaurant_pricing (
           supplier_id, restaurant_id, product_id, price, currency,
           contract_discount_percentage, contract_start_date, contract_end_date,
@@ -702,20 +704,21 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
           updated_at = now()
         RETURNING *
         `,
-        [
-          supplierId,
-          bulkData.restaurantId,
-          resolvedItems.map((i) => i.productId),
-          resolvedItems.map((i) => i.price),
-          resolvedItems.map((i) => i.currency || 'USD'),
-          resolvedItems.map((i) => i.contractDiscountPercentage ?? null),
-          resolvedItems.map((i) => i.contractStartDate || null),
-          resolvedItems.map((i) => i.contractEndDate || null),
-          resolvedItems.map((i) => i.agreementType || 'CUSTOM'),
-          resolvedItems.map((i) => i.minOrderQuantity ?? null),
-          resolvedItems.map((i) => i.notes || null),
-        ]
-      )
+          [
+            supplierId,
+            bulkData.restaurantId,
+            resolvedItems.map((i) => i.productId),
+            resolvedItems.map((i) => i.price),
+            resolvedItems.map((i) => i.currency || 'USD'),
+            resolvedItems.map((i) => i.contractDiscountPercentage ?? null),
+            resolvedItems.map((i) => i.contractStartDate || null),
+            resolvedItems.map((i) => i.contractEndDate || null),
+            resolvedItems.map((i) => i.agreementType || 'CUSTOM'),
+            resolvedItems.map((i) => i.minOrderQuantity ?? null),
+            resolvedItems.map((i) => i.notes || null),
+          ]
+        )
+      })
       created.push(...inserted.map(mapPricingRow))
       for (const row of inserted) {
         await fireContractRecipeHook(row)
@@ -729,6 +732,7 @@ router.post('/bulk', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof RelationshipError) return relationshipErrorResponse(res, req, error)
     if (error instanceof NotFoundError || error instanceof ValidationError) {
       return res.status(400).json({
         ok: false,
@@ -799,26 +803,21 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       throw new ValidationError('No fields to update')
     }
 
-    const needsExistingRow =
-      updateData.contractStartDate !== undefined ||
-      updateData.contractEndDate !== undefined ||
-      (updateData.contractDiscountPercentage !== undefined && updateData.price === undefined)
-
-    let existing = null
-    if (needsExistingRow) {
-      const { rows: existingRows } = await query(
-        `
-        SELECT product_id, contract_start_date, contract_end_date
-        FROM restaurant_pricing
-        WHERE id = $1 AND supplier_id = $2
-        `,
-        [id, supplierId]
-      )
-      if (!existingRows.length) {
-        throw new NotFoundError('Pricing not found')
-      }
-      existing = existingRows[0]
-    }
+    // Unknown contract ids and contracts of restaurants that no longer follow (or blocked)
+    // get the same 404 RESTAURANT_NOT_AVAILABLE (spec §6.2 item 8).
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!UUID_RE.test(String(id))) throw new RestaurantNotAvailableError()
+    const { rows: existingRows } = await query(
+      `
+      SELECT restaurant_id, product_id, contract_start_date, contract_end_date
+      FROM restaurant_pricing
+      WHERE id = $1 AND supplier_id = $2
+      `,
+      [id, supplierId]
+    )
+    if (!existingRows.length) throw new RestaurantNotAvailableError()
+    const existing = existingRows[0]
+    await assertRestaurantEligibleForContract(supplierId, existing.restaurant_id)
 
     if (updateData.contractDiscountPercentage !== undefined && updateData.price === undefined) {
       const resolvedPrice = await resolveContractUpsertPrice(
@@ -849,15 +848,18 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
 
     const {
       rows: [pricing],
-    } = await query(
-      `
+    } = await withTransaction(async (client) => {
+      await lockAndAssertRestaurantVisible(client, existing.restaurant_id, supplierId)
+      return client.query(
+        `
       UPDATE restaurant_pricing
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex} AND supplier_id = $${paramIndex + 1}
       RETURNING *
       `,
-      updateValues
-    )
+        updateValues
+      )
+    })
 
     if (!pricing) {
       throw new NotFoundError('Pricing not found')
@@ -874,6 +876,7 @@ router.patch('/:id', requireRole(['SUPPLIER', 'ADMIN']), supplierWrite, async (r
       requestId: req.requestId,
     })
   } catch (error) {
+    if (error instanceof RelationshipError) return relationshipErrorResponse(res, req, error)
     if (error instanceof NotFoundError || error instanceof ValidationError) {
       return res.status(error instanceof NotFoundError ? 404 : 400).json({
         ok: false,

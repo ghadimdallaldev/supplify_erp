@@ -1,6 +1,12 @@
 import express from 'express'
 import { z } from 'zod'
-import { requireAuth, requireRole, resolveTenantContext } from '../lib/rbac.js'
+import {
+  getRestaurantIdForRequest,
+  optionalAuth,
+  requireAuth,
+  requireRole,
+  resolveTenantContext,
+} from '../lib/rbac.js'
 import { reviewsAccessGuard } from '../lib/route-permissions.js'
 import { requireFeature } from '../lib/subscription.js'
 import { requireRestaurantId } from '../lib/tenant-resolve.js'
@@ -43,11 +49,16 @@ const paginationSchema = z.object({
 })
 
 // Public routes (no auth)
-router.get('/suppliers/:supplierId', async (req, res, next) => {
+router.get('/suppliers/:supplierId', optionalAuth, async (req, res, next) => {
   try {
     const { supplierId } = req.params
     const { limit, offset } = paginationSchema.parse(req.query)
-    const result = await listSupplierReviews(supplierId, { limit, offset })
+    // Only marks the caller's own review (is_own); reviewer identity is never returned.
+    let viewerRestaurantId = null
+    if (req.userData) {
+      viewerRestaurantId = await getRestaurantIdForRequest(req).catch(() => null)
+    }
+    const result = await listSupplierReviews(supplierId, { limit, offset, viewerRestaurantId })
     res.json({
       ok: true,
       data: { reviews: result.reviews },

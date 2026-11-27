@@ -219,7 +219,7 @@
   },
   "customerGrowth": {
     "title": "Customer Growth",
-    "description": "Bring your existing restaurant customers onto Supplify. Upload a customer list, see who is already on the platform, then invite new restaurants or gift them a paid plan to get them started.",
+    "description": "Bring your existing restaurant customers onto Supplify. Upload a customer list, then invite restaurants or gift them a paid plan to get them started.",
     "lockedFeature": "Customer growth & referrals",
     "metricsError": {
       "title": "Could not load growth metrics",
@@ -228,18 +228,18 @@
     },
     "metrics": {
       "imported": "Imported",
-      "onSupplify": "On Supplify",
       "invited": "Invited",
       "converted": "Converted",
       "sponsored": "Sponsored",
       "registered": "Registered",
       "revenueGenerated": "Revenue generated",
       "rewardsEarned": "Rewards earned",
-      "rewardsMonths": "{{months}} mo"
+      "rewardsMonths": "{{months}} mo",
+      "following": "Following"
     },
     "import": {
       "title": "Import customers",
-      "description": "Upload a spreadsheet of restaurants you already supply. We match each row to Supplify accounts automatically so you can connect, invite, or sponsor them from the list below.",
+      "description": "Upload a spreadsheet of restaurants you already supply. Each row becomes a private prospect you can invite or sponsor from the list below.",
       "howItWorks": "How it works",
       "step1": "Download the example CSV or use your own file with the columns below.",
       "step2": "Choose a file — we validate rows and show a preview before anything is saved.",
@@ -261,7 +261,7 @@
     },
     "prospects": {
       "title": "Imported customers",
-      "description": "Restaurants from your import, with their match status on Supplify. For restaurants already on the platform, send a connection request. For everyone else, share an invite link or sponsor them with a one-month gift subscription.",
+      "description": "Restaurants from your import. Invite any of them with your referral link, or sponsor a first month. A restaurant shows as Following once it follows you.",
       "defaultGiftPlan": "Default gift plan for Sponsor",
       "sponsorPlanAria": "Sponsorship gift plan",
       "sponsorLimit_one": "Up to {{count}} gift per year on your supplier plan",
@@ -270,14 +270,17 @@
       "errorTitle": "Could not load imported customers",
       "errorDescription": "Check your connection and try again.",
       "retry": "Retry",
-      "empty": "No customers imported yet. Upload a CSV above — after import, each restaurant will show here with options to connect, invite, or sponsor.",
-      "actionsHelp": "Connect — already on Supplify; sends a follow request they must accept. Invite — copies a signup link with your referral benefits. Sponsor — starts their one-month {{plan}} gift immediately.",
-      "match": "Match",
+      "empty": "No customers imported yet. Upload a CSV above — after import, each restaurant shows here with options to invite or sponsor.",
+      "actionsHelp": "Invite — copies a signup link with your referral benefits. Sponsor — offers a one-month {{plan}} gift.",
       "status": "Status",
       "actions": "Actions",
-      "connect": "Connect",
       "invite": "Invite",
-      "sponsor": "Sponsor"
+      "sponsor": "Sponsor",
+      "statuses": {
+        "imported": "Imported",
+        "invited": "Invited",
+        "following": "Following"
+      }
     },
     "toasts": {
       "noValidRows": "No valid rows to import — fix errors below",
@@ -287,8 +290,6 @@
       "fixErrors": "Fix validation errors before importing",
       "importSuccess": "Imported {{count}} customers",
       "importFailed": "Import failed",
-      "connectionSent": "Connection request sent",
-      "connectionFailed": "Could not send connection request",
       "inviteCopied": "Invite link copied",
       "inviteFailed": "Invite failed",
       "sponsorStarted": "Sponsorship started",

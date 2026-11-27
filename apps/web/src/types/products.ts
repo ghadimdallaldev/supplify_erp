@@ -36,6 +36,10 @@ export interface Product {
   order_multiple?: number
   /** Supplier minimum order amount (catalog join) */
   supplier_minimum_order_amount?: number | null
+  /** Restaurant follows this product's supplier organisation (marketplace visibility). */
+  is_followed?: boolean
+  /** Ordering needs a follow; false means the UI shows "Follow & add". */
+  can_order?: boolean
 }
 
 export interface CreateProductRequest {

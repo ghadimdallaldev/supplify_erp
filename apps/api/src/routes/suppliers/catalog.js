@@ -99,7 +99,7 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
           whereConditions.push(`
             NOT EXISTS (
               SELECT 1 FROM supplier_blocklist sb
-              WHERE sb.supplier_id = ANY(scope.supplier_ids) AND sb.restaurant_id = $${paramIndex}
+              WHERE sb.supplier_org_id = scope.public_id AND sb.restaurant_id = $${paramIndex}
             )
           `)
           queryParams.push(restaurantId)
@@ -147,7 +147,7 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
       sql += `,
         EXISTS (
           SELECT 1 FROM supplier_follow sf
-          WHERE sf.supplier_id = ANY(scope.supplier_ids)
+          WHERE sf.supplier_org_id = scope.public_id
             AND sf.restaurant_id = $${paramIndex}
         ) as is_followed`
       queryParams.push(restaurantId)
@@ -182,7 +182,8 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
         LIMIT 1
       ) feat ON true
       ${whereClause}
-      ORDER BY (feat.is_featured IS TRUE) DESC, scope.public_id, s.created_at DESC
+      ORDER BY ${params.sort === 'followed' && restaurantId ? 'is_followed DESC, ' : ''}(feat.is_featured IS TRUE) DESC,
+        ${params.sort === 'followed' ? 'COALESCE(so.name, s.name), ' : ''}scope.public_id, s.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `
 
@@ -196,7 +197,9 @@ router.get('/', optionalAuth, supplierDirectoryGate, async (req, res) => {
 
     const { rows } = await query(sql, queryParams)
 
-    const suppliersWithReviews = await attachReviewFields(rows)
+    const suppliersWithReviews = await attachReviewFields(rows, {
+      viewerRestaurantId: restaurantId,
+    })
     const suppliersWithDeals = await attachStoreDealFields(suppliersWithReviews, { restaurantId })
     const publicSuppliers = suppliersWithDeals.map(({ supplier_ids, ...supplier }) => {
       const presented = presentPublicSupplier(supplier)

@@ -316,7 +316,7 @@ export function shouldResetApprovalOnEdit(existing, body) {
     const prevVal = existing[dbKey]
     if (String(nextVal ?? '') !== String(prevVal ?? '')) return true
   }
-  if (body.productIds || body.categoryIds || body.restaurantIds) return true
+  if (body.productIds || body.categoryIds || body.appliesTo !== undefined) return true
   return false
 }
 

@@ -34,6 +34,7 @@ import {
   listAllActivePlacementsForAdmin,
 } from '../../services/featured-supplier-placement.service.js'
 
+import { bumpCatalogVersionSafe } from '../../lib/relationship-cache.js'
 import {
   attachReviewFields,
   supplierCreateSchema,
@@ -156,6 +157,9 @@ router.patch(
       })
 
       await invalidateTenantProfileCache(id, 'SUPPLIER')
+      if (Object.prototype.hasOwnProperty.call(updateData, 'publicCatalogEnabled')) {
+        await bumpCatalogVersionSafe()
+      }
 
       res.json({
         ok: true,

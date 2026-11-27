@@ -92,7 +92,14 @@ export async function getSupplierRatingSummariesBatch(supplierIds) {
   return map
 }
 
-export async function getRecentReviewsForSuppliersBatch(supplierIds, limitPerSupplier = 3) {
+/** Reviews never identify the reviewing restaurant (spec §6.2 item 5). */
+export const REVIEWER_LABEL = 'Verified restaurant'
+
+export async function getRecentReviewsForSuppliersBatch(
+  supplierIds,
+  limitPerSupplier = 3,
+  { viewerRestaurantId = null } = {}
+) {
   if (!supplierIds?.length) return new Map()
   const { rows } = await query(
     `
@@ -106,16 +113,16 @@ export async function getRecentReviewsForSuppliersBatch(supplierIds, limitPerSup
         sr.value_rating,
         sr.comment,
         sr.created_at,
-        r.name AS restaurant_name,
+        'Verified restaurant'::text AS reviewer_label,
+        (sr.restaurant_id = $3::uuid) IS TRUE AS is_own,
         ROW_NUMBER() OVER (PARTITION BY sr.supplier_id ORDER BY sr.created_at DESC) AS rn
       FROM supplier_reviews sr
-      JOIN restaurant r ON r.id = sr.restaurant_id
       WHERE sr.supplier_id = ANY($1::uuid[])
     ) ranked
     WHERE rn <= $2
     ORDER BY supplier_id, created_at DESC
     `,
-    [supplierIds, limitPerSupplier]
+    [supplierIds, limitPerSupplier, viewerRestaurantId]
   )
   const map = new Map()
   for (const row of rows) {
@@ -126,7 +133,11 @@ export async function getRecentReviewsForSuppliersBatch(supplierIds, limitPerSup
   return map
 }
 
-export async function getRecentReviewsForSupplier(supplierId, limit = 3) {
+export async function getRecentReviewsForSupplier(
+  supplierId,
+  limit = 3,
+  { viewerRestaurantId = null } = {}
+) {
   const supplierIds = await resolveSupplierReviewScope(supplierId)
   const { rows } = await query(
     `
@@ -138,14 +149,14 @@ export async function getRecentReviewsForSupplier(supplierId, limit = 3) {
       sr.value_rating,
       sr.comment,
       sr.created_at,
-      r.name AS restaurant_name
+      'Verified restaurant'::text AS reviewer_label,
+      (sr.restaurant_id = $3::uuid) IS TRUE AS is_own
     FROM supplier_reviews sr
-    JOIN restaurant r ON r.id = sr.restaurant_id
     WHERE sr.supplier_id = ANY($1::uuid[])
     ORDER BY sr.created_at DESC
     LIMIT $2
     `,
-    [supplierIds, limit]
+    [supplierIds, limit, viewerRestaurantId]
   )
   return rows
 }
@@ -293,7 +304,10 @@ export async function deleteSupplierReview(reviewId, userId) {
   return { id: reviewId }
 }
 
-export async function listSupplierReviews(supplierId, { limit = 20, offset = 0 }) {
+export async function listSupplierReviews(
+  supplierId,
+  { limit = 20, offset = 0, viewerRestaurantId = null } = {}
+) {
   const supplierIds = await resolveSupplierReviewScope(supplierId)
   const { rows } = await query(
     `
@@ -306,14 +320,14 @@ export async function listSupplierReviews(supplierId, { limit = 20, offset = 0 }
       sr.comment,
       sr.created_at,
       sr.updated_at,
-      r.name AS restaurant_name
+      'Verified restaurant'::text AS reviewer_label,
+      (sr.restaurant_id = $4::uuid) IS TRUE AS is_own
     FROM supplier_reviews sr
-    JOIN restaurant r ON r.id = sr.restaurant_id
     WHERE sr.supplier_id = ANY($1::uuid[])
     ORDER BY sr.created_at DESC
     LIMIT $2 OFFSET $3
     `,
-    [supplierIds, limit, offset]
+    [supplierIds, limit, offset, viewerRestaurantId]
   )
 
   const { rows: countRows } = await query(

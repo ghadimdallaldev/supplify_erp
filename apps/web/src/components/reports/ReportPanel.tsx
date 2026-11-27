@@ -79,7 +79,17 @@ export function ReportPanel({
   const { data, isLoading, isFetching, isError, error, refetch } = isRestaurant
     ? restaurantQuery
     : supplierQuery
-  const rows = useMemo(() => data?.data ?? [], [data])
+  // The API folds restaurants the supplier may no longer see into one row with a null
+  // restaurant_id (spec §6.2); localise its English placeholder name.
+  const rows = useMemo(
+    () =>
+      (data?.data ?? []).map((row: Record<string, unknown>) =>
+        'restaurant_id' in row && row.restaurant_id == null && 'restaurant_name' in row
+          ? { ...row, restaurant_name: t('common:marketplace.otherCustomers') }
+          : row
+      ),
+    [data, t]
+  )
   const showInitialLoad = isLoading && !data
   const showRefreshing = isFetching && !isLoading && rows.length > 0
 
