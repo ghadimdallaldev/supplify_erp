@@ -1,3 +1,4 @@
+import { canSeeRestaurant, canTransact } from '../lib/relationship.js'
 import {
   getReorderIntelligence,
   createReorderReminderDraft,
@@ -120,6 +121,8 @@ export async function createSupplierFollowUpDraft(
   createdBy,
   { openChat = false } = {}
 ) {
+  // Drafts and chat need a current follow and no block (spec §6.2).
+  if (!(await canSeeRestaurant(restaurantId, supplierId))) return null
   const draft = await createReorderReminderDraft(supplierId, restaurantId, createdBy)
   if (!draft) return null
 
@@ -128,7 +131,8 @@ export async function createSupplierFollowUpDraft(
 
   if (openChat) {
     const chatEnabled = await isFeatureEnabled(supplierId, 'SUPPLIER', 'chat')
-    if (chatEnabled) {
+    // Opening chat from reorder assistance needs a follow and no block (spec §11.4).
+    if (chatEnabled && (await canTransact(restaurantId, supplierId))) {
       const conversation = await getOrCreateConversation(supplierId, restaurantId, {
         enforceOpenLimit: false,
       })

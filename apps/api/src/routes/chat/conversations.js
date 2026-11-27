@@ -22,6 +22,19 @@ import {
 import { z } from 'zod'
 import { notifyMessageReceived } from '../../services/notification.service.js'
 import { assertChatAttachmentUrl } from '../../lib/sanitize-upload.js'
+import { ChatReadOnlyError, canSendMessage } from '../../lib/chat-access.js'
+import {
+  OPEN_ORDER_STATUSES,
+  RelationshipError,
+  blockedExistsSql,
+  followExistsSql,
+  followRequired,
+  getRelationship,
+  lockRelationshipShared,
+  resolveSupplierOrgId,
+  restaurantNotAvailable,
+} from '../../lib/relationship.js'
+import { chatAttachmentPath } from './attachments.js'
 import { assertCleanUploadOwnership } from '../../services/storage/upload-security.service.js'
 import {
   getOrCreateConversation,
@@ -65,7 +78,19 @@ router.get('/conversations', async (req, res) => {
           COALESCE(cp.is_pinned, false) AS is_pinned,
           COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(r.name, s.name) as participant_name,
-          lm.content as last_message_preview
+          lm.content as last_message_preview,
+          (${followExistsSql('c.restaurant_id', 's')} AND NOT ${blockedExistsSql('c.restaurant_id', 's')}) AS can_send_general,
+          ${blockedExistsSql('c.restaurant_id', 's')} AS is_closed_by_block,
+          CASE WHEN ${blockedExistsSql('c.restaurant_id', 's')} THEN ARRAY[]::uuid[]
+            ELSE ARRAY(
+              SELECT o.id FROM customer_order o
+              WHERE o.restaurant_id = c.restaurant_id
+                AND o.status::text = ANY($4::text[])
+                AND EXISTS (SELECT 1 FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = c.supplier_id)
+              ORDER BY o.created_at DESC
+              LIMIT 50
+            )
+          END AS open_order_ids
         FROM conversation c
         LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
         LEFT JOIN supplier s ON s.id = c.supplier_id
@@ -76,6 +101,7 @@ router.get('/conversations', async (req, res) => {
         WHERE c.supplier_id = $1
           AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
+          AND NOT ${blockedExistsSql('c.restaurant_id', 's')}
         ORDER BY COALESCE(cp.is_pinned, false) DESC, c.last_message_at DESC NULLS LAST, c.updated_at DESC
         LIMIT $2 OFFSET $3
       `
@@ -83,11 +109,13 @@ router.get('/conversations', async (req, res) => {
         SELECT COUNT(*)::int AS total
         FROM conversation c
         LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'SUPPLIER'
+        LEFT JOIN supplier s ON s.id = c.supplier_id
         WHERE c.supplier_id = $1
           AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
+          AND NOT ${blockedExistsSql('c.restaurant_id', 's')}
       `
-      queryParams = [tenant.tenantId, limit, offset]
+      queryParams = [tenant.tenantId, limit, offset, [...OPEN_ORDER_STATUSES]]
     } else if (tenant?.tenantType === 'RESTAURANT') {
       listQueryText = `
         SELECT 
@@ -100,7 +128,19 @@ router.get('/conversations', async (req, res) => {
           COALESCE(cp.is_pinned, false) AS is_pinned,
           COALESCE(cp.is_archived, false) AS is_archived,
           COALESCE(s.name, r.name) as participant_name,
-          lm.content as last_message_preview
+          lm.content as last_message_preview,
+          (${followExistsSql('c.restaurant_id', 's')} AND NOT ${blockedExistsSql('c.restaurant_id', 's')}) AS can_send_general,
+          ${blockedExistsSql('c.restaurant_id', 's')} AS is_closed_by_block,
+          CASE WHEN ${blockedExistsSql('c.restaurant_id', 's')} THEN ARRAY[]::uuid[]
+            ELSE ARRAY(
+              SELECT o.id FROM customer_order o
+              WHERE o.restaurant_id = c.restaurant_id
+                AND o.status::text = ANY($4::text[])
+                AND EXISTS (SELECT 1 FROM order_item oi WHERE oi.order_id = o.id AND oi.supplier_id = c.supplier_id)
+              ORDER BY o.created_at DESC
+              LIMIT 50
+            )
+          END AS open_order_ids
         FROM conversation c
         LEFT JOIN conversation_participant cp ON cp.conversation_id = c.id AND cp.participant_type = 'RESTAURANT'
         LEFT JOIN supplier s ON s.id = c.supplier_id
@@ -122,7 +162,7 @@ router.get('/conversations', async (req, res) => {
           AND COALESCE(c.is_admin_conversation, false) = false
           AND (cp.id IS NULL OR cp.is_archived = false)
       `
-      queryParams = [tenant.tenantId, limit, offset]
+      queryParams = [tenant.tenantId, limit, offset, [...OPEN_ORDER_STATUSES]]
     } else {
       return res.json({
         ok: true,
@@ -286,20 +326,19 @@ router.post(
           })
         }
 
+        // Unknown, blocked and never-followed restaurants get the same answer (no enumeration).
         const { rows: restaurants } = await query('SELECT id FROM restaurant WHERE id = $1', [
           restaurantId,
         ])
-
-        if (restaurants.length === 0) {
-          return res.status(404).json({
-            ok: false,
-            data: null,
-            error: {
-              name: 'NOT_FOUND',
-              message: 'Restaurant not found',
-            },
-            requestId: req.requestId,
-          })
+        if (restaurants.length === 0) return restaurantNotAvailable(res, req)
+        const rel = await getRelationship(restaurantId, supplierId)
+        if (rel.blocked) return restaurantNotAvailable(res, req)
+        if (!rel.following) {
+          const { rows: existing } = await query(
+            'SELECT id FROM conversation WHERE supplier_id = $1 AND restaurant_id = $2',
+            [supplierId, restaurantId]
+          )
+          if (!existing.length) return restaurantNotAvailable(res, req)
         }
 
         const conversation = await getOrCreateConversation(supplierId, restaurantId)
@@ -328,7 +367,7 @@ router.post(
           })
         }
 
-        const { rows: suppliers } = await query('SELECT id FROM supplier WHERE id = $1', [
+        const { rows: suppliers } = await query('SELECT id, name FROM supplier WHERE id = $1', [
           supplierId,
         ])
 
@@ -342,6 +381,16 @@ router.post(
             },
             requestId: req.requestId,
           })
+        }
+
+        // Starting a chat needs a follow; an existing conversation stays readable.
+        const rel = await getRelationship(restaurantId, supplierId)
+        if (rel.blocked || !rel.following) {
+          const { rows: existing } = await query(
+            'SELECT id FROM conversation WHERE supplier_id = $1 AND restaurant_id = $2',
+            [supplierId, restaurantId]
+          )
+          if (!existing.length) return followRequired(res, req, [suppliers[0]])
         }
 
         const conversation = await getOrCreateConversation(supplierId, restaurantId)
@@ -451,7 +500,6 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       const { rows: attRows } = await query(
         `
         SELECT id, message_id,
-               file_url AS "fileUrl",
                file_type AS "fileType",
                file_name AS "fileName",
                file_size AS "fileSize",
@@ -461,7 +509,8 @@ router.get('/conversations/:conversationId/messages', requireAuth, async (req, r
       `,
         [messageIds]
       )
-      attachments = attRows
+      // Stored object URLs are never returned; the attachment endpoint re-checks access.
+      attachments = attRows.map((att) => ({ ...att, fileUrl: chatAttachmentPath(att.id) }))
     }
 
     // Group attachments by message_id
@@ -510,6 +559,46 @@ router.post(
   requirePermission('CHAT_SEND'),
   async (req, res) => {
     try {
+      const messageData = sendMessageSchema.parse(req.body)
+
+      const { conversationId } = req.params
+
+      // Verify conversation and access
+      const { rows: conversations } = await query(
+        `
+      SELECT * FROM conversation WHERE id = $1
+    `,
+        [conversationId]
+      )
+
+      if (conversations.length === 0) {
+        throw new NotFoundError('Conversation not found')
+      }
+
+      const conversation = conversations[0]
+
+      if (!(await userCanAccessConversation(req, conversation))) {
+        return res.status(403).json({
+          ok: false,
+          data: null,
+          error: {
+            name: 'FORBIDDEN',
+            message: 'Access denied',
+          },
+          requestId: req.requestId,
+        })
+      }
+
+      // Relationship pre-check before a chat slot is reserved; re-checked under lock below.
+      if (req.userData.role !== 'ADMIN' && !conversation.is_admin_conversation) {
+        const access = await canSendMessage({
+          conversation,
+          orderId: messageData.orderId || null,
+          actorRole: req.userData.role,
+        })
+        if (!access.allowed) throw new ChatReadOnlyError(access.openOrderIds)
+      }
+
       // Check daily chat limit before sending message
       const tenant = await getRequestTenant(req)
       const tenantId = tenant?.tenantId
@@ -548,9 +637,6 @@ router.post(
         }
       }
 
-      const { conversationId } = req.params
-      const messageData = sendMessageSchema.parse(req.body)
-
       if (messageData.attachments?.length) {
         for (const attachment of messageData.attachments) {
           const fileKey = assertChatAttachmentUrl(attachment.fileUrl, req.userData.id)
@@ -560,32 +646,6 @@ router.post(
             tenantType: tenantId ? tenantType : null,
           })
         }
-      }
-
-      // Verify conversation and access
-      const { rows: conversations } = await query(
-        `
-      SELECT * FROM conversation WHERE id = $1
-    `,
-        [conversationId]
-      )
-
-      if (conversations.length === 0) {
-        throw new NotFoundError('Conversation not found')
-      }
-
-      const conversation = conversations[0]
-
-      if (!(await userCanAccessConversation(req, conversation))) {
-        return res.status(403).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'FORBIDDEN',
-            message: 'Access denied',
-          },
-          requestId: req.requestId,
-        })
       }
 
       const senderType = req.userData.role === 'ADMIN' ? 'ADMIN' : req.userData.role
@@ -637,6 +697,22 @@ router.post(
       }
 
       const message = await withTransaction(async (client) => {
+        // Shared relationship lock + re-check in the same transaction as the insert, so an
+        // unfollow or block that commits first is seen (spec §11.2).
+        if (!conversation.is_admin_conversation) {
+          const orgId = await resolveSupplierOrgId(conversation.supplier_id, client)
+          await lockRelationshipShared(client, conversation.restaurant_id, orgId)
+          const access = await canSendMessage(
+            {
+              conversation,
+              orderId: messageData.orderId || null,
+              actorRole: req.userData.role,
+            },
+            client
+          )
+          if (!access.allowed) throw new ChatReadOnlyError(access.openOrderIds)
+        }
+
         // Create message
         const { rows: messages } = await client.query(
           `
@@ -703,7 +779,7 @@ router.post(
             json_agg(
               json_build_object(
                 'id', ma.id,
-                'fileUrl', ma.file_url,
+                'fileUrl', '/api/chat/attachments/' || ma.id::text,
                 'fileType', ma.file_type,
                 'fileName', ma.file_name,
                 'fileSize', ma.file_size
@@ -780,6 +856,15 @@ router.post(
             name: error.name || 'VALIDATION_ERROR',
             message: error.message || 'Invalid attachment',
           },
+          requestId: req.requestId,
+        })
+      }
+
+      if (error instanceof RelationshipError) {
+        return res.status(error.statusCode).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
           requestId: req.requestId,
         })
       }

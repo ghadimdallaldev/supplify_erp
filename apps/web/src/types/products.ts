@@ -17,7 +17,10 @@ export interface Product {
   supplier_name?: string
   supplier_slug?: string
   supplier_email?: string
+  /** Followers only; non-followers get `in_stock` instead (spec §10 Q2). */
   available_qty?: number
+  /** Every restaurant that can see the catalog gets this flag. */
+  in_stock?: boolean
   current_price?: number
   currency?: string
   is_favorited?: boolean
@@ -36,6 +39,10 @@ export interface Product {
   order_multiple?: number
   /** Supplier minimum order amount (catalog join) */
   supplier_minimum_order_amount?: number | null
+  /** Restaurant follows this product's supplier organisation (marketplace visibility). */
+  is_followed?: boolean
+  /** Ordering needs a follow; false means the UI shows "Follow & add". */
+  can_order?: boolean
 }
 
 export interface CreateProductRequest {

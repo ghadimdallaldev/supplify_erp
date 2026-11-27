@@ -31,18 +31,19 @@ export type SponsorshipUsage = {
   unlimited: boolean
 }
 
+/** Supplier-visible prospect status (spec §6.2 item 1): no match information, ever. */
+export type SupplierProspectStatus = 'imported' | 'invited' | 'following'
+
 export type SupplierProspect = {
   id: string
-  restaurant_name: string
+  /** The name from the supplier's own import file. */
+  name: string
   contact_person?: string | null
   phone?: string | null
   email?: string | null
   area_region?: string | null
-  match_status: string
-  matched_restaurant_id?: string | null
-  matched_restaurant_name?: string | null
-  lifecycle_status: string
-  created_at: string
+  status: SupplierProspectStatus
+  invited_at?: string | null
 }
 
 export type RestaurantConnectionRequest = {
@@ -80,7 +81,8 @@ export type SupplierSponsorship = {
 
 export type SupplierGrowthMetrics = {
   importedCustomers: number
-  existingSupplifyCustomers: number
+  /** Imported prospects whose restaurant now follows the supplier. */
+  followingCustomers: number
   invitedCustomers: number
   sponsoredCustomers: number
   registeredCustomers: number
@@ -157,13 +159,6 @@ export const growthApi = api.injectEndpoints({
         url: `/api/supplier/growth/customers/prospects/${prospectId}/invite`,
         method: 'POST',
         body: { channel },
-      }),
-      invalidatesTags: ['SupplierGrowth'],
-    }),
-    connectProspect: builder.mutation<unknown, { prospectId: string }>({
-      query: ({ prospectId }) => ({
-        url: `/api/supplier/growth/customers/prospects/${prospectId}/connect`,
-        method: 'POST',
       }),
       invalidatesTags: ['SupplierGrowth'],
     }),
@@ -324,7 +319,6 @@ export const {
   usePreviewCustomerImportMutation,
   useExecuteCustomerImportMutation,
   useInviteProspectMutation,
-  useConnectProspectMutation,
   useSponsorProspectMutation,
   useCreateSponsorshipOfferMutation,
   useGetSupplierSponsorshipsQuery,

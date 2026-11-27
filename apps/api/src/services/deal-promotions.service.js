@@ -1,3 +1,4 @@
+import { catalogVisibleSql, followExistsSql } from '../lib/relationship.js'
 import { query, withTransaction } from '../lib/db.js'
 import { buildBoostStatus } from './deal-boost.helpers.js'
 import {
@@ -186,10 +187,7 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
       p.*,
       s.name AS supplier_name,
       s.slug AS supplier_slug,
-      EXISTS (
-        SELECT 1 FROM supplier_follow sf
-        WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
-      ) AS is_followed,
+      ${followExistsSql('$1::uuid', 's')} AS is_followed,
       dp.id AS deal_promotion_id,
       dp.budget AS promotion_budget,
       dp.starts_at AS promotion_starts_at,
@@ -214,19 +212,8 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
       AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-      AND (
-        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-        OR EXISTS (
-          SELECT 1 FROM promotion_restaurant_targets prt
-          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
-        )
-      )
-      AND (
-        EXISTS (SELECT 1 FROM supplier_follow sf WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1)
-        OR EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1)
-        OR dp.id IS NOT NULL
-      )
-      AND NOT EXISTS (SELECT 1 FROM supplier_blocklist sb WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1)
+      -- Visible wherever the catalog is (spec §11.3.1); boosts only rank and filter audience.
+      AND ${catalogVisibleSql('$1::uuid', 's')}
   `
 
   if (previewSupplierId) {
@@ -290,10 +277,7 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
       p.*,
       s.name AS supplier_name,
       s.slug AS supplier_slug,
-      EXISTS (
-        SELECT 1 FROM supplier_follow sf
-        WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1
-      ) AS is_followed,
+      ${followExistsSql('$1::uuid', 's')} AS is_followed,
       dp.id AS deal_promotion_id,
       dp.budget AS promotion_budget,
       dp.starts_at AS promotion_starts_at,
@@ -319,19 +303,8 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
       AND (p.ends_at IS NULL OR p.ends_at > NOW())
       AND (p.stock_quantity IS NULL OR p.usage_count < p.stock_quantity)
       AND (p.usage_limit IS NULL OR p.usage_count < p.usage_limit)
-      AND (
-        NOT EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id)
-        OR EXISTS (
-          SELECT 1 FROM promotion_restaurant_targets prt
-          WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1
-        )
-      )
-      AND (
-        EXISTS (SELECT 1 FROM supplier_follow sf WHERE sf.supplier_id = p.supplier_id AND sf.restaurant_id = $1)
-        OR EXISTS (SELECT 1 FROM promotion_restaurant_targets prt WHERE prt.promotion_id = p.id AND prt.restaurant_id = $1)
-        OR dp.id IS NOT NULL
-      )
-      AND NOT EXISTS (SELECT 1 FROM supplier_blocklist sb WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $1)
+      -- Visible wherever the catalog is (spec §11.3.1); boosts only rank and filter audience.
+      AND ${catalogVisibleSql('$1::uuid', 's')}
     `,
     [restaurantId, dealId]
   )
@@ -875,12 +848,7 @@ export async function applyPromotionByIdToOrder({
         (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
          FROM promotion_targets pt WHERE pt.promotion_id = p.id),
         '{}'
-      ) AS target_category_ids,
-      COALESCE(
-        (SELECT array_agg(prt.restaurant_id) FROM promotion_restaurant_targets prt
-         WHERE prt.promotion_id = p.id),
-        '{}'
-      ) AS restaurant_ids
+      ) AS target_category_ids
     FROM promotions p
     WHERE p.id = $1 AND p.supplier_id = $2
     `,
@@ -955,12 +923,7 @@ export async function validateCouponForOrder({
         (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
          FROM promotion_targets pt WHERE pt.promotion_id = p.id),
         '{}'
-      ) AS target_category_ids,
-      COALESCE(
-        (SELECT array_agg(prt.restaurant_id) FROM promotion_restaurant_targets prt
-         WHERE prt.promotion_id = p.id),
-        '{}'
-      ) AS restaurant_ids
+      ) AS target_category_ids
     FROM promotions p
     WHERE p.supplier_id = $1
       AND lower(p.coupon_code) = lower($2)

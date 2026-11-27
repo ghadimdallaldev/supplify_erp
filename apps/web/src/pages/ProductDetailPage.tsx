@@ -11,6 +11,11 @@ import { DetailPageSkeleton } from '../components/ui/detail-page-skeleton'
 import { Package, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCartActions } from '../hooks/useCartActions'
+import {
+  FollowAndAddButton,
+  needsFollowToOrder,
+} from '../components/marketplace/FollowAndAddButton'
+import type { Product } from '../types'
 import { toast } from 'sonner'
 import { ContractPriceDisplay } from '../components/ContractPriceDisplay'
 import { useImpersonation } from '../hooks/useImpersonation'
@@ -21,6 +26,7 @@ import {
   normalizeCartQuantity,
 } from '../lib/orderQuantityRules'
 import { Input } from '../components/ui/input'
+import { restaurantStock } from '../lib/restaurantStock'
 import { Label } from '../components/ui/label'
 
 export function ProductDetailPage() {
@@ -48,10 +54,13 @@ export function ProductDetailPage() {
       )
   }, [product, requestedQty])
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (target: Product) => {
     if (data?.product) {
-      const normalizedQty = normalizeCartQuantity(Number(quantity), data.product)
-      if (!normalizedQty || normalizedQty > Number(data.product.available_qty ?? 0)) {
+      const normalizedQty = normalizeCartQuantity(Number(quantity), target)
+      // Just followed: the page still holds the non-follower payload (no stock figure), so
+      // checkout validates stock instead of this page.
+      const justFollowed = needsFollowToOrder(data.product)
+      if (!normalizedQty || (!justFollowed && normalizedQty > Number(target.available_qty ?? 0))) {
         toast.error(
           t('detail.quantityUnavailable', {
             defaultValue: 'Choose a quantity within the available stock.',
@@ -59,11 +68,7 @@ export function ProductDetailPage() {
         )
         return
       }
-      addItem({
-        productId: data.product.id,
-        product: data.product,
-        quantity: normalizedQty,
-      })
+      if (!addItem({ productId: target.id, product: target, quantity: normalizedQty }).ok) return
       toast.success(t('toast.addedToCart'))
     }
   }
@@ -162,7 +167,11 @@ export function ProductDetailPage() {
                 <div>
                   <p className="font-medium text-[var(--text-muted)]">{t('detail.stock')}</p>
                   <p>
-                    {product.available_qty || 0} {product.unit || t('detail.units')}
+                    {(() => {
+                      const { qty, inStock } = restaurantStock(product)
+                      if (qty !== null) return `${qty} ${product.unit || t('detail.units')}`
+                      return inStock ? t('detail.inStock') : t('detail.outOfStock')
+                    })()}
                   </p>
                 </div>
               </div>
@@ -193,24 +202,20 @@ export function ProductDetailPage() {
               type="number"
               min={getProductMoq(product)}
               step={getProductOrderMultiple(product)}
-              max={Number(product.available_qty ?? 0)}
+              max={needsFollowToOrder(product) ? undefined : Number(product.available_qty ?? 0)}
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
             />
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={handleAddToCart}
-              disabled={
-                !product.available_qty ||
-                product.available_qty <= 0 ||
-                Number(quantity) <= 0 ||
-                !Number.isFinite(Number(quantity))
-              }
+            <FollowAndAddButton
+              product={product}
+              onAdd={handleAddToCart}
+              label={t('detail.addToCart')}
+              outOfStock={restaurantStock(product).inStock !== true}
+              disabled={Number(quantity) <= 0 || !Number.isFinite(Number(quantity))}
               className="flex-1"
-            >
-              {t('detail.addToCart')}
-            </Button>
+            />
             <Button variant="outline" asChild>
               <Link to="/app/cart">{t('detail.viewCart')}</Link>
             </Button>

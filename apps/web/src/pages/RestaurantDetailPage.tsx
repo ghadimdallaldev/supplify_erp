@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGetOrdersQuery, useGetRestaurantQuery } from '../services/api'
+import { isRelationshipError } from '../lib/relationshipErrors'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
@@ -37,9 +38,15 @@ export function RestaurantDetailPage() {
   const supplierId =
     user?.workspace?.tenantType === 'SUPPLIER' ? user.workspace.tenantId : undefined
 
-  const { data: restaurantPayload, isLoading: restaurantLoading } = useGetRestaurantQuery(id!, {
+  const {
+    data: restaurantPayload,
+    isLoading: restaurantLoading,
+    error: restaurantError,
+  } = useGetRestaurantQuery(id!, {
     skip: !id,
   })
+  // A restaurant that does not follow this supplier answers the same 404 as an unknown one.
+  const notAvailable = isRelationshipError(restaurantError, 'RESTAURANT_NOT_AVAILABLE')
   const restaurant =
     restaurantPayload && typeof restaurantPayload === 'object' && 'restaurant' in restaurantPayload
       ? (restaurantPayload as { restaurant: any }).restaurant
@@ -148,10 +155,21 @@ export function RestaurantDetailPage() {
     )
   }
 
-  if (!restaurant) {
+  if (!restaurant || notAvailable) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--text-muted)]">{t('detail.notFound')}</p>
+      <div className="text-center py-12" data-testid="restaurant-not-available">
+        {notAvailable ? (
+          <>
+            <p className="font-medium text-[var(--text)]">
+              {t('common:marketplace.restaurantNotAvailable')}
+            </p>
+            <p className="mt-1 text-[var(--text-muted)]">
+              {t('common:marketplace.restaurantNotAvailableBody')}
+            </p>
+          </>
+        ) : (
+          <p className="text-[var(--text-muted)]">{t('detail.notFound')}</p>
+        )}
         <Button onClick={() => navigate('/app/restaurants')} className="mt-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t('detail.backToList')}

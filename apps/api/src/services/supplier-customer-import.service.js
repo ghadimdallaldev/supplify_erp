@@ -253,8 +253,9 @@ export async function executeCustomerImport(supplierId, csvText, { userId } = {}
     [batchId, summary.created, summary.failed]
   )
 
-  const { matchProspectsForSupplier } = await import('./supplier-customer-matching.service.js')
-  await matchProspectsForSupplier(supplierId, { batchId })
+  // Matching runs after the response so import timing never depends on matches (§11.4).
+  const { enqueueProspectMatch } = await import('../jobs/prospect-invite.job.js')
+  enqueueProspectMatch({ supplierId, batchId })
 
   return { ...summary, rowErrors }
 }

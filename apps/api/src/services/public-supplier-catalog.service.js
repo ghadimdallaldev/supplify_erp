@@ -98,7 +98,7 @@ export async function resolveSupplierScope(idOrSlug, dbQuery = query) {
     `
       SELECT s.id
       FROM supplier s
-      WHERE COALESCE(s.organization_id, s.id) = COALESCE($1, s.id)
+      WHERE s.organization_id = $1
         AND s.is_branch_active = TRUE
         ${catalogFilter}
       ORDER BY s.is_main_branch DESC, s.created_at ASC

@@ -169,19 +169,7 @@ async function completeSupplierRegistration(
 ) {
   lap?.('createTenantAndOrg')
 
-  const { rows: supplierRows } = await client.query(
-    `INSERT INTO supplier (name, slug, contact_email, phone, address_json)
-     VALUES ($1, $2, $3, $4, '{}'::jsonb)
-     RETURNING *`,
-    [name, slug, normalizedEmail, phone || null]
-  )
-  const tenant = supplierRows[0]
-
-  await client.query(`INSERT INTO catalog (supplier_id, name, is_active) VALUES ($1, $2, true)`, [
-    tenant.id,
-    `${name} Catalog`,
-  ])
-
+  // Organisation first: supplier.organization_id is NOT NULL (0238).
   const orgSlug = `${slug}-org`
   const { rows: orgRows } = await client.query(
     `INSERT INTO supplier_organizations (name, slug)
@@ -191,12 +179,18 @@ async function completeSupplierRegistration(
   )
   const organization = orgRows[0]
 
-  await client.query(
-    `UPDATE supplier
-     SET organization_id = $1, is_main_branch = true, updated_at = now()
-     WHERE id = $2`,
-    [organization.id, tenant.id]
+  const { rows: supplierRows } = await client.query(
+    `INSERT INTO supplier (name, slug, contact_email, phone, address_json, organization_id, is_main_branch)
+     VALUES ($1, $2, $3, $4, '{}'::jsonb, $5, true)
+     RETURNING *`,
+    [name, slug, normalizedEmail, phone || null, organization.id]
   )
+  const tenant = supplierRows[0]
+
+  await client.query(`INSERT INTO catalog (supplier_id, name, is_active) VALUES ($1, $2, true)`, [
+    tenant.id,
+    `${name} Catalog`,
+  ])
 
   await ensureOrgSystemRoles(organization.id, client)
   lap?.('ensureOrgRoles')

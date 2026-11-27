@@ -122,6 +122,22 @@ const cartSlice = createSlice({
         persist(state, ownerEmail)
       }
     },
+    /** Follow / unfollow of a supplier changes whether its cart lines can be ordered. */
+    setSupplierFollowState: (
+      state,
+      action: PayloadAction<{ supplierId: string; isFollowed: boolean; ownerEmail?: string | null }>
+    ) => {
+      const { supplierId, isFollowed, ownerEmail } = action.payload
+      let changed = false
+      for (const item of state.items) {
+        if (item.product.supplier_id !== supplierId) continue
+        item.product = { ...item.product, is_followed: isFollowed, can_order: isFollowed }
+        changed = true
+      }
+      if (!changed) return
+      recomputeGroups(state)
+      persist(state, ownerEmail)
+    },
     updateItemResolvedPrice: (
       state,
       action: PayloadAction<{
@@ -190,5 +206,6 @@ export const {
   loadDraft,
   deleteDraft,
   rehydrateCart,
+  setSupplierFollowState,
 } = cartSlice.actions
 export default cartSlice.reducer

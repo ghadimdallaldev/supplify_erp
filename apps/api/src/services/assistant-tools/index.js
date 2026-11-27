@@ -259,15 +259,20 @@ const TOOLS = {
     available: async (ctx) => ctx.tenantType === 'RESTAURANT' && can(ctx, P.CATALOG_VIEW),
     run: async (ctx) => {
       const { rows } = await query(
-        `SELECT DISTINCT ON (COALESCE(s.organization_id, s.id))
-          COALESCE(s.organization_id, s.id) AS "supplierId",
+        // Follows are per organisation (supplier_org_id); org-less suppliers use their own id.
+        `SELECT
+          sf.supplier_org_id AS "supplierId",
           COALESCE(so.name, s.name) AS "supplierName",
           sf.created_at AS "followedAt"
          FROM supplier_follow sf
-         JOIN supplier s ON s.id = sf.supplier_id
-         LEFT JOIN supplier_organizations so ON so.id = s.organization_id
+         LEFT JOIN supplier_organizations so ON so.id = sf.supplier_org_id
+         LEFT JOIN supplier s ON s.id = sf.supplier_org_id
          WHERE sf.restaurant_id = $1
-         ORDER BY COALESCE(s.organization_id, s.id), sf.created_at DESC`,
+           AND NOT EXISTS (
+             SELECT 1 FROM supplier_blocklist sb
+             WHERE sb.restaurant_id = sf.restaurant_id AND sb.supplier_org_id = sf.supplier_org_id
+           )
+         ORDER BY sf.created_at DESC`,
         [ctx.tenantId]
       )
       return { count: rows.length, suppliers: cap(rows) }

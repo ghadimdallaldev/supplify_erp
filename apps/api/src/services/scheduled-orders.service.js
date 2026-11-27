@@ -7,7 +7,12 @@ import {
   incrementUsage,
   isFeatureEnabled,
 } from '../lib/subscription.js'
-import { notifyScheduledOrderEvent, notifyOrderStatusChange } from './notification.service.js'
+import {
+  notifyScheduledOrderEvent,
+  notifyOrderStatusChange,
+  notifyScheduledOrderSkippedUnfollowed,
+} from './notification.service.js'
+import { lockAndPartitionOrderSuppliers } from './order-relationship-guard.service.js'
 import { applySmartQuantitiesToItems } from './quick-list-ai.service.js'
 import { resolveProductPricesBatch } from './resolve-product-price.service.js'
 import { reserveStockForPlacedOrder } from './supplier-order-stock.service.js'
@@ -145,6 +150,13 @@ export async function executeScheduledOrders() {
               )
               const orders = result?.orders
               aiAdjustments = result?.aiAdjustments ?? null
+              if (result?.skippedUnfollowed?.length) {
+                postCommitNotifications.push({
+                  quickList,
+                  notifyType: 'SKIPPED_UNFOLLOWED',
+                  skipped: result.skippedUnfollowed,
+                })
+              }
               outcome = 'executed'
               if (orders?.length) {
                 postCommitNotifications.push({
@@ -152,7 +164,9 @@ export async function executeScheduledOrders() {
                   notifyType: 'EXECUTED',
                   createdOrders: orders,
                 })
-              } else {
+              } else if (!result?.skippedUnfollowed?.length) {
+                // Nothing placed only because every supplier was skipped: the skip notice
+                // above is the whole story, so no "order created" message.
                 postCommitNotifications.push({ quickList, notifyType: 'EXECUTED' })
               }
             } else {
@@ -201,8 +215,12 @@ export async function executeScheduledOrders() {
       skipped += batchResult.skipped
 
       for (const entry of batchResult.postCommitNotifications ?? []) {
-        const { quickList, notifyType, createdOrders } = entry
+        const { quickList, notifyType, createdOrders, skipped } = entry
         try {
+          if (notifyType === 'SKIPPED_UNFOLLOWED') {
+            await notifyScheduledOrderSkippedUnfollowed(quickList, skipped)
+            continue
+          }
           await notifyScheduledOrderEvent(quickList, notifyType)
           if (createdOrders?.length) {
             for (const order of createdOrders) {
@@ -290,9 +308,31 @@ export async function createOrderFromQuickList(quickList, client, executionDate 
     supplierGroups.get(item.supplier_id).push(item)
   }
 
+  // Follow required (spec §11.4): lock each supplier org shared and re-check in this
+  // transaction. Unfollowed or blocked suppliers are skipped and the restaurant is told;
+  // the other suppliers in the same run still get their orders.
+  const { allowed, missing } = await lockAndPartitionOrderSuppliers(
+    client || { query: q },
+    restaurantId,
+    [...supplierGroups.keys()]
+  )
+  const skippedUnfollowed = missing.map((m) => ({
+    quickListId: quickList.id,
+    supplierId: m.id,
+    supplierName: m.name ?? null,
+  }))
+  if (skippedUnfollowed.length) {
+    logger.info('Scheduled order skipped unfollowed suppliers', {
+      quickListId: quickList.id,
+      restaurantId,
+      supplierIds: skippedUnfollowed.map((m) => m.supplierId),
+    })
+  }
+
   const createdOrders = []
 
   for (const [supplierId, supplierItems] of supplierGroups) {
+    if (!allowed.has(supplierId)) continue
     const productIds = supplierItems.map((item) => item.product_id)
 
     const { rows: products } = await q(
@@ -429,7 +469,7 @@ export async function createOrderFromQuickList(quickList, client, executionDate 
     )
   }
 
-  return { orders: createdOrders, aiAdjustments }
+  return { orders: createdOrders, aiAdjustments, skippedUnfollowed }
 }
 
 /**

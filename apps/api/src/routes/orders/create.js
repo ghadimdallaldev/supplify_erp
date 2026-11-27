@@ -86,6 +86,13 @@ import {
   scheduleOrdersCalendarCacheInvalidation,
 } from '../../lib/orders-calendar-cache.js'
 import { invalidateDashboardSummaryCache } from '../../services/dashboard-summary.service.js'
+import {
+  RelationshipError,
+  canSeeRestaurant,
+  lockAndAssertRestaurantVisible,
+  restaurantNotAvailable,
+} from '../../lib/relationship.js'
+import { lockAndAssertOrderRelationships } from '../../services/order-relationship-guard.service.js'
 
 const router = express.Router()
 
@@ -324,66 +331,9 @@ router.post(
       }
       orderCreateTimings.itemGroupingMs = elapsedMsSince(phaseStart)
 
-      // Enforce supplier blocklist (parity with supplier manual-order eligibility)
+      // Follow required (spec §11.2): checked inside the order transaction below, under the
+      // shared relationship locks, so an unfollow/block cannot race the order.
       const cartSupplierIds = [...supplierGroups.keys()]
-      if (cartSupplierIds.length > 0) {
-        const { rows: blockedSuppliers } = await query(
-          `
-          SELECT sb.supplier_id, s.name AS supplier_name
-          FROM supplier_blocklist sb
-          JOIN supplier s ON s.id = sb.supplier_id
-          WHERE sb.restaurant_id = $1
-            AND COALESCE(s.organization_id, s.id) IN (
-              SELECT COALESCE(s2.organization_id, s2.id)
-              FROM supplier s2
-              WHERE s2.id = ANY($2::uuid[])
-            )
-          `,
-          [restaurantId, cartSupplierIds]
-        )
-        if (blockedSuppliers.length > 0) {
-          const names = blockedSuppliers.map((r) => r.supplier_name || r.supplier_id).join(', ')
-          throw new ValidationError(
-            `Cannot order from blocked supplier${blockedSuppliers.length > 1 ? 's' : ''}: ${names}`
-          )
-        }
-
-        // Require follow or prior order (parity with product detail / supplier manual order)
-        const { rows: linkedSuppliers } = await query(
-          `
-          SELECT s.id AS supplier_id, s.name AS supplier_name
-          FROM supplier s
-          WHERE s.id = ANY($2::uuid[])
-            AND (
-              EXISTS (
-                SELECT 1 FROM supplier_follow sf
-                JOIN supplier followed_supplier ON followed_supplier.id = sf.supplier_id
-                WHERE COALESCE(followed_supplier.organization_id, followed_supplier.id) = COALESCE(s.organization_id, s.id)
-                  AND sf.restaurant_id = $1
-              )
-              OR EXISTS (
-                SELECT 1
-                FROM customer_order o
-                JOIN order_item oi ON oi.order_id = o.id
-                JOIN supplier historical_supplier ON historical_supplier.id = oi.supplier_id
-                WHERE o.restaurant_id = $1
-                  AND COALESCE(historical_supplier.organization_id, historical_supplier.id) = COALESCE(s.organization_id, s.id)
-              )
-            )
-          `,
-          [restaurantId, cartSupplierIds]
-        )
-        const linkedIds = new Set(linkedSuppliers.map((r) => r.supplier_id))
-        const unlinked = cartSupplierIds.filter((id) => !linkedIds.has(id))
-        if (unlinked.length > 0) {
-          const { rows: names } = await query(
-            `SELECT name FROM supplier WHERE id = ANY($1::uuid[])`,
-            [unlinked]
-          )
-          const label = names.map((r) => r.name).join(', ') || unlinked.join(', ')
-          throw new ValidationError(`Follow the supplier before ordering: ${label}`)
-        }
-      }
 
       // Resolve daily limit + supplier preflight (reuse req.subscription when available)
       phaseStart = performance.now()
@@ -538,6 +488,7 @@ router.post(
             idempotencyReplay = idempotencyClaim.replay
             return []
           }
+          await lockAndAssertOrderRelationships(client, restaurantId, cartSupplierIds)
           const txResult = await createRestaurantOrdersInTransaction({
             client,
             restaurantId,
@@ -815,6 +766,15 @@ router.post(
         })
       }
 
+      if (error instanceof RelationshipError) {
+        return res.status(error.statusCode).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
+          requestId: req.requestId,
+        })
+      }
+
       if (error instanceof IdempotencyConflictError) {
         return res.status(error.status || 409).json({
           ok: false,
@@ -876,6 +836,13 @@ router.post(
           requestId: req.requestId,
         })
       }
+      // Relationship first, before any restaurant, branch or idempotency lookup: unknown,
+      // never-followed and blocked restaurants (and foreign branch ids) all get the same 404
+      // (spec §6.2 item 7). Re-checked under the shared lock inside the transaction below.
+      if (!(await canSeeRestaurant(orderData.restaurant_id, supplierId))) {
+        return restaurantNotAvailable(res, req)
+      }
+
       const requestedBranchId = orderData.branchId || orderData.branch_id || null
       const idempotencyKey =
         req.get('Idempotency-Key') || orderData.idempotencyKey || orderData.idempotency_key || null
@@ -917,45 +884,6 @@ router.post(
         throw new ValidationError('Supplier record not found for user')
       }
 
-      // Verify restaurant is an eligible customer (follows supplier or has ordered before)
-      const { rows: eligibleRestaurants } = await query(
-        `
-        SELECT r.id
-        FROM restaurant r
-        WHERE r.id = $1
-          AND r.id NOT IN (
-            SELECT sb.restaurant_id FROM supplier_blocklist sb WHERE sb.supplier_id = $2
-          )
-          AND (
-            EXISTS (
-              SELECT 1
-              FROM supplier_follow sf
-              WHERE sf.supplier_id = $2 AND sf.restaurant_id = r.id
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM customer_order o
-              JOIN order_item oi ON oi.order_id = o.id
-              WHERE o.restaurant_id = r.id AND oi.supplier_id = $2
-            )
-          )
-      `,
-        [orderData.restaurant_id, supplierId]
-      )
-
-      if (eligibleRestaurants.length === 0) {
-        return res.status(400).json({
-          ok: false,
-          data: null,
-          error: {
-            name: 'VALIDATION_ERROR',
-            message:
-              'This restaurant cannot receive manual orders. They must follow your supplier profile or have placed an order with you before.',
-          },
-          requestId: req.requestId,
-        })
-      }
-
       const productIds = orderData.items.map((item) => item.productId)
       const clientLocks = orderData.quoteLocks ?? []
       const multiActive = await isFeatureEnabled(supplierId, 'SUPPLIER', 'multi_warehouse')
@@ -973,6 +901,7 @@ router.post(
           idempotencyReplay = idempotencyClaim.replay
           return null
         }
+        await lockAndAssertRestaurantVisible(client, orderData.restaurant_id, supplierId)
         const quoteRows = await lockCheckoutQuoteRows(client, {
           restaurantId: orderData.restaurant_id,
           productIds,
@@ -1248,6 +1177,15 @@ router.post(
             message: error.message,
             details: error.details,
           },
+          requestId: req.requestId,
+        })
+      }
+
+      if (error instanceof RelationshipError) {
+        return res.status(error.statusCode).json({
+          ok: false,
+          data: null,
+          error: { name: error.code, message: error.message, details: error.details },
           requestId: req.requestId,
         })
       }

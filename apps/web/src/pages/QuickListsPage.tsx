@@ -240,9 +240,10 @@ export function QuickListsPage() {
         return
       }
 
-      for (const cartItem of cartItems) {
-        addItem(cartItem)
-      }
+      // Lines of suppliers the restaurant no longer follows are refused here (or, without
+      // follow info, at checkout); the cart then offers "Follow & keep in cart" per supplier.
+      const refused = cartItems.filter((cartItem) => !addItem(cartItem).ok).length
+      if (refused > 0) toast.warning(t('common:marketplace.followToReorder'))
 
       toast.success(
         t('quickLists.toastAddedToCart', {

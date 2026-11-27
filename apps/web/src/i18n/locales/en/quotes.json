@@ -60,7 +60,10 @@
     "selectAllProducts": "Select all products",
     "selectAllSuppliers": "Select all suppliers",
     "visibleCount": "{{count}} shown",
-    "selectedCount": "{{count}} selected"
+    "selectedCount": "{{count}} selected",
+    "searchSuppliersPlaceholder": "Search suppliers…",
+    "loadMoreSuppliers": "Load more suppliers",
+    "loadMoreProducts": "Load more products"
   },
   "detail": {
     "notFoundTitle": "Quote request not found",

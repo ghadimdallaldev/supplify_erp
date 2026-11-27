@@ -12,6 +12,9 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { enrichProductsWithResolvedPricing } from '../services/resolve-product-price.service.js'
+import { blockedExistsSql, catalogVisibleSql, followExistsSql } from '../lib/relationship.js'
+import { applyRestaurantStockViewToRows } from '../lib/restaurant-catalog-view.js'
+import { overlayProductRowsWithAuthoritativeStock } from '../services/supplier-stock.service.js'
 import { toContainsPattern, toPrefixTsQuery } from '../lib/search-query.js'
 
 const router = express.Router()
@@ -97,14 +100,12 @@ async function searchProducts(q, limit, restaurantId) {
   const tsQuery = toPrefixTsQuery(q)
   if (!tsQuery) return []
   const params = [tsQuery, limit, toContainsPattern(q)]
+  // Restaurants: catalog visibility (not blocked AND (follows OR public catalog)), org-level.
   let blocklistClause = ''
+  let followedExpr = 'false'
   if (restaurantId) {
-    blocklistClause = `
-      AND NOT EXISTS (
-        SELECT 1 FROM supplier_blocklist sb
-        WHERE sb.supplier_id = p.supplier_id AND sb.restaurant_id = $4
-      )
-    `
+    blocklistClause = `AND ${catalogVisibleSql('$4::uuid', 's')}`
+    followedExpr = followExistsSql('$4::uuid', 's')
     params.push(restaurantId)
   }
 
@@ -114,6 +115,7 @@ async function searchProducts(q, limit, restaurantId) {
       ${SEARCH_PRODUCT_COLUMNS},
       s.name AS supplier_name,
       s.slug AS supplier_slug,
+      ${followedExpr} AS is_followed,
       ts_rank(p.search_vector, to_tsquery('simple', $1)) AS search_rank
     FROM product p
     JOIN supplier s ON s.id = p.supplier_id
@@ -129,21 +131,20 @@ async function searchProducts(q, limit, restaurantId) {
   )
 
   if (restaurantId && rows.length > 0) {
-    return enrichProductsWithResolvedPricing(rows, restaurantId)
+    const priced = await enrichProductsWithResolvedPricing(rows, restaurantId)
+    return applyRestaurantStockViewToRows(await overlayProductRowsWithAuthoritativeStock(priced))
   }
   return rows
 }
 
 async function searchSuppliers(q, limit, restaurantId) {
   const params = [`%${q.toLowerCase()}%`, limit]
+  // Blocked organisations are hidden; private-catalog suppliers still appear as a card.
   let blocklistClause = ''
+  let followedExpr = 'false'
   if (restaurantId) {
-    blocklistClause = `
-      AND NOT EXISTS (
-        SELECT 1 FROM supplier_blocklist sb
-        WHERE sb.supplier_id = s.id AND sb.restaurant_id = $3
-      )
-    `
+    blocklistClause = `AND NOT ${blockedExistsSql('$3::uuid', 's')}`
+    followedExpr = followExistsSql('$3::uuid', 's')
     params.push(restaurantId)
   }
 
@@ -151,6 +152,7 @@ async function searchSuppliers(q, limit, restaurantId) {
     `
     SELECT
       s.*,
+      ${followedExpr} AS is_followed,
       COALESCE(stats.product_count, 0) AS product_count
     FROM supplier s
     LEFT JOIN LATERAL (

@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { supplierSeesRestaurantSql } from '../lib/relationship.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { addCalendarDays } from '../lib/delivery-rollover-time.js'
 import { getZonedParts, zonedDayBounds } from '../lib/tenant-timezone.js'
@@ -430,23 +431,36 @@ export async function supplierRevenueTrend(supplierId, params) {
   return { data: rows, meta: reportMeta(params, rows.length) }
 }
 
+/**
+ * Top restaurants by revenue. Followers are named; every other restaurant (unfollowed or
+ * blocked) is aggregated into one "Other customers" row per currency (spec §6.2).
+ */
 export async function supplierTopRestaurants(supplierId, params) {
   const { rows } = await query(
     `
+    WITH lines AS (
+      SELECT
+        CASE WHEN ${supplierSeesRestaurantSql('co.restaurant_id', '$1')} THEN r.id END AS restaurant_id,
+        r.name AS live_name,
+        co.id AS order_id,
+        co.currency,
+        oi.line_total
+      FROM customer_order co
+      JOIN order_item oi ON oi.order_id = co.id
+      JOIN restaurant r ON r.id = co.restaurant_id
+      WHERE oi.supplier_id = $1
+        AND co.placed_at >= $2
+        AND co.placed_at <= $3
+        AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
+    )
     SELECT
-      r.id AS restaurant_id,
-      r.name AS restaurant_name,
-      co.currency,
-      COALESCE(SUM(oi.line_total), 0)::numeric AS revenue,
-      COUNT(DISTINCT co.id)::int AS order_count
-    FROM customer_order co
-    JOIN order_item oi ON oi.order_id = co.id
-    JOIN restaurant r ON r.id = co.restaurant_id
-    WHERE oi.supplier_id = $1
-      AND co.placed_at >= $2
-      AND co.placed_at <= $3
-      AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
-    GROUP BY r.id, r.name, co.currency
+      restaurant_id,
+      CASE WHEN restaurant_id IS NULL THEN 'Other customers' ELSE MAX(live_name) END AS restaurant_name,
+      currency,
+      COALESCE(SUM(line_total), 0)::numeric AS revenue,
+      COUNT(DISTINCT order_id)::int AS order_count
+    FROM lines
+    GROUP BY restaurant_id, currency
     ORDER BY revenue DESC
     LIMIT 20
     `,

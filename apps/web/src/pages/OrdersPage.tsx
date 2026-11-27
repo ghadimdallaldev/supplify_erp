@@ -4,13 +4,13 @@ import {
   useGetOrdersQuery,
   useUpdateOrderMutation,
   useCreateManualOrderMutation,
-  useGetRestaurantsQuery,
   useGetProductsQuery,
   useSendOrderReminderMutation,
   useGetDisputesQuery,
   useGetIncomingDisputesQuery,
   useGetEntitlementsQuery,
 } from '../services/api'
+import { FollowerRestaurantPicker } from '../components/marketplace/FollowerRestaurantPicker'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -169,7 +169,6 @@ export function OrdersPage() {
   const allDisputes =
     (isSupplier ? supplierDisputesData?.disputes : restaurantDisputesData?.disputes) ?? []
 
-  const { data: restaurantsData } = useGetRestaurantsQuery(undefined, { skip: !isSupplier })
   const { data: productsData } = useGetProductsQuery(
     { limit: 50, offset: productOffset, q: debouncedProductSearch || undefined },
     { skip: !isSupplier || !showManualOrderDialog }
@@ -346,8 +345,9 @@ export function OrdersPage() {
     debouncedSearch || status || hasAdvancedFilters || restaurantFilter
   )
 
+  // Name from the orders themselves: a past customer stays on its own orders (spec §6.2).
   const restaurantFilterName =
-    restaurantsData?.restaurants?.find((r: any) => r.id === restaurantFilter)?.name ??
+    (data?.orders ?? []).find((o: any) => o.restaurant_id === restaurantFilter)?.restaurant_name ??
     restaurantFilter
 
   const clearAllFilters = () => {
@@ -656,25 +656,15 @@ export function OrdersPage() {
                   {/* Restaurant Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="restaurant">{t('page.restaurantRequired')}</Label>
-                    <Select value={selectedRestaurant} onValueChange={setSelectedRestaurant}>
-                      <SelectTrigger id="restaurant">
-                        <option value="">
-                          {(restaurantsData?.restaurants?.length ?? 0) === 0
-                            ? t('page.noEligibleRestaurants')
-                            : t('page.selectRestaurant')}
-                        </option>
-                        {restaurantsData?.restaurants?.map((restaurant: any) => (
-                          <option key={restaurant.id} value={restaurant.id}>
-                            {restaurant.name}
-                          </option>
-                        ))}
-                      </SelectTrigger>
-                    </Select>
-                    {(restaurantsData?.restaurants?.length ?? 0) === 0 && (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        {t('page.eligibleRestaurantsHint')}
-                      </p>
-                    )}
+                    <FollowerRestaurantPicker
+                      id="restaurant"
+                      value={selectedRestaurant}
+                      onChange={(id) => setSelectedRestaurant(id)}
+                      placeholder={t('page.selectRestaurant')}
+                    />
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {t('page.eligibleRestaurantsHint')}
+                    </p>
                   </div>
 
                   {/* Order Notes */}

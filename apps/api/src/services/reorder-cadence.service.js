@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { blockedExistsSql, supplierSeesRestaurantSql } from '../lib/relationship.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { formatYmd } from '../lib/reservation-board-date.js'
 import {
@@ -191,6 +192,8 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
       c.*,
       r.name AS restaurant_name,
       s.name AS supplier_name,
+      ${supplierSeesRestaurantSql('c.restaurant_id', 'c.supplier_id')} AS supplier_can_see,
+      ${blockedExistsSql('c.restaurant_id', 's')} AS is_blocked,
       ((now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::date AS reminder_date
     FROM restaurant_order_cadence c
     JOIN restaurant r ON r.id = c.restaurant_id
@@ -257,7 +260,7 @@ export async function listRestaurantReminders(restaurantId) {
 export async function listSupplierAtRisk(supplierId) {
   const missed = await getMissedCadencesForToday()
   return missed
-    .filter((m) => m.supplier_id === supplierId)
+    .filter((m) => m.supplier_id === supplierId && m.supplier_can_see === true)
     .map((m) => ({
       cadenceId: m.id,
       restaurantId: m.restaurant_id,
@@ -276,6 +279,8 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
   let notificationsSent = 0
 
   for (const cadence of missed) {
+    // A block silences the pattern for both sides.
+    if (cadence.is_blocked === true) continue
     const restaurantSmartReorder = await isFeatureEnabled(
       cadence.restaurant_id,
       'RESTAURANT',
@@ -292,7 +297,9 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
         tenantId: cadence.restaurant_id,
         tenantType: 'RESTAURANT',
       }))
+    // Suppliers hear about followers only (spec §6.2); the restaurant still gets its reminder.
     const supplierUnlocked =
+      cadence.supplier_can_see === true &&
       supplierSmartReorder &&
       (await isTenantUnlockedForBackgroundWrites({
         tenantId: cadence.supplier_id,

@@ -1,3 +1,4 @@
+import { blockedExistsSql, followExistsSql } from '../lib/relationship.js'
 import { query, withTransaction } from '../lib/db.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import {
@@ -38,10 +39,7 @@ async function assertAllSuppliersEligible(restaurantId, supplierIds, dbQuery = q
       s.id,
       s.name,
       s.account_status,
-      EXISTS (
-        SELECT 1 FROM supplier_blocklist sb
-        WHERE sb.supplier_id = s.id AND sb.restaurant_id = $2
-      ) AS is_blocked
+      ${blockedExistsSql('$2', 's')} AS is_blocked
     FROM supplier s
     WHERE s.id = ANY($1::uuid[])
     `,
@@ -402,13 +400,14 @@ export async function listSupplierQuoteRequests(
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
+    JOIN supplier qs ON qs.id = qrs.supplier_id
     LEFT JOIN LATERAL (
       SELECT COUNT(*)::int AS item_count
       FROM quote_request_items qri
       JOIN product p ON p.id = qri.product_id
       WHERE qri.quote_request_id = qr.id AND p.supplier_id = qrs.supplier_id
     ) item_stats ON true
-    WHERE qrs.supplier_id = $1${filterSql}
+    WHERE qrs.supplier_id = $1 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}${filterSql}
     ORDER BY ${orderBy}
     LIMIT ${safeLimit} OFFSET ${offset}
     `,
@@ -421,7 +420,8 @@ export async function listSupplierQuoteRequests(
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
-    WHERE qrs.supplier_id = $1${filterSql}
+    JOIN supplier qs ON qs.id = qrs.supplier_id
+    WHERE qrs.supplier_id = $1 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}${filterSql}
     `,
     params
   )
@@ -443,7 +443,8 @@ export async function listSupplierQuoteRequests(
       )::int AS urgent
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-    WHERE qrs.supplier_id = $1
+    JOIN supplier qs ON qs.id = qrs.supplier_id
+    WHERE qrs.supplier_id = $1 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}
     `,
     [supplierId]
   )
@@ -497,13 +498,14 @@ export async function getSupplierQuoteRequestDetail(
 
   const { rows } = await dbQuery(
     `
-    SELECT qrs.*, qr.restaurant_id, qr.note AS quote_request_note, qr.needed_by::text AS needed_by,
+    SELECT qrs.*, qr.note AS quote_request_note, qr.needed_by::text AS needed_by,
            qr.status AS quote_request_status, qr.created_at AS quote_request_created_at,
            r.name AS restaurant_name
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
     JOIN restaurant r ON r.id = qr.restaurant_id
-    WHERE qrs.id = $1 AND qrs.supplier_id = $2
+    JOIN supplier qs ON qs.id = qrs.supplier_id
+    WHERE qrs.id = $1 AND qrs.supplier_id = $2 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}
     `,
     [quoteRequestSupplierId, supplierId]
   )
@@ -566,7 +568,6 @@ export async function getSupplierQuoteRequestDetail(
     quoteRequestId: row.quote_request_id,
     defaultCurrency,
     status: row.status,
-    restaurantId: row.restaurant_id,
     restaurantName: row.restaurant_name,
     quoteRequestNote: row.quote_request_note,
     quoteRequestStatus: row.quote_request_status,
@@ -615,7 +616,8 @@ export async function submitQuoteResponse(
     `SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
      FROM quote_request_suppliers qrs
      JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-     WHERE qrs.id = $1 AND qrs.supplier_id = $2`,
+     JOIN supplier qs ON qs.id = qrs.supplier_id
+     WHERE qrs.id = $1 AND qrs.supplier_id = $2 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}`,
     [quoteRequestSupplierId, supplierId]
   )
   if (!qrsRows.length) throw new NotFoundError('Quote request not found')
@@ -770,7 +772,8 @@ export async function declineQuoteRequest(
     `SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
      FROM quote_request_suppliers qrs
      JOIN quote_requests qr ON qr.id = qrs.quote_request_id
-     WHERE qrs.id = $1 AND qrs.supplier_id = $2`,
+     JOIN supplier qs ON qs.id = qrs.supplier_id
+     WHERE qrs.id = $1 AND qrs.supplier_id = $2 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}`,
     [quoteRequestSupplierId, supplierId]
   )
   if (!rows.length) throw new NotFoundError('Quote request not found')
@@ -826,15 +829,20 @@ export async function buildCartPayloadFromResponse(
 ) {
   const { rows } = await dbQuery(
     `
-    SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status
+    SELECT qrs.*, qr.restaurant_id, qr.status AS quote_request_status,
+           ${followExistsSql('qr.restaurant_id', 'qs')} AS is_followed
     FROM quote_request_suppliers qrs
     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+    LEFT JOIN supplier qs ON qs.id = qrs.supplier_id
     WHERE qrs.id = $1
     `,
     [quoteRequestSupplierId]
   )
   if (!rows.length) throw new NotFoundError('Quote response not found')
   const qrs = rows[0]
+  // Quotes may come from any supplier (spec §11.4); ordering still needs a follow, so the
+  // client offers "Follow & add" when this is false (FOLLOW_REQUIRED at checkout otherwise).
+  const isFollowed = qrs.is_followed === true
   if (quoteRequestId && qrs.quote_request_id !== quoteRequestId) {
     throw new ValidationError('Supplier row does not belong to this quote request')
   }
@@ -903,6 +911,8 @@ export async function buildCartPayloadFromResponse(
         supplier_slug: row.supplier_slug,
         current_price: quotedUnitPrice,
         currency: row.currency || 'USD',
+        is_followed: isFollowed,
+        can_order: isFollowed,
       },
     }
   })
@@ -910,6 +920,7 @@ export async function buildCartPayloadFromResponse(
   return {
     supplierId: qrs.supplier_id,
     quoteRequestSupplierId: qrs.id,
+    isFollowed,
     items,
   }
 }
@@ -990,7 +1001,10 @@ export async function assertSupplierQuoteRequestAccess(
   dbQuery = query
 ) {
   const { rows } = await dbQuery(
-    `SELECT id FROM quote_request_suppliers WHERE id = $1 AND supplier_id = $2`,
+    `SELECT qrs.id FROM quote_request_suppliers qrs
+     JOIN quote_requests qr ON qr.id = qrs.quote_request_id
+     JOIN supplier qs ON qs.id = qrs.supplier_id
+     WHERE qrs.id = $1 AND qrs.supplier_id = $2 AND NOT ${blockedExistsSql('qr.restaurant_id', 'qs')}`,
     [quoteRequestSupplierId, supplierId]
   )
   if (!rows.length) throw new NotFoundError('Quote request not found')

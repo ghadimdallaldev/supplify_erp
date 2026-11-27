@@ -207,7 +207,7 @@ async function loadRouteStopsForRoutes(routeIds, client = null) {
     `
     SELECT
       rs.*,
-      COALESCE(r.name, o.customer_contact_snapshot->>'name', 'Guest customer') AS restaurant_name,
+      COALESCE(o.customer_contact_snapshot->>'name', r.name, 'Guest customer') AS restaurant_name,
       COALESCE(o.delivery_location_snapshot, r.address_json, rs.address_json) AS address_json,
       o.total_amount,
       o.currency,

@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { canSeeRestaurant, supplierSeesRestaurantSql } from '../lib/relationship.js'
 import { notifyTenantUsers } from './notification/in-app.js'
 
 const DEFAULT_GRACE_DAYS = 7
@@ -50,6 +51,8 @@ export async function getReorderIntelligence(supplierId, { graceDays = DEFAULT_G
     FROM cadence c
     JOIN restaurant r ON r.id = c.restaurant_id
     WHERE c.last_order_at < NOW() - ((COALESCE(c.avg_days_between, 14) + $4)::text || ' days')::interval
+      -- Only current followers that have not blocked the supplier (spec §6.2).
+      AND ${supplierSeesRestaurantSql('c.restaurant_id', '$1')}
     ORDER BY c.last_order_at ASC
     LIMIT 50
     `,
@@ -147,6 +150,7 @@ async function getSuggestedProducts(supplierId, restaurantId) {
 }
 
 export async function createReorderReminderDraft(supplierId, restaurantId, createdBy) {
+  if (!(await canSeeRestaurant(restaurantId, supplierId))) return null
   const intelligence = await getReorderIntelligence(supplierId)
   const customer = intelligence.customersAtRisk.find((c) => c.restaurantId === restaurantId)
   if (!customer) {
@@ -203,6 +207,8 @@ export async function sendReorderReminderDraft(supplierId, draftId, sentBy) {
   if (!rows.length) return null
 
   const draft = rows[0]
+  // The restaurant may have unfollowed or blocked since the draft was written.
+  if (!(await canSeeRestaurant(draft.restaurant_id, supplierId))) return null
   await notifyTenantUsers({
     tenantId: draft.restaurant_id,
     tenantType: 'RESTAURANT',

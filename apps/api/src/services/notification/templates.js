@@ -962,6 +962,40 @@ export async function notifyScheduledOrderEvent(quickList, action, locale = DEFA
   return sent[0] || null
 }
 
+/**
+ * A scheduled quick list ran but skipped suppliers the restaurant no longer follows (or has
+ * blocked). One notification per skipped supplier; metadata is { quickListId, supplierId, supplierName }.
+ */
+export async function notifyScheduledOrderSkippedUnfollowed(quickList, skipped = []) {
+  const restaurantId = quickList.restaurant_id || quickList.restaurantId
+  if (!restaurantId || !skipped.length) return []
+  const results = []
+  for (const entry of skipped) {
+    const sent = await notifyTenantUsers({
+      tenantId: restaurantId,
+      tenantType: 'RESTAURANT',
+      notificationType: 'SCHEDULED_ORDER_SKIPPED_UNFOLLOWED',
+      notificationCategory: 'SCHEDULED_ORDER',
+      contentForLocale: (userLocale) => ({
+        title: nt('scheduledOrder.skippedUnfollowedTitle', userLocale),
+        message: nt('scheduledOrder.skippedUnfollowedMessage', userLocale, {
+          name: quickList.name,
+          supplier: entry.supplierName || '',
+        }),
+      }),
+      referenceId: quickList.id,
+      referenceType: 'QUICK_LIST',
+      metadata: {
+        quickListId: entry.quickListId || quickList.id,
+        supplierId: entry.supplierId,
+        supplierName: entry.supplierName ?? null,
+      },
+    })
+    if (sent[0]) results.push(sent[0])
+  }
+  return results
+}
+
 export async function notifyInvoiceIssued(invoice, locale = DEFAULT_LOCALE) {
   const sent = await notifyTenantUsers({
     tenantId: invoice.restaurant_id,
@@ -1118,11 +1152,21 @@ export async function notifyMessageReceived(
   locale = DEFAULT_LOCALE
 ) {
   const { rows: cRows } = await query(
-    `SELECT supplier_id, restaurant_id FROM conversation WHERE id = $1`,
+    `SELECT c.supplier_id, c.restaurant_id,
+            EXISTS (
+              SELECT 1 FROM supplier_blocklist sb
+              JOIN supplier s ON s.id = c.supplier_id
+              WHERE sb.restaurant_id = c.restaurant_id
+                AND sb.supplier_org_id = COALESCE(s.organization_id, s.id)
+            ) AS is_blocked
+     FROM conversation c WHERE c.id = $1`,
     [conversationId]
   )
   if (!cRows.length) return null
   const conv = cRows[0]
+  // Callers notify only after an authorised send; a block closes the conversation, so never
+  // notify across one (defence in depth, spec §11.4).
+  if (conv.is_blocked === true) return null
 
   let tenantId
   let tenantType
@@ -1259,20 +1303,20 @@ export async function notifyDealApproved(deal, { supplierName } = {}, locale = D
   if (!supplierId || !dealId) return { followers: 0, nonFollowers: 0 }
 
   try {
+    // Followers of the whole supplier organisation (any branch), never across a block.
     const { rows: followers } = await query(
-      `SELECT restaurant_id FROM supplier_follow WHERE supplier_id = $1`,
+      `SELECT sf.restaurant_id
+       FROM supplier s
+       JOIN supplier_follow sf ON sf.supplier_org_id = COALESCE(s.organization_id, s.id)
+       WHERE s.id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM supplier_blocklist sb
+           WHERE sb.restaurant_id = sf.restaurant_id AND sb.supplier_org_id = sf.supplier_org_id
+         )`,
       [supplierId]
     )
 
-    const { rows: targeted } = await query(
-      `SELECT restaurant_id FROM promotion_restaurant_targets WHERE promotion_id = $1`,
-      [dealId]
-    )
-
-    const recipientIds = new Set([
-      ...followers.map((r) => r.restaurant_id),
-      ...targeted.map((r) => r.restaurant_id),
-    ])
+    const recipientIds = new Set(followers.map((r) => r.restaurant_id))
 
     let notifiedCount = 0
 
@@ -1829,8 +1873,8 @@ export async function notifyQuoteRequestReceived(
     })
     if (alreadySent) return null
 
+    // §11.3: the supplier learns only the restaurant's display name (no id in metadata).
     const { rows } = await query(`SELECT name FROM restaurant WHERE id = $1`, [restaurantId])
-    const restaurantName = rows[0]?.name || nt('common.aRestaurant', locale)
 
     return notifyTenantUsers({
       tenantId: supplierId,

@@ -75,7 +75,12 @@ const promotionBodySchema = z.object({
   isFeatured: z.boolean().optional(),
   productIds: z.array(z.string().uuid()).optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
-  restaurantIds: z.array(z.string().uuid()).optional(),
+  // Deals are app-wide (spec §6.2 item 4): restaurant targeting is no longer accepted.
+  restaurantIds: z
+    .undefined({
+      errorMap: () => ({ message: 'restaurantIds is no longer supported; deals are app-wide' }),
+    })
+    .optional(),
   imageUrl: z.string().url().optional().nullable(),
   couponCode: z.string().max(64).optional().nullable(),
   minOrderQuantity: z.number().int().positive().optional().nullable(),
@@ -185,19 +190,6 @@ async function syncPromotionTargets(client, promotionId, productIds = [], catego
   }
 }
 
-async function syncRestaurantTargets(client, promotionId, restaurantIds = []) {
-  await client.query(`DELETE FROM promotion_restaurant_targets WHERE promotion_id = $1`, [
-    promotionId,
-  ])
-  if (restaurantIds.length > 0) {
-    await client.query(
-      `INSERT INTO promotion_restaurant_targets (promotion_id, restaurant_id)
-       SELECT $1, unnest($2::uuid[])`,
-      [promotionId, restaurantIds]
-    )
-  }
-}
-
 function mapPromotionInsertFields(body) {
   return {
     name: body.name,
@@ -253,7 +245,6 @@ export {
   getRestaurantId,
   loadPromotionForSupplier,
   syncPromotionTargets,
-  syncRestaurantTargets,
   mapPromotionInsertFields,
   supplierDealsGate,
   BOOST_PRICING_WHERE,
