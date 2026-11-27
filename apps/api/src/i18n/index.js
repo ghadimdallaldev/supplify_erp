@@ -16,6 +16,7 @@ function loadJson(locale, namespace) {
 const TRANSLATIONS = {
   en: {
     billing: loadJson('en', 'billing'),
+    catalog: loadJson('en', 'catalog'),
     consumer: loadJson('en', 'consumer'),
     emails: loadJson('en', 'emails'),
     notifications: loadJson('en', 'notifications'),
@@ -25,6 +26,7 @@ const TRANSLATIONS = {
   },
   ar: {
     billing: loadJson('ar', 'billing'),
+    catalog: loadJson('ar', 'catalog'),
     consumer: loadJson('ar', 'consumer'),
     emails: loadJson('ar', 'emails'),
     notifications: loadJson('ar', 'notifications'),

@@ -103,6 +103,8 @@ vi.mock('../lib/warehouse-helpers.js', () => ({
 // Now import routes (mocks are set up)
 import { productsRoutes, __resetProductTagsColumnCache } from './products.routes.js'
 
+const LEAF_ID = '22222222-2222-4222-8222-222222222222'
+
 describe('Products Routes', () => {
   let app
   let db
@@ -201,29 +203,13 @@ describe('Products Routes', () => {
     })
   })
 
-  describe('POST /api/products/categories', () => {
-    it('creates a category owned by the active supplier', async () => {
-      db.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: '11111111-1111-4111-8111-111111111111',
-            supplier_id: 'supplier-1',
-            name: 'Fresh herbs',
-            slug: 'fresh-herbs',
-          },
-        ],
-      })
-
-      const response = await request(app)
-        .post('/api/products/categories')
-        .send({ name: 'Fresh herbs' })
-        .expect(201)
-
-      expect(response.body.data.category.name).toBe('Fresh herbs')
-      expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining('supplier_id'),
-        expect.arrayContaining(['supplier-1', 'Fresh herbs'])
-      )
+  describe('removed supplier /categories CRUD', () => {
+    it('old supplier /categories CRUD is 404', async () => {
+      const id = '11111111-1111-4111-8111-111111111111'
+      await request(app).post('/api/products/categories').send({ name: 'Mine' }).expect(404)
+      await request(app).patch(`/api/products/categories/${id}`).send({ name: 'X' }).expect(404)
+      await request(app).delete(`/api/products/categories/${id}`).expect(404)
+      expect(db.query).not.toHaveBeenCalled()
     })
   })
   describe('GET /api/products', () => {
@@ -436,6 +422,9 @@ describe('Products Routes', () => {
     it('should create a new product', async () => {
       __resetProductTagsColumnCache() // ensure productHasTagsColumn runs (info_schema query)
       db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: LEAF_ID, name: 'Cheese', parent_category_id: 'dept-1', is_leaf: true }],
+        }) // leaf category check
         .mockResolvedValueOnce({ rows: [] }) // productHasTagsColumn() when uncached - no tags column
         .mockResolvedValueOnce({
           rows: [
@@ -448,6 +437,7 @@ describe('Products Routes', () => {
             },
           ],
         }) // INSERT product
+        .mockResolvedValueOnce({ rows: [] }) // replace product shelves
 
       const { checkLimit, incrementUsage } = await import('../lib/subscription.js')
       vi.mocked(checkLimit).mockResolvedValueOnce({
@@ -466,12 +456,68 @@ describe('Products Routes', () => {
           name: 'New Product',
           description: 'Product description',
           supplier_id: 'supplier-1',
+          category: 'legacy text is ignored',
+          category_id: LEAF_ID,
         })
         .expect(201)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.product.name).toBe('New Product')
+      expect(response.body.data.product.shelf_ids).toEqual([])
       expect(db.withTransaction).toHaveBeenCalledTimes(1)
+      const [insertSql, insertValues] = db.query.mock.calls[2]
+      expect(insertSql).toMatch(
+        /INSERT INTO product \(supplier_id, sku, name, name_ar, description, description_ar, brand, category_id,/
+      )
+      expect(insertValues).toContain(LEAF_ID)
+      expect(insertValues).not.toContain('legacy text is ignored')
+    })
+
+    it('create without category is 400', async () => {
+      const response = await request(app)
+        .post('/api/products')
+        .send({ sku: 'SKU002', name: 'No category' })
+        .expect(400)
+      expect(response.body.error).toMatchObject({
+        name: 'VALIDATION_ERROR',
+        code: 'chooseCategory',
+      })
+      expect(db.withTransaction).not.toHaveBeenCalled()
+    })
+
+    it('department id rejected', async () => {
+      db.query.mockResolvedValueOnce({
+        rows: [{ id: LEAF_ID, name: 'Dairy', parent_category_id: null, is_leaf: false }],
+      })
+      const response = await request(app)
+        .post('/api/products')
+        .send({ sku: 'SKU003', name: 'Dept', category_id: LEAF_ID })
+        .expect(400)
+      expect(response.body.error.code).toBe('categoryNotLeaf')
+      expect(db.withTransaction).not.toHaveBeenCalled()
+    })
+
+    it('foreign shelf rejected', async () => {
+      db.query
+        .mockResolvedValueOnce({
+          rows: [{ id: LEAF_ID, name: 'Cheese', parent_category_id: 'dept-1', is_leaf: true }],
+        })
+        .mockResolvedValueOnce({ rows: [] }) // none of the shelves are the supplier's
+      const response = await request(app)
+        .post('/api/products')
+        .send({
+          sku: 'SKU004',
+          name: 'Shelved',
+          category_id: LEAF_ID,
+          shelfIds: ['33333333-3333-4333-8333-333333333333'],
+        })
+        .expect(400)
+      expect(response.body.error.code).toBe('foreignShelf')
+      expect(db.query.mock.calls[1][1]).toEqual([
+        ['33333333-3333-4333-8333-333333333333'],
+        'supplier-1',
+      ])
+      expect(db.withTransaction).not.toHaveBeenCalled()
     })
 
     it('should validate required fields', async () => {
@@ -493,6 +539,7 @@ describe('Products Routes', () => {
         .send({
           sku: 'SKU-WH',
           name: 'Warehouse Product',
+          category_id: LEAF_ID,
           warehouse_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           initialStock: 12,
         })
@@ -513,6 +560,7 @@ describe('Products Routes', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'prod-1', name: 'Updated Product', sku: 'SKU001' }],
         })
+        .mockResolvedValueOnce({ rows: [] }) // shelf ids for the response
 
       const response = await request(app)
         .patch('/api/products/prod-1')
@@ -523,6 +571,16 @@ describe('Products Routes', () => {
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.product.name).toBe('Updated Product')
+      expect(response.body.data.product.shelf_ids).toEqual([])
+    })
+
+    it('update with category null is 400 chooseCategory', async () => {
+      db.query.mockResolvedValueOnce({ rows: [{ id: 'prod-1', supplier_id: 'supplier-1' }] })
+      const response = await request(app)
+        .patch('/api/products/prod-1')
+        .send({ category_id: null })
+        .expect(400)
+      expect(response.body.error.code).toBe('chooseCategory')
     })
 
     it('should return 404 for non-existent product', async () => {

@@ -236,5 +236,14 @@
     "newTenantEmail": " ({{contactEmail}})",
     "tenantTypeSupplier": "مورد",
     "tenantTypeRestaurant": "مطعم"
+  },
+  "categoryRequest": {
+    "approvedTitle": "تمت إضافة الفئة",
+    "approvedMessage": "تمت الموافقة على طلب الفئة \"{{proposedName}}\" باسم {{categoryName}}. تم نقل {{count}} منتج.",
+    "mergedTitle": "تمت معالجة طلب الفئة",
+    "mergedMessage": "تمت مطابقة طلبك \"{{proposedName}}\" مع الفئة الموجودة {{categoryName}}. تم نقل {{count}} منتج.",
+    "rejectedTitle": "تم رفض طلب الفئة",
+    "rejectedMessage": "تم رفض طلبك \"{{proposedName}}\". تبقى منتجاتك في \"أخرى\" إلى أن تختار فئة.",
+    "rejectedNote": "ملاحظة من Supplify: {{note}}"
   }
 }

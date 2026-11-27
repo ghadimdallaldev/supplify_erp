@@ -1,0 +1,20 @@
+{
+  "errors": {
+    "chooseCategory": "Choose a category for this product",
+    "categoryNotFound": "That category does not exist",
+    "categoryNotLeaf": "Choose a category, not a department",
+    "foreignShelf": "One or more shelves are not available for this supplier",
+    "foreignProducts": "One or more products do not belong to this supplier",
+    "shelfNotFound": "Shelf not found",
+    "shelfNameTaken": "A shelf with this name already exists",
+    "shelfInUse": "This shelf is used by active deals or routing rules. Change them first.",
+    "categoryRequestExists": "You already asked for this category. It is waiting for review.",
+    "categoryRequestNotFound": "Category request not found",
+    "categoryRequestResolved": "This category request has already been resolved",
+    "categoryNameTaken": "A category with this name already exists in that department",
+    "departmentNotFound": "That department does not exist",
+    "supplierNotFound": "Supplier record not found for user",
+    "invalidInput": "Invalid input",
+    "internal": "Something went wrong. Please try again."
+  }
+}
