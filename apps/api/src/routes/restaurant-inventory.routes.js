@@ -15,6 +15,9 @@ import {
 } from '../lib/subscription.js'
 import { isFeatureEnabledForTenant } from '../lib/feature-flags.js'
 import { query, withTransaction } from '../lib/db.js'
+import { categoryFilterSql, leafCategoryJoinSql } from '../lib/category-sql.js'
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 import { startStage, mark } from '../middlewares/request-timing.js'
 import { logger } from '../lib/logger.js'
 import { ForbiddenError, NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
@@ -139,10 +142,10 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       typeof req.query.supplierId === 'string' && req.query.supplierId.length > 0
         ? req.query.supplierId
         : null
-    const category =
-      typeof req.query.category === 'string' && req.query.category.trim()
-        ? req.query.category.trim()
-        : null
+    // Platform category filter: a department id (all its categories) or a category id.
+    const rawCategoryId = req.query.categoryId ?? req.query.category_id
+    const categoryId =
+      typeof rawCategoryId === 'string' && UUID_PATTERN.test(rawCategoryId) ? rawCategoryId : null
 
     const baseClauses = ['ri.restaurant_id = $1']
     const baseParams = [restaurantId]
@@ -150,7 +153,8 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
 
     if (q) {
       baseClauses.push(
-        `(p.name ILIKE $${paramIndex} OR p.sku ILIKE $${paramIndex} OR COALESCE(pc.name, p.category, '') ILIKE $${paramIndex})`
+        `(p.name ILIKE $${paramIndex} OR p.sku ILIKE $${paramIndex} OR pc.name ILIKE $${paramIndex}
+          OR COALESCE(pc.name_ar, '') ILIKE $${paramIndex})`
       )
       baseParams.push(`%${q}%`)
       paramIndex++
@@ -160,9 +164,9 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       baseParams.push(supplierId)
       paramIndex++
     }
-    if (category) {
-      baseClauses.push(`COALESCE(pc.name, p.category, '') = $${paramIndex}`)
-      baseParams.push(category)
+    if (categoryId) {
+      baseClauses.push(categoryFilterSql(`$${paramIndex}`, 'pc'))
+      baseParams.push(categoryId)
       paramIndex++
     }
 
@@ -197,7 +201,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           ri.created_at
         FROM restaurant_inventory ri
         JOIN product p ON p.id = ri.product_id
-        LEFT JOIN product_category pc ON pc.id = p.category_id
+        ${leafCategoryJoinSql('p', 'pc')}
         JOIN supplier s ON s.id = p.supplier_id
         WHERE ${filterWhere}
         ORDER BY ri.updated_at DESC, ri.created_at DESC
@@ -220,8 +224,10 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         p.name AS product_name,
         p.sku AS product_sku,
         p.unit AS product_unit,
-        p.category AS product_category_legacy,
         pc.name AS product_category,
+        pc.id AS product_category_id,
+        pc.name_ar AS product_category_name_ar,
+        pc.parent_category_id AS product_department_id,
         p.supplier_id,
         s.name AS supplier_name,
         COALESCE(ri.low_stock_threshold, 0) AS low_stock_threshold,
@@ -238,7 +244,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
       FROM restaurant_inventory ri
       INNER JOIN filtered f ON f.product_id = ri.product_id
       JOIN product p ON p.id = ri.product_id
-      LEFT JOIN product_category pc ON pc.id = p.category_id
+      ${leafCategoryJoinSql('p', 'pc')}
       JOIN supplier s ON s.id = p.supplier_id
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN branch b ON b.id = ri.branch_id AND b.tenant_id = ri.restaurant_id
@@ -255,7 +261,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
         SELECT COUNT(*)::int AS total
         FROM restaurant_inventory ri
         JOIN product p ON p.id = ri.product_id
-        LEFT JOIN product_category pc ON pc.id = p.category_id
+        ${leafCategoryJoinSql('p', 'pc')}
         JOIN supplier s ON s.id = p.supplier_id
         WHERE ${filterWhere}
         `,
@@ -277,7 +283,7 @@ router.get('/', requireRole(['RESTAURANT', 'ADMIN']), async (req, res) => {
           )::int AS in_stock
         FROM restaurant_inventory ri
         JOIN product p ON p.id = ri.product_id
-        LEFT JOIN product_category pc ON pc.id = p.category_id
+        ${leafCategoryJoinSql('p', 'pc')}
         JOIN supplier s ON s.id = p.supplier_id
         WHERE ${summaryWhere}
         `,

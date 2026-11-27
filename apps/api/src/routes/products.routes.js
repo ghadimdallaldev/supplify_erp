@@ -50,6 +50,17 @@ import {
   applyRestaurantStockViewToRows,
 } from '../lib/restaurant-catalog-view.js'
 import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
+import {
+  categoryFilterSql,
+  leafCategoryColumnsSql,
+  leafCategoryJoinSql,
+} from '../lib/category-sql.js'
+import { loadPlatformCategories } from '../lib/category-matcher.js'
+import {
+  buildCategoryTree,
+  categorySuggestions,
+  productQueryCategoryIds,
+} from '../lib/category-tree.js'
 
 const CATALOG_META_CACHE_TTL_SECONDS = 300
 
@@ -59,7 +70,8 @@ const PRODUCT_LIST_COLUMNS = `
   p.sku,
   p.name,
   p.description,
-  p.category,
+  ${leafCategoryColumnsSql('lc')},
+  p.category_needs_review,
   p.unit,
   p.supplier_id,
   p.image_url,
@@ -227,7 +239,7 @@ const categoryUpdateSchema = z.object({
 })
 const productListSchema = z.object({
   q: z.string().optional(),
-  category: z.string().optional(), // Support both old category and category_id
+  /** A department id (all its categories) or a category id. */
   categoryId: z.string().uuid().optional(),
   tags: z.string().optional(), // Comma-separated tags
   supplier: z.string().uuid().optional(),
@@ -269,43 +281,60 @@ const productListSchema = z.object({
   cursor: z.string().optional(),
 })
 
-// Get product categories
+// Platform category tree: departments → categories with per-viewer product counts.
+// Restaurants count catalog-visible suppliers only and never see empty nodes; suppliers get
+// the full tree with their own counts; admins the full tree with all counts.
 router.get('/categories', async (req, res) => {
   try {
-    const { supplierId, restaurantId, cacheKey } = await catalogMetaScope(req, 'productCats')
-    let categories = await getCache(cacheKey)
-    if (!Array.isArray(categories)) {
+    const { supplierId, restaurantId, cacheKey } = await catalogMetaScope(req, 'categoryTree')
+    let tree = await getCache(cacheKey)
+    if (!Array.isArray(tree?.departments)) {
       const { rows } = await query(
         `
-        SELECT
-          pc.id,
-          pc.supplier_id,
-          pc.name,
-          pc.slug,
-          pc.description,
-          pc.display_order,
-          COUNT(p.id)::int AS product_count
+        WITH counts AS (
+          SELECT lc.id AS category_id, COUNT(DISTINCT p.id)::int AS product_count
+          FROM product p
+          ${leafCategoryJoinSql('p', 'lc')}
+          WHERE ($1::uuid IS NULL OR p.supplier_id = $1)
+            AND ${restaurantVisibleProductSql(2)}
+          GROUP BY lc.id
+        )
+        SELECT pc.id, pc.slug, pc.name, pc.name_ar, pc.name_fr, pc.icon_key,
+               pc.parent_category_id, pc.display_order,
+               COALESCE(counts.product_count, 0)::int AS product_count
         FROM product_category pc
-        LEFT JOIN product p ON p.category_id = pc.id
-          AND ($1::uuid IS NULL OR p.supplier_id = $1)
-          AND ${restaurantVisibleProductSql(2)}
-        WHERE pc.is_active = true
-          AND (pc.supplier_id IS NULL OR pc.supplier_id = $1)
-        GROUP BY pc.id
-        HAVING ($1::uuid IS NOT NULL OR COUNT(p.id) > 0)
-        ORDER BY product_count DESC, pc.display_order, pc.name
+        LEFT JOIN counts ON counts.category_id = pc.id
+        WHERE pc.is_active = true AND pc.supplier_id IS NULL
         `,
         [supplierId, restaurantId],
         req
       )
-      categories = rows
-      await setCache(cacheKey, categories, CATALOG_META_CACHE_TTL_SECONDS).catch(() => {})
+      tree = buildCategoryTree(rows, { omitEmpty: Boolean(restaurantId) })
+      await setCache(cacheKey, tree, CATALOG_META_CACHE_TTL_SECONDS).catch(() => {})
     }
 
-    return res.json({ ok: true, data: { categories }, error: null, requestId: req.requestId })
+    return res.json({ ok: true, data: tree, error: null, requestId: req.requestId })
   } catch (error) {
-    logger.warn('Categories unavailable, returning empty list:', error.message)
-    return res.json({ ok: true, data: { categories: [] }, error: null, requestId: req.requestId })
+    logger.warn('Categories unavailable, returning empty tree:', error.message)
+    return res.json({ ok: true, data: { departments: [] }, error: null, requestId: req.requestId })
+  }
+})
+
+const categorySuggestionSchema = z.object({ name: z.string().trim().max(200).default('') })
+
+// Supplier: platform category suggestions for a product name (top 3, score ≥ 0.6).
+router.get('/category-suggestions', requireRole(['SUPPLIER', 'ADMIN']), async (req, res, next) => {
+  try {
+    const { name } = categorySuggestionSchema.parse(req.query)
+    const categories = await loadPlatformCategories()
+    return res.json({
+      ok: true,
+      data: categorySuggestions(name, categories),
+      error: null,
+      requestId: req.requestId,
+    })
+  } catch (error) {
+    next(error)
   }
 })
 
@@ -536,20 +565,24 @@ router.get('/', async (req, res) => {
     if (params.q) {
       const hasSearchVector = await productHasSearchVectorColumn()
       const prefixQuery = toPrefixTsQuery(params.q)
+      // A query that names a category ("خبز", "pain") also returns that category's products.
+      const queryCategoryIds = productQueryCategoryIds(params.q, await loadPlatformCategories())
       if (hasSearchVector && prefixQuery) {
         // Search-as-you-type: prefix lexemes plus a name substring, so "tom" finds "Tomatoes".
         whereConditions.push(
-          `(p.search_vector @@ to_tsquery('simple', $${paramIndex}) OR LOWER(p.name) LIKE $${paramIndex + 1})`
+          `(p.search_vector @@ to_tsquery('simple', $${paramIndex}) OR LOWER(p.name) LIKE $${paramIndex + 1}
+            OR lc.id = ANY($${paramIndex + 2}::uuid[]))`
         )
-        queryParams.push(prefixQuery, toContainsPattern(params.q))
+        queryParams.push(prefixQuery, toContainsPattern(params.q), queryCategoryIds)
         orderByClause = `ts_rank(p.search_vector, to_tsquery('simple', $${paramIndex})) DESC, p.created_at DESC`
-        paramIndex += 2
+        paramIndex += 3
       } else {
         whereConditions.push(
-          `(LOWER(p.name) LIKE $${paramIndex} OR LOWER(p.sku) LIKE $${paramIndex})`
+          `(LOWER(p.name) LIKE $${paramIndex} OR LOWER(p.sku) LIKE $${paramIndex}
+            OR lc.id = ANY($${paramIndex + 1}::uuid[]))`
         )
-        queryParams.push(`%${params.q.toLowerCase()}%`)
-        paramIndex++
+        queryParams.push(`%${params.q.toLowerCase()}%`, queryCategoryIds)
+        paramIndex += 2
       }
     }
 
@@ -577,15 +610,10 @@ router.get('/', async (req, res) => {
       paramIndex += 2
     }
 
-    // Category filter (support both old category field and new category_id)
+    // Platform category filter: a department id matches all its categories.
     if (params.categoryId) {
-      whereConditions.push(`p.category_id = $${paramIndex}`)
+      whereConditions.push(categoryFilterSql(`$${paramIndex}`, 'lc'))
       queryParams.push(params.categoryId)
-      paramIndex++
-    } else if (params.category) {
-      // Fallback to plain category text match only to avoid dependency on product_category
-      whereConditions.push(`p.category = $${paramIndex}`)
-      queryParams.push(params.category)
       paramIndex++
     }
 
@@ -701,6 +729,7 @@ router.get('/', async (req, res) => {
         pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${leafCategoryJoinSql('p', 'lc')}
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       ${inventoryJoin}
       LEFT JOIN LATERAL (
@@ -720,6 +749,7 @@ router.get('/', async (req, res) => {
       SELECT COUNT(*)::int as total
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${leafCategoryJoinSql('p', 'lc')}
       ${
         countNeedsPriceJoin
           ? `LEFT JOIN LATERAL (
@@ -907,6 +937,7 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
         `
         SELECT
           p.*,
+          ${leafCategoryColumnsSql('lc')},
           s.id AS supplier_id,
           s.name AS supplier_name,
           s.slug AS supplier_slug,
@@ -918,6 +949,7 @@ router.get('/favorites', requireRole(['RESTAURANT']), async (req, res) => {
         FROM product_favorite pf
         JOIN product p ON p.id = pf.product_id
         JOIN supplier s ON s.id = p.supplier_id
+        ${leafCategoryJoinSql('p', 'lc')}
         LEFT JOIN LATERAL (
           SELECT amount, currency
           FROM price
@@ -1112,6 +1144,9 @@ router.get('/:id', async (req, res) => {
       `
       SELECT 
         p.*,
+        ${leafCategoryColumnsSql('lc')},
+        lc_dept.name AS department_name,
+        lc_dept.name_ar AS department_name_ar,
         s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,
@@ -1123,6 +1158,7 @@ router.get('/:id', async (req, res) => {
         pr.currency
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${leafCategoryJoinSql('p', 'lc')}
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       LEFT JOIN inventory i ON i.product_id = p.id
       LEFT JOIN price pr ON pr.product_id = p.id 

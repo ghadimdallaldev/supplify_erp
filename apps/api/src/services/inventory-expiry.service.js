@@ -1,4 +1,11 @@
 import { query } from '../lib/db.js'
+import { categoryFilterSql, leafCategoryJoinSql } from '../lib/category-sql.js'
+
+// Lots with no product keep pc NULL; a product always resolves to a leaf ("Other" included).
+const expiryCategoryJoin = leafCategoryJoinSql('p', 'pc').replace(
+  'ON pc.id = COALESCE(',
+  'ON p.id IS NOT NULL AND pc.id = COALESCE('
+)
 import { NotFoundError, ValidationError } from '../middlewares/errorHandler.js'
 import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
 import { computeExpiryStatus, mapLotRow } from '../lib/inventory-expiry-status.js'
@@ -50,7 +57,7 @@ function buildListFilters(restaurantId, filters, thresholdDays) {
     params.push(filters.storageLocation)
   }
   if (filters.categoryId) {
-    conditions.push(`p.category_id = $${paramIdx++}`)
+    conditions.push(categoryFilterSql(`$${paramIdx++}`, 'pc'))
     params.push(filters.categoryId)
   }
 
@@ -64,11 +71,12 @@ export async function listExpiryLots(restaurantId, filters = {}) {
 
   const { rows } = await query(
     `
-    SELECT l.*, s.name AS supplier_name, p.category_id, pc.name AS category_name
+    SELECT l.*, s.name AS supplier_name, pc.id AS category_id, pc.name AS category_name,
+           pc.name_ar AS category_name_ar
     FROM restaurant_inventory_lot l
     LEFT JOIN supplier s ON s.id = l.supplier_id
     LEFT JOIN product p ON p.id = l.product_id
-    LEFT JOIN product_category pc ON pc.id = p.category_id
+    ${expiryCategoryJoin}
     WHERE ${conditions.join(' AND ')}
     ORDER BY l.expiry_date ASC NULLS LAST, l.created_at ASC
     `,

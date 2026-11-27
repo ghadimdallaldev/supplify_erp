@@ -47,6 +47,13 @@ vi.mock('../lib/rbac.js', () => ({
   getUserBySub: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
 }))
 
+// The platform tree comes from the seed migration, not from the mocked db.
+vi.mock('../lib/category-matcher.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  const { loadSeedCategories } = await import('../test/category-seed.js')
+  return { ...actual, loadPlatformCategories: vi.fn(async () => loadSeedCategories()) }
+})
+
 vi.mock('../lib/subscription.js', () => ({
   checkLimit: vi
     .fn()
@@ -141,25 +148,56 @@ describe('Products Routes', () => {
   })
 
   describe('GET /api/products/categories', () => {
-    it('should return product categories', async () => {
+    it('returns the platform tree: departments with their categories', async () => {
       db.query.mockResolvedValueOnce({
         rows: [
           {
-            id: 'cat-1',
-            name: 'Beverages',
-            slug: 'beverages',
-            description: 'Drinks',
+            id: 'd-2',
+            slug: 'dept-food',
+            name: 'Food',
+            parent_category_id: null,
+            display_order: 2,
+          },
+          {
+            id: 'd-1',
+            slug: 'dept-drinks',
+            name: 'Drinks',
+            parent_category_id: null,
             display_order: 1,
           },
-          { id: 'cat-2', name: 'Food', slug: 'food', description: 'Food items', display_order: 2 },
+          {
+            id: 'c-1',
+            slug: 'beverages',
+            name: 'Beverages',
+            name_ar: 'مشروبات',
+            icon_key: 'coffee',
+            parent_category_id: 'd-1',
+            display_order: 1,
+            product_count: 3,
+          },
+          { id: 'c-2', slug: 'bread', name: 'Bread', parent_category_id: 'd-2', product_count: 0 },
         ],
       })
 
       const response = await request(app).get('/api/products/categories').expect(200)
 
       expect(response.body.ok).toBe(true)
-      expect(response.body.data.categories).toHaveLength(2)
-      expect(response.body.data.categories[0].name).toBe('Beverages')
+      const { departments } = response.body.data
+      expect(departments.map((d) => d.slug)).toEqual(['dept-drinks', 'dept-food'])
+      expect(departments[0]).toMatchObject({ product_count: 3 })
+      expect(departments[0].categories).toEqual([
+        expect.objectContaining({
+          id: 'c-1',
+          name_ar: 'مشروبات',
+          icon_key: 'coffee',
+          product_count: 3,
+        }),
+      ])
+      // Admin/supplier view (no restaurant) keeps empty nodes.
+      expect(departments[1].categories[0]).toMatchObject({ id: 'c-2', product_count: 0 })
+      const sql = String(db.query.mock.calls[0][0])
+      expect(sql).toContain('COUNT(DISTINCT p.id)')
+      expect(sql).toContain('pc.supplier_id IS NULL')
     })
   })
 
@@ -218,7 +256,8 @@ describe('Products Routes', () => {
       expect(response.body.data.products[0].name).toBe('Test Product')
     })
 
-    it('should filter products by category', async () => {
+    it('filters by a department or category id', async () => {
+      const categoryId = '00000000-0000-4000-8000-000000000001'
       db.query
         .mockResolvedValueOnce({
           rows: [],
@@ -228,10 +267,24 @@ describe('Products Routes', () => {
           rows: [{ total: '0' }],
         })
 
-      const response = await request(app).get('/api/products?category=cat-1').expect(200)
+      const response = await request(app).get(`/api/products?categoryId=${categoryId}`).expect(200)
 
       expect(response.body.ok).toBe(true)
-      expect(db.query).toHaveBeenCalledWith(expect.stringContaining('category'), expect.any(Array))
+      const [listSql, listParams] = db.query.mock.calls[0]
+      expect(String(listSql)).toContain('lc.parent_category_id = $1::uuid')
+      expect(listParams).toContain(categoryId)
+    })
+
+    it('the old category= text filter is gone', async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get('/api/products?category=Dairy').expect(200)
+
+      const [listSql, listParams] = db.query.mock.calls[0]
+      expect(String(listSql)).not.toContain('p.category =')
+      expect(listParams).not.toContain('Dairy')
     })
 
     it('should filter products by search query', async () => {

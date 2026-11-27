@@ -301,7 +301,9 @@ const publicSupplierProductsSchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().optional(),
   q: z.string().optional(),
-  category: z.string().optional(),
+  /** A platform department id (all its categories) or a category id. */
+  categoryId: z.string().uuid().optional(),
+  shelfId: z.string().uuid().optional(),
 })
 
 router.get('/resolve-host', async (req, res) => {

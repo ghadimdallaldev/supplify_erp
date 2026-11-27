@@ -26,3 +26,42 @@ export function leafCategoryIdSql(productAlias = 'p') {
 export function isLeafCategorySql(categoryAlias = 'c') {
   return `(${categoryAlias}.supplier_id IS NULL AND ${categoryAlias}.parent_category_id IS NOT NULL)`
 }
+
+/**
+ * Joins `<alias>` = the product's leaf platform category (the "Other" leaf for NULL,
+ * supplier-owned or department ids) and `<alias>_dept` = its department. Both are LEFT
+ * JOINs, so the product row is never dropped. Aliases are trusted identifiers, not input.
+ * @param {string} [productAlias]
+ * @param {string} [alias]
+ */
+export function leafCategoryJoinSql(productAlias = 'p', alias = 'lc') {
+  return `LEFT JOIN product_category ${alias}_raw ON ${alias}_raw.id = ${productAlias}.category_id
+      AND ${isLeafCategorySql(`${alias}_raw`)}
+    LEFT JOIN product_category ${alias}
+      ON ${alias}.id = COALESCE(${alias}_raw.id, ${OTHER_CATEGORY_ID_SQL})
+    LEFT JOIN product_category ${alias}_dept ON ${alias}_dept.id = ${alias}.parent_category_id`
+}
+
+/**
+ * Select-list columns for a `leafCategoryJoinSql` join: `category` (the platform name, kept
+ * for readers of the old text field), `category_id`, `category_name`, `category_name_ar`,
+ * `category_slug`, `department_id`.
+ * @param {string} [alias]
+ */
+export function leafCategoryColumnsSql(alias = 'lc') {
+  return `${alias}.name AS category,
+    ${alias}.id AS category_id,
+    ${alias}.name AS category_name,
+    ${alias}.name_ar AS category_name_ar,
+    ${alias}.slug AS category_slug,
+    ${alias}.parent_category_id AS department_id`
+}
+
+/**
+ * Predicate for `?categoryId=`: the joined leaf is the id, or its department is.
+ * @param {string} placeholder a bound parameter such as `$3` (never raw input)
+ * @param {string} [alias]
+ */
+export function categoryFilterSql(placeholder, alias = 'lc') {
+  return `(${alias}.id = ${placeholder}::uuid OR ${alias}.parent_category_id = ${placeholder}::uuid)`
+}

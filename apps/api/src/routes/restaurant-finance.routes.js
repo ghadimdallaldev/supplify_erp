@@ -10,6 +10,7 @@ import {
 import { requireRestaurantId, requireTenantScope } from '../lib/tenant-resolve.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query, withTransaction } from '../lib/db.js'
+import { leafCategoryJoinSql } from '../lib/category-sql.js'
 import { foldInvoiceCurrencyTotals } from '../lib/money.js'
 import { getDefaultTenantTimezone, getRestaurantTimezone } from '../lib/tenant-timezone.js'
 import { logger } from '../lib/logger.js'
@@ -890,17 +891,23 @@ router.get(
       const { rows: byCategory } = await query(
         `
       SELECT 
-        COALESCE(p.category, 'Uncategorized') as category,
+        COALESCE(lc.name, 'Uncategorized') as category,
+        lc.id AS category_id,
+        lc.name_ar AS category_name_ar,
+        lc_dept.id AS department_id,
+        lc_dept.name AS department_name,
+        lc_dept.name_ar AS department_name_ar,
         i.currency,
         SUM(ili.quantity * ili.unit_price) as total_spent
       FROM invoice i
       JOIN invoice_line_item ili ON ili.invoice_id = i.id
       LEFT JOIN product p ON p.id = ili.product_id
+      ${leafCategoryJoinSql('p', 'lc').replace('ON lc.id = COALESCE(', 'ON p.id IS NOT NULL AND lc.id = COALESCE(')}
       WHERE i.restaurant_id = $1
         AND i.status NOT IN ('VOID', 'DRAFT')
         AND ili.product_id IS NOT NULL
         AND i.invoice_date >= ${restaurantToday} - $2::int
-      GROUP BY p.category, i.currency
+      GROUP BY lc.id, lc.name, lc.name_ar, lc_dept.id, lc_dept.name, lc_dept.name_ar, i.currency
       ORDER BY total_spent DESC
     `,
         [restaurantId, periodDays, timeZone]
