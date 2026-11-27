@@ -210,7 +210,7 @@ Branch `feat/platform-categories` (ERP from origin/dev 43dead8a, Android 2aa711d
 
 | Task                          | Commits                                                                   | Tests                                                                                                                                                                 | Notes                 |
 | ----------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| B1 schema, triggers, taxonomy | see git log `feat(db): HoReCa category tree, shelves, integrity triggers` | category-schema.pg.test.js 16/16 (15 RED first); `pnpm test:marketplace:pg` 80 passed 7 skipped (fresh DB); local Docker `pnpm db:migrate`: 18 departments, 85 leaves | migrations 0240, 0241 |
+| B1 schema, triggers, taxonomy | see git log `feat(db): horeca category tree, shelves, integrity triggers` | category-schema.pg.test.js 16/16 (15 RED first); `pnpm test:marketplace:pg` 80 passed 7 skipped (fresh DB); local Docker `pnpm db:migrate`: 18 departments, 85 leaves | migrations 0240, 0241 |
 
 ### Plan B rulings
 
