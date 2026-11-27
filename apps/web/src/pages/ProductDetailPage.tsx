@@ -26,6 +26,7 @@ import {
   normalizeCartQuantity,
 } from '../lib/orderQuantityRules'
 import { Input } from '../components/ui/input'
+import { restaurantStock } from '../lib/restaurantStock'
 import { Label } from '../components/ui/label'
 
 export function ProductDetailPage() {
@@ -166,7 +167,11 @@ export function ProductDetailPage() {
                 <div>
                   <p className="font-medium text-[var(--text-muted)]">{t('detail.stock')}</p>
                   <p>
-                    {product.available_qty || 0} {product.unit || t('detail.units')}
+                    {(() => {
+                      const { qty, inStock } = restaurantStock(product)
+                      if (qty !== null) return `${qty} ${product.unit || t('detail.units')}`
+                      return inStock ? t('detail.inStock') : t('detail.outOfStock')
+                    })()}
                   </p>
                 </div>
               </div>
@@ -207,7 +212,7 @@ export function ProductDetailPage() {
               product={product}
               onAdd={handleAddToCart}
               label={t('detail.addToCart')}
-              outOfStock={!product.available_qty || product.available_qty <= 0}
+              outOfStock={restaurantStock(product).inStock !== true}
               disabled={Number(quantity) <= 0 || !Number.isFinite(Number(quantity))}
               className="flex-1"
             />

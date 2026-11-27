@@ -41,7 +41,9 @@
     "quantityUnavailable": "اختر كمية ضمن المخزون المتاح.",
     "loadFailed": "تعذر تحميل هذا المنتج. يرجى المحاولة مجددًا.",
     "retry": "حاول مجددًا",
-    "quantity": "الكمية"
+    "quantity": "الكمية",
+    "inStock": "متوفّر",
+    "outOfStock": "نفد المخزون"
   },
   "catalog": {
     "product": "المنتج",
@@ -60,7 +62,9 @@
     "removeFromFavorites": "إزالة من المفضلة",
     "addToFavorites": "إضافة إلى المفضلة",
     "notAvailable": "غ/م",
-    "units": "وحدات"
+    "units": "وحدات",
+    "inStock": "متوفّر",
+    "outOfStock": "نفد المخزون"
   },
   "filters": {
     "supplier": "المورد",
