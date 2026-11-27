@@ -66,10 +66,12 @@ Deal **boost** checkout uses separate `promotion_pricing_config` — not counted
 
 ## Targeting
 
-- **Products/categories:** `applies_to` + `promotion_targets` (supplier UI: DealTargetingPickers)
+- **Products/categories/shelves:** `applies_to` (`all`, `specific_products`, `specific_categories`, `specific_shelves`) + `promotion_targets` (supplier UI: DealTargetingPickers)
+  - Category targets are leaf platform categories (a trigger rejects departments). A shelf deal applies to the products on that shelf when the order is priced; archiving a shelf a live deal uses returns `409 SHELF_IN_USE`.
+  - The release 1 backfill re-points deals that targeted a supplier-owned category to the shelf made from it. See [platform-categories-and-shelves.md](./platform-categories-and-shelves.md).
 - **Restaurants:** none. Deals are app-wide (marketplace visibility release 1, 2026-11-26).
   - The API rejects `restaurantIds` with 400. `promotion_restaurant_targets` is no longer read or written; the table stays for history.
-  - Switching a deal to `appliesTo: 'all'` clears its product and category targets.
+  - Switching a deal to `appliesTo: 'all'` clears its product, category and shelf targets.
 - **Audience (types + areas):**
   - Deal columns: `promotions.target_restaurant_types`, `promotions.target_areas`
   - Boost copy: on publish, `deal_promotions.target_audience` is built from those columns via `buildBoostTargetAudienceFromDeal` (`{ all: true }` when both empty; otherwise `{ all: false, restaurantTypes, areas }`)

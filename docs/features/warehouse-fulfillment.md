@@ -60,11 +60,16 @@ Existing order flows are unchanged when multi-warehouse is off.
 Priority (lowest number wins within same rule type ordering in `warehouseRouting.js`):
 
 1. **product** — exact `product_id`
-2. **category** — product `category_id`
-3. **zone** — restaurant address matches the rule's `delivery_zone`, not merely some other zone of the same warehouse. Radius is used only when `zone_type` is `radius`. Polygon holes do not count as inside, including rings-format coverage. Postal codes match after trimming, removing spaces, and ignoring case. A shorter code also matches a longer one at a district boundary, so SW1 covers SW1A 1AA and E1 covers E1 6AN, while SW1 does not cover SW10 and a numeric code such as 11 does not cover 1100. Dispatch and route area labels use a postal or radius zone only when the delivery destination matches it (order snapshot, then branch, then restaurant). Branch zones use that same destination match. Otherwise they show the city. `PATCH /api/warehouses/:id/zones/:zoneId` stores one coverage type. A postal zone clears radius and center, and a radius zone clears postal codes, so a later edit cannot flip the match. A name-only update leaves coverage as it is. A radius zone needs a positive radius and a center; a postal zone needs at least one code.
-4. **stock_available** — `warehouse_inventory.quantity_available` ≥ line qty
-5. **default** — explicit default rule or supplier default warehouse
-6. **fallback** — first active warehouse
+2. **shelf** — the product is on the rule's `shelf_id` (one of the supplier's own shelves)
+3. **category** — the product's leaf platform `category_id` (rules on departments are rejected)
+4. **zone** — restaurant address matches the rule's `delivery_zone`, not merely some other zone of the same warehouse. Radius is used only when `zone_type` is `radius`. Polygon holes do not count as inside, including rings-format coverage. Postal codes match after trimming, removing spaces, and ignoring case. A shorter code also matches a longer one at a district boundary, so SW1 covers SW1A 1AA and E1 covers E1 6AN, while SW1 does not cover SW10 and a numeric code such as 11 does not cover 1100. Dispatch and route area labels use a postal or radius zone only when the delivery destination matches it (order snapshot, then branch, then restaurant). Branch zones use that same destination match. Otherwise they show the city. `PATCH /api/warehouses/:id/zones/:zoneId` stores one coverage type. A postal zone clears radius and center, and a radius zone clears postal codes, so a later edit cannot flip the match. A name-only update leaves coverage as it is. A radius zone needs a positive radius and a center; a postal zone needs at least one code.
+5. **stock_available** — `warehouse_inventory.quantity_available` ≥ line qty
+6. **default** — explicit default rule or supplier default warehouse
+7. **fallback** — first active warehouse
+
+The release 1 category backfill turns a rule on a supplier-owned category into a `shelf` rule on
+the shelf made from it. Archiving a shelf that a rule uses returns `409 SHELF_IN_USE`. See
+[platform-categories-and-shelves.md](./platform-categories-and-shelves.md).
 
 A product rule aimed at an inactive warehouse does not block the active warehouses. Listing the same product twice on an order does not fail tenant ownership. Stock used to choose the warehouse is locked in that transaction before the choice, in a stable warehouse and product order. Completing a pick wave marks packed only the warehouse leg that pick list belongs to.
 

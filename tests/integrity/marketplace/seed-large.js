@@ -64,9 +64,16 @@ export async function seedLarge(client) {
     [LARGE.restaurants]
   )
   await pool.query(
-    `INSERT INTO product (supplier_id, sku, name, unit, created_at)
+    // Spread products over every active leaf platform category (Plan B budgets browse them).
+    `WITH leaf AS (
+       SELECT id, (row_number() OVER (ORDER BY slug) - 1)::int AS i, count(*) OVER ()::int AS n
+       FROM product_category
+       WHERE supplier_id IS NULL AND parent_category_id IS NOT NULL AND is_active
+     )
+     INSERT INTO product (supplier_id, sku, name, unit, created_at, category_id)
      SELECT s.id, 'BENCH-' || s.slug || '-' || g, initcap(w.w) || ' grade ' || g, 'kg',
-            now() - (abs(hashtext(s.slug || g)) % 525600) * interval '1 minute'
+            now() - (abs(hashtext(s.slug || g)) % 525600) * interval '1 minute',
+            (SELECT l.id FROM leaf l WHERE l.i = abs(hashtext('cat' || s.slug || g)) % l.n)
      FROM supplier s
      CROSS JOIN generate_series(1, $1) g
      JOIN bench_words w ON w.i = g % 10
@@ -202,8 +209,10 @@ export async function attachBenchViewers(
     [branch, supplier.orgId]
   )
   await pool.query(
-    `INSERT INTO product (supplier_id, sku, name, unit)
-     SELECT $1, 'BENCHV-' || g, 'Viewer tomato ' || g, 'kg' FROM generate_series(1, 100) g`,
+    `INSERT INTO product (supplier_id, sku, name, unit, category_id)
+     SELECT $1, 'BENCHV-' || g, 'Viewer tomato ' || g, 'kg',
+            (SELECT id FROM product_category WHERE slug = 'vegetables' AND supplier_id IS NULL)
+     FROM generate_series(1, 100) g`,
     [branch]
   )
   await pool.query(

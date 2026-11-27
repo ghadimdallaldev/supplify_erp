@@ -37,6 +37,20 @@ Without the `search_vector` column, `/api/products` still falls back to name/SKU
 
 Full rules: [marketplace-visibility.md](./marketplace-visibility.md).
 
+## Categories (platform categories release 1)
+
+- Browsing uses one Supplify category tree: departments (`dept-*`) and their leaf categories,
+  from `GET /api/products/categories` with per-viewer counts. Restaurants never see empty nodes.
+- `/api/products?categoryId=` takes a leaf or a department id (a department matches all its
+  leaves). The old free-text `?category=` filter is gone.
+- `/api/search` returns `categories` beside suppliers and products: leaves whose English, Arabic,
+  French name or alias matches the query (e.g. "خبز", "kaak", "fromage"), with visible counts.
+  Product search also matches products in those categories.
+- A supplier page groups products by the supplier's **shelves** (`?shelfId=`), with
+  "All products" first.
+
+Full model: [platform-categories-and-shelves.md](./platform-categories-and-shelves.md).
+
 ## Web
 
 - `useDebouncedSearch` hook (300ms default)
@@ -50,7 +64,12 @@ the accessible directory. The Following filter uses the restaurant's supplier
 relationships.
 
 Supplier Catalog sends product and SKU searches to the existing supplier-scoped
-`/api/products` endpoint. The category and in-stock filters can be combined.
-Category choices come from loaded products, and the filter sheet can load more
-choices. See [mobile feature parity](../mobile/MOBILE_FEATURE_PARITY.md) for the
-paired app worktrees.
+`/api/products` endpoint. The shelf rail ("All products" plus the supplier's
+shelves), the category filter (`categoryId`) and the in-stock filter can be
+combined. Shelves and categories come from `GET /api/suppliers/:id`. Without
+shelves the rail shows the supplier's categories.
+
+Restaurant Home shows the department rail; a department opens a sheet of its
+categories. Search lists matching categories before products. See
+[mobile feature parity](../mobile/MOBILE_FEATURE_PARITY.md) for the paired app
+worktrees.

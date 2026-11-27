@@ -299,14 +299,21 @@ router.get('/categories', async (req, res) => {
     const { supplierId, restaurantId, cacheKey } = await catalogMetaScope(req, 'categoryTree')
     let tree = await getCache(cacheKey)
     if (!Array.isArray(tree?.departments)) {
+      // The visible suppliers are resolved once and hash-joined: a per-product EXISTS made the
+      // planner cost this whole-catalog count at ~1.5M, which switched on JIT (~650ms on 60k
+      // products). The leaf join is one row per product, so COUNT(*) needs no DISTINCT sort.
       const { rows } = await query(
         `
-        WITH counts AS (
-          SELECT lc.id AS category_id, COUNT(DISTINCT p.id)::int AS product_count
+        WITH vis AS MATERIALIZED (
+          SELECT vis_s.id FROM supplier vis_s
+          WHERE $2::uuid IS NULL OR ${catalogVisibleSql('$2::uuid', 'vis_s')}
+        ),
+        counts AS (
+          SELECT lc.id AS category_id, COUNT(*)::int AS product_count
           FROM product p
+          JOIN vis ON vis.id = p.supplier_id
           ${leafCategoryJoinSql('p', 'lc')}
           WHERE ($1::uuid IS NULL OR p.supplier_id = $1)
-            AND ${restaurantVisibleProductSql(2)}
           GROUP BY lc.id
         )
         SELECT pc.id, pc.slug, pc.name, pc.name_ar, pc.name_fr, pc.icon_key,

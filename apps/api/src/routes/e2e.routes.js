@@ -215,8 +215,11 @@ router.post('/reset-seed', async (req, res) => {
         )
         if (existing.length === 0) {
           const { rows: prod } = await client.query(
-            `INSERT INTO product (id, supplier_id, sku, name, unit)
-             VALUES (gen_random_uuid(), $1, 'E2E-SKU-1', 'E2E Catalog Product', 'kg')
+            `INSERT INTO product (id, supplier_id, sku, name, unit, category_id)
+             VALUES (gen_random_uuid(), $1, 'E2E-SKU-1', 'E2E Catalog Product', 'kg',
+               (SELECT id FROM product_category
+                WHERE slug = 'grains-legumes' AND supplier_id IS NULL AND
+                      parent_category_id IS NOT NULL))
              RETURNING id`,
             [supplierId]
           )

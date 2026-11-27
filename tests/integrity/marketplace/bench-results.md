@@ -140,3 +140,23 @@ ANALYZE
 
 DROP INDEX
 ```
+
+## Plan B — platform categories (2026-11-27)
+
+Same host and method. `seed-large.js` now spreads the 60,000 products over the 85 active leaf
+categories (release 2 makes `product.category_id` required).
+
+| Query                                                                 | Before    | After (best of 3) | Rounds             | Budget |
+| --------------------------------------------------------------------- | --------- | ----------------- | ------------------ | ------ |
+| categoryTree (`/api/products/categories`, restaurant, cache bypassed) | 841.01 ms | 44.14 ms          | 44.1 / 57.2 / 52.8 | 50 ms  |
+| categoryProductList (`/api/products?categoryId=<dept>&limit=24`)      | 38.67 ms  | 41.85 ms          | 57.1 / 49.7 / 41.8 | 60 ms  |
+
+The tree's per-product `EXISTS` visibility filter made the planner cost the whole-catalog count
+at ~1.5M, which switched on JIT (82 functions, ~650 ms of compilation for ~90 ms of work).
+Resolving the visible suppliers once (`WITH vis AS MATERIALIZED`) and hash-joining them, plus
+`COUNT(*)` instead of `COUNT(DISTINCT p.id)` (the leaf join is one row per product), brings the
+raw query from 674 ms to 35 ms p95 with identical counts for restaurant, supplier and admin
+callers. Each benchmark call bumps `catalog:version`, so it measures the uncached path; warm
+calls are served from the per-viewer cache. The other budgets were re-run on the new seed and
+all pass (getRelationship 1.33, productList 36.78, groupedSearch 69.60, customerList 30.88,
+dealList 36.27, conversationList 26.18 ms).

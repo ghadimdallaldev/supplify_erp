@@ -198,7 +198,9 @@ describe('Products Routes', () => {
       // Admin/supplier view (no restaurant) keeps empty nodes.
       expect(departments[1].categories[0]).toMatchObject({ id: 'c-2', product_count: 0 })
       const sql = String(db.query.mock.calls[0][0])
-      expect(sql).toContain('COUNT(DISTINCT p.id)')
+      // Visible suppliers once, hash-joined (a per-product EXISTS switched on JIT at scale).
+      expect(sql).toContain('WITH vis AS MATERIALIZED')
+      expect(sql).toContain('JOIN vis ON vis.id = p.supplier_id')
       expect(sql).toContain('pc.supplier_id IS NULL')
     })
   })

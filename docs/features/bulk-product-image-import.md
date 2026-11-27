@@ -65,6 +65,7 @@ The image-import dialog’s **URL via CSV** tab documents this path. During impo
 - 15s fetch timeout; response must be `image/*`.
 - Same optimization and storage metering as ZIP imports.
 - Runs inline with product row processing (not a background ZIP job).
+- The same CSV's `category` and `shelf` columns are matched to a platform category and a shelf (see [supplier-ops.md](./supplier-ops.md#product-import-csv--excel)). ZIP image jobs only attach images to existing products and do not change categories.
 
 CSV previews use a lightweight parser and load the XLSX dependency only for spreadsheet uploads, keeping the common CSV path responsive while preserving quoted-field support.
 
