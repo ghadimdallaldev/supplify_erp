@@ -14,6 +14,7 @@ import {
   loadPlatformCategories,
   normalizeCategoryText,
 } from './category-matcher.js'
+import { BROAD_CATEGORY_SLUGS } from './category-sql.js'
 import { connectMigrationClient, query as defaultQuery } from './db.js'
 import { logger } from './logger.js'
 import { bumpCatalogVersionSafe } from './relationship-cache.js'
@@ -22,24 +23,7 @@ export const CATEGORY_BACKFILL_NAME = 'category-backfill'
 const LOCK_KEY = 'category-backfill'
 
 /** The 16 original platform categories: broad leaves since 0240. */
-export const BROAD_CATEGORY_SLUGS = [
-  'vegetables',
-  'meat-poultry',
-  'seafood',
-  'grains-legumes',
-  'oils-fats',
-  'dairy',
-  'beverages',
-  'spices-seasonings',
-  'canned-preserved',
-  'bakery-bread',
-  'frozen-foods',
-  'snacks-nuts',
-  'condiments-sauces',
-  'cleaning-supplies',
-  'paper-disposables',
-  'other',
-]
+export { BROAD_CATEGORY_SLUGS }
 
 const STAT_KEYS = [
   'suppliers',
@@ -370,34 +354,63 @@ export async function runCategoryBackfill(db, options = {}) {
     )
     const ctx = { leaves, byId, otherId, broadIds }
 
+    const passOver = async (supplierIds, passCtx, { advanceCursor }) => {
+      for (const supplierId of supplierIds) {
+        await client.query('BEGIN')
+        try {
+          const delta = await backfillSupplier(client, supplierId, passCtx)
+          for (const key of STAT_KEYS) {
+            if (key !== 'targetsSplit') stats[key] += delta[key]
+          }
+          if (advanceCursor) stats.suppliers += 1
+          await client.query(
+            `UPDATE data_migration_run
+             SET cursor = CASE WHEN $4 THEN jsonb_build_object('lastSupplierId', $2::text)
+                               ELSE cursor END,
+                 stats = $3
+             WHERE name = $1`,
+            [CATEGORY_BACKFILL_NAME, supplierId, stats, advanceCursor]
+          )
+          await client.query('COMMIT')
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => undefined)
+          error.message = `supplier ${supplierId}: ${error.message}`
+          throw error
+        }
+        if (options.onSupplierDone) await options.onSupplierDone(supplierId)
+      }
+    }
+
     const { rows: suppliers } = await client.query(
       'SELECT id FROM supplier WHERE ($1::uuid IS NULL OR id > $1::uuid) ORDER BY id',
       [run?.cursor?.lastSupplierId ?? null]
     )
-    for (const { id: supplierId } of suppliers) {
-      await client.query('BEGIN')
-      try {
-        const delta = await backfillSupplier(client, supplierId, ctx)
-        for (const key of STAT_KEYS) {
-          if (key !== 'targetsSplit') stats[key] += delta[key]
-        }
-        stats.suppliers += 1
-        await client.query(
-          `UPDATE data_migration_run SET cursor = jsonb_build_object('lastSupplierId', $2::text),
-                  stats = $3 WHERE name = $1`,
-          [CATEGORY_BACKFILL_NAME, supplierId, stats]
-        )
-        await client.query('COMMIT')
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined)
-        error.message = `supplier ${supplierId}: ${error.message}`
-        throw error
-      }
-      if (options.onSupplierDone) await options.onSupplierDone(supplierId)
-    }
+    await passOver(
+      suppliers.map((r) => r.id),
+      ctx,
+      { advanceCursor: true }
+    )
 
     await bumpCatalogVersionSafe()
-    const verification = await verifyCategoryBackfill(client)
+    let verification = await verifyCategoryBackfill(client)
+    if (!verification.ok) {
+      // Rows written behind the cursor (an old instance still serving during a rolling deploy,
+      // or a previous run that ended failed) would otherwise fail every later start. Repair
+      // every supplier once more, touching only rows that break the rules: with no broad ids,
+      // a product a supplier chose for a broad leaf is never reclassified a second time.
+      logger.warn('Category backfill repairing rows behind the cursor', {
+        event: 'category_backfill.repair',
+        violations: verification.violations,
+      })
+      const { rows: all } = await client.query('SELECT id FROM supplier ORDER BY id')
+      await passOver(
+        all.map((r) => r.id),
+        { ...ctx, broadIds: new Set() },
+        { advanceCursor: false }
+      )
+      await bumpCatalogVersionSafe()
+      verification = await verifyCategoryBackfill(client)
+    }
     if (verification.ok) {
       await client.query(
         `UPDATE data_migration_run SET status = 'verified', stats = $2, finished_at = now(),

@@ -223,6 +223,41 @@ describe('shelves API (real PG)', () => {
     expect(dup.body.error.name).toBe('SHELF_NAME_TAKEN')
   })
 
+  it('PATCH shelf products adds and removes without touching other members', async () => {
+    const org = await createSupplierOrg(db.pool)
+    const other = await createSupplierOrg(db.pool)
+    const branch = org.branchIds[0]
+    const sub = org.users[0].userSub
+    const shelfId = await shelf(branch, 'Big shelf')
+    const products = []
+    for (let i = 0; i < 4; i += 1) {
+      products.push(await createProduct(db.pool, branch, { categoryId: leaf('cheese') }))
+    }
+    const [p1, p2, p3, p4] = products.map((p) => p.id)
+    await call(sub, 'PUT', `/api/products/shelves/${shelfId}/products`, {
+      productIds: [p1, p2, p3],
+    })
+
+    const res = await call(sub, 'PATCH', `/api/products/shelves/${shelfId}/products`, {
+      add: [p4, p2],
+      remove: [p1],
+    })
+    expect(res.status, JSON.stringify(res.body)).toBe(200)
+    expect(res.body.data.shelf.product_count).toBe(3)
+    const { rows } = await db.pool.query(
+      'SELECT product_id FROM product_shelf WHERE shelf_id = $1 ORDER BY product_id',
+      [shelfId]
+    )
+    expect(rows.map((r) => r.product_id)).toEqual([p2, p3, p4].sort())
+
+    const theirs = await createProduct(db.pool, other.branchIds[0], { categoryId: leaf('cheese') })
+    const foreign = await call(sub, 'PATCH', `/api/products/shelves/${shelfId}/products`, {
+      add: [theirs.id],
+    })
+    expect(foreign.status).toBe(400)
+    expect(foreign.body.error.code).toBe('foreignProducts')
+  })
+
   it('foreign productIds and foreign shelves are refused', async () => {
     const org = await createSupplierOrg(db.pool)
     const other = await createSupplierOrg(db.pool)

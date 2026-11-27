@@ -6,6 +6,12 @@ import { ProductShelvesDialog } from './ProductShelvesDialog'
 
 const archiveShelf = vi.fn()
 const createShelf = vi.fn()
+const changeShelfProducts = vi.fn()
+const members = [
+  { id: 'm1', name: 'Halloumi', sku: 'H-1' },
+  { id: 'm2', name: 'Akkawi', sku: 'A-1' },
+]
+const others = [{ id: 's1', name: 'Feta', sku: 'F-1' }]
 
 vi.mock('../../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/api')>()
@@ -35,9 +41,12 @@ vi.mock('../../services/api', async (importOriginal) => {
     useCreateShelfMutation: () => [createShelf, { isLoading: false }],
     useUpdateShelfMutation: () => [vi.fn(), { isLoading: false }],
     useReorderShelvesMutation: () => [vi.fn(), { isLoading: false }],
-    useSetShelfProductsMutation: () => [vi.fn(), { isLoading: false }],
+    useChangeShelfProductsMutation: () => [changeShelfProducts, { isLoading: false }],
     useArchiveShelfMutation: () => [archiveShelf, { isLoading: false }],
-    useGetProductsQuery: () => ({ data: { products: [] }, isLoading: false }),
+    useGetProductsQuery: (args?: { shelfId?: string }) =>
+      args?.shelfId
+        ? { data: { products: members }, isLoading: false }
+        : { data: { products: [...members, ...others] }, isLoading: false, isFetching: false },
   }
 })
 
@@ -83,5 +92,23 @@ describe('ProductShelvesDialog', () => {
     const inUse = await screen.findByRole('alert')
     expect(within(inUse).getByText('Summer cheese week')).toBeInTheDocument()
     expect(within(inUse).getByText('Cold store (priority 1)')).toBeInTheDocument()
+  })
+
+  it('saving shelf products sends only what changed', async () => {
+    changeShelfProducts.mockReturnValue({ unwrap: () => Promise.resolve({ shelf: {} }) })
+    const user = userEvent.setup()
+    renderWithProviders(<ProductShelvesDialog open onOpenChange={() => {}} />)
+
+    const row = screen.getByTestId('shelf-row-shelf-1')
+    await user.click(within(row).getByRole('button', { name: 'Products' }))
+    await user.click(screen.getByRole('checkbox', { name: /Halloumi/ }))
+    await user.click(screen.getByRole('checkbox', { name: /Feta/ }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(changeShelfProducts).toHaveBeenCalledWith({
+      id: 'shelf-1',
+      add: ['s1'],
+      remove: ['m1'],
+    })
   })
 })

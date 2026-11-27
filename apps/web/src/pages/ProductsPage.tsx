@@ -362,14 +362,15 @@ export function ProductsPage() {
       const createdId = (created as { product?: { id?: string } })?.product?.id
       if (pendingRequest && createdId) {
         try {
-          await createCategoryRequest({ ...pendingRequest, productIds: [createdId] }).unwrap()
-          toast.success(t('categoryRequest.sent'))
+          const sent = await createCategoryRequest({
+            ...pendingRequest,
+            productIds: [createdId],
+          }).unwrap()
+          toast.success(
+            t(sent.alreadyRequested ? 'categoryRequest.exists' : 'categoryRequest.sent')
+          )
         } catch (error: any) {
-          if (error?.data?.error?.name === 'CATEGORY_REQUEST_EXISTS') {
-            toast.success(t('categoryRequest.exists'))
-          } else {
-            toast.error(error?.data?.error?.message || t('categoryRequest.failed'))
-          }
+          toast.error(error?.data?.error?.message || t('categoryRequest.failed'))
         }
       }
       setShowAddProduct(false)

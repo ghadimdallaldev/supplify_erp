@@ -217,6 +217,7 @@ for a missing category with **Request a category**.
 | PUT            | `/api/products/shelves/order`              | `CATALOG_EDIT`                  | Reorder                                                                    |
 | PATCH / DELETE | `/api/products/shelves/:id`                | `CATALOG_EDIT`                  | Rename / archive (`409 SHELF_IN_USE` while a deal or routing rule uses it) |
 | PUT            | `/api/products/shelves/:id/products`       | `CATALOG_EDIT`                  | Replace a shelf's products                                                 |
+| PATCH          | `/api/products/shelves/:id/products`       | `CATALOG_EDIT`                  | Add / remove products (`{ add[], remove[] }`)                              |
 | GET / POST     | `/api/products/category-requests`          | `CATALOG_VIEW` / `CATALOG_EDIT` | Own requests / request a category                                          |
 
 Migration `0211_supplier_product_categories.sql` had added supplier-owned categories; the

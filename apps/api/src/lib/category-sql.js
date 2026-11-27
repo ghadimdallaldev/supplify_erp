@@ -6,6 +6,47 @@
 
 export const OTHER_CATEGORY_SLUG = 'other'
 
+/**
+ * The 16 original platform categories. Since 0240 they are leaves beside narrower ones but keep
+ * their broad meaning ("Dairy" still covers cheese), so readers that match on a category treat
+ * one of these as its whole department.
+ */
+export const BROAD_CATEGORY_SLUGS = [
+  'vegetables',
+  'meat-poultry',
+  'seafood',
+  'grains-legumes',
+  'oils-fats',
+  'dairy',
+  'beverages',
+  'spices-seasonings',
+  'canned-preserved',
+  'bakery-bread',
+  'frozen-foods',
+  'snacks-nuts',
+  'condiments-sauces',
+  'cleaning-supplies',
+  'paper-disposables',
+  'other',
+]
+
+const BROAD_SLUGS_SQL = BROAD_CATEGORY_SLUGS.filter((slug) => slug !== OTHER_CATEGORY_SLUG)
+  .map((slug) => `'${slug}'`)
+  .join(', ')
+
+/**
+ * Predicate: the leaf `leafIdSql` falls under the category `categoryIdSql`, i.e. it is that
+ * category, or that category is a broad leaf and the leaf is in the same department.
+ * Both arguments are trusted SQL expressions, not input.
+ */
+export function leafCoveredByCategorySql(leafIdSql, categoryIdSql) {
+  return `(${leafIdSql} = ${categoryIdSql} OR EXISTS (
+    SELECT 1 FROM product_category broad_c
+    JOIN product_category sib_c ON sib_c.parent_category_id = broad_c.parent_category_id
+    WHERE broad_c.id = ${categoryIdSql} AND broad_c.supplier_id IS NULL
+      AND broad_c.slug IN (${BROAD_SLUGS_SQL}) AND sib_c.id = ${leafIdSql}))`
+}
+
 /** Expression: the id of the platform "Other" leaf. */
 export const OTHER_CATEGORY_ID_SQL = `(SELECT oc.id FROM product_category oc
   WHERE oc.slug = '${OTHER_CATEGORY_SLUG}' AND oc.supplier_id IS NULL AND oc.parent_category_id IS NOT NULL

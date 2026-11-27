@@ -7,7 +7,11 @@ import {
   getRestaurantTimezone,
   getZonedDayOfWeek,
 } from '../lib/tenant-timezone.js'
-import { OTHER_CATEGORY_ID_SQL, leafCategoryIdSql } from '../lib/category-sql.js'
+import {
+  OTHER_CATEGORY_ID_SQL,
+  leafCategoryIdSql,
+  leafCoveredByCategorySql,
+} from '../lib/category-sql.js'
 import { t } from '../i18n/index.js'
 
 export const MIN_ORDERS_FOR_CADENCE = 4
@@ -251,7 +255,8 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
           AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($1::int || ' days')::interval
           AND (
             (c.cadence_level = 'product' AND oi.product_id = c.product_id)
-            OR (c.cadence_level = 'category' AND ${leafCategoryIdSql('p')} = c.category_id)
+            OR (c.cadence_level = 'category'
+                AND ${leafCoveredByCategorySql(leafCategoryIdSql('p'), 'c.category_id')})
           )
       )
     `,

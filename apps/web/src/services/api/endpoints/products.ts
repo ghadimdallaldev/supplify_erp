@@ -54,14 +54,14 @@ export const productsApi = api.injectEndpoints({
       query: (body) => ({ url: '/api/products/shelves/order', method: 'PUT', body }),
       invalidatesTags: ['Shelf'],
     }),
-    setShelfProducts: builder.mutation<
+    changeShelfProducts: builder.mutation<
       { shelf: SupplierShelf },
-      { id: string; productIds: string[] }
+      { id: string; add: string[]; remove: string[] }
     >({
-      query: ({ id, productIds }) => ({
+      query: ({ id, add, remove }) => ({
         url: `/api/products/shelves/${id}/products`,
-        method: 'PUT',
-        body: { productIds },
+        method: 'PATCH',
+        body: { add, remove },
       }),
       invalidatesTags: ['Shelf', 'Product'],
     }),
@@ -78,7 +78,7 @@ export const productsApi = api.injectEndpoints({
       providesTags: ['CategoryRequest'],
     }),
     createCategoryRequest: builder.mutation<
-      { request: CategoryRequest },
+      { request: CategoryRequest; alreadyRequested: boolean },
       CreateCategoryRequestBody
     >({
       query: (body) => ({ url: '/api/products/category-requests', method: 'POST', body }),

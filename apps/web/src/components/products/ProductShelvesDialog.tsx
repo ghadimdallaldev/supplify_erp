@@ -8,7 +8,7 @@ import {
   useGetProductsQuery,
   useGetShelvesQuery,
   useReorderShelvesMutation,
-  useSetShelfProductsMutation,
+  useChangeShelfProductsMutation,
   useUpdateShelfMutation,
 } from '../../services/api'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -344,27 +344,30 @@ export function ProductShelvesDialog({
   )
 }
 
-/** Choose which products sit on a shelf. Saves the full membership (PUT replaces it). */
+/**
+ * Choose which products sit on a shelf. Only the first page of members is listed, so saving
+ * sends what changed (PATCH add/remove) and never restates members it did not load.
+ */
 function ShelfProductsPicker({ shelf, onDone }: { shelf: SupplierShelf; onDone: () => void }) {
   const { t } = useTranslation('products')
   const { search, setSearch, debouncedSearch } = useDebouncedSearch('')
   const { data: memberData, isLoading: membersLoading } = useGetProductsQuery({
     shelfId: shelf.id,
-    limit: 500,
+    limit: 100,
   })
   const { data: searchData, isFetching } = useGetProductsQuery({
     q: debouncedSearch || undefined,
     limit: 50,
   })
-  const [setShelfProducts, { isLoading: saving }] = useSetShelfProductsMutation()
-  const [selected, setSelected] = useState<Set<string> | null>(null)
+  const [changeShelfProducts, { isLoading: saving }] = useChangeShelfProductsMutation()
+  // Toggles relative to the saved membership: ids added and ids removed.
+  const [added, setAdded] = useState<Set<string>>(() => new Set())
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set())
 
   const members = useMemo(() => (memberData?.products ?? []) as Product[], [memberData?.products])
-  useEffect(() => {
-    if (!membersLoading && selected === null) setSelected(new Set(members.map((p) => p.id)))
-  }, [membersLoading, members, selected])
-
-  const chosen = selected ?? new Set<string>()
+  const memberIds = useMemo(() => new Set(members.map((p) => p.id)), [members])
+  const isChosen = (id: string) => (memberIds.has(id) ? !removed.has(id) : added.has(id))
+  const chosenCount = Math.max(0, shelf.product_count + added.size - removed.size)
   const candidates = useMemo(() => {
     const seen = new Set<string>()
     const list: Product[] = []
@@ -383,17 +386,22 @@ function ShelfProductsPicker({ shelf, onDone }: { shelf: SupplierShelf; onDone: 
     return list
   }, [members, searchData?.products, debouncedSearch])
 
-  const toggle = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev ?? [])
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const flip = (set: Set<string>, id: string) => {
+    const next = new Set(set)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  }
+  const toggle = (id: string) => {
+    if (memberIds.has(id)) setRemoved((prev) => flip(prev, id))
+    else setAdded((prev) => flip(prev, id))
+  }
 
   const save = async () => {
     try {
-      await setShelfProducts({ id: shelf.id, productIds: [...chosen] }).unwrap()
+      if (added.size || removed.size) {
+        await changeShelfProducts({ id: shelf.id, add: [...added], remove: [...removed] }).unwrap()
+      }
       toast.success(t('shelves.productsSaved'))
       onDone()
     } catch (err) {
@@ -423,7 +431,7 @@ function ShelfProductsPicker({ shelf, onDone }: { shelf: SupplierShelf; onDone: 
               key={p.id}
               className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-[var(--app-bg-subtle)]"
             >
-              <input type="checkbox" checked={chosen.has(p.id)} onChange={() => toggle(p.id)} />
+              <input type="checkbox" checked={isChosen(p.id)} onChange={() => toggle(p.id)} />
               <span className="flex-1 truncate">{p.name}</span>
               <span className="text-xs text-[var(--text-muted)]">{p.sku}</span>
             </label>
@@ -432,13 +440,13 @@ function ShelfProductsPicker({ shelf, onDone }: { shelf: SupplierShelf; onDone: 
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs tabular-nums text-[var(--text-muted)]">
-          {t('shelves.selectedCount', { count: chosen.size })}
+          {t('shelves.selectedCount', { count: chosenCount })}
         </span>
         <div className="flex gap-2">
           <Button type="button" variant="outline" onClick={onDone}>
             {t('form.cancel')}
           </Button>
-          <Button type="button" onClick={() => void save()} disabled={saving || selected === null}>
+          <Button type="button" onClick={() => void save()} disabled={saving || membersLoading}>
             {t('shelves.saveProducts')}
           </Button>
         </div>

@@ -91,23 +91,44 @@ describe('supplier category requests (real PG)', () => {
     ])
   })
 
-  it('duplicate pending request is 409', async () => {
+  it('a second product on the same pending name joins that request', async () => {
     const org = await createSupplierOrg(db.pool)
     const p = await createProduct(db.pool, org.branchIds[0], { categoryId: leaf('cheese') })
+    const q = await createProduct(db.pool, org.branchIds[0], { categoryId: leaf('cheese') })
     const first = await requestFor(org, 'Truffles', [p.id])
     const dup = await call(org.users[0].userSub, 'POST', '/api/products/category-requests', {
       proposedName: ' truffle ',
-      productIds: [p.id],
+      productIds: [q.id],
     })
-    expect(dup.status, JSON.stringify(dup.body)).toBe(409)
-    expect(dup.body.error).toMatchObject({
-      name: 'CATEGORY_REQUEST_EXISTS',
-      details: { existingId: first.id },
+    expect(dup.status, JSON.stringify(dup.body)).toBe(200)
+    expect(dup.body.data).toMatchObject({
+      alreadyRequested: true,
+      request: { id: first.id, status: 'pending', product_count: 2 },
     })
+    expect(await productRows([q.id])).toEqual([
+      {
+        id: q.id,
+        category_id: leaf('other'),
+        category_needs_review: true,
+        category_request_id: first.id,
+      },
+    ])
+    // Approving the request moves both products.
+    const admin = await adminUser()
+    await service.approveCategoryRequest(
+      first.id,
+      { parentId: dept('cheese') },
+      { adminUserId: admin }
+    )
+    const moved = await productRows([p.id, q.id])
+    expect(new Set(moved.map((r) => r.category_id)).size).toBe(1)
+    expect(moved.every((r) => r.category_id !== leaf('other') && !r.category_needs_review)).toBe(
+      true
+    )
     // Another supplier may ask for the same name.
     const other = await createSupplierOrg(db.pool)
-    const q = await createProduct(db.pool, other.branchIds[0], { categoryId: leaf('cheese') })
-    await requestFor(other, 'Truffles', [q.id])
+    const theirs = await createProduct(db.pool, other.branchIds[0], { categoryId: leaf('cheese') })
+    await requestFor(other, 'Truffles', [theirs.id])
   })
 
   it('foreign productIds rejected', async () => {

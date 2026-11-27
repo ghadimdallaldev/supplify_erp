@@ -66,36 +66,23 @@ export async function assertLeafCategory(db, categoryId) {
   return rows[0]
 }
 
-async function findPendingId(db, supplierId, normalizedName) {
-  const { rows } = await db.query(
-    `SELECT id FROM category_request
-     WHERE supplier_id = $1 AND normalized_name = $2 AND status = 'pending'`,
-    [supplierId, normalizedName]
-  )
-  return rows[0]?.id ?? null
-}
-
-const existsError = (existingId) =>
-  new CatalogError('CATEGORY_REQUEST_EXISTS', 'categoryRequestExists', 409, { existingId })
-
 /**
- * Supplier: create a pending request and park the given products on "Other" for review.
+ * Supplier: ask for a category and park the given products on "Other" for review. When the
+ * supplier already has a pending request with the same folded name, the products join that
+ * request instead (`alreadyRequested: true`), so approving it moves them too.
  * @param {string} supplierId the caller's branch
  * @param {{ proposedName: string, proposedNameAr?: string|null, proposedParentId?: string|null, productIds?: string[] }} body
+ * @returns {Promise<{ request: object, alreadyRequested: boolean }>}
  */
 export async function createCategoryRequest(supplierId, body) {
   const proposedName = body.proposedName.trim()
   const normalizedName = normalizeRequestName(proposedName)
   if (!normalizedName) throw catalogValidation('invalidInput')
   const productIds = uniqueIds(body.productIds)
-  const db = { query: defaultQuery }
-  if (body.proposedParentId) await assertDepartment(db, body.proposedParentId)
-  const existingId = await findPendingId(db, supplierId, normalizedName)
-  if (existingId) throw existsError(existingId)
+  if (body.proposedParentId) await assertDepartment({ query: defaultQuery }, body.proposedParentId)
 
-  let request
-  try {
-    request = await withTransaction(async (client) => {
+  const run = () =>
+    withTransaction(async (client) => {
       if (productIds.length) {
         const { rows } = await client.query(
           `SELECT id FROM product WHERE id = ANY($1::uuid[]) AND supplier_id = $2 FOR UPDATE`,
@@ -103,41 +90,61 @@ export async function createCategoryRequest(supplierId, body) {
         )
         if (rows.length !== productIds.length) throw catalogValidation('foreignProducts')
       }
+      // Locking the pending row makes a concurrent resolution wait for us (or us for it: a row
+      // resolved meanwhile no longer matches, and the products get a new request).
       const {
-        rows: [created],
+        rows: [pending],
       } = await client.query(
-        `INSERT INTO category_request (supplier_id, proposed_name, proposed_name_ar, normalized_name,
-                                       proposed_parent_id, example_product_id)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id`,
-        [
-          supplierId,
-          proposedName,
-          body.proposedNameAr?.trim() || null,
-          normalizedName,
-          body.proposedParentId || null,
-          productIds[0] ?? null,
-        ]
+        `SELECT id FROM category_request
+         WHERE supplier_id = $1 AND normalized_name = $2 AND status = 'pending'
+         FOR UPDATE`,
+        [supplierId, normalizedName]
       )
+      let requestId = pending?.id
+      if (!requestId) {
+        const {
+          rows: [created],
+        } = await client.query(
+          `INSERT INTO category_request (supplier_id, proposed_name, proposed_name_ar,
+                                         normalized_name, proposed_parent_id, example_product_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id`,
+          [
+            supplierId,
+            proposedName,
+            body.proposedNameAr?.trim() || null,
+            normalizedName,
+            body.proposedParentId || null,
+            productIds[0] ?? null,
+          ]
+        )
+        requestId = created.id
+      }
       if (productIds.length) {
         await client.query(
           `UPDATE product
            SET category_id = ${OTHER_CATEGORY_ID_SQL}, category_needs_review = true,
                category_request_id = $1, updated_at = now()
            WHERE id = ANY($2::uuid[]) AND supplier_id = $3`,
-          [created.id, productIds, supplierId]
+          [requestId, productIds, supplierId]
         )
       }
-      return created
+      return { requestId, alreadyRequested: Boolean(pending) }
     })
+
+  let result
+  try {
+    result = await run()
   } catch (error) {
-    if (isUniqueViolation(error, 'idx_category_request_pending_name')) {
-      throw existsError(await findPendingId(db, supplierId, normalizedName))
-    }
-    throw error
+    // Two first requests raced; the loser joins the winner's request.
+    if (!isUniqueViolation(error, 'idx_category_request_pending_name')) throw error
+    result = await run()
   }
   if (productIds.length) await bumpCatalogVersionSafe()
-  return getCategoryRequest(request.id)
+  return {
+    request: await getCategoryRequest(result.requestId),
+    alreadyRequested: result.alreadyRequested,
+  }
 }
 
 /** One request with its product count and names for display. */

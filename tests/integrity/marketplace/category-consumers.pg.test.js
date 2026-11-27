@@ -400,6 +400,53 @@ describe('warehouse routing and cadence (real PG)', () => {
     expect(ar[0].label).toContain(cats.cheese.name_ar)
     expect(ar[0].label).toContain('Fromagerie')
   })
+
+  it('a category cadence on a broad leaf is met by an order from a sibling leaf', async () => {
+    const { getMissedCadencesForToday } = await import(
+      '../../../apps/api/src/services/reorder-cadence.service.js'
+    )
+    expect(cats.cheese.parent_category_id).toBe(cats.dairy.parent_category_id)
+    expect(cats['yogurt-labneh'].parent_category_id).toBe(cats.dairy.parent_category_id)
+    const org = await createSupplierOrg(db.pool, { name: 'Laiterie' })
+    const branch = org.branchIds[0]
+    const r = await createRestaurant(db.pool)
+    await db.pool.query(`UPDATE restaurant SET timezone = 'UTC' WHERE id = $1`, [r.id])
+    const cheese = await createProduct(db.pool, branch, { categoryId: leaf('cheese') })
+    const {
+      rows: [o],
+    } = await db.pool.query(
+      `INSERT INTO customer_order (restaurant_id, status, total_amount, subtotal_amount, currency,
+                                   supplier_organization_id, placed_at)
+       VALUES ($1, 'PLACED', 10, 10, 'USD', $2, now()) RETURNING id`,
+      [r.id, org.orgId]
+    )
+    await db.pool.query(
+      `INSERT INTO order_item (order_id, product_id, supplier_id, quantity, unit_price, line_total)
+       VALUES ($1, $2, $3, 1, 10, 10)`,
+      [o.id, cheese.id, branch]
+    )
+    const cadenceOn = async (slug) => {
+      const {
+        rows: [c],
+      } = await db.pool.query(
+        `INSERT INTO restaurant_order_cadence
+           (restaurant_id, supplier_id, category_id, cadence_level, day_of_week, label,
+            confidence_score, is_active)
+         VALUES ($1, $2, $3, 'category',
+                 EXTRACT(DOW FROM (now() AT TIME ZONE 'UTC'))::int, 'Weekly', 80, true)
+         RETURNING id`,
+        [r.id, branch, leaf(slug)]
+      )
+      return c.id
+    }
+    const broad = await cadenceOn('dairy')
+    const narrow = await cadenceOn('yogurt-labneh')
+    const missed = (await getMissedCadencesForToday()).map((m) => m.id)
+    // "Dairy" keeps its broad meaning: the cheese order counts.
+    expect(missed).not.toContain(broad)
+    // A narrow leaf still needs its own products.
+    expect(missed).toContain(narrow)
+  })
 })
 
 describe('supplier page shelves and categories for restaurants (real PG)', () => {

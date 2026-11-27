@@ -44,10 +44,10 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const body = categoryRequestCreateSchema.parse(req.body)
-    const request = await createCategoryRequest(await supplierFor(req), body)
+    const data = await createCategoryRequest(await supplierFor(req), body)
     return res
-      .status(201)
-      .json({ ok: true, data: { request }, error: null, requestId: req.requestId })
+      .status(data.alreadyRequested ? 200 : 201)
+      .json({ ok: true, data, error: null, requestId: req.requestId })
   } catch (error) {
     return sendCatalogError(req, res, error, 'Create category request failed')
   }

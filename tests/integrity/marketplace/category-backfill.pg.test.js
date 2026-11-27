@@ -474,6 +474,44 @@ describe('runCategoryBackfill', () => {
     expect(final.filter((r) => r.slug === 'other' && r.category_needs_review)).toHaveLength(4)
   })
 
+  it('a failed verification repairs rows written behind the cursor, sparing broad-leaf choices', async () => {
+    const suppliers = []
+    for (let i = 0; i < 2; i++) {
+      const supplierId = await newSupplier()
+      const cat = await supplierCategory(supplierId, `Aisle ${i}`)
+      await createProduct(db.pool, supplierId, { name: 'Sunflower oil 18L', categoryId: cat })
+      suppliers.push(supplierId)
+    }
+    let first = null
+    let late = null
+    let broad = null
+    let calls = 0
+    const result = await backfill.runCategoryBackfill(undefined, {
+      // An old API instance keeps writing during a rolling deploy, behind the cursor.
+      onSupplierDone: async (supplierId) => {
+        calls += 1
+        first ??= supplierId
+        if (calls !== suppliers.length) return
+        const own = await supplierCategory(first, 'Late section')
+        late = await createProduct(db.pool, first, { name: 'Cheddar block 5kg', categoryId: own })
+        broad = await createProduct(db.pool, first, {
+          name: 'Cheddar slices 1kg',
+          categoryId: await platformId('dairy'),
+        })
+      },
+    })
+    expect(result.verified, JSON.stringify(result.violations)).toBe(true)
+    expect((await runRow()).status).toBe('verified')
+    expect((await productRow(late.id)).slug).toBe('cheese')
+    // A product the supplier put on a broad leaf after its pass is not reclassified.
+    expect((await productRow(broad.id)).slug).toBe('dairy')
+    const { rows: shelves } = await db.pool.query(
+      'SELECT name FROM supplier_shelf WHERE supplier_id = $1 ORDER BY name',
+      [first]
+    )
+    expect(shelves.map((r) => r.name)).toContain('Late section')
+  })
+
   it('second run is a no-op', async () => {
     const supplierId = await newSupplier()
     const cat = await supplierCategory(supplierId, 'Pantry')

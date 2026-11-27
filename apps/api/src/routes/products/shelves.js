@@ -13,6 +13,7 @@ import {
   listShelves,
   reorderShelves,
   setShelfProducts,
+  changeShelfProducts,
   updateShelf,
 } from '../../services/shelves.service.js'
 
@@ -31,6 +32,12 @@ export const shelfUpdateSchema = z
   })
   .strict()
 export const shelfProductsSchema = z.object({ productIds: z.array(z.string().uuid()).max(5000) })
+export const shelfProductsChangeSchema = z
+  .object({
+    add: z.array(z.string().uuid()).max(5000).default([]),
+    remove: z.array(z.string().uuid()).max(5000).default([]),
+  })
+  .strict()
 export const shelfOrderSchema = z.object({ shelfIds: z.array(z.string().uuid()).min(1).max(500) })
 const shelfIdParam = z.string().uuid()
 
@@ -89,6 +96,16 @@ router.put('/:id/products', async (req, res) => {
     return ok(req, res, { shelf: await setShelfProducts(await supplierFor(req), id, productIds) })
   } catch (error) {
     return sendCatalogError(req, res, error, 'Set shelf products failed')
+  }
+})
+
+router.patch('/:id/products', async (req, res) => {
+  try {
+    const id = shelfIdParam.parse(req.params.id)
+    const change = shelfProductsChangeSchema.parse(req.body)
+    return ok(req, res, { shelf: await changeShelfProducts(await supplierFor(req), id, change) })
+  } catch (error) {
+    return sendCatalogError(req, res, error, 'Change shelf products failed')
   }
 })
 

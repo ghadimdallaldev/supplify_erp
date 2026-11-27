@@ -78,7 +78,7 @@ export const {
   useCreateShelfMutation,
   useUpdateShelfMutation,
   useReorderShelvesMutation,
-  useSetShelfProductsMutation,
+  useChangeShelfProductsMutation,
   useArchiveShelfMutation,
   useGetCategoryRequestsQuery,
   useCreateCategoryRequestMutation,

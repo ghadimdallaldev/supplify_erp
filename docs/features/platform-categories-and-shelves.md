@@ -57,8 +57,8 @@ A supplier who cannot find the right leaf asks for one. The product is filed und
 
 - `POST /api/products/category-requests`
   `{ proposedName, proposedNameAr?, proposedParentId? (a department), productIds[] }`. A
-  pending request with the same folded name from the same supplier returns
-  `409 CATEGORY_REQUEST_EXISTS`; clients treat that as sent.
+  pending request with the same folded name from the same supplier takes the products instead
+  (`200`, `alreadyRequested: true`), so approving it moves them too; a new request is `201`.
 - Admins **approve** (creates the leaf and moves the products), **merge** (moves the products to an
   existing leaf) or **reject** (products stay under Other, still flagged).
 - The supplier gets a `CATEGORY_REQUEST_RESOLVED` notification (`reference_type
@@ -76,6 +76,7 @@ CATEGORY_REQUEST`, `metadata.outcome`, `ctaUrl /app/products?needsReview=1`).
 | PUT                | `/api/products/shelves/order`                             | supplier           | `{ shelfIds[] }`                                                                                                                                                                                                                                     |
 | PATCH / DELETE     | `/api/products/shelves/:id`                               | supplier           | Rename / archive (`409 SHELF_IN_USE`)                                                                                                                                                                                                                |
 | PUT                | `/api/products/shelves/:id/products`                      | supplier           | Replace a shelf's products                                                                                                                                                                                                                           |
+| PATCH              | `/api/products/shelves/:id/products`                      | supplier           | `{ add[], remove[] }`: change membership without restating it (the web picker)                                                                                                                                                                       |
 | GET / POST         | `/api/products/category-requests`                         | supplier           | Own requests / new request                                                                                                                                                                                                                           |
 | GET                | `/api/admin/category-requests`                            | admin              | Pending queue                                                                                                                                                                                                                                        |
 | POST               | `/api/admin/category-requests/:id/{approve,merge,reject}` | admin              | Resolve                                                                                                                                                                                                                                              |
@@ -97,7 +98,9 @@ Catalog errors use `error { name, code, message, details }`; messages are locali
 - **Imports:** the `category` column is matched to a leaf; an optional `shelf` column creates or
   reuses a shelf (see [supplier-ops.md](./supplier-ops.md)).
 - **Reorder cadences, inventory, reports:** read the leaf platform category; spend-by-category
-  rows carry `category_id`, `category_name_ar` and the department.
+  rows carry `category_id`, `category_name_ar` and the department. A category cadence on one of
+  the 16 broad leaves ("Dairy") keeps its broad meaning: an order from any leaf in the same
+  department meets it (`leafCoveredByCategorySql`).
 
 ## Backfill (release 1)
 
@@ -110,6 +113,10 @@ Catalog errors use `error { name, code, message, details }`; messages are locali
 - Per supplier it turns each supplier-owned category into a shelf of the same name, classifies its
   products onto leaves (unmatched → Other with `category_needs_review`), and remaps deal targets,
   routing rules and cadences.
+- When verification fails after the pass (rows written behind the cursor, for example by an old
+  instance during a rolling deploy, or a previous failed run), it repairs every supplier once more,
+  touching only rows that break a check (a product on a broad leaf is never reclassified twice),
+  then verifies again.
 - A failure is logged and recorded; the API keeps serving and the backfill resumes on the next
   start. `SKIP_CATEGORY_BACKFILL=1` skips it (see
   [environment-variables.md](../operations/environment-variables.md)).

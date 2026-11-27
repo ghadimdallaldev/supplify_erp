@@ -225,6 +225,39 @@ export async function setShelfProducts(supplierId, shelfId, productIds) {
   return (await listShelves(supplierId)).find((s) => s.id === shelfId)
 }
 
+/**
+ * Add and remove products on a shelf without restating the whole membership, so a client that
+ * loaded only a page of members cannot drop the rest. `add` must be the supplier's products.
+ */
+export async function changeShelfProducts(supplierId, shelfId, { add = [], remove = [] }) {
+  const addIds = uniqueIds(add)
+  const removeIds = uniqueIds(remove).filter((id) => !addIds.includes(id))
+  await withTransaction(async (client) => {
+    await getOwnShelf(client, supplierId, shelfId, { forUpdate: true })
+    if (addIds.length) {
+      const { rows } = await client.query(
+        `SELECT count(*)::int AS n FROM product WHERE id = ANY($1::uuid[]) AND supplier_id = $2`,
+        [addIds, supplierId]
+      )
+      if (rows[0].n !== addIds.length) throw catalogValidation('foreignProducts')
+      await client.query(
+        `INSERT INTO product_shelf (product_id, shelf_id, supplier_id)
+         SELECT unnest($1::uuid[]), $2, $3
+         ON CONFLICT DO NOTHING`,
+        [addIds, shelfId, supplierId]
+      )
+    }
+    if (removeIds.length) {
+      await client.query(
+        'DELETE FROM product_shelf WHERE shelf_id = $1 AND product_id = ANY($2::uuid[])',
+        [shelfId, removeIds]
+      )
+    }
+  })
+  await bumpCatalogVersionSafe()
+  return (await listShelves(supplierId)).find((s) => s.id === shelfId)
+}
+
 /** Set display_order from the given order; every id must be an active shelf of the supplier. */
 export async function reorderShelves(supplierId, shelfIds) {
   const ids = uniqueIds(shelfIds)
