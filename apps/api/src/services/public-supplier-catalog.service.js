@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js'
+import { categoryFilterSql, leafCategoryJoinSql } from '../lib/category-sql.js'
 import { columnExists } from '../lib/ensure-tenant-branding-schema.js'
 import { NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { getTenantBranding } from './branding.service.js'
@@ -196,9 +197,15 @@ export async function getPublicSupplierProfile(idOrSlug, dbQuery = query) {
   }
 }
 
+/**
+ * A supplier storefront page. Filters: `q` (name), `categoryId` (a platform department or
+ * category), `shelfId` (one of this supplier's shelves). Returns the platform categories its
+ * products sit on and its active shelves, each with distinct product counts; products on no
+ * shelf are still listed (the storefront's "All products" section).
+ */
 export async function listPublicSupplierProducts(
   supplierId,
-  { page = 1, limit = DEFAULT_PAGE_SIZE, q, category } = {},
+  { page = 1, limit = DEFAULT_PAGE_SIZE, q, categoryId, shelfId } = {},
   dbQuery = query
 ) {
   const safeLimit = Math.min(Math.max(1, limit), 48)
@@ -214,24 +221,44 @@ export async function listPublicSupplierProducts(
     params.push(`%${q.toLowerCase()}%`)
     paramIndex++
   }
-  if (category) {
-    where.push(`p.category = $${paramIndex}`)
-    params.push(category)
+  if (categoryId) {
+    where.push(categoryFilterSql(`$${paramIndex}`, 'lc'))
+    params.push(categoryId)
+    paramIndex++
+  }
+  if (shelfId) {
+    where.push(`EXISTS (
+      SELECT 1 FROM product_shelf ps_f
+      JOIN supplier_shelf sh_f ON sh_f.id = ps_f.shelf_id AND sh_f.archived_at IS NULL
+      WHERE ps_f.product_id = p.id AND ps_f.shelf_id = $${paramIndex}::uuid
+    )`)
+    params.push(shelfId)
     paramIndex++
   }
 
   const whereClause = where.join(' AND ')
+  const categoryJoin = leafCategoryJoinSql('p', 'lc')
 
-  // Products page, total count, and category list are independent — run in parallel.
-  const [{ rows }, { rows: countRows }, { rows: categories }] = await Promise.all([
-    dbQuery(
-      `
+  // Products page, total count, categories and shelves are independent — run in parallel.
+  const [{ rows }, { rows: countRows }, { rows: categories }, { rows: shelves }] =
+    await Promise.all([
+      dbQuery(
+        `
       SELECT
         p.id,
         p.supplier_id,
         p.name,
         p.sku,
-        p.category,
+        lc.id AS category_id,
+        lc.name AS category_name,
+        lc.name_ar AS category_name_ar,
+        lc.parent_category_id AS department_id,
+        ARRAY(
+          SELECT ps.shelf_id FROM product_shelf ps
+          JOIN supplier_shelf sh ON sh.id = ps.shelf_id AND sh.archived_at IS NULL
+          WHERE ps.product_id = p.id
+          ORDER BY sh.display_order, sh.name
+        ) AS shelf_ids,
         p.unit,
         p.image_url,
         p.description,
@@ -239,37 +266,56 @@ export async function listPublicSupplierProducts(
         COALESCE(pis.order_multiple, 1) AS order_multiple
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${categoryJoin}
       LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
       WHERE ${whereClause}
       ORDER BY p.name ASC
       LIMIT ${safeLimit} OFFSET ${offset}
       `,
-      params
-    ),
-    dbQuery(
-      `
+        params
+      ),
+      dbQuery(
+        `
       SELECT COUNT(*)::int AS total
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${categoryJoin}
       WHERE ${whereClause}
       `,
-      params
-    ),
-    dbQuery(
-      `
-      SELECT DISTINCT p.category
+        params
+      ),
+      dbQuery(
+        `
+      SELECT lc.id, lc.slug, lc.name, lc.name_ar, lc.name_fr, lc.icon_key,
+             lc.parent_category_id AS department_id,
+             COUNT(DISTINCT p.id)::int AS product_count
       FROM product p
       JOIN supplier s ON s.id = p.supplier_id
+      ${categoryJoin}
       WHERE p.supplier_id = ANY($1::uuid[])
-        AND p.category IS NOT NULL
-        AND p.category <> ''
         AND ${catalogEnabledPredicate}
-      ORDER BY p.category ASC
-      LIMIT 50
+      GROUP BY lc.id, lc.slug, lc.name, lc.name_ar, lc.name_fr, lc.icon_key, lc.parent_category_id,
+               lc.display_order
+      ORDER BY lc.display_order, lc.name
       `,
-      [scope.supplierIds]
-    ),
-  ])
+        [scope.supplierIds]
+      ),
+      dbQuery(
+        `
+      SELECT sh.id, sh.supplier_id, sh.name, sh.name_ar, sh.display_order,
+             COUNT(DISTINCT ps.product_id)::int AS product_count
+      FROM supplier_shelf sh
+      JOIN supplier s ON s.id = sh.supplier_id
+      LEFT JOIN product_shelf ps ON ps.shelf_id = sh.id
+      WHERE sh.supplier_id = ANY($1::uuid[])
+        AND sh.archived_at IS NULL
+        AND ${catalogEnabledPredicate}
+      GROUP BY sh.id
+      ORDER BY sh.display_order, sh.name
+      `,
+        [scope.supplierIds]
+      ),
+    ])
 
   const stockRows = rows.length
     ? await listSupplierStockForScope(
@@ -304,7 +350,12 @@ export async function listPublicSupplierProducts(
         supplierId: row.supplier_id,
         name: row.name,
         sku: row.sku,
-        category: row.category,
+        category: row.category_name ?? null,
+        categoryId: row.category_id ?? null,
+        categoryName: row.category_name ?? null,
+        categoryNameAr: row.category_name_ar ?? null,
+        departmentId: row.department_id ?? null,
+        shelfIds: row.shelf_ids ?? [],
         unit: row.unit,
         imageUrl: row.image_url,
         description: row.description,
@@ -317,7 +368,24 @@ export async function listPublicSupplierProducts(
         pricingSource: canSell && price ? 'DEFAULT_PRICE' : null,
       }
     }),
-    categories: categories.map((c) => c.category).filter(Boolean),
+    categories: categories.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      name_ar: c.name_ar ?? null,
+      name_fr: c.name_fr ?? null,
+      icon_key: c.icon_key ?? null,
+      department_id: c.department_id ?? null,
+      product_count: Number(c.product_count || 0),
+    })),
+    shelves: shelves.map((sh) => ({
+      id: sh.id,
+      supplierId: sh.supplier_id,
+      name: sh.name,
+      name_ar: sh.name_ar ?? null,
+      display_order: Number(sh.display_order || 0),
+      product_count: Number(sh.product_count || 0),
+    })),
     pagination: {
       page: Math.max(1, page),
       limit: safeLimit,
@@ -344,14 +412,14 @@ export async function assertRestaurantNotBlocklisted(restaurantId, supplierId, d
 export async function listAuthenticatedRestaurantProducts(
   supplierId,
   restaurantId,
-  { page = 1, limit = DEFAULT_PAGE_SIZE, q, category } = {},
+  { page = 1, limit = DEFAULT_PAGE_SIZE, q, categoryId, shelfId } = {},
   dbQuery = query
 ) {
   await assertRestaurantNotBlocklisted(restaurantId, supplierId, dbQuery)
 
   const catalog = await listPublicSupplierProducts(
     supplierId,
-    { page, limit, q, category },
+    { page, limit, q, categoryId, shelfId },
     dbQuery
   )
   if (!catalog.products.length) return catalog

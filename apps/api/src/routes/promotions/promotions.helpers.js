@@ -1,5 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
+import { validateDealTargets } from '../../services/catalog-targets.service.js'
 import {
   requireAuth,
   requireRole,
@@ -68,13 +69,18 @@ const promotionBodySchema = z.object({
   maxDiscountCap: z.number().nonnegative().optional().nullable(),
   buyQuantity: z.number().int().positive().optional().nullable(),
   getQuantity: z.number().int().positive().optional().nullable(),
-  appliesTo: z.enum(['all', 'specific_products', 'specific_categories']).default('all'),
+  appliesTo: z
+    .enum(['all', 'specific_products', 'specific_categories', 'specific_shelves'])
+    .default('all'),
   startsAt: z.string(),
   endsAt: z.string().optional().nullable(),
   usageLimit: z.number().int().positive().optional().nullable(),
   isFeatured: z.boolean().optional(),
   productIds: z.array(z.string().uuid()).optional(),
+  /** Leaf platform categories: the deal covers this supplier's products in them. */
   categoryIds: z.array(z.string().uuid()).optional(),
+  /** The supplier's own shelves. */
+  shelfIds: z.array(z.string().uuid()).optional(),
   // Deals are app-wide (spec §6.2 item 4): restaurant targeting is no longer accepted.
   restaurantIds: z
     .undefined({
@@ -172,7 +178,17 @@ async function loadPromotionForSupplier(promotionId, supplierId) {
   return rows[0]
 }
 
-async function syncPromotionTargets(client, promotionId, productIds = [], categoryIds = []) {
+/**
+ * Replace a deal's targets. Every id is checked first (spec §11.5): products and shelves must be
+ * the supplier's own, categories active leaf platform categories (CatalogError otherwise).
+ * One row per target, exactly one of product / category / shelf.
+ */
+async function syncPromotionTargets(client, promotionId, supplierId, targets = {}) {
+  const { productIds, categoryIds, shelfIds } = await validateDealTargets(
+    client,
+    supplierId,
+    targets
+  )
   await client.query(`DELETE FROM promotion_targets WHERE promotion_id = $1`, [promotionId])
   if (productIds.length > 0) {
     await client.query(
@@ -187,6 +203,26 @@ async function syncPromotionTargets(client, promotionId, productIds = [], catego
        SELECT $1, unnest($2::uuid[])`,
       [promotionId, categoryIds]
     )
+  }
+  if (shelfIds.length > 0) {
+    await client.query(
+      `INSERT INTO promotion_targets (promotion_id, shelf_id)
+       SELECT $1, unnest($2::uuid[])`,
+      [promotionId, shelfIds]
+    )
+  }
+}
+
+/** True when the body sets any target list. */
+function hasTargetLists(body) {
+  return Boolean(body.productIds || body.categoryIds || body.shelfIds)
+}
+
+function targetLists(body) {
+  return {
+    productIds: body.productIds || [],
+    categoryIds: body.categoryIds || [],
+    shelfIds: body.shelfIds || [],
   }
 }
 
@@ -245,6 +281,8 @@ export {
   getRestaurantId,
   loadPromotionForSupplier,
   syncPromotionTargets,
+  hasTargetLists,
+  targetLists,
   mapPromotionInsertFields,
   supplierDealsGate,
   BOOST_PRICING_WHERE,

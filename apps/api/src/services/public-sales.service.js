@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { query, withTransaction } from '../lib/db.js'
+import { leafCategoryJoinSql } from '../lib/category-sql.js'
 import { buildAppUrl } from '../lib/app-url.js'
 import { ValidationError, NotFoundError, ForbiddenError } from '../middlewares/errorHandler.js'
 import { getDefaultCatalogPricesBatch } from './resolve-product-price.service.js'
@@ -632,7 +633,8 @@ export async function buildConsumerReorder(consumerUserId, orderId, dbQuery = qu
   const order = await getConsumerPublicOrder(consumerUserId, orderId, dbQuery)
   const productIds = order.items.map((item) => item.productId)
   const { rows } = await dbQuery(
-    `SELECT p.id, p.name, p.sku, p.category, p.unit, p.image_url, p.description,
+    `SELECT p.id, p.name, p.sku, lc.name AS category_name, lc.id AS category_id,
+            lc.name_ar AS category_name_ar, p.unit, p.image_url, p.description,
             p.supplier_id, s.slug AS supplier_slug, s.public_catalog_enabled,
             COALESCE(pis.moq, 1) AS moq,
             COALESCE(pis.order_multiple, 1) AS order_multiple,
@@ -659,6 +661,7 @@ export async function buildConsumerReorder(consumerUserId, orderId, dbQuery = qu
             ) AS has_public_stock
      FROM product p
      JOIN supplier s ON s.id = p.supplier_id
+     ${leafCategoryJoinSql('p', 'lc')}
      LEFT JOIN product_inventory_settings pis ON pis.product_id = p.id
      LEFT JOIN supplier_public_sales_config c ON c.supplier_id = p.supplier_id
      WHERE p.id = ANY($1::uuid[])`,
@@ -702,7 +705,9 @@ export async function buildConsumerReorder(consumerUserId, orderId, dbQuery = qu
                 supplierId: row.supplier_id,
                 name: row.name,
                 sku: row.sku,
-                category: row.category,
+                category: row.category_name ?? null,
+                categoryId: row.category_id ?? null,
+                categoryNameAr: row.category_name_ar ?? null,
                 unit: row.unit,
                 imageUrl: row.image_url,
                 description: row.description,

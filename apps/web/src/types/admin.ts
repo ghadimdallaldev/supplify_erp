@@ -295,7 +295,14 @@ export interface PublicSupplierProduct {
   supplierId?: string | null
   name: string
   sku: string
+  /** Platform leaf category name. */
   category?: string | null
+  categoryId?: string | null
+  categoryName?: string | null
+  categoryNameAr?: string | null
+  departmentId?: string | null
+  /** The supplier's shelves this product sits on (non-archived). */
+  shelfIds?: string[]
   unit?: string | null
   imageUrl?: string | null
   description?: string | null
@@ -308,9 +315,30 @@ export interface PublicSupplierProduct {
   orderMultiple?: number
 }
 
+export interface PublicSupplierCategory {
+  id: string
+  slug: string
+  name: string
+  name_ar?: string | null
+  name_fr?: string | null
+  icon_key?: string | null
+  department_id: string
+  product_count: number
+}
+
+export interface PublicSupplierShelf {
+  id: string
+  supplierId: string
+  name: string
+  name_ar?: string | null
+  display_order: number
+  product_count: number
+}
+
 export interface PublicSupplierProductsResponse {
   products: PublicSupplierProduct[]
-  categories: string[]
+  categories: PublicSupplierCategory[]
+  shelves: PublicSupplierShelf[]
   pagination: { page: number; limit: number; total: number }
 }
 

@@ -8,6 +8,7 @@ import {
   usePreviewProductImportMutation,
 } from '../services/api'
 import {
+  type ProductImportCategoryOverrides,
   isAsyncProductImportStart,
   isTerminalProductImportStatus,
   type ProductImportRowError,
@@ -166,7 +167,7 @@ export function useProductCatalogImport({
   }, [importErrors, importSummary, t])
 
   const submitImport = useCallback(
-    async (uploadedFile: File | null) => {
+    async (uploadedFile: File | null, categoryOverrides?: ProductImportCategoryOverrides) => {
       if (!uploadedFile) return
       if (importPreviewMeta && importPreviewMeta.validCount === 0) {
         toast.error(t('toast.catalogFixValidationErrors'))
@@ -174,8 +175,12 @@ export function useProductCatalogImport({
       }
       try {
         const result = isSpreadsheetUpload(uploadedFile)
-          ? await executeImport({ file: uploadedFile, partial: true }).unwrap()
-          : await executeImport({ csv: await uploadedFile.text(), partial: true }).unwrap()
+          ? await executeImport({ file: uploadedFile, partial: true, categoryOverrides }).unwrap()
+          : await executeImport({
+              csv: await uploadedFile.text(),
+              partial: true,
+              categoryOverrides,
+            }).unwrap()
         if (isAsyncProductImportStart(result)) {
           setImportJobId(result.jobId)
           importTerminalToastRef.current = null

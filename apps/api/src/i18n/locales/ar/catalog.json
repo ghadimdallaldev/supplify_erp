@@ -1,0 +1,20 @@
+{
+  "errors": {
+    "chooseCategory": "اختر فئة لهذا المنتج",
+    "categoryNotFound": "هذه الفئة غير موجودة",
+    "categoryNotLeaf": "اختر فئة وليس قسماً",
+    "foreignShelf": "رف واحد أو أكثر غير متاح لهذا المورّد",
+    "foreignProducts": "منتج واحد أو أكثر لا يخص هذا المورّد",
+    "shelfNotFound": "الرف غير موجود",
+    "shelfNameTaken": "يوجد رف بهذا الاسم بالفعل",
+    "shelfInUse": "هذا الرف مستخدم في عروض أو قواعد توجيه نشطة. عدّلها أولاً.",
+    "categoryRequestExists": "سبق أن طلبت هذه الفئة، وهي بانتظار المراجعة.",
+    "categoryRequestNotFound": "طلب الفئة غير موجود",
+    "categoryRequestResolved": "تمت معالجة طلب الفئة هذا مسبقاً",
+    "categoryNameTaken": "توجد فئة بهذا الاسم في هذا القسم بالفعل",
+    "departmentNotFound": "هذا القسم غير موجود",
+    "supplierNotFound": "لم يتم العثور على سجل المورّد لهذا المستخدم",
+    "invalidInput": "مدخلات غير صالحة",
+    "internal": "حدث خطأ ما. يرجى المحاولة مرة أخرى."
+  }
+}

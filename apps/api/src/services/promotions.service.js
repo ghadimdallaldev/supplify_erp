@@ -3,6 +3,7 @@ import { isRestaurantVisibleDeal, buildDealConfigSnapshot } from './deal-lifecyc
 import { isFeatureEnabled } from '../lib/subscription.js'
 import { moneySub, moneyToNumber } from '../lib/money.js'
 import { ConflictError } from '../middlewares/errorHandler.js'
+import { leafCategoryIdSql, productShelfIdsSql } from '../lib/category-sql.js'
 
 function runQuery(db, text, params) {
   if (db && typeof db.query === 'function') {
@@ -30,7 +31,33 @@ export function isPromotionEligible(promotion, { now = new Date(), restaurantId 
 }
 
 /**
- * Line items subset that counts toward promotion (product/category targets).
+ * `target_product_ids`, `target_category_ids` and `target_shelf_ids` for promotion alias `p`.
+ * Every loader that feeds calculatePromotionDiscount must select these.
+ */
+export const PROMOTION_TARGET_ARRAYS_SQL = `
+      COALESCE(
+        (SELECT array_agg(pt.product_id) FILTER (WHERE pt.product_id IS NOT NULL)
+         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
+        '{}'
+      ) AS target_product_ids,
+      COALESCE(
+        (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
+         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
+        '{}'
+      ) AS target_category_ids,
+      COALESCE(
+        (SELECT array_agg(pt.shelf_id) FILTER (WHERE pt.shelf_id IS NOT NULL)
+         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
+        '{}'
+      ) AS target_shelf_ids`
+
+/**
+ * Line items that count toward a promotion. A targeted deal (any `applies_to` other than
+ * `all`) covers a line when ANY of its targets matches: the product itself, the line's leaf
+ * platform category, or one of the product's shelves. Each line is kept at most once, so a
+ * product matched by several targets is discounted once (spec §11.5).
+ * Lines must carry server-resolved `categoryId` (leaf) and `shelfIds`; see
+ * hydratePromotionLineItems.
  */
 export function filterEligibleLineItems(promotion, lineItems) {
   if (!lineItems?.length) return []
@@ -38,16 +65,59 @@ export function filterEligibleLineItems(promotion, lineItems) {
 
   const productIds = new Set((promotion.target_product_ids || []).map(String))
   const categoryIds = new Set((promotion.target_category_ids || []).map(String))
+  const shelfIds = new Set((promotion.target_shelf_ids || []).map(String))
 
   return lineItems.filter((line) => {
-    if (promotion.applies_to === 'specific_products') {
-      return productIds.has(String(line.productId || line.product_id))
-    }
-    if (promotion.applies_to === 'specific_categories') {
-      const catId = line.categoryId || line.category_id
-      return catId && categoryIds.has(String(catId))
-    }
-    return true
+    const productId = line.productId || line.product_id
+    if (productId && productIds.has(String(productId))) return true
+    const categoryId = line.categoryId || line.category_id
+    if (categoryId && categoryIds.has(String(categoryId))) return true
+    const lineShelves = line.shelfIds || line.shelf_ids || []
+    return lineShelves.some((id) => shelfIds.has(String(id)))
+  })
+}
+
+/**
+ * Predicate: promotion `promoAlias` covers product `productAlias` — same supplier, and either a
+ * supplier-wide deal or one of its targets matches the product, its leaf platform category or
+ * one of its non-archived shelves. EXISTS keeps one row per product (discounted once).
+ * Aliases are trusted identifiers, never input.
+ */
+export function dealCoversProductSql(promoAlias = 'p', productAlias = 'pr') {
+  return `(${productAlias}.supplier_id = ${promoAlias}.supplier_id AND (
+    ${promoAlias}.applies_to = 'all' OR EXISTS (
+      SELECT 1 FROM promotion_targets dpt
+      WHERE dpt.promotion_id = ${promoAlias}.id AND (
+        dpt.product_id = ${productAlias}.id
+        OR dpt.category_id = ${leafCategoryIdSql(productAlias)}
+        OR (dpt.shelf_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM product_shelf dps
+          JOIN supplier_shelf dsh ON dsh.id = dps.shelf_id AND dsh.archived_at IS NULL
+          WHERE dps.shelf_id = dpt.shelf_id AND dps.product_id = ${productAlias}.id))
+      ))))`
+}
+
+/**
+ * Replace client-sent category/shelf data on cart lines with the product's own leaf category
+ * and shelves. Lines whose product is not this supplier's lose both, so a deal can never
+ * cover another supplier's product.
+ * @param {{ query: Function } | Function} db
+ */
+export async function hydratePromotionLineItems(db, supplierId, lineItems = []) {
+  const ids = [...new Set(lineItems.map((l) => l.productId || l.product_id).filter(Boolean))]
+  const byId = new Map()
+  if (ids.length) {
+    const { rows } = await runQuery(
+      db,
+      `SELECT p.id, ${leafCategoryIdSql('p')} AS category_id, ${productShelfIdsSql('p')} AS shelf_ids
+       FROM product p WHERE p.id = ANY($1::uuid[]) AND p.supplier_id = $2`,
+      [ids, supplierId]
+    )
+    for (const row of rows) byId.set(row.id, row)
+  }
+  return lineItems.map((line) => {
+    const own = byId.get(line.productId || line.product_id)
+    return { ...line, categoryId: own?.category_id ?? null, shelfIds: own?.shelf_ids ?? [] }
   })
 }
 
@@ -133,16 +203,7 @@ async function fetchActivePromotionsForSupplier(db, supplierId, restaurantId) {
     db,
     `
     SELECT p.*,
-      COALESCE(
-        (SELECT array_agg(pt.product_id) FILTER (WHERE pt.product_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_product_ids,
-      COALESCE(
-        (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_category_ids
+      ${PROMOTION_TARGET_ARRAYS_SQL}
     FROM promotions p
     WHERE p.supplier_id = $1
       AND p.status = 'active'

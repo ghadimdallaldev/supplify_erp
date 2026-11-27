@@ -12,6 +12,8 @@ import { CardActionGrid, cardActionBtnClass } from '../ui/card-layout'
 import { responsiveDataListClasses } from '../ui/responsive-data-list'
 import { restaurantStock } from '../../lib/restaurantStock'
 import { cn } from '../../lib/utils'
+import { localizedName } from '../../lib/categoryLabel'
+import { ProductCategoryFixer } from './ProductCategoryFixer'
 
 type ProductCatalogRowProps = {
   product: any
@@ -112,12 +114,20 @@ function CategoryBadges({
   layout: 'card' | 'table'
   isSupplier: boolean
 }) {
-  const { t } = useTranslation('products')
-  const categoryLabel = product.category_name || product.category || t('catalog.notAvailable')
+  const { t, i18n } = useTranslation('products')
+  const categoryLabel =
+    localizedName(
+      { name: product.category_name || product.category, name_ar: product.category_name_ar },
+      i18n.language
+    ) || t('catalog.notAvailable')
+  // Suppliers see which products still need a real category.
+  const reviewBadge =
+    isSupplier && product.category_needs_review ? <ProductCategoryFixer product={product} /> : null
   if (layout === 'card') {
     return (
       <div className="mt-2 flex flex-wrap gap-1">
         <Badge variant="secondary">{categoryLabel}</Badge>
+        {reviewBadge}
         {!isSupplier && product.supplier_name ? (
           <Badge variant="outline">{product.supplier_name}</Badge>
         ) : null}
@@ -129,6 +139,7 @@ function CategoryBadges({
   return (
     <div className="flex flex-col gap-1">
       <Badge variant="secondary">{categoryLabel}</Badge>
+      {reviewBadge}
       <div className={cn('mt-1 flex flex-wrap gap-1', responsiveDataListClasses.tagsInCell)}>
         <TagBadges product={product} />
       </div>

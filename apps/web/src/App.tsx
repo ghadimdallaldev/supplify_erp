@@ -74,6 +74,7 @@ const ProductDetailPage = lazyNamedPage(
   () => import('./pages/ProductDetailPage'),
   'ProductDetailPage'
 )
+const CategoryPage = lazyNamedPage(() => import('./pages/CategoryPage'), 'CategoryPage')
 const OrdersPage = lazyNamedPage(() => import('./pages/OrdersPage'), 'OrdersPage')
 const OrderDetailPage = lazyNamedPage(() => import('./pages/OrderDetailPage'), 'OrderDetailPage')
 const SuppliersPage = lazyNamedPage(() => import('./pages/SuppliersPage'), 'SuppliersPage')
@@ -682,6 +683,20 @@ const router = createBrowserRouter([
                   title="products"
                 >
                   <ProductsPage />
+                </RequirePermission>
+              </LazyPage>
+            ),
+          },
+          {
+            path: 'app/shop/category/:slug',
+            element: (
+              <LazyPage>
+                <RequirePermission
+                  anyOf={['CATALOG_VIEW', 'ORDERS_VIEW']}
+                  allowOwner
+                  title="products"
+                >
+                  <CategoryPage />
                 </RequirePermission>
               </LazyPage>
             ),

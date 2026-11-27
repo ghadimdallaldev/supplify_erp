@@ -12,6 +12,8 @@ import {
   useGetEntitlementsQuery,
   useFavoriteProductMutation,
   useUnfavoriteProductMutation,
+  useGetShelvesQuery,
+  useCreateCategoryRequestMutation,
 } from '../services/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
@@ -24,7 +26,17 @@ import { TablePagination } from '../components/ui/table-pagination'
 import { filterControlClass } from '../components/ui/filter-control'
 import { DataTableShell } from '../components/ui/data-table-shell'
 import { cn } from '../lib/utils'
-import { Plus, Upload, Image, FileQuestion, Heart, Package, Loader2, Tags } from 'lucide-react'
+import {
+  Plus,
+  Upload,
+  Image,
+  FileQuestion,
+  Heart,
+  Package,
+  Loader2,
+  Rows,
+  AlertTriangle,
+} from 'lucide-react'
 import { useImpersonation } from '../hooks/useImpersonation'
 import { useCartActions } from '../hooks/useCartActions'
 import { toast } from 'sonner'
@@ -46,7 +58,9 @@ import {
 } from '../components/products/ProductFilters'
 import { ProductCatalogTable } from '../components/products/ProductCatalogTable'
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch'
-import { ProductCategoriesDialog } from '../components/products/ProductCategoriesDialog'
+import { ProductShelvesDialog } from '../components/products/ProductShelvesDialog'
+import { CategoryBrowse, CategorySearchHits } from '../components/marketplace/CategoryBrowse'
+import type { CategoryDepartment, SupplierShelf } from '../types'
 import { useProductCatalogImport } from '../hooks/useProductCatalogImport'
 import { SearchHistoryDropdown } from '../components/search/SearchHistoryDropdown'
 import {
@@ -60,12 +74,27 @@ const PRODUCTS_PAGE_SIZE = 50
 
 export function ProductsPage() {
   const { t } = useTranslation('products')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const searchFromUrl = searchParams.get('q') ?? ''
   const { search, setSearch, debouncedSearch } = useDebouncedSearch(searchFromUrl)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [category, setCategory] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  // Supplier "Needs a category" filter; deep-linkable as ?needsReview=1.
+  const needsReviewOnly = searchParams.get('needsReview') === '1'
+  const setNeedsReviewOnly = useCallback(
+    (on: boolean) =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (on) next.set('needsReview', '1')
+          else next.delete('needsReview')
+          return next
+        },
+        { replace: true }
+      ),
+    [setSearchParams]
+  )
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<number, string>>({})
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
@@ -74,7 +103,7 @@ export function ProductsPage() {
   const [cursor, setCursor] = useState<string | undefined>()
   const [cursorHistory, setCursorHistory] = useState<string[]>([])
   const [showAddProduct, setShowAddProduct] = useState(false)
-  const [showCategories, setShowCategories] = useState(false)
+  const [showShelves, setShowShelves] = useState(false)
   const [showBulkUpload, setShowBulkUpload] = useState(false)
   const [showImageImport, setShowImageImport] = useState(false)
   const [showInventoryAdjustment, setShowInventoryAdjustment] = useState(false)
@@ -93,6 +122,7 @@ export function ProductsPage() {
   const { isEffectiveSupplier, isEffectiveRestaurant } = useImpersonation()
   const { can } = usePermissions()
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation()
+  const [createCategoryRequest] = useCreateCategoryRequestMutation()
   const [favoriteProduct] = useFavoriteProductMutation()
   const [unfavoriteProduct] = useUnfavoriteProductMutation()
   const [generatePresignedUrl] = useGeneratePresignedUrlMutation()
@@ -114,6 +144,14 @@ export function ProductsPage() {
   })
   const { data: suppliersData } = useGetSuppliersQuery({ limit: 100 }, { skip: isSupplier })
   const { data: categoriesData } = useGetProductCategoriesQuery()
+  const departments = (categoriesData?.departments ?? []) as CategoryDepartment[]
+  const { data: shelvesData } = useGetShelvesQuery(undefined, { skip: !isSupplier })
+  const shelves = (shelvesData?.shelves ?? []) as SupplierShelf[]
+  const { data: needsReviewData } = useGetProductsQuery(
+    { needsReview: true, limit: 1 },
+    { skip: !isSupplier }
+  )
+  const needsReviewCount = needsReviewData?.pagination?.total ?? 0
   const { data: tagsData } = useGetProductTagsQuery()
 
   const uniqueSuppliers = useMemo(() => {
@@ -128,8 +166,8 @@ export function ProductsPage() {
   const queryParams = useMemo(
     () => ({
       q: debouncedSearch || undefined,
-      category: category || undefined,
       categoryId: categoryId || undefined,
+      needsReview: isSupplier && needsReviewOnly ? true : undefined,
       tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined,
       minPrice: minPrice ? minPrice : undefined,
       maxPrice: maxPrice ? maxPrice : undefined,
@@ -141,8 +179,8 @@ export function ProductsPage() {
     }),
     [
       debouncedSearch,
-      category,
       categoryId,
+      needsReviewOnly,
       selectedTags,
       minPrice,
       maxPrice,
@@ -161,8 +199,8 @@ export function ProductsPage() {
     setCursorHistory([])
   }, [
     debouncedSearch,
-    category,
     categoryId,
+    needsReviewOnly,
     selectedTags,
     minPrice,
     maxPrice,
@@ -176,6 +214,7 @@ export function ProductsPage() {
     setShowBulkUpload(false)
     setUploadedFile(null)
     setUploadPreview([])
+    setCategoryOverrides({})
   }, [])
 
   const {
@@ -305,12 +344,12 @@ export function ProductsPage() {
           return
         }
       }
-      await createProduct({
+      const created = await createProduct({
         name: productForm.name,
         sku: productForm.sku,
         description: productForm.description,
-        category: productForm.category || undefined,
-        category_id: productForm.category_id || undefined,
+        category_id: productForm.category_id,
+        shelfIds: productForm.shelfIds.length > 0 ? productForm.shelfIds : undefined,
         tags: productForm.tags.length > 0 ? productForm.tags : undefined,
         unit: productForm.unit,
         price: parseFloat(productForm.price),
@@ -319,6 +358,21 @@ export function ProductsPage() {
         warehouse_id: productForm.warehouse_id || undefined,
       }).unwrap()
       toast.success(t('toast.productCreated'))
+      const pendingRequest = productForm.pendingCategoryRequest
+      const createdId = (created as { product?: { id?: string } })?.product?.id
+      if (pendingRequest && createdId) {
+        try {
+          const sent = await createCategoryRequest({
+            ...pendingRequest,
+            productIds: [createdId],
+          }).unwrap()
+          toast.success(
+            t(sent.alreadyRequested ? 'categoryRequest.exists' : 'categoryRequest.sent')
+          )
+        } catch (error: any) {
+          toast.error(error?.data?.error?.message || t('categoryRequest.failed'))
+        }
+      }
       setShowAddProduct(false)
       setProductForm(EMPTY_PRODUCT_FORM)
       setNewTag('')
@@ -341,11 +395,12 @@ export function ProductsPage() {
       return
     }
     setUploadedFile(file)
+    setCategoryOverrides({})
     await previewImportFile(file, setUploadPreview)
   }
 
   const handleBulkSubmit = async () => {
-    await submitImport(uploadedFile)
+    await submitImport(uploadedFile, categoryOverrides)
   }
 
   if (showInitialLoad) return <ProductsPageLoading />
@@ -393,9 +448,9 @@ export function ProductsPage() {
                         <Plus className="h-4 w-4 mr-2" />
                         {t('page.addProduct')}
                       </Button>
-                      <Button variant="outline" onClick={() => setShowCategories(true)}>
-                        <Tags className="h-4 w-4 mr-2" />
-                        {t('page.manageCategories')}
+                      <Button variant="outline" onClick={() => setShowShelves(true)}>
+                        <Rows className="h-4 w-4 me-2" aria-hidden />
+                        {t('shelves.open')}
                       </Button>
                       <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
                         <Upload className="h-4 w-4 mr-2" />
@@ -436,6 +491,29 @@ export function ProductsPage() {
             </div>
           )}
 
+          {isSupplier && needsReviewCount > 0 && !needsReviewOnly ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--amber)] bg-[var(--amber-pale)] px-4 py-3 text-sm"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--amber)]" aria-hidden />
+              <span className="flex-1 text-[var(--text)]">
+                {t('categories.needsReviewBanner', { count: needsReviewCount })}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setNeedsReviewOnly(true)}>
+                {t('categories.needsReviewAction')}
+              </Button>
+            </div>
+          ) : null}
+
+          {isRestaurant ? (
+            debouncedSearch ? (
+              <CategorySearchHits query={debouncedSearch} />
+            ) : (
+              <CategoryBrowse />
+            )
+          ) : null}
+
           <DataTableShell
             data-testid="products-table-shell"
             stickyHeader
@@ -451,6 +529,20 @@ export function ProductsPage() {
                     inputClassName={cn(filterControlClass, 'pl-10')}
                   />
                 </div>
+                {isSupplier && (
+                  <Button
+                    variant={needsReviewOnly ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 shrink-0"
+                    aria-pressed={needsReviewOnly}
+                    onClick={() => setNeedsReviewOnly(!needsReviewOnly)}
+                  >
+                    {t('categories.needsReviewFilter')}
+                    {needsReviewCount > 0 ? (
+                      <span className="ms-1.5 tabular-nums">{needsReviewCount}</span>
+                    ) : null}
+                  </Button>
+                )}
                 {isRestaurant && (
                   <Button
                     variant={favoritesOnly ? 'default' : 'outline'}
@@ -475,8 +567,7 @@ export function ProductsPage() {
                 uniqueSuppliers={uniqueSuppliers}
                 categoryId={categoryId}
                 setCategoryId={setCategoryId}
-                setCategory={setCategory}
-                categoriesData={categoriesData}
+                departments={departments}
                 minPrice={minPrice}
                 maxPrice={maxPrice}
                 setMinPrice={setMinPrice}
@@ -515,10 +606,8 @@ export function ProductsPage() {
               supplierFilter={supplierFilter}
               setSupplierFilter={setSupplierFilter}
               categoryId={categoryId}
-              category={category}
               setCategoryId={setCategoryId}
-              setCategory={setCategory}
-              categoriesData={categoriesData}
+              departments={departments}
               selectedTags={selectedTags}
               setSelectedTags={setSelectedTags}
               minPrice={minPrice}
@@ -554,11 +643,9 @@ export function ProductsPage() {
             </div>
           </DataTableShell>
 
-          <ProductCategoriesDialog
-            open={showCategories}
-            onOpenChange={setShowCategories}
-            categories={categoriesData?.categories ?? []}
-          />
+          {isSupplier ? (
+            <ProductShelvesDialog open={showShelves} onOpenChange={setShowShelves} />
+          ) : null}
 
           <Suspense fallback={null}>
             {showAddProduct && (
@@ -569,7 +656,8 @@ export function ProductsPage() {
                 setProductForm={setProductForm}
                 newTag={newTag}
                 setNewTag={setNewTag}
-                categoriesData={categoriesData}
+                departments={departments}
+                shelves={shelves}
                 tagsData={tagsData}
                 warehousesData={warehousesData}
                 imagePreview={imagePreview}
@@ -603,6 +691,11 @@ export function ProductsPage() {
                 isCreating={isCreating}
                 importJob={importJob}
                 importJobActive={importJobActive}
+                departments={departments}
+                categoryOverrides={categoryOverrides}
+                setCategoryOverride={(rowNumber, id) =>
+                  setCategoryOverrides((prev) => ({ ...prev, [rowNumber]: id }))
+                }
               />
             )}
             {showInventoryAdjustment && (

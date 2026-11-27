@@ -138,7 +138,11 @@ describe('public-supplier-catalog.service', () => {
             id: 'product-1',
             name: 'Chicken',
             sku: 'CHK',
-            category: 'Poultry',
+            category_id: 'cat-poultry',
+            category_name: 'Poultry',
+            category_name_ar: 'دواجن',
+            department_id: 'dept-meat',
+            shelf_ids: ['shelf-1'],
             unit: 'kg',
             image_url: null,
             description: 'Fresh',
@@ -147,7 +151,29 @@ describe('public-supplier-catalog.service', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [{ total: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ category: 'Poultry' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'cat-poultry',
+            slug: 'poultry',
+            name: 'Poultry',
+            name_ar: 'دواجن',
+            department_id: 'dept-meat',
+            product_count: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'shelf-1',
+            supplier_id: 'supplier-1',
+            name: 'Fresh',
+            display_order: 0,
+            product_count: 1,
+          },
+        ],
+      })
       .mockResolvedValueOnce({
         rows: [{ product_id: 'product-1', amount: '12.50', currency: 'USD' }],
       })
@@ -159,6 +185,18 @@ describe('public-supplier-catalog.service', () => {
     expect(result.products[0].orderable).toBe(false)
     expect(result.products[0]).not.toHaveProperty('unit_price')
     expect(result.pagination.total).toBe(1)
+    expect(result.products[0]).toMatchObject({
+      category: 'Poultry',
+      categoryId: 'cat-poultry',
+      categoryNameAr: 'دواجن',
+      shelfIds: ['shelf-1'],
+    })
+    expect(result.categories).toEqual([
+      expect.objectContaining({ id: 'cat-poultry', name: 'Poultry', product_count: 1 }),
+    ])
+    expect(result.shelves).toEqual([
+      expect.objectContaining({ id: 'shelf-1', name: 'Fresh', product_count: 1 }),
+    ])
     expect(queryMock.mock.calls[0][0]).not.toContain('brand_primary')
   })
 

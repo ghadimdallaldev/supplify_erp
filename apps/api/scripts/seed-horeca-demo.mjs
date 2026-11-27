@@ -28,6 +28,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createSeededRng, intBetween, floatBetween, pick, shuffle } from './seed/seedRng.js'
 import { SUPPLIERS, RESTAURANTS, PLATFORM_ADMIN, DEMO_PASSWORD, RELATIONS } from './seed/horeca-data.mjs'
+import { loadSeedCategoryResolver, seedCategoryFields } from './lib/seed-categories.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const argv = process.argv.slice(2)
@@ -569,34 +570,41 @@ async function sectionCatalog() {
     const rec = state.suppliers.get(s.key)
     const productRows = []
     const priceRows = []
-    const catRows = []
+    const shelfRows = []
+    const productShelfRows = []
     let idx = 0
-    const catIds = {}
+    const shelfIds = {}
+    // Each demo section becomes a supplier shelf; every product sits on a leaf platform category.
+    const resolveCategory = await loadSeedCategoryResolver(c)
     for (const [cat, items] of Object.entries(s.categories)) {
-      const catId = uid('pcat', s.key, cat)
-      catIds[cat] = catId
-      catRows.push({ id: catId, name: cat, slug: `${s.key}-${cat.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, description: `${cat} from ${s.name}`, display_order: catRows.length, is_active: true, supplier_id: rec.id, created_at: ago(100), updated_at: ago(100) })
+      const shelfId = uid('shelf', s.key, cat)
+      shelfIds[cat] = shelfId
+      shelfRows.push({ id: shelfId, supplier_id: rec.id, name: cat, display_order: shelfRows.length, created_at: ago(100), updated_at: ago(100) })
       for (const it of items) {
         idx += 1
         const sku = `${s.skuPrefix}-${initials(cat)}-${String(idx).padStart(3, '0')}`
         const id = uid('product', s.key, sku)
-        const p = { id, sku, name: it.name, ar: it.ar, unit: it.unit, price: it.price, cat, catId, imgKey: it.img }
+        const placed = seedCategoryFields(resolveCategory, it.name, cat)
+        const catId = placed.category_id
+        productShelfRows.push({ product_id: id, shelf_id: shelfId, supplier_id: rec.id, created_at: ago(100) })
+        const p = { id, sku, name: it.name, ar: it.ar, unit: it.unit, price: it.price, cat, catId, shelfId, imgKey: it.img }
         rec.products.push(p)
         productRows.push({
           id, supplier_id: rec.id, sku, name: it.name, name_ar: it.ar,
           description: `${it.name}. Supplied by ${s.name}, packed for professional kitchens.`,
           description_ar: it.ar, brand: it.brand || s.name, category: cat, image_url: img(it.img), image_thumb_url: img(it.img),
-          unit: it.unit, tags: [cat.toLowerCase(), 'horeca'], category_id: catId, created_at: ago(100), updated_at: ago(30),
+          unit: it.unit, tags: [cat.toLowerCase(), 'horeca'], category_id: catId, category_needs_review: placed.category_needs_review, created_at: ago(100), updated_at: ago(30),
         })
         priceRows.push({ id: uid('price', id, 'base'), product_id: id, currency: 'USD', amount: it.price, min_qty: 1, valid_from: ago(110), valid_to: null })
         const bulkQty = ['kg', 'bunch', 'each'].includes(it.unit) ? 20 : it.unit === 'case' ? 5 : 6
         priceRows.push({ id: uid('price', id, 'tier'), product_id: id, currency: 'USD', amount: r2(it.price * 0.94), min_qty: bulkQty, valid_from: ago(110), valid_to: null })
       }
     }
-    await bulk(c, 'product_category', catRows)
+    await bulk(c, 'supplier_shelf', shelfRows)
     await bulk(c, 'product', productRows)
+    await bulk(c, 'product_shelf', productShelfRows)
     await bulk(c, 'price', priceRows)
-    rec.catIds = catIds
+    rec.shelfIds = shelfIds
 
     // Stock: inventory (trigger created a 0-row), warehouse_inventory, settings, alerts
     const whs = rec.warehouses

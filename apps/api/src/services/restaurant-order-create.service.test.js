@@ -119,7 +119,7 @@ describe('restaurant-order-create.service', () => {
         productId: '550e8400-e29b-41d4-a716-446655440000',
         quantity: 2,
         unitPrice: 10,
-        product: { sku: 'SKU1', category_id: null },
+        product: { sku: 'SKU1', category_id: 'leaf-cheese', shelf_ids: ['shelf-1'] },
       },
     ]
     const client = {
@@ -164,6 +164,11 @@ describe('restaurant-order-create.service', () => {
     expect(err?.code).toBe('PROMOTION_NO_LONGER_AVAILABLE')
     expect(err?.name).toBe('ConflictError')
     expect(applyPromotions).toHaveBeenCalledTimes(1)
+    // Deal lines carry the server-resolved leaf category and shelves.
+    expect(applyPromotions.mock.calls[0][0].promoLines[0]).toMatchObject({
+      categoryId: 'leaf-cheese',
+      shelfIds: ['shelf-1'],
+    })
     expect(client.query.mock.calls.some(([sql]) => /COMMIT/i.test(sql))).toBe(false)
   })
 })

@@ -5,13 +5,37 @@ import Decimal from 'decimal.js'
 import { reserveWarehouseStock, reserveWarehouseStockBatch } from './warehouseInventory.js'
 import { haversineDistanceKm } from './delivery-eta.service.js'
 import { postalCodeMatches } from '../lib/postal-code-match.js'
+import { leafCategoryIdSql, productShelfIdsSql } from '../lib/category-sql.js'
 
+/**
+ * Item-level rules, most specific first: a product, then one of the supplier's own shelves,
+ * then the product's leaf platform category.
+ */
 const RULE_PRIORITY = {
   product: 1,
+  shelf: 1.5,
   category: 2,
   zone: 3,
   stock_available: 4,
   default: 5,
+}
+
+/** The item's shelves (server-resolved by the routing loaders). */
+function itemShelfIds(item) {
+  return item.shelf_ids ?? item.shelfIds ?? []
+}
+
+function shelfRuleMatches(rule, item) {
+  return rule.rule_type === 'shelf' && rule.shelf_id && itemShelfIds(item).includes(rule.shelf_id)
+}
+
+/**
+ * SELECT list for routing loaders: id, supplier_id, leaf `category_id`, `shelf_ids`.
+ * @param {string} [alias]
+ */
+export function routingProductColumnsSql(alias = 'p') {
+  return `${alias}.id, ${alias}.supplier_id, ${leafCategoryIdSql(alias)} AS category_id,
+    ${productShelfIdsSql(alias)} AS shelf_ids`
 }
 
 function extractLatLng(address) {
@@ -233,6 +257,17 @@ export function resolveWarehouseForItem(item, context) {
   }
 
   for (const rule of activeRules) {
+    if (shelfRuleMatches(rule, item)) {
+      if (
+        !warehouses.length ||
+        warehouses.some((w) => w.id === rule.warehouse_id && w.is_active !== false)
+      ) {
+        return { warehouseId: rule.warehouse_id, ruleType: 'shelf', ruleId: rule.id }
+      }
+    }
+  }
+
+  for (const rule of activeRules) {
     if (rule.rule_type === 'category' && rule.category_id && rule.category_id === categoryId) {
       if (
         !warehouses.length ||
@@ -334,15 +369,17 @@ async function loadRoutingContext(client, supplier, order, orderItems) {
   const productIds = orderItems.map((i) => i.product_id)
   const { rows: products } = productIds.length
     ? await client.query(
-        `SELECT id, category_id FROM product WHERE id = ANY($1) AND supplier_id = $2`,
+        `SELECT ${routingProductColumnsSql('p')} FROM product p
+         WHERE p.id = ANY($1) AND p.supplier_id = $2`,
         [productIds, supplierId]
       )
     : { rows: [] }
-  const categoryByProduct = new Map(products.map((p) => [p.id, p.category_id]))
+  const productById = new Map(products.map((p) => [p.id, p]))
 
   const enrichedItems = orderItems.map((item) => ({
     ...item,
-    category_id: categoryByProduct.get(item.product_id) ?? null,
+    category_id: productById.get(item.product_id)?.category_id ?? null,
+    shelf_ids: productById.get(item.product_id)?.shelf_ids ?? [],
   }))
 
   const { rows: stockRows } = productIds.length
@@ -493,13 +530,16 @@ function ruleMatchesCandidate(item, warehouseId, rules) {
     return false
   }
 
+  // The most specific matching group rule decides: shelf rules over category rules.
+  const shelfRules = rules.filter((rule) => shelfRuleMatches(rule, item))
   const categoryRules = rules.filter(
     (rule) => rule.rule_type === 'category' && rule.category_id === item.category_id
   )
+  const groupRules = shelfRules.length ? shelfRules : categoryRules
   if (
     !productRules.length &&
-    categoryRules.length &&
-    !categoryRules.some((rule) => rule.warehouse_id === warehouseId)
+    groupRules.length &&
+    !groupRules.some((rule) => rule.warehouse_id === warehouseId)
   ) {
     return false
   }
@@ -516,6 +556,9 @@ function candidateRuleRank(items, warehouseId, rules, zoneEligible, matchedZoneI
         rule.product_id === (item.product_id ?? item.productId) &&
         rule.warehouse_id === warehouseId
     )
+    const shelfRule = rules.find(
+      (rule) => shelfRuleMatches(rule, item) && rule.warehouse_id === warehouseId
+    )
     const categoryRule = rules.find(
       (rule) =>
         rule.rule_type === 'category' &&
@@ -523,6 +566,7 @@ function candidateRuleRank(items, warehouseId, rules, zoneEligible, matchedZoneI
         rule.warehouse_id === warehouseId
     )
     if (productRule) matching.push([1, Number(productRule.priority ?? 1)])
+    else if (shelfRule) matching.push([1.5, Number(shelfRule.priority ?? 1)])
     else if (categoryRule) matching.push([2, Number(categoryRule.priority ?? 1)])
   }
   if (zoneEligible) {
@@ -633,13 +677,15 @@ export function resolveSingleWarehouseForOrder(items, context) {
     ruleType:
       selected.ruleRank === 1
         ? 'product'
-        : selected.ruleRank === 2
-          ? 'category'
-          : selected.ruleRank === 3
-            ? 'zone'
-            : selected.ruleRank === 5
-              ? 'default'
-              : 'configured_priority',
+        : selected.ruleRank === 1.5
+          ? 'shelf'
+          : selected.ruleRank === 2
+            ? 'category'
+            : selected.ruleRank === 3
+              ? 'zone'
+              : selected.ruleRank === 5
+                ? 'default'
+                : 'configured_priority',
     distanceKm: Number.isFinite(selected.distance) ? selected.distance : null,
   }
 }
@@ -663,7 +709,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
   const productIds = [...new Set(orderItems.map((item) => item.product_id).filter(Boolean))]
   const { rows: products } = productIds.length
     ? await client.query(
-        `SELECT id, supplier_id, category_id FROM product WHERE id = ANY($1::uuid[])`,
+        `SELECT ${routingProductColumnsSql('p')} FROM product p WHERE p.id = ANY($1::uuid[])`,
         [productIds]
       )
     : { rows: [] }
@@ -713,6 +759,7 @@ async function loadCanonicalRoutingContext(client, supplier, order, orderItems) 
   const enrichedItems = orderItems.map((item) => ({
     ...item,
     category_id: productMap.get(item.product_id)?.category_id ?? null,
+    shelf_ids: productMap.get(item.product_id)?.shelf_ids ?? [],
   }))
   const activeIds = new Set(warehouses.map((warehouse) => warehouse.id))
   const defaultWarehouseId =

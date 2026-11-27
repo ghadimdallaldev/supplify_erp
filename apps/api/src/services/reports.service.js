@@ -1,4 +1,12 @@
 import { query } from '../lib/db.js'
+import { leafCategoryJoinSql } from '../lib/category-sql.js'
+
+// Lines whose product is gone keep lc NULL (→ "Uncategorized"); a live product always
+// resolves to a leaf, "Other" included.
+const productCategoryJoin = leafCategoryJoinSql('p', 'lc').replace(
+  'ON lc.id = COALESCE(',
+  'ON p.id IS NOT NULL AND lc.id = COALESCE('
+)
 import { supplierSeesRestaurantSql } from '../lib/relationship.js'
 import { ValidationError } from '../middlewares/errorHandler.js'
 import { addCalendarDays } from '../lib/delivery-rollover-time.js'
@@ -214,26 +222,35 @@ export async function restaurantSpendBySupplier(restaurantId, params) {
   return { data: rows, meta: reportMeta(params, rows.length) }
 }
 
+/**
+ * Spend by the product's current platform category (lines of a deleted product, or with no
+ * product, group as "Uncategorized"); each row carries its department for the roll-up.
+ */
 export async function restaurantSpendByCategory(restaurantId, params) {
   const qParams = [restaurantId, params.from, params.to]
   const branch = branchFilter('co', params.branchId, qParams)
   const { rows } = await query(
     `
     SELECT
-      COALESCE(pc.name, p.category, 'Uncategorized') AS category,
+      COALESCE(lc.name, 'Uncategorized') AS category,
+      lc.id AS category_id,
+      lc.name_ar AS category_name_ar,
+      lc_dept.id AS department_id,
+      lc_dept.name AS department_name,
+      lc_dept.name_ar AS department_name_ar,
       co.currency,
       COALESCE(SUM(oi.line_total), 0)::numeric AS total_spend,
       COUNT(DISTINCT co.id)::int AS order_count
     FROM customer_order co
     JOIN order_item oi ON oi.order_id = co.id
-    JOIN product p ON p.id = oi.product_id
-    LEFT JOIN product_category pc ON pc.id = p.category_id
+    LEFT JOIN product p ON p.id = oi.product_id
+    ${productCategoryJoin}
     WHERE co.restaurant_id = $1
       AND co.placed_at >= $2
       AND co.placed_at <= $3
       AND co.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
       ${branch.sql}
-    GROUP BY COALESCE(pc.name, p.category, 'Uncategorized'), co.currency
+    GROUP BY lc.id, lc.name, lc.name_ar, lc_dept.id, lc_dept.name, lc_dept.name_ar, co.currency
     ORDER BY total_spend DESC
     `,
     qParams

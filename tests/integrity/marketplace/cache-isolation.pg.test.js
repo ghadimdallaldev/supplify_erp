@@ -30,16 +30,20 @@ const h = (sub) => ({ 'x-test-user': sub, 'content-type': 'application/json' })
 
 async function platformCategoryId() {
   const { rows } = await db.pool.query(
-    `SELECT id FROM product_category WHERE supplier_id IS NULL AND is_active = true ORDER BY name LIMIT 1`
+    `SELECT id FROM product_category
+     WHERE supplier_id IS NULL AND parent_category_id IS NOT NULL AND is_active = true
+     ORDER BY name LIMIT 1`
   )
   return rows[0].id
 }
 
+/** A leaf's count in the caller's category tree (0 when restaurants get it omitted as empty). */
 async function categoryCount(sub, categoryId) {
   const res = await fetch(`${api.baseUrl}/api/products/categories`, { headers: h(sub) })
   expect(res.status).toBe(200)
   const body = await res.json()
-  return body.data.categories.find((c) => c.id === categoryId)?.product_count ?? 0
+  const leaves = body.data.departments.flatMap((d) => d.categories)
+  return leaves.find((c) => c.id === categoryId)?.product_count ?? 0
 }
 
 describe('relationship-aware caches (real PG, in-memory cache)', () => {

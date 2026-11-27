@@ -30,6 +30,7 @@ import './endpoints/amendments'
 import './endpoints/push'
 import './endpoints/billing'
 import './endpoints/admin'
+import './endpoints/adminCatalog'
 import './endpoints/impersonation'
 import './endpoints/catalogImport'
 import './endpoints/growth'
@@ -72,9 +73,22 @@ export const {
   useLogoutMutation,
   useGetProductsQuery,
   useGetProductCategoriesQuery,
-  useCreateProductCategoryMutation,
-  useUpdateProductCategoryMutation,
-  useDeleteProductCategoryMutation,
+  useGetCategorySuggestionsQuery,
+  useGetShelvesQuery,
+  useCreateShelfMutation,
+  useUpdateShelfMutation,
+  useReorderShelvesMutation,
+  useChangeShelfProductsMutation,
+  useArchiveShelfMutation,
+  useGetCategoryRequestsQuery,
+  useCreateCategoryRequestMutation,
+  useGetAdminCategoryRequestsQuery,
+  useApproveCategoryRequestMutation,
+  useMergeCategoryRequestMutation,
+  useRejectCategoryRequestMutation,
+  useAddPlatformCategoryMutation,
+  useUpdatePlatformCategoryMutation,
+  useReorderPlatformCategoriesMutation,
   useGetProductTagsQuery,
   useGetProductQuery,
   useCreateProductMutation,

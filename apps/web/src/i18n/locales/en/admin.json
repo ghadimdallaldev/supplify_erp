@@ -172,7 +172,8 @@
       "limits": "Limits",
       "health": "Health",
       "operations": "Operations",
-      "audit": "Audit log"
+      "audit": "Audit log",
+      "catalog": "Catalog"
     },
     "aria": {
       "navigation": "Admin navigation",
@@ -1375,5 +1376,63 @@
     "tenantEnabled": "{{name}} enabled for tenant",
     "tenantDisabled": "{{name}} disabled for tenant",
     "tenantUpdateFailed": "Failed to update {{name}}"
+  },
+  "catalog": {
+    "cancel": "Cancel",
+    "requests": {
+      "title": "Category requests",
+      "description": "Suppliers ask for categories they cannot find. Their products wait under Other until you decide.",
+      "statusFilter": "Request status",
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "merged": "Merged",
+        "rejected": "Rejected"
+      },
+      "empty": "No requests here.",
+      "meta_one": "{{supplier}} · {{department}} · {{count}} product",
+      "meta_other": "{{supplier}} · {{department}} · {{count}} products",
+      "noDepartment": "No department suggested",
+      "resolvedTo": "Now in {{name}}",
+      "approve": "Approve",
+      "merge": "Merge",
+      "reject": "Reject",
+      "approveTitle": "Add “{{name}}” as a category",
+      "approveDescription_one": "The new category is added to the tree and {{count}} product moves into it.",
+      "approveDescription_other": "The new category is added to the tree and {{count}} products move into it.",
+      "approveConfirm": "Add category",
+      "mergeTitle": "Merge “{{name}}” into an existing category",
+      "mergeDescription_one": "{{count}} product moves into the category you choose.",
+      "mergeDescription_other": "{{count}} products move into the category you choose.",
+      "mergeConfirm": "Merge",
+      "rejectTitle": "Reject “{{name}}”?",
+      "rejectDescription_one": "{{count}} product stays under Other and the supplier is asked to choose a category.",
+      "rejectDescription_other": "{{count}} products stay under Other and the supplier is asked to choose a category.",
+      "rejectConfirm": "Reject",
+      "department": "Department",
+      "name": "Category name",
+      "nameAr": "Arabic name",
+      "iconKey": "Icon (Phosphor name)",
+      "existingCategory": "Existing category",
+      "chooseCategory": "Choose a category",
+      "note": "Note to the supplier (optional)",
+      "approved": "Category added",
+      "merged": "Request merged",
+      "rejected": "Request rejected",
+      "failed": "Unable to update the request"
+    },
+    "tree": {
+      "title": "Platform categories",
+      "description": "Departments and the categories suppliers file products under. Counts are products across all suppliers.",
+      "newCategoryIn": "New category in {{name}}",
+      "newCategoryPlaceholder": "New category",
+      "add": "Add",
+      "rename": "Rename {{name}}",
+      "renameLabel": "New name for {{name}}",
+      "save": "Save",
+      "moveUp": "Move {{name}} up",
+      "moveDown": "Move {{name}} down",
+      "saveFailed": "Unable to save the category"
+    }
   }
 }

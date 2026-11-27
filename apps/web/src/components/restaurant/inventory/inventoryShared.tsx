@@ -75,11 +75,31 @@ export function getStockStatus(quantity: number | string, threshold: number | st
   return 'IN_STOCK'
 }
 
-export function getItemCategory(item: {
-  product_category?: string
-  product_category_legacy?: string
-}) {
-  return item.product_category || item.product_category_legacy || ''
+type InventoryCategoryFields = {
+  product_category?: string | null
+  product_category_id?: string | null
+  product_category_name_ar?: string | null
+}
+
+/** The item's platform leaf category name in the UI language ('' when none). */
+export function getItemCategory(item: InventoryCategoryFields, language?: string) {
+  if (language?.startsWith('ar') && item.product_category_name_ar) {
+    return item.product_category_name_ar
+  }
+  return item.product_category || ''
+}
+
+/** `{ id, label }` filter options for the leaf categories present in `items`, sorted by label. */
+export function getItemCategoryOptions(items: InventoryCategoryFields[], language?: string) {
+  const byId = new Map<string, string>()
+  for (const item of items) {
+    if (item.product_category_id && !byId.has(item.product_category_id)) {
+      byId.set(item.product_category_id, getItemCategory(item, language))
+    }
+  }
+  return Array.from(byId, ([id, label]) => ({ id, label })).sort((a, b) =>
+    a.label.localeCompare(b.label, language)
+  )
 }
 
 export function getStatusSortRank(status: string) {

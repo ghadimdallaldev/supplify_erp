@@ -236,5 +236,30 @@
     "newTenantEmail": " ({{contactEmail}})",
     "tenantTypeSupplier": "مورد",
     "tenantTypeRestaurant": "مطعم"
+  },
+  "categoryRequest": {
+    "approvedTitle": "تمت إضافة الفئة",
+    "approvedMessage": "تمت الموافقة على طلب الفئة \"{{proposedName}}\" باسم {{categoryName}}. تم نقل {{count}} منتج.",
+    "mergedTitle": "تمت معالجة طلب الفئة",
+    "mergedMessage": "تمت مطابقة طلبك \"{{proposedName}}\" مع الفئة الموجودة {{categoryName}}. تم نقل {{count}} منتج.",
+    "rejectedTitle": "تم رفض طلب الفئة",
+    "rejectedMessage": "تم رفض طلبك \"{{proposedName}}\". تبقى منتجاتك في \"أخرى\" إلى أن تختار فئة.",
+    "rejectedNote": "ملاحظة من Supplify: {{note}}"
+  },
+  "reorderCadence": {
+    "label": "{{item}} من {{supplier}}",
+    "restaurantTitle": "تذكير بإعادة الطلب",
+    "restaurantMessage": "عادةً تطلب {{label}} يوم {{day}}. لم يُقدَّم أي طلب اليوم.",
+    "supplierTitle": "لم يُقدَّم الطلب المتوقع",
+    "supplierMessage": "يطلب {{restaurant}} عادةً {{label}} كل {{day}} ولم يطلب بعد.",
+    "days": {
+      "0": "الأحد",
+      "1": "الاثنين",
+      "2": "الثلاثاء",
+      "3": "الأربعاء",
+      "4": "الخميس",
+      "5": "الجمعة",
+      "6": "السبت"
+    }
   }
 }

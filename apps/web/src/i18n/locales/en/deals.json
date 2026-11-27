@@ -214,7 +214,11 @@
       "hotel": "Hotel",
       "catering": "Catering",
       "cloud_kitchen": "Cloud kitchen"
-    }
+    },
+    "specificShelves": "Specific shelves",
+    "shelves": "Shelves",
+    "noShelves": "No shelves yet. Create shelves from Products → Shelves.",
+    "categoriesHelper": "Only categories you sell in are listed. The deal covers your products in them."
   },
   "banner": {
     "andMore": " and {{count}} more",

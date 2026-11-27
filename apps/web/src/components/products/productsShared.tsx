@@ -3,13 +3,17 @@ import { Card, CardContent } from '../ui/card'
 import { TableScroll } from '../ui/table-scroll'
 import { toast } from 'sonner'
 import { i18n } from '../../i18n'
+import type { CreateCategoryRequestBody } from '../../types'
 
 export const EMPTY_PRODUCT_FORM = {
   name: '',
   sku: '',
   description: '',
-  category: '',
+  /** Required leaf platform category id. */
   category_id: '',
+  shelfIds: [] as string[],
+  /** "Request a category": sent after the product is created, with its id. */
+  pendingCategoryRequest: null as CreateCategoryRequestBody | null,
   tags: [] as string[],
   unit: '',
   price: '',
@@ -21,15 +25,17 @@ export const EMPTY_PRODUCT_FORM = {
 export type ProductFormState = typeof EMPTY_PRODUCT_FORM
 
 export function downloadExampleFile() {
-  const csvContent = `Name,SKU,Description,Category,Unit,Price,Stock,image_url
-Fresh Tomatoes,FT001,Premium fresh tomatoes,Vegetables,kg,2.50,100,
-Organic Lettuce,OL002,Fresh organic lettuce heads,Vegetables,pack,1.80,50,
-Chicken Breast,CB003,Free-range chicken breast,Meat,kg,8.99,30,
-Basmati Rice,BR004,Premium long-grain rice,Grains,kg,3.25,200,
-Olive Oil,OO005,Extra virgin olive oil,Oils,bottle,12.99,40,
-Whole Milk,WM006,Fresh whole milk,Dairy,liter,1.25,75,
-Orange Juice,OJ007,Fresh squeezed orange juice,Beverages,liter,2.50,60,
-French Bread,FB008,Artisan French baguette,Grains,loaf,2.00,45,`
+  // Category is matched to the platform tree (unknown → Other, flagged for review); Shelf is
+  // the supplier's own grouping and is created when missing.
+  const csvContent = `Name,SKU,Description,Category,Shelf,Unit,Price,Stock,image_url
+Fresh Tomatoes,FT001,Premium fresh tomatoes,Vegetables,Fresh counter,kg,2.50,100,
+Organic Lettuce,OL002,Fresh organic lettuce heads,Vegetables,Fresh counter,pack,1.80,50,
+Chicken Breast,CB003,Free-range chicken breast,Meat & Poultry,Butchery,kg,8.99,30,
+Basmati Rice,BR004,Premium long-grain rice,Grains & Legumes,Dry store,kg,3.25,200,
+Olive Oil,OO005,Extra virgin olive oil,Olive oil,Dry store,bottle,12.99,40,
+Whole Milk,WM006,Fresh whole milk,Dairy,Fridge,liter,1.25,75,
+Orange Juice,OJ007,Fresh squeezed orange juice,Juices,Fridge,liter,2.50,60,
+French Bread,FB008,Artisan French baguette,Bakery & Bread,,piece,2.00,45,`
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')

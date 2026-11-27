@@ -56,7 +56,9 @@
       "addedToCart": "تمت الإضافة إلى السلة",
       "linkCopied": "تم نسخ رابط الكتالوج",
       "copyFailed": "تعذّر نسخ الرابط"
-    }
+    },
+    "allProducts": "كل المنتجات",
+    "shelvesAriaLabel": "الرفوف"
   },
   "toastMessages": {
     "addedToCart": "تمت الإضافة إلى سلتك"

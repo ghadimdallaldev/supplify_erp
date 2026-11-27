@@ -1,5 +1,24 @@
 Mobile parity audit — source of truth for this repo. Native Expo apps live only in the standalone sibling repositories: `C:/myProjects/supplify-mobile` (Android) and `C:/myProjects/supplify-mobile-ios` (iOS).
 
+## 2026-11-27 — Platform categories and shelves (release 1)
+
+Plan [platform categories and shelves](../superpowers/plans/2026-11-25-platform-categories-and-shelves.md), branch `feat/platform-categories` in all three repos. Model and API: [platform-categories-and-shelves.md](../features/platform-categories-and-shelves.md).
+
+- **Final-review fixes (2026-11-28)**: a repeated category request now joins the pending one (API `200 alreadyRequested`; both apps drop the 409 special case, `src/` identical). Shelf membership gains `PATCH /api/products/shelves/:id/products` (`add` / `remove`) for the web picker; mobile edits membership per product (`shelfIds`), so it is not affected. The backfill repair pass and the broad-leaf cadence matching are server-only.
+- **Plan B Task 8 (mobile)**: implemented in both `supplify-mobile` and `supplify-mobile-ios` (`src/` identical).
+  - **Types.** `CategoryNode`, `CategoryDepartment`, `CategoryFacet`, `CategorySuggestion`, `SupplierShelf`, `CategoryRequestBody`; products add `category_name_ar`, `category_slug`, `department_id`, `category_needs_review`, `shelf_ids`; suppliers add `shelves` / `categories`; deal bodies accept `specific_shelves` / `shelfIds` (mobile still creates "all" / one-product deals only).
+  - **Restaurant Home.** "Shop by category" shows departments from `GET /api/products/categories` with `icon_key` glyphs. A department opens a sheet ("All in …" plus its categories with counts); a pick opens search results by `categoryId`.
+  - **Search.** A Categories group (from `/api/search` `categories`) leads the results; a category row opens its products. The free-text `?category=` filter is gone.
+  - **Supplier page.** Shelves from `GET /api/suppliers/:id` are the rail ("All products" first, empty shelves hidden) and filter by `shelfId`; categories move to the filter sheet, or to the rail when the supplier has no shelves. The public storefront browse does the same.
+  - **Supplier catalog.** The product editor needs a category: searchable picker (English / Arabic, leaf names before department names), name suggestions with a confident one pre-selected, and "Request a category" (a pending request with the same name takes the product: `alreadyRequested: true`). Shelf toggles save `shelfIds`. A new Shelves screen adds, renames, reorders and archives shelves; an archive blocked by `409 SHELF_IN_USE` lists the deals and routing rules. The products list shows a "needs a category" banner, filter and badge.
+  - **Notifications.** `CATEGORY_REQUEST_RESOLVED` (reference `CATEGORY_REQUEST`, `ctaUrl /app/products?needsReview=1`) opens the supplier's products filtered to those that need a category.
+  - **Inventory and reports.** Inventory filters by platform category id; spend-by-category labels use `category_name_ar` in Arabic.
+  - **Client.** Requests send `Accept-Language` (the app locale), and `ApiError.reason` keeps `error.code`. Supplier category CRUD hooks are removed (the endpoints are gone).
+  - **Strings.** 52 new strings in `en.json` / `ar.json` (plural forms for the needs-a-category count).
+  - **Verification:** supplify-mobile 05b7fd7 and supplify-mobile-ios c1c8b09 (base 2aa711d / 9700e1c): `tsc` clean; jest 73/73 suites, 290/290 tests in each; `src/` identical. The restaurant tests fail on the base screens (4 failures). Android and iOS JS bundles export cleanly. Android emulator captures PENDING (see the checklist); iOS not visually verified.
+- **Plan B Task 7 (web)**: web only; mobile ported in Task 8.
+- **Plan B Tasks 1–6 (API)**: the API contract changes (category tree response, `categoryId` / `shelfId` / `needsReview` filters, required leaf `category_id`, shelves and category-request endpoints, `CATEGORY_REQUEST_RESOLVED`, spend-by-category fields) are ported in Task 8. Migrations `0240` / `0241` and the startup backfill are server-only.
+
 ## 2026-11-26 — Marketplace visibility and categories (release 1)
 
 - **Plan A Task 14 (docs)**: new [marketplace-visibility.md](../features/marketplace-visibility.md) (rule table, unfollow, block, chat, quotes, error codes, realtime revocation). Search, deals, supplier ops, RBAC and onboarding counts updated. Docs only; no mobile code change.

@@ -242,5 +242,30 @@
     "newTenantEmail": " ({{contactEmail}})",
     "tenantTypeSupplier": "supplier",
     "tenantTypeRestaurant": "restaurant"
+  },
+  "categoryRequest": {
+    "approvedTitle": "Category added",
+    "approvedMessage": "Your category request \"{{proposedName}}\" was approved as {{categoryName}}. {{count}} product(s) moved.",
+    "mergedTitle": "Category request resolved",
+    "mergedMessage": "Your request \"{{proposedName}}\" was matched to the existing category {{categoryName}}. {{count}} product(s) moved.",
+    "rejectedTitle": "Category request declined",
+    "rejectedMessage": "Your request \"{{proposedName}}\" was declined. Your products stay in Other until you choose a category.",
+    "rejectedNote": "Note from Supplify: {{note}}"
+  },
+  "reorderCadence": {
+    "label": "{{item}} from {{supplier}}",
+    "restaurantTitle": "Suggested reorder reminder",
+    "restaurantMessage": "You usually order {{label}} on {{day}}s. No order was placed today.",
+    "supplierTitle": "Expected order not placed",
+    "supplierMessage": "{{restaurant}} usually orders {{label}} every {{day}} but has not ordered yet.",
+    "days": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    }
   }
 }

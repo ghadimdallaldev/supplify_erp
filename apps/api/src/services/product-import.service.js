@@ -9,6 +9,8 @@ import { logger } from '../lib/logger.js'
 import { writeSystemAuditLog } from '../lib/audit.js'
 import { isTenantUnlockedForBackgroundWrites } from '../lib/background-write-locks.js'
 import { importImageFromUrl, assertSafeImageUrl } from './product-image-import.service.js'
+import { classifyProduct, loadPlatformCategories } from '../lib/category-matcher.js'
+import { OTHER_CATEGORY_SLUG } from '../lib/category-sql.js'
 
 const require = createRequire(import.meta.url)
 let xlsxModule
@@ -30,6 +32,7 @@ const FIELD_ALIASES = {
   name: ['name', 'product_name', 'title', 'item_name'],
   description: ['description', 'desc'],
   category: ['category', 'product_category'],
+  shelf: ['shelf', 'section', 'shelf_name'],
   unit: ['unit', 'uom', 'unit_of_measure'],
   price: ['price', 'unit_price', 'sell_price'],
   stock: ['stock', 'quantity', 'qty', 'available_qty', 'inventory'],
@@ -251,7 +254,53 @@ function parseOptionalNumber(value) {
   return Number.isFinite(n) ? n : null
 }
 
-export function previewProductImport(fileInput, columnMapping = null, filename = null) {
+/**
+ * Match a row to a leaf platform category (spec §5.3): a per-row `overrideId` wins; otherwise the
+ * `category` text, then the product name, through the matcher (exact names, slugs and aliases
+ * score 1). Anything not confidently matched lands on "Other" with `needsReview`, and the row
+ * still imports.
+ * @returns {{ categoryId: string, categoryName: string, categoryNameAr: string|null,
+ *   score: number, needsReview: boolean, fromCategoryText: boolean } | { error: string }}
+ */
+export function matchImportCategory(raw, categories, { overrideId = null } = {}) {
+  const byId = new Map(categories.map((c) => [c.id, c]))
+  const pick = (c, score, needsReview, fromCategoryText) => ({
+    categoryId: c.id,
+    categoryName: c.name,
+    categoryNameAr: c.name_ar ?? null,
+    score,
+    needsReview,
+    fromCategoryText,
+  })
+  if (overrideId) {
+    const chosen = byId.get(overrideId)
+    if (!chosen) return { error: 'categoryNotFound' }
+    if (!chosen.parent_category_id) return { error: 'categoryNotLeaf' }
+    return pick(chosen, 1, false, true)
+  }
+  let bestScore = 0
+  for (const [text, fromCategoryText] of [
+    [raw.category, true],
+    [raw.name, false],
+  ]) {
+    if (!text || !String(text).trim()) continue
+    const { suggestions, autoCategoryId } = classifyProduct(String(text), categories)
+    bestScore = Math.max(bestScore, suggestions[0]?.score ?? 0)
+    if (autoCategoryId) {
+      return pick(byId.get(autoCategoryId), suggestions[0]?.score ?? 1, false, fromCategoryText)
+    }
+  }
+  const other = categories.find((c) => c.slug === OTHER_CATEGORY_SLUG && c.parent_category_id)
+  return pick(other, bestScore, true, false)
+}
+
+export async function previewProductImport(
+  fileInput,
+  columnMapping = null,
+  filename = null,
+  { categories = null } = {}
+) {
+  const platformCategories = categories || (await loadPlatformCategories())
   const { headers, rows } = resolveParsedImport(fileInput, filename)
   const preview = []
   const errors = []
@@ -267,11 +316,18 @@ export function previewProductImport(fileInput, columnMapping = null, filename =
     }
     const duplicateInFile = skuSet.has(mapped.sku)
     if (!duplicateInFile) skuSet.add(mapped.sku)
+    const match = matchImportCategory(mapped, platformCategories)
     preview.push({
       rowNumber,
       mapped,
       status: duplicateInFile ? 'duplicate_in_file' : 'valid',
       errors: duplicateInFile ? [{ field: 'sku', message: 'Duplicate SKU in file' }] : [],
+      matchedCategoryId: match.categoryId,
+      matchedCategoryName: match.categoryName,
+      matchedCategoryNameAr: match.categoryNameAr,
+      score: match.score,
+      needsReview: match.needsReview,
+      shelf: mapped.shelf ? String(mapped.shelf).trim() : null,
     })
   }
 
@@ -293,17 +349,66 @@ function applyColumnMapping(raw, mapping) {
   return mapped
 }
 
+/** `p.category_id` is an active leaf platform category (for the import update). */
+const EXISTING_LEAF_SQL = `EXISTS (SELECT 1 FROM product_category ec
+  WHERE ec.id = p.category_id AND ec.supplier_id IS NULL AND ec.parent_category_id IS NOT NULL
+    AND ec.is_active)`
+
+/**
+ * The `shelf` column: find each named shelf on the branch (case/space-insensitive), create the
+ * missing ones, and add the product to it (existing shelf memberships are kept).
+ */
+async function linkImportShelves(client, supplierId, importableRows, skuToProductId) {
+  const links = []
+  const names = new Map()
+  for (const { raw } of importableRows) {
+    const name = raw.shelf ? String(raw.shelf).trim().replace(/\s+/g, ' ').slice(0, 80) : ''
+    const productId = skuToProductId.get(String(raw.sku).toLowerCase())
+    if (!name || !productId) continue
+    // Same identity as the active-name unique index: lower(btrim(name)).
+    const key = name.toLowerCase()
+    if (!names.has(key)) names.set(key, name)
+    links.push({ productId, key })
+  }
+  if (!links.length) return
+  const keys = [...names.keys()]
+  await client.query(
+    `INSERT INTO supplier_shelf (supplier_id, name, display_order)
+     SELECT $1, t.name, COALESCE((SELECT max(display_order) FROM supplier_shelf
+                                   WHERE supplier_id = $1 AND archived_at IS NULL), -1) + t.ord
+     FROM unnest($2::text[], $3::text[]) WITH ORDINALITY AS t(key, name, ord)
+     WHERE NOT EXISTS (SELECT 1 FROM supplier_shelf s
+                       WHERE s.supplier_id = $1 AND s.archived_at IS NULL
+                         AND lower(btrim(s.name)) = t.key)
+     ON CONFLICT DO NOTHING`,
+    [supplierId, keys, keys.map((k) => names.get(k))]
+  )
+  const { rows: shelves } = await client.query(
+    `SELECT id, lower(btrim(name)) AS key FROM supplier_shelf
+     WHERE supplier_id = $1 AND archived_at IS NULL AND lower(btrim(name)) = ANY($2::text[])`,
+    [supplierId, keys]
+  )
+  const shelfByKey = new Map(shelves.map((s) => [s.key, s.id]))
+  const pairs = links.filter((l) => shelfByKey.has(l.key))
+  await client.query(
+    `INSERT INTO product_shelf (product_id, shelf_id, supplier_id)
+     SELECT t.product_id, t.shelf_id, $1 FROM unnest($2::uuid[], $3::uuid[]) AS t(product_id, shelf_id)
+     ON CONFLICT DO NOTHING`,
+    [supplierId, pairs.map((l) => l.productId), pairs.map((l) => shelfByKey.get(l.key))]
+  )
+}
+
 async function batchPersistProducts(supplierId, importableRows, existingBySku) {
   const creates = []
   const updates = []
 
-  for (const { rowNumber, raw } of importableRows) {
-    const skuKey = String(raw.sku).toLowerCase()
+  for (const row of importableRows) {
+    const skuKey = String(row.raw.sku).toLowerCase()
     const existing = existingBySku.get(skuKey)
     if (existing) {
-      updates.push({ rowNumber, raw, productId: existing.id })
+      updates.push({ ...row, productId: existing.id })
     } else {
-      creates.push({ rowNumber, raw })
+      creates.push(row)
     }
   }
 
@@ -313,15 +418,17 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
     if (creates.length > 0) {
       const { rows: inserted } = await client.query(
         `
-        INSERT INTO product (supplier_id, sku, name, description, category, unit)
-        SELECT $1, t.sku, t.name, t.description, t.category, t.unit
+        INSERT INTO product (supplier_id, sku, name, description, category_id,
+                             category_needs_review, unit)
+        SELECT $1, t.sku, t.name, t.description, t.category_id, t.needs_review, t.unit
         FROM unnest(
           $2::text[],
           $3::text[],
           $4::text[],
-          $5::text[],
-          $6::text[]
-        ) AS t(sku, name, description, category, unit)
+          $5::uuid[],
+          $6::boolean[],
+          $7::text[]
+        ) AS t(sku, name, description, category_id, needs_review, unit)
         RETURNING id, lower(sku) AS sku
         `,
         [
@@ -329,7 +436,8 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
           creates.map(({ raw }) => raw.sku),
           creates.map(({ raw }) => raw.name),
           creates.map(({ raw }) => raw.description || null),
-          creates.map(({ raw }) => raw.category || null),
+          creates.map(({ match }) => match.categoryId),
+          creates.map(({ match }) => match.needsReview),
           creates.map(({ raw }) => raw.unit || 'each'),
         ]
       )
@@ -344,16 +452,26 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
         UPDATE product AS p SET
           name = COALESCE(v.name, p.name),
           description = COALESCE(v.description, p.description),
-          category = COALESCE(v.category, p.category),
+          -- A confident match from the row's category text (or a chosen id) replaces the
+          -- category; otherwise an existing leaf category is kept and only a product with no
+          -- usable category takes the row's result (Other + review).
+          category_id = CASE WHEN v.apply_category OR NOT ${EXISTING_LEAF_SQL}
+                             THEN v.category_id ELSE p.category_id END,
+          category_needs_review = CASE WHEN v.apply_category THEN false
+                                       WHEN NOT ${EXISTING_LEAF_SQL} THEN v.needs_review
+                                       ELSE p.category_needs_review END,
+          category_request_id = CASE WHEN v.apply_category THEN NULL ELSE p.category_request_id END,
           unit = COALESCE(v.unit, p.unit),
           updated_at = NOW()
         FROM unnest(
           $2::uuid[],
           $3::text[],
           $4::text[],
-          $5::text[],
-          $6::text[]
-        ) AS v(id, name, description, category, unit)
+          $5::uuid[],
+          $6::boolean[],
+          $7::boolean[],
+          $8::text[]
+        ) AS v(id, name, description, category_id, needs_review, apply_category, unit)
         WHERE p.id = v.id AND p.supplier_id = $1
         `,
         [
@@ -361,7 +479,9 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
           updates.map(({ productId }) => productId),
           updates.map(({ raw }) => raw.name),
           updates.map(({ raw }) => raw.description || null),
-          updates.map(({ raw }) => raw.category || null),
+          updates.map(({ match }) => match.categoryId),
+          updates.map(({ match }) => match.needsReview),
+          updates.map(({ match }) => !match.needsReview && match.fromCategoryText),
           updates.map(({ raw }) => raw.unit || null),
         ]
       )
@@ -369,6 +489,8 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
         skuToProductId.set(String(raw.sku).toLowerCase(), productId)
       }
     }
+
+    await linkImportShelves(client, supplierId, importableRows, skuToProductId)
 
     const priceRows = importableRows
       .map(({ raw }) => {
@@ -419,9 +541,10 @@ async function batchPersistProducts(supplierId, importableRows, existingBySku) {
 export async function executeProductImport(
   supplierId,
   fileInput,
-  { partial = true, userId, filename = null } = {}
+  { partial = true, userId, filename = null, categoryOverrides = null } = {}
 ) {
   const { rows } = resolveParsedImport(fileInput, filename)
+  const categories = await loadPlatformCategories()
   const summary = {
     created: 0,
     updated: 0,
@@ -441,7 +564,15 @@ export async function executeProductImport(
       if (!partial) continue
       continue
     }
-    validatedRows.push({ rowNumber, raw })
+    const overrideId = categoryOverrides?.[rowNumber] ?? categoryOverrides?.[String(rowNumber)]
+    const match = matchImportCategory(raw, categories, { overrideId })
+    if (match.error) {
+      summary.failed += 1
+      rowErrors.push({ rowNumber, errors: [{ field: 'category', message: match.error }] })
+      continue
+    }
+    if (match.needsReview) summary.needsReview = (summary.needsReview || 0) + 1
+    validatedRows.push({ rowNumber, raw, match })
   }
 
   if (validatedRows.length > 0) {
@@ -493,7 +624,8 @@ export async function executeProductImport(
         if (!productId) continue
         try {
           assertSafeImageUrl(imageUrl)
-          await importImageFromUrl({ url: imageUrl, supplierId, productId, userId })
+          // One catalog-version bump for the whole import happens below.
+          await importImageFromUrl({ url: imageUrl, supplierId, productId, bumpVersion: false })
           summary.imagesImported += 1
         } catch (err) {
           summary.imagesFailed += 1
@@ -557,10 +689,12 @@ export async function createProductImportJob({
   partial = true,
   columnMapping = null,
   preview = null,
+  categoryOverrides = null,
 }) {
   const previewJson = {
     partial,
     columnMapping,
+    categoryOverrides,
     preview,
     filename,
     rowCount:
@@ -685,7 +819,7 @@ export async function processProductImportJob(jobId) {
 
   const payload =
     typeof job.preview_json === 'string' ? JSON.parse(job.preview_json) : job.preview_json || {}
-  const { csv, fileBuffer, filename, partial = true } = payload
+  const { csv, fileBuffer, filename, partial = true, categoryOverrides = null } = payload
 
   try {
     let fileInput
@@ -702,6 +836,7 @@ export async function processProductImportJob(jobId) {
       partial,
       userId: job.created_by,
       filename: importFilename,
+      categoryOverrides,
     })
 
     await updateProductImportJob(jobId, {

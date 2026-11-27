@@ -56,7 +56,9 @@
       "addedToCart": "Added to cart",
       "linkCopied": "Catalog link copied",
       "copyFailed": "Could not copy link"
-    }
+    },
+    "allProducts": "All products",
+    "shelvesAriaLabel": "Shelves"
   },
   "toastMessages": {
     "addedToCart": "Added to your cart"

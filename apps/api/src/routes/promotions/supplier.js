@@ -66,6 +66,8 @@ import {
   getRestaurantId,
   loadPromotionForSupplier,
   syncPromotionTargets,
+  hasTargetLists,
+  targetLists,
   mapPromotionInsertFields,
   supplierDealsGate,
   BOOST_PRICING_WHERE,
@@ -142,6 +144,7 @@ router.get('/', async (req, res, next) => {
         active_deal_promotion_id: null,
         target_product_ids: [],
         target_category_ids: [],
+        target_shelf_ids: [],
       }))
     }
     res.json({
@@ -223,12 +226,7 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
       )
       const created = rows[0]
       if (body.appliesTo !== 'all') {
-        await syncPromotionTargets(
-          client,
-          created.id,
-          body.productIds || [],
-          body.categoryIds || []
-        )
+        await syncPromotionTargets(client, created.id, supplierId, targetLists(body))
       }
       return created
     })
@@ -254,7 +252,7 @@ router.post('/', promotionsCreateLimitGate, async (req, res, next) => {
     }
     res.status(201).json({
       ok: true,
-      data: { promotion: finalPromotion },
+      data: { promotion: await enrichPromotionRow(finalPromotion) },
       error: null,
       requestId: req.requestId,
     })
@@ -329,7 +327,7 @@ router.patch('/:id', async (req, res, next) => {
           }
         }
       }
-      if (!fields.length && !body.productIds && !body.categoryIds) {
+      if (!fields.length && !hasTargetLists(body)) {
         return existing
       }
       let updated = existing
@@ -351,14 +349,9 @@ router.patch('/:id', async (req, res, next) => {
       }
       if (body.appliesTo === 'all') {
         // A supplier-wide deal has zero target rows (spec §11.5).
-        await syncPromotionTargets(client, updated.id, [], [])
-      } else if (body.productIds || body.categoryIds) {
-        await syncPromotionTargets(
-          client,
-          updated.id,
-          body.productIds || [],
-          body.categoryIds || []
-        )
+        await syncPromotionTargets(client, updated.id, supplierId, {})
+      } else if (hasTargetLists(body)) {
+        await syncPromotionTargets(client, updated.id, supplierId, targetLists(body))
       }
       return updated
     })
@@ -370,7 +363,12 @@ router.patch('/:id', async (req, res, next) => {
       target_id: promotion.id,
       payload_json: { resource_type: 'deal' },
     })
-    res.json({ ok: true, data: { promotion }, error: null, requestId: req.requestId })
+    res.json({
+      ok: true,
+      data: { promotion: await enrichPromotionRow(promotion) },
+      error: null,
+      requestId: req.requestId,
+    })
   } catch (err) {
     next(err)
   }

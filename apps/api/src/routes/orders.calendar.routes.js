@@ -8,6 +8,7 @@ import {
 } from '../lib/rbac.js'
 import { requireFeature } from '../lib/subscription.js'
 import { query } from '../lib/db.js'
+import { categoryFilterSql, leafCategoryJoinSql } from '../lib/category-sql.js'
 import { logger } from '../lib/logger.js'
 import { getCache, setCache } from '../lib/cache.js'
 import { assertLegacyBranchOwnedByRestaurant } from '../lib/branch-scope.js'
@@ -48,7 +49,8 @@ const calendarQuerySchema = z.object({
   status: z.string().optional(),
   supplier: z.string().uuid().optional(),
   branch: z.string().uuid().optional(),
-  category: z.string().optional(),
+  /** Platform category filter: a department id (all its categories) or a category id. */
+  categoryId: z.string().uuid().optional(),
   role: z.enum(['RESTAURANT', 'SUPPLIER']).optional(),
 })
 
@@ -234,7 +236,7 @@ router.get(
         status: params.status || null,
         supplier: params.supplier || null,
         branch: params.branch || null,
-        category: params.category || null,
+        categoryId: params.categoryId || null,
       })}`
 
       const cached = await getCache(cacheKey)
@@ -286,14 +288,15 @@ router.get(
         whereParts.push(`o.branch_id = ${addParam(params.branch)}`)
       }
 
-      if (params.category) {
+      if (params.categoryId) {
         whereParts.push(
           `EXISTS (
-          SELECT 1 
-          FROM order_item oi_cat 
-          JOIN product p_cat ON p_cat.id = oi_cat.product_id 
-          WHERE oi_cat.order_id = o.id 
-            AND LOWER(p_cat.category) = LOWER(${addParam(params.category)})
+          SELECT 1
+          FROM order_item oi_cat
+          JOIN product p_cat ON p_cat.id = oi_cat.product_id
+          ${leafCategoryJoinSql('p_cat', 'lc_cat')}
+          WHERE oi_cat.order_id = o.id
+            AND ${categoryFilterSql(addParam(params.categoryId), 'lc_cat')}
         )`
         )
       }
@@ -462,11 +465,13 @@ router.get(
               WHERE oi.order_id = o.id
             ), '[]'::json) AS suppliers,
             COALESCE((
-              SELECT array_remove(array_agg(DISTINCT p.category), NULL)
+              SELECT json_agg(DISTINCT jsonb_build_object('id', lc.id, 'name', lc.name,
+                                                          'name_ar', lc.name_ar))
               FROM order_item oi
               JOIN product p ON p.id = oi.product_id
+              ${leafCategoryJoinSql('p', 'lc')}
               WHERE oi.order_id = o.id
-            ), ARRAY[]::text[]) AS categories
+            ), '[]'::json) AS categories
           FROM customer_order o
           LEFT JOIN restaurant r ON r.id = o.restaurant_id
           ${hasBranchColumn ? 'LEFT JOIN branch b ON b.id = o.branch_id AND b.tenant_id = o.restaurant_id' : ''}
@@ -515,7 +520,13 @@ router.get(
       const statusSet = new Set()
       const supplierMap = new Map()
       const branchMap = new Map()
-      const categorySet = new Set()
+      const categoryMap = new Map()
+      const addCategories = (categories) => {
+        if (!Array.isArray(categories)) return
+        for (const category of categories) {
+          if (category?.id) categoryMap.set(category.id, category)
+        }
+      }
 
       for (const pageRow of pageRows) {
         if (pageRow.source === 'order') {
@@ -534,9 +545,7 @@ router.get(
             if (hasBranchColumn && event.branchId && event.branchName) {
               branchMap.set(event.branchId, event.branchName)
             }
-            if (Array.isArray(event.categories)) {
-              event.categories.filter(Boolean).forEach((category) => categorySet.add(category))
-            }
+            addCategories(event.categories)
           }
           continue
         }
@@ -557,9 +566,7 @@ router.get(
         if (hasBranchColumn && invoiceEvent.branchId && invoiceEvent.branchName) {
           branchMap.set(invoiceEvent.branchId, invoiceEvent.branchName)
         }
-        if (Array.isArray(invoiceEvent.categories)) {
-          invoiceEvent.categories.filter(Boolean).forEach((category) => categorySet.add(category))
-        }
+        addCategories(invoiceEvent.categories)
       }
 
       const responseData = {
@@ -580,7 +587,9 @@ router.get(
           branches: hasBranchColumn
             ? Array.from(branchMap.entries()).map(([id, name]) => ({ id, name }))
             : [],
-          categories: Array.from(categorySet).sort(),
+          categories: Array.from(categoryMap.values()).sort((a, b) =>
+            String(a.name).localeCompare(String(b.name))
+          ),
           totalOrders,
           totalInvoices,
         },

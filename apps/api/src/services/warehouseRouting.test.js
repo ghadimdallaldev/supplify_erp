@@ -60,6 +60,51 @@ describe('warehouseRouting', () => {
       expect(result.ruleType).toBe('product')
     })
 
+    it('shelf rule beats category rule and loses to product rule', () => {
+      const rules = [
+        {
+          id: 'r-cat',
+          rule_type: 'category',
+          category_id: 'cat-1',
+          warehouse_id: 'wh-east',
+          is_active: true,
+          priority: 1,
+        },
+        {
+          id: 'r-shelf',
+          rule_type: 'shelf',
+          shelf_id: 'sh-1',
+          warehouse_id: 'wh-west',
+          is_active: true,
+          priority: 9,
+        },
+      ]
+      const item = { product_id: 'p1', category_id: 'cat-1', shelf_ids: ['sh-1'], quantity: 1 }
+      expect(resolveWarehouseForItem(item, baseContext({ rules }))).toMatchObject({
+        warehouseId: 'wh-west',
+        ruleType: 'shelf',
+      })
+      const withProduct = [
+        ...rules,
+        {
+          id: 'r-prod',
+          rule_type: 'product',
+          product_id: 'p1',
+          warehouse_id: 'wh-default',
+          is_active: true,
+          priority: 9,
+        },
+      ]
+      expect(resolveWarehouseForItem(item, baseContext({ rules: withProduct }))).toMatchObject({
+        warehouseId: 'wh-default',
+        ruleType: 'product',
+      })
+      // a product not on the shelf falls through to its category
+      expect(
+        resolveWarehouseForItem({ ...item, shelf_ids: [] }, baseContext({ rules }))
+      ).toMatchObject({ warehouseId: 'wh-east', ruleType: 'category' })
+    })
+
     it('category rule beats zone rule', () => {
       const rules = [
         {

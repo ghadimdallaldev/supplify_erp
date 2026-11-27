@@ -172,7 +172,8 @@
       "limits": "الحدود",
       "health": "الصحة",
       "operations": "العمليات",
-      "audit": "سجل التدقيق"
+      "audit": "سجل التدقيق",
+      "catalog": "الكتالوج"
     },
     "aria": {
       "navigation": "تنقل الإدارة",
@@ -1375,5 +1376,63 @@
     "order_warehouse_dispatch": "نقل المستودع والإرسال",
     "featured_placement": "الظهور المميز",
     "customer_directory": "دليل العملاء"
+  },
+  "catalog": {
+    "cancel": "إلغاء",
+    "requests": {
+      "title": "طلبات الفئات",
+      "description": "يطلب الموردون فئات لا يجدونها. تنتظر منتجاتهم ضمن «أخرى» حتى تقرر.",
+      "statusFilter": "حالة الطلب",
+      "status": {
+        "pending": "قيد الانتظار",
+        "approved": "مقبول",
+        "merged": "مدمج",
+        "rejected": "مرفوض"
+      },
+      "empty": "لا توجد طلبات هنا.",
+      "meta_one": "{{supplier}} · {{department}} · {{count}} منتج",
+      "meta_other": "{{supplier}} · {{department}} · {{count}} منتج",
+      "noDepartment": "لم يُقترح قسم",
+      "resolvedTo": "الآن ضمن {{name}}",
+      "approve": "قبول",
+      "merge": "دمج",
+      "reject": "رفض",
+      "approveTitle": "إضافة «{{name}}» كفئة",
+      "approveDescription_one": "تُضاف الفئة الجديدة إلى الشجرة وينتقل إليها {{count}} منتج.",
+      "approveDescription_other": "تُضاف الفئة الجديدة إلى الشجرة وينتقل إليها {{count}} منتج.",
+      "approveConfirm": "إضافة الفئة",
+      "mergeTitle": "دمج «{{name}}» في فئة موجودة",
+      "mergeDescription_one": "ينتقل {{count}} منتج إلى الفئة التي تختارها.",
+      "mergeDescription_other": "ينتقل {{count}} منتج إلى الفئة التي تختارها.",
+      "mergeConfirm": "دمج",
+      "rejectTitle": "رفض «{{name}}»؟",
+      "rejectDescription_one": "يبقى {{count}} منتج ضمن «أخرى» ويُطلب من المورد اختيار فئة.",
+      "rejectDescription_other": "يبقى {{count}} منتج ضمن «أخرى» ويُطلب من المورد اختيار فئة.",
+      "rejectConfirm": "رفض",
+      "department": "القسم",
+      "name": "اسم الفئة",
+      "nameAr": "الاسم بالعربية",
+      "iconKey": "الأيقونة (اسم Phosphor)",
+      "existingCategory": "فئة موجودة",
+      "chooseCategory": "اختر فئة",
+      "note": "ملاحظة للمورد (اختياري)",
+      "approved": "تمت إضافة الفئة",
+      "merged": "تم دمج الطلب",
+      "rejected": "تم رفض الطلب",
+      "failed": "تعذر تحديث الطلب"
+    },
+    "tree": {
+      "title": "فئات المنصة",
+      "description": "الأقسام والفئات التي يصنّف الموردون منتجاتهم ضمنها. الأعداد لمنتجات كل الموردين.",
+      "newCategoryIn": "فئة جديدة في {{name}}",
+      "newCategoryPlaceholder": "فئة جديدة",
+      "add": "إضافة",
+      "rename": "إعادة تسمية {{name}}",
+      "renameLabel": "اسم جديد لـ {{name}}",
+      "save": "حفظ",
+      "moveUp": "نقل {{name}} للأعلى",
+      "moveDown": "نقل {{name}} للأسفل",
+      "saveFailed": "تعذر حفظ الفئة"
+    }
   }
 }

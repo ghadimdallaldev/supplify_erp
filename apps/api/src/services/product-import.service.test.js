@@ -71,14 +71,37 @@ describe('product-import.service', () => {
     expect(rows[0].raw.stock).toBe('25')
   })
 
-  it('previewProductImport accepts xlsx buffer input', () => {
+  it('previewProductImport accepts xlsx buffer input', async () => {
     const buffer = buildXlsxBuffer([
       ['sku', 'name'],
       ['P-1', 'Widget'],
       ['', 'Missing SKU'],
     ])
-    const result = previewProductImport(buffer, null, 'import.xlsx')
+    const categories = [
+      {
+        id: 'dept-food',
+        slug: 'food',
+        name: 'Food',
+        name_ar: null,
+        aliases: [],
+        parent_category_id: null,
+      },
+      {
+        id: 'leaf-other',
+        slug: 'other',
+        name: 'Other',
+        name_ar: null,
+        aliases: [],
+        parent_category_id: 'dept-food',
+      },
+    ]
+    const result = await previewProductImport(buffer, null, 'import.xlsx', { categories })
     expect(result.totalRows).toBe(2)
+    // Unmatched rows still import, on "Other" with the review flag.
+    expect(result.preview.find((r) => r.status === 'valid')).toMatchObject({
+      matchedCategoryId: 'leaf-other',
+      needsReview: true,
+    })
     expect(result.validCount).toBe(1)
     expect(result.errorCount).toBe(1)
   })

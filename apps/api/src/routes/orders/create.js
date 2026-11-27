@@ -22,6 +22,7 @@ import {
   resolveEffectivePlanFeatures,
 } from '../../lib/subscription.js'
 import { z } from 'zod'
+import { leafCategoryIdSql, productShelfIdsSql } from '../../lib/category-sql.js'
 import { notifyOrderStatusChange } from '../../services/notification.service.js'
 import {
   applyBestPromotionToOrder,
@@ -164,7 +165,8 @@ router.post(
         p.supplier_id,
         s.organization_id,
         p.sku,
-        p.category_id,
+        ${leafCategoryIdSql('p')} AS category_id,
+        ${productShelfIdsSql('p')} AS shelf_ids,
         p.name,
         COALESCE(pis.moq, 1) AS moq,
         COALESCE(pis.order_multiple, 1) AS order_multiple,

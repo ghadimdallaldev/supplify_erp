@@ -29,6 +29,9 @@ export const BUDGETS_MS = {
   customerList: 40,
   dealList: 80,
   conversationList: 40,
+  // Plan B (platform categories): spec budgets.
+  categoryTree: 50,
+  categoryProductList: 60,
 }
 
 let db
@@ -203,6 +206,29 @@ describe.skipIf(!BENCH)('marketplace performance budgets (large dataset)', () =>
         slow.map((t) => `${t.ms.toFixed(1)}ms ${t.text}`).join('\n\n')
     )
     await budget('productList', () => get(sub, '/api/products?limit=24'))
+  })
+
+  it('restaurant category tree, uncached', async () => {
+    const sub = viewers.restaurant.userSub
+    const { bumpCatalogVersion } = await import('../../../apps/api/src/lib/relationship-cache.js')
+    const body = await get(sub, '/api/products/categories')
+    expect(body.data.departments.length).toBeGreaterThan(0)
+    // Each call misses the per-viewer cache: the version bump changes the key.
+    await budget('categoryTree', async () => {
+      await bumpCatalogVersion()
+      await get(sub, '/api/products/categories')
+    })
+  }, 300_000)
+
+  it('restaurant category page product list, 24 rows', async () => {
+    const sub = viewers.restaurant.userSub
+    const { rows } = await db.pool.query(
+      `SELECT id FROM product_category WHERE slug = 'dept-fresh-produce' AND supplier_id IS NULL`
+    )
+    const url = `/api/products?categoryId=${rows[0].id}&limit=24`
+    const body = await get(sub, url)
+    expect(body.data.products.length).toBeGreaterThan(0)
+    await budget('categoryProductList', () => get(sub, url))
   })
 
   it('grouped /api/search', async () => {

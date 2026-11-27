@@ -23,6 +23,17 @@ import type {
   ConsumerAddress,
   ConsumerReorderPreview,
 } from '../../../types'
+export type PublicSupplierProductsArgs = {
+  idOrSlug: string
+  page?: number
+  limit?: number
+  q?: string
+  /** A department or leaf platform category id. */
+  categoryId?: string
+  /** One of the supplier's shelves. */
+  shelfId?: string
+}
+
 export const publicApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getPublicRestaurant: builder.query<PublicRestaurant, string>({
@@ -49,21 +60,21 @@ export const publicApi = api.injectEndpoints({
     }),
     getPublicSupplierProducts: builder.query<
       PublicSupplierProductsResponse,
-      { idOrSlug: string; page?: number; limit?: number; q?: string; category?: string }
+      PublicSupplierProductsArgs
     >({
-      query: ({ idOrSlug, page, limit, q, category }) => ({
+      query: ({ idOrSlug, page, limit, q, categoryId, shelfId }) => ({
         url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/products`,
-        params: { page, limit, q, category },
+        params: { page, limit, q, categoryId, shelfId },
         credentials: 'omit',
       }),
     }),
     getPublicSupplierPricedProducts: builder.query<
       PublicSupplierProductsResponse,
-      { idOrSlug: string; page?: number; limit?: number; q?: string; category?: string }
+      PublicSupplierProductsArgs
     >({
-      query: ({ idOrSlug, page, limit, q, category }) => ({
+      query: ({ idOrSlug, page, limit, q, categoryId, shelfId }) => ({
         url: `/api/public/suppliers/${encodeURIComponent(idOrSlug)}/products/priced`,
-        params: { page, limit, q, category },
+        params: { page, limit, q, categoryId, shelfId },
       }),
     }),
     getPublicSalesSuppliers: builder.query<

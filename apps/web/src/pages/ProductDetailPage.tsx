@@ -28,9 +28,10 @@ import {
 import { Input } from '../components/ui/input'
 import { restaurantStock } from '../lib/restaurantStock'
 import { Label } from '../components/ui/label'
+import { localizedName } from '../lib/categoryLabel'
 
 export function ProductDetailPage() {
-  const { t } = useTranslation('products')
+  const { t, i18n } = useTranslation('products')
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const requestedQty = Number((location.state as { addToCartQty?: number } | null)?.addToCartQty)
@@ -142,7 +143,15 @@ export function ProductDetailPage() {
 
         <div className="space-y-6">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">{product.category}</Badge>
+            <Badge variant="secondary">
+              {localizedName(
+                {
+                  name: product.category_name ?? product.category,
+                  name_ar: product.category_name_ar,
+                },
+                i18n.language
+              )}
+            </Badge>
             <Badge variant="outline">{product.brand}</Badge>
           </div>
 

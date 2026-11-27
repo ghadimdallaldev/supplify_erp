@@ -35,6 +35,13 @@ vi.mock('../lib/rbac.js', () => ({
   getRequestTenant: vi.fn().mockResolvedValue({ tenantId: 'rest-1', tenantType: 'RESTAURANT' }),
 }))
 
+// The platform tree comes from the seed migration, not from the mocked db.
+vi.mock('../lib/category-matcher.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  const { loadSeedCategories } = await import('../test/category-seed.js')
+  return { ...actual, loadPlatformCategories: vi.fn(async () => loadSeedCategories()) }
+})
+
 vi.mock('../lib/logger.js', () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }))
@@ -115,12 +122,18 @@ describe('Search Routes', () => {
       db.query
         .mockResolvedValueOnce({ rows: [{ id: 'p1', name: 'Tomato' }] })
         .mockResolvedValueOnce({ rows: [{ id: 's1', name: 'Fresh Foods' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'vegetables', product_count: 4 }] })
 
       const response = await request(app).get('/api/search?q=tomato&grouped=true').expect(200)
 
       expect(response.body.ok).toBe(true)
       expect(response.body.data.products).toHaveLength(1)
       expect(response.body.data.suppliers).toHaveLength(1)
+      // Restaurants only see matched categories that hold visible products.
+      expect(response.body.data.categories).toEqual([
+        expect.objectContaining({ id: 'vegetables', slug: 'vegetables', product_count: 4 }),
+      ])
+      expect(response.body.data.categories[0]).not.toHaveProperty('score')
     })
 
     it('uses slim product columns and aggregate supplier product counts', async () => {
@@ -137,7 +150,10 @@ describe('Search Routes', () => {
     })
 
     it('matches partial words with a prefix tsquery and a name substring', async () => {
-      db.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] })
+      db.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
 
       await request(app).get('/api/search?q=tom&grouped=true').expect(200)
 
@@ -147,8 +163,10 @@ describe('Search Routes', () => {
       expect(String(productSql)).toContain('LOWER(p.name) LIKE $3')
       expect(productParams[0]).toBe('tom:*')
       expect(productParams[2]).toBe('%tom%')
-      // Blocklist uses the restaurant id after the pattern.
-      expect(productParams[3]).toBe('rest-1')
+      // A prefix ("tom") never widens to whole categories; only exact/phrase matches do.
+      expect(productParams[3]).toEqual([])
+      // Blocklist uses the restaurant id after the category ids.
+      expect(productParams[4]).toBe('rest-1')
     })
   })
 })

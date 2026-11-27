@@ -503,8 +503,15 @@ export interface OrdersCalendarEvent {
   supplierList?: Array<{ id: string; name: string }>
   branchId?: string
   branchName?: string
-  categories?: string[]
+  categories?: OrdersCalendarCategory[]
   role: 'RESTAURANT' | 'SUPPLIER'
+}
+
+/** A platform leaf category on a calendar order or filter list. */
+export interface OrdersCalendarCategory {
+  id: string
+  name: string
+  name_ar?: string | null
 }
 
 export interface OrdersCalendarFilters {
@@ -515,7 +522,8 @@ export interface OrdersCalendarFilters {
   status?: string
   supplier?: string
   branch?: string
-  category?: string
+  /** A department or leaf category id. */
+  categoryId?: string
   role?: 'RESTAURANT' | 'SUPPLIER'
   view?: string
 }
@@ -531,6 +539,6 @@ export interface OrdersCalendarResponse {
     statuses: string[]
     suppliers: Array<{ id: string; name: string }>
     branches: Array<{ id: string; name: string }>
-    categories: string[]
+    categories: OrdersCalendarCategory[]
   }
 }

@@ -122,6 +122,27 @@ describe('promotions.service', () => {
       expect(filtered).toHaveLength(1)
       expect(filtered[0].productId).toBe('p2')
     })
+
+    it('a targeted deal covers a line by product, leaf category or shelf, each line once', () => {
+      const promo = {
+        applies_to: 'specific_shelves',
+        target_product_ids: ['p1'],
+        target_category_ids: ['cheese'],
+        target_shelf_ids: ['promo-shelf'],
+      }
+      const filtered = filterEligibleLineItems(promo, [
+        { productId: 'p1', categoryId: 'cheese', shelfIds: ['promo-shelf'], lineTotal: 10 },
+        { productId: 'p2', categoryId: 'dairy', shelfIds: ['promo-shelf'], lineTotal: 20 },
+        { productId: 'p3', categoryId: 'cheese', shelfIds: [], lineTotal: 30 },
+        { productId: 'p4', categoryId: 'dairy', shelfIds: ['other-shelf'], lineTotal: 40 },
+      ])
+      expect(filtered.map((l) => l.productId)).toEqual(['p1', 'p2', 'p3'])
+    })
+
+    it('a line without shelves or a category matches only by product', () => {
+      const promo = { applies_to: 'specific_categories', target_category_ids: ['cheese'] }
+      expect(filterEligibleLineItems(promo, [{ productId: 'p1', lineTotal: 10 }])).toEqual([])
+    })
   })
 
   describe('selectBestPromotion', () => {

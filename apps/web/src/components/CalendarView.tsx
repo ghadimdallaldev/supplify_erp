@@ -25,6 +25,7 @@ import { useOrdersCalendar, OrdersCalendarFetchError } from '../hooks/useOrdersC
 import { usePermissions } from '../hooks/usePermissions'
 import { useTranslation } from 'react-i18next'
 import { ensureNamespace } from '../i18n'
+import { localizedName } from '../lib/categoryLabel'
 import { useGetEntitlementsQuery } from '../services/api'
 import { isEntitlementFeatureEnabled } from '../lib/planLimits'
 import { useAppDispatch } from '../hooks/redux'
@@ -107,7 +108,7 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
       status: statusFilter || undefined,
       supplier: supplierFilter || undefined,
       branch: branchFilter || undefined,
-      category: categoryFilter || undefined,
+      categoryId: categoryFilter || undefined,
       page,
       pageSize: DEFAULT_PAGE_SIZE,
       role: activeRole,
@@ -453,8 +454,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
           <SelectTrigger placeholder={t('filters.allCategories')}>
             <option value="">{t('filters.allCategories')}</option>
             {data?.filters?.categories?.map((category) => (
-              <SelectItem key={category} value={category}>
-                {category}
+              <SelectItem key={category.id} value={category.id}>
+                {localizedName(category, i18n.language)}
               </SelectItem>
             ))}
           </SelectTrigger>
@@ -683,8 +684,8 @@ export function CalendarView({ role = 'RESTAURANT', isAdmin = false }: CalendarV
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {selectedEvent.categories.map((category) => (
-                        <Badge key={category} variant="outline">
-                          {category}
+                        <Badge key={category.id} variant="outline">
+                          {localizedName(category, i18n.language)}
                         </Badge>
                       ))}
                     </div>

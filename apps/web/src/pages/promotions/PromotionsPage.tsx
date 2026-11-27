@@ -128,6 +128,7 @@ export function PromotionsPage() {
     appliesTo: 'all',
     productIds: [],
     categoryIds: [],
+    shelfIds: [],
     restaurantTypes: [],
     areas: [],
   })
@@ -174,6 +175,7 @@ export function PromotionsPage() {
     appliesTo: targeting.appliesTo,
     productIds: targeting.appliesTo === 'specific_products' ? targeting.productIds : undefined,
     categoryIds: targeting.appliesTo === 'specific_categories' ? targeting.categoryIds : undefined,
+    shelfIds: targeting.appliesTo === 'specific_shelves' ? targeting.shelfIds : undefined,
     targetRestaurantTypes: targeting.restaurantTypes?.length
       ? targeting.restaurantTypes
       : undefined,
@@ -229,6 +231,10 @@ export function PromotionsPage() {
       toast.error(t('promotions.toastSelectCategory'))
       return false
     }
+    if (targeting.appliesTo === 'specific_shelves' && targeting.shelfIds.length === 0) {
+      toast.error(t('promotions.toastSelectShelf'))
+      return false
+    }
     return true
   }
 
@@ -243,6 +249,7 @@ export function PromotionsPage() {
       appliesTo: 'all',
       productIds: [],
       categoryIds: [],
+      shelfIds: [],
       restaurantTypes: [],
       areas: [],
     })
@@ -259,6 +266,7 @@ export function PromotionsPage() {
         appliesTo: 'all',
         productIds: [],
         categoryIds: [],
+        shelfIds: [],
         restaurantTypes: [],
         areas: [],
       })
@@ -284,6 +292,7 @@ export function PromotionsPage() {
         appliesTo: 'all',
         productIds: [],
         categoryIds: [],
+        shelfIds: [],
         restaurantTypes: [],
         areas: [],
       })

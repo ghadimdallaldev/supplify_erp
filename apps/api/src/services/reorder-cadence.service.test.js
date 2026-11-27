@@ -51,6 +51,30 @@ describe('reorder-cadence missed detection', () => {
   })
 })
 
+describe('reorder-cadence labels', () => {
+  it('names the platform category or product in the reader language', async () => {
+    const { cadenceLabel } = await import('./reorder-cadence.service.js')
+    const category = {
+      cadence_level: 'category',
+      label: 'stale',
+      supplier_name: 'Fromagerie',
+      label_category_name: 'Cheese',
+      label_category_name_ar: 'أجبان',
+    }
+    expect(cadenceLabel(category, 'en')).toBe('Cheese from Fromagerie')
+    expect(cadenceLabel(category, 'ar')).toBe('أجبان من Fromagerie')
+    const product = {
+      cadence_level: 'product',
+      label: 'stale',
+      supplier_name: 'ABC',
+      label_product_name: 'Chicken',
+      label_product_name_ar: null,
+    }
+    expect(cadenceLabel(product, 'ar')).toBe('Chicken من ABC')
+    expect(cadenceLabel({ cadence_level: 'category', label: 'Stored' }, 'en')).toBe('Stored')
+  })
+})
+
 describe('reorder-cadence reminder locks', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -102,6 +126,12 @@ describe('reorder-cadence reminder locks', () => {
     expect(notifyTenantUsers).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: 'rest-1', tenantType: 'RESTAURANT' })
     )
+    // Each recipient gets the text in their own language.
+    const { contentForLocale } = notifyTenantUsers.mock.calls[0][0]
+    expect(contentForLocale('en').message).toBe(
+      'You usually order Chicken from ABC on Mondays. No order was placed today.'
+    )
+    expect(contentForLocale('ar').message).toContain('الاثنين')
     const updateCall = queryMock.mock.calls.find((call) =>
       String(call[0]).includes('UPDATE reorder_cadence_reminder_log')
     )

@@ -11,6 +11,7 @@
 import 'dotenv/config'
 import { pool } from '../src/lib/db.js'
 import { disconnectCache } from '../src/lib/cache.js'
+import { categoryResolver, seedCategoryFields } from './lib/seed-categories.js'
 import { assignDefaultRoleForTenant } from '../src/lib/rbac.js'
 import {
   ensureTenantSystemRoles,
@@ -168,16 +169,13 @@ async function seedSupplier(client, def, warehouseShape) {
   for (let i = 1; i <= productCount; i++) {
     const productId = uuid()
     const sku = `${def.tier.toUpperCase()}-SKU-${String(i).padStart(3, '0')}`
+    const productName = `${tierMeta.label} ${pick(rng, ['Tomatoes', 'Rice', 'Chicken', 'Oil', 'Herbs'])} ${i}`
+    const placed = seedCategoryFields(await categoryResolver(client), productName, 'Produce')
     await client.query(
-      `INSERT INTO product (id, supplier_id, sku, name, unit, category, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'kg', $5, now(), now())`,
-      [
-        productId,
-        id,
-        sku,
-        `${tierMeta.label} ${pick(rng, ['Tomatoes', 'Rice', 'Chicken', 'Oil', 'Herbs'])} ${i}`,
-        'Produce',
-      ]
+      `INSERT INTO product (id, supplier_id, sku, name, unit, category, category_id,
+                            category_needs_review, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'kg', $5, $6, $7, now(), now())`,
+      [productId, id, sku, productName, 'Produce', placed.category_id, placed.category_needs_review]
     )
     const price = 4 + i * 1.25
     await client.query(

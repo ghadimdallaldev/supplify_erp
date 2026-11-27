@@ -34,6 +34,7 @@ const allTabs: AdminCanTabMap = {
   finance: true,
   usage: true,
   features: true,
+  catalog: true,
   deals: true,
   limits: true,
   health: true,

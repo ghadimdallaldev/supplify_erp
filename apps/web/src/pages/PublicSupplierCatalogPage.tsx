@@ -32,6 +32,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import type { PublicSupplierProduct } from '../types'
+import { localizedCategoryName, localizedName } from '../lib/categoryLabel'
 import { ensureNamespace } from '../i18n'
 import { PublicSalesCheckout } from '../components/public/PublicSalesCheckout'
 import { readPublicCart, writePublicCart, type PublicCart } from '../lib/publicSalesCart'
@@ -53,7 +54,7 @@ function ProductCard({
   canOrder: boolean
   loginHref: string
 }) {
-  const { t } = useTranslation('public')
+  const { t, i18n } = useTranslation('public')
   const initial = product.name.charAt(0).toUpperCase()
 
   return (
@@ -96,10 +97,10 @@ function ProductCard({
           {product.unit ? ` · ${product.unit}` : ''}
         </p>
 
-        {product.category && (
+        {(product.categoryName || product.category) && (
           <p className="mt-2">
             <span className="inline-flex rounded-full bg-[var(--brand-ultra)] px-2 py-0.5 text-xs font-medium text-[var(--text-mid)]">
-              {product.category}
+              {localizedCategoryName(product, i18n.language)}
             </span>
           </p>
         )}
@@ -242,7 +243,7 @@ export function PublicSupplierCatalogPage({
   forcedSlug?: string
   whiteLabel?: boolean
 } = {}) {
-  const { t } = useTranslation('public')
+  const { t, i18n } = useTranslation('public')
   const { idOrSlug: paramSlug } = useParams<{ idOrSlug: string }>()
   const idOrSlug = forcedSlug || paramSlug
   const navigate = useNavigate()
@@ -253,7 +254,8 @@ export function PublicSupplierCatalogPage({
   const { follow } = useFollowSupplier()
 
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [shelfId, setShelfId] = useState('')
   const [page, setPage] = useState(1)
   const [linkCopied, setLinkCopied] = useState(false)
   const [publicCart, setPublicCart] = useState<PublicCart>(() => readPublicCart())
@@ -287,9 +289,10 @@ export function PublicSupplierCatalogPage({
       page,
       limit: 24,
       q: search || undefined,
-      category: category || undefined,
+      categoryId: categoryId || undefined,
+      shelfId: shelfId || undefined,
     }),
-    [idOrSlug, page, search, category]
+    [idOrSlug, page, search, categoryId, shelfId]
   )
 
   const {
@@ -312,11 +315,15 @@ export function PublicSupplierCatalogPage({
     } as React.CSSProperties
   }, [supplier])
 
-  const categoryNavItems = useMemo(() => {
-    const list = (catalog?.categories ?? []).map((name) => ({ id: name, name }))
+  // Shelf sections: the supplier's own groupings, plus "All products". Empty shelves are hidden.
+  const shelfNavItems = useMemo(() => {
+    const list = [...(catalog?.shelves ?? [])]
+      .filter((shelf) => shelf.product_count > 0)
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((shelf) => ({ id: shelf.id, name: localizedName(shelf, i18n.language) }))
     if (list.length === 0) return []
-    return [{ id: '', name: t('catalog.categoryAll') }, ...list]
-  }, [catalog?.categories, t])
+    return [{ id: '', name: t('catalog.allProducts') }, ...list]
+  }, [catalog?.shelves, i18n.language, t])
 
   const handleAddToCart = async (product: PublicSupplierProduct) => {
     if (!supplier) return
@@ -352,7 +359,8 @@ export function PublicSupplierCatalogPage({
         sku: product.sku,
         name: product.name,
         description: product.description || undefined,
-        category: product.category || undefined,
+        category: localizedCategoryName(product, i18n.language) || undefined,
+        category_id: product.categoryId || undefined,
         unit: product.unit || undefined,
         image_url: product.imageUrl || undefined,
         supplier_name: supplier.brandDisplayName || supplier.name,
@@ -519,35 +527,35 @@ export function PublicSupplierCatalogPage({
         </div>
       </div>
 
-      {categoryNavItems.length > 0 && (
+      {shelfNavItems.length > 0 && (
         <CategoryNav
           className="-mx-4 mb-4 sm:-mx-6 sm:px-6"
           sticky={false}
-          ariaLabel={t('catalog.categoryAriaLabel')}
-          categories={categoryNavItems}
-          activeCategoryId={category}
+          ariaLabel={t('catalog.shelvesAriaLabel')}
+          categories={shelfNavItems}
+          activeCategoryId={shelfId}
           onSelect={(id) => {
-            setCategory(id)
+            setShelfId(id)
             setPage(1)
           }}
         />
       )}
 
-      {categories.length > 0 && categoryNavItems.length === 0 && (
+      {categories.length > 0 && (
         <div className="mb-4">
           <select
             className="h-11 w-full rounded-lg border border-[var(--app-border)] bg-[var(--surface)] px-3 text-sm text-[var(--text)] sm:w-auto"
-            value={category}
+            value={categoryId}
             onChange={(e) => {
-              setCategory(e.target.value)
+              setCategoryId(e.target.value)
               setPage(1)
             }}
             aria-label={t('catalog.filterCategoryAriaLabel')}
           >
             <option value="">{t('catalog.allCategories')}</option>
             {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+              <option key={cat.id} value={cat.id}>
+                {localizedName(cat, i18n.language)}
               </option>
             ))}
           </select>
@@ -563,22 +571,25 @@ export function PublicSupplierCatalogPage({
       ) : products.length === 0 ? (
         <EmptyState
           title={
-            search || category ? t('catalog.emptyFilteredTitle') : t('catalog.emptyDefaultTitle')
+            search || categoryId || shelfId
+              ? t('catalog.emptyFilteredTitle')
+              : t('catalog.emptyDefaultTitle')
           }
           description={
-            search || category
+            search || categoryId || shelfId
               ? t('catalog.emptyFilteredDescription')
               : t('catalog.emptyDefaultDescription')
           }
           icon={<Package className="h-6 w-6" />}
           action={
-            search || category ? (
+            search || categoryId || shelfId ? (
               <Button
                 variant="outline"
                 className="consumer-pressable"
                 onClick={() => {
                   setSearch('')
-                  setCategory('')
+                  setCategoryId('')
+                  setShelfId('')
                   setPage(1)
                 }}
               >

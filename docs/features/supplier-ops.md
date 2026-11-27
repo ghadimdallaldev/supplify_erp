@@ -9,7 +9,10 @@ latest order is filtered to that restaurant and uses `ORDERS_VIEW`.
 Messaging continues to use the existing chat entitlement and permissions.
 
 The native Supplier catalog opens Product details. Catalog editors can save
-the name, SKU, unit, and category through `PATCH /api/products/:id`.
+the name, SKU, unit, platform category (`category_id`, a searchable picker with
+suggestions, or "Request a category") and shelves (`shelfIds`) through
+`PATCH /api/products/:id`. The native Shelves screen adds, renames, reorders and
+archives shelves. Products waiting for a category show a banner and a filter.
 Current catalog price and available quantity come from the catalog response.
 The product screen links to contract pricing and warehouse stock where access
 allows. Catalog price setup, creation, and bulk import remain in the web tools.
@@ -188,7 +191,10 @@ Bulk catalog upload with preview and partial-import support. Accepts **`.csv`** 
 | POST   | `/products/import`              | `CATALOG_EDIT` | Execute import (`partial` default true — skip bad rows)    |
 | POST   | `/products/import/error-report` | `CATALOG_EDIT` | Download CSV of row errors                                 |
 
-**Columns:** `name`, `sku` (required); optional `description`, `category`, `unit`, `price`, `stock`, **`image_url`** (aliases: `image`, `photo`, `photo_url`).
+**Columns:** `name`, `sku` (required); optional `description`, `category`, `shelf` (aliases: `section`, `shelf_name`), `unit`, `price`, `stock`, **`image_url`** (aliases: `image`, `photo`, `photo_url`).
+
+- `category` (or, when it is empty or unmatched, the product name) goes through the category matcher to a leaf platform category. The preview shows the match per row and the supplier can override it (`overrideId`). Rows with no confident match are imported under **Other** with `category_needs_review`, and listed for review.
+- `shelf` finds the branch's shelf by name (case and spacing ignored) or creates it, and adds the product to it. Existing memberships are kept.
 
 **Execute summary fields:** `created`, `updated`, `failed`, `skipped`, plus `imagesImported` / `imagesFailed` when `image_url` column is used.
 
@@ -196,18 +202,28 @@ Bulk catalog upload with preview and partial-import support. Accepts **`.csv`** 
 
 Service: `product-import.service.js` (delegates image fetch to `importImageFromUrl` in `product-image-import.service.js`).
 
-## Supplier product categories
+## Product categories and shelves
 
-Suppliers can manage their catalog categories from **Products → Manage categories**. They may create, rename, deactivate, or delete only categories owned by their supplier account; the shared platform categories remain available and read-only. Product create/update accepts `category_id` only when it references a shared category or one owned by the product supplier.
+Every product sits in one leaf of the Supplify platform category tree; suppliers no longer create
+their own categories (the `POST/PATCH/DELETE /api/products/categories` endpoints are removed).
+Suppliers organise their storefront with **shelves** instead (**Products → Shelves**), and ask
+for a missing category with **Request a category**.
 
-| Method | Endpoint                               | Permission       | Purpose                                                 |
-| ------ | -------------------------------------- | ---------------- | ------------------------------------------------------- |
-| GET    | `/api/products/categories`             | `CATALOG_VIEW`   | Shared categories plus the active supplier’s categories |
-| POST   | `/api/products/categories`             | `CATALOG_EDIT`   | Create a supplier-owned category                        |
-| PATCH  | `/api/products/categories/:categoryId` | `CATALOG_EDIT`   | Update a supplier-owned category                        |
-| DELETE | `/api/products/categories/:categoryId` | `CATALOG_MANAGE` | Delete a supplier-owned category                        |
+| Method         | Endpoint                                   | Permission                      | Purpose                                                                    |
+| -------------- | ------------------------------------------ | ------------------------------- | -------------------------------------------------------------------------- |
+| GET            | `/api/products/categories`                 | `CATALOG_VIEW`                  | Platform tree with the supplier's own counts                               |
+| GET            | `/api/products/category-suggestions?name=` | `CATALOG_VIEW`                  | Top suggestions and a confident `autoCategoryId`                           |
+| GET / POST     | `/api/products/shelves`                    | `CATALOG_VIEW` / `CATALOG_EDIT` | List / create shelves                                                      |
+| PUT            | `/api/products/shelves/order`              | `CATALOG_EDIT`                  | Reorder                                                                    |
+| PATCH / DELETE | `/api/products/shelves/:id`                | `CATALOG_EDIT`                  | Rename / archive (`409 SHELF_IN_USE` while a deal or routing rule uses it) |
+| PUT            | `/api/products/shelves/:id/products`       | `CATALOG_EDIT`                  | Replace a shelf's products                                                 |
+| PATCH          | `/api/products/shelves/:id/products`       | `CATALOG_EDIT`                  | Add / remove products (`{ add[], remove[] }`)                              |
+| GET / POST     | `/api/products/category-requests`          | `CATALOG_VIEW` / `CATALOG_EDIT` | Own requests / request a category                                          |
 
-Database migration `0211_supplier_product_categories.sql` adds `product_category.supplier_id`; existing categories stay shared (`NULL`).
+Migration `0211_supplier_product_categories.sql` had added supplier-owned categories; the
+platform categories release 1 backfill turns each into a shelf of the same name and moves its
+products onto platform leaves. Full model:
+[platform-categories-and-shelves.md](./platform-categories-and-shelves.md).
 
 ## Bulk product image import (ZIP)
 

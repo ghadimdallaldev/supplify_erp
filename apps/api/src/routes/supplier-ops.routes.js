@@ -1,4 +1,5 @@
 import express from 'express'
+import { resolveRequestLocale } from '../i18n/index.js'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import rateLimit from 'express-rate-limit'
@@ -773,6 +774,9 @@ const importPreviewSchema = z.object({
   columnMapping: z.record(z.string()).optional(),
 })
 
+/** `{ [rowNumber]: categoryId }`: the supplier's category pick per row from the preview. */
+const categoryOverridesSchema = z.record(z.string().regex(/^\d+$/), z.string().uuid()).optional()
+
 const PRODUCT_IMPORT_EXTENSIONS = new Set(['.csv', '.xlsx'])
 
 const productImportUpload = multer({
@@ -813,6 +817,19 @@ function parseColumnMappingField(value) {
   return undefined
 }
 
+function parseCategoryOverridesField(value) {
+  if (!value) return undefined
+  let parsed = value
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value)
+    } catch {
+      throw new ValidationError('categoryOverrides must be valid JSON')
+    }
+  }
+  return categoryOverridesSchema.parse(parsed)
+}
+
 function optionalRawImportBody(req, res, next) {
   const contentType = String(req.headers['content-type'] || '')
   if (contentType.includes('multipart/form-data') || contentType.includes('application/json')) {
@@ -840,6 +857,7 @@ function resolveProductImportPayload(req) {
       buffer: req.file.buffer,
       filename,
       columnMapping: parseColumnMappingField(req.body?.columnMapping),
+      categoryOverrides: parseCategoryOverridesField(req.body?.categoryOverrides),
       partial: req.body?.partial !== 'false' && req.body?.partial !== false,
     }
   }
@@ -852,14 +870,18 @@ function resolveProductImportPayload(req) {
       buffer: rawBody,
       filename,
       columnMapping: parseColumnMappingField(req.headers['x-column-mapping']),
+      categoryOverrides: parseCategoryOverridesField(req.headers['x-category-overrides']),
       partial: req.headers['x-import-partial'] !== 'false',
     }
   }
 
-  const body = importPreviewSchema.extend({ partial: z.boolean().optional() }).parse(req.body)
+  const body = importPreviewSchema
+    .extend({ partial: z.boolean().optional(), categoryOverrides: categoryOverridesSchema })
+    .parse(req.body)
   return {
     csvText: body.csv,
     columnMapping: body.columnMapping,
+    categoryOverrides: body.categoryOverrides,
     partial: body.partial !== false,
   }
 }
@@ -876,8 +898,8 @@ router.post(
       const payload = resolveProductImportPayload(req)
       const data =
         payload.buffer != null
-          ? previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
-          : previewProductImport(payload.csvText, payload.columnMapping)
+          ? await previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
+          : await previewProductImport(payload.csvText, payload.columnMapping)
       res.json({ ok: true, data, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)
@@ -903,8 +925,8 @@ router.post(
       if (rowCount > config.PRODUCT_IMPORT_ASYNC_THRESHOLD) {
         const preview =
           payload.buffer != null
-            ? previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
-            : previewProductImport(payload.csvText, payload.columnMapping)
+            ? await previewProductImport(payload.buffer, payload.columnMapping, payload.filename)
+            : await previewProductImport(payload.csvText, payload.columnMapping)
         const job = await createProductImportJob({
           supplierId,
           userId: req.userData.id,
@@ -913,6 +935,7 @@ router.post(
           filename: payload.filename,
           partial: payload.partial !== false,
           columnMapping: payload.columnMapping,
+          categoryOverrides: payload.categoryOverrides ?? null,
           preview,
         })
 
@@ -944,10 +967,12 @@ router.post(
               partial: payload.partial !== false,
               userId: req.userData.id,
               filename: payload.filename,
+              categoryOverrides: payload.categoryOverrides,
             })
           : await executeProductImport(supplierId, payload.csvText, {
               partial: payload.partial !== false,
               userId: req.userData.id,
+              categoryOverrides: payload.categoryOverrides,
             })
       res.json({ ok: true, data: result, error: null, requestId: req.requestId })
     } catch (err) {
@@ -1494,7 +1519,7 @@ router.get(
   async (req, res, next) => {
     try {
       const supplierId = await resolveSupplier(req)
-      const atRisk = await listSupplierAtRisk(supplierId)
+      const atRisk = await listSupplierAtRisk(supplierId, { locale: resolveRequestLocale(req) })
       res.json({ ok: true, data: { atRisk }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

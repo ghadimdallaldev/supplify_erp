@@ -1,5 +1,18 @@
 # Mobile Parity Checklist
 
+## 2026-11-27 — Platform categories and shelves (release 1)
+
+- [x] Home department rail with icons and a category sheet; search Categories group; `categoryId` everywhere (Android source, iOS mirror, `src/` identical).
+- [x] Supplier page shelves ("All products" first) and categories from `GET /api/suppliers/:id`; storefront browse shelves.
+- [x] Supplier product editor: required category picker with suggestions, Request a category, shelf toggles.
+- [x] Shelves screen (add, rename, reorder, archive; `409 SHELF_IN_USE` details).
+- [x] Needs-a-category banner, filter and badge; `CATEGORY_REQUEST_RESOLVED` deep link.
+- [x] Inventory and spend-by-category on platform categories (Arabic names).
+- [x] `en.json` / `ar.json` strings for all new copy.
+- [x] `tsc` and jest in both worktrees (73 suites, 290 tests each).
+- [ ] Android emulator captures (390x844, scrolled, Arabic RTL, 360x800, font scale 1.3) — pending: needs this branch's API on dev (release 1 deploy).
+- [ ] Run on iOS hardware or simulator.
+
 ## 2026-11-26 — Marketplace visibility (release 1)
 
 - [x] Follow & add on catalog cards, reorder guidance, quote detail and Quick Lists (Android source, iOS mirror, `src/` identical).

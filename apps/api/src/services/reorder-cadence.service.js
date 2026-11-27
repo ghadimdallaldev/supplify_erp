@@ -7,12 +7,50 @@ import {
   getRestaurantTimezone,
   getZonedDayOfWeek,
 } from '../lib/tenant-timezone.js'
+import {
+  OTHER_CATEGORY_ID_SQL,
+  leafCategoryIdSql,
+  leafCoveredByCategorySql,
+} from '../lib/category-sql.js'
+import { t } from '../i18n/index.js'
 
 export const MIN_ORDERS_FOR_CADENCE = 4
 export const LOOKBACK_DAYS = 180
 export const REPLACEMENT_GRACE_DAYS = 1
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * Columns for building a cadence label at read time: the product, or the leaf platform
+ * category, in both languages (needs `c` = restaurant_order_cadence and `s` = supplier).
+ */
+const CADENCE_LABEL_JOINS = `
+    LEFT JOIN product cp ON cp.id = c.product_id
+    LEFT JOIN product_category cc ON cc.id = c.category_id`
+const CADENCE_LABEL_COLUMNS = `cp.name AS label_product_name, cp.name_ar AS label_product_name_ar,
+      cc.name AS label_category_name, cc.name_ar AS label_category_name_ar`
+
+/**
+ * "<product or category> from <supplier>" in `locale`. Category cadences name the platform
+ * category (spec §11.6); the stored English label is the fallback for rows whose product or
+ * category no longer resolves.
+ */
+export function cadenceLabel(row, locale = 'en') {
+  const ar = String(locale || '').startsWith('ar')
+  const item =
+    row.cadence_level === 'category'
+      ? (ar && row.label_category_name_ar) || row.label_category_name
+      : (ar && row.label_product_name_ar) || row.label_product_name
+  if (!item) return row.label
+  return t('notifications.reorderCadence.label', locale, {
+    item,
+    supplier: row.supplier_name,
+  })
+}
+
+function dayName(dow, locale = 'en') {
+  return t(`notifications.reorderCadence.days.${dow}`, locale)
+}
 
 /**
  * Recompute cadence patterns for a restaurant (or all restaurants when restaurantId null).
@@ -39,7 +77,7 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
         o.restaurant_id,
         oi.supplier_id,
         oi.product_id,
-        p.category_id,
+        ${leafCategoryIdSql('p')} AS category_id,
         EXTRACT(DOW FROM (
           COALESCE(o.placed_at, o.created_at) AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $3)
         ))::int AS dow,
@@ -51,7 +89,7 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
       WHERE o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
         AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($1::int || ' days')::interval
         ${restaurantFilter}
-      GROUP BY o.restaurant_id, oi.supplier_id, oi.product_id, p.category_id, dow
+      GROUP BY o.restaurant_id, oi.supplier_id, oi.product_id, 4, dow
       HAVING COUNT(DISTINCT o.id) >= $2
     )
     SELECT
@@ -123,7 +161,7 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
       SELECT
         o.restaurant_id,
         oi.supplier_id,
-        p.category_id,
+        ${leafCategoryIdSql('p')} AS category_id,
         EXTRACT(DOW FROM (
           COALESCE(o.placed_at, o.created_at) AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $3)
         ))::int AS dow,
@@ -134,9 +172,10 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
       JOIN product p ON p.id = oi.product_id
       WHERE o.status NOT IN ('DRAFT', 'CANCELLED', 'PENDING_APPROVAL')
         AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($1::int || ' days')::interval
-        AND p.category_id IS NOT NULL
+        -- "Other" is not a buying pattern (spec §11.6).
+        AND ${leafCategoryIdSql('p')} <> ${OTHER_CATEGORY_ID_SQL}
         ${restaurantFilter}
-      GROUP BY o.restaurant_id, oi.supplier_id, p.category_id, dow
+      GROUP BY o.restaurant_id, oi.supplier_id, 3, dow
       HAVING COUNT(DISTINCT o.id) >= $2
     ),
     covered AS (
@@ -150,7 +189,7 @@ export async function recomputeCadencePatterns({ restaurantId = null } = {}) {
     JOIN supplier s ON s.id = ol.supplier_id
     WHERE NOT EXISTS (
       SELECT 1 FROM covered c
-      JOIN product p ON p.id = c.product_id AND p.category_id = ol.category_id
+      JOIN product p ON p.id = c.product_id AND ${leafCategoryIdSql('p')} = ol.category_id
       WHERE c.restaurant_id = ol.restaurant_id AND c.supplier_id = ol.supplier_id
         AND c.day_of_week = ol.dow
     )
@@ -192,12 +231,14 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
       c.*,
       r.name AS restaurant_name,
       s.name AS supplier_name,
+      ${CADENCE_LABEL_COLUMNS},
       ${supplierSeesRestaurantSql('c.restaurant_id', 'c.supplier_id')} AS supplier_can_see,
       ${blockedExistsSql('c.restaurant_id', 's')} AS is_blocked,
       ((now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::date AS reminder_date
     FROM restaurant_order_cadence c
     JOIN restaurant r ON r.id = c.restaurant_id
     JOIN supplier s ON s.id = c.supplier_id
+    ${CADENCE_LABEL_JOINS}
     WHERE c.is_active = true
       AND c.day_of_week = EXTRACT(DOW FROM (now() AT TIME ZONE COALESCE(NULLIF(TRIM(r.timezone), ''), $2)))::int
       AND NOT EXISTS (
@@ -214,7 +255,8 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
           AND COALESCE(o.placed_at, o.created_at) >= NOW() - ($1::int || ' days')::interval
           AND (
             (c.cadence_level = 'product' AND oi.product_id = c.product_id)
-            OR (c.cadence_level = 'category' AND p.category_id = c.category_id)
+            OR (c.cadence_level = 'category'
+                AND ${leafCoveredByCategorySql(leafCategoryIdSql('p'), 'c.category_id')})
           )
       )
     `,
@@ -231,14 +273,15 @@ export async function getMissedCadencesForToday({ now = new Date() } = {}) {
   }))
 }
 
-export async function listRestaurantReminders(restaurantId) {
+export async function listRestaurantReminders(restaurantId, { locale = 'en' } = {}) {
   const tz = await getRestaurantTimezone(restaurantId)
   const dow = getZonedDayOfWeek(new Date(), tz)
   const { rows } = await query(
     `
-    SELECT c.*, s.name AS supplier_name
+    SELECT c.*, s.name AS supplier_name, ${CADENCE_LABEL_COLUMNS}
     FROM restaurant_order_cadence c
     JOIN supplier s ON s.id = c.supplier_id
+    ${CADENCE_LABEL_JOINS}
     WHERE c.restaurant_id = $1 AND c.is_active = true AND c.day_of_week = $2
     ORDER BY c.confidence_score DESC
     LIMIT 20
@@ -247,17 +290,18 @@ export async function listRestaurantReminders(restaurantId) {
   )
   return rows.map((r) => ({
     id: r.id,
-    label: r.label,
+    label: cadenceLabel(r, locale),
     supplierId: r.supplier_id,
     supplierName: r.supplier_name,
     cadenceLevel: r.cadence_level,
+    categoryId: r.category_id ?? null,
     dayOfWeek: r.day_of_week,
-    dayName: DAY_NAMES[r.day_of_week],
+    dayName: dayName(r.day_of_week, locale),
     confidenceScore: parseFloat(r.confidence_score),
   }))
 }
 
-export async function listSupplierAtRisk(supplierId) {
+export async function listSupplierAtRisk(supplierId, { locale = 'en' } = {}) {
   const missed = await getMissedCadencesForToday()
   return missed
     .filter((m) => m.supplier_id === supplierId && m.supplier_can_see === true)
@@ -265,8 +309,8 @@ export async function listSupplierAtRisk(supplierId) {
       cadenceId: m.id,
       restaurantId: m.restaurant_id,
       restaurantName: m.restaurant_name,
-      label: m.label,
-      dayName: m.dayName,
+      label: cadenceLabel(m, locale),
+      dayName: dayName(m.day_of_week, locale),
     }))
 }
 
@@ -318,9 +362,22 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
     )
     if (claim.rows.length === 0) continue
 
-    const dayName = DAY_NAMES[cadence.day_of_week]
-    const restaurantMsg = `You usually order ${cadence.label} on ${dayName}s. No order was placed today.`
-    const supplierMsg = `${cadence.restaurant_name} usually orders ${cadence.label} every ${dayName} but has not ordered yet.`
+    // Each recipient reads the label, day and text in their own language.
+    const restaurantContent = (locale) => ({
+      title: t('notifications.reorderCadence.restaurantTitle', locale),
+      message: t('notifications.reorderCadence.restaurantMessage', locale, {
+        label: cadenceLabel(cadence, locale),
+        day: dayName(cadence.day_of_week, locale),
+      }),
+    })
+    const supplierContent = (locale) => ({
+      title: t('notifications.reorderCadence.supplierTitle', locale),
+      message: t('notifications.reorderCadence.supplierMessage', locale, {
+        restaurant: cadence.restaurant_name,
+        label: cadenceLabel(cadence, locale),
+        day: dayName(cadence.day_of_week, locale),
+      }),
+    })
 
     let restaurantNotified = false
     let supplierNotified = false
@@ -331,8 +388,8 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
         tenantType: 'RESTAURANT',
         notificationType: 'ORDER',
         notificationCategory: 'reorder_cadence_missed',
-        title: 'Suggested reorder reminder',
-        message: restaurantMsg,
+        ...restaurantContent('en'),
+        contentForLocale: restaurantContent,
         referenceType: 'QUICK_LIST',
         metadata: { link: '/app/quick-lists', cadenceId: cadence.id },
       })
@@ -345,8 +402,8 @@ export async function runCadenceReminderCheck({ notify = true } = {}) {
         tenantType: 'SUPPLIER',
         notificationType: 'ORDER',
         notificationCategory: 'reorder_cadence_missed',
-        title: 'Expected order not placed',
-        message: supplierMsg,
+        ...supplierContent('en'),
+        contentForLocale: supplierContent,
         referenceType: 'ORDER',
         metadata: { link: '/app/supplier/command-center', cadenceId: cadence.id },
       })

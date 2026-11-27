@@ -20,6 +20,7 @@ import { ValidationError, NotFoundError } from '../../middlewares/errorHandler.j
 import { createPendingActivationSubscription } from '../../lib/billing/subscription-activation.js'
 import { ensureTenantSystemRoles } from '../../lib/tenant-roles.js'
 import { presentSupplier } from '../../lib/tenant-profile-redaction.js'
+import { listRestaurantSupplierFacets } from '../../services/shelves.service.js'
 import { z } from 'zod'
 import { buildWhitelistedUpdate } from '../../lib/safe-update.js'
 import {
@@ -779,10 +780,22 @@ async function handleGetSupplierById(req, res) {
       restaurantId = await getRestaurantIdForRequest(req)
     }
 
-    const supplierScope = restaurantId ? await resolveSupplierScope(id) : null
-    const supplierIds = supplierScope?.supplierIds?.length
-      ? supplierScope.supplierIds
-      : [supplierScope?.tenantId || id]
+    // Every active branch of the organisation `id` names (an org id or a branch id). Not the
+    // public-catalog scope: a followers-only supplier's page is reachable too (its catalog
+    // stays hidden by catalogVisibleSql until the restaurant follows).
+    let supplierIds = [id]
+    if (restaurantId) {
+      const { rows: branchRows } = await query(
+        `SELECT s.id FROM supplier s
+         WHERE COALESCE(s.organization_id, s.id) = (
+             SELECT COALESCE(o.organization_id, o.id) FROM supplier o
+             WHERE o.id = $1 OR o.organization_id = $1 LIMIT 1)
+           AND COALESCE(s.is_branch_active, TRUE) = TRUE
+         ORDER BY s.is_main_branch DESC, s.created_at ASC, s.id ASC`,
+        [id]
+      )
+      if (branchRows.length) supplierIds = branchRows.map((row) => row.id)
+    }
     const relationshipFields = restaurantId
       ? [
           ',',
@@ -892,6 +905,10 @@ async function handleGetSupplierById(req, res) {
     }
 
     const presented = presentSupplier(req, { ...enriched, id: supplier.id })
+    // Restaurants browse the supplier page by its shelves and platform categories.
+    const facets = restaurantId
+      ? await listRestaurantSupplierFacets(supplierIds, restaurantId)
+      : null
     res.json({
       ok: true,
       data: {
@@ -899,6 +916,7 @@ async function handleGetSupplierById(req, res) {
           ...presented,
           id: enriched.id,
           tenant_id: supplier.id,
+          ...(facets ?? {}),
         },
       },
       error: null,

@@ -15,12 +15,17 @@ import { deliveredOrderStatusInSql } from '../lib/order-statuses.js'
 import { logger } from '../lib/logger.js'
 import { z } from 'zod'
 import { getCache, setCache } from '../lib/cache.js'
+import { adminCategoriesRouter, adminCategoryRequestsRouter } from './admin-catalog.routes.js'
 import {
   buildDashboardSummary,
   dashboardSummaryCacheKey,
 } from '../services/dashboard-summary.service.js'
 
 const router = express.Router()
+
+// Category requests and platform tree edits (each router carries its own admin guard).
+router.use('/category-requests', adminCategoryRequestsRouter)
+router.use('/categories', adminCategoriesRouter)
 
 // Validation schemas
 const auditListSchema = z.object({

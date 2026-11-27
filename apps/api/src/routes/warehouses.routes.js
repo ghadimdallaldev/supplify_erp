@@ -17,6 +17,9 @@ import { query } from '../lib/db.js'
 import { logger } from '../lib/logger.js'
 import { checkWarehouseLimit, createAuditLog } from '../lib/plan-enforcement.js'
 import { requireFeature } from '../lib/subscription.js'
+import { CatalogError, sendCatalogError } from '../lib/catalog-errors.js'
+import { validateRoutingRuleTarget } from '../services/catalog-targets.service.js'
+import { routingProductColumnsSql } from '../services/warehouseRouting.js'
 import {
   getWarehouseSupplierColumn,
   getWarehouseOwnerInsertSpec,
@@ -172,9 +175,13 @@ router.get(
       }
       const supplierCol = await getWarehouseSupplierColumn()
       const { rows } = await query(
-        `SELECT r.*, w.name AS warehouse_name
+        `SELECT r.*, w.name AS warehouse_name,
+                pc.name AS category_name, pc.name_ar AS category_name_ar,
+                sh.name AS shelf_name, sh.name_ar AS shelf_name_ar, sh.archived_at AS shelf_archived_at
          FROM warehouse_routing_rule r
          JOIN warehouse w ON w.id = r.warehouse_id AND w.${supplierCol} = r.supplier_id
+         LEFT JOIN product_category pc ON pc.id = r.category_id
+         LEFT JOIN supplier_shelf sh ON sh.id = r.shelf_id
          WHERE r.supplier_id = $1
          ORDER BY r.priority ASC, r.created_at ASC`,
         [supplierId]
@@ -200,31 +207,27 @@ router.post(
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
-      const {
-        warehouse_id,
-        priority = 1,
-        rule_type,
-        product_id,
-        category_id,
-        zone_id,
-        is_active = true,
-      } = req.body
+      const { warehouse_id, priority = 1, rule_type, is_active = true } = req.body
 
       const wh = await getWarehouseForSupplier(warehouse_id, supplierId)
       if (!wh) throw new NotFoundError('Warehouse not found')
+      // Products and shelves must be this branch's; categories leaf platform ones.
+      const target = await validateRoutingRuleTarget({ query }, supplierId, req.body)
 
       const { rows } = await query(
         `INSERT INTO warehouse_routing_rule (
-          supplier_id, warehouse_id, priority, rule_type, product_id, category_id, zone_id, is_active
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+          supplier_id, warehouse_id, priority, rule_type, product_id, category_id, shelf_id,
+          zone_id, is_active
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           supplierId,
           warehouse_id,
           priority,
           rule_type,
-          product_id ?? null,
-          category_id ?? null,
-          zone_id ?? null,
+          target.product_id,
+          target.category_id,
+          target.shelf_id,
+          target.zone_id,
           is_active,
         ]
       )
@@ -232,6 +235,7 @@ router.post(
         .status(201)
         .json({ ok: true, data: { rule: rows[0] }, error: null, requestId: req.requestId })
     } catch (error) {
+      if (error instanceof CatalogError) return sendCatalogError(req, res, error)
       if (error instanceof NotFoundError) {
         return res.status(404).json({
           ok: false,
@@ -259,30 +263,41 @@ router.patch(
   async (req, res) => {
     try {
       const supplierId = await resolveSupplierId(req)
-      const { priority, rule_type, warehouse_id, product_id, category_id, zone_id, is_active } =
-        req.body
+      const { priority, warehouse_id, is_active } = req.body
       if (warehouse_id) {
-        const target = await getWarehouseForSupplier(warehouse_id, supplierId)
-        if (!target) throw new NotFoundError('Warehouse not found')
+        const targetWarehouse = await getWarehouseForSupplier(warehouse_id, supplierId)
+        if (!targetWarehouse) throw new NotFoundError('Warehouse not found')
       }
+      const { rows: existingRows } = await query(
+        `SELECT * FROM warehouse_routing_rule WHERE id = $1 AND supplier_id = $2`,
+        [req.params.id, supplierId]
+      )
+      if (!existingRows.length) throw new NotFoundError('Rule not found')
+      const merged = { ...existingRows[0] }
+      for (const key of ['rule_type', 'product_id', 'category_id', 'shelf_id', 'zone_id']) {
+        if (req.body[key] !== undefined && req.body[key] !== null) merged[key] = req.body[key]
+      }
+      const target = await validateRoutingRuleTarget({ query }, supplierId, merged)
       const { rows } = await query(
         `UPDATE warehouse_routing_rule SET
           priority = COALESCE($1, priority),
-          rule_type = COALESCE($2, rule_type),
+          rule_type = $2,
           warehouse_id = COALESCE($3, warehouse_id),
-          product_id = COALESCE($4, product_id),
-          category_id = COALESCE($5, category_id),
-          zone_id = COALESCE($6, zone_id),
-          is_active = COALESCE($7, is_active)
-         WHERE id = $8 AND supplier_id = $9
+          product_id = $4,
+          category_id = $5,
+          shelf_id = $6,
+          zone_id = $7,
+          is_active = COALESCE($8, is_active)
+         WHERE id = $9 AND supplier_id = $10
          RETURNING *`,
         [
           priority,
-          rule_type,
+          merged.rule_type,
           warehouse_id,
-          product_id,
-          category_id,
-          zone_id,
+          target.product_id,
+          target.category_id,
+          target.shelf_id,
+          target.zone_id,
           is_active,
           req.params.id,
           supplierId,
@@ -291,6 +306,7 @@ router.patch(
       if (!rows.length) throw new NotFoundError('Rule not found')
       res.json({ ok: true, data: { rule: rows[0] }, error: null, requestId: req.requestId })
     } catch (error) {
+      if (error instanceof CatalogError) return sendCatalogError(req, res, error)
       if (error instanceof NotFoundError) {
         return res.status(404).json({
           ok: false,
@@ -434,19 +450,24 @@ router.post(
 
       const { rows: products } = productIds.length
         ? await query(
-            `SELECT id, category_id FROM product WHERE id = ANY($1) AND supplier_id = $2`,
+            `SELECT ${routingProductColumnsSql('p')} FROM product p
+             WHERE p.id = ANY($1) AND p.supplier_id = $2`,
             [productIds, supplierId]
           )
         : { rows: [] }
-      const catMap = new Map(products.map((p) => [p.id, p.category_id]))
-      if (catMap.size !== productIds.length)
+      const productById = new Map(products.map((p) => [p.id, p]))
+      if (productById.size !== new Set(productIds).size)
         throw new ValidationError('Simulation products must belong to this supplier')
 
-      const enrichedItems = items.map((item) => ({
-        product_id: item.product_id ?? item.productId,
-        quantity: item.quantity,
-        category_id: catMap.get(item.product_id ?? item.productId) ?? item.category_id,
-      }))
+      const enrichedItems = items.map((item) => {
+        const own = productById.get(item.product_id ?? item.productId)
+        return {
+          product_id: item.product_id ?? item.productId,
+          quantity: item.quantity,
+          category_id: own.category_id,
+          shelf_ids: own.shelf_ids,
+        }
+      })
 
       const preview = buildSimulationFromPayload({
         items: enrichedItems,
