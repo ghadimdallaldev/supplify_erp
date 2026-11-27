@@ -17,7 +17,10 @@ export interface Product {
   supplier_name?: string
   supplier_slug?: string
   supplier_email?: string
+  /** Followers only; non-followers get `in_stock` instead (spec §10 Q2). */
   available_qty?: number
+  /** Every restaurant that can see the catalog gets this flag. */
+  in_stock?: boolean
   current_price?: number
   currency?: string
   is_favorited?: boolean
