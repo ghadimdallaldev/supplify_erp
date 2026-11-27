@@ -203,3 +203,20 @@ Harness DB: docker `supplify-marketplace-audit` (postgres:16-alpine, `127.0.0.1`
 - Final review: not performed — the owner closed the release once code and EAS builds were done (2026-11-27); no fresh or self review of the whole branch.
 - Final: minor (deferred): the supplier-card heart keeps an accessibility label ending in ", busy" after a follow completes (mobile Suppliers list).
 - Final: minor (deferred): preprod has one extra `schema_migrations` row (241 vs 240 on dev), not investigated.
+
+## Plan B — platform categories and shelves
+
+Branch `feat/platform-categories` (ERP from origin/dev 43dead8a, Android 2aa711d, iOS 9700e1c) in `C:/w/erp-mv`, `C:/w/smv`, `C:/w/smiv`.
+
+| Task                          | Commits                                                                   | Tests                                                                                                                                                                 | Notes                 |
+| ----------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| B1 schema, triggers, taxonomy | see git log `feat(db): HoReCa category tree, shelves, integrity triggers` | category-schema.pg.test.js 16/16 (15 RED first); `pnpm test:marketplace:pg` 80 passed 7 skipped (fresh DB); local Docker `pnpm db:migrate`: 18 departments, 85 leaves | migrations 0240, 0241 |
+
+### Plan B rulings
+
+- B1: Ruling: the 18 department rows are inserted by 0240 (inside its DO block), not by the seed 0241 — the re-parent must run before the new unique indexes (department "Beverages"/"Seafood"/"Other" collide with the root-level leaves of the same name until re-parented), and re-parenting needs the departments; 0241 then upserts names_ar/fr, aliases, icons and the narrower leaves — if wrong, none (same end state).
+- B1: Ruling: every data-changing statement of 0240 is in one DO block because `sql-migrator.js` runs statements one by one with no transaction — a failed run then leaves nothing half-applied and is retried whole — if wrong, none.
+- B1: Ruling: the no-silent-deletion FKs (product_shelf → supplier_shelf, category_request example product, promotion_targets.shelf_id/category_id, warehouse_routing_rule.shelf_id/category_id, restaurant_order_cadence.category_id) are `NO ACTION DEFERRABLE INITIALLY DEFERRED` — the plan assumed NO ACTION is checked at statement end, but in a supplier delete the check fires inside the first cascade (supplier_shelf) before the second (product → product_shelf) removes the rows, so seeds and admin deletes failed (test "supplier delete still cascades through shelves and deals" RED); deferred checks run at commit, so cascades pass and direct deletes are still refused — if wrong, the refusal surfaces at COMMIT instead of at the DELETE statement (the API refuses earlier anyway).
+- B1: Ruling: the leaf trigger skips UPDATEs that leave the category unchanged — `UPDATE OF category_id` fires whenever the column is in the SET list, and a product update that re-sends its current value must not fail — if wrong, none.
+- B1: Ruling: the taxonomy has exactly the plan table's 85 leaves under 18 departments (the schema test asserts ≥ 85) — the plan table is the contract — if wrong, more leaves are added later by admin tree edit (Task 5) or a seed migration.
+- B1: Ruling: icon keys are Phosphor kebab-case names validated against the installed `phosphor-react-native@3.0.6` icon list (no mushroom/onion icons exist; `plant`/`basket` used) — web uses `@phosphor-icons/react`, which shares the set — if wrong, a missing icon falls back in the Task 7/8 icon map.
