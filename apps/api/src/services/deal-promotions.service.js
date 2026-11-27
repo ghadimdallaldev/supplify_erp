@@ -1,8 +1,12 @@
 import { catalogVisibleSql, followExistsSql } from '../lib/relationship.js'
 import { query, withTransaction } from '../lib/db.js'
 import { buildBoostStatus } from './deal-boost.helpers.js'
+import { categoryFilterSql, leafCategoryIdSql, leafCategoryJoinSql } from '../lib/category-sql.js'
 import {
+  PROMOTION_TARGET_ARRAYS_SQL,
   calculatePromotionDiscount,
+  dealCoversProductSql,
+  hydratePromotionLineItems,
   claimPromotionUsage,
   promotionNoLongerAvailableError,
   isPromotionEligible,
@@ -227,13 +231,14 @@ export async function discoverDealsForRestaurant(restaurantId, options = {}) {
   }
 
   if (categoryId) {
+    // A department or leaf id: the deal covers at least one of its supplier's products there.
     params.push(categoryId)
-    sql += ` AND (
-      p.applies_to = 'all'
-      OR EXISTS (
-        SELECT 1 FROM promotion_targets pt
-        WHERE pt.promotion_id = p.id AND pt.category_id = $${params.length}
-      )
+    sql += ` AND EXISTS (
+      SELECT 1 FROM product pr
+      ${leafCategoryJoinSql('pr', 'dlc')}
+      WHERE pr.supplier_id = p.supplier_id
+        AND ${categoryFilterSql(`$${params.length}`, 'dlc')}
+        AND ${dealCoversProductSql('p', 'pr')}
     )`
   }
 
@@ -320,15 +325,19 @@ export async function loadDealDetailForRestaurant(dealId, restaurantId) {
 
   const { rows: targets } = await query(
     `
-    SELECT pt.product_id, pt.category_id,
+    SELECT pt.product_id, pt.category_id, pt.shelf_id,
       pr.name AS product_name,
       (SELECT amount FROM price WHERE product_id = pr.id
          AND valid_from <= NOW() AND (valid_to IS NULL OR valid_to > NOW())
        ORDER BY valid_from DESC LIMIT 1) AS product_price,
-      pc.name AS category_name
+      pc.name AS category_name,
+      pc.name_ar AS category_name_ar,
+      sh.name AS shelf_name,
+      sh.name_ar AS shelf_name_ar
     FROM promotion_targets pt
     LEFT JOIN product pr ON pr.id = pt.product_id
     LEFT JOIN product_category pc ON pc.id = pt.category_id
+    LEFT JOIN supplier_shelf sh ON sh.id = pt.shelf_id
     WHERE pt.promotion_id = $1
     `,
     [dealId]
@@ -661,13 +670,14 @@ export async function previewDealForCart({
   let promotion = null
   if (promotionId) {
     const { rows } = await query(
-      `SELECT p.* FROM promotions p WHERE p.id = $1 AND p.supplier_id = $2`,
+      `SELECT p.*, ${PROMOTION_TARGET_ARRAYS_SQL}
+       FROM promotions p WHERE p.id = $1 AND p.supplier_id = $2`,
       [promotionId, supplierId]
     )
     promotion = rows[0] || null
   } else if (couponCode?.trim()) {
     const { rows } = await query(
-      `SELECT p.* FROM promotions p
+      `SELECT p.*, ${PROMOTION_TARGET_ARRAYS_SQL} FROM promotions p
        WHERE p.supplier_id = $1 AND lower(p.coupon_code) = lower($2)`,
       [supplierId, couponCode.trim()]
     )
@@ -686,6 +696,7 @@ export async function previewDealForCart({
     }
   }
 
+  lineItems = await hydratePromotionLineItems({ query }, supplierId, lineItems || [])
   const discountAmount = calculatePromotionDiscount(promotion, subtotal, lineItems)
   if (discountAmount <= 0) {
     const minOrder = promotion.min_order_amount
@@ -743,7 +754,8 @@ export async function enrichPromotionRows(rows) {
   if (!rows?.length) return []
   const ids = rows.map((r) => r.id)
   const { rows: targets } = await query(
-    `SELECT promotion_id, product_id, category_id FROM promotion_targets WHERE promotion_id = ANY($1::uuid[])`,
+    `SELECT promotion_id, product_id, category_id, shelf_id
+     FROM promotion_targets WHERE promotion_id = ANY($1::uuid[])`,
     [ids]
   )
   const { rows: latestPromos } = await query(
@@ -762,16 +774,18 @@ export async function enrichPromotionRows(rows) {
     const list = targetsByDeal.get(t.promotion_id) || {
       productIds: [],
       categoryIds: [],
+      shelfIds: [],
     }
     if (t.product_id) list.productIds.push(t.product_id)
     if (t.category_id) list.categoryIds.push(t.category_id)
+    if (t.shelf_id) list.shelfIds.push(t.shelf_id)
     targetsByDeal.set(t.promotion_id, list)
   }
   const latestByDeal = new Map(latestPromos.map((p) => [p.deal_id, p]))
   const now = Date.now()
 
   return rows.map((row) => {
-    const t = targetsByDeal.get(row.id) || { productIds: [], categoryIds: [] }
+    const t = targetsByDeal.get(row.id) || { productIds: [], categoryIds: [], shelfIds: [] }
     const latestPromo = latestByDeal.get(row.id) || null
     const boostStart = row.boost_start_at
     const boostEnd = row.boost_end_at
@@ -809,6 +823,7 @@ export async function enrichPromotionRows(rows) {
       ...row,
       target_product_ids: t.productIds,
       target_category_ids: t.categoryIds,
+      target_shelf_ids: t.shelfIds,
       is_promoted: Boolean(isCurrentlyBoosted),
       active_deal_promotion_id: isCurrentlyBoosted ? latestPromo?.id : null,
       boost_status: boostStatus,
@@ -839,16 +854,7 @@ export async function applyPromotionByIdToOrder({
   const { rows } = await client.query(
     `
     SELECT p.*,
-      COALESCE(
-        (SELECT array_agg(pt.product_id) FILTER (WHERE pt.product_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_product_ids,
-      COALESCE(
-        (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_category_ids
+      ${PROMOTION_TARGET_ARRAYS_SQL}
     FROM promotions p
     WHERE p.id = $1 AND p.supplier_id = $2
     `,
@@ -914,16 +920,7 @@ export async function validateCouponForOrder({
   const { rows } = await query(
     `
     SELECT p.*,
-      COALESCE(
-        (SELECT array_agg(pt.product_id) FILTER (WHERE pt.product_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_product_ids,
-      COALESCE(
-        (SELECT array_agg(pt.category_id) FILTER (WHERE pt.category_id IS NOT NULL)
-         FROM promotion_targets pt WHERE pt.promotion_id = p.id),
-        '{}'
-      ) AS target_category_ids
+      ${PROMOTION_TARGET_ARRAYS_SQL}
     FROM promotions p
     WHERE p.supplier_id = $1
       AND lower(p.coupon_code) = lower($2)
@@ -938,34 +935,19 @@ export async function validateCouponForOrder({
   return { promotion, discountAmount }
 }
 
+/** The supplier's products a deal covers (supplier-wide deals: all of them). */
 export async function getEligibleProductsForDeal(dealId, supplierId) {
-  const { rows: dealRows } = await query(
-    `SELECT applies_to FROM promotions WHERE id = $1 AND supplier_id = $2`,
-    [dealId, supplierId]
-  )
-  if (!dealRows.length) return []
-  const deal = dealRows[0]
-
-  if (deal.applies_to === 'all') {
-    const { rows } = await query(
-      `SELECT id, name, sku, price, image_url, category_id FROM product
-       WHERE supplier_id = $1 AND is_active = TRUE ORDER BY name`,
-      [supplierId]
-    )
-    return rows
-  }
-
   const { rows } = await query(
     `
-    SELECT DISTINCT pr.id, pr.name, pr.sku, pr.price, pr.image_url, pr.category_id
-    FROM product pr
-    LEFT JOIN promotion_targets pt ON pt.promotion_id = $1
-    WHERE pr.supplier_id = $2 AND pr.is_active = TRUE
-      AND (
-        (pt.product_id IS NOT NULL AND pr.id = pt.product_id)
-        OR (pt.category_id IS NOT NULL AND pr.category_id = pt.category_id)
-      )
-    ORDER BY pr.name
+    SELECT pr.id, pr.name, pr.sku, pr.image_url,
+      ${leafCategoryIdSql('pr')} AS category_id,
+      (SELECT amount FROM price WHERE product_id = pr.id
+         AND valid_from <= NOW() AND (valid_to IS NULL OR valid_to > NOW())
+       ORDER BY valid_from DESC LIMIT 1) AS price
+    FROM promotions p
+    JOIN product pr ON ${dealCoversProductSql('p', 'pr')}
+    WHERE p.id = $1 AND p.supplier_id = $2
+    ORDER BY pr.name, pr.id
     `,
     [dealId, supplierId]
   )

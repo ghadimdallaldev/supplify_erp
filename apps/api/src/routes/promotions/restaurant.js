@@ -864,10 +864,12 @@ router.get(
       const enriched = await enrichPromotionRow(deal)
       const { rows: targets } = await query(
         `
-        SELECT pt.*, pr.name AS product_name, pc.name AS category_name
+        SELECT pt.*, pr.name AS product_name, pc.name AS category_name,
+               pc.name_ar AS category_name_ar, sh.name AS shelf_name, sh.name_ar AS shelf_name_ar
         FROM promotion_targets pt
         LEFT JOIN product pr ON pr.id = pt.product_id
         LEFT JOIN product_category pc ON pc.id = pt.category_id
+        LEFT JOIN supplier_shelf sh ON sh.id = pt.shelf_id
         WHERE pt.promotion_id = $1
         `,
         [deal.id]

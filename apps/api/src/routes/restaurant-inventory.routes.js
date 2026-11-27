@@ -1,4 +1,5 @@
 import express from 'express'
+import { resolveRequestLocale } from '../i18n/index.js'
 import {
   requireAuth,
   requireRole,
@@ -1454,7 +1455,9 @@ router.get(
     try {
       const restaurantId = await getRestaurantIdForRequest(req)
       if (!restaurantId) throw new ValidationError('Restaurant not found')
-      const reminders = await listRestaurantReminders(restaurantId)
+      const reminders = await listRestaurantReminders(restaurantId, {
+        locale: resolveRequestLocale(req),
+      })
       res.json({ ok: true, data: { reminders }, error: null, requestId: req.requestId })
     } catch (err) {
       next(err)

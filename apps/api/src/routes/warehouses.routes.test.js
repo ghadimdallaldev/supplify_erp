@@ -242,6 +242,37 @@ describe('Warehouses Routes', () => {
     })
   })
 
+  describe('POST /api/warehouses/routing/rules', () => {
+    it('rejects a shelf rule for a shelf the branch does not own', async () => {
+      db.query.mockImplementation(async (sql) => {
+        const text = typeof sql === 'string' ? sql : ''
+        if (text.includes('information_schema.columns')) {
+          return { rows: [{ column_name: 'supplier_id' }] }
+        }
+        if (text.includes('SELECT * FROM warehouse WHERE id')) {
+          return { rows: [{ id: 'wh-1', supplier_id: 'supplier-1' }] }
+        }
+        return { rows: [] }
+      })
+
+      const response = await request(app)
+        .post('/api/warehouses/routing/rules')
+        .send({
+          warehouse_id: 'wh-1',
+          rule_type: 'shelf',
+          shelf_id: '3f0c1c1e-6d2a-4c55-9d6e-0d6f8b2b9a11',
+        })
+        .expect(400)
+
+      expect(response.body.error.code).toBe('foreignShelf')
+      expect(
+        db.query.mock.calls.some(([sql]) =>
+          String(sql).includes('INSERT INTO warehouse_routing_rule')
+        )
+      ).toBe(false)
+    })
+  })
+
   describe('PATCH /api/warehouses/:id/inventory/:productId', () => {
     it('does not zero omitted quantity fields on partial update', async () => {
       db.query.mockImplementation(async (sql) => {

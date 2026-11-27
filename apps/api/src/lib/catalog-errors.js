@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { localizedError, resolveRequestLocale } from '../i18n/index.js'
+import { localizedError, resolveRequestLocale, t } from '../i18n/index.js'
 import { logger } from './logger.js'
 
 /**
@@ -15,7 +15,9 @@ export class CatalogError extends Error {
    * @param {unknown} [details]
    */
   constructor(name, code, statusCode, details = undefined) {
-    super(code)
+    super(t(`catalog.errors.${code}`, 'en'))
+    /** Lets the global error handler answer with this contract (see errorHandler.js). */
+    this.isCatalogError = true
     this.name = name
     this.code = code
     this.statusCode = statusCode

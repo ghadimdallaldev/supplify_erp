@@ -15,6 +15,28 @@ vi.mock('../lib/db.js', () => {
   }
 })
 
+// Platform categories come from the DB; a fixed tree keeps these mocked-DB tests independent.
+vi.mock('../lib/category-matcher.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  loadPlatformCategories: vi.fn(async () => [
+    {
+      id: 'dept-food',
+      slug: 'food',
+      name: 'Food',
+      name_ar: null,
+      aliases: [],
+      parent_category_id: null,
+    },
+    {
+      id: 'leaf-other',
+      slug: 'other',
+      name: 'Other',
+      name_ar: null,
+      aliases: [],
+      parent_category_id: 'dept-food',
+    },
+  ]),
+}))
 vi.mock('../lib/ensure-delivery-schema.js', () => ({
   ensureDeliverySchema: vi.fn().mockResolvedValue(undefined),
 }))
@@ -49,7 +71,7 @@ describe('supplier pain-killer services', () => {
       const csv = `name,sku,price
 ,SKU1,10
 Valid Product,SKU2,abc`
-      const result = previewProductImport(csv)
+      const result = await previewProductImport(csv)
       expect(result.totalRows).toBe(2)
       expect(result.validCount).toBe(0)
       expect(result.errorCount).toBeGreaterThan(0)

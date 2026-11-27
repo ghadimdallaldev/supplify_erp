@@ -1,6 +1,7 @@
 import { logger } from '../lib/logger.js'
 import { syncRequestLogContext } from '../lib/request-log-context.js'
 import { writeSystemEvent } from '../lib/systemEvent.js'
+import { resolveRequestLocale, t } from '../i18n/index.js'
 
 /** Map thrown errors to HTTP status + error envelope (shared by handler and system_event). */
 export function resolveHttpError(err) {
@@ -8,7 +9,12 @@ export function resolveHttpError(err) {
   let errorName = 'INTERNAL_ERROR'
   let message = 'Internal server error'
 
-  if (err.expose === true && err.code && err.statusCode) {
+  if (err.isCatalogError) {
+    // Catalog rules (lib/catalog-errors.js): name + code + message are the public contract.
+    statusCode = err.statusCode
+    errorName = err.name
+    message = err.message
+  } else if (err.expose === true && err.code && err.statusCode) {
     // Domain errors that carry their own public contract (e.g. FOLLOW_REQUIRED, SUPPLIER_BLOCKED).
     statusCode = err.statusCode
     errorName = err.code
@@ -113,7 +119,12 @@ export function errorHandler(err, req, res, next) {
       data: null,
       error: {
         name: errorName,
-        message: isDevelopment ? err.message : publicMessage,
+        ...(err.isCatalogError && { code: err.code }),
+        message: err.isCatalogError
+          ? t(`catalog.errors.${err.code}`, resolveRequestLocale(req))
+          : isDevelopment
+            ? err.message
+            : publicMessage,
         ...(isDevelopment && { stack: err.stack }),
         ...(err.details && { details: err.details }),
       },

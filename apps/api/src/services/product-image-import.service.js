@@ -717,7 +717,8 @@ async function uploadOptimizedProductImages({ supplierId, productId, fileName, b
   }
 }
 
-export async function importImageFromUrl({ url, supplierId, productId }) {
+/** @param {{ url: string, supplierId: string, productId: string, bumpVersion?: boolean }} args */
+export async function importImageFromUrl({ url, supplierId, productId, bumpVersion = true }) {
   assertSafeImageUrl(url)
 
   try {
@@ -776,6 +777,8 @@ export async function importImageFromUrl({ url, supplierId, productId }) {
       `,
       [uploaded.imageUrl, uploaded.imageThumbUrl, productId, supplierId]
     )
+    // Catalog readers cache images under the catalog version.
+    if (bumpVersion) await bumpCatalogVersionSafe()
 
     return uploaded
   } catch (err) {

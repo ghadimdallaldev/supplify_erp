@@ -65,3 +65,13 @@ export function leafCategoryColumnsSql(alias = 'lc') {
 export function categoryFilterSql(placeholder, alias = 'lc') {
   return `(${alias}.id = ${placeholder}::uuid OR ${alias}.parent_category_id = ${placeholder}::uuid)`
 }
+
+/**
+ * Expression: uuid[] of the product's non-archived shelves (empty when none).
+ * @param {string} [productAlias]
+ */
+export function productShelfIdsSql(productAlias = 'p') {
+  return `COALESCE(ARRAY(SELECT ps.shelf_id FROM product_shelf ps
+      JOIN supplier_shelf sh ON sh.id = ps.shelf_id AND sh.archived_at IS NULL
+      WHERE ps.product_id = ${productAlias}.id ORDER BY ps.shelf_id), '{}'::uuid[])`
+}

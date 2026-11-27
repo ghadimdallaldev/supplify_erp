@@ -185,7 +185,9 @@ export async function createRestaurantOrdersInTransaction({
     if (shouldApplyPromotions && promotionHandlers) {
       const promoLines = items.map((item) => ({
         productId: item.productId,
+        // Server-resolved leaf category and shelves (orders/create.js product query).
         categoryId: item.product.category_id,
+        shelfIds: item.product.shelf_ids ?? [],
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         lineTotal: item.unitPrice * item.quantity,
