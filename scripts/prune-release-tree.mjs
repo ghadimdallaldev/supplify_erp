@@ -95,18 +95,34 @@ function pruneRootScripts() {
   }
 }
 
+/** Remove the e2e router from every API entry file (server.js, and app.js since the harness split). */
 function patchServerJs() {
-  const rel = 'apps/api/src/server.js'
-  const abs = path.join(ROOT, rel)
-  if (!fs.existsSync(abs)) return
-  let src = fs.readFileSync(abs, 'utf8')
-  src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\r?\n/, '')
-  src = src.replace(
-    /\r?\nif \((?:config\.E2E_SECRET|allowE2eRoutes\(\))\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n\}\r?\n/,
-    '\n'
-  )
-  fs.writeFileSync(abs, src)
-  console.log('patched apps/api/src/server.js (removed e2e routes)')
+  for (const rel of ['apps/api/src/server.js', 'apps/api/src/app.js']) {
+    const abs = path.join(ROOT, rel)
+    if (!fs.existsSync(abs)) continue
+    let src = fs.readFileSync(abs, 'utf8')
+    src = src.replace(/import \{ e2eRoutes \} from '\.\/routes\/e2e\.routes\.js'\r?\n/, '')
+    src = src.replace(
+      /\r?\n[ \t]*if \((?:config\.E2E_SECRET|allowE2eRoutes\(\))\) \{\r?\n\s*app\.use\('\/api\/e2e', e2eRoutes\)\r?\n[ \t]*\}\r?\n/,
+      '\n'
+    )
+    fs.writeFileSync(abs, src)
+    console.log(`patched ${rel} (removed e2e routes)`)
+  }
+}
+
+/** Fail the prune if any remaining API source still references the deleted e2e router. */
+function assertNoDanglingE2eImports() {
+  const offenders = []
+  walk(path.join(ROOT, 'apps/api/src'), (file) => {
+    if (!/\.(js|mjs)$/.test(file)) return
+    const src = fs.readFileSync(file, 'utf8')
+    if (/e2e\.routes\.js|\be2eRoutes\b/.test(src)) offenders.push(path.relative(ROOT, file))
+  })
+  if (offenders.length) {
+    console.error(`e2e routes still referenced after prune: ${offenders.join(', ')}`)
+    process.exit(1)
+  }
 }
 
 function pruneDeployArtifacts() {
@@ -219,6 +235,7 @@ removeTestFiles()
 pruneApiScripts()
 pruneRootScripts()
 patchServerJs()
+assertNoDanglingE2eImports()
 pruneDeployArtifacts()
 slimPackageJson()
 writeReadme()
