@@ -5,6 +5,12 @@ import type {
   UpdateProductRequest,
   ProductFilters,
   ProductsResponse,
+  CategoryTreeResponse,
+  CategorySuggestionsResponse,
+  SupplierShelf,
+  CategoryRequest,
+  CategoryRequestStatus,
+  CreateCategoryRequestBody,
 } from '../../../types'
 export const productsApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -15,45 +21,68 @@ export const productsApi = api.injectEndpoints({
       }),
       providesTags: ['Product', 'ProductList'],
     }),
-    getProductCategories: builder.query<
-      {
-        categories: Array<{
-          id: string
-          supplier_id?: string | null
-          name: string
-          slug: string
-          description?: string
-          display_order: number
-          product_count?: number
-        }>
-      },
-      void
-    >({
+    /** Platform category tree (departments → leaf categories) with product counts. */
+    getProductCategories: builder.query<CategoryTreeResponse, void>({
       query: () => '/api/products/categories',
-      providesTags: ['Product'],
+      transformResponse: (data: Partial<CategoryTreeResponse> | undefined) => ({
+        departments: Array.isArray(data?.departments) ? data.departments : [],
+      }),
+      providesTags: ['ProductCategory'],
       keepUnusedDataFor: 300,
     }),
-    createProductCategory: builder.mutation<
-      { category: { id: string; name: string; description?: string } },
-      { name: string; description?: string }
-    >({
-      query: (body) => ({ url: '/api/products/categories', method: 'POST', body }),
-      invalidatesTags: ['Product'],
+    /** Supplier: leaf category suggestions for a product name (top 3, score ≥ 0.6). */
+    getCategorySuggestions: builder.query<CategorySuggestionsResponse, { name: string }>({
+      query: ({ name }) => ({ url: '/api/products/category-suggestions', params: { name } }),
+      keepUnusedDataFor: 120,
     }),
-    updateProductCategory: builder.mutation<
-      { category: { id: string; name: string; description?: string } },
-      { id: string; name?: string; description?: string | null; is_active?: boolean }
+    getShelves: builder.query<{ shelves: SupplierShelf[] }, void>({
+      query: () => '/api/products/shelves',
+      providesTags: ['Shelf'],
+    }),
+    createShelf: builder.mutation<{ shelf: SupplierShelf }, { name: string; name_ar?: string }>({
+      query: (body) => ({ url: '/api/products/shelves', method: 'POST', body }),
+      invalidatesTags: ['Shelf'],
+    }),
+    updateShelf: builder.mutation<
+      { shelf: SupplierShelf },
+      { id: string; name?: string; name_ar?: string | null; display_order?: number }
     >({
-      query: ({ id, ...body }) => ({
-        url: `/api/products/categories/${id}`,
-        method: 'PATCH',
-        body,
+      query: ({ id, ...body }) => ({ url: `/api/products/shelves/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Shelf'],
+    }),
+    reorderShelves: builder.mutation<{ shelves: SupplierShelf[] }, { shelfIds: string[] }>({
+      query: (body) => ({ url: '/api/products/shelves/order', method: 'PUT', body }),
+      invalidatesTags: ['Shelf'],
+    }),
+    setShelfProducts: builder.mutation<
+      { shelf: SupplierShelf },
+      { id: string; productIds: string[] }
+    >({
+      query: ({ id, productIds }) => ({
+        url: `/api/products/shelves/${id}/products`,
+        method: 'PUT',
+        body: { productIds },
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ['Shelf', 'Product'],
     }),
-    deleteProductCategory: builder.mutation<{ id: string }, string>({
-      query: (id) => ({ url: `/api/products/categories/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Product'],
+    /** Archives the shelf; 409 SHELF_IN_USE lists the deals and routing rules using it. */
+    archiveShelf: builder.mutation<{ id: string }, string>({
+      query: (id) => ({ url: `/api/products/shelves/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Shelf', 'Product'],
+    }),
+    getCategoryRequests: builder.query<
+      { requests: CategoryRequest[] },
+      { status?: CategoryRequestStatus } | void
+    >({
+      query: (params) => ({ url: '/api/products/category-requests', params: params ?? {} }),
+      providesTags: ['CategoryRequest'],
+    }),
+    createCategoryRequest: builder.mutation<
+      { request: CategoryRequest },
+      CreateCategoryRequestBody
+    >({
+      query: (body) => ({ url: '/api/products/category-requests', method: 'POST', body }),
+      invalidatesTags: ['CategoryRequest', 'Product'],
     }),
     getProductTags: builder.query<{ tags: string[] }, void>({
       query: () => '/api/products/tags',
@@ -70,7 +99,7 @@ export const productsApi = api.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Product'],
+      invalidatesTags: ['Product', 'Shelf', 'ProductCategory'],
     }),
     updateProduct: builder.mutation<Product, { id: string; data: UpdateProductRequest }>({
       query: ({ id, data }) => ({
@@ -78,7 +107,12 @@ export const productsApi = api.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { id }) => [{ type: 'Product', id }, 'Product'],
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Product', id },
+        'Product',
+        'Shelf',
+        'ProductCategory',
+      ],
     }),
     getProductFavorites: builder.query<{ products: Product[] }, void>({
       query: () => '/api/products/favorites',

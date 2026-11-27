@@ -53,6 +53,7 @@ import {
   SORT_OPTIONS,
   calculateReorderQuantity,
   getItemCategory,
+  getItemCategoryOptions,
   getStatusSortRank,
   getStockStatus,
   summaryCardClass,
@@ -131,7 +132,7 @@ export function InventoryTab({
         ? { status: statusFilter as 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' }
         : {}),
       ...(supplierFilter !== 'ALL' ? { supplierId: supplierFilter } : {}),
-      ...(categoryFilter !== 'ALL' ? { category: categoryFilter } : {}),
+      ...(categoryFilter !== 'ALL' ? { categoryId: categoryFilter } : {}),
     }),
     [pageOffset, debouncedSearch, statusFilter, supplierFilter, categoryFilter]
   )
@@ -161,13 +162,8 @@ export function InventoryTab({
   }, [inventory])
 
   const uniqueCategories = useMemo(
-    () =>
-      Array.from(
-        new Set<string>(
-          inventory.map((item: any) => getItemCategory(item)).filter((c): c is string => Boolean(c))
-        )
-      ).sort(),
-    [inventory]
+    () => getItemCategoryOptions(inventory, i18n.language),
+    [inventory, i18n.language]
   )
 
   const hasActiveFilters =
@@ -405,7 +401,7 @@ export function InventoryTab({
         return [
           item.product_name,
           item.product_sku,
-          getItemCategory(item),
+          getItemCategory(item, i18n.language),
           item.supplier_name,
           item.quantity,
           item.product_unit,
@@ -731,8 +727,8 @@ export function InventoryTab({
                 <SelectContent>
                   <SelectItem value="ALL">{t('filters.allCategories')}</SelectItem>
                   {uniqueCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -857,7 +853,7 @@ export function InventoryTab({
             ) : null}
             {categoryFilter !== 'ALL' ? (
               <Badge variant="secondary" className="gap-1">
-                {categoryFilter}
+                {uniqueCategories.find((c) => c.id === categoryFilter)?.label ?? categoryFilter}
                 <button
                   type="button"
                   onClick={() => setCategoryFilter('ALL')}
@@ -949,7 +945,9 @@ export function InventoryTab({
                           </p>
                           <p className="truncate text-xs text-[var(--text-muted)]">
                             {item.product_sku}
-                            {getItemCategory(item) ? ` · ${getItemCategory(item)}` : ''}
+                            {getItemCategory(item, i18n.language)
+                              ? ` · ${getItemCategory(item, i18n.language)}`
+                              : ''}
                             {item.supplier_name ? ` · ${item.supplier_name}` : ''}
                           </p>
                         </div>
@@ -1072,7 +1070,7 @@ export function InventoryTab({
                             </div>
                           </td>
                           <td className="hidden px-4 py-4 text-sm text-[var(--text-muted)] lg:table-cell">
-                            {getItemCategory(item) || '-'}
+                            {getItemCategory(item, i18n.language) || '-'}
                           </td>
                           <td className="hidden px-4 py-4 text-sm text-[var(--text)] xl:table-cell">
                             {item.supplier_name}

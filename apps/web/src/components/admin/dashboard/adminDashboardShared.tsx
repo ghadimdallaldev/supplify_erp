@@ -116,6 +116,7 @@ export type AdminTabKey =
   | 'finance'
   | 'usage'
   | 'features'
+  | 'catalog'
   | 'deals'
   | 'limits'
   | 'operations'

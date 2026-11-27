@@ -8,20 +8,25 @@ import { Select, SelectTrigger } from '../ui/select'
 import {
   useGetProductsQuery,
   useGetProductCategoriesQuery,
+  useGetShelvesQuery,
   useGetSupplierMeQuery,
 } from '../../services/api'
 import { useAppSelector } from '../../hooks/redux'
 import { ensureNamespace } from '../../i18n'
-import type { Product } from '../../types'
+import type { CategoryDepartment, Product, SupplierShelf } from '../../types'
+import { localizedName } from '../../lib/categoryLabel'
 import { Loader2, Search, X } from 'lucide-react'
 import { RESTAURANT_BUSINESS_TYPES } from '../../lib/restaurantBusinessTypes'
 
-export type AppliesTo = 'all' | 'specific_products' | 'specific_categories'
+export type AppliesTo = 'all' | 'specific_products' | 'specific_categories' | 'specific_shelves'
 
 export type DealTargetingValue = {
   appliesTo: AppliesTo
   productIds: string[]
+  /** Leaf platform categories (the deal covers this supplier's products in them). */
   categoryIds: string[]
+  /** The supplier's own shelves. */
+  shelfIds: string[]
   restaurantTypes: string[]
   areas: string[]
 }
@@ -32,7 +37,7 @@ type Props = {
 }
 
 export function DealTargetingPickers({ value, onChange }: Props) {
-  const { t } = useTranslation('deals')
+  const { t, i18n } = useTranslation('deals')
   const [productSearch, setProductSearch] = useState('')
   const [areaDraft, setAreaDraft] = useState('')
   const { user } = useAppSelector((state) => state.auth)
@@ -40,7 +45,13 @@ export function DealTargetingPickers({ value, onChange }: Props) {
   const { data: supplierMe } = useGetSupplierMeQuery(undefined, { skip: !isSupplier })
   const supplierId = supplierMe?.supplier?.id as string | undefined
 
-  const { data: categoriesData, isLoading: categoriesLoading } = useGetProductCategoriesQuery()
+  const { data: categoriesData, isLoading: categoriesLoading } = useGetProductCategoriesQuery(
+    undefined,
+    { skip: value.appliesTo !== 'specific_categories' }
+  )
+  const { data: shelvesData, isLoading: shelvesLoading } = useGetShelvesQuery(undefined, {
+    skip: value.appliesTo !== 'specific_shelves' || !isSupplier,
+  })
   const productsEnabled =
     value.appliesTo === 'specific_products' && (!isSupplier || Boolean(supplierId))
   const { data: productsData, isLoading: productsLoading } = useGetProductsQuery(
@@ -52,7 +63,15 @@ export function DealTargetingPickers({ value, onChange }: Props) {
     { skip: !productsEnabled }
   )
 
-  const categories = categoriesData?.categories || []
+  // Supplier counts are their own products: offer only the leaves they actually sell in.
+  const departments = useMemo(
+    () =>
+      ((categoriesData?.departments ?? []) as CategoryDepartment[])
+        .map((d) => ({ ...d, categories: d.categories.filter((c) => c.product_count > 0) }))
+        .filter((d) => d.categories.length > 0),
+    [categoriesData?.departments]
+  )
+  const shelves = (shelvesData?.shelves ?? []) as SupplierShelf[]
   const products = useMemo(
     () => (productsData?.products ?? []) as Product[],
     [productsData?.products]
@@ -84,6 +103,13 @@ export function DealTargetingPickers({ value, onChange }: Props) {
     onChange({ ...value, categoryIds: [...set] })
   }
 
+  const toggleShelf = (shelfId: string) => {
+    const set = new Set(value.shelfIds)
+    if (set.has(shelfId)) set.delete(shelfId)
+    else set.add(shelfId)
+    onChange({ ...value, shelfIds: [...set] })
+  }
+
   const toggleRestaurantType = (type: string) => {
     const set = new Set(value.restaurantTypes || [])
     if (set.has(type)) set.delete(type)
@@ -111,23 +137,28 @@ export function DealTargetingPickers({ value, onChange }: Props) {
     <div className="space-y-3 border rounded-lg p-3 bg-[var(--app-muted)]/30">
       <p className="text-xs text-[var(--text-muted)]">{t('targeting.helperText')}</p>
       <div>
-        <Label>{t('targeting.appliesTo')}</Label>
+        <Label htmlFor="deal-applies-to">{t('targeting.appliesTo')}</Label>
         <Select
           value={value.appliesTo}
           onValueChange={(v) => {
             const appliesTo = v as AppliesTo
+            // One kind of target per deal; switching clears the others.
             onChange({
               ...value,
               appliesTo,
               productIds: appliesTo === 'specific_products' ? value.productIds : [],
               categoryIds: appliesTo === 'specific_categories' ? value.categoryIds : [],
+              shelfIds: appliesTo === 'specific_shelves' ? value.shelfIds : [],
             })
           }}
         >
-          <SelectTrigger className="mt-1">
+          <SelectTrigger id="deal-applies-to" className="mt-1">
             <option value="all">{t('targeting.allProducts')}</option>
             <option value="specific_products">{t('targeting.specificProducts')}</option>
             <option value="specific_categories">{t('targeting.specificCategories')}</option>
+            {isSupplier ? (
+              <option value="specific_shelves">{t('targeting.specificShelves')}</option>
+            ) : null}
           </SelectTrigger>
         </Select>
       </div>
@@ -174,7 +205,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                   <button
                     key={id}
                     type="button"
-                    className={`w-full text-start px-3 py-2 text-sm hover:bg-[var(--app-muted)] ${
+                    className={`w-full text-start px-3 py-2 text-sm hover:bg-[var(--app-bg-subtle)] ${
                       selected ? 'bg-[var(--brand)]/10 font-medium' : ''
                     }`}
                     onClick={() => toggleProduct(id)}
@@ -199,24 +230,35 @@ export function DealTargetingPickers({ value, onChange }: Props) {
       {value.appliesTo === 'specific_categories' ? (
         <div className="space-y-2">
           <Label>{t('targeting.categories')}</Label>
+          <p className="text-xs text-[var(--text-muted)]">{t('targeting.categoriesHelper')}</p>
           {categoriesLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
-              {categories.map((c) => {
-                const id = String(c.id)
-                const checked = value.categoryIds.includes(id)
-                return (
-                  <label
-                    key={id}
-                    className="flex items-center gap-2 text-sm cursor-pointer px-1 py-1 rounded hover:bg-[var(--app-muted)]"
-                  >
-                    <input type="checkbox" checked={checked} onChange={() => toggleCategory(id)} />
-                    {String(c.name)}
-                  </label>
-                )
-              })}
-              {categories.length === 0 ? (
+            <div className="max-h-56 overflow-y-auto border rounded-md p-2 space-y-2">
+              {departments.map((dept) => (
+                <div key={dept.id} role="group" aria-label={localizedName(dept, i18n.language)}>
+                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                    {localizedName(dept, i18n.language)}
+                  </p>
+                  {dept.categories.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 text-sm cursor-pointer px-1 py-1 rounded hover:bg-[var(--app-bg-subtle)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={value.categoryIds.includes(c.id)}
+                        onChange={() => toggleCategory(c.id)}
+                      />
+                      <span className="flex-1">{localizedName(c, i18n.language)}</span>
+                      <span className="text-xs tabular-nums text-[var(--text-muted)]">
+                        {c.product_count}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+              {departments.length === 0 ? (
                 <p className="text-xs text-[var(--text-muted)]">
                   {t('targeting.noCategoriesAvailable')}
                 </p>
@@ -229,6 +271,47 @@ export function DealTargetingPickers({ value, onChange }: Props) {
               variant="ghost"
               size="sm"
               onClick={() => onChange({ ...value, categoryIds: [] })}
+            >
+              {t('targeting.clearSelection')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {value.appliesTo === 'specific_shelves' ? (
+        <div className="space-y-2">
+          <Label>{t('targeting.shelves')}</Label>
+          {shelvesLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
+              {shelves.map((shelf) => (
+                <label
+                  key={shelf.id}
+                  className="flex items-center gap-2 text-sm cursor-pointer px-1 py-1 rounded hover:bg-[var(--app-bg-subtle)]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={value.shelfIds.includes(shelf.id)}
+                    onChange={() => toggleShelf(shelf.id)}
+                  />
+                  <span className="flex-1">{localizedName(shelf, i18n.language)}</span>
+                  <span className="text-xs tabular-nums text-[var(--text-muted)]">
+                    {shelf.product_count}
+                  </span>
+                </label>
+              ))}
+              {shelves.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">{t('targeting.noShelves')}</p>
+              ) : null}
+            </div>
+          )}
+          {value.shelfIds.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange({ ...value, shelfIds: [] })}
             >
               {t('targeting.clearSelection')}
             </Button>
@@ -250,7 +333,7 @@ export function DealTargetingPickers({ value, onChange }: Props) {
                 className={`rounded-md border px-2 py-1 text-xs ${
                   selected
                     ? 'border-[var(--brand)] bg-[var(--brand)]/10 font-medium'
-                    : 'hover:bg-[var(--app-muted)]'
+                    : 'hover:bg-[var(--app-bg-subtle)]'
                 }`}
               >
                 {t(`targeting.restaurantTypes.${type}`, { defaultValue: type.replace(/_/g, ' ') })}

@@ -6,6 +6,7 @@ export const PAGE_I18N: Record<string, I18nNamespace[]> = {
   SupplierHome: ['dashboard', 'supplierOps'],
   ProductsPage: ['products'],
   ProductDetailPage: ['products'],
+  CategoryPage: ['products'],
   OrdersPage: ['orders'],
   OrderDetailPage: ['orders', 'disputes'],
   SuppliersPage: ['suppliers'],

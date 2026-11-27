@@ -146,15 +146,23 @@ export function isTerminalProductImportStatus(status: ProductImportJobStatus): b
   return TERMINAL_PRODUCT_IMPORT_STATUSES.has(status)
 }
 
+/** Preview rowNumber → leaf platform category id chosen by the supplier. */
+export type ProductImportCategoryOverrides = Record<number, string>
+
+type ImportExtras = {
+  columnMapping?: Record<string, string>
+  categoryOverrides?: ProductImportCategoryOverrides
+}
+
 export type ProductImportPreviewRequest =
-  | { csv: string; columnMapping?: Record<string, string> }
-  | { file: File; columnMapping?: Record<string, string> }
+  | ({ csv: string } & ImportExtras)
+  | ({ file: File } & ImportExtras)
 
 export type ProductImportExecuteRequest =
-  | { csv: string; partial?: boolean; columnMapping?: Record<string, string> }
-  | { file: File; partial?: boolean; columnMapping?: Record<string, string> }
+  | ({ csv: string; partial?: boolean } & ImportExtras)
+  | ({ file: File; partial?: boolean } & ImportExtras)
 
-function buildProductImportBody(
+export function buildProductImportBody(
   body: ProductImportPreviewRequest | ProductImportExecuteRequest
 ): FormData | Record<string, unknown> {
   if ('file' in body && body.file) {
@@ -166,9 +174,15 @@ function buildProductImportBody(
     if ('partial' in body && body.partial !== undefined) {
       formData.append('partial', String(body.partial))
     }
+    if (body.categoryOverrides && Object.keys(body.categoryOverrides).length > 0) {
+      formData.append('categoryOverrides', JSON.stringify(body.categoryOverrides))
+    }
     return formData
   }
-  return body as Record<string, unknown>
+  const { categoryOverrides, ...rest } = body
+  return categoryOverrides && Object.keys(categoryOverrides).length > 0
+    ? { ...rest, categoryOverrides }
+    : (rest as Record<string, unknown>)
 }
 
 export const catalogImportApi = api.injectEndpoints({

@@ -95,4 +95,23 @@ describe('resolveNotificationUrl tenant routing', () => {
       '/app'
     )
   })
+
+  it('routes a resolved category request to the needs-a-category products', () => {
+    expect(
+      resolveNotificationUrl({
+        id: 'n1',
+        reference_type: 'CATEGORY_REQUEST',
+        reference_id: 'req-1',
+        metadata: { ctaUrl: '/app/products?needsReview=1', outcome: 'approved' },
+      })
+    ).toBe('/app/products?needsReview=1')
+    // Older payloads without a ctaUrl still land on the review list.
+    expect(
+      resolveNotificationUrl({
+        id: 'n2',
+        reference_type: 'CATEGORY_REQUEST',
+        reference_id: 'req-1',
+      })
+    ).toBe('/app/products?needsReview=1')
+  })
 })

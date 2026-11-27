@@ -261,6 +261,20 @@ describe('Products Routes', () => {
       expect(listParams).toContain(categoryId)
     })
 
+    it('filters to products that need a category, and by shelf', async () => {
+      const shelfId = '00000000-0000-4000-8000-0000000000aa'
+      db.query
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })
+
+      await request(app).get(`/api/products?needsReview=true&shelfId=${shelfId}`).expect(200)
+
+      const [listSql, listParams] = db.query.mock.calls[0]
+      expect(String(listSql)).toContain('p.category_needs_review = true')
+      expect(String(listSql)).toMatch(/FROM product_shelf fps[\s\S]*fps\.shelf_id = \$1::uuid/)
+      expect(listParams).toContain(shelfId)
+    })
+
     it('the old category= text filter is gone', async () => {
       db.query
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })

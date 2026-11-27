@@ -259,6 +259,13 @@ const productListSchema = z.object({
     .string()
     .transform((val) => val === 'true')
     .optional(),
+  /** Supplier catalog: only products waiting for a category (on Other for review). */
+  needsReview: z
+    .string()
+    .transform((val) => val === 'true' || val === '1')
+    .optional(),
+  /** Only products on this shelf. */
+  shelfId: z.string().uuid().optional(),
   minPrice: z
     .string()
     .transform((val) => (val ? parseFloat(val) : undefined))
@@ -479,6 +486,16 @@ router.get('/', async (req, res) => {
     if (params.categoryId) {
       whereConditions.push(categoryFilterSql(`$${paramIndex}`, 'lc'))
       queryParams.push(params.categoryId)
+      paramIndex++
+    }
+
+    if (params.needsReview) {
+      whereConditions.push('p.category_needs_review = true')
+    }
+    if (params.shelfId) {
+      whereConditions.push(`EXISTS (SELECT 1 FROM product_shelf fps
+        WHERE fps.product_id = p.id AND fps.shelf_id = $${paramIndex}::uuid)`)
+      queryParams.push(params.shelfId)
       paramIndex++
     }
 

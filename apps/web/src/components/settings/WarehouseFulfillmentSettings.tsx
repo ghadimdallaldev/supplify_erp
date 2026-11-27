@@ -14,13 +14,14 @@ import { Input } from '../ui/input'
 import { toast } from 'sonner'
 import { Route, Loader2 } from 'lucide-react'
 import { usePermissions } from '../../hooks/usePermissions'
+import { routingRuleLabel, type WarehouseRoutingRule } from '../../lib/routingRuleLabel'
 
 type Props = {
   enabled: boolean
 }
 
 export function WarehouseFulfillmentSettings({ enabled }: Props) {
-  const { t } = useTranslation('settings')
+  const { t, i18n } = useTranslation('settings')
   const { can } = usePermissions()
   // M10: API allows WAREHOUSES_MANAGE; keep SETTINGS_MANAGE for owners who already had it.
   const canManageFulfillment = can('WAREHOUSES_MANAGE') || can('SETTINGS_MANAGE')
@@ -97,8 +98,8 @@ export function WarehouseFulfillmentSettings({ enabled }: Props) {
           <div className="rounded-lg border p-3 text-sm">
             <p className="font-medium mb-2">Active routing rules ({rulesData.rules.length})</p>
             <ul className="space-y-1 text-[var(--text-muted)]">
-              {rulesData.rules.slice(0, 5).map((rule: { id: string; name?: string }) => (
-                <li key={rule.id}>{rule.name || rule.id.slice(0, 8)}</li>
+              {rulesData.rules.slice(0, 5).map((rule: WarehouseRoutingRule) => (
+                <li key={rule.id}>{routingRuleLabel(rule, i18n.language)}</li>
               ))}
             </ul>
           </div>

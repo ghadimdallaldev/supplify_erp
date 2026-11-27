@@ -6,21 +6,32 @@ import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
 import { filterControlClass } from '../ui/filter-control'
 import { cn } from '../../lib/utils'
+import { localizedName } from '../../lib/categoryLabel'
+import type { CategoryDepartment } from '../../types'
+
+/** Department or leaf name for a category id. */
+function categoryLabelFor(departments: CategoryDepartment[], id: string, language: string) {
+  for (const dept of departments) {
+    if (dept.id === id) return localizedName(dept, language)
+    const leaf = dept.categories.find((c) => c.id === id)
+    if (leaf) return localizedName(leaf, language)
+  }
+  return ''
+}
 
 type ProductFiltersProps = {
   isSupplier: boolean
   supplierFilter: string
   setSupplierFilter: (v: string) => void
   uniqueSuppliers: Array<{ id: string; name: string }>
+  /** A department or leaf platform category id ('' = all). */
   categoryId: string
   setCategoryId: (v: string) => void
-  setCategory: (v: string) => void
-  categoriesData: { categories?: Array<{ id: string; name: string }> } | undefined
+  departments: CategoryDepartment[]
   minPrice: string
   maxPrice: string
   setMinPrice: (v: string) => void
   setMaxPrice: (v: string) => void
-  category: string
   selectedTags: string[]
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>
   tagsData: { tags?: string[] } | undefined
@@ -33,8 +44,7 @@ export function ProductFilterFields({
   uniqueSuppliers,
   categoryId,
   setCategoryId,
-  setCategory,
-  categoriesData,
+  departments,
   minPrice,
   maxPrice,
   setMinPrice,
@@ -47,14 +57,13 @@ export function ProductFilterFields({
   | 'uniqueSuppliers'
   | 'categoryId'
   | 'setCategoryId'
-  | 'setCategory'
-  | 'categoriesData'
+  | 'departments'
   | 'minPrice'
   | 'maxPrice'
   | 'setMinPrice'
   | 'setMaxPrice'
 >) {
-  const { t } = useTranslation('products')
+  const { t, i18n } = useTranslation('products')
   const hasPriceFilter = Boolean(minPrice || maxPrice)
 
   const priceRangeFields = (
@@ -130,19 +139,21 @@ export function ProductFilterFields({
         >
           {t('filters.category')}
         </Label>
-        <Select
-          value={categoryId}
-          onValueChange={(value) => {
-            setCategoryId(value)
-            setCategory('')
-          }}
-        >
+        <Select value={categoryId} onValueChange={setCategoryId}>
           <SelectTrigger id="product-category-filter">
             <option value="">{t('filters.allCategories')}</option>
-            {categoriesData?.categories?.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
+            {departments.map((dept) => (
+              <optgroup key={dept.id} label={localizedName(dept, i18n.language)}>
+                {/* The department itself: every category under it. */}
+                <option value={dept.id}>
+                  {t('filters.allInDepartment', { name: localizedName(dept, i18n.language) })}
+                </option>
+                {dept.categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {localizedName(cat, i18n.language)}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </SelectTrigger>
         </Select>
@@ -191,10 +202,8 @@ export function ProductActiveFilters({
   supplierFilter,
   setSupplierFilter,
   categoryId,
-  category,
   setCategoryId,
-  setCategory,
-  categoriesData,
+  departments,
   selectedTags,
   setSelectedTags,
   minPrice,
@@ -202,10 +211,10 @@ export function ProductActiveFilters({
   setMinPrice,
   setMaxPrice,
 }: Omit<ProductFiltersProps, 'uniqueSuppliers' | 'tagsData'>) {
-  const { t } = useTranslation('products')
+  const { t, i18n } = useTranslation('products')
   if (
     isSupplier ||
-    !(supplierFilter || categoryId || category || selectedTags.length || minPrice || maxPrice)
+    !(supplierFilter || categoryId || selectedTags.length || minPrice || maxPrice)
   ) {
     return null
   }
@@ -221,18 +230,15 @@ export function ProductActiveFilters({
           {t('filters.filterSupplier', { value: supplierFilter })}
         </Badge>
       )}
-      {(categoryId || category) && (
+      {categoryId && (
         <Badge
           variant="secondary"
           className="cursor-pointer hover:bg-[var(--app-border-mid)]"
-          onClick={() => {
-            setCategoryId('')
-            setCategory('')
-          }}
+          onClick={() => setCategoryId('')}
         >
           {t('filters.filterCategory', {
-            value: categoriesData?.categories?.find((c) => c.id === categoryId)?.name || category,
-          })}{' '}
+            value: categoryLabelFor(departments, categoryId, i18n.language),
+          })}
         </Badge>
       )}
       {selectedTags.map((tag) => (

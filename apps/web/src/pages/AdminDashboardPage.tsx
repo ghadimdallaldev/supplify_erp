@@ -22,6 +22,7 @@ import {
   LazyAdminActivityTab,
   LazyAdminAuditTab,
   LazyAdminFeaturesTab,
+  LazyAdminCatalogTab,
   LazyAdminFinanceTab,
   LazyAdminHealthTab,
   LazyAdminOverviewTab,
@@ -75,6 +76,8 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
       finance: can('ADMIN_FINANCE'),
       usage: can('ADMIN_PLANS'),
       features: can('ADMIN_GROWTH'),
+      // Category requests and the platform tree (the API gates on ADMIN_ACCESS).
+      catalog: can('ADMIN_ACCESS'),
       deals: can('ADMIN_GROWTH'),
       limits: can('ADMIN_PLANS'),
       health: can('ADMIN_ACCESS'),
@@ -196,6 +199,10 @@ export function AdminDashboardPage({ initialTab = 'overview' }: AdminDashboardPa
 
         <AdminTabMount tab="features" selectedTab={selectedTab}>
           <LazyAdminFeaturesTab active={selectedTab === 'features'} />
+        </AdminTabMount>
+
+        <AdminTabMount tab="catalog" selectedTab={selectedTab}>
+          <LazyAdminCatalogTab active={selectedTab === 'catalog'} />
         </AdminTabMount>
 
         <AdminTabMount tab="deals" selectedTab={selectedTab}>

@@ -329,6 +329,7 @@
       "use_coupon": "Reveal a coupon code and apply it during checkout.",
       "message_supplier": "Start a chat with a prefilled message about this deal.",
       "view_products": "Show restaurants the eligible products for this deal."
-    }
+    },
+    "toastSelectShelf": "Select at least one shelf"
   }
 }

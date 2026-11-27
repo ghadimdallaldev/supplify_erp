@@ -34,3 +34,6 @@ export const LazyAdminAuditTab = lazy(() =>
 export const LazyAdminFeaturesTab = lazy(() =>
   import('./AdminFeaturesTab').then((m) => ({ default: m.AdminFeaturesTab }))
 )
+export const LazyAdminCatalogTab = lazy(() =>
+  import('./AdminCatalogTab').then((m) => ({ default: m.AdminCatalogTab }))
+)

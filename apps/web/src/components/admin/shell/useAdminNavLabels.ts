@@ -22,6 +22,7 @@ export function useAdminTabLabels(): Record<AdminTabKey, string> {
       finance: t('nav.tabs.finance'),
       usage: t('nav.tabs.usage'),
       features: t('nav.tabs.features'),
+      catalog: t('nav.tabs.catalog'),
       deals: t('nav.tabs.deals'),
       limits: t('nav.tabs.limits'),
       health: t('nav.tabs.health'),

@@ -101,6 +101,7 @@ export function resolveNotificationUrl(
       : '/app/inventory?tab=expiry'
   }
   if (type === 'PRODUCT') return '/app/products'
+  if (type === 'CATEGORY_REQUEST') return '/app/products?needsReview=1'
   if (type === 'STAFF_PTO' || type === 'STAFF_SWAP') return '/app/staff'
   if (type === 'SUBSCRIPTION' || type === 'BILLING') return billingSettingsPath(options)
   // No /app/notifications route exists — fall back to the dashboard home.

@@ -9,7 +9,8 @@ export interface OrdersCalendarQuery {
   status?: string | null
   supplier?: string | null
   branch?: string | null
-  category?: string | null
+  /** A department or leaf category id. */
+  categoryId?: string | null
   page?: number
   pageSize?: number
   role?: 'RESTAURANT' | 'SUPPLIER'
@@ -34,7 +35,7 @@ async function fetchCalendar(params: OrdersCalendarQuery): Promise<OrdersCalenda
   if (params.end) searchParams.set('end', params.end)
   if (params.status) searchParams.set('status', params.status)
   if (params.supplier) searchParams.set('supplier', params.supplier)
-  if (params.category) searchParams.set('category', params.category)
+  if (params.categoryId) searchParams.set('categoryId', params.categoryId)
   if (params.branch) searchParams.set('branch', params.branch)
   if (params.page) searchParams.set('page', String(params.page))
   if (params.pageSize) searchParams.set('pageSize', String(params.pageSize))
@@ -69,7 +70,7 @@ export function useOrdersCalendar(
         status: params.status ?? null,
         supplier: params.supplier ?? null,
         branch: params.branch ?? null,
-        category: params.category ?? null,
+        categoryId: params.categoryId ?? null,
         page: params.page ?? 1,
         pageSize: params.pageSize ?? 100,
         role: params.role ?? null,
@@ -82,7 +83,7 @@ export function useOrdersCalendar(
       params.status,
       params.supplier,
       params.branch,
-      params.category,
+      params.categoryId,
       params.page,
       params.pageSize,
       params.role,

@@ -9,10 +9,20 @@ export interface SearchHistoryEntry {
   created_at: string
 }
 
+/** A leaf category matching the query (grouped search only). */
+export interface SearchCategoryHit {
+  id: string
+  slug: string
+  name: string
+  name_ar?: string | null
+  icon_key?: string | null
+  product_count: number
+}
+
 export const searchApi = api.injectEndpoints({
   endpoints: (builder) => ({
     search: builder.query<
-      | { products: unknown[]; suppliers: unknown[] }
+      | { products: unknown[]; suppliers: unknown[]; categories?: SearchCategoryHit[] }
       | { results: Array<{ type: SearchEntityType; item: unknown }> },
       { q: string; grouped?: boolean; limit?: number }
     >({

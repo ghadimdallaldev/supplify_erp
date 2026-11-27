@@ -59,7 +59,8 @@ export const restaurantInventoryApi = api.injectEndpoints({
         q?: string
         status?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
         supplierId?: string
-        category?: string
+        /** A department or leaf platform category id. */
+        categoryId?: string
       } | void
     >({
       query: (params) => ({

@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -13,6 +14,11 @@ import { Badge } from '../ui/badge'
 import { Label } from '../ui/label'
 import { Select, SelectTrigger } from '../ui/select'
 import type { ProductFormState } from './productsShared'
+import { CategoryCombobox } from './CategoryCombobox'
+import { CategoryRequestSheet } from './CategoryRequestSheet'
+import { localizedName } from '../../lib/categoryLabel'
+import { OTHER_CATEGORY_SLUG } from '../../lib/categoryTree'
+import type { CategoryDepartment, SupplierShelf } from '../../types'
 
 type ProductFormDialogProps = {
   showAddProduct: boolean
@@ -21,7 +27,10 @@ type ProductFormDialogProps = {
   setProductForm: React.Dispatch<React.SetStateAction<ProductFormState>>
   newTag: string
   setNewTag: (v: string) => void
-  categoriesData: { categories?: Array<{ id: string; name: string }> } | undefined
+  /** Platform category tree (supplier view: full tree). */
+  departments: CategoryDepartment[]
+  /** The branch's active shelves. */
+  shelves: SupplierShelf[]
   tagsData: { tags?: string[] } | undefined
   warehousesData: { warehouses?: Array<{ id: string; name: string; code?: string }> } | undefined
   imagePreview: string | null
@@ -38,7 +47,8 @@ export function ProductFormDialog({
   setProductForm,
   newTag,
   setNewTag,
-  categoriesData,
+  departments,
+  shelves,
   tagsData,
   warehousesData,
   imagePreview,
@@ -47,7 +57,32 @@ export function ProductFormDialog({
   isCreating,
   isUploadingImage,
 }: ProductFormDialogProps) {
-  const { t } = useTranslation('products')
+  const { t, i18n } = useTranslation('products')
+  const [requestOpen, setRequestOpen] = useState(false)
+  const otherLeafId = useMemo(
+    () =>
+      departments.flatMap((d) => d.categories).find((c) => c.slug === OTHER_CATEGORY_SLUG)?.id ??
+      '',
+    [departments]
+  )
+  const setCategory = useCallback(
+    (categoryId: string) =>
+      setProductForm((form) => ({
+        ...form,
+        category_id: categoryId,
+        // Choosing a real category drops a pending "request a category".
+        pendingCategoryRequest: categoryId === otherLeafId ? form.pendingCategoryRequest : null,
+      })),
+    [setProductForm, otherLeafId]
+  )
+  const toggleShelf = (shelfId: string) =>
+    setProductForm((form) => ({
+      ...form,
+      shelfIds: form.shelfIds.includes(shelfId)
+        ? form.shelfIds.filter((id) => id !== shelfId)
+        : [...form.shelfIds, shelfId],
+    }))
+  const missingCategory = !productForm.category_id
   const unitOptions = [
     'kg',
     'g',
@@ -103,25 +138,58 @@ export function ProductFormDialog({
               onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="category_id">{t('form.category')}</Label>
+            <CategoryCombobox
+              id="category_id"
+              departments={departments}
+              value={productForm.category_id}
+              onChange={setCategory}
+              productName={productForm.name}
+            />
+            {productForm.pendingCategoryRequest ? (
+              <p className="text-xs text-[var(--text-muted)]" aria-live="polite">
+                {t('categoryRequest.pending', {
+                  name: productForm.pendingCategoryRequest.proposedName,
+                })}
+              </p>
+            ) : missingCategory ? (
+              <p className="text-xs text-[var(--amber)]">{t('form.chooseCategory')}</p>
+            ) : null}
+            <button
+              type="button"
+              className="text-xs font-medium text-[var(--brand-mid)] hover:underline"
+              onClick={() => setRequestOpen(true)}
+            >
+              {t('categoryRequest.open')}
+            </button>
+          </div>
+          {shelves.length > 0 ? (
             <div className="space-y-2">
-              <Label htmlFor="category_id">{t('form.category')}</Label>
-              <Select
-                value={productForm.category_id}
-                onValueChange={(value) =>
-                  setProductForm({ ...productForm, category_id: value, category: '' })
-                }
-              >
-                <SelectTrigger id="category_id">
-                  <option value="">{t('form.selectCategory')}</option>
-                  {categoriesData?.categories?.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </SelectTrigger>
-              </Select>
+              <Label>{t('form.shelves')}</Label>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('form.shelves')}>
+                {shelves.map((shelf) => {
+                  const on = productForm.shelfIds.includes(shelf.id)
+                  return (
+                    <button
+                      key={shelf.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleShelf(shelf.id)}
+                      className={
+                        on
+                          ? 'rounded-full border border-[var(--brand)] bg-[var(--brand-pale)] px-3 py-1 text-xs font-medium text-[var(--brand-mid)]'
+                          : 'rounded-full border border-[var(--app-border)] px-3 py-1 text-xs text-[var(--text-mid)] hover:bg-[var(--app-bg-subtle)]'
+                      }
+                    >
+                      {localizedName(shelf, i18n.language)}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+          ) : null}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="unit">{t('form.unit')}</Label>
               <Select
@@ -285,10 +353,28 @@ export function ProductFormDialog({
           <Button variant="outline" onClick={() => setShowAddProduct(false)}>
             {t('form.cancel')}
           </Button>
-          <Button onClick={handleSubmitProduct} disabled={isCreating || isUploadingImage}>
+          <Button
+            onClick={handleSubmitProduct}
+            disabled={isCreating || isUploadingImage || missingCategory}
+          >
             {isCreating || isUploadingImage ? t('form.creating') : t('form.createProduct')}
           </Button>
         </DialogFooter>
+        <CategoryRequestSheet
+          open={requestOpen}
+          onOpenChange={setRequestOpen}
+          departments={departments}
+          suggestedName={productForm.name}
+          onSubmit={(body) => {
+            // The product is saved under Other for now; the request is sent with its id.
+            setProductForm((form) => ({
+              ...form,
+              category_id: otherLeafId || form.category_id,
+              pendingCategoryRequest: body,
+            }))
+            setRequestOpen(false)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

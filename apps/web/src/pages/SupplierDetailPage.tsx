@@ -64,9 +64,10 @@ import {
 import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { ensureNamespace } from '../i18n'
+import { localizedName } from '../lib/categoryLabel'
 
 export function SupplierDetailPage() {
-  const { t } = useTranslation('suppliers')
+  const { t, i18n } = useTranslation('suppliers')
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAppSelector((state) => state.auth)
@@ -697,7 +698,19 @@ export function SupplierDetailPage() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="font-medium">{product.name}</h4>
-                        {product.category && <Badge variant="secondary">{product.category}</Badge>}
+                        {(product.category_name || product.category) && (
+                          <Badge variant="secondary">
+                            {product.category_name
+                              ? localizedName(
+                                  {
+                                    name: product.category_name,
+                                    name_ar: product.category_name_ar,
+                                  },
+                                  i18n.language
+                                )
+                              : product.category}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-[var(--text-muted)] mb-2">{product.sku}</p>
                       <div className="flex items-center justify-between gap-2">
