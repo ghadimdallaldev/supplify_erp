@@ -21,6 +21,7 @@ import {
   todayStart,
 } from './seed/timeUtils.js'
 import { bulkInsert } from './seed/bulkInsert.js'
+import { categoryResolver, seedCategoryFields } from './lib/seed-categories.js'
 import { getScopedInsertShape, insertScopedLocation } from './seed/scopedLocation.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -329,9 +330,11 @@ async function main() {
         const sku = `SKU-${s.id.slice(0, 8)}-${i + 1}`
         const unit = pick(rng, units)
         const priceAmount = floatBetween(rng, 1.5, 120)
+        const placed = seedCategoryFields(await categoryResolver(client), name)
         await client.query(
-          `INSERT INTO product (id, supplier_id, sku, name, unit, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-          [id, s.id, sku, name, unit]
+          `INSERT INTO product (id, supplier_id, sku, name, unit, category_id, category_needs_review, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+          [id, s.id, sku, name, unit, placed.category_id, placed.category_needs_review]
         )
         await client.query(
           `INSERT INTO price (id, product_id, currency, amount, min_qty, valid_from) VALUES ($1, $2, 'USD', $3, 1, NOW())`,

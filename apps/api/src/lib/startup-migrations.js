@@ -1,6 +1,7 @@
 /**
  * Full migration pipeline for API startup and `pnpm db:migrate`.
- * SQL files + runtime schema checks + tenant role backfill + supplier org backfill.
+ * SQL files + runtime schema checks + tenant role backfill + supplier org backfill +
+ * category backfill.
  */
 import { config } from '../config/env.js'
 import { logger } from './logger.js'
@@ -15,6 +16,7 @@ import {
   migrateUsersToTenantRoles,
 } from '../../scripts/migrate-users-to-roles.js'
 import { migrateSuppliersToOrgs } from '../../scripts/migrate-suppliers-to-orgs.js'
+import { runCategoryBackfill } from './category-backfill.js'
 
 /**
  * @param {{ force?: boolean }} [options]
@@ -61,6 +63,21 @@ export async function runFullStartupMigrations(options = {}) {
   } else {
     logger.info('Running supplier org backfill')
     await migrateSuppliersToOrgs()
+  }
+
+  if (process.env.SKIP_CATEGORY_BACKFILL === '1') {
+    logger.info('SKIP_CATEGORY_BACKFILL=1 — category backfill skipped')
+  } else {
+    // Locked and resumable; a verified run returns at once. A failure is recorded in
+    // data_migration_run and the API keeps serving (non-leaf ids read as "Other").
+    try {
+      const stats = await runCategoryBackfill()
+      if (!stats.skipped) logger.info('Category backfill finished', { stats })
+    } catch (error) {
+      logger.error('Category backfill did not finish; it resumes on the next start', {
+        error: error.message,
+      })
+    }
   }
 
   logger.info('Full startup migrations completed')

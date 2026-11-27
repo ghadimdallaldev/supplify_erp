@@ -13,6 +13,7 @@ import 'dotenv/config'
 import { pool } from '../src/lib/db.js'
 import { disconnectCache } from '../src/lib/cache.js'
 import { isMainModule } from './lib/is-main.mjs'
+import { categoryResolver, seedCategoryFields } from './lib/seed-categories.js'
 import { applyPlanFeaturePatches } from './seed/tierDefinitions.js'
 import { getScopedInsertShape, insertScopedLocation } from './seed/scopedLocation.js'
 import { createSeededRng, intBetween, pick, shuffle } from './seed/seedRng.js'
@@ -179,10 +180,23 @@ async function seedSupplier(client, def, warehouseShape) {
   const products = []
   for (const p of productsForSupplier(def)) {
     const productId = uuid()
+    const placed = seedCategoryFields(await categoryResolver(client), p.name, p.category)
     await client.query(
-      `INSERT INTO product (id, supplier_id, sku, name, description, category, unit, image_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())`,
-      [productId, id, p.sku, p.name, p.description, p.category, p.unit, productImageUrl(p.sku)]
+      `INSERT INTO product (id, supplier_id, sku, name, description, category, unit, image_url,
+                            category_id, category_needs_review, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())`,
+      [
+        productId,
+        id,
+        p.sku,
+        p.name,
+        p.description,
+        p.category,
+        p.unit,
+        productImageUrl(p.sku),
+        placed.category_id,
+        placed.category_needs_review,
+      ]
     )
     await client.query(
       `INSERT INTO price (product_id, currency, amount, valid_from) VALUES ($1, 'USD', $2, now())`,

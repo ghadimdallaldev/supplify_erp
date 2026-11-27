@@ -175,6 +175,10 @@ BEGIN
   VALUES ('promotion-target-split', 'done', jsonb_build_object('split', v_split), now())
   ON CONFLICT (name) DO NOTHING;
 
+  -- The split queued deferred FK checks; ALTER TABLE refuses a table with pending trigger
+  -- events, so run them now (the mode lasts only for this migration's transaction).
+  SET CONSTRAINTS ALL IMMEDIATE;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'promotion_targets_exactly_one_target'
   ) THEN

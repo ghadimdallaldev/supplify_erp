@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 import { pool } from '../src/lib/db.js'
 import { isMainModule } from './lib/is-main.mjs'
+import { categoryResolver, seedCategoryFields } from './lib/seed-categories.js'
 import { getScopedInsertShape, insertScopedLocation } from './seed/scopedLocation.js'
 import { applyPlanFeaturePatches, TIERS } from './seed/tierDefinitions.js'
 
@@ -133,10 +134,12 @@ async function seedSupplier(client, def, warehouseShape) {
   for (let i = 1; i <= 5; i++) {
     const productId = uuid()
     const sku = `DEMO-${def.tier.toUpperCase()}-${i}`
+    const productName = `${tier.label} Product ${i}`
+    const placed = seedCategoryFields(await categoryResolver(client), productName)
     await client.query(
-      `INSERT INTO product (id, supplier_id, sku, name, unit, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'kg', now(), now())`,
-      [productId, id, sku, `${tier.label} Product ${i}`]
+      `INSERT INTO product (id, supplier_id, sku, name, unit, category_id, category_needs_review, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'kg', $5, $6, now(), now())`,
+      [productId, id, sku, productName, placed.category_id, placed.category_needs_review]
     )
     await client.query(
       `INSERT INTO price (product_id, currency, amount, valid_from) VALUES ($1, 'USD', $2, now())`,

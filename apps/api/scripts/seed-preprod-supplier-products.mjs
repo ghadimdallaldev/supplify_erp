@@ -1,5 +1,7 @@
 import pg from 'pg'
 import { randomUUID } from 'node:crypto'
+import { categoryResolver, seedCategoryFields } from './lib/seed-categories.js'
+import { disconnectCache } from '../src/lib/cache.js'
 
 const DATABASE_URL = process.env.DATABASE_URL
 if (!DATABASE_URL) {
@@ -135,10 +137,12 @@ async function addProducts(client, supplier, count) {
     const productId = randomUUID()
     const amount = priceFor(category.key, i)
     const qty = 40 + ((i * 7) % 180)
+    const placed = seedCategoryFields(await categoryResolver(client), name, category.label)
 
     await client.query(
-      `INSERT INTO product (id, supplier_id, sku, name, description, category, unit, image_url, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), now())`,
+      `INSERT INTO product (id, supplier_id, sku, name, description, category, unit, image_url,
+                            category_id, category_needs_review, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())`,
       [
         productId,
         supplier.id,
@@ -148,6 +152,8 @@ async function addProducts(client, supplier, count) {
         category.label,
         category.unit,
         productImageUrl(sku),
+        placed.category_id,
+        placed.category_needs_review,
       ]
     )
     await client.query(
@@ -228,4 +234,5 @@ try {
   process.exitCode = 1
 } finally {
   await client.end()
+  await disconnectCache().catch(() => undefined)
 }

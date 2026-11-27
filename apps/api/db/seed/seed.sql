@@ -29,6 +29,14 @@ INSERT INTO product (supplier_id, sku, name, name_ar, description, description_a
 ('550e8400-e29b-41d4-a716-446655440001', 'FF004', 'Basmati Rice', 'أرز بسمتي', 'Premium basmati rice', 'أرز بسمتي عالي الجودة', 'Fresh Foods', 'Grains', 'kg'),
 ('550e8400-e29b-41d4-a716-446655440001', 'FF005', 'Olive Oil', 'زيت زيتون', 'Extra virgin olive oil', 'زيت زيتون بكر ممتاز', 'Fresh Foods', 'Oils', 'bottle');
 
+-- Every product sits on a leaf platform category (migrations 0240/0241 seed the tree).
+UPDATE product p SET category_id = c.id
+FROM (VALUES ('FF001', 'vegetables'), ('FF002', 'leafy-greens-herbs'), ('FF003', 'meat-poultry'),
+             ('FF004', 'grains-legumes'), ('FF005', 'olive-oil')) AS m(sku, slug)
+JOIN product_category c ON c.slug = m.slug AND c.supplier_id IS NULL AND c.parent_category_id IS NOT NULL
+WHERE p.sku = m.sku AND p.supplier_id = '550e8400-e29b-41d4-a716-446655440001'
+  AND p.category_id IS NULL;
+
 -- Insert sample prices (scope by demo supplier — other tenants may reuse SKUs)
 INSERT INTO price (product_id, currency, amount, min_qty) VALUES 
 ((SELECT id FROM product WHERE sku = 'FF001' AND supplier_id = '550e8400-e29b-41d4-a716-446655440001'), 'USD', 2.50, 1),
