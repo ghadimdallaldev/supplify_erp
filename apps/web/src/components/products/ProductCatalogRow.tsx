@@ -10,6 +10,7 @@ import { AddToOrderingListButton } from '../ordering/AddToOrderingListButton'
 import { FollowAndAddButton } from '../marketplace/FollowAndAddButton'
 import { CardActionGrid, cardActionBtnClass } from '../ui/card-layout'
 import { responsiveDataListClasses } from '../ui/responsive-data-list'
+import { restaurantStock } from '../../lib/restaurantStock'
 import { cn } from '../../lib/utils'
 
 type ProductCatalogRowProps = {
@@ -157,8 +158,13 @@ function PriceCell({ product, layout }: { product: any; layout: 'card' | 'table'
 
 function StockLabel({ product, layout }: { product: any; layout: 'card' | 'table' }) {
   const { t } = useTranslation('products')
-  const inStock = parseFloat(product.available_qty || 0) > 0
-  const text = `${formatNumber(product.available_qty, { maximumFractionDigits: 2 })} ${product.unit || t('catalog.units')}`
+  const { qty, inStock } = restaurantStock(product)
+  const text =
+    qty !== null
+      ? `${formatNumber(qty, { maximumFractionDigits: 2 })} ${product.unit || t('catalog.units')}`
+      : inStock
+        ? t('catalog.inStock')
+        : t('catalog.outOfStock')
   if (layout === 'card') {
     return (
       <span className={`font-medium ${inStock ? 'text-[var(--mint)]' : 'text-[var(--red)]'}`}>
@@ -198,7 +204,7 @@ function ProductActions({
               product={product}
               onAdd={onAddToCart}
               label={t('catalog.addToCart')}
-              outOfStock={!product.available_qty || product.available_qty <= 0}
+              outOfStock={restaurantStock(product).inStock !== true}
               data-testid={`product-add-to-cart-${product.id}`}
             />
             {product.supplier_id ? (
@@ -241,7 +247,7 @@ function ProductActions({
             product={product}
             onAdd={onAddToCart}
             label={t('catalog.addToCart')}
-            outOfStock={!product.available_qty || product.available_qty <= 0}
+            outOfStock={restaurantStock(product).inStock !== true}
             data-testid={`product-add-to-cart-${product.id}`}
             iconClassName={cn('h-4 w-4', responsiveDataListClasses.actionIconGap)}
             labelClassName={responsiveDataListClasses.actionLabel}
