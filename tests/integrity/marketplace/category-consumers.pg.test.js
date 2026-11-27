@@ -15,7 +15,7 @@ vi.mock('../../../apps/api/src/lib/subscription.js', async (importOriginal) => (
 }))
 
 import { resetMarketplaceDb, startApiForTest, startMarketplaceDb } from './harness.js'
-import { createProduct, createRestaurant, createSupplierOrg } from './fixtures.js'
+import { createProduct, createRestaurant, createSupplierOrg, follow } from './fixtures.js'
 
 let db
 let api
@@ -399,5 +399,88 @@ describe('warehouse routing and cadence (real PG)', () => {
     const ar = await listRestaurantReminders(r.id, { locale: 'ar' })
     expect(ar[0].label).toContain(cats.cheese.name_ar)
     expect(ar[0].label).toContain('Fromagerie')
+  })
+})
+
+describe('supplier page shelves and categories for restaurants (real PG)', () => {
+  it('lists active non-empty shelves in order and the leaf categories with visible counts', async () => {
+    const org = await createSupplierOrg(db.pool, { name: 'Shelf Foods' })
+    const sid = org.branchIds[0]
+    const rest = await createRestaurant(db.pool)
+    const bread = await createProduct(db.pool, sid, { categoryId: leaf('bakery-bread') })
+    const cheese = await createProduct(db.pool, sid, { categoryId: leaf('cheese') })
+    await createProduct(db.pool, sid, { categoryId: leaf('cheese') })
+    const morning = await shelf(sid, 'Morning')
+    const deli = await shelf(sid, 'Deli')
+    const empty = await shelf(sid, 'Empty')
+    const gone = await shelf(sid, 'Gone')
+    await db.pool.query('UPDATE supplier_shelf SET display_order = 2 WHERE id = $1', [morning])
+    await db.pool.query('UPDATE supplier_shelf SET display_order = 1 WHERE id = $1', [deli])
+    await db.pool.query('UPDATE supplier_shelf SET archived_at = now() WHERE id = $1', [gone])
+    await onShelf(bread.id, morning, sid)
+    await onShelf(cheese.id, morning, sid)
+    await onShelf(cheese.id, deli, sid)
+    await onShelf(bread.id, gone, sid)
+
+    const res = await call(rest.userSub, 'GET', `/api/suppliers/${org.orgId}`)
+    expect(res.status).toBe(200)
+    const { shelves, categories } = res.body.data.supplier
+    expect(shelves.map((s) => [s.name, s.product_count])).toEqual([
+      ['Deli', 1],
+      ['Morning', 2],
+    ])
+    expect(shelves.find((s) => s.id === empty)).toBeUndefined()
+    expect(Object.fromEntries(categories.map((c) => [c.slug, c.product_count]))).toEqual({
+      'bakery-bread': 1,
+      cheese: 2,
+    })
+    const cheeseRow = categories.find((c) => c.slug === 'cheese')
+    expect(cheeseRow).toMatchObject({
+      id: leaf('cheese'),
+      name_ar: cats.cheese.name_ar,
+      department_id: dept('cheese'),
+    })
+
+    const shelfPage = await call(
+      rest.userSub,
+      'GET',
+      `/api/products?supplier=${org.orgId}&shelfId=${deli}`
+    )
+    expect(shelfPage.body.data.products.map((p) => p.id)).toEqual([cheese.id])
+  })
+
+  it("a supplier's own product list carries each product's active shelf ids", async () => {
+    const org = await createSupplierOrg(db.pool)
+    const sid = org.branchIds[0]
+    const p = await createProduct(db.pool, sid, { categoryId: leaf('cheese') })
+    const bare = await createProduct(db.pool, sid, { categoryId: leaf('cheese') })
+    const deli = await shelf(sid, 'Deli')
+    const gone = await shelf(sid, 'Gone')
+    await onShelf(p.id, deli, sid)
+    await onShelf(p.id, gone, sid)
+    await db.pool.query('UPDATE supplier_shelf SET archived_at = now() WHERE id = $1', [gone])
+
+    const res = await call(org.users[0].userSub, 'GET', '/api/products?limit=10')
+    expect(res.status).toBe(200)
+    const byId = Object.fromEntries(res.body.data.products.map((row) => [row.id, row]))
+    expect(byId[p.id].shelf_ids).toEqual([deli])
+    expect(byId[bare.id].shelf_ids).toEqual([])
+  })
+
+  it('a followers-only catalog shows no shelves or categories until the restaurant follows', async () => {
+    const org = await createSupplierOrg(db.pool, { publicCatalog: false })
+    const sid = org.branchIds[0]
+    const rest = await createRestaurant(db.pool)
+    const p = await createProduct(db.pool, sid, { categoryId: leaf('cheese') })
+    await onShelf(p.id, await shelf(sid, 'Deli'), sid)
+
+    const before = await call(rest.userSub, 'GET', `/api/suppliers/${org.orgId}`)
+    expect(before.body.data.supplier.shelves).toEqual([])
+    expect(before.body.data.supplier.categories).toEqual([])
+
+    await follow(db.pool, rest.id, org.orgId)
+    const after = await call(rest.userSub, 'GET', `/api/suppliers/${org.orgId}`)
+    expect(after.body.data.supplier.shelves.map((s) => s.name)).toEqual(['Deli'])
+    expect(after.body.data.supplier.categories.map((c) => c.slug)).toEqual(['cheese'])
   })
 })

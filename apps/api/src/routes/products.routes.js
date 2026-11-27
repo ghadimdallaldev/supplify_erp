@@ -53,6 +53,7 @@ import { getWarehouseSupplierColumn } from '../lib/warehouse-helpers.js'
 import {
   categoryFilterSql,
   leafCategoryColumnsSql,
+  productShelfIdsSql,
   leafCategoryJoinSql,
 } from '../lib/category-sql.js'
 import { loadPlatformCategories } from '../lib/category-matcher.js'
@@ -596,6 +597,7 @@ router.get('/', async (req, res) => {
     const listSelectSql = `
       SELECT 
         ${PRODUCT_LIST_COLUMNS},
+        ${scopedSupplierId ? `${productShelfIdsSql('p')} AS shelf_ids,` : ''}
         s.id as supplier_id,
         s.name as supplier_name,
         s.slug as supplier_slug,

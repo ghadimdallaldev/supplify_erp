@@ -5,6 +5,8 @@
  */
 import { query as defaultQuery, withTransaction } from '../lib/db.js'
 import { bumpCatalogVersionSafe } from '../lib/relationship-cache.js'
+import { catalogVisibleSql } from '../lib/relationship.js'
+import { leafCategoryJoinSql } from '../lib/category-sql.js'
 import {
   CatalogError,
   catalogNotFound,
@@ -98,6 +100,50 @@ export async function listShelves(supplierId, db = { query: defaultQuery }) {
     [supplierId]
   )
   return rows
+}
+
+/**
+ * What a restaurant browses on a supplier page: the active shelves and the leaf platform
+ * categories of the supplier's branches, each counting distinct products the restaurant can
+ * see (followers-only catalogs count nothing until it follows; blocked suppliers nothing).
+ * Empty shelves and categories are left out.
+ * @param {string[]} supplierIds branch supplier ids of one organisation
+ * @param {string} restaurantId
+ */
+export async function listRestaurantSupplierFacets(
+  supplierIds,
+  restaurantId,
+  db = { query: defaultQuery }
+) {
+  const visible = catalogVisibleSql('$2::uuid', 's')
+  const [{ rows: shelves }, { rows: categories }] = await Promise.all([
+    db.query(
+      `SELECT sh.id, sh.supplier_id, sh.name, sh.name_ar, sh.display_order,
+              count(DISTINCT p.id)::int AS product_count
+       FROM supplier_shelf sh
+       JOIN product_shelf ps ON ps.shelf_id = sh.id
+       JOIN product p ON p.id = ps.product_id
+       JOIN supplier s ON s.id = p.supplier_id
+       WHERE sh.supplier_id = ANY($1::uuid[]) AND sh.archived_at IS NULL AND ${visible}
+       GROUP BY sh.id
+       ORDER BY sh.display_order, lower(sh.name), sh.id`,
+      [supplierIds, restaurantId]
+    ),
+    db.query(
+      `SELECT lc.id, lc.slug, lc.name, lc.name_ar, lc.name_fr, lc.icon_key,
+              lc.parent_category_id AS department_id,
+              count(DISTINCT p.id)::int AS product_count
+       FROM product p
+       JOIN supplier s ON s.id = p.supplier_id
+       ${leafCategoryJoinSql('p', 'lc')}
+       WHERE p.supplier_id = ANY($1::uuid[]) AND ${visible}
+       GROUP BY lc.id, lc.slug, lc.name, lc.name_ar, lc.name_fr, lc.icon_key,
+                lc.parent_category_id, lc.display_order
+       ORDER BY lc.display_order, lc.name`,
+      [supplierIds, restaurantId]
+    ),
+  ])
+  return { shelves, categories }
 }
 
 async function getOwnShelf(db, supplierId, shelfId, { forUpdate = false } = {}) {
