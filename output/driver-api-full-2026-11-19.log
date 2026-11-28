@@ -1,0 +1,5 @@
+      Tests  1 failed | 2779 passed (2780)
+ FAIL  src/lib/subscription.test.js > Subscription lib > getTenantSubscription > creates free subscription when none exists and returns it
+ Test Files  1 failed | 407 passed (408)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+done

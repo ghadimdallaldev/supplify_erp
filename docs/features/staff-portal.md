@@ -1,5 +1,9 @@
 # Staff portal access (operational staff)
 
+The Restaurant mobile Staff screen shows the workspace roster and lets managers
+find and inspect staff profiles. Invitations, role and permission changes,
+scheduling, and payroll use the existing web Staff or Team workspaces.
+
 Operational staff (waiters, cashiers, chefs, drivers, kitchen) are **separate** from platform/team users managed under **Settings → Team → Roles**.
 
 ## User types

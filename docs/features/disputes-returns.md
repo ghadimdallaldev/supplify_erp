@@ -2,6 +2,11 @@
 
 Plan feature key: `disputes_returns` (included in the selected trial target and paid Growth/Scale plans for both restaurants and suppliers; expired trials remain subject to account-lock rules).
 
+On Restaurant mobile, an eligible order can open a dispute with an optional
+selection of its actual supplier lines. The dispute detail shows available
+evidence filenames and opens the authenticated web detail for evidence
+management.
+
 ## Overview
 
 Restaurants can open formal disputes on **delivered / received / invoiced / completed** orders when deliveries are wrong, damaged, or billed incorrectly. Disputes can include **per line-item** quantities (e.g. received 1 of 3 SKUs). Each line must be an item on that order for that supplier, and stored quantities and prices come from the order line. The disputed amount, and any credit or refund, cannot exceed that supplier's line total (or the linked invoice total when it is lower). Suppliers see incoming disputes under **Disputes** (Operations nav) and on the **order timeline**; both sides get notifications. Suppliers review, resolve (optionally issuing a credit note), or reject. Credit notes link to the existing `credit_note` finance table.

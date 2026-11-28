@@ -2,6 +2,11 @@
 
 Restaurant front-of-house: floor plan, day board, table assignment, public booking, guest reviews, and team notifications.
 
+The Restaurant mobile day board supports previous and next day controls
+alongside the date picker. Booking creation displays validation feedback
+while retaining the form. Status changes, waitlist promotion, and table
+assignments use the existing scoped reservation actions.
+
 ## iPad and booking state repair (2026-11-13)
 
 The host board uses wider responsive columns and larger assignment/status actions.

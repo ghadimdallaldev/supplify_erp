@@ -86,6 +86,25 @@ Running log for branch `feat/marketplace-visibility` (plans `docs/superpowers/pl
 - Plan A Task 1 (organisation-level relationships): mobile skipped — server-only. Follow and
   block rows are now stored per supplier organisation; no endpoint, payload or error code changed.
 
+## 2026-11-26 — Restaurant V4 workflow pass
+
+The paired `design/round-01-home` worktrees implement the Restaurant cart
+review and receipt, receiving queue and discrepancy review, invoice details
+and supplier statements, reservation day controls and form feedback, staff
+roster details, contract prices, delivery-pin selection, recipe ingredients
+and costing, quotes, disputes, guest management, and Restaurant account
+screens. Shared account and dispute presentation changes are selected by
+Restaurant role. Checkout idempotency, receiving audit writes, permission
+checks, and workspace switching continue through the existing APIs.
+
+Restaurant dispute creation now sends the existing API's camel-case
+contract and supports selecting actual order lines. Branch delivery-pin
+editing uses the existing scoped branch endpoint. Native invoice and recipe
+details read the existing tenant-scoped endpoints. Statement balances use the
+currency groups returned by the server. See the
+[workflow tracker](RESTAURANT_V4_WORKFLOW_TRACKER_2026-11-26.md) for
+device evidence, browser handoffs, and outstanding checks.
+
 ## 2026-11-26 — Restaurant V4
 
 The paired Android and iOS clients use the Restaurant

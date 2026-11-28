@@ -1,5 +1,10 @@
 # Restaurant branches and invitations
 
+The native Restaurant workspace picker switches among accounts available to the
+current user. Delivery location settings edit an existing delivery pin within
+the active Restaurant scope. Organization administration and branch-account
+creation are available through the existing web workspace.
+
 > Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
 
 ## Model

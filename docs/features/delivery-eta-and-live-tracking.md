@@ -1,5 +1,10 @@
 # Delivery ETA and live tracking
 
+Restaurant mobile can select the main delivery pin or an authorized branch
+from the existing delivery-locations query. Users with `SETTINGS_EDIT` can
+save coordinates and driver notes to the existing endpoint for that site.
+Drafts are separate per site while the form is open.
+
 ## Mobile map provider safety (2026-09-12)
 
 The Android and iOS active-delivery and order-tracking screens mount `react-native-maps` only when `EXPO_PUBLIC_MAP_PROVIDER` is `native` or `google`. The default `osm` configuration now renders a stable delivery summary with an **Open map** action that hands coordinates to the device maps app. This avoids native provider crashes while preserving delivery location access; ETA/API calculations are unchanged.

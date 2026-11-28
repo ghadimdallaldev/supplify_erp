@@ -2,6 +2,10 @@
 
 Restaurants configure a **diner-facing rewards program**. Only **signed-up members** (username + password per restaurant) earn and redeem points. Guests order without an account and see no points UI.
 
+The Android and iOS Restaurant settings display the saved guest rewards program
+and its configured rates. The screen shows the program-setup state when the
+workspace has no configured program.
+
 **Migrations:** `0160_loyalty_programs.sql`, `0162_search_b2c_loyalty.sql`, `0163_consumer_b2c_complete.sql`
 
 ## Auth model

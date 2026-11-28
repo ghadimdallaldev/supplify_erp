@@ -1,5 +1,11 @@
 # Contract Pricing Feature
 
+Restaurant **My prices** on Android and iOS shows available negotiated terms
+and supports searching by supplier, product or SKU and filtering by supplier.
+The detail view shows the contract unit price and comparable catalog price when
+the source data supports it. Checkout continues to resolve the applicable price
+on the server.
+
 ## Mobile sheet behavior (2026-09-12)
 
 Supplier create/edit contract-pricing sheets in both mobile apps are safe-area aware, vertically scrollable, and keyboard avoiding. Product search and selection remain usable while the keyboard is open, and save/cancel controls are reachable on small screens. API behavior and catalog permissions are unchanged.

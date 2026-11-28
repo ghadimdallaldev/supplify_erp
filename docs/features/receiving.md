@@ -4,6 +4,12 @@
 
 Plan feature key: `receiving_quality` (Silver+ for restaurants).
 
+On Restaurant mobile, the receiving queue separates ready and waiting orders.
+Each line shows expected and actual quantity and an explicit quality selector.
+Review lists shortages and quality issues before a single final submission to
+the existing receiving endpoint. The endpoint retains responsibility for
+inventory movements, discrepancy records, and receiving audit history.
+
 ## Flow
 
 1. Supplier assigns a driver and advances the exact assignment (`assigned` -> `picked_up` -> `out_for_delivery`). Physical departure is dispatch: `out_for_delivery` atomically promotes the parent `PROCESSING` order to `SHIPPED`. The driver confirms a photo-backed POD with `POST /api/orders/:id/complete-delivery`, which saves the proof and completes that assignment atomically; the order becomes **`DELIVERED`** (not `COMPLETED`) when its delivery legs are complete.

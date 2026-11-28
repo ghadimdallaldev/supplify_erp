@@ -4,6 +4,12 @@ Restaurants send **multi-supplier quote requests** (RFQ) for catalog products. S
 
 **Plan gate:** None — uses existing RBAC (`ORDERS_CREATE`, `CATALOG_VIEW`).
 
+On Restaurant mobile, requests start with the current cart lines. The supplier
+picker supports search and multiple selection. Supplier responses show the
+available quantities, quoted price, and delivery date when provided. Using a
+response opens a review sheet before adding the eligible quote-locked lines
+to the cart.
+
 ## Flow
 
 1. Restaurant selects products + quantities and picks one or more suppliers.

@@ -10,6 +10,10 @@ its registered destination or expand its message. Marking one or all records
 as read uses the workspace-scoped API. Cached records stay visible offline.
 The supplier feed has a section for unread order and low-stock updates.
 
+Restaurant **Notification settings** display the current channels and categories
+along with the device's push registration state. Push registration uses the
+native build's Firebase or Apple configuration.
+
 ## Mobile chat notification behavior (2026-09-12)
 
 - Authenticated mobile sessions keep one global Socket.IO notification listener active for the selected tenant. A `MESSAGE` notification invalidates both notifications and chat conversations.

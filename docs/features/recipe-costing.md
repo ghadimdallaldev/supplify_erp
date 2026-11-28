@@ -1,5 +1,10 @@
 # Recipe Costing V1 — Implementation Summary
 
+Restaurant mobile opens existing recipe details with ingredient quantities and
+stored yield and costing metrics. Cost and margin fields follow the existing
+`RECIPES_VIEW_COSTS` check. Recipe editing is available in the authenticated
+web workspace.
+
 > Pricing model note: plan names, prices, limits, and upgrade examples in this document may reflect the legacy tier catalog. Current commercial guidance lives in [../product/four-plan-pricing-model.md](../product/four-plan-pricing-model.md) and [../product/plans-and-limits.md](../product/plans-and-limits.md). Use those documents for current public names, limits, trial behavior, add-ons, AI allowances, and billing status.
 
 ## Audit findings (existing codebase)

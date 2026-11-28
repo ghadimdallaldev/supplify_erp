@@ -1,5 +1,14 @@
 # Finance, Billing & Credit - Implementation Summary
 
+## Restaurant invoices and statements on mobile
+
+Android and iOS filter the Restaurant invoice list by status and total the
+outstanding amounts in the loaded list by currency. Invoice details use the
+existing scoped API for amounts, lines and payment history. Supplier statements
+show the server's opening balance, charges, payments, adjustments and balance
+for each currency. From an invoice, the statement link uses the billed supplier
+ID. Documents and billing open the corresponding web screens.
+
 ## 🎯 Overview
 
 Complete finance, billing, and credit management system for suppliers with invoice management, payment tracking, and accounting features.

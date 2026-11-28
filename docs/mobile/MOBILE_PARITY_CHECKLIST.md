@@ -25,6 +25,17 @@
 - [ ] Android emulator captures (390x844, scrolled, Arabic RTL, 360x800, font scale 1.3) — pending: the build was stopped for low host memory.
 - [ ] Run on iOS hardware or simulator.
 
+## 2026-11-26 — Restaurant V4 workflow pass
+
+- [x] Mirror Restaurant workflow and role-scoped presentation updates in both native design worktrees.
+- [x] Verify Android receiving filters, quantity entry, quality selection, and discrepancy review with Development data.
+- [x] Verify Android cart quantities, estimated totals, and delivery-date selection with Development catalog data.
+- [x] Build an Android x86_64 Gradle APK and open the Restaurant workspace on the emulator.
+- [x] Pass ERP and both native typechecks, focused native and API tests, and the disposable PostgreSQL checkout suite.
+- [ ] Verify a live checkout receipt and final receiving submission against an isolated test order.
+- [ ] Run the new sources on an iOS device or simulator.
+- [ ] Review the remaining device and permission variants in the [workflow tracker](RESTAURANT_V4_WORKFLOW_TRACKER_2026-11-26.md).
+
 ## 2026-11-26 — Restaurant V4
 
 - [x] Mirror the Restaurant notification center across Android and iOS.

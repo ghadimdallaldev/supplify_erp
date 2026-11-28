@@ -8,6 +8,10 @@
 
 Guest-facing online ordering for restaurants: menu with modifiers, cart, fulfillment picker (delivery / takeaway / dine-in), COD checkout, and **universal live order tracking** via receipt link (no login required).
 
+The Restaurant native workspace can add or edit supported guest menu items and
+filter guest order tickets by fulfillment status. Advanced menu configuration
+continues through the existing web workflow.
+
 ## Guest reliability and iPad layout (2026-11-13)
 
 Development follow-up (2026-11-14): Chef picks use vertical cards so long dish
